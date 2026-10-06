@@ -36,7 +36,10 @@ export function invalidRpcStream(
 }
 
 /** Validate event shape and portable value budget before core touches stream state. */
-export function normalizeStreamPayload(value: unknown): IRpcStreamPayload {
+export function normalizeStreamPayload(
+  value: unknown,
+  portableValue: (value: unknown) => IRpcPortableValue = normalizePortable
+): IRpcStreamPayload {
   if (typeof value !== 'object' || value === null || Array.isArray(value))
     throw invalidRpcStream(RpcStreamViolation.field, '')
   let record: Record<string, unknown>
@@ -74,7 +77,7 @@ export function normalizeStreamPayload(value: unknown): IRpcStreamPayload {
   const result: Record<string, unknown> = { event, seq: record.seq }
   if (Object.hasOwn(record, 'value')) {
     try {
-      const portable = normalizePortable(record.value)
+      const portable = portableValue(record.value)
       if (measurePortableStreamValue(portable) > RpcStreamLimit.maxItemValueBytes)
         throw invalidRpcStream(RpcStreamViolation.budget, '/value')
       result.value = portable

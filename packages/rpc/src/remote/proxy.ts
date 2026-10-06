@@ -23,7 +23,12 @@ import type { IAbortSignal } from '@migaia/lifecycle'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
-import { normalizePortable } from '../contract/normalize.js'
+import {
+  normalizePortable,
+  normalizeRuntimePortable,
+  hasRpcPortableBinary
+} from '../contract/normalize.js'
+import { RpcCapability } from '../contract/wire-constants.js'
 import {
   isForwardedPayload,
   isForwardedOperation,
@@ -33,6 +38,7 @@ import type { IRpcPortableValue } from '../contract/types.js'
 import type { IRuntimePeer, IRuntimePeerSourceResult } from './runtime-api/peer.js'
 import { readRuntimePeerConnection } from './runtime-api/peer.js'
 import { RuntimeApiErrorText, RuntimeApiMode } from './runtime-api/constants.js'
+import { retainRuntimeTransferOptions } from './runtime-api/transfer.js'
 import { RpcCoreErrorText } from '../core/error-text.js'
 import { createProviderGenerationRetired } from '../core/internal/provider.js'
 import {
@@ -791,7 +797,10 @@ class RemoteRegistration<TUnit, TSpec> {
         key !== 'signal' &&
         key !== 'timeoutMs' &&
         !(allowKey && key === 'idempotencyKey') &&
-        !(this.#options.prepareRuntime && (key === 'orderKey' || key === 'cancel'))
+        !(
+          this.#options.prepareRuntime &&
+          (key === 'orderKey' || key === 'cancel' || key === 'transfer')
+        )
       )
         throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid, undefined, {
           path: `$.options.${key}`
@@ -820,7 +829,7 @@ class RemoteRegistration<TUnit, TSpec> {
       runtime && params !== undefined
         ? forwarded
           ? (params as IRpcPortableValue)
-          : normalizePortable(params)
+          : normalizeRuntimePortable(params)
         : undefined
     /** The original accepted route index supplies the declaration without a directory query. */
     const runtimeDeclaration = runtime ? this.#runtimeMethod(method, mode) : undefined
@@ -846,19 +855,35 @@ class RemoteRegistration<TUnit, TSpec> {
       if (key !== undefined) assertRpcIdempotencyKey(key)
       const timeoutMs = this.#timeout(options.timeoutMs)
       /** The final runtime owner alone settles opted-in cancellation and start deadlines. */
-      if (active.runtime && (options.orderKey !== undefined || options.cancel !== undefined)) {
+      if (
+        active.runtime &&
+        (options.orderKey !== undefined ||
+          options.cancel !== undefined ||
+          Object.hasOwn(options, 'transfer'))
+      ) {
         /** Preserve the selected mode, full options and original private forwarding provenance. */
-        const callOptions = retainForwardOptions(options, {
-          ...options,
-          ...(timeoutMs === undefined ? {} : { timeoutMs }),
-          ...(key === undefined ? {} : { idempotencyKey: key })
-        })
+        const callOptions = retainForwardOptions(
+          options,
+          retainRuntimeTransferOptions(options, {
+            ...options,
+            ...(timeoutMs === undefined ? {} : { timeoutMs }),
+            ...(key === undefined ? {} : { idempotencyKey: key })
+          })
+        )
         /** This is the actual downstream result, without the legacy retry timer or abort winner. */
-        const operation = (
-          mode === RuntimeApiMode.notify
-            ? active.runtime.notify(method, data, callOptions)
-            : active.runtime.request(method, data, callOptions)
-        ) as Promise<IRpcPortableValue>
+        /** The accepted runtime is captured before a tracking callback can observe replacement. */
+        const runtimePeer = active.runtime
+        const invoke = () =>
+          (mode === RuntimeApiMode.notify
+            ? runtimePeer.notify(method, data, callOptions)
+            : runtimePeer.request(method, data, callOptions)) as Promise<IRpcPortableValue>
+        /**
+         * The original native drain counts this runtime operation without changing Promise
+         * identity.
+         */
+        const operation = this.#options.binding.trackRequest
+          ? this.#options.binding.trackRequest(invoke)
+          : invoke()
         if (!forwarded) return operation
         /** The existing leave receipt wins only when this captured downstream generation retires. */
         let retired: Error | undefined
@@ -910,24 +935,47 @@ class RemoteRegistration<TUnit, TSpec> {
               this.#departed.get(input.expectedGeneration),
               { generation: input.expectedGeneration }
             )
-          return live.served.endpoint
-            .send<IRpcPortableValue>(
-              live.channel.peerId,
-              method,
-              data,
-              retainForwardOptions(options, {
-                ...(options.signal ? { signal: options.signal } : {}),
-                ...(input.remainingMs === undefined
-                  ? timeoutMs === undefined
-                    ? runtime && options.timeoutMs === false
-                      ? { timeoutMs: false as const }
-                      : {}
-                    : { timeoutMs }
-                  : { timeoutMs: input.remainingMs }),
-                ...(key === undefined ? {} : { idempotencyKey: key })
-              })
-            )
-            .catch(restoreTaggedProviderFailure)
+          const sendOptions = retainForwardOptions(options, {
+            ...(options.signal ? { signal: options.signal } : {}),
+            ...(input.remainingMs === undefined
+              ? timeoutMs === undefined
+                ? runtime && options.timeoutMs === false
+                  ? { timeoutMs: false as const }
+                  : {}
+                : { timeoutMs }
+              : { timeoutMs: input.remainingMs }),
+            ...(key === undefined ? {} : { idempotencyKey: key })
+          })
+          /** Native results can be returned without native input; this retains the same retry owner. */
+          const result =
+            live.runtime &&
+            (hasRpcPortableBinary(data) ||
+              live.channel.agreement.capabilities.includes(RpcCapability.portableBinary))
+              ? this.#options.binding.trackRequest
+                ? this.#options.binding.trackRequest(
+                    () =>
+                      (mode === RuntimeApiMode.notify
+                        ? live.runtime!.notify(method, data, sendOptions)
+                        : live.runtime!.request(
+                            method,
+                            data,
+                            sendOptions
+                          )) as Promise<IRpcPortableValue>
+                  )
+                : ((mode === RuntimeApiMode.notify
+                    ? live.runtime.notify(method, data, sendOptions)
+                    : live.runtime.request(
+                        method,
+                        data,
+                        sendOptions
+                      )) as Promise<IRpcPortableValue>)
+              : live.served.endpoint.send<IRpcPortableValue>(
+                  live.channel.peerId,
+                  method,
+                  data,
+                  sendOptions
+                )
+          return result.catch(restoreTaggedProviderFailure)
         }
       }
       /**
@@ -1043,7 +1091,7 @@ class RemoteRegistration<TUnit, TSpec> {
             ? undefined
             : forwarded
               ? (params as IRpcPortableValue)
-              : normalizePortable(params)
+              : normalizeRuntimePortable(params)
         this.#runtimeMethod(method, RuntimeApiMode.stream)
         this.#callOptions(options, true)
         this.#options.callGuard?.beforeDispatch({
@@ -1058,10 +1106,13 @@ class RemoteRegistration<TUnit, TSpec> {
         consumer = active.runtime!.stream(
           method,
           data,
-          retainForwardOptions(options, {
-            ...options,
-            ...(timeoutMs === undefined ? {} : { timeoutMs })
-          })
+          retainForwardOptions(
+            options,
+            retainRuntimeTransferOptions(options, {
+              ...options,
+              ...(timeoutMs === undefined ? {} : { timeoutMs })
+            })
+          )
         )
         if (forwarded)
           unsubscribe = this.events.onLeave(active.number, (reason) => {

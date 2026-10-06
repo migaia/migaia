@@ -17,6 +17,8 @@ import { observeRemoteGenerations } from '../internal/assemble-plugin.js'
 import type { IRuntimePreparationContext } from './launch-context.js'
 import { isForwardedPayload } from '../../core/internal/outbound-envelope.js'
 import { RuntimeApiMode } from './constants.js'
+import { RuntimePluginKey } from './constants.js'
+import { assertRuntimeTransferFamily } from './transfer.js'
 import { readRuntimeDefaultTimeout, prepareRuntimeCallTimeout } from './timeout.js'
 import { RpcRuntimeGenerationKind } from '../../contract/runtime-api/constants.js'
 import { compileRuntimeMethods } from './catalog.js'
@@ -51,7 +53,8 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   preparation?: IRuntimePreparationContext,
   beforeRelease?: () => Promise<void>,
   origin?: IRuntimeConnectionOrigin,
-  ownsExecution = false
+  ownsExecution = false,
+  family?: keyof typeof RuntimePluginKey
 ): Promise<IRuntimePeer> {
   /** The original registration receives a logical deadline before applying its launcher cap. */
   const callTimeout = prepareRuntimeCallTimeout(readRuntimeDefaultTimeout(options))
@@ -94,7 +97,8 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
           ...(bindEndpoint
             ? { wrapEndpoint: (endpoint: IRemoteServeEndpoint) => bindEndpoint(channel, endpoint) }
             : {})
-        }
+        },
+        family
       ),
     readRuntimeEndpoint: (peer) => {
       /** Native health/drain receives the actual endpoint, never a synthetic successful ping. */
@@ -139,19 +143,28 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   /** Calls preserve the original current-generation operation Promise and stream iterator. */
   const peer: IRuntimePeer = Object.freeze({
     self: context.self,
-    request: (method, payload, callOptions) =>
-      registration.invokeRequest(method, payload, callTimeout(callOptions)),
-    notify: (method, payload, callOptions) =>
-      isForwardedPayload(callOptions, payload)
+    request: (method, payload, callOptions) => {
+      assertRuntimeTransferFamily(family, callOptions)
+      return registration.invokeRequest(method, payload, callTimeout(callOptions))
+    },
+    notify: (method, payload, callOptions) => {
+      assertRuntimeTransferFamily(family, callOptions)
+      return isForwardedPayload(callOptions, payload)
         ? registration
             .invokeRequest(method, payload, callOptions, RuntimeApiMode.notify)
             .then(() => undefined)
-        : registration.currentPeer().notify(method, payload, callOptions),
-    stream: (method, payload, callOptions) =>
-      isForwardedPayload(callOptions, payload) || options.callDeadlineCapMs !== undefined
+        : registration.currentPeer().notify(method, payload, callOptions)
+    },
+    stream: (method, payload, callOptions) => {
+      assertRuntimeTransferFamily(family, callOptions)
+      return isForwardedPayload(callOptions, payload) || options.callDeadlineCapMs !== undefined
         ? registration.invokeStream(method, payload, callTimeout(callOptions))
-        : registration.currentPeer().stream(method, payload, callTimeout(callOptions)),
-    group: (steps, callOptions) => registration.invokeGroup(steps, callOptions),
+        : registration.currentPeer().stream(method, payload, callTimeout(callOptions))
+    },
+    group: (steps, callOptions) => {
+      assertRuntimeTransferFamily(family, callOptions)
+      return registration.invokeGroup(steps, callOptions)
+    },
     outcome: (key) => registration.currentPeer().outcome(key),
     describe: runtimeQuery(() => registration.inspectRuntime()),
     close

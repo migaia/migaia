@@ -1,8 +1,21 @@
 import { createOutboundEnvelope, readForwardRoute } from './outbound-envelope.js'
 import { hasFastEndpoint, hasFastComponents } from './fast-path.js'
-import { hasBatchAgreement, batchPayloadLimit, readTransportCapabilities } from './batch-frame.js'
+import {
+  hasBatchAgreement,
+  batchPayloadLimit,
+  readTransportCapabilities,
+  hasCloneTransferCarrier
+} from './batch-frame.js'
 import { readRuntimeCarrier } from '../../contract/runtime-api/carrier.js'
 import { normalizeRuntimeEnvelope } from '../../contract/runtime-api/normalize.js'
+import {
+  restoreRpcBinary,
+  readRpcNativeBinary,
+  measureRpcNativeBinaryFrame,
+  isRpcBinaryIntegrityFailure
+} from '../../contract/runtime-api/binary.js'
+import { RpcMiddlewareErrorText } from '../middleware/error-text.js'
+import { RpcBinaryProfile, RpcBinaryStorage } from '../../contract/runtime-api/binary-constants.js'
 import { runtimeOperationCapabilities } from '../../contract/runtime-api/capabilities.js'
 import {
   RpcRuntimeKind,
@@ -40,6 +53,7 @@ import {
   RpcAbortError,
   RpcContractError,
   RpcError,
+  RpcAuthenticationError,
   RpcCoreErrorCode,
   RpcLifecycleError,
   RpcRemoteError,
@@ -95,6 +109,8 @@ import { createNativeDefaultAllocator } from './native-default-id.js'
 import { NativeDefaultIdText } from './native-default-id-text.js'
 import {
   bindAuthenticationReplayContext,
+  bindAuthenticationBinaryValidation,
+  readAuthenticationBinaryDigest,
   markAuthenticationReplayEnvelope,
   consumedAuthenticationFrame,
   readAuthenticationChallengeProof,
@@ -131,7 +147,7 @@ type IOutboundPending = {
 
 /** Signals remain local; only the closed portable options enter an opted-in physical frame. */
 export type IRpcRuntimeSendOptions = Omit<IRpcRuntimeOptions, 'timeoutMs'> &
-  Pick<ISendOptions, 'timeoutMs' | 'signal'>
+  Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
 
 /** Receiver identity selected for one logical target before a frame is emitted. */
 export type IOutboundReceiver = {
@@ -362,7 +378,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       this.#fast,
       this.#batch,
       this.#physicalLimit,
-      this.receiverId
+      this.receiverId,
+      hasCloneTransferCarrier(kernel.transport)
     )
     this.inboundIdentity = new InboundIdentityCoordinator({
       native: this.#native,
@@ -486,6 +503,28 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
             this.kernel.closingSignal.addEventListener('abort', closeCandidate, { once: true })
           try {
             let frame = carrier ? carrier.frame : physical.data
+            /** Native wrapper admission belongs to the same physical receipt, before authentication. */
+            const nativeBinary = carrier
+              ? readRpcNativeBinary(frame, this.#physicalLimit)
+              : undefined
+            /**
+             * Only this private accepted validator can supply an already restored semantic
+             * envelope.
+             */
+            let restoredBinary: IRpcRuntimeEnvelope | undefined
+            if (nativeBinary) {
+              if (
+                !hasCloneTransferCarrier(this.kernel.transport) ||
+                !readAuthenticationBinaryDigest(this.#authentication) ||
+                !this.#runtimeCapabilities?.includes(RpcCapability.portableBinary) ||
+                !this.#runtimeCapabilities.includes(RpcCapability.nativeBinary)
+              )
+                throw new RpcError(
+                  RpcCoreErrorCode.capabilityUnsupported,
+                  RpcCoreErrorText.capabilityUnsupported
+                )
+              frame = nativeBinary.protectedMetadata
+            }
             if (carrier) {
               /**
                * Only original paired callables prove whole acceptance and the complete frame
@@ -500,10 +539,22 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                   RpcCoreErrorCode.capabilityUnsupported,
                   RpcCoreErrorText.capabilityUnsupported
                 )
-              assertRpcPhysicalFrameSize(
-                physical.data,
-                Math.min(RpcBatchPhysical.maxBytes, this.#physicalLimit, facts.maxMessageBytes)
+              /** Sidecar properties never participate in native serialization or physical bytes. */
+              const limit = Math.min(
+                RpcBatchPhysical.maxBytes,
+                this.#physicalLimit,
+                facts.maxMessageBytes
               )
+              if (nativeBinary) {
+                if (
+                  measureRpcNativeBinaryFrame(
+                    nativeBinary.protectedMetadata,
+                    nativeBinary.sidecars.length,
+                    nativeBinary.backingBytes
+                  ) > limit
+                )
+                  rejectRpcPhysicalFrameSize()
+              } else assertRpcPhysicalFrameSize(physical.data, limit)
             }
             if (this.#batch && (this.#authentication || typeof frame === 'string'))
               assertRpcPhysicalFrameSize(frame, this.#physicalLimit)
@@ -555,6 +606,36 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                       }
                     : undefined
                 )
+              if (nativeBinary) {
+                const digest = readAuthenticationBinaryDigest(this.#authentication)!
+                bindAuthenticationBinaryValidation(authenticationContext, async (encoded) => {
+                  try {
+                    /** Original codec/framer run exactly once, inside final native acceptance. */
+                    const accepted = this.#runtimeComponents.framer.accept(encoded, {
+                      source: physical.sourceToken,
+                      messageId: 'whole'
+                    })
+                    if (accepted.status !== 'complete')
+                      throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
+                    const manifest = this.#runtimeComponents.codec.decode(accepted.value)
+                    restoredBinary = await restoreRpcBinary(
+                      manifest,
+                      RpcBinaryStorage.native,
+                      nativeBinary.sidecars,
+                      this.#physicalLimit,
+                      digest
+                    )
+                    return restoredBinary
+                  } catch (cause) {
+                    if (isRpcBinaryIntegrityFailure(cause))
+                      throw new RpcAuthenticationError(
+                        RpcMiddlewareErrorText.inboundFrameAuthenticationFailed,
+                        cause
+                      )
+                    throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid, cause)
+                  }
+                })
+              }
               frame = await this.#authentication.unprotect(frame, authenticationContext)
               if (frame === consumedAuthenticationFrame) return
             }
@@ -563,7 +644,10 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
             if (this.#native && !this.#native.active) return
             /** Private component proof omits generic whole-frame fanout, never semantic admission. */
             let decoded: unknown
-            if (this.#fast && !carrier) decoded = this.#runtimeComponents.codec.decode(frame)
+            if (nativeBinary) {
+              if (!restoredBinary) throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
+              decoded = restoredBinary
+            } else if (this.#fast && !carrier) decoded = this.#runtimeComponents.codec.decode(frame)
             else {
               const preparedFrame = this.#runtimeComponents.ingressPrepare(frame, {
                 source: physical.sourceToken,
@@ -587,7 +671,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                 message,
                 generation,
                 authenticationContext,
-                receipt!
+                receipt!,
+                restoredBinary
               )
             /**
              * Unknown/no-capability carriers keep their original normalize path without batch
@@ -654,10 +739,37 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     message: IRpcInboundMessage,
     generation: number,
     authenticationContext: import('../typing.js').IRpcAuthenticationContext,
-    receipt: IProviderIngressReceipt
+    receipt: IProviderIngressReceipt,
+    restoredBinary?: IRpcRuntimeEnvelope
   ): Promise<void> {
     /** Closed metadata, task association and portable payloads are checked before identity leases. */
-    const envelope = normalizeRuntimeEnvelope(decoded)
+    /** The independent binary parser is selected only by its own protected profile. */
+    const binary =
+      decoded &&
+      typeof decoded === 'object' &&
+      Object.getOwnPropertyDescriptor(decoded, 'profile')?.value === RpcBinaryProfile
+    if (binary && !this.#runtimeCapabilities?.includes(RpcCapability.portableBinary))
+      throw new RpcError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        RpcCoreErrorText.capabilityUnsupported
+      )
+    /** Inline bytes stay entirely in the original protected physical frame. */
+    let envelope: IRpcRuntimeEnvelope
+    if (restoredBinary) envelope = restoredBinary
+    else if (binary) {
+      try {
+        envelope = normalizeRuntimeEnvelope(
+          await restoreRpcBinary(decoded, RpcBinaryStorage.inline, [], this.#physicalLimit)
+        )
+      } catch (cause) {
+        throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid, cause)
+      }
+    } else
+      envelope = normalizeRuntimeEnvelope(decoded, (value) =>
+        normalizePortable(value, 0, new Set<object>(), () => {
+          throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
+        })
+      )
     assertAuthenticationChallengeEnvelope(authenticationContext, envelope)
     markAuthenticationReplayEnvelope(authenticationContext, envelope)
     /** Every explicitly requested capability must be present in the actual completed intersection. */
@@ -785,7 +897,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   sendRuntimeFrame(
     envelope: IRpcRuntimeEnvelope,
     admission?: IRpcFrameAdmission,
-    onPrepared?: () => Promise<void>
+    onPrepared?: () => Promise<void>,
+    transferOptions?: Pick<ISendOptions, 'transfer'>
   ): Promise<void> {
     return this.#pipeline.sendRuntime(
       envelope,
@@ -798,7 +911,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           }
         : undefined,
       admission?.onStarted,
-      onPrepared
+      onPrepared,
+      transferOptions
     )
   }
 
@@ -874,6 +988,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
 
   /** Every new mode uses one option/capability policy; ordinary calls never enter this branch. */
   #runtimeOptions(mode: RpcRuntimeMode, options: IRpcRuntimeSendOptions): IRpcRuntimeOptions {
+    this.#pipeline.assertRuntimeTransfer(this.#runtimeCapabilities ?? [], options)
     if (!this.#runtimeGeneration)
       throw new RpcError(
         RpcCoreErrorCode.capabilityUnsupported,
@@ -887,7 +1002,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       options.timeoutMs === false ||
       (mode === RpcRuntimeMode.notify && options.cancel !== RpcRuntimeCancel)
         ? {}
-        : { timeoutMs: options.timeoutMs })
+        : /** Wire durations are integers; rounding down never extends the original logical budget. */
+          { timeoutMs: Math.floor(options.timeoutMs) })
     }
     const required = runtimeOperationCapabilities(mode, wireOptions, options.signal !== undefined)
     if (required.some((capability) => !this.#runtimeCapabilities?.includes(capability)))
@@ -919,6 +1035,18 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     this.kernel.assertActive()
     /** All new modes share the same original capability and option validation owner. */
     const wireOptions = this.#runtimeOptions(mode, options)
+    /** Existing signed route identifies a forwarded notify that needs the final provider receipt. */
+    if (
+      awaitNotifyTerminal &&
+      mode === RpcRuntimeMode.notify &&
+      wireOptions.cancel !== RpcRuntimeCancel &&
+      wireOptions.orderKey === undefined &&
+      readForwardRoute(options) === undefined
+    )
+      throw new RpcError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        RpcCoreErrorText.capabilityUnsupported
+      )
     const taskId = allocateRpcId(this.#uuid, 'task', this.id, targetId, (id) =>
       this.#replay.hasReservedId(id)
     )
@@ -979,6 +1107,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     return new Promise<unknown>((resolve, reject) => {
       /** Opt-in order needs true completion for forwarding leases; public notify still ends at send. */
       const terminalReceipt =
+        awaitNotifyTerminal ||
         mode !== RpcRuntimeMode.notify ||
         options.cancel === RpcRuntimeCancel ||
         options.orderKey !== undefined
@@ -1067,7 +1196,9 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
             },
             () => {
               sent = true
-            }
+            },
+            undefined,
+            options
           )
           .then(
             () => {

@@ -3,7 +3,7 @@ import { RpcCapability, RpcBatchPhysical } from '../../contract/wire-constants.j
 /** Exact final transport identities carry only their completed/static capability intersection. */
 const agreements = new WeakMap<
   object,
-  Readonly<{ limit?: number; capabilities: readonly string[] }>
+  Readonly<{ limit?: number; capabilities: readonly string[]; cloneTransfer?: true }>
 >()
 /** Only the canonical sender can bypass the gate's single-envelope physical limiter. */
 const writers = new WeakSet<object>()
@@ -21,12 +21,30 @@ export function registerBatchAgreement<T extends object>(
     transport,
     Object.freeze({
       capabilities: Object.freeze([...capabilities]),
+      ...(agreements.get(transport)?.cloneTransfer ? { cloneTransfer: true as const } : {}),
       ...(capabilities.includes(RpcCapability.batch)
         ? { limit: RpcBatchPhysical.maxBytes - framingBytes }
         : {})
     })
   )
   return transport
+}
+
+/**
+ * Only native clone-transfer adapter construction records this physical fact on its original
+ * receipt.
+ */
+export function registerCloneTransferCarrier<T extends object>(transport: T): T {
+  agreements.set(
+    transport,
+    Object.freeze({ ...(agreements.get(transport) ?? { capabilities: [] }), cloneTransfer: true })
+  )
+  return transport
+}
+
+/** A platform name or public transport property cannot manufacture a native ownership boundary. */
+export function hasCloneTransferCarrier(transport: object): boolean {
+  return agreements.get(transport)?.cloneTransfer === true
 }
 
 /** Canonical gate wrappers explicitly carry the physical channel's agreement. */

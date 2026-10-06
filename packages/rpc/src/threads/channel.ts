@@ -16,7 +16,7 @@ import type { IThreadChannelOptions, IThreadWebPort } from './types.js'
 /** Adapt EventTarget message shape without transferring Worker lifecycle ownership. */
 export function threadWebPort(port: IThreadWebPort): IBrowserMessagePortLike {
   return {
-    postMessage: (message) => port.postMessage(message, undefined),
+    postMessage: (message, transfer) => port.postMessage(message, transfer),
     addEventListener: (type, listener) => port.addEventListener(type, listener),
     removeEventListener: (type, listener) => port.removeEventListener(type, listener),
     start: () => undefined,

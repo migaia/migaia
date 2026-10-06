@@ -8,7 +8,7 @@ import {
 import { RpcContractErrorCode } from './error-code.js'
 import { normalizePortable } from './normalize.js'
 import type {
-  IRpcPortableValue,
+  IRpcWirePortableValue,
   IRpcSerializedError,
   IRpcSerializeErrorOptions,
   IRpcWireErrorOptions
@@ -37,7 +37,7 @@ type IWireNode = {
   stack: string
   cause?: IRpcSerializedError
   errors?: readonly IRpcSerializedError[]
-  data?: IRpcPortableValue
+  data?: IRpcWirePortableValue
   route?: readonly string[]
   truncated?: true
 }
@@ -105,7 +105,7 @@ export function serializeRpcError(
   /** Try a portable data projection and its separate byte budget. */
   function projectData(raw: unknown, pointer: string, node: IWireNode, depth: number): void {
     if (raw === undefined) return
-    let portable: IRpcPortableValue
+    let portable: IRpcWirePortableValue
     try {
       portable = normalizePortable(raw, 16 + depth + 1)
     } catch (error) {
@@ -382,14 +382,14 @@ export function sanitizeText(
 
 /** Sanitize portable data and count its wire text without counting field names. */
 function sanitizeData(
-  value: IRpcPortableValue
-): { value: IRpcPortableValue; bytes: number; replaced: boolean } | undefined {
+  value: IRpcWirePortableValue
+): { value: IRpcWirePortableValue; bytes: number; replaced: boolean } | undefined {
   if (typeof value === 'string') {
     const text = sanitizeText(value, false)
     return { value: text.value, bytes: text.bytes, replaced: text.changed }
   }
   if (Array.isArray(value)) {
-    const items: IRpcPortableValue[] = []
+    const items: IRpcWirePortableValue[] = []
     let bytes = 0
     let replaced = false
     for (const item of value) {
@@ -410,9 +410,9 @@ function sanitizeData(
     ) {
       return { value, bytes: utf8Bytes(value.base64url), replaced: false }
     }
-    const record: Record<string, IRpcPortableValue> = Object.create(null) as Record<
+    const record: Record<string, IRpcWirePortableValue> = Object.create(null) as Record<
       string,
-      IRpcPortableValue
+      IRpcWirePortableValue
     >
     let bytes = 0
     let replaced = false
@@ -530,10 +530,10 @@ export function normalizeRpcSerializedError(
   }
 
   /** Count only the language-neutral text units of a normalized portable value. */
-  function countData(data: IRpcPortableValue, pointer: string): void {
+  function countData(data: IRpcWirePortableValue, pointer: string): void {
     let size = 0
     /** Visit portable data without treating the bytes representation as a nested record. */
-    function visit(child: IRpcPortableValue, path: string): void {
+    function visit(child: IRpcWirePortableValue, path: string): void {
       if (typeof child === 'string') {
         size += countText(child, path, false)
       } else if (Array.isArray(child)) {
@@ -611,7 +611,7 @@ export function normalizeRpcSerializedError(
       stack: string
       cause?: IRpcSerializedError
       errors?: readonly IRpcSerializedError[]
-      data?: IRpcPortableValue
+      data?: IRpcWirePortableValue
       route?: readonly string[]
       truncated?: true
     } = {

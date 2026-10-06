@@ -4,6 +4,8 @@ import { RpcMiddlewareErrorText } from '../middleware/error-text.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import { RpcEnvelopeKind, RpcRouteType, type IRpcEnvelope } from '../../contract/index.js'
 import { RpcAuthenticationRejectionReason } from '../error-code.js'
+import type { IRpcBinaryDigest } from '../../contract/runtime-api/binary.js'
+import type { IRpcRuntimeEnvelope } from '../../contract/runtime-api/types.js'
 
 /** Signed control discriminants are private authentication facts, outside RPC business routes. */
 export const RpcAuthenticationControl = {
@@ -68,6 +70,11 @@ const contexts = new WeakMap<
     runtimeRoute?: import('../../contract/runtime-api/types.js').IRpcRuntimeRoute
     receiverId?: string
     fields?: IAuthenticationChallengeFields
+    /** First-party native validation runs after verify and before the same replay commit. */
+    binary?: {
+      validate(payload: unknown): Promise<IRpcRuntimeEnvelope>
+      result?: IRpcRuntimeEnvelope
+    }
   }
 >()
 /** Successful physical binding is carried to canonical semantic envelopes after decoding. */
@@ -80,6 +87,8 @@ const counterSetters = new WeakMap<
   {
     setter: (counter: bigint) => void
     challenge?: IAuthenticationChallengePort
+    /** Only the canonical once-read sign-only config can provide the native manifest digest port. */
+    binaryDigest?: IRpcBinaryDigest
   }
 >()
 /** Only locally created counter exhaustion may retain INVALID_CONFIG through sender wrapping. */
@@ -205,6 +214,48 @@ export function authenticationReplaySession(
 /** Reads only receiver-owned source-less proof, never public context shape. */
 export function authenticationFrameContext(context: IRpcAuthenticationContext) {
   return contexts.get(context)
+}
+
+/**
+ * Extend the existing physical context only after the first-party negotiated native branch
+ * qualifies.
+ */
+export function bindAuthenticationBinaryValidation(
+  context: IRpcAuthenticationContext,
+  validate: (payload: unknown) => Promise<IRpcRuntimeEnvelope>
+): void {
+  const binding = contexts.get(context)
+  if (!binding?.session)
+    throw new RpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
+  binding.binary = { validate }
+}
+
+/** Keep native eligibility with the original capability/counter owner rather than a second registry. */
+export function registerAuthenticationBinaryDigest(
+  capability: IRpcAuthenticationCapability,
+  digest: IRpcBinaryDigest
+): void {
+  counterSetters.get(capability)!.binaryDigest = digest
+}
+
+/** Opaque external capabilities have no native mapping authority, even with a matching label. */
+export function readAuthenticationBinaryDigest(
+  capability: IRpcAuthenticationCapability | undefined
+): IRpcBinaryDigest | undefined {
+  return capability ? counterSetters.get(capability)?.binaryDigest : undefined
+}
+
+/** Select actual stateless core hashing; this function grants no auth, replay or carrier authority. */
+export function createRpcBackingDigest(): IRpcBinaryDigest | undefined {
+  /** Core selects actual runtime cryptography; the portable codec accepts only its callback. */
+  const subtle = globalThis.crypto?.subtle
+  if (!subtle || typeof subtle.digest !== 'function') return undefined
+  /** Capture the builtin once with its required native receiver. */
+  const nativeDigest = subtle.digest
+  return async (backing) => {
+    const hash = (await Reflect.apply(nativeDigest, subtle, ['SHA-256', backing])) as ArrayBuffer
+    return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+  }
 }
 
 /** Captures one outbound semantic snapshot without mutating the stable transform context. */

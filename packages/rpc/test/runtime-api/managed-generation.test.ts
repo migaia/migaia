@@ -1,3 +1,4 @@
+import { readRuntimeCarrier } from '../../src/contract/runtime-api/carrier.js'
 import { readRuntimeOutletConnection } from '../../src/remote/runtime-api/outlet.js'
 import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
 import { runtimeTestHost } from './fixture.js'
@@ -330,10 +331,22 @@ for (const idempotent of [false, true]) {
           'retry',
           '[A36] one original logical dispatch replays on the actual ready replacement'
         )
-        const sends = frames.filter((frame) => frame.method === method).slice(1)
+        const sends = frames
+          .filter((frame) => {
+            const carrier = readRuntimeCarrier(frame)
+            return carrier
+              ? (carrier.frame as { task?: { method?: string } }).task?.method === method
+              : frame.method === method
+          })
+          .slice(1)
         assert.equal(sends.length, 2)
         assert.deepEqual(
-          sends.map((frame) => frame.data.route.idempotencyKey),
+          sends.map((frame) => {
+            const carrier = readRuntimeCarrier(frame)
+            return carrier
+              ? (carrier.frame as { options: { idempotencyKey: string } }).options.idempotencyKey
+              : frame.data.route.idempotencyKey
+          }),
           ['native-original-key-2', 'native-original-key-2']
         )
       } else {
@@ -342,7 +355,15 @@ for (const idempotent of [false, true]) {
           'REMOTE_RESULT_UNKNOWN',
           '[A35] sent non-idempotent work is never silently retargeted'
         )
-        assert.equal(frames.filter((frame) => frame.method === method).length, 1)
+        assert.equal(
+          frames.filter((frame) => {
+            const carrier = readRuntimeCarrier(frame)
+            return carrier
+              ? (carrier.frame as { task?: { method?: string } }).task?.method === method
+              : frame.method === method
+          }).length,
+          1
+        )
       }
     } finally {
       await peer?.close()

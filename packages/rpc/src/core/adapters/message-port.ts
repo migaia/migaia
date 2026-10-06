@@ -1,4 +1,5 @@
 import { RpcAdapterErrorText } from './error-text.js'
+import { registerCloneTransferCarrier } from '../internal/batch-frame.js'
 import {
   createEventChannel,
   EventAdmissionPolicy,
@@ -154,7 +155,7 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
     )
     errorListeners.report(error, secondaryFailures)
   }
-  return {
+  return registerCloneTransferCarrier({
     platform: RpcPlatform.messagePort,
     topology: 'exclusive',
     ownership,
@@ -238,7 +239,7 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
         return deleted
       }
     }
-  }
+  })
 }
 
 /**
@@ -386,5 +387,5 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
     }
   }
   bindNativeReplayTransport(port, transport)
-  return transport
+  return registerCloneTransferCarrier(transport)
 }

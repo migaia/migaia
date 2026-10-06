@@ -12,6 +12,8 @@ export const RuntimeReportKind = {
 
 /** Automatic provide descriptor errors are stable, non-reflecting configuration diagnostics. */
 export const RuntimeApiErrorText = {
+  /** Every own process transfer field is invalid, including empty or undefined values. */
+  processTransferInvalid: 'Runtime process calls do not accept transfer',
   /** Factory admission rejects this value before bootstrap or physical resource acquisition. */
   defaultTimeoutInvalid: 'Runtime defaultTimeoutMs must be a positive finite number',
   /** A foreign origin without a negotiated node cannot safely begin a native forwarding route. */
@@ -177,7 +179,9 @@ export const RUNTIME_API_CAPABILITIES = Object.freeze([
   RpcCapability.group,
   RpcCapability.cancelBeforeStart,
   RpcCapability.outcome,
-  RpcCapability.deadline
+  RpcCapability.deadline,
+  /** The canonical assembly now restores actual ArrayBuffer/Uint8Array business values. */
+  RpcCapability.portableBinary
 ])
 
 /** Recent lifecycle summaries have the design's fixed 100-record capacity per original owner. */

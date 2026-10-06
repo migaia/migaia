@@ -137,7 +137,8 @@ export function createNodeThreadLauncher(
       let terminating = false
       /** Launcher provenance belongs to this exact borrowed surface, independent of public shape. */
       const native: INodeMessagePortLike = {
-        postMessage: (message) => worker.postMessage(message, undefined),
+        postMessage: (message, transfer) =>
+          worker.postMessage(message, transfer as Parameters<typeof worker.postMessage>[1]),
         on: (event, listener) => worker.on(event === 'close' ? ThreadEvent.exit : event, listener),
         off: (event, listener) => worker.off(event === 'close' ? ThreadEvent.exit : event, listener)
       }

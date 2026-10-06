@@ -4,1259 +4,13 @@
   "title": "RPC opt-in runtime atomic-support profile",
   "oneOf": [
     {
-      "type": "object",
-      "required": [
-        "profile",
-        "kind",
-        "id",
-        "route",
-        "task",
-        "options"
-      ],
-      "properties": {
-        "profile": {
-          "const": "migaia.rpc.runtime-api/1"
-        },
-        "kind": {
-          "const": "runtime-call"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "route": {
-          "$ref": "#/$defs/route"
-        },
-        "task": {
-          "type": "object",
-          "required": [
-            "mode",
-            "callerId",
-            "callerGeneration",
-            "targetGeneration",
-            "method"
-          ],
-          "properties": {
-            "mode": {
-              "const": "request"
-            },
-            "callerId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "callerGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "targetGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "method": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            }
-          },
-          "additionalProperties": false
-        },
-        "options": {
-          "type": "object",
-          "required": [],
-          "properties": {
-            "orderKey": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "cancel": {
-              "const": "before-start"
-            },
-            "timeoutMs": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 2147483647
-            },
-            "idempotencyKey": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9._:~-]{1,128}$"
-            }
-          },
-          "additionalProperties": false
-        },
-        "payload": {
-          "$ref": "#/$defs/portable"
-        }
-      },
-      "additionalProperties": false
+      "$ref": "#/$defs/runtimeEnvelope"
     },
     {
-      "type": "object",
-      "required": [
-        "profile",
-        "kind",
-        "id",
-        "route",
-        "task",
-        "options"
-      ],
-      "properties": {
-        "profile": {
-          "const": "migaia.rpc.runtime-api/1"
-        },
-        "kind": {
-          "const": "runtime-call"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "route": {
-          "$ref": "#/$defs/route"
-        },
-        "task": {
-          "type": "object",
-          "required": [
-            "mode",
-            "callerId",
-            "callerGeneration",
-            "targetGeneration",
-            "method"
-          ],
-          "properties": {
-            "mode": {
-              "const": "notify"
-            },
-            "callerId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "callerGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "targetGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "method": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            }
-          },
-          "additionalProperties": false
-        },
-        "options": {
-          "type": "object",
-          "required": [],
-          "properties": {
-            "orderKey": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "cancel": {
-              "const": "before-start"
-            },
-            "timeoutMs": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 2147483647
-            },
-            "idempotencyKey": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9._:~-]{1,128}$"
-            }
-          },
-          "additionalProperties": false,
-          "if": {
-            "required": [
-              "idempotencyKey"
-            ]
-          },
-          "then": {
-            "required": [
-              "cancel"
-            ]
-          }
-        },
-        "payload": {
-          "$ref": "#/$defs/portable"
-        }
-      },
-      "additionalProperties": false
+      "$ref": "#/$defs/inlineBinaryManifest"
     },
     {
-      "type": "object",
-      "required": [
-        "profile",
-        "kind",
-        "id",
-        "route",
-        "task",
-        "options"
-      ],
-      "properties": {
-        "profile": {
-          "const": "migaia.rpc.runtime-api/1"
-        },
-        "kind": {
-          "const": "runtime-call"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "route": {
-          "$ref": "#/$defs/route"
-        },
-        "task": {
-          "type": "object",
-          "required": [
-            "mode",
-            "callerId",
-            "callerGeneration",
-            "targetGeneration",
-            "method"
-          ],
-          "properties": {
-            "mode": {
-              "const": "stream"
-            },
-            "callerId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "callerGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "targetGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "method": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            }
-          },
-          "additionalProperties": false
-        },
-        "options": {
-          "type": "object",
-          "required": [],
-          "properties": {
-            "orderKey": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "cancel": {
-              "const": "before-start"
-            },
-            "timeoutMs": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 2147483647
-            },
-            "idempotencyKey": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9._:~-]{1,128}$"
-            }
-          },
-          "additionalProperties": false,
-          "if": {
-            "required": [
-              "idempotencyKey"
-            ]
-          },
-          "then": {
-            "required": [
-              "cancel"
-            ]
-          }
-        },
-        "payload": {
-          "$ref": "#/$defs/portable"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "profile",
-        "kind",
-        "id",
-        "route",
-        "task",
-        "options",
-        "steps"
-      ],
-      "properties": {
-        "profile": {
-          "const": "migaia.rpc.runtime-api/1"
-        },
-        "kind": {
-          "const": "runtime-group"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "route": {
-          "$ref": "#/$defs/route"
-        },
-        "task": {
-          "type": "object",
-          "required": [
-            "mode",
-            "callerId",
-            "callerGeneration",
-            "targetGeneration"
-          ],
-          "properties": {
-            "mode": {
-              "const": "group"
-            },
-            "callerId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "callerGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "targetGeneration": {
-              "$ref": "#/$defs/generation"
-            }
-          },
-          "additionalProperties": false
-        },
-        "options": {
-          "type": "object",
-          "required": [],
-          "properties": {
-            "orderKey": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "cancel": {
-              "const": "before-start"
-            },
-            "timeoutMs": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 2147483647
-            },
-            "idempotencyKey": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9._:~-]{1,128}$"
-            }
-          },
-          "additionalProperties": false
-        },
-        "steps": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": [
-              "method"
-            ],
-            "properties": {
-              "method": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 128
-              },
-              "payload": {
-                "$ref": "#/$defs/portable"
-              }
-            },
-            "additionalProperties": false
-          },
-          "minItems": 1
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "profile",
-        "kind",
-        "id",
-        "route",
-        "task",
-        "operation"
-      ],
-      "properties": {
-        "profile": {
-          "const": "migaia.rpc.runtime-api/1"
-        },
-        "kind": {
-          "const": "runtime-control"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "route": {
-          "$ref": "#/$defs/route"
-        },
-        "task": {
-          "type": "object",
-          "required": [
-            "mode",
-            "callerId",
-            "callerGeneration",
-            "targetGeneration",
-            "method"
-          ],
-          "properties": {
-            "mode": {
-              "const": "request"
-            },
-            "callerId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "callerGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "targetGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "method": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            }
-          },
-          "additionalProperties": false
-        },
-        "operation": {
-          "const": "cancel"
-        },
-        "reason": {
-          "$ref": "wire-error.schema.json"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "profile",
-        "kind",
-        "id",
-        "route",
-        "task",
-        "operation"
-      ],
-      "properties": {
-        "profile": {
-          "const": "migaia.rpc.runtime-api/1"
-        },
-        "kind": {
-          "const": "runtime-control"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "route": {
-          "$ref": "#/$defs/route"
-        },
-        "task": {
-          "type": "object",
-          "required": [
-            "mode",
-            "callerId",
-            "callerGeneration",
-            "targetGeneration",
-            "method"
-          ],
-          "properties": {
-            "mode": {
-              "const": "notify"
-            },
-            "callerId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "callerGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "targetGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "method": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            }
-          },
-          "additionalProperties": false
-        },
-        "operation": {
-          "const": "cancel"
-        },
-        "reason": {
-          "$ref": "wire-error.schema.json"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "profile",
-        "kind",
-        "id",
-        "route",
-        "task",
-        "operation"
-      ],
-      "properties": {
-        "profile": {
-          "const": "migaia.rpc.runtime-api/1"
-        },
-        "kind": {
-          "const": "runtime-control"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "route": {
-          "$ref": "#/$defs/route"
-        },
-        "task": {
-          "type": "object",
-          "required": [
-            "mode",
-            "callerId",
-            "callerGeneration",
-            "targetGeneration",
-            "method"
-          ],
-          "properties": {
-            "mode": {
-              "const": "stream"
-            },
-            "callerId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "callerGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "targetGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "method": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            }
-          },
-          "additionalProperties": false
-        },
-        "operation": {
-          "const": "cancel"
-        },
-        "reason": {
-          "$ref": "wire-error.schema.json"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "profile",
-        "kind",
-        "id",
-        "route",
-        "task",
-        "operation"
-      ],
-      "properties": {
-        "profile": {
-          "const": "migaia.rpc.runtime-api/1"
-        },
-        "kind": {
-          "const": "runtime-control"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "route": {
-          "$ref": "#/$defs/route"
-        },
-        "task": {
-          "type": "object",
-          "required": [
-            "mode",
-            "callerId",
-            "callerGeneration",
-            "targetGeneration"
-          ],
-          "properties": {
-            "mode": {
-              "const": "group"
-            },
-            "callerId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "callerGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "targetGeneration": {
-              "$ref": "#/$defs/generation"
-            }
-          },
-          "additionalProperties": false
-        },
-        "operation": {
-          "const": "cancel"
-        },
-        "reason": {
-          "$ref": "wire-error.schema.json"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "profile",
-        "kind",
-        "id",
-        "route",
-        "task",
-        "operation",
-        "completion"
-      ],
-      "properties": {
-        "profile": {
-          "const": "migaia.rpc.runtime-api/1"
-        },
-        "kind": {
-          "const": "runtime-control"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "route": {
-          "$ref": "#/$defs/route"
-        },
-        "task": {
-          "type": "object",
-          "required": [
-            "mode",
-            "callerId",
-            "callerGeneration",
-            "targetGeneration",
-            "method"
-          ],
-          "properties": {
-            "mode": {
-              "const": "request"
-            },
-            "callerId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "callerGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "targetGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "method": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            }
-          },
-          "additionalProperties": false
-        },
-        "operation": {
-          "const": "terminal"
-        },
-        "completion": {
-          "$ref": "#/$defs/completion"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "profile",
-        "kind",
-        "id",
-        "route",
-        "task",
-        "operation",
-        "completion"
-      ],
-      "properties": {
-        "profile": {
-          "const": "migaia.rpc.runtime-api/1"
-        },
-        "kind": {
-          "const": "runtime-control"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "route": {
-          "$ref": "#/$defs/route"
-        },
-        "task": {
-          "type": "object",
-          "required": [
-            "mode",
-            "callerId",
-            "callerGeneration",
-            "targetGeneration",
-            "method"
-          ],
-          "properties": {
-            "mode": {
-              "const": "notify"
-            },
-            "callerId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "callerGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "targetGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "method": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            }
-          },
-          "additionalProperties": false
-        },
-        "operation": {
-          "const": "terminal"
-        },
-        "completion": {
-          "$ref": "#/$defs/completion"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "profile",
-        "kind",
-        "id",
-        "route",
-        "task",
-        "operation",
-        "completion"
-      ],
-      "properties": {
-        "profile": {
-          "const": "migaia.rpc.runtime-api/1"
-        },
-        "kind": {
-          "const": "runtime-control"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "route": {
-          "$ref": "#/$defs/route"
-        },
-        "task": {
-          "type": "object",
-          "required": [
-            "mode",
-            "callerId",
-            "callerGeneration",
-            "targetGeneration"
-          ],
-          "properties": {
-            "mode": {
-              "const": "group"
-            },
-            "callerId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "callerGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "targetGeneration": {
-              "$ref": "#/$defs/generation"
-            }
-          },
-          "additionalProperties": false
-        },
-        "operation": {
-          "const": "terminal"
-        },
-        "completion": {
-          "$ref": "#/$defs/groupCompletion"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "profile",
-        "kind",
-        "id",
-        "route",
-        "task",
-        "operation",
-        "stream"
-      ],
-      "properties": {
-        "profile": {
-          "const": "migaia.rpc.runtime-api/1"
-        },
-        "kind": {
-          "const": "runtime-control"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "route": {
-          "$ref": "#/$defs/route"
-        },
-        "task": {
-          "type": "object",
-          "required": [
-            "mode",
-            "callerId",
-            "callerGeneration",
-            "targetGeneration",
-            "method"
-          ],
-          "properties": {
-            "mode": {
-              "const": "stream"
-            },
-            "callerId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "callerGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "targetGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "method": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            }
-          },
-          "additionalProperties": false
-        },
-        "operation": {
-          "const": "stream"
-        },
-        "stream": {
-          "$ref": "#/$defs/stream"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "profile",
-        "kind",
-        "id",
-        "route",
-        "task",
-        "operation",
-        "idempotencyKey"
-      ],
-      "properties": {
-        "profile": {
-          "const": "migaia.rpc.runtime-api/1"
-        },
-        "kind": {
-          "const": "runtime-outcome"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "route": {
-          "$ref": "#/$defs/route"
-        },
-        "task": {
-          "type": "object",
-          "required": [
-            "mode",
-            "callerId",
-            "callerGeneration",
-            "targetGeneration"
-          ],
-          "properties": {
-            "mode": {
-              "const": "outcome"
-            },
-            "callerId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "callerGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "targetGeneration": {
-              "$ref": "#/$defs/generation"
-            }
-          },
-          "additionalProperties": false
-        },
-        "operation": {
-          "const": "lookup"
-        },
-        "idempotencyKey": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9._:~-]{1,128}$"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "profile",
-        "kind",
-        "id",
-        "route",
-        "task",
-        "operation",
-        "state",
-        "store"
-      ],
-      "properties": {
-        "profile": {
-          "const": "migaia.rpc.runtime-api/1"
-        },
-        "kind": {
-          "const": "runtime-outcome"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "route": {
-          "$ref": "#/$defs/route"
-        },
-        "task": {
-          "type": "object",
-          "required": [
-            "mode",
-            "callerId",
-            "callerGeneration",
-            "targetGeneration"
-          ],
-          "properties": {
-            "mode": {
-              "const": "outcome"
-            },
-            "callerId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "callerGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "targetGeneration": {
-              "$ref": "#/$defs/generation"
-            }
-          },
-          "additionalProperties": false
-        },
-        "operation": {
-          "const": "result"
-        },
-        "state": {
-          "enum": [
-            "pending",
-            "unknown"
-          ]
-        },
-        "store": {
-          "$ref": "#/$defs/store"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "profile",
-        "kind",
-        "id",
-        "route",
-        "task",
-        "operation",
-        "state",
-        "store",
-        "outcome"
-      ],
-      "properties": {
-        "profile": {
-          "const": "migaia.rpc.runtime-api/1"
-        },
-        "kind": {
-          "const": "runtime-outcome"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "route": {
-          "$ref": "#/$defs/route"
-        },
-        "task": {
-          "type": "object",
-          "required": [
-            "mode",
-            "callerId",
-            "callerGeneration",
-            "targetGeneration"
-          ],
-          "properties": {
-            "mode": {
-              "const": "outcome"
-            },
-            "callerId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "callerGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "targetGeneration": {
-              "$ref": "#/$defs/generation"
-            }
-          },
-          "additionalProperties": false
-        },
-        "operation": {
-          "const": "result"
-        },
-        "state": {
-          "const": "done"
-        },
-        "store": {
-          "$ref": "#/$defs/store"
-        },
-        "outcome": {
-          "oneOf": [
-            {
-              "type": "object",
-              "required": [
-                "mode",
-                "targetGeneration",
-                "completion"
-              ],
-              "properties": {
-                "mode": {
-                  "const": "request"
-                },
-                "targetGeneration": {
-                  "$ref": "#/$defs/generation"
-                },
-                "completion": {
-                  "$ref": "#/$defs/completion"
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "required": [
-                "mode",
-                "targetGeneration",
-                "completion"
-              ],
-              "properties": {
-                "mode": {
-                  "const": "notify"
-                },
-                "targetGeneration": {
-                  "$ref": "#/$defs/generation"
-                },
-                "completion": {
-                  "$ref": "#/$defs/completion"
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "required": [
-                "mode",
-                "targetGeneration",
-                "completion"
-              ],
-              "properties": {
-                "mode": {
-                  "const": "stream"
-                },
-                "targetGeneration": {
-                  "$ref": "#/$defs/generation"
-                },
-                "completion": {
-                  "$ref": "#/$defs/completion"
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "required": [
-                "mode",
-                "targetGeneration",
-                "completion"
-              ],
-              "properties": {
-                "mode": {
-                  "const": "group"
-                },
-                "targetGeneration": {
-                  "$ref": "#/$defs/generation"
-                },
-                "completion": {
-                  "$ref": "#/$defs/groupCompletion"
-                }
-              },
-              "additionalProperties": false
-            }
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "profile",
-        "kind",
-        "id",
-        "route",
-        "task",
-        "operation",
-        "completion"
-      ],
-      "properties": {
-        "profile": {
-          "const": "migaia.rpc.runtime-api/1"
-        },
-        "kind": {
-          "const": "runtime-control"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "route": {
-          "$ref": "#/$defs/route"
-        },
-        "task": {
-          "type": "object",
-          "required": [
-            "mode",
-            "callerId",
-            "callerGeneration",
-            "targetGeneration"
-          ],
-          "properties": {
-            "mode": {
-              "const": "outcome"
-            },
-            "callerId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "callerGeneration": {
-              "$ref": "#/$defs/generation"
-            },
-            "targetGeneration": {
-              "$ref": "#/$defs/generation"
-            }
-          },
-          "additionalProperties": false
-        },
-        "operation": {
-          "const": "terminal"
-        },
-        "completion": {
-          "type": "object",
-          "required": [
-            "ok",
-            "error"
-          ],
-          "properties": {
-            "ok": {
-              "const": false
-            },
-            "error": {
-              "$ref": "wire-error.schema.json"
-            }
-          },
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
+      "$ref": "#/$defs/nativeBinaryManifest"
     }
   ],
   "$defs": {
@@ -1700,6 +454,1856 @@
           "additionalProperties": false
         }
       ]
+    },
+    "runtimeEnvelope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "profile",
+            "kind",
+            "id",
+            "route",
+            "task",
+            "options"
+          ],
+          "properties": {
+            "profile": {
+              "const": "migaia.rpc.runtime-api/1"
+            },
+            "kind": {
+              "const": "runtime-call"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "task": {
+              "type": "object",
+              "required": [
+                "mode",
+                "callerId",
+                "callerGeneration",
+                "targetGeneration",
+                "method"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "request"
+                },
+                "callerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "callerGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "targetGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "method": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "additionalProperties": false
+            },
+            "options": {
+              "type": "object",
+              "required": [],
+              "properties": {
+                "orderKey": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "cancel": {
+                  "const": "before-start"
+                },
+                "timeoutMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2147483647
+                },
+                "idempotencyKey": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._:~-]{1,128}$"
+                }
+              },
+              "additionalProperties": false
+            },
+            "payload": {
+              "$ref": "#/$defs/portable"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "profile",
+            "kind",
+            "id",
+            "route",
+            "task",
+            "options"
+          ],
+          "properties": {
+            "profile": {
+              "const": "migaia.rpc.runtime-api/1"
+            },
+            "kind": {
+              "const": "runtime-call"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "task": {
+              "type": "object",
+              "required": [
+                "mode",
+                "callerId",
+                "callerGeneration",
+                "targetGeneration",
+                "method"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "notify"
+                },
+                "callerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "callerGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "targetGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "method": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "additionalProperties": false
+            },
+            "options": {
+              "type": "object",
+              "required": [],
+              "properties": {
+                "orderKey": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "cancel": {
+                  "const": "before-start"
+                },
+                "timeoutMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2147483647
+                },
+                "idempotencyKey": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._:~-]{1,128}$"
+                }
+              },
+              "additionalProperties": false,
+              "if": {
+                "required": [
+                  "idempotencyKey"
+                ]
+              },
+              "then": {
+                "required": [
+                  "cancel"
+                ]
+              }
+            },
+            "payload": {
+              "$ref": "#/$defs/portable"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "profile",
+            "kind",
+            "id",
+            "route",
+            "task",
+            "options"
+          ],
+          "properties": {
+            "profile": {
+              "const": "migaia.rpc.runtime-api/1"
+            },
+            "kind": {
+              "const": "runtime-call"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "task": {
+              "type": "object",
+              "required": [
+                "mode",
+                "callerId",
+                "callerGeneration",
+                "targetGeneration",
+                "method"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "stream"
+                },
+                "callerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "callerGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "targetGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "method": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "additionalProperties": false
+            },
+            "options": {
+              "type": "object",
+              "required": [],
+              "properties": {
+                "orderKey": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "cancel": {
+                  "const": "before-start"
+                },
+                "timeoutMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2147483647
+                },
+                "idempotencyKey": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._:~-]{1,128}$"
+                }
+              },
+              "additionalProperties": false,
+              "if": {
+                "required": [
+                  "idempotencyKey"
+                ]
+              },
+              "then": {
+                "required": [
+                  "cancel"
+                ]
+              }
+            },
+            "payload": {
+              "$ref": "#/$defs/portable"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "profile",
+            "kind",
+            "id",
+            "route",
+            "task",
+            "options",
+            "steps"
+          ],
+          "properties": {
+            "profile": {
+              "const": "migaia.rpc.runtime-api/1"
+            },
+            "kind": {
+              "const": "runtime-group"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "task": {
+              "type": "object",
+              "required": [
+                "mode",
+                "callerId",
+                "callerGeneration",
+                "targetGeneration"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "group"
+                },
+                "callerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "callerGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "targetGeneration": {
+                  "$ref": "#/$defs/generation"
+                }
+              },
+              "additionalProperties": false
+            },
+            "options": {
+              "type": "object",
+              "required": [],
+              "properties": {
+                "orderKey": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "cancel": {
+                  "const": "before-start"
+                },
+                "timeoutMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2147483647
+                },
+                "idempotencyKey": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._:~-]{1,128}$"
+                }
+              },
+              "additionalProperties": false
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "method"
+                ],
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "payload": {
+                    "$ref": "#/$defs/portable"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "minItems": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "profile",
+            "kind",
+            "id",
+            "route",
+            "task",
+            "operation"
+          ],
+          "properties": {
+            "profile": {
+              "const": "migaia.rpc.runtime-api/1"
+            },
+            "kind": {
+              "const": "runtime-control"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "task": {
+              "type": "object",
+              "required": [
+                "mode",
+                "callerId",
+                "callerGeneration",
+                "targetGeneration",
+                "method"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "request"
+                },
+                "callerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "callerGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "targetGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "method": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "additionalProperties": false
+            },
+            "operation": {
+              "const": "cancel"
+            },
+            "reason": {
+              "$ref": "wire-error.schema.json"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "profile",
+            "kind",
+            "id",
+            "route",
+            "task",
+            "operation"
+          ],
+          "properties": {
+            "profile": {
+              "const": "migaia.rpc.runtime-api/1"
+            },
+            "kind": {
+              "const": "runtime-control"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "task": {
+              "type": "object",
+              "required": [
+                "mode",
+                "callerId",
+                "callerGeneration",
+                "targetGeneration",
+                "method"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "notify"
+                },
+                "callerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "callerGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "targetGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "method": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "additionalProperties": false
+            },
+            "operation": {
+              "const": "cancel"
+            },
+            "reason": {
+              "$ref": "wire-error.schema.json"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "profile",
+            "kind",
+            "id",
+            "route",
+            "task",
+            "operation"
+          ],
+          "properties": {
+            "profile": {
+              "const": "migaia.rpc.runtime-api/1"
+            },
+            "kind": {
+              "const": "runtime-control"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "task": {
+              "type": "object",
+              "required": [
+                "mode",
+                "callerId",
+                "callerGeneration",
+                "targetGeneration",
+                "method"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "stream"
+                },
+                "callerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "callerGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "targetGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "method": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "additionalProperties": false
+            },
+            "operation": {
+              "const": "cancel"
+            },
+            "reason": {
+              "$ref": "wire-error.schema.json"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "profile",
+            "kind",
+            "id",
+            "route",
+            "task",
+            "operation"
+          ],
+          "properties": {
+            "profile": {
+              "const": "migaia.rpc.runtime-api/1"
+            },
+            "kind": {
+              "const": "runtime-control"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "task": {
+              "type": "object",
+              "required": [
+                "mode",
+                "callerId",
+                "callerGeneration",
+                "targetGeneration"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "group"
+                },
+                "callerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "callerGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "targetGeneration": {
+                  "$ref": "#/$defs/generation"
+                }
+              },
+              "additionalProperties": false
+            },
+            "operation": {
+              "const": "cancel"
+            },
+            "reason": {
+              "$ref": "wire-error.schema.json"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "profile",
+            "kind",
+            "id",
+            "route",
+            "task",
+            "operation",
+            "completion"
+          ],
+          "properties": {
+            "profile": {
+              "const": "migaia.rpc.runtime-api/1"
+            },
+            "kind": {
+              "const": "runtime-control"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "task": {
+              "type": "object",
+              "required": [
+                "mode",
+                "callerId",
+                "callerGeneration",
+                "targetGeneration",
+                "method"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "request"
+                },
+                "callerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "callerGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "targetGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "method": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "additionalProperties": false
+            },
+            "operation": {
+              "const": "terminal"
+            },
+            "completion": {
+              "$ref": "#/$defs/completion"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "profile",
+            "kind",
+            "id",
+            "route",
+            "task",
+            "operation",
+            "completion"
+          ],
+          "properties": {
+            "profile": {
+              "const": "migaia.rpc.runtime-api/1"
+            },
+            "kind": {
+              "const": "runtime-control"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "task": {
+              "type": "object",
+              "required": [
+                "mode",
+                "callerId",
+                "callerGeneration",
+                "targetGeneration",
+                "method"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "notify"
+                },
+                "callerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "callerGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "targetGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "method": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "additionalProperties": false
+            },
+            "operation": {
+              "const": "terminal"
+            },
+            "completion": {
+              "$ref": "#/$defs/completion"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "profile",
+            "kind",
+            "id",
+            "route",
+            "task",
+            "operation",
+            "completion"
+          ],
+          "properties": {
+            "profile": {
+              "const": "migaia.rpc.runtime-api/1"
+            },
+            "kind": {
+              "const": "runtime-control"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "task": {
+              "type": "object",
+              "required": [
+                "mode",
+                "callerId",
+                "callerGeneration",
+                "targetGeneration"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "group"
+                },
+                "callerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "callerGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "targetGeneration": {
+                  "$ref": "#/$defs/generation"
+                }
+              },
+              "additionalProperties": false
+            },
+            "operation": {
+              "const": "terminal"
+            },
+            "completion": {
+              "$ref": "#/$defs/groupCompletion"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "profile",
+            "kind",
+            "id",
+            "route",
+            "task",
+            "operation",
+            "stream"
+          ],
+          "properties": {
+            "profile": {
+              "const": "migaia.rpc.runtime-api/1"
+            },
+            "kind": {
+              "const": "runtime-control"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "task": {
+              "type": "object",
+              "required": [
+                "mode",
+                "callerId",
+                "callerGeneration",
+                "targetGeneration",
+                "method"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "stream"
+                },
+                "callerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "callerGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "targetGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "method": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "additionalProperties": false
+            },
+            "operation": {
+              "const": "stream"
+            },
+            "stream": {
+              "$ref": "#/$defs/stream"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "profile",
+            "kind",
+            "id",
+            "route",
+            "task",
+            "operation",
+            "idempotencyKey"
+          ],
+          "properties": {
+            "profile": {
+              "const": "migaia.rpc.runtime-api/1"
+            },
+            "kind": {
+              "const": "runtime-outcome"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "task": {
+              "type": "object",
+              "required": [
+                "mode",
+                "callerId",
+                "callerGeneration",
+                "targetGeneration"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "outcome"
+                },
+                "callerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "callerGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "targetGeneration": {
+                  "$ref": "#/$defs/generation"
+                }
+              },
+              "additionalProperties": false
+            },
+            "operation": {
+              "const": "lookup"
+            },
+            "idempotencyKey": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:~-]{1,128}$"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "profile",
+            "kind",
+            "id",
+            "route",
+            "task",
+            "operation",
+            "state",
+            "store"
+          ],
+          "properties": {
+            "profile": {
+              "const": "migaia.rpc.runtime-api/1"
+            },
+            "kind": {
+              "const": "runtime-outcome"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "task": {
+              "type": "object",
+              "required": [
+                "mode",
+                "callerId",
+                "callerGeneration",
+                "targetGeneration"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "outcome"
+                },
+                "callerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "callerGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "targetGeneration": {
+                  "$ref": "#/$defs/generation"
+                }
+              },
+              "additionalProperties": false
+            },
+            "operation": {
+              "const": "result"
+            },
+            "state": {
+              "enum": [
+                "pending",
+                "unknown"
+              ]
+            },
+            "store": {
+              "$ref": "#/$defs/store"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "profile",
+            "kind",
+            "id",
+            "route",
+            "task",
+            "operation",
+            "state",
+            "store",
+            "outcome"
+          ],
+          "properties": {
+            "profile": {
+              "const": "migaia.rpc.runtime-api/1"
+            },
+            "kind": {
+              "const": "runtime-outcome"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "task": {
+              "type": "object",
+              "required": [
+                "mode",
+                "callerId",
+                "callerGeneration",
+                "targetGeneration"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "outcome"
+                },
+                "callerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "callerGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "targetGeneration": {
+                  "$ref": "#/$defs/generation"
+                }
+              },
+              "additionalProperties": false
+            },
+            "operation": {
+              "const": "result"
+            },
+            "state": {
+              "const": "done"
+            },
+            "store": {
+              "$ref": "#/$defs/store"
+            },
+            "outcome": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "mode",
+                    "targetGeneration",
+                    "completion"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "request"
+                    },
+                    "targetGeneration": {
+                      "$ref": "#/$defs/generation"
+                    },
+                    "completion": {
+                      "$ref": "#/$defs/completion"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "mode",
+                    "targetGeneration",
+                    "completion"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "notify"
+                    },
+                    "targetGeneration": {
+                      "$ref": "#/$defs/generation"
+                    },
+                    "completion": {
+                      "$ref": "#/$defs/completion"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "mode",
+                    "targetGeneration",
+                    "completion"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "stream"
+                    },
+                    "targetGeneration": {
+                      "$ref": "#/$defs/generation"
+                    },
+                    "completion": {
+                      "$ref": "#/$defs/completion"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "mode",
+                    "targetGeneration",
+                    "completion"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "group"
+                    },
+                    "targetGeneration": {
+                      "$ref": "#/$defs/generation"
+                    },
+                    "completion": {
+                      "$ref": "#/$defs/groupCompletion"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "profile",
+            "kind",
+            "id",
+            "route",
+            "task",
+            "operation",
+            "completion"
+          ],
+          "properties": {
+            "profile": {
+              "const": "migaia.rpc.runtime-api/1"
+            },
+            "kind": {
+              "const": "runtime-control"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "route": {
+              "$ref": "#/$defs/route"
+            },
+            "task": {
+              "type": "object",
+              "required": [
+                "mode",
+                "callerId",
+                "callerGeneration",
+                "targetGeneration"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "outcome"
+                },
+                "callerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "callerGeneration": {
+                  "$ref": "#/$defs/generation"
+                },
+                "targetGeneration": {
+                  "$ref": "#/$defs/generation"
+                }
+              },
+              "additionalProperties": false
+            },
+            "operation": {
+              "const": "terminal"
+            },
+            "completion": {
+              "type": "object",
+              "required": [
+                "ok",
+                "error"
+              ],
+              "properties": {
+                "ok": {
+                  "const": false
+                },
+                "error": {
+                  "$ref": "wire-error.schema.json"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "inlineTaggedValue": {
+      "oneOf": [
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "null"
+            }
+          ],
+          "minItems": 1,
+          "maxItems": 1
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "boolean"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "array"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/inlineTaggedValue"
+              }
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "object"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "$ref": "#/$defs/inlineTaggedValue"
+                  }
+                ],
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "buffer"
+            },
+            {
+              "type": "string",
+              "pattern": "^([A-Za-z0-9_-]{4})*([A-Za-z0-9_-][AQgw]|[A-Za-z0-9_-]{2}[AEIMQUYcgkosw048])?$"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "uint8array"
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "string",
+              "pattern": "^([A-Za-z0-9_-]{4})*([A-Za-z0-9_-][AQgw]|[A-Za-z0-9_-]{2}[AEIMQUYcgkosw048])?$"
+            }
+          ],
+          "minItems": 3,
+          "maxItems": 3
+        }
+      ]
+    },
+    "inlineBinaryEnvelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/runtimeEnvelope"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/inlineTaggedValue"
+            },
+            "steps": {
+              "items": {
+                "properties": {
+                  "payload": {
+                    "$ref": "#/$defs/inlineTaggedValue"
+                  }
+                }
+              }
+            },
+            "stream": {
+              "properties": {
+                "value": {
+                  "$ref": "#/$defs/inlineTaggedValue"
+                }
+              }
+            },
+            "outcome": {
+              "if": {
+                "properties": {
+                  "mode": {
+                    "const": "group"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "completion": {
+                    "properties": {
+                      "result": {
+                        "type": "array",
+                        "items": {
+                          "properties": {
+                            "result": {
+                              "$ref": "#/$defs/inlineTaggedValue"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "completion": {
+                    "properties": {
+                      "result": {
+                        "$ref": "#/$defs/inlineTaggedValue"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "task": {
+                "properties": {
+                  "mode": {
+                    "const": "group"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "completion": {
+                "properties": {
+                  "result": {
+                    "type": "array",
+                    "items": {
+                      "properties": {
+                        "result": {
+                          "$ref": "#/$defs/inlineTaggedValue"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "completion": {
+                "properties": {
+                  "result": {
+                    "$ref": "#/$defs/inlineTaggedValue"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "inlineBinaryManifest": {
+      "type": "object",
+      "required": [
+        "profile",
+        "storage",
+        "envelope",
+        "backings"
+      ],
+      "properties": {
+        "profile": {
+          "const": "migaia.rpc.portable-binary/1"
+        },
+        "storage": {
+          "const": "inline"
+        },
+        "envelope": {
+          "$ref": "#/$defs/inlineBinaryEnvelope"
+        },
+        "backings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "byteLength",
+              "sha256"
+            ],
+            "properties": {
+              "byteLength": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "nativeTaggedValue": {
+      "oneOf": [
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "null"
+            }
+          ],
+          "minItems": 1,
+          "maxItems": 1
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "boolean"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "array"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/nativeTaggedValue"
+              }
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "object"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "$ref": "#/$defs/nativeTaggedValue"
+                  }
+                ],
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "buffer"
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "uint8array"
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          ],
+          "minItems": 4,
+          "maxItems": 4
+        }
+      ]
+    },
+    "nativeBinaryEnvelope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/runtimeEnvelope"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/nativeTaggedValue"
+            },
+            "steps": {
+              "items": {
+                "properties": {
+                  "payload": {
+                    "$ref": "#/$defs/nativeTaggedValue"
+                  }
+                }
+              }
+            },
+            "stream": {
+              "properties": {
+                "value": {
+                  "$ref": "#/$defs/nativeTaggedValue"
+                }
+              }
+            },
+            "outcome": {
+              "if": {
+                "properties": {
+                  "mode": {
+                    "const": "group"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "completion": {
+                    "properties": {
+                      "result": {
+                        "type": "array",
+                        "items": {
+                          "properties": {
+                            "result": {
+                              "$ref": "#/$defs/nativeTaggedValue"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "completion": {
+                    "properties": {
+                      "result": {
+                        "$ref": "#/$defs/nativeTaggedValue"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "task": {
+                "properties": {
+                  "mode": {
+                    "const": "group"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "completion": {
+                "properties": {
+                  "result": {
+                    "type": "array",
+                    "items": {
+                      "properties": {
+                        "result": {
+                          "$ref": "#/$defs/nativeTaggedValue"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "completion": {
+                "properties": {
+                  "result": {
+                    "$ref": "#/$defs/nativeTaggedValue"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "nativeBinaryManifest": {
+      "type": "object",
+      "required": [
+        "profile",
+        "storage",
+        "envelope",
+        "backings"
+      ],
+      "properties": {
+        "profile": {
+          "const": "migaia.rpc.portable-binary/1"
+        },
+        "storage": {
+          "const": "native"
+        },
+        "envelope": {
+          "$ref": "#/$defs/nativeBinaryEnvelope"
+        },
+        "backings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "byteLength",
+              "sha256"
+            ],
+            "properties": {
+              "byteLength": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "nativeBinaryCarrier": {
+      "type": "object",
+      "required": [
+        "kind",
+        "protectedMetadata",
+        "sidecars"
+      ],
+      "properties": {
+        "kind": {
+          "const": "rpc.native-binary.v1"
+        },
+        "protectedMetadata": {
+          "type": "object"
+        },
+        "sidecars": {
+          "type": "array",
+          "items": {
+            "x-migaia-native-value": "genuine non-shared ArrayBuffer"
+          }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "x-migaia-owner-validation": [
@@ -1707,6 +2311,10 @@
     "Portable depth, canonical base64url unused bits and stream value budget reuse the existing contract domains.",
     "Group terminal length equals admitted steps; first failure is followed only by not-executed.",
     "Stream direction, task tuple and single-credit sequence belong to original correlation/stream owners.",
-    "Complete protected physical frame with selector/auth/channel overhead is bounded by min(16 MiB, original carrier/framer limit)."
+    "Complete protected physical frame with selector/auth/channel overhead is bounded by min(16 MiB, original carrier/framer limit).",
+    "Binary tagged object keys are strictly sorted and unique; business slots only, never task, route or serialized errors.",
+    "Inline restoration budgets offset plus decoded bytes and allocates one backing; canonical base64url excludes unused bits.",
+    "Native sidecars are dense unique genuine ArrayBuffers, every backing is referenced, and indices plus offset/length are checked against full backing length.",
+    "Native full-backing SHA-256 validation precedes original auth nonce/counter commit; sidecar byteLength plus exact protected metadata and original framing fit the whole-frame budget."
   ]
 }

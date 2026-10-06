@@ -10,7 +10,7 @@ import {
 } from './overview.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { createAbortController, type IAbortSignal } from '@migaia/lifecycle'
-import { normalizePortable } from '../../contract/normalize.js'
+import { normalizePortable, hasRpcPortableBinary } from '../../contract/normalize.js'
 import {
   normalizeRuntimeGeneration,
   normalizeRuntimeSteps
@@ -57,6 +57,8 @@ import { retainProviderFailureRoute } from '../../core/internal/provider.js'
 import { RpcCoreErrorText } from '../../core/error-text.js'
 import { readRuntimePreparationContext } from './launch-context.js'
 import { readRuntimeDefaultTimeout, prepareRuntimeCallTimeout } from './timeout.js'
+import { assertRuntimeTransferFamily } from './transfer.js'
+import { RuntimePluginKey } from './constants.js'
 import type { IRuntimeCallOptions } from './typing.js'
 import type {
   IProviderAdmissionScope,
@@ -241,8 +243,10 @@ function invalid(message: string): never {
 }
 
 /** Normalize one provided payload; an omitted optional argument remains omitted on the wire. */
-function payloadValue(payload: unknown): IRpcPortableValue | undefined {
-  return payload === undefined ? undefined : normalizePortable(payload)
+function payloadValue(payload: unknown, binary = false): IRpcPortableValue | undefined {
+  return payload === undefined
+    ? undefined
+    : normalizePortable(payload, 0, new Set<object>(), binary || rejectRuntimeApiCapability)
 }
 
 /** A forwarded business failure keeps the serialized provider identity and its original stack. */
@@ -297,7 +301,8 @@ export async function createRuntimePeer(
     wrapEndpoint?(endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint
     /** Listener sessions reuse the endpoint already built by their original admission/drain owner. */
     endpoint?: IRemoteServeEndpoint
-  }>
+  }>,
+  family?: keyof typeof RuntimePluginKey
 ): Promise<IRuntimePeer> {
   /** Invalid timeout configuration cannot consume bootstrap or acquire a physical channel. */
   const callTimeout = prepareRuntimeCallTimeout(readRuntimeDefaultTimeout(options))
@@ -336,6 +341,11 @@ export async function createRuntimePeer(
   const channel = await sources[0]!(sourceContext)
   /** A local offer alone cannot enable application description or reverse registration. */
   const supportsRuntime = channel.agreement.capabilities.includes(RpcCapability.runtimeApi)
+  /**
+   * A negotiated binary profile selects the same original runtime task owner for bidirectional
+   * results.
+   */
+  const supportsBinary = channel.agreement.capabilities.includes(RpcCapability.portableBinary)
   /** Generation requires the actual bilateral base and one original prepared endpoint. */
   const supportsGeneration =
     supportsRuntime && channel.agreement.capabilities.includes(RpcCapability.generation)
@@ -465,7 +475,12 @@ export async function createRuntimePeer(
         /** Only failed normalization opts in to the payload code and bounded cause transfer. */
         let portable: IRpcPortableValue
         try {
-          portable = normalizePortable(result)
+          portable = normalizePortable(
+            result,
+            0,
+            new Set<object>(),
+            supportsBinary || rejectRuntimeApiCapability
+          )
         } catch (cause) {
           /** Business RpcSerializationError instances never receive this local trusted summary. */
           const failure = new RpcSerializationError(RuntimeApiErrorText.resultInvalid, cause)
@@ -741,15 +756,21 @@ export async function createRuntimePeer(
     const peer: IRuntimePeer = Object.freeze({
       self,
       request: (method: string, payload?: unknown, callOptions?: IRuntimeCallOptions) => {
+        assertRuntimeTransferFamily(family, callOptions)
         callOptions = callTimeout(callOptions)
         route(method, RuntimeApiMode.request)
-        if (callOptions?.orderKey !== undefined || callOptions?.cancel !== undefined) {
+        if (
+          supportsBinary ||
+          callOptions?.orderKey !== undefined ||
+          callOptions?.cancel !== undefined ||
+          (callOptions !== undefined && Object.hasOwn(callOptions, 'transfer'))
+        ) {
           if (!runtimeOutbound || !remote?.self.generation) rejectRuntimeApiCapability()
           return runtimeOutbound.sendRuntimeOperation(
             channel.peerId,
             remote.self.generation,
             'request',
-            { method, payload: payloadValue(payload) },
+            { method, payload: payloadValue(payload, supportsBinary) },
             callOptions
           ) as Promise<IRpcPortableValue | undefined>
         }
@@ -758,7 +779,7 @@ export async function createRuntimePeer(
           method,
           isForwardedPayload(callOptions, payload)
             ? (payload as IRpcPortableValue | undefined)
-            : payloadValue(payload),
+            : payloadValue(payload, supportsBinary),
           callOptions
         )
         return routes.get(method)?.forwardedVia || isForwardedPayload(callOptions, payload)
@@ -766,14 +787,27 @@ export async function createRuntimePeer(
           : result
       },
       notify: (method: string, payload?: unknown, callOptions?: IRuntimeCallOptions) => {
+        assertRuntimeTransferFamily(family, callOptions)
         route(method, RuntimeApiMode.notify)
-        if (callOptions?.orderKey !== undefined || callOptions?.cancel !== undefined) {
+        /**
+         * Plain notify has no binary result; its existing physical/forward completion path stays
+         * intact.
+         */
+        const normalizedPayload = isForwardedPayload(callOptions, payload)
+          ? (payload as IRpcPortableValue | undefined)
+          : payloadValue(payload, supportsBinary)
+        if (
+          hasRpcPortableBinary(normalizedPayload) ||
+          callOptions?.orderKey !== undefined ||
+          callOptions?.cancel !== undefined ||
+          (callOptions !== undefined && Object.hasOwn(callOptions, 'transfer'))
+        ) {
           if (!runtimeOutbound || !remote?.self.generation) rejectRuntimeApiCapability()
           return runtimeOutbound.sendRuntimeOperation(
             channel.peerId,
             remote.self.generation,
             'notify',
-            { method, payload: payloadValue(payload) },
+            { method, payload: normalizedPayload },
             callOptions,
             isForwardedPayload(callOptions, payload)
           ) as Promise<void>
@@ -786,13 +820,19 @@ export async function createRuntimePeer(
           return ready
             .send(channel.peerId, method, payload, callOptions)
             .then(() => undefined, restoreForwardError)
-        return ready.sendOneWay(channel.peerId, method, payloadValue(payload), callOptions)
+        return ready.sendOneWay(channel.peerId, method, normalizedPayload, callOptions)
       },
       stream: (method: string, payload?: unknown, callOptions?: IRuntimeCallOptions) => {
+        assertRuntimeTransferFamily(family, callOptions)
         callOptions = callTimeout(callOptions)
         if (!supportsStream) rejectRuntimeApiCapability()
         route(method, RuntimeApiMode.stream)
-        if (callOptions?.orderKey !== undefined || callOptions?.cancel !== undefined) {
+        if (
+          supportsBinary ||
+          callOptions?.orderKey !== undefined ||
+          callOptions?.cancel !== undefined ||
+          (callOptions !== undefined && Object.hasOwn(callOptions, 'transfer'))
+        ) {
           if (!runtimeOutbound || !remote?.self.generation) rejectRuntimeApiCapability()
           /** The same canonical stream owner retains its existing consumer and single-credit loop. */
           const owner = readEndpointOwner<RpcStreamOwner>(ready, EndpointOwnerKey.streamOwner)
@@ -800,7 +840,7 @@ export async function createRuntimePeer(
           return owner.openRuntime(
             channel.peerId,
             method,
-            payloadValue(payload),
+            payloadValue(payload, supportsBinary),
             remote.self.generation,
             callOptions
           )
@@ -810,11 +850,12 @@ export async function createRuntimePeer(
           routes.get(method)!.stream,
           isForwardedPayload(callOptions, payload)
             ? (payload as IRpcPortableValue | undefined)
-            : payloadValue(payload),
+            : payloadValue(payload, supportsBinary),
           callOptions
         )
       },
       group: (steps: readonly IRpcRuntimeStep[], callOptions?: IRpcRuntimeSendOptions) => {
+        assertRuntimeTransferFamily(family, callOptions)
         if (!runtimeOutbound || !remote?.self.generation) rejectRuntimeApiCapability()
         /** Snapshot the owning grammar before any route read can execute a user getter. */
         let normalized: readonly IRpcRuntimeStep[]

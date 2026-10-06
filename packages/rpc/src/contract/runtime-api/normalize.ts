@@ -1,4 +1,4 @@
-import { normalizePortable } from '../normalize.js'
+import { normalizeRuntimePortable } from '../normalize.js'
 import { RpcContractErrorCode } from '../error-code.js'
 import { normalizeRpcSerializedError } from '../error.js'
 import { invalidRpcEnvelope, isIdentifier, isRouteFieldValid } from '../v1/route.js'
@@ -19,6 +19,7 @@ import {
   RpcRuntimeFinish,
   RpcRuntimeField as F
 } from './constants.js'
+import type { IRpcPortableValue } from '../types.js'
 import type {
   IRpcRuntimeEnvelope,
   IRpcRuntimeGeneration,
@@ -34,14 +35,17 @@ function invalid(pointer: string, cause?: unknown): never {
 }
 
 /** Local factories and wire admission share this exact closed, request-only group step snapshot. */
-export function normalizeRuntimeSteps(value: unknown): readonly IRpcRuntimeStep[] {
+export function normalizeRuntimeSteps(
+  value: unknown,
+  portable: (value: unknown) => IRpcPortableValue = normalizeRuntimePortable
+): readonly IRpcRuntimeStep[] {
   const steps = array(
     value,
     (item, pointer) => {
       const step = record(item, [F.method], [F.payload], pointer)
       return Object.freeze({
         method: identifier(step.method, `${pointer}/method`),
-        ...(Object.hasOwn(step, F.payload) ? { payload: normalizePortable(step.payload) } : {})
+        ...(Object.hasOwn(step, F.payload) ? { payload: portable(step.payload) } : {})
       })
     },
     '/steps'
@@ -187,7 +191,11 @@ function options(value: unknown, mode: IRpcRuntimeTask['mode']): IRpcRuntimeOpti
 }
 
 /** A completion preserves undefined omission and validates the existing serialized error domain. */
-function completion(value: unknown, mode: IRpcRuntimeTask['mode']): IRpcRuntimeCompletion {
+function completion(
+  value: unknown,
+  mode: IRpcRuntimeTask['mode'],
+  portable: (value: unknown) => IRpcPortableValue
+): IRpcRuntimeCompletion {
   const input = record(value, [F.ok], [F.result, F.error], '/completion')
   if (input.ok === false) {
     if (!Object.hasOwn(input, F.error) || Object.hasOwn(input, F.result)) invalid('/completion')
@@ -210,7 +218,7 @@ function completion(value: unknown, mode: IRpcRuntimeTask['mode']): IRpcRuntimeC
           failed = true
         } else if (item.state === RpcRuntimeStepState.success) {
           if (Object.hasOwn(item, F.error)) invalid(pointer)
-          if (Object.hasOwn(item, F.result)) item.result = normalizePortable(item.result)
+          if (Object.hasOwn(item, F.result)) item.result = portable(item.result)
         } else invalid(pointer)
         return Object.freeze(item)
       },
@@ -221,12 +229,15 @@ function completion(value: unknown, mode: IRpcRuntimeTask['mode']): IRpcRuntimeC
   }
   return Object.freeze({
     ok: true,
-    ...(Object.hasOwn(input, F.result) ? { result: normalizePortable(input.result) } : {})
+    ...(Object.hasOwn(input, F.result) ? { result: portable(input.result) } : {})
   })
 }
 
 /** Validate the entire independent union before canonical identity, replay or provider mutation. */
-export function normalizeRuntimeEnvelope(value: unknown): IRpcRuntimeEnvelope {
+export function normalizeRuntimeEnvelope(
+  value: unknown,
+  portable: (value: unknown) => IRpcPortableValue = normalizeRuntimePortable
+): IRpcRuntimeEnvelope {
   /**
    * First snapshot establishes the discriminator while retaining every field for its closed
    * variant.
@@ -305,8 +316,8 @@ export function normalizeRuntimeEnvelope(value: unknown): IRpcRuntimeEnvelope {
     fields = group ? [F.options, F.steps] : [F.options, F.payload]
     result.options = options(input.options, selected.mode)
     if (group) {
-      result.steps = normalizeRuntimeSteps(input.steps)
-    } else if (Object.hasOwn(input, F.payload)) result.payload = normalizePortable(input.payload)
+      result.steps = normalizeRuntimeSteps(input.steps, portable)
+    } else if (Object.hasOwn(input, F.payload)) result.payload = portable(input.payload)
   } else if (input.kind === RpcRuntimeKind.control) {
     if (
       selected.mode === RpcRuntimeMode.outcome &&
@@ -320,7 +331,7 @@ export function normalizeRuntimeEnvelope(value: unknown): IRpcRuntimeEnvelope {
     } else if (input.operation === RpcRuntimeOperation.terminal) {
       if (selected.mode === RpcRuntimeMode.stream) invalid('/operation')
       fields = [F.operation, F.completion]
-      result.completion = completion(input.completion, selected.mode)
+      result.completion = completion(input.completion, selected.mode, portable)
       /**
        * A failed query carries the exact error; successful queries require the outcome result
        * union.
@@ -347,7 +358,7 @@ export function normalizeRuntimeEnvelope(value: unknown): IRpcRuntimeEnvelope {
           stream.reason = normalizeRpcSerializedError(stream.reason)
         result.stream = Object.freeze(stream)
       } else {
-        result.stream = normalizeStreamPayload(stream)
+        result.stream = normalizeStreamPayload(stream, portable)
         if (stream.event === RpcStreamEvent.open && stream.seq !== 0) invalid('/stream/seq')
       }
     } else invalid('/operation')
@@ -392,7 +403,11 @@ export function normalizeRuntimeEnvelope(value: unknown): IRpcRuntimeEnvelope {
         result.outcome = Object.freeze({
           mode: outcome.mode,
           targetGeneration: normalizeRuntimeGeneration(outcome.targetGeneration),
-          completion: completion(outcome.completion, outcome.mode as IRpcRuntimeTask['mode'])
+          completion: completion(
+            outcome.completion,
+            outcome.mode as IRpcRuntimeTask['mode'],
+            portable
+          )
         })
       } else if (Object.hasOwn(input, F.outcome)) invalid('/outcome')
     } else invalid('/operation')

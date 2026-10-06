@@ -64,6 +64,10 @@ import {
   type IProviderRuntimeRelay
 } from './provider.js'
 import type { IRpcPortableValue } from '../../contract/types.js'
+import { normalizeRuntimePortable, hasRpcPortableBinary } from '../../contract/normalize.js'
+import { prepareRpcBinary, hasRpcBinaryEnvelope } from '../../contract/runtime-api/binary.js'
+import { RpcBinaryStorage } from '../../contract/runtime-api/binary-constants.js'
+import { createRpcBackingDigest } from './authentication-replay.js'
 import { safeRead, safeString, tupleKey, runtimeTaskKey } from './safe-value.js'
 import { RpcMessageKind, RpcProviderRejectionReason } from '../semantic-constants.js'
 import { localErrorWireSummary } from '../../contract/contract-error.js'
@@ -179,7 +183,33 @@ function runtimeRequestInput(
 }
 
 /** Canonical portable object ordering makes the same admitted body independent of insertion order. */
-function runtimeFingerprint(mode: string, steps: readonly IRpcRuntimeStep[]): string {
+function runtimeFingerprint(
+  envelope: IRpcRuntimeEnvelope,
+  steps: readonly IRpcRuntimeStep[]
+): string | Promise<string> {
+  if (hasRpcBinaryEnvelope(envelope)) {
+    /** Complete native refs/digests include bytes, type, offset and aliases in the original claim. */
+    const digest = createRpcBackingDigest()
+    return prepareRpcBinary(
+      envelope,
+      digest ? RpcBinaryStorage.native : RpcBinaryStorage.inline,
+      undefined,
+      digest
+    ).then((prepared) => {
+      const encoded = prepared.manifest.envelope
+      const data =
+        'steps' in encoded
+          ? encoded.steps
+          : [
+              {
+                method: encoded.task.method,
+                ...('payload' in encoded ? { payload: encoded.payload } : {})
+              }
+            ]
+      return JSON.stringify([envelope.task.mode, data, prepared.manifest.backings])
+    })
+  }
+  const mode = envelope.task.mode
   return JSON.stringify([mode, steps], (_key, value: unknown) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return value
     return Object.fromEntries(
@@ -543,7 +573,8 @@ export class ProviderExecutor<TTargetId extends string> {
           )
         : envelope.task.mode === RpcRuntimeMode.notify &&
             envelope.options.cancel !== RpcRuntimeCancel &&
-            envelope.options.orderKey === undefined
+            envelope.options.orderKey === undefined &&
+            envelope.route.forwardRoute === undefined
           ? Promise.resolve()
           : ports.send(
               {
@@ -633,7 +664,9 @@ export class ProviderExecutor<TTargetId extends string> {
         controllerKey,
         envelope.kind === RpcRuntimeKind.group
           ? RpcProviderRejectionReason.groupConcurrency
-          : RpcProviderRejectionReason.orderedQueueFull
+          : envelope.options.orderKey !== undefined
+            ? RpcProviderRejectionReason.orderedQueueFull
+            : RpcProviderRejectionReason.concurrency
       )
       await respond(
         failed(
@@ -689,9 +722,21 @@ export class ProviderExecutor<TTargetId extends string> {
     let sealed = false
     /** Only a real producer terminal can supply the stream's final completion. */
     let streamCompletion: IRpcRuntimeCompletion | undefined
-    /** Started scalar/group cancellation retains its original lease until the handler actually ends. */
+    /** A running handler or in-progress binary claim preparation retains its final cancel result. */
     let cancellationCompletion: IRpcRuntimeCompletion | undefined
+    /** Ordinary cancellation must not publish a keyed terminal before this original hash completes. */
+    let preparingFingerprint = false
+    /**
+     * Retirement is terminal; only a live preparation's deferred cancel may finish its original
+     * claim.
+     */
+    const canClaimPrepared = (): boolean =>
+      state === 'queued' || (state === 'cancelled' && cancellationCompletion !== undefined)
     let releaseOrder: (() => void) | undefined
+    /** Only asynchronous binary preparation may reach the original FIFO head before it is ready. */
+    let prepareReachedHead = false
+    /** The existing run callback is handed to that same FIFO entry after its fingerprint is ready. */
+    let preparedOrderStart: (() => void) | undefined
     let finishTask!: () => void
     const finished = new Promise<void>((resolve) => {
       finishTask = resolve
@@ -709,7 +754,20 @@ export class ProviderExecutor<TTargetId extends string> {
           targetGeneration: ports.generation,
           completion
         }
-        claim.settle({ ok: true, data: normalizePortable(outcome) }, this.options.now())
+        /**
+         * The sealed result owns its bytes; this is a completion snapshot, never an input retry
+         * backup.
+         */
+        const snapshot = normalizeRuntimePortable(outcome)
+        claim.settle(
+          {
+            ok: true,
+            data: hasRpcPortableBinary(snapshot)
+              ? normalizeRuntimePortable(structuredClone(snapshot))
+              : snapshot
+          },
+          this.options.now()
+        )
       }
       sealed = true
     }
@@ -781,34 +839,6 @@ export class ProviderExecutor<TTargetId extends string> {
         finishTask()
       }
     }
-    try {
-      /** All original quotas are committed before a key becomes visible; no provider has started. */
-      const key = envelope.options.idempotencyKey
-      if (key !== undefined && !relay) {
-        /** The canonical configured store owns the whole queued lifetime, including cancellation. */
-        const store = this.options.idempotencyStore
-        if (!store?.lookup)
-          throw new RpcError(
-            RpcCoreErrorCode.capabilityUnsupported,
-            RpcCoreErrorText.capabilityUnsupported
-          )
-        claimInput = {
-          store,
-          key,
-          scope: this.#runtimeScope(peerKey, envelope.route.senderId, ports.generation.providerId),
-          fingerprint: runtimeFingerprint(envelope.task.mode, steps)
-        }
-        claim = store.claim(claimInput.scope, key, this.options.now(), claimInput.fingerprint)
-        if (claim.status === 'full')
-          throw new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.idempotencyStoreFull)
-      }
-    } catch (error) {
-      /** Store refusal precedes task admission; preserve no tombstones for uncommitted members. */
-      reserved.rollback()
-      report(error)
-      await settle(failed(error))
-      return
-    }
     /**
      * Ordinary remote cancellation retains running business; resource retirement revokes its
      * session.
@@ -844,7 +874,8 @@ export class ProviderExecutor<TTargetId extends string> {
             return settle(failed(error))
           }
         )
-      else if (started && retainStarted) cancellationCompletion = completion
+      else if (retainStarted && (started || preparingFingerprint))
+        cancellationCompletion = completion
       else void settle(completion)
     }
     const cancelIntent = (reason?: unknown): void => {
@@ -896,6 +927,58 @@ export class ProviderExecutor<TTargetId extends string> {
         () => cancelIntent(new RpcTimeoutError()),
         envelope.options.timeoutMs
       )
+    /** Retired or cancelled preparation never publishes a new key claim. */
+    if (state !== 'queued') return
+    try {
+      /** All original quotas are committed before a key becomes visible; no provider has started. */
+      const key = envelope.options.idempotencyKey
+      if (key !== undefined && !relay) {
+        /** The canonical configured store owns the whole queued lifetime, including cancellation. */
+        const store = this.options.idempotencyStore
+        if (!store?.lookup)
+          throw new RpcError(
+            RpcCoreErrorCode.capabilityUnsupported,
+            RpcCoreErrorText.capabilityUnsupported
+          )
+        /** Non-binary claims keep the original synchronous fingerprint with no extra Promise. */
+        const fingerprint = runtimeFingerprint(envelope, steps)
+        if (typeof fingerprint !== 'string' && envelope.options.orderKey !== undefined) {
+          /** Full backing hashing cannot let a later admitted task take this task's FIFO place. */
+          releaseOrder = admission.enqueueOrder!(envelope.options.orderKey, () => {
+            prepareReachedHead = true
+            preparedOrderStart?.()
+          })
+        }
+        /** The existing controller must remain registered while full binary hashing yields. */
+        preparingFingerprint = typeof fingerprint !== 'string'
+        const preparedFingerprint =
+          typeof fingerprint === 'string' ? fingerprint : await fingerprint
+        preparingFingerprint = false
+        if (!canClaimPrepared()) return
+        claimInput = {
+          store,
+          key,
+          scope: this.#runtimeScope(peerKey, envelope.route.senderId, ports.generation.providerId),
+          fingerprint: preparedFingerprint
+        }
+        claim = store.claim(claimInput.scope, key, this.options.now(), claimInput.fingerprint)
+        if (claim.status === 'full')
+          throw new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.idempotencyStoreFull)
+        /** A queued cancellation seals/matches the original key before its final terminal is sent. */
+        if (cancellationCompletion) {
+          await settle(cancellationCompletion)
+          return
+        }
+      }
+    } catch (error) {
+      preparingFingerprint = false
+      /** Store refusal precedes task admission; preserve no tombstones for uncommitted members. */
+      report(error)
+      if (!canClaimPrepared()) return
+      reserved.rollback()
+      await settle(failed(error))
+      return
+    }
     /** Claim waiting remains queued, retains original quotas and cannot run the first group member. */
     const run = async (): Promise<void> => {
       if (state !== 'queued') return
@@ -1036,7 +1119,9 @@ export class ProviderExecutor<TTargetId extends string> {
           if (!response.ok) throw new RpcRemoteError(response.code, response.message)
           await settle({
             ok: true,
-            ...(response.data === undefined ? {} : { result: normalizePortable(response.data) })
+            ...(response.data === undefined
+              ? {}
+              : { result: normalizeRuntimePortable(response.data) })
           })
           return
         }
@@ -1082,7 +1167,9 @@ export class ProviderExecutor<TTargetId extends string> {
             this.options.validate(step.method, 'result', response.data)
             results.push({
               state: RpcRuntimeStepState.success,
-              ...(response.data === undefined ? {} : { result: normalizePortable(response.data) })
+              ...(response.data === undefined
+                ? {}
+                : { result: normalizeRuntimePortable(response.data) })
             })
           } catch (error) {
             report(error)
@@ -1093,7 +1180,7 @@ export class ProviderExecutor<TTargetId extends string> {
           }
         }
         if (envelope.kind === RpcRuntimeKind.group)
-          await settle({ ok: true, result: normalizePortable(results) })
+          await settle({ ok: true, result: normalizeRuntimePortable(results) })
         else {
           const result = results[0]!
           await settle(
@@ -1116,7 +1203,13 @@ export class ProviderExecutor<TTargetId extends string> {
       }
     }
     if (state === 'queued') {
-      if (envelope.options.orderKey !== undefined)
+      if (releaseOrder !== undefined) {
+        /** One original FIFO entry waits for preparation, with no second queue or execution owner. */
+        preparedOrderStart = () => {
+          void run()
+        }
+        if (prepareReachedHead) preparedOrderStart()
+      } else if (envelope.options.orderKey !== undefined)
         releaseOrder = admission.enqueueOrder!(envelope.options.orderKey, () => {
           void run()
         })

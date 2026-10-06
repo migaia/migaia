@@ -1,4 +1,5 @@
-import { rpcProtocolV1, type IRpcEnvelope, type IRpcPortableRecord } from '../contract/index.js'
+import { rpcProtocolV1, type IRpcEnvelope } from '../contract/index.js'
+import type { IRpcWirePortableValue } from '../contract/types.js'
 import type { IRpcEnvelopeData } from '../contract/v1/route.js'
 import type { identityCodecV1 } from '@migaia/serialize/codec'
 import type { messageFramerV1 } from '../contract/framing/index.js'
@@ -45,7 +46,7 @@ type IEnvelope<T> =
     ? IResult<TValue>
     : IRpcEnvelope
 /** Sending variation data is portable even though received unknown subtype payloads stay opaque. */
-type IRpcOutboundEnvelope = IRpcPortableRecord &
+type IRpcOutboundEnvelope = Readonly<Record<string, IRpcWirePortableValue>> &
   (
     | Exclude<IRpcEnvelope, { readonly kind: 'variation' }>
     | Readonly<{ kind: 'variation'; id: string; data: IRpcEnvelopeData }>

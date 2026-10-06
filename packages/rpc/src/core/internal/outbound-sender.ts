@@ -6,7 +6,8 @@ import {
 import {
   isAuthenticationCounterExhaustion,
   bindAuthenticationOutboundFrame,
-  readAuthenticationChallengePort
+  readAuthenticationChallengePort,
+  readAuthenticationBinaryDigest
 } from './authentication-replay.js'
 import {
   RpcAuthenticationError,
@@ -29,7 +30,16 @@ import type { IRpcSelectedComponents } from './endpoint-options.js'
 import { RpcEnvelopeKind, type IRpcEnvelope } from '../../contract/index.js'
 import type { IRpcOutboundAdmission, IRpcOutboundGate } from './outbound-gate.js'
 import { registerBatchWriter, type IBatchWriteGuard } from './batch-frame.js'
-import { RpcBatchPhysical } from '../../contract/wire-constants.js'
+import { RpcBatchPhysical, RpcCapability } from '../../contract/wire-constants.js'
+import {
+  hasRpcBinaryEnvelope,
+  prepareRpcBinary,
+  measureRpcNativeBinaryFrame
+} from '../../contract/runtime-api/binary.js'
+import { RpcBinaryStorage } from '../../contract/runtime-api/binary-constants.js'
+import { RpcNativeBinaryKind } from '../../contract/runtime-api/binary-constants.js'
+import { hasFastComponents } from './fast-path.js'
+import { isArrayBuffer } from '@migaia/utils/bytes'
 import {
   measureRpcPhysicalFrame,
   assertRpcPhysicalFrameSize,
@@ -105,6 +115,8 @@ export class RpcOutboundSender {
   readonly #batch: boolean
   /** Exact negotiated adapter overhead is included without estimating any semantic member. */
   readonly #physicalLimit: number
+  /** Only the original native adapter receipt authorizes a real clone/transfer boundary. */
+  readonly #cloneTransfer: boolean
   /** Busy physical writes accumulate ready requests and responses in this single owner. */
   #writing = false
   /** FIFO contains semantic settlements, never serialized per-member size estimates. */
@@ -130,7 +142,8 @@ export class RpcOutboundSender {
     fast = false,
     batch = false,
     physicalLimit = RpcBatchPhysical.maxBytes,
-    receiverId = id
+    receiverId = id,
+    cloneTransfer = false
   ) {
     this.transport = transport
     this.id = id
@@ -144,6 +157,7 @@ export class RpcOutboundSender {
     this.#fast = fast && authentication === undefined
     this.#batch = batch
     this.#physicalLimit = physicalLimit
+    this.#cloneTransfer = cloneTransfer
     this.#receiverId = receiverId
     const lifecycle = transport as Partial<IRpcOutboundLifecycle>
     this.#lifecycle =
@@ -181,15 +195,66 @@ export class RpcOutboundSender {
   }
 
   /** Prepare one opt-in semantic frame through the original codec/framer/auth/write owners. */
+  assertRuntimeTransfer(
+    capabilities: readonly string[],
+    options?: Pick<ISendOptions, 'transfer'>
+  ): void {
+    if (!options || !Object.hasOwn(options, 'transfer')) return
+    if (!this.#nativeBinaryEnabled(capabilities) || !capabilities.includes(RpcCapability.transfer))
+      throw new RpcError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        RpcCoreErrorText.capabilityUnsupported
+      )
+  }
+
+  /** Only exact canonical component/config/carrier facts may select the native representation. */
+  #nativeBinaryEnabled(capabilities: readonly string[]): boolean {
+    return (
+      this.#cloneTransfer &&
+      readAuthenticationBinaryDigest(this.authentication) !== undefined &&
+      (hasFastComponents(this.components) || this.#objectPort !== undefined) &&
+      (this.#objectPort?.codec ?? this.components.codec).encodedType === 'unknown' &&
+      capabilities.includes(RpcCapability.portableBinary) &&
+      capabilities.includes(RpcCapability.nativeBinary)
+    )
+  }
+
+  /** Prepare one opt-in semantic frame through the original codec/framer/auth/write owners. */
   async sendRuntime(
     message: IRpcRuntimeEnvelope,
     capabilities: readonly string[],
     admission?: IRpcOutboundAdmission,
     onStarted?: () => void,
-    onPrepared?: () => Promise<void>
+    onPrepared?: () => Promise<void>,
+    transferOptions?: Pick<ISendOptions, 'transfer'>
   ): Promise<void> {
     /** All permission-bearing fields are snapshotted before any async signature or gate handoff. */
     const envelope = normalizeRuntimeEnvelope(message)
+    /** Proof is minted during portable normalization, so ordinary calls never scan a binary graph. */
+    const binary = hasRpcBinaryEnvelope(envelope)
+    /**
+     * Own presence, including [], selects native ownership semantics instead of an inline
+     * downgrade.
+     */
+    const transferRequested =
+      transferOptions !== undefined && Object.hasOwn(transferOptions, 'transfer')
+    this.assertRuntimeTransfer(capabilities, transferOptions)
+    /** The original snapshot is read before gate, digest or authentication can yield. */
+    const transfer = transferRequested ? (this.#snapshotTransfer(transferOptions) ?? []) : undefined
+    /**
+     * Canonical config facts exclude encrypt/opaque capabilities and byte/string/custom codec
+     * mappings.
+     */
+    const digest = readAuthenticationBinaryDigest(this.authentication)
+    const native = (binary || transferRequested) && this.#nativeBinaryEnabled(capabilities)
+    if (transfer) {
+      const unique = new Set<object>()
+      for (const backing of transfer) {
+        if (!isArrayBuffer(backing) || unique.has(backing))
+          throw new RpcSerializationError(RpcCoreErrorText.invalidTransferList)
+        unique.add(backing)
+      }
+    }
     /** These labels come from the accepted channel intersection, never from one-sided offers. */
     const required = runtimeOperationCapabilities(
       envelope.task.mode,
@@ -197,6 +262,7 @@ export class RpcOutboundSender {
     )
     if (
       required.some((capability) => !capabilities.includes(capability)) ||
+      (binary && !capabilities.includes(RpcCapability.portableBinary)) ||
       (this.#bridge && envelope.kind === RpcRuntimeKind.group)
     )
       throw new RpcError(
@@ -223,9 +289,43 @@ export class RpcOutboundSender {
       admission?.assertCanSend()
       /** Codec descriptors encode data; this independent normalized union is never a legacy wrapper. */
       let encoded: unknown
+      /**
+       * Native metadata retains these exact original buffers through protection and physical
+       * commit.
+       */
+      let sidecars: readonly ArrayBuffer[] = []
+      /**
+       * Unique full backing bytes are charged in addition to metadata and selector/framing
+       * overhead.
+       */
+      let backingBytes = 0
       try {
+        const prepared =
+          binary || transferRequested
+            ? await prepareRpcBinary(
+                envelope,
+                native ? RpcBinaryStorage.native : RpcBinaryStorage.inline,
+                limit,
+                digest,
+                (manifest, bytes) => {
+                  const metadata = (this.#objectPort?.codec ?? this.components.codec).encode(
+                    manifest as unknown as IRpcEnvelope
+                  )
+                  if (
+                    measureRpcNativeBinaryFrame(metadata, manifest.backings.length, bytes) > limit
+                  )
+                    rejectRpcPhysicalFrameSize()
+                }
+              )
+            : undefined
+        if (prepared) {
+          sidecars = prepared.sidecars
+          backingBytes = prepared.backingBytes
+          if (transfer?.some((backing) => !sidecars.includes(backing as ArrayBuffer)))
+            throw new RpcSerializationError(RpcCoreErrorText.invalidTransferList)
+        }
         encoded = (this.#objectPort?.codec ?? this.components.codec).encode(
-          envelope as unknown as IRpcEnvelope
+          (prepared?.manifest ?? envelope) as unknown as IRpcEnvelope
         )
         if (!this.#objectPort) this.assertProtocolEncodedType(encoded)
       } catch (cause) {
@@ -257,13 +357,34 @@ export class RpcOutboundSender {
         context
       )
       /** Selector overhead is charged after auth, without splitting or re-signing this frame. */
-      const carrier = wrapRuntimeCarrier(protectedValue)
-      assertRpcPhysicalFrameSize(carrier, limit)
+      if (
+        native &&
+        (!protectedValue ||
+          typeof protectedValue !== 'object' ||
+          Array.isArray(protectedValue) ||
+          isUint8Array(protectedValue) ||
+          ![Object.prototype, null].includes(Object.getPrototypeOf(protectedValue)))
+      )
+        throw new RpcError(
+          RpcCoreErrorCode.capabilityUnsupported,
+          RpcCoreErrorText.capabilityUnsupported
+        )
+      const carrier = wrapRuntimeCarrier(
+        native
+          ? { kind: RpcNativeBinaryKind, protectedMetadata: protectedValue, sidecars }
+          : protectedValue
+      )
+      if (
+        (native
+          ? measureRpcNativeBinaryFrame(protectedValue, sidecars.length, backingBytes)
+          : measureRpcPhysicalFrame(carrier)) > limit
+      )
+        rejectRpcPhysicalFrameSize()
       /** The original result owner can seal only this fully valid frame, before physical commit. */
       await onPrepared?.()
       return this.#sendPreparedTransport(
         carrier,
-        undefined,
+        transfer,
         generation,
         () => {
           admission?.assertCanSend()
