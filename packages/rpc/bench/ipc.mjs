@@ -1,4 +1,5 @@
 import { IpcBenchErrorText } from './error-text.mjs'
+import { IpcW3Reference } from './text.mjs'
 /**
  * Bare-side measurement core for the conformance IPC driver. Channel launch, codec, peer, isolation
  * and PID observer belong to the caller. This module does not freeze support units or claim
@@ -201,6 +202,36 @@ export function judgeW3Regression(rounds, baseline, noiseBand) {
     relativeChange,
     noiseBand,
     ratiosByRound
+  }
+}
+
+/**
+ * Bind one frozen cell to calibration from the same reference source before any measured launch.
+ * Historical collection and final public Peer guards cannot exchange their A/A source silently.
+ *
+ * @param {string} unitId The exact registered unit selected for the final paired verdict.
+ * @param {{ sourceCommit: string; cells: Record<string, { p50Ratio: number }> }} baseline The
+ *   explicitly selected historical or final public reference, including original provenance.
+ * @param {{ sourceCommit: string; representatives: object[]; p50RatioNoiseBand: number }} noise
+ *   Fresh same-window reference calibration, retaining all four original representative cells.
+ * @returns {{ baseline: object; noiseBand: number }} Existing W3 judge inputs without new budgets.
+ * @throws {Error} Missing cell, incomplete calibration or different reference source.
+ */
+export function resolveW3Guard(unitId, baseline, noise) {
+  /** The original selected cell keeps its frozen value and retained raw provenance together. */
+  const cell = baseline?.cells?.[unitId]
+  if (
+    !(cell?.p50Ratio > 0) ||
+    typeof baseline.sourceCommit !== 'string' ||
+    noise?.sourceCommit !== baseline.sourceCommit ||
+    noise.representatives?.length !== 4 ||
+    !Number.isFinite(noise.p50RatioNoiseBand) ||
+    noise.p50RatioNoiseBand < 0
+  )
+    throw new Error(IpcBenchErrorText.paired)
+  return {
+    baseline: { ...cell, sourceCommit: baseline.sourceCommit },
+    noiseBand: noise.p50RatioNoiseBand
   }
 }
 
@@ -639,10 +670,14 @@ async function pairedMain() {
     )
     return
   }
-  /** Frozen ratios ship with the benchmark only; this adds no production endpoint API. */
+  /** Explicit collection retains primitive history; ordinary guards require the final public file. */
   const baseline = prepare
     ? undefined
-    : JSON.parse(await readFile(new URL('./w3-baseline.json', import.meta.url)))
+    : JSON.parse(
+        await readFile(
+          new URL(freezeSdk ? './w3-baseline.json' : './w3-public-baseline.json', import.meta.url)
+        )
+      )
   /** New final-source values live separately from the immutable 76-cell pre-program baseline. */
   const needsSdk = scenario === 'concurrency' || scenario === 'deno'
   const sdkBaseline =
@@ -658,9 +693,12 @@ async function pairedMain() {
     throw new Error(IpcBenchErrorText.paired)
   if (
     sdkBaseline &&
-    units.some((unit) => !sdkBaseline.cells[unit.id] || !noise.sdkCells?.[unit.id])
+    (sdkBaseline.sourceCommit !== noise.sdkSourceCommit ||
+      units.some((unit) => !sdkBaseline.cells[unit.id] || !noise.sdkCells?.[unit.id]))
   )
     throw new Error(IpcBenchErrorText.paired)
+  if (!prepare && scenario !== 'deno')
+    for (const unit of units) resolveW3Guard(unit.id, baseline, noise)
   if (
     !prepare &&
     (!inventory.frozen || units.some((unit) => unit.status !== 'supported' || !unit.evidence))
@@ -753,8 +791,7 @@ async function pairedMain() {
               ...(scenario === 'deno'
                 ? {}
                 : {
-                    baseline: { ...baseline.cells[unit.id], sourceCommit: baseline.sourceCommit },
-                    noiseBand: noise.p50RatioNoiseBand
+                    ...resolveW3Guard(unit.id, baseline, noise)
                   }),
               ...(sdkBaseline
                 ? {
@@ -771,7 +808,10 @@ async function pairedMain() {
         type: 'bench-unit',
         unit,
         rounds,
-        ...(needsSdk && freezeSdk && !prepare ? { sdkFreeze: 'unfrozen-candidate' } : {}),
+        ...(freezeSdk && !prepare ? { sdkFreeze: 'unfrozen-candidate' } : {}),
+        ...(scenario !== 'deno' && !prepare
+          ? { w3Reference: freezeSdk ? IpcW3Reference.historical : IpcW3Reference.public }
+          : {}),
         inventorySHA256: createHash('sha256').update(inventoryBytes).digest('hex')
       }
       if (output)
