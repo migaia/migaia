@@ -12,7 +12,7 @@ import { encodeRpcStreamFrame } from '@migaia/rpc/contract/framing/stream'
 import {
   createNativeProcessOffer,
   createProcessTransport,
-  createServeProcessHost,
+  createProcessResilience,
   RpcProcessErrorCode
 } from '@migaia/rpc/process'
 import {
@@ -27,7 +27,11 @@ import {
   deployment,
   contract
 } from './fixtures/conformance-business.js'
-import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
+import { PluginHost } from '@migaia/plugin-host'
+import {
+  adoptHostRegistration,
+  type IAdoptedHostRegistration
+} from '../../src/process/host/registration.js'
 import { systemScheduler, createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { createProcessPlugin } from '@migaia/rpc/process'
 import { endpointFor } from './peers/ts/runtime.js'
@@ -192,17 +196,11 @@ async function stats(active: Pick<Awaited<ReturnType<typeof client>>, 'feature'>
 
 describe('[A7] real process session and principal isolation', () => {
   it('[A7.1] no-token reverse native registration never resolves permission, constructs endpoint or installs plugin', async () => {
-    /** Both main ingress and reverse-registration sockets are real public listeners. */
+    /** The reverse-registration socket is owned by the original authenticated listener. */
     const directory = await mkdtemp(join(tmpdir(), 'rpc-hi-reverse-'))
     /** The target Host begins empty; an actual use observer detects any unauthorized installation. */
     const host = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-    })
-    /** This approved implementation remains strictly local and is never transferred over the socket. */
-    const definition = definePlugin({
-      name: 'p',
-      install: () => ({}),
-      features: { f: defineFeature(() => ({ request: (input: unknown) => input })) }
     })
     /** Installation observes the real Host method rather than substituting a fake target. */
     const use = vi.spyOn(host, 'use')
@@ -219,37 +217,36 @@ describe('[A7] real process session and principal isolation', () => {
       if (auth !== 'reverse-required') throw new TypeError('reverse credential required')
       return 'approved-principal'
     }
-    /** A production process Host owns both its public ingress and reverse-registration listener. */
-    const service = await createServeProcessHost({
-      host,
-      catalog: { p: contract },
-      resolvePlugin: () => definition,
+    /** The canonical governor owns authentication and never offers an unauthenticated candidate. */
+    const resilience = createProcessResilience({
       scheduler: systemScheduler,
-      report: (error) => reports.push(error),
-      endpointFactory,
-      ingress: {
-        kind: 'listener',
-        address: join(directory, 'main.sock'),
-        listen: listenProcessByteChannel,
-        verify,
-        offer: createNativeProcessOffer({ peer: { id: 'server', runtime: 'node' } }),
-        createConnectionContext: () => ({
-          peerId: 'caller',
-          ipc: { connectionId: 'main', sessionId: 'main', log: () => undefined }
-        })
-      },
-      registrations: {
-        address: join(directory, 'reverse.sock'),
-        serviceId: 'rpc-hi-reverse',
-        listen: listenProcessByteChannel,
-        verifyToken: verify,
-        offer: createNativeProcessOffer({ peer: { id: 'server', runtime: 'node' } }),
-        createConnectionContext: () => ({
-          peerId: 'caller',
-          ipc: { connectionId: 'reverse', sessionId: 'reverse', log: () => undefined }
-        }),
-        resolveRegistration
-      }
+      report: (error) => reports.push(error)
+    })
+    /** Retain actual adoption cleanup even if this negative assertion unexpectedly admits a peer. */
+    const adopted = new Set<IAdoptedHostRegistration>()
+    const service = await resilience.listenRegistrations({
+      address: join(directory, 'reverse.sock'),
+      serviceId: 'rpc-hi-reverse',
+      listen: listenProcessByteChannel,
+      verifyToken: verify,
+      offer: createNativeProcessOffer({ peer: { id: 'server', runtime: 'node' } }),
+      createConnectionContext: () => ({
+        peerId: 'caller',
+        ipc: { connectionId: 'reverse', sessionId: 'reverse', log: () => undefined }
+      }),
+      scheduler: systemScheduler,
+      wire: 'native',
+      onCandidate: (candidate) =>
+        adoptHostRegistration(
+          candidate,
+          {
+            endpointFactory,
+            report: (error) => reports.push(error),
+            registrations: { resolveRegistration }
+          },
+          resilience,
+          adopted
+        )
     })
     /** This actual reverse candidate sends a valid native hello without an auth field. */
     const raw = await dialProcessByteChannel({ address: join(directory, 'reverse.sock') })
@@ -285,8 +282,10 @@ describe('[A7] real process session and principal isolation', () => {
     } finally {
       await raw.close()
       await service.close()
+      await Promise.all([...adopted].map((entry) => entry.close()))
+      await resilience.close()
       await host.dispose()
-      /** Both listeners have closed before their fixture-created rendezvous directory is removed. */
+      /** The listener closes before its fixture-created rendezvous directory is removed. */
       await rm(directory, { recursive: true, force: true })
     }
   })
