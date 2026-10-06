@@ -10,7 +10,7 @@ import { createEventChannel } from '@migaia/event-subscriber'
 import { createConcurrencyLimiter, hostRethrowReporter } from '@migaia/utils/promise'
 import { RpcStreamEvent } from '../../contract/index.js'
 import type { IRpcEnvelope, IRpcRuntimeEnvelope } from '../../contract/index.js'
-import { RpcRuntimeKind } from '../../contract/runtime-api/constants.js'
+import { RpcRuntimeKind, RpcRuntimeOperation } from '../../contract/runtime-api/constants.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import { RpcCoreErrorCode } from '../error-code.js'
 import { RpcError, RpcLifecycleError, tagRpcError } from '../errors.js'
@@ -49,8 +49,19 @@ const LOW_WATERMARK_RATIO = 0.5
 
 /** Selects the reserved control class from normalized fields without invoking user getters. */
 function classify(envelope: IRpcEnvelope | IRpcRuntimeEnvelope): IIpcSendClass {
-  if (envelope.kind === RpcRuntimeKind.control || envelope.kind === RpcRuntimeKind.outcome)
+  if (envelope.kind === RpcRuntimeKind.outcome) return IpcSendClass.control
+  if (envelope.kind === RpcRuntimeKind.control) {
+    /** Business replies retain the same data lane as legacy responses and stream data. */
+    if (envelope.operation === RpcRuntimeOperation.terminal) return IpcSendClass.data
+    if (
+      envelope.operation === RpcRuntimeOperation.stream &&
+      (envelope.stream.event === RpcStreamEvent.item ||
+        envelope.stream.event === RpcStreamEvent.end ||
+        envelope.stream.event === RpcStreamEvent.fail)
+    )
+      return IpcSendClass.data
     return IpcSendClass.control
+  }
   if (envelope.kind === 'variation') {
     const variation = envelope.data.route.variation
     if (
