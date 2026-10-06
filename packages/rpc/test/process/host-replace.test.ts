@@ -6,6 +6,7 @@ import * as remoteHostModule from '../../src/remote/host.js'
 import { hostFixture } from './fixtures/host-control.js'
 import { nativeHostFixture, nativeHostOptions } from './fixtures/host-native.js'
 import { createProcessPlugin } from '../../src/process/plugin/client.js'
+import * as processPeerModule from '../../src/process/peer.js'
 import { RemoteMethodName } from '../../src/remote/constants.js'
 import { RuntimeEventName } from '../../src/remote/runtime-api/constants.js'
 import { createUnitBudget } from '@migaia/supervision'
@@ -127,7 +128,9 @@ describe('process Host replacement publication', () => {
     '[A3/A4] reclaims a real failed description and permits a fresh replacement (%s)',
     async (strategy) => {
       /** Real child exits prove the failed candidate cannot retain a process or budget lease. */
-      const fixture = nativeHostOptions('old')
+      const fixture = nativeHostFixture('old')
+      /** Call-through observes the genuine factory readiness Promise, not a fixture ready facade. */
+      const preparing = vi.spyOn(processPeerModule, 'createProcessPeer')
       const original = fixture.options.endpointFactory
       const primary = createProcessError(RpcProcessErrorCode.hostInvalidOption)
       let endpoints = 0
@@ -139,9 +142,9 @@ describe('process Host replacement publication', () => {
       const gate = new Promise<void>((resolve) => {
         fail = resolve
       })
-      const host = createProcessHost({
+      const options = {
         ...fixture.options,
-        endpointFactory: async (...args) => {
+        endpointFactory: async (...args: Parameters<typeof original>) => {
           const served = await original(...args)
           const ordinal = ++endpoints
           return {
@@ -159,39 +162,61 @@ describe('process Host replacement publication', () => {
             }
           }
         }
-      })
+      }
       try {
-        await host.use('p')
+        await fixture.host.use(createProcessPlugin(options))
+        const outlet = fixture.host.process!
+        await outlet.request('child', RemoteMethodName.hostUse, ['p'])
         const old = fixture.handles[0]!
-        const replacing = host.replace({ strategy })
+        const candidate = createProcessPlugin(options)
+        const replacing =
+          strategy === 'stop-then-start'
+            ? outlet.stop('child').then(() => fixture.host.replace('child', candidate))
+            : fixture.host.replace('child', candidate)
         const outcome = Promise.allSettled([replacing])
         await describing
         const readiness =
-          strategy === 'stop-then-start' ? Promise.allSettled([host.ready()]) : undefined
+          strategy === 'stop-then-start'
+            ? Promise.allSettled([preparing.mock.results[1]!.value])
+            : undefined
         fail()
-        expect((await outcome)[0]).toMatchObject({ status: 'rejected', reason: primary })
+        const failed = (await outcome)[0]!
+        expect(failed).toMatchObject({
+          status: 'rejected',
+          reason: { code: 'PLUGIN_INSTALL_FAILED' }
+        })
+        if (failed.status === 'rejected') expect(failed.reason.cause).toBe(primary)
         if (readiness)
           expect((await readiness)[0]).toMatchObject({ status: 'rejected', reason: primary })
         await fixture.handles[1]!.exited
-        if (fixture.options.deployment.kind !== 'spawn') throw new Error('fixture deployment')
-        expect(fixture.options.deployment.supervision.budget!.inUse).toBe(
+        expect(fixture.options.spawn.supervision.budget!.inUse).toBe(
           strategy === 'start-then-switch' ? 1 : 0
         )
         if (strategy === 'start-then-switch') {
-          const features = await host.use('p')
-          expect(await features.f!.request!(['still-old'])).toMatchObject({ pid: old.identity.pid })
+          await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+          expect(await outlet.request('child', 'p.request', 'still-old')).toMatchObject({
+            pid: old.identity.pid
+          })
         } else {
           await old.exited
-          await expect(host.use('p')).rejects.toMatchObject({ code: 'REMOTE_CLOSED' })
+          expect(() => outlet.request('child', RemoteMethodName.hostUse, ['p'])).toThrow(
+            expect.objectContaining({ code: 'TARGET_UNKNOWN' })
+          )
         }
-        expect(await host.replace({ strategy: 'stop-then-start' })).toBe(host)
-        const fresh = await host.use('p')
-        expect(await fresh.f!.request!(['recovered'])).toMatchObject({
+        if (strategy === 'start-then-switch') await outlet.stop('child')
+        await fixture.host.replace('child', createProcessPlugin(options))
+        expect(fixture.host.process).toBe(outlet)
+        await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+        expect(await outlet.request('child', 'p.request', 'recovered')).toMatchObject({
           pid: fixture.handles[2]!.identity.pid
         })
       } finally {
         fail()
-        await host.release()
+        try {
+          await fixture.close()
+        } finally {
+          preparing.mockRestore()
+        }
       }
     }
   )
