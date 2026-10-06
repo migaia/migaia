@@ -33,6 +33,25 @@
 - Report the result of all three gates in the final response.
 - Store all test files under the owning package's `test/` directory (for example, `packages/foo/test/`); do not mix test files with main source files.
 
+## Measurement and Diagnostic Fixtures
+
+- A bench, soak, spike, or hypothesis fixture that counts failures must record the full classification of every failure, not only `error.code`. Record at least `source`, `code`, `name`, the package-local reason enum when one exists (for example `onRejected.reason` / `RpcProviderRejectionReason`), and a redacted message. One code can map to several branches (for example `OVERLOADED` covers replay-ledger full, provider concurrency, and binding expiry), so a code-only counter cannot locate a cause.
+- Before a measurement window starts, list which codes the fixture can observe and which branches share each code. If a code is shared, wire the existing reason channel (rejection listener/report hook) into the fixture before measuring. Do not add a new production diagnostic path just for the fixture.
+- Record the observed concurrency at the layer the hypothesis is about. Client in-flight count is not provider concurrency; rate-catch-up loops that send backlog in bursts must record their burst size or be bounded, so averaged RPS is not reported as smooth load.
+- A conclusion may only exclude causes that have independent evidence. Unexplained rejections stay `UNVERIFIED` with the missing evidence named; lost classification cannot be reconstructed after the window and requires a re-run with complete recording.
+
+## Exclusive Measurement Window
+
+- Every heavy command runs inside the repository exclusive window, from any chat, sub-agent or worktree: build, full or package test runs, `test:e2e`, `make ci`/`ci-fast`, website tests, bench, soak and DA1/W3 measurement. Use the absolute entry point so worktrees without the script still share one lock:
+  `node /Users/kaeo/workspack/migai/scripts/exclusive-window.mjs run --window <short-name> --wait 2700 -- <command...>`
+- The window's mutex is the loopback port `127.0.0.1:47219` held by the runner; the lock file under `~/.local/state/migaia/exclusive-window/` is metadata only. Never create, edit or delete that file or any other lock file by hand, and never implement a private lock script. The file-based `docs/rpc/scratch/EXCLUSIVE-WINDOW.lock` protocol is retired.
+- Measurement windows (bench, soak, DA1/W3, any timing evidence) add `--end-load enforce`, so a run that ends above the load ceiling exits `75` instead of passing. Builds and test gates keep the default `report`, which only records the breach in history.
+- The runner enforces the 45-minute cap, the load gate (≤5 at start; at end per `--end-load`), heartbeat, process-group termination and history. Do not re-implement them around it. Exit `75` means busy, load too high, or a failed heartbeat: retry later or wait. Exit `69` means another service owns the port: stop and report it. Exit `124` means the cap was hit.
+- Waiting runners queue fairly: a higher priority goes first, then first come, first served, so a thread that issues windows back to back cannot starve the others. Delivery and implementation threads keep the default `normal` priority. Background measurement, research, design prototypes and audits run with `low`: pass `--priority low`, or set `MIGAIA_EXCLUSIVE_WINDOW_PRIORITY=low` for the whole thread. Use `high` only when the user asks for it. Do not add sleeps or retry loops to jump the queue; `--wait` already polls, and the head of the queue is admitted within about a second of a release.
+- Inspect with `node /Users/kaeo/workspack/migai/scripts/exclusive-window.mjs status`, which also lists the queued waiters. A `stale` result is reported, never waited on forever; clear it with `... reap`, which only acts while holding the port.
+- Sandboxed agents: full-access threads need nothing extra. The workspace-write sandbox denies loopback `listen` and writes outside the workspace, so a thread in that mode must run the whole wrapped command with escalated permissions; never drop the wrapper to avoid an approval.
+- Short, single-file unit runs and read-only commands (lint, format check, typecheck of one package) do not need the window.
+
 ## TypeScript Type Conventions
 
 - Prefer `type` for every named type that it can express. Use `interface` only when TypeScript specifically requires interface semantics, such as declaration merging or module augmentation; document that reason next to the declaration.
