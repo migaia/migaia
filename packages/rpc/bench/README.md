@@ -94,6 +94,22 @@ real directory. These reads perform RPC allocation and are not described as
 equivalent to the bare out-of-band snapshot cost. Formal echo samples contain
 no snapshot calls, counters, debugger or profile overlay.
 
+Deno supplementary cells are listed separately in `deno-units.json`; the original
+76-cell inventory and `db5441cc` values stay unchanged. Both stdio sides use the
+actual Deno Command/std-stream adapter. The Worker cell uses a native Deno Web
+Worker and the public Thread Peer. Its cold entry installs loaded-byte hooks,
+loads the SDK, and attaches the original automatic bootstrap capture before the
+canonical launcher adopts the prestarted native object. Startup is outside
+warmup and timing. Bare Worker keeps one JSON parse/stringify echo and a separate
+snapshot port. RPC Worker snapshots use the same private boundary method as Bun.
+
+Deno's compatibility `threadId` and ELU zeroes are explicitly unavailable;
+receipts use `null` plus the actual parent/peer/Worker isolate role. Native
+thread CPU, process memory, PID deduplication and loader-supplied source hashes
+remain separately recorded. Unsupported Worker final-exit semantics are not
+promoted to an actual-exit receipt. These new cells remain unfrozen until the
+final-source A/A and SDK baseline receipts are installed.
+
 The six sustained >=400-second cells run separately with the replay fixture's
 full records and classifications. A native send/receive change requires fresh
 records from that code version. B0 is historical wall-budget tracking only.

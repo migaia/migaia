@@ -1,0 +1,25 @@
+{
+  "revision": "I28-deno-supplement",
+  "units": [
+    {
+      "id": "deno:stdio-framed:64",
+      "executable": "deno",
+      "executableArgs": ["run", "-A"],
+      "runtime": "deno",
+      "carrier": "stdio-framed",
+      "codec": "json",
+      "payloadBytes": 64,
+      "concurrency": 1
+    },
+    {
+      "id": "deno:worker:64",
+      "executable": "deno",
+      "executableArgs": ["run", "-A"],
+      "runtime": "deno",
+      "carrier": "worker",
+      "codec": "identity",
+      "payloadBytes": 64,
+      "concurrency": 1
+    }
+  ]
+}

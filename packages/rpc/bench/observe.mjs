@@ -4,6 +4,15 @@ import { parentPort, workerData, threadId } from 'node:worker_threads'
 import { performance } from 'node:perf_hooks'
 import { IpcBenchControl } from './text.mjs'
 
+/** Deno exposes Node compatibility zeroes for ELU/threadId, rather than native observations. */
+const deno = typeof Deno !== 'undefined'
+/** Physical Worker entry has a global messaging port; stdio children retain their real argv. */
+const isolateRole =
+  parentPort || (deno && typeof globalThis.postMessage === 'function')
+    ? 'worker'
+    : process.argv.includes('--child')
+      ? 'peer'
+      : 'parent'
 /** Actual loaded dist bytes are retained per isolate; formal execution never applies an overlay. */
 const loaded = []
 /** Each child owns its out-of-band snapshot sequence, outside measured exchanges. */
@@ -37,7 +46,8 @@ function observe(path, source) {
     loadedSHA256: actualSHA256,
     diskSHA256: createHash('sha256').update(readFileSync(path)).digest('hex'),
     pid: process.pid,
-    threadId,
+    threadId: deno ? null : threadId,
+    isolateRole,
     diagnosticOverlay: false
   })
   return source
@@ -83,10 +93,12 @@ if (process.versions.bun) {
 export function snapshot() {
   return {
     pid: process.pid,
-    threadId,
+    threadId: deno ? null : threadId,
+    isolateRole,
     threadCpu: typeof process.threadCpuUsage === 'function' ? process.threadCpuUsage() : null,
     threadCpuSemantics: process.versions.bun ? 'UNVERIFIED_BUN_API' : 'native threadCpuUsage',
-    elu: performance.eventLoopUtilization(),
+    elu: deno ? null : performance.eventLoopUtilization(),
+    eluStatus: deno ? 'UNAVAILABLE_DENO_NODE_COMPATIBILITY' : 'native eventLoopUtilization',
     memory: process.memoryUsage(),
     loaded: [...loaded],
     classification: globalThis.__IPC_BENCH_CLASSIFICATION ?? null,
@@ -96,7 +108,7 @@ export function snapshot() {
   }
 }
 
-if (parentPort) {
+if (parentPort && !deno) {
   workerData?.benchPort?.on('message', () => workerData.benchPort.postMessage(snapshot()))
   if (workerData?.data?.observation)
     observationReady = new Promise((resolve) => {
