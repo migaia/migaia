@@ -3,20 +3,13 @@ import { mkdirSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { expect } from 'vitest'
 import { createRpcStreamFrameDecoder } from '@migaia/rpc/contract/framing/stream'
-import { PluginHost } from '@migaia/plugin-host'
 import { createUnitBudget, type IUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle } from '@migaia/supervision/process'
 import { createProcessTransport, createNativeProcessOffer } from '@migaia/rpc/process'
-import {
-  createProcessPlugin,
-  type IProcessByteChannel,
-  type IProcessPluginOptions
-} from '@migaia/rpc/process'
-import { createProcessHost } from '@migaia/rpc/process'
+import { type IProcessByteChannel, type IProcessPluginOptions } from '@migaia/rpc/process'
 import { createNodeProcessLauncher } from '@migaia/rpc/process/adapters/node-child-process'
 import { dialProcessByteChannel } from '@migaia/rpc/process/adapters/node-socket'
-import type { IRemoteContract, IRemoteServeEndpoint } from '@migaia/rpc/remote'
-import { endpointFor, bridgeEndpointFor } from '../peers/ts/runtime.js'
+import type { IRemoteContract } from '@migaia/rpc/remote'
 import { fdLauncher } from '../../bridge/fixtures/jsonrpc-process.js'
 import { createJsonRpcRemoteChannel } from '@migaia/rpc/bridge/jsonrpc'
 import { createProcessPeer } from '../../../src/process/adapters/node-peer.js'
@@ -255,10 +248,7 @@ function deployment(
       }
   return { selected, handles, output, stdout, sent, reports, rawChannels }
 }
-/**
- * Install the public processPlugin or processHost and retain its exact composed endpoint for
- * control observations.
- */
+/** Prepare the public process Peer and retain its exact original endpoint for control observations. */
 async function client(
   peer: (typeof peers)[number],
   hostProfile: boolean,
@@ -268,104 +258,45 @@ async function client(
   budget?: IUnitBudget<'process'>
 ) {
   const fixture = deployment(peer, hostProfile, token, address, bridge, budget)
-  /** Independent peers exchange v2 directories; no v1 contract parser participates. */
-  if (!bridge && ['python', 'go', 'rust'].includes(peer.language)) {
-    /** Source identity and capabilities belong to the canonical runtime Peer preparation. */
-    const self = { name: 'caller', instanceId: 'caller' }
-    /** Existing native proposal retains physical controls while requiring the new runtime baseline. */
-    const source = {
-      ...fixture.selected,
-      offer: {
-        ...fixture.selected.offer!,
-        capabilities: prepareRuntimePeerSourceContext(self).capabilities
+  /** All native and bridge carriers use the same public Peer and original source owner. */
+  const self = { name: 'caller', instanceId: 'caller' }
+  /** Bridge hello owns its proposal; native hello uses the actual installed endpoint offer. */
+  const { offer: priorOffer, ...deploymentOptions } = fixture.selected
+  const source = bridge
+    ? deploymentOptions
+    : {
+        ...deploymentOptions,
+        offer: {
+          ...priorOffer!,
+          capabilities: prepareRuntimePeerSourceContext(self).capabilities
+        }
       }
-    }
-    /** Native supervision, budgets, channel ownership and provider roots remain production-owned. */
-    const active = await createProcessPeer({
-      self,
-      ...(source.kind === 'spawn' ? { spawn: source } : { connect: source }),
-      report: (error) => fixture.reports.push(error)
-    })
-    /** The actual selected runtime exposes its original core controls to existing observations. */
-    const accepted = readRuntimePeerConnection(active)
-    /** Pure fixture method projections exercise the current production caller, not a legacy facade. */
-    const feature: IBusinessFeature = {
-      request: (params, options) => active.request('p.f.request', params, options),
-      oneWay: (params) => active.notify('p.f.oneWay', params),
-      generator: (params) => active.stream('p.f.generator', params),
-      asyncGenerator: (params) => active.stream('p.f.asyncGenerator', params)
-    }
-    if (hostProfile) await active.request('migaia.remote.host.use', ['p', { local: 'value' }])
-    return {
-      ...fixture,
-      feature,
-      runtime: {
-        endpoint: accepted.endpoint,
-        oneWay: accepted.endpoint,
-        stream: accepted.endpoint.stream
-      },
-      close: active.close,
-      remove: hostProfile ? () => active.request('migaia.remote.host.unUse', ['p']) : undefined,
-      inspect: hostProfile ? () => active.request('migaia.remote.host.inspect', []) : undefined
-    }
-  }
-  const selectedContract = bridge ? bridgeContract : contract
-  let runtime: IRemoteServeEndpoint | undefined
-  const endpointFactory = async (channel: Parameters<typeof endpointFor>[0]) => {
-    runtime = await (bridge ? bridgeEndpointFor : endpointFor)(channel, 'caller')
-    return runtime
-  }
-  const local = new PluginHost<Record<string, never>>({
-    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-  })
-  if (hostProfile) {
-    const facade = createProcessHost({
-      catalog: { p: selectedContract },
-      deployment: fixture.selected,
-      endpointFactory,
-      report: (error) => fixture.reports.push(error)
-    })
-    try {
-      await facade.ready()
-      const installed = await facade.use('p', { local: 'value' })
-      expect(await facade.inspect()).toMatchObject({ plugins: [{ name: 'p' }] })
-      return {
-        ...fixture,
-        feature: installed.f as unknown as IBusinessFeature,
-        runtime: runtime!,
-        close: () => facade.release(),
-        remove: () => facade.unUse('p'),
-        inspect: () => facade.inspect()
-      }
-    } catch (error) {
-      await facade.release()
-      throw error
-    }
-  }
-  const definition = createProcessPlugin({
-    name: 'p',
-    contract: selectedContract,
-    registrationOwner: { name: 'p', host: local },
-    host: local.plugin,
-    deployment: fixture.selected,
-    endpointFactory,
+  const active = await createProcessPeer({
+    self,
+    ...(source.kind === 'spawn' ? { spawn: source } : { connect: source }),
     report: (error) => fixture.reports.push(error)
   })
-  try {
-    const [installed] = await local.use(definition)
-    return {
-      ...fixture,
-      feature: installed!.getFeature('f') as unknown as IBusinessFeature,
-      runtime: runtime!,
-      close: async () => {
-        await local.dispose()
-      },
-      remove: undefined,
-      inspect: undefined
-    }
-  } catch (error) {
-    await local.dispose()
-    throw error
+  /** Core fault observers retain the exact endpoint accepted by the new production caller. */
+  const accepted = readRuntimePeerConnection(active)
+  /** These application payload projections preserve the original Promise and iterator. */
+  const feature: IBusinessFeature = {
+    request: (params, options) => active.request('p.f.request', params, options),
+    oneWay: (params) => active.notify('p.f.oneWay', params),
+    generator: (params) => active.stream('p.f.generator', params),
+    asyncGenerator: (params) => active.stream('p.f.asyncGenerator', params)
+  }
+  if (hostProfile) await active.request('migaia.remote.host.use', ['p', { local: 'value' }])
+  return {
+    ...fixture,
+    feature,
+    runtime: {
+      endpoint: accepted.endpoint,
+      oneWay: accepted.endpoint,
+      stream: accepted.endpoint.stream
+    },
+    close: active.close,
+    remove: hostProfile ? () => active.request('migaia.remote.host.unUse', ['p']) : undefined,
+    inspect: hostProfile ? () => active.request('migaia.remote.host.inspect', []) : undefined
   }
 }
 /**

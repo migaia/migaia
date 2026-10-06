@@ -1,15 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
+import { defineFeature, definePlugin } from '@migaia/plugin-host'
+import { runtimeTestHost } from '../runtime-api/fixture.js'
+import { RUNTIME_API_BASE_CAPABILITIES } from '../../src/remote/runtime-api/constants.js'
+import { prepareRuntimePeerEndpoint } from '../../src/remote/runtime-api/peer.js'
+import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
 import { describe, expect, it } from 'vitest'
-import { createEndpoint } from '../../src/core/index.js'
-import type { IRpcEndpoint } from '../../src/core/typing.js'
-import { abort } from '../../src/core/middleware/abort.js'
-import { codec } from '../../src/core/middleware/codec.js'
-import { connect } from '../../src/core/middleware/connect.js'
-import { framer } from '../../src/core/middleware/framer.js'
-import { ping } from '../../src/core/middleware/ping.js'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
@@ -17,7 +14,6 @@ import {
 import { createProcessTransport } from '../../src/process/handshake.js'
 import { createNativeProcessOffer } from '../../src/process/offer.js'
 import { createProcessPlugin } from '../../src/process/plugin/client.js'
-import { createServeProcessPlugin } from '../../src/process/plugin/serve.js'
 import type { IProcessByteListener } from '../../src/process/types.js'
 import type { IRemoteContract } from '../../src/remote/contract.js'
 import type { IRemoteChannel, IRemoteServeEndpoint } from '../../src/remote/types.js'
@@ -30,28 +26,20 @@ const contract: IRemoteContract = {
 }
 
 /** Each endpoint uses the authenticated channel's negotiated codec and IPC features. */
-async function endpointFor(channel: IRemoteChannel, id: string): Promise<IRemoteServeEndpoint> {
-  const endpoint = await createEndpoint({
-    id,
-    transport: channel.transport,
-    features: [channel.features[0]!, channel.features[1]!] as const,
-    middlewares: [
-      codec(channel.pipeline.codec),
-      framer(channel.pipeline.framer),
-      abort(),
-      connect({ transport: channel.transport }),
-      ping()
-    ]
-  })
-  return { endpoint: endpoint as unknown as IRpcEndpoint }
+function endpointFor(channel: IRemoteChannel, id: string): Promise<IRemoteServeEndpoint> {
+  return prepareRuntimePeerEndpoint(
+    { self: { name: id, instanceId: id }, report: () => undefined },
+    channel,
+    new AbortController().signal
+  )
 }
 
 describe('native process plugin socket', () => {
   it('[A2/A4/A8] authenticates two clients and isolates a rejected token', async () => {
     const address = join(tmpdir(), `rp-${randomUUID().slice(0, 8)}.sock`)
     const token = 'socket-plugin-secret'
-    const serverHost = new PluginHost<Record<string, never>>({
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    const serverHost = runtimeTestHost({
+      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
     await serverHost.use(
       definePlugin({
@@ -66,58 +54,60 @@ describe('native process plugin socket', () => {
     let endpoints = 0
     /** Listener closure must not close already authenticated sessions. */
     let listener: IProcessByteListener | undefined
-    const serving = await createServeProcessPlugin({
-      host: serverHost,
-      contract,
-      createSharedTarget: async () => undefined,
-      onInstanceUnhealthy: () => () => undefined,
-      report: () => undefined,
-      endpointFactory: async (channel) => {
-        endpoints += 1
-        return endpointFor(channel, 'server')
-      },
-      ingress: {
-        kind: 'listener',
-        listen: async (options) => {
-          listener = await listenProcessByteChannel(options)
-          return listener
+    await serverHost.use(
+      createProcessPlugin({
+        name: 'listener',
+        self: { name: 'server', instanceId: 'server' },
+        expose: ['p'],
+        contract,
+        report: () => undefined,
+        endpointFactory: async (channel) => {
+          endpoints += 1
+          return endpointFor(channel, 'server')
         },
-        address,
-        verify(auth) {
-          if (auth !== token) throw new TypeError('authentication rejected')
-          return 'trusted-client'
-        },
-        offer: createNativeProcessOffer({ peer: { id: 'server', runtime: 'node' } }),
-        createConnectionContext: () => {
-          accepted += 1
-          return {
-            peerId: `client-${accepted}`,
-            ipc: {
-              connectionId: `server-connection-${accepted}`,
-              sessionId: `server-session-${accepted}`,
-              log: () => undefined
+        listen: {
+          kind: 'listener',
+          listen: async (options) => {
+            listener = await listenProcessByteChannel(options)
+            return listener
+          },
+          address,
+          verify(auth) {
+            if (auth !== token) throw new TypeError('authentication rejected')
+            return 'trusted-client'
+          },
+          offer: createNativeProcessOffer({
+            peer: { id: 'server', runtime: 'node' },
+            capabilities: RUNTIME_API_BASE_CAPABILITIES
+          }),
+          createConnectionContext: () => {
+            accepted += 1
+            return {
+              peerId: `client-${accepted}`,
+              ipc: {
+                connectionId: `server-connection-${accepted}`,
+                sessionId: `server-session-${accepted}`,
+                log: () => undefined
+              }
             }
           }
         }
-      }
-    })
+      })
+    )
     /** The two local Hosts own only their respective borrowed socket sessions. */
-    const clients = [0, 1].map(
-      () =>
-        new PluginHost<Record<string, never>>({
-          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-        })
+    const clients = [0, 1].map(() =>
+      runtimeTestHost({
+        host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+      })
     )
     /** The adapter must use the token passed by the binding, including wrong tokens. */
-    const pluginFor = (host: (typeof clients)[number], credential: string, clientId: string) =>
-      createProcessPlugin({
-        name: 'p',
-        contract,
-        registrationOwner: { name: 'p', host },
-        host: host.plugin,
+    const pluginFor = (credential: string, clientId: string) =>
+      createProcessPlugin<IRuntimeDynamicSurface>({
+        name: 'server',
+        self: { name: 'client', instanceId: clientId },
         report: () => undefined,
         endpointFactory: (channel) => endpointFor(channel, clientId),
-        deployment: {
+        connect: {
           kind: 'connect',
           address,
           token: credential,
@@ -128,8 +118,9 @@ describe('native process plugin socket', () => {
             return createProcessTransport(raw, {
               role: 'initiator',
               offer: createNativeProcessOffer({
-                peer: { id: 'client', runtime: 'node' },
-                auth: options.token
+                peer: { id: clientId, runtime: 'node' },
+                auth: options.token,
+                capabilities: RUNTIME_API_BASE_CAPABILITIES
               }),
               peerId: 'server',
               ipc: { ...options.session, log: () => undefined },
@@ -140,34 +131,35 @@ describe('native process plugin socket', () => {
         }
       })
     try {
-      const [first] = await clients[0]!.use(pluginFor(clients[0]!, token, 'client-1'))
-      const [second] = await clients[1]!.use(pluginFor(clients[1]!, token, 'client-2'))
-      const request = (handle: typeof first) =>
-        (handle!.getFeature('f') as { request(params: unknown[]): Promise<unknown> }).request([
-          'ready'
-        ])
-      expect(await request(first)).toBe('socket:ready')
-      expect(await request(second)).toBe('socket:ready')
-      const wrongHost = new PluginHost<Record<string, never>>({
-        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      await clients[0]!.use(pluginFor(token, 'client-1'))
+      await clients[1]!.use(pluginFor(token, 'client-2'))
+      expect(await clients[0]!.process!.request('server', 'p.request', 'ready')).toBe(
+        'socket:ready'
+      )
+      expect(await clients[1]!.process!.request('server', 'p.request', 'ready')).toBe(
+        'socket:ready'
+      )
+      const wrongHost = runtimeTestHost({
+        host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
       })
       try {
-        await expect(
-          wrongHost.use(pluginFor(wrongHost, 'wrong-token', 'client-3'))
-        ).rejects.toBeDefined()
+        await expect(wrongHost.use(pluginFor('wrong-token', 'client-3'))).rejects.toBeDefined()
         expect(endpoints).toBe(2)
       } finally {
         await wrongHost.dispose()
       }
       await clients[0]!.dispose()
-      expect(await request(second)).toBe('socket:ready')
+      expect(await clients[1]!.process!.request('server', 'p.request', 'ready')).toBe(
+        'socket:ready'
+      )
       await listener!.close()
-      expect(await request(second)).toBe('socket:ready')
+      expect(await clients[1]!.process!.request('server', 'p.request', 'ready')).toBe(
+        'socket:ready'
+      )
       expect(endpoints).toBe(2)
       expect(accepted).toBe(3)
     } finally {
       await Promise.allSettled(clients.map((host) => host.dispose()))
-      await serving.close()
       await serverHost.dispose()
     }
   })

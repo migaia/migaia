@@ -227,6 +227,11 @@ describe('[A1] independent native business peers through public process facades'
         }
         expect(active.handles).toHaveLength(1)
         const outcome = await active.handles[0]!.exited
+        /** Retain the actual native exit before judging ownership; signals are never inferred. */
+        writeFileSync(
+          join(evidence, `${peer.language}-stdio-${host}.exit.json`),
+          JSON.stringify(outcome)
+        )
         expect(outcome.code === 0 || outcome.signal === 'SIGKILL').toBe(true)
         expect(Buffer.concat(active.output).toString()).toContain('READY')
         const frames = wireFrames(active.sent)

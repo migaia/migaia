@@ -1,8 +1,11 @@
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it } from 'vitest'
-import { createProcessHost } from '../../src/process/host/client.js'
-import { BRIDGE_CONTRACT, bridgeEndpoint } from './fixture.js'
+import { createProcessPeer } from '../../src/process/peer.js'
+import type { IRuntimeProcessPeerOptions } from '../../src/process/runtime-peer.js'
+import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
+import { RemoteMethodName } from '../../src/remote/constants.js'
+import { BRIDGE_CONTRACT } from './fixture.js'
 import {
   childPath,
   token,
@@ -29,12 +32,11 @@ describe('JSON-RPC process Host ownership', () => {
     const order: string[] = []
     /** Reports retain their original identities for failure diagnosis. */
     const reports: unknown[] = []
-    /** The facade uses its normal stable remote Host assembly and lazy spawn path. */
-    const host = createProcessHost({
-      catalog: { p: BRIDGE_CONTRACT },
-      scheduler: systemScheduler,
+    /** Public Peer construction reuses the actual source, bridge handshake and native lifecycle. */
+    const options: IRuntimeProcessPeerOptions = {
+      self: { name: 'caller', instanceId: 'caller' },
       report: (error) => reports.push(error),
-      deployment: {
+      spawn: {
         kind: 'spawn',
         channelKind: 'byte',
         wire: 'jsonrpc',
@@ -84,28 +86,31 @@ describe('JSON-RPC process Host ownership', () => {
           restart: { maxRestarts: 0 },
           report: (error) => reports.push(error)
         },
-        rawChannel: async (handle) => handle.channel,
+        rawChannel: async (handle) => (handle as IFixtureHandle).channel,
         establish: establish([], reports, [], [], { kind: 'host', catalog: { p: BRIDGE_CONTRACT } })
-      },
-      endpointFactory: async (channel) => ({ endpoint: await bridgeEndpoint(channel) })
-    })
+      }
+    }
+    expect(handles).toHaveLength(0)
+    const host = await createProcessPeer<IRuntimeDynamicSurface>(options)
     try {
-      expect(handles).toHaveLength(0)
-      await host.ready()
-      expect(host.inspectRegistration()).toMatchObject({ state: 'ready', health: 'none' })
-      expect(await host.inspect()).toMatchObject({ plugins: [] })
+      expect((await host.describe()).connections[0]).toMatchObject({
+        unit: { state: 'ready' },
+        connection: { status: 'ready' },
+        health: { status: 'unavailable' }
+      })
+      expect(await host.request(RemoteMethodName.hostInspect, [])).toMatchObject({ plugins: [] })
       /** Public proxy requests follow actual describe/use negotiation with the handwritten peer. */
-      const features = await host.use('p', { mode: 'configuration' })
-      expect(await features.f!.request!(['host-business'])).toMatchObject({
+      await host.request(RemoteMethodName.hostUse, ['p', { mode: 'configuration' }])
+      expect(await host.request('p.f.request', ['host-business'])).toMatchObject({
         args: ['host-business'],
         first: 67
       })
-      expect(await host.inspect()).toMatchObject({
+      expect(await host.request(RemoteMethodName.hostInspect, [])).toMatchObject({
         plugins: [{ name: 'p', state: 'enabled', features: ['f'] }]
       })
-      expect(await host.unUse('p')).toEqual({ ok: true })
-      expect(await host.inspect()).toMatchObject({ plugins: [] })
-      await host.release()
+      expect(await host.request(RemoteMethodName.hostUnUse, ['p'])).toEqual({ ok: true })
+      expect(await host.request(RemoteMethodName.hostInspect, [])).toMatchObject({ plugins: [] })
+      await host.close()
       await handles[0]!.exited
       expect(order.indexOf('byte.close')).toBeLessThan(order.indexOf('process.terminate'))
       expect(writes.map((event) => event.method)).not.toContain('migaia.remote.close')
@@ -133,7 +138,7 @@ describe('JSON-RPC process Host ownership', () => {
         true
       )
     } finally {
-      await host.release()
+      await host.close()
     }
   })
 })
