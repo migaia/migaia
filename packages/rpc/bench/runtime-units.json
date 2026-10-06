@@ -1,0 +1,45 @@
+{
+  "revision": "I28-runtime-supplement",
+  "units": [
+    {
+      "id": "node:worker:64:reverse",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "worker",
+      "codec": "identity",
+      "payloadBytes": 64,
+      "concurrency": 1,
+      "direction": "reverse"
+    },
+    {
+      "id": "node:worker:64:managed",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "worker",
+      "codec": "identity",
+      "payloadBytes": 64,
+      "concurrency": 1,
+      "topology": "managed"
+    },
+    {
+      "id": "node:stdio-worker:64:one-hop",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "stdio-framed+worker",
+      "codec": "json+identity",
+      "payloadBytes": 64,
+      "concurrency": 1,
+      "topology": "one-hop"
+    },
+    {
+      "id": "node:stdio-worker:64:one-hop:c16",
+      "executable": "node",
+      "runtime": "node",
+      "carrier": "stdio-framed+worker",
+      "codec": "json+identity",
+      "payloadBytes": 64,
+      "concurrency": 16,
+      "topology": "one-hop"
+    }
+  ]
+}
