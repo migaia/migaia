@@ -3,12 +3,14 @@ import { spawn, spawnSync } from 'node:child_process'
 import {
   chmodSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   utimesSync,
   writeFileSync
 } from 'node:fs'
-import { createServer } from 'node:net'
+import { createConnection, createServer } from 'node:net'
 import { hostname, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { test } from 'node:test'
@@ -16,11 +18,13 @@ import { fileURLToPath } from 'node:url'
 import {
   ExitCode,
   inspectLock,
+  liveWaiters,
   lockPaths,
   parseArgs,
   probePort,
   reapLock,
-  runWindow
+  runWindow,
+  waiterDirectory
 } from '../exclusive-window.mjs'
 
 /** CLI entry under test. */
@@ -564,4 +568,435 @@ test('status and check report an ended window of this port as stale, not held', 
   const cli = (...args) => spawnSync(process.execPath, [script, ...args], { env, encoding: 'utf8' })
   assert.equal(cli('check').status, ExitCode.stale)
   assert.match(cli('status').stdout, /"state": "stale"/)
+})
+
+/**
+ * Starts a long-lived helper process whose pid stands in for another queued runner, because every
+ * in-process runner shares this test's pid.
+ */
+function helperProcess() {
+  /** Helper child that only sleeps until killed. */
+  const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore' })
+  return child
+}
+
+/** Writes a waiter record for `pid`, as a queued runner in another process would. */
+function writeWaiter(directory, waiter) {
+  mkdirSync(waiterDirectory(directory), { recursive: true })
+  writeFileSync(
+    join(waiterDirectory(directory), `${waiter.pid}.json`),
+    JSON.stringify({ seenAt: Date.now(), ...waiter })
+  )
+}
+
+test('a live higher-priority waiter is admitted first; a normal runner waits behind it', async () => {
+  /** Isolated environment. */
+  const { directory, env } = await sandbox()
+  /** Stand-in for a queued high-priority runner. */
+  const helper = helperProcess()
+  try {
+    writeWaiter(directory, { pid: helper.pid, priority: 'high', since: Date.now(), window: 'i28' })
+    /** Lines logged by the normal runner. */
+    const lines = []
+    /** Moment the normal runner started waiting. */
+    const begin = Date.now()
+    /** Normal runner; it may start only once the high waiter leaves the queue. */
+    const normal = runWindow({
+      command: ['node', '-e', ''],
+      waitSeconds: 5,
+      pollSeconds: 0.1,
+      env,
+      log: (line) => lines.push(line)
+    })
+    await delay(700)
+    assert.equal(history(lockPaths(directory)).length, 0)
+    helper.kill('SIGKILL')
+    assert.equal(await normal, 0)
+    assert.ok(Date.now() - begin >= 700)
+    assert.equal(history(lockPaths(directory)).length, 1)
+  } finally {
+    helper.kill('SIGKILL')
+  }
+})
+
+test('runners of the same priority are admitted first come, first served', async () => {
+  /** Isolated environment. */
+  const { directory, env } = await sandbox()
+  /** Stand-in for an earlier normal waiter. */
+  const earlier = helperProcess()
+  try {
+    writeWaiter(directory, {
+      pid: earlier.pid,
+      priority: 'normal',
+      since: Date.now() - 1000,
+      window: 'earlier'
+    })
+    /** Lines logged by the later runner. */
+    const lines = []
+    /** Exit code of a later normal runner that does not wait. */
+    const code = await runWindow({
+      command: ['node', '-e', ''],
+      env,
+      log: (line) => lines.push(line)
+    })
+    assert.equal(code, ExitCode.busy)
+    assert.match(lines[0], /waiting behind earlier/)
+    // A later waiter of the same priority does not block an earlier one.
+    writeWaiter(directory, {
+      pid: earlier.pid,
+      priority: 'normal',
+      since: Date.now() + 60_000,
+      window: 'later'
+    })
+    assert.equal(await runWindow({ command: ['node', '-e', ''], env, log: () => {} }), 0)
+  } finally {
+    earlier.kill('SIGKILL')
+  }
+})
+
+test('a low-priority thread set through the environment yields to a normal waiter', async () => {
+  /** Isolated environment, with the whole thread marked low priority. */
+  const { directory, env } = await sandbox({ MIGAIA_EXCLUSIVE_WINDOW_PRIORITY: 'low' })
+  /** Stand-in for a normal waiter that arrived later. */
+  const normal = helperProcess()
+  try {
+    writeWaiter(directory, {
+      pid: normal.pid,
+      priority: 'normal',
+      since: Date.now() + 60_000,
+      window: 'delivery'
+    })
+    /** Lines logged by the low runner. */
+    const lines = []
+    assert.equal(
+      await runWindow({ command: ['node', '-e', ''], env, log: (line) => lines.push(line) }),
+      ExitCode.busy
+    )
+    assert.match(lines[0], /waiting behind delivery/)
+  } finally {
+    normal.kill('SIGKILL')
+  }
+})
+
+test('waiter records of dead processes never block the queue', async () => {
+  /** Isolated environment. */
+  const { directory, env } = await sandbox()
+  /** Helper that exits immediately; its pid is then dead. */
+  const gone = spawnSync(process.execPath, ['-e', 'console.log(process.pid)'], {
+    encoding: 'utf8'
+  })
+  writeWaiter(directory, {
+    pid: Number(gone.stdout.trim()),
+    priority: 'high',
+    since: 0,
+    window: 'crashed'
+  })
+  assert.deepEqual(liveWaiters(directory), [])
+  assert.equal(await runWindow({ command: ['node', '-e', ''], env, log: () => {} }), 0)
+})
+
+test('a runner that had to wait leaves no waiter record behind', async () => {
+  /** Isolated environment. */
+  const { directory, port, env } = await sandbox()
+  /** First window holding the mutex briefly. */
+  const first = runWindow({
+    command: ['node', '-e', 'setTimeout(() => {}, 600)'],
+    env,
+    log: () => {}
+  })
+  assert.ok(await eventually(async () => (await probePort(port)).state === 'held'))
+  /** Second runner, which queues while the first holds the window. */
+  const second = runWindow({
+    command: ['node', '-e', ''],
+    waitSeconds: 5,
+    pollSeconds: 0.1,
+    env,
+    log: () => {}
+  })
+  assert.ok(await eventually(() => liveWaiters(directory).length === 1))
+  assert.equal(await first, 0)
+  assert.equal(await second, 0)
+  assert.deepEqual(liveWaiters(directory), [])
+})
+
+test('an unknown priority is a usage error from the CLI and from the API', async () => {
+  assert.match(parseArgs(['run', '--priority', 'urgent', '--', 'true']).error, /priority must be/)
+  for (const inherited of ['toString', 'constructor', '__proto__', 'hasOwnProperty'])
+    assert.match(
+      parseArgs(['run', '--priority', inherited, '--', 'true']).error,
+      /priority must be/
+    )
+  assert.equal(parseArgs(['run', '--priority', 'low', '--', 'true']).options.priority, 'low')
+  /** Isolated environment. */
+  const { env } = await sandbox({ MIGAIA_EXCLUSIVE_WINDOW_PRIORITY: 'urgent' })
+  assert.equal(await runWindow({ command: ['node', '-e', ''], env, log: () => {} }), ExitCode.usage)
+})
+
+test('a waiter whose live process stopped refreshing its record no longer blocks the queue', async () => {
+  /** Isolated environment. */
+  const { directory, env } = await sandbox()
+  /** Live process standing in for a runner that abandoned its wait (or a reused pid). */
+  const helper = helperProcess()
+  try {
+    writeWaiter(directory, {
+      pid: helper.pid,
+      priority: 'high',
+      since: Date.now() - 120_000,
+      seenAt: Date.now() - 120_000,
+      window: 'abandoned'
+    })
+    /** Exit code of a normal runner, which must not wait behind the abandoned record. */
+    const code = await runWindow({ command: ['node', '-e', ''], env, log: () => {} })
+    assert.equal(code, 0)
+  } finally {
+    helper.kill('SIGKILL')
+  }
+})
+
+test('with --end-load enforce, a successful command whose window ends above the ceiling fails', async () => {
+  /** Isolated environment. */
+  const { paths, env } = await sandbox()
+  /** Exit code when the load rises above the ceiling during the window. */
+  const code = await runWindow({
+    command: ['node', '-e', 'setTimeout(() => {}, 300)'],
+    maxLoad: 5,
+    env,
+    log: () => {}
+  })
+  // Raise the injected load mid-window for the next run, then run again.
+  assert.equal(code, 0)
+  setTimeout(() => {
+    env.MIGAIA_EXCLUSIVE_WINDOW_LOAD = '9'
+  }, 100)
+  /** Exit code of a window whose end load breaches the ceiling. */
+  const breached = await runWindow({
+    command: ['node', '-e', 'setTimeout(() => {}, 400)'],
+    maxLoad: 5,
+    endLoad: 'enforce',
+    env,
+    log: () => {}
+  })
+  assert.equal(breached, ExitCode.load)
+  assert.equal(history(paths).at(-1).endLoadExceeded, true)
+  // A failing command keeps its own code even when the end load is also too high.
+  env.MIGAIA_EXCLUSIVE_WINDOW_LOAD = '0'
+  setTimeout(() => {
+    env.MIGAIA_EXCLUSIVE_WINDOW_LOAD = '9'
+  }, 100)
+  assert.equal(
+    await runWindow({
+      command: ['node', '-e', 'setTimeout(() => process.exit(3), 400)'],
+      maxLoad: 5,
+      endLoad: 'enforce',
+      env,
+      log: () => {}
+    }),
+    3
+  )
+})
+
+test('an operator interrupt escalates to SIGKILL for a group that ignores it', async () => {
+  /** Isolated environment. */
+  const { directory, port, env } = await sandbox()
+  /** File where the command records its own pid. */
+  const pidFile = join(directory, 'stubborn.pid')
+  /** Runner process that receives the operator interrupt. */
+  const runner = spawn(
+    process.execPath,
+    [
+      script,
+      'run',
+      '--',
+      'node',
+      '-e',
+      `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); process.on('SIGINT', () => {}); process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)`
+    ],
+    { env, stdio: 'ignore' }
+  )
+  assert.ok(await eventually(() => existsSync(pidFile)))
+  /** Moment the interrupt was sent. */
+  const begin = Date.now()
+  runner.kill('SIGINT')
+  /** Runner exit code. */
+  const code = await new Promise((resolveExit) => runner.on('exit', (exit) => resolveExit(exit)))
+  assert.equal(code, 137)
+  assert.ok(Date.now() - begin < 15_000)
+  assert.equal(alive(Number(readFileSync(pidFile, 'utf8'))), false)
+  assert.equal((await probePort(port)).state, 'free')
+})
+
+test('by default an end-load breach is recorded but keeps the command exit code', async () => {
+  /** Isolated environment. */
+  const { paths, env } = await sandbox()
+  setTimeout(() => {
+    env.MIGAIA_EXCLUSIVE_WINDOW_LOAD = '9'
+  }, 100)
+  /** Exit code of a successful command whose window ends above the ceiling. */
+  const code = await runWindow({
+    command: ['node', '-e', 'setTimeout(() => {}, 400)'],
+    maxLoad: 5,
+    env,
+    log: () => {}
+  })
+  assert.equal(code, 0)
+  assert.equal(history(paths).at(-1).endLoadExceeded, true)
+  assert.equal(parseArgs(['run', '--end-load', 'enforce', '--', 'x']).options.endLoad, 'enforce')
+  for (const value of ['strict', 'toString'])
+    assert.match(parseArgs(['run', '--end-load', value, '--', 'x']).error, /end-load must be/)
+})
+
+test('a filesystem failure while taking the window releases the mutex port', async () => {
+  /** Isolated environment. */
+  const { directory, paths, port, env } = await sandbox()
+  // A directory where the lock file should be makes creating the file fail with EISDIR.
+  mkdirSync(paths.lock)
+  await assert.rejects(runWindow({ command: ['node', '-e', ''], env, log: () => {} }))
+  assert.equal((await probePort(port)).state, 'free')
+  rmSync(paths.lock, { recursive: true })
+  assert.equal(existsSync(join(directory, 'EXCLUSIVE-WINDOW.lock')), false)
+})
+
+test('a synchronous spawn failure releases the window and removes the lock file', async () => {
+  /** Isolated environment. */
+  const { paths, port, env } = await sandbox()
+  await assert.rejects(runWindow({ command: [42], env, log: () => {} }))
+  assert.equal((await probePort(port)).state, 'free')
+  assert.equal(existsSync(paths.lock), false)
+})
+
+test('a waiter cleanup failure is reported and does not leave the port held', async () => {
+  /** Isolated environment. */
+  const { directory, port, env } = await sandbox()
+  /** First window; the second runner must queue behind it. */
+  const first = runWindow({
+    command: ['node', '-e', 'setTimeout(() => {}, 800)'],
+    env,
+    log: () => {}
+  })
+  assert.ok(await eventually(async () => (await probePort(port)).state === 'held'))
+  /** Lines logged by the queued runner. */
+  const lines = []
+  /** Second runner, which registers a waiter file while it waits. */
+  const second = runWindow({
+    command: ['node', '-e', ''],
+    waitSeconds: 10,
+    pollSeconds: 0.05,
+    env,
+    log: (line) => lines.push(line)
+  })
+  assert.ok(await eventually(() => existsSync(waiterDirectory(directory))))
+  // Make the waiter directory read-only so removing the waiter file fails with EACCES.
+  chmodSync(waiterDirectory(directory), 0o500)
+  try {
+    assert.equal(await first, 0)
+    assert.equal(await second, 0)
+    assert.ok(lines.some((line) => /cleanup failed/.test(line)))
+    assert.equal((await probePort(port)).state, 'free')
+  } finally {
+    chmodSync(waiterDirectory(directory), 0o700)
+  }
+})
+
+test('a lock-file removal failure after a spawn failure still releases the port and keeps the spawn error', async () => {
+  /** Isolated environment. */
+  const { directory, port, env } = await sandbox()
+  /** Lines logged by the runner. */
+  const lines = []
+  try {
+    // The lock directory turns read-only once the lock file exists, so its removal fails.
+    await assert.rejects(
+      runWindow({
+        command: [42],
+        afterAcquire: () => chmodSync(directory, 0o500),
+        env,
+        log: (line) => lines.push(line)
+      }),
+      (error) => error.code === 'ERR_INVALID_ARG_TYPE'
+    )
+    assert.ok(lines.some((line) => /bookkeeping failed/.test(line)))
+    assert.equal((await probePort(port)).state, 'free')
+  } finally {
+    chmodSync(directory, 0o700)
+  }
+})
+
+test('probe clients that reset the connection do not crash the window holder', async () => {
+  /** Isolated environment. */
+  const { port, env } = await sandbox()
+  /** Window that stays open while connections are reset against it. */
+  const run = runWindow({
+    command: ['node', '-e', 'setTimeout(() => {}, 800)'],
+    env,
+    log: () => {}
+  })
+  assert.ok(await eventually(async () => (await probePort(port)).state === 'held'))
+  for (let index = 0; index < 20; index += 1) {
+    /** Client that resets instead of reading the reply. */
+    const client = createConnection({ port, host: '127.0.0.1' })
+    client.on('error', () => {})
+    client.on('connect', () => client.resetAndDestroy())
+  }
+  assert.equal(await run, 0)
+  assert.equal((await probePort(port)).state, 'free')
+})
+
+test('a listener that trickles bytes cannot hold a probe past its deadline', async () => {
+  /** Isolated environment. */
+  const { port } = await sandbox()
+  /** Stranger that sends one byte every 100 ms and never ends. */
+  const stranger = createServer((socket) => {
+    socket.on('error', () => {})
+    const timer = setInterval(() => socket.write('x'), 100)
+    socket.on('close', () => clearInterval(timer))
+  })
+  await new Promise((resolveListen) => stranger.listen(port, '127.0.0.1', resolveListen))
+  try {
+    /** Moment the probe started. */
+    const begin = Date.now()
+    assert.equal((await probePort(port, 500)).state, 'conflict')
+    assert.ok(Date.now() - begin < 2000)
+  } finally {
+    await new Promise((resolveClose) => stranger.close(resolveClose))
+  }
+})
+
+test('a lock-file write failure removes the partial file and releases the port', async () => {
+  /** Isolated environment. */
+  const { paths, port, env } = await sandbox()
+  // A BigInt in the recorded command makes serializing the record throw after the file is opened.
+  await assert.rejects(runWindow({ command: ['node', 10n], env, log: () => {} }), TypeError)
+  assert.equal(existsSync(paths.lock), false)
+  assert.equal((await probePort(port)).state, 'free')
+})
+
+test('timer-driven numbers must fit a Node timer', async () => {
+  assert.match(parseArgs(['run', '--max-seconds', '3000000', '--', 'x']).error, /--max-seconds/)
+  assert.match(parseArgs(['run', '--wait', '3000000', '--', 'x']).error, /--wait/)
+  /** Isolated environment. */
+  const { env } = await sandbox()
+  for (const option of [
+    { pollSeconds: 0 },
+    { heartbeatSeconds: Number.NaN },
+    { killGraceSeconds: -1 }
+  ])
+    assert.equal(
+      await runWindow({ command: ['node', '-e', ''], ...option, env, log: () => {} }),
+      ExitCode.usage
+    )
+})
+
+test('a command that cannot start keeps its cause in the log and the history', async () => {
+  /** Isolated environment. */
+  const { paths, env } = await sandbox()
+  /** Lines logged by the runner. */
+  const lines = []
+  /** Exit code for a missing command. */
+  const code = await runWindow({
+    command: ['/nonexistent/exclusive-window-command'],
+    env,
+    log: (line) => lines.push(line)
+  })
+  assert.equal(code, 127)
+  assert.ok(lines.some((line) => /failed to start \(ENOENT\)/.test(line)))
+  assert.equal(history(paths).at(-1).spawnError.code, 'ENOENT')
 })
