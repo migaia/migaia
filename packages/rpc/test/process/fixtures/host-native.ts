@@ -9,8 +9,8 @@ import { createNativeProcessOffer } from '../../../src/process/offer.js'
 import { createProcessPeer } from '../../../src/process/peer.js'
 import { RUNTIME_API_BASE_CAPABILITIES } from '../../../src/remote/runtime-api/constants.js'
 import type { IRuntimeDynamicSurface } from '../../../src/remote/runtime-api/typing.js'
-import type { IProcessHostOptions } from '../../../src/process/host/types.js'
 import type { IRemoteHostCatalog } from '../../../src/remote/contract.js'
+import type { IRemoteEndpointFactory } from '../../../src/remote/types.js'
 import { nativeEndpoint } from './native-runtime.js'
 import type { IProcessHandle } from '@migaia/supervision/process'
 import {
@@ -34,17 +34,22 @@ export const nativeHostChildPath = fileURLToPath(
 export const nativeHostToken = 'host-fixture-secret'
 
 /** Assemble real process bindings while retaining actual handles for PID and exit assertions. */
-export function nativeHostOptions(value = 'initial', maxUnits = 2) {
+export function nativeHostFixture(value = 'initial', maxUnits = 2) {
   const launcher = createNodeProcessLauncher()
   const handles: IProcessHandle[] = []
   const reports: unknown[] = []
-  const options: IProcessHostOptions = {
-    catalog: nativeHostCatalog,
+  /** Retain the canonical two-argument factory type even though this native owner ignores signal. */
+  const endpointFactory: IRemoteEndpointFactory = (channel) =>
+    nativeEndpoint(channel, 'host-parent')
+  /** Modern options directly retain the actual original native source and endpoint owner. */
+  const options = {
+    name: 'child',
+    self: { name: 'host-parent', instanceId: 'host-parent' },
     report: (error) => {
       reports.push(error)
     },
-    endpointFactory: (channel) => nativeEndpoint(channel, 'host-parent'),
-    deployment: {
+    endpointFactory,
+    spawn: {
       kind: 'spawn',
       channelKind: 'byte',
       wire: 'native',
@@ -52,7 +57,8 @@ export function nativeHostOptions(value = 'initial', maxUnits = 2) {
       offer: createNativeProcessOffer({
         peer: { id: 'host-parent', runtime: 'node' },
         auth: nativeHostToken,
-        stream: true
+        stream: true,
+        capabilities: RUNTIME_API_BASE_CAPABILITIES
       }),
       supervision: {
         id: 'native-host',
@@ -99,42 +105,14 @@ export function nativeHostOptions(value = 'initial', maxUnits = 2) {
         })
       }
     }
-  }
-  return { options, handles, reports }
-}
-
-/** One actual local Host installs a symmetric connection and retains its original native handles. */
-export function nativeHostFixture(value = 'initial', maxUnits = 2) {
-  /** Reuse the original real launcher, byte authentication, spec, budget and PID observations. */
-  const fixture = nativeHostOptions(value, maxUnits)
-  /** This fixture owns its local Host; no remote control facade or lifecycle state is simulated. */
+  } satisfies IRuntimeProcessPluginOptions
+  /** This real local Host owns the connection definition, never the remote target Host. */
   const host = runtimeTestHost({
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
-  /** The native fixture always supplies a spawn deployment; the type preserves the original union. */
-  const deployment = fixture.options.deployment
-  if (deployment.kind !== 'spawn') throw new TypeError('native fixture requires spawn')
-  /** The explicit offer names the endpoint roots selected by this custom native composition. */
-  const spawn = {
-    ...deployment,
-    offer: createNativeProcessOffer({
-      peer: { id: 'host-parent', runtime: 'node' },
-      auth: nativeHostToken,
-      stream: true,
-      capabilities: RUNTIME_API_BASE_CAPABILITIES
-    })
-  }
-  /** The returned definition is the public factory's actual Plugin, installed by each assertion. */
-  const options = {
-    name: 'child',
-    self: { name: 'host-parent', instanceId: 'host-parent' },
-    spawn,
-    endpointFactory: fixture.options.endpointFactory,
-    report: fixture.options.report
-  } satisfies IRuntimeProcessPluginOptions
   /** Factory construction remains lazy until the genuine Host installs this definition. */
   const plugin = createProcessPlugin<IRuntimeDynamicSurface>(options)
-  return { ...fixture, options, host, plugin, close: () => host.dispose() }
+  return { options, handles, reports, host, plugin, close: () => host.dispose() }
 }
 
 /** Borrow an independent Node listener with the exact same endpoint and authenticated contract. */
