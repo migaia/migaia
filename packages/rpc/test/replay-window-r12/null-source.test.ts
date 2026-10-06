@@ -9,7 +9,7 @@ import { connect } from '../../src/core/middleware/connect.js'
 import type { IRpcTransport } from '../../src/core/transport.js'
 
 describe('replay-window r12 absent browser message source', () => {
-  it('[A29] accepts null source and still rejects captured signed replay', async () => {
+  it('[rpc-replay-window A29] accepts null source and still rejects captured signed replay', async () => {
     /** Real ports deliver frames; null models the browser BroadcastChannel source value. */
     const { port1, port2 } = new MessageChannel()
     /** Keeps each native transport's cleanup while selecting the generic receive path. */
@@ -63,14 +63,22 @@ describe('replay-window r12 absent browser message source', () => {
       const outcome = await client
         .send('null-source-server', 'echo', 'source-null')
         .catch((error: unknown) => error)
-      assert.equal(outcome, 'source-null', '[A29] null means an absent physical source')
+      assert.equal(
+        outcome,
+        'source-null',
+        '[rpc-replay-window A29] null means an absent physical source'
+      )
       assert.equal(providers, 1)
       assert.equal(failures.length, 0)
       port1.postMessage(captured)
       for (let turn = 0; turn < 20 && failures.length === 0; turn++) await nextTurn()
-      assert.equal(failures.length, 1, '[A29] captured signed replay is still rejected')
+      assert.equal(
+        failures.length,
+        1,
+        '[rpc-replay-window A29] captured signed replay is still rejected'
+      )
       assert.equal((failures[0] as { code: string }).code, 'AUTHENTICATION_FAILED')
-      assert.equal(providers, 1, '[A29] replay never repeats the business effect')
+      assert.equal(providers, 1, '[rpc-replay-window A29] replay never repeats the business effect')
     } finally {
       release()
       await client.dispose()
