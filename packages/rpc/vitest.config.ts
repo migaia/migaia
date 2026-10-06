@@ -6,11 +6,39 @@ export default defineConfig(
     test: {
       /** Large frame coverage and native child fixtures share the CI host without starving timers. */
       maxWorkers: 2,
-      include: ['test/**/*.{test,spec}.ts'],
       exclude: [
         ...configDefaults.exclude,
         'test/process/conformance*.test.ts',
         'test/merge/suite-parity.test.ts'
+      ],
+      /**
+       * Reuse the repository's project ordering so 16 MiB coverage never competes with native
+       * fixtures.
+       */
+      projects: [
+        {
+          extends: true,
+          test: {
+            name: 'unit',
+            include: ['test/**/*.{test,spec}.ts'],
+            exclude: [
+              ...configDefaults.exclude,
+              'test/process/conformance*.test.ts',
+              'test/merge/suite-parity.test.ts',
+              'test/runtime-api/single-frame.test.ts'
+            ],
+            sequence: { groupOrder: 0 }
+          }
+        },
+        {
+          extends: true,
+          test: {
+            name: 'large-frame',
+            include: ['test/runtime-api/single-frame.test.ts'],
+            fileParallelism: false,
+            sequence: { groupOrder: 1 }
+          }
+        }
       ],
       coverage: {
         provider: 'v8',
