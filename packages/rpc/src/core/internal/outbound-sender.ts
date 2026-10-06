@@ -46,10 +46,14 @@ import {
   rejectRpcPhysicalFrameSize
 } from '../../contract/batch-frame.js'
 import { resolveAbortReason } from './async-control.js'
-import { isOutboundEnvelope, outboundJsonByteUpperBound } from './outbound-envelope.js'
+import {
+  isOutboundEnvelope,
+  isRuntimeOutboundEnvelope,
+  createRuntimeOutboundEnvelope,
+  outboundJsonByteUpperBound
+} from './outbound-envelope.js'
 import type { IAuthenticationChallengeFields } from './authentication-replay.js'
 import {
-  normalizeRuntimeEnvelope,
   runtimeOperationCapabilities,
   wrapRuntimeCarrier
 } from '../../contract/runtime-api/index.js'
@@ -229,7 +233,9 @@ export class RpcOutboundSender {
     transferOptions?: Pick<ISendOptions, 'transfer'>
   ): Promise<void> {
     /** All permission-bearing fields are snapshotted before any async signature or gate handoff. */
-    const envelope = normalizeRuntimeEnvelope(message)
+    const envelope = isRuntimeOutboundEnvelope(message)
+      ? message
+      : createRuntimeOutboundEnvelope(message)
     /** Proof is minted during portable normalization, so ordinary calls never scan a binary graph. */
     const binary = hasRpcBinaryEnvelope(envelope)
     /**

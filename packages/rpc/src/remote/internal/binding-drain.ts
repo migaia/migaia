@@ -4,7 +4,8 @@ import {
 } from '../../core/internal/provider.js'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import { RpcCapability } from '../../contract/wire-constants.js'
-import type { IRemoteChannel, IRemoteServeEndpoint } from '../types.js'
+import type { IRemoteChannel, IRemoteServeEndpoint, IRemoteRequestTracker } from '../types.js'
+import type { IRuntimeCallOptions } from '../runtime-api/typing.js'
 import type { IRpcEndpoint } from '../../core/typing.js'
 import { EndpointOwnerKey } from '../../core/endpoint-kernel.js'
 import { readEndpointOwner } from '../../core/internal/endpoint-projection.js'
@@ -27,9 +28,30 @@ type IDrainGeneration = {
 export type IRemoteBindingDrain = Readonly<{
   wrap(channel: IRemoteChannel, endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint
   /** Keep logical request settlement inside the same physical generation's drain barrier. */
-  trackCurrent<T>(operation: () => Promise<T>): Promise<T>
+  trackCurrent: IRemoteRequestTracker
   drainCurrent(options?: Readonly<{ hostRemainingMs?: number; drainMs?: number }>): Promise<void>
 }>
+
+/** The same original counter admits either callback shape without allocating an argument array. */
+type ITrackedRequest<T> =
+  | (() => Promise<T>)
+  | ((method: string, payload: unknown, options: IRuntimeCallOptions) => Promise<T>)
+
+/** Preserve legacy zero-argument invocation while passing current runtime input to a cold closure. */
+function invokeTrackedRequest<T>(
+  operation: ITrackedRequest<T>,
+  method?: string,
+  payload?: unknown,
+  options?: IRuntimeCallOptions
+): Promise<T> {
+  return method === undefined
+    ? (operation as () => Promise<T>)()
+    : (operation as (method: string, payload: unknown, options: IRuntimeCallOptions) => Promise<T>)(
+        method,
+        payload,
+        options!
+      )
+}
 
 /** One counter follows each physical generation, so a replacement cannot inherit old work. */
 export function createRemoteBindingDrain(
@@ -50,11 +72,17 @@ export function createRemoteBindingDrain(
   }
 
   /** Count a request from send until its original promise settles, without changing its result. */
-  const track = <T>(generation: IDrainGeneration, operation: () => Promise<T>): Promise<T> => {
+  const track = <T>(
+    generation: IDrainGeneration,
+    operation: ITrackedRequest<T>,
+    method?: string,
+    payload?: unknown,
+    options?: IRuntimeCallOptions
+  ): Promise<T> => {
     generation.pending += 1
     let result: Promise<T>
     try {
-      result = operation()
+      result = invokeTrackedRequest(operation, method, payload, options)
     } catch (error) {
       generation.pending -= 1
       finish(generation)
@@ -85,8 +113,15 @@ export function createRemoteBindingDrain(
   }
 
   return Object.freeze({
-    trackCurrent: <T>(operation: () => Promise<T>): Promise<T> =>
-      current ? track(current, operation) : operation(),
+    trackCurrent: <T>(
+      operation: ITrackedRequest<T>,
+      method?: string,
+      payload?: unknown,
+      options?: IRuntimeCallOptions
+    ): Promise<T> =>
+      current
+        ? track(current, operation, method, payload, options)
+        : invokeTrackedRequest(operation, method, payload, options),
     wrap(channel, endpoint) {
       const generation: IDrainGeneration = {
         channel,

@@ -236,7 +236,7 @@ export class RpcProviderAttachment {
       )
     if (kernel.readOwner(EndpointOwnerKey.outboundAttachment))
       kernel.registerOwner(EndpointOwnerKey.providerAttachment, this)
-    kernel.registerOwner('provider-registry', this.#registry)
+    kernel.registerOwner(EndpointOwnerKey.providerRegistry, this.#registry)
     kernel.registerOwner('request-replay', this.#replay)
     kernel.registerOwner(EndpointOwnerKey.providerAdmission, this.#runtimeAdmission)
     kernel.registerOwner('provider-controllers', this.#controllers)
