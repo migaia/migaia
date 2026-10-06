@@ -3,11 +3,12 @@ import type { IRpcEndpoint } from '../../src/core/typing.js'
 import type { IAbortSignal } from '@migaia/lifecycle'
 import { createProcessHost } from '../../src/process/host/client.js'
 import { hostFixture, runtimeHostFixture } from './fixtures/host-control.js'
-import { nativeHostFixture, nativeHostOptions } from './fixtures/host-native.js'
+import { nativeHostFixture } from './fixtures/host-native.js'
 import { createProcessPlugin } from '../../src/process/plugin/client.js'
 import * as processPeerModule from '../../src/process/peer.js'
 import { RemoteMethodName } from '../../src/remote/constants.js'
 import { RuntimeEventName } from '../../src/remote/runtime-api/constants.js'
+import { readRuntimeOutletConnection } from '../../src/remote/runtime-api/outlet.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
 import { createPrewarmPool } from '@migaia/supervision/process'
@@ -67,28 +68,26 @@ describe('process Host replacement publication', () => {
 
   it('[A3] never resends an old sent idempotent request into the new real child', async () => {
     /** Real I/O retains production deadlines while the injected monotonic clock advances drain. */
-    const fixture = nativeHostOptions('old')
-    if (fixture.options.deployment.kind !== 'spawn') throw new Error('fixture deployment')
+    const fixture = nativeHostFixture('old')
     const scheduler = createManualScheduler()
     const original = fixture.options.endpointFactory
     let draining!: () => void
     const drainStarted = new Promise<void>((resolve) => {
       draining = resolve
     })
-    const host = createProcessHost({
+    const options = {
       ...fixture.options,
-      scheduler,
-      deployment: {
-        ...fixture.options.deployment,
-        supervision: { ...fixture.options.deployment.supervision, scheduler }
+      spawn: {
+        ...fixture.options.spawn,
+        supervision: { ...fixture.options.spawn.supervision, scheduler }
       },
-      endpointFactory: async (...args) => {
+      endpointFactory: async (...args: Parameters<typeof original>) => {
         const served = await original(...args)
         return {
           ...served,
           endpoint: {
             ...served.endpoint,
-            announceClose(...input) {
+            announceClose(...input: Parameters<typeof served.endpoint.announceClose>) {
               const announced = served.endpoint.announceClose(...input)
               draining()
               return announced
@@ -96,13 +95,21 @@ describe('process Host replacement publication', () => {
           }
         }
       }
-    })
+    }
     try {
-      const oldFeatures = await host.use('p')
-      const pending = oldFeatures.f!.request!(['hold'], { idempotencyKey: 'old-request-fixture' })
+      await fixture.host.use(createProcessPlugin(options))
+      const outlet = fixture.host.process!
+      await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+      /** The actual old receipt remains captured so a stale call cannot select its successor. */
+      const oldPeer = readRuntimeOutletConnection(outlet, 'child')!.peer
+      const pending = outlet.request('child', 'p.request', 'hold', {
+        idempotencyKey: 'old-request-fixture'
+      })
       const outcome = Promise.allSettled([pending])
-      expect(await oldFeatures.f!.request!(['count'])).toMatchObject({ calls: 1 })
-      const replacing = host.replace()
+      expect(await outlet.request('child', 'p.request', 'count')).toMatchObject({ calls: 1 })
+      const replacing = outlet
+        .stop('child')
+        .then(() => fixture.host.replace('child', createProcessPlugin(options)))
       await drainStarted
       scheduler.advance(DEFAULT_DRAIN_MS)
       await replacing
@@ -111,14 +118,14 @@ describe('process Host replacement publication', () => {
         reason: { code: 'REMOTE_RESULT_UNKNOWN' }
       })
       await fixture.handles[0]!.exited
-      const fresh = await host.use('p')
-      expect(await fresh.f!.request!(['count'])).toMatchObject({ calls: 0 })
-      await expect(oldFeatures.f!.request!(['old-proxy'])).rejects.toMatchObject({
-        code: 'REMOTE_CLOSED'
-      })
-      expect(await fresh.f!.request!(['count'])).toMatchObject({ calls: 0 })
+      await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+      expect(await outlet.request('child', 'p.request', 'count')).toMatchObject({ calls: 0 })
+      expect(() => oldPeer.request('p.request', 'old-proxy')).toThrow(
+        expect.objectContaining({ code: 'REMOTE_CLOSED' })
+      )
+      expect(await outlet.request('child', 'p.request', 'count')).toMatchObject({ calls: 0 })
     } finally {
-      await host.release()
+      await fixture.close()
     }
   })
   it.each(['stop-then-start', 'start-then-switch'] as const)(
