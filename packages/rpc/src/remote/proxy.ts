@@ -19,7 +19,7 @@ import {
   RuntimeQueryLimit,
   RuntimeQueryReason
 } from './runtime-api/constants.js'
-import type { IAbortSignal } from '@migaia/lifecycle'
+import { createGenerationController, type IAbortSignal } from '@migaia/lifecycle'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
@@ -1379,7 +1379,9 @@ export function createRemoteGenerationHolder<
   TRegistration extends IRemoteRegistration | IRemoteRuntimeRegistration
 >(
   registration: TRegistration,
-  report: (error: unknown) => void
+  report: (error: unknown) => void,
+  /** Runtime native drain owns committed channels; preparation cancellation must detach at commit. */
+  detachPreparationOnCommit = false
 ): IRemoteGenerationHolder<TRegistration> {
   /** A departed generation drops its resource group instead of growing a lifetime stack. */
   const retained = new Set<Set<() => Promise<void>>>()
@@ -1414,10 +1416,23 @@ export function createRemoteGenerationHolder<
   ): Promise<number> => {
     const group = new Set<() => Promise<void>>()
     retained.add(group)
+    /** The existing lifecycle controller separates one preparation from its committed channel. */
+    const attempt = detachPreparationOnCommit
+      ? createGenerationController({ parentSignal: signal })
+      : undefined
+    /** Initial setup and later rebinds use the same canonical cancellation transfer. */
+    const request = attempt?.begin()
     try {
-      const generation = await registration.prepareGeneration(signal, (dispose) => {
-        group.add(dispose)
-      })
+      const generation = await registration.prepareGeneration(
+        request?.signal ?? signal,
+        (dispose) => {
+          group.add(dispose)
+        }
+      )
+      if (request) {
+        if (request.signal.aborted) throw resolveAbortReason(request.signal)
+        attempt!.complete(request.token)
+      }
       registration.events.onLeave(generation, () => {
         void registration.whenClosed(generation).then(() => {
           group.clear()
@@ -1431,6 +1446,8 @@ export function createRemoteGenerationHolder<
         if (reportFailure && !hadCleanupFailure) report(error)
       }
       throw error
+    } finally {
+      attempt?.dispose()
     }
   }
   return {

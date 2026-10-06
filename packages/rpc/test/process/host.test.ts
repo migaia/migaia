@@ -2,13 +2,18 @@ import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { createProcessHost } from '../../src/process/host/client.js'
 import { hostFixture } from './fixtures/host-control.js'
-import { nativeHostOptions } from './fixtures/host-native.js'
+import { nativeHostFixture } from './fixtures/host-native.js'
+import { createProcessPlugin } from '../../src/process/plugin/client.js'
+import { RemoteMethodName } from '../../src/remote/constants.js'
 import type { IRemoteRetryPort } from '../../src/remote/types.js'
+import type { IAbortSignal } from '@migaia/lifecycle'
 
 describe('process Host facade admission and ownership', () => {
   it('[K221/A1] drains an external retry port without changing its call count or Promise', async () => {
     /** No endpoint send owns this logical operation; the caller-supplied retry port does. */
-    const fixture = hostFixture()
+    const fixture = nativeHostFixture()
+    /** Preserve the original drain-timer oracle on the actual native binding's clock. */
+    const scheduler = createManualScheduler()
     /** Preserve the exact settlement object and Promise produced by the external owner. */
     const value = Object.freeze({ completed: true })
     /** The external owner decides when its request settles. */
@@ -18,27 +23,78 @@ describe('process Host facade admission and ownership', () => {
     })
     /** Count forwarding at the external boundary instead of inspecting internal drain counters. */
     const dispatch = vi.fn(() => pending)
-    const external: IRemoteRetryPort = { dispatch: dispatch as IRemoteRetryPort['dispatch'] }
-    const host = createProcessHost({ ...fixture.options, retryPort: external })
+    /** Reserved controls perform their real single send; this external owner handles business only. */
+    const external: IRemoteRetryPort = {
+      dispatch: (input) =>
+        input.method === 'p.request'
+          ? dispatch()
+          : input.sendOnce({ expectedGeneration: input.generation, key: input.key })
+    }
+    /** Observe actual endpoint work and actual process termination independently from retry. */
+    const sends: string[] = []
+    const terminate = vi.fn()
+    const factory = fixture.options.endpointFactory
+    const launcher = fixture.options.spawn.supervision.launcher
+    const plugin = createProcessPlugin({
+      ...fixture.options,
+      retryPort: external,
+      endpointFactory: async (...args) => {
+        const served = await factory(...args)
+        return {
+          ...served,
+          endpoint: {
+            ...served.endpoint,
+            send<T>(...input: Parameters<typeof served.endpoint.send>) {
+              sends.push(input[1])
+              return served.endpoint.send<T>(...input)
+            }
+          }
+        }
+      },
+      spawn: {
+        ...fixture.options.spawn,
+        supervision: {
+          ...fixture.options.spawn.supervision,
+          scheduler,
+          launcher: {
+            ...launcher,
+            async launch(spec, context) {
+              /** Native exit and identity remain those of the original launched handle. */
+              const handle = await launcher.launch(spec, context)
+              return {
+                ...handle,
+                terminate: (...args) => {
+                  terminate(...args)
+                  return handle.terminate(...args)
+                }
+              }
+            }
+          }
+        }
+      }
+    })
     try {
-      const feature = await host.use('p')
-      const request = feature.f!.m!([])
+      await fixture.host.use(plugin)
+      const outlet = fixture.host.process!
+      await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+      const request = outlet.request('child', 'p.request', [])
       expect(request).toBe(pending)
       expect(dispatch).toHaveBeenCalledTimes(1)
-      expect(fixture.send.mock.calls.filter((call) => call[1] === 'p.f.m')).toHaveLength(0)
-      const closing = host.release()
+      expect(sends.filter((method) => method === 'p.request')).toHaveLength(0)
+      const closing = fixture.close()
       await Promise.resolve()
       await Promise.resolve()
-      expect(fixture.terminate).not.toHaveBeenCalled()
+      expect(terminate).not.toHaveBeenCalled()
       settle(value)
       expect(await request).toBe(value)
       await closing
       expect(dispatch).toHaveBeenCalledTimes(1)
-      expect(fixture.terminate).toHaveBeenCalledTimes(1)
-      expect(fixture.scheduler.pendingCount).toBe(0)
+      expect(terminate).toHaveBeenCalledTimes(1)
+      await fixture.handles[0]!.exited
+      expect(scheduler.pendingCount).toBe(0)
     } finally {
       settle(value)
-      await host.release()
+      await fixture.close()
     }
   })
 
@@ -81,16 +137,19 @@ describe('process Host facade admission and ownership', () => {
     }
   })
   it('[A1] announces one close and waits for the real in-flight request before child exit', async () => {
-    const fixture = nativeHostOptions()
+    const fixture = nativeHostFixture()
     const original = fixture.options.endpointFactory
     const close = vi.fn()
+    /** The committed channel keeps its preparation signal detached while Host drains live work. */
+    let generationSignal: IAbortSignal | undefined
     let sent!: () => void
     const businessSent = new Promise<void>((resolve) => {
       sent = resolve
     })
-    const host = createProcessHost({
+    const plugin = createProcessPlugin({
       ...fixture.options,
       endpointFactory: async (...args) => {
+        generationSignal = args[1]
         const served = await original(...args)
         return {
           ...served,
@@ -110,33 +169,44 @@ describe('process Host facade admission and ownership', () => {
       }
     })
     try {
-      const feature = await host.use('p')
-      const request = feature.f!.request!(['delay'])
+      await fixture.host.use(plugin)
+      const outlet = fixture.host.process!
+      await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+      const request = outlet.request('child', 'p.request', 'delay')
+      /** Observe any cleanup rejection immediately while preserving the actual request Promise. */
+      const outcome = Promise.allSettled([request])
       await businessSent
       let finished = false
-      const releasing = host.release().then(() => {
+      const releasing = fixture.close().then(() => {
         finished = true
       })
       await Promise.resolve()
       expect(finished).toBe(false)
-      expect(() => host.inspect()).toThrow(expect.objectContaining({ code: 'PROCESS_HOST_CLOSED' }))
+      expect(() => outlet.request('child', RemoteMethodName.hostInspect, [])).toThrow(
+        expect.objectContaining({ source: '@migaia/plugin-host', code: 'HOST_DISPOSING' })
+      )
+      const observed = (await outcome)[0]!
+      expect(observed).toMatchObject({ status: 'fulfilled' })
+      expect(generationSignal?.aborted).toBe(false)
       expect(await request).toMatchObject({ pid: fixture.handles[0]!.identity.pid, input: 'delay' })
       await releasing
       expect(close).toHaveBeenCalledTimes(1)
       await fixture.handles[0]!.exited
     } finally {
-      await host.release()
+      await fixture.close()
     }
   })
   it('[A1] controls a real initially empty Node Host through the local catalog resolver', async () => {
-    const fixture = nativeHostOptions()
-    const host = createProcessHost(fixture.options)
+    const fixture = nativeHostFixture()
     try {
       expect(fixture.handles).toHaveLength(0)
-      await host.ready()
-      expect(await host.inspect()).toMatchObject({ plugins: [] })
-      const features = await host.use('p', { portable: 'configuration' })
-      const response = await features.f!.request!(['hello'])
+      await fixture.host.use(fixture.plugin)
+      const outlet = fixture.host.process!
+      expect(await outlet.request('child', RemoteMethodName.hostInspect, [])).toMatchObject({
+        plugins: []
+      })
+      await outlet.request('child', RemoteMethodName.hostUse, ['p', { portable: 'configuration' }])
+      const response = await outlet.request('child', 'p.request', 'hello')
       expect(response).toMatchObject({
         pid: fixture.handles[0]!.identity.pid,
         input: 'hello',
@@ -144,13 +214,17 @@ describe('process Host facade admission and ownership', () => {
         resolutions: 1,
         calls: 1
       })
-      expect(await host.inspect()).toMatchObject({ plugins: [{ name: 'p', state: 'enabled' }] })
-      await host.unUse('p')
-      expect(await host.inspect()).toMatchObject({ plugins: [] })
-      await host.release()
+      expect(await outlet.request('child', RemoteMethodName.hostInspect, [])).toMatchObject({
+        plugins: [{ name: 'p', state: 'enabled' }]
+      })
+      await outlet.request('child', RemoteMethodName.hostUnUse, ['p'])
+      expect(await outlet.request('child', RemoteMethodName.hostInspect, [])).toMatchObject({
+        plugins: []
+      })
+      await fixture.close()
       await fixture.handles[0]!.exited
     } finally {
-      await host.release()
+      await fixture.close()
     }
   })
   it('[A1] stays lazy, delegates catalog control and gates release synchronously', async () => {

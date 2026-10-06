@@ -12,6 +12,7 @@ import { serveRemotePlugin } from '../../../dist/remote/serve-plugin.js'
 import { createServeProcessHost } from '../../../dist/process/host/serve.js'
 import { createProcessPlugin } from '../../../dist/process/index.js'
 import { RUNTIME_API_BASE_CAPABILITIES } from '../../../dist/remote/runtime-api/constants.js'
+import { PROCESS_RUNTIME_API_ENV } from '../../../dist/process/constants.js'
 import { RpcProcessErrorCode } from '../../../dist/process/error-code.js'
 import { createProcessError } from '../../../dist/process/error.js'
 import { createComposedEndpoint } from '../../../dist/core/composed.js'
@@ -232,17 +233,17 @@ if (process.env.RPC_REGISTRATION_ADDRESS) {
     },
     endpointFactory: (channel, _signal, session) => createEndpoint(channel, session)
   }
-  if (address)
+  if (address || process.env[PROCESS_RUNTIME_API_ENV])
     await host.use(
       createProcessPlugin({
-        name: 'listener',
+        name: address ? 'listener' : 'parent',
         host,
-        self: { name: 'host-child', instanceId: 'host-child' },
+        ...(address ? { self: { name: 'host-child', instanceId: 'host-child' } } : {}),
         expose: ['host', 'p'],
         catalog,
         resolvePlugin: options.resolvePlugin,
         report,
-        listen: ingress
+        ...(address ? { listen: ingress } : {})
       })
     )
   else await createServeProcessHost(options)
