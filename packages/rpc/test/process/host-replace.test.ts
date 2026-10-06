@@ -9,6 +9,7 @@ import * as processPeerModule from '../../src/process/peer.js'
 import { RemoteMethodName } from '../../src/remote/constants.js'
 import { RuntimeEventName } from '../../src/remote/runtime-api/constants.js'
 import { readRuntimeOutletConnection } from '../../src/remote/runtime-api/outlet.js'
+import { createSpawnProcessBinding } from '../../src/process/plugin/binding.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
 import { createPrewarmPool } from '@migaia/supervision/process'
@@ -225,9 +226,8 @@ describe('process Host replacement publication', () => {
     }
   )
   it('[A3] invalidates a real size-one pool after old exit without taking it for replacement', async () => {
-    const fixture = hostFixture()
-    if (fixture.options.deployment.kind !== 'spawn') throw new Error('fixture deployment')
-    const deployment = fixture.options.deployment
+    const fixture = runtimeHostFixture()
+    const deployment = fixture.options.spawn
     const budget = createUnitBudget({ kind: 'process', maxUnits: 3, scheduler: fixture.scheduler })
     const pool = createPrewarmPool({
       size: 1,
@@ -245,18 +245,19 @@ describe('process Host replacement publication', () => {
       pool.invalidate()
     })
     const take = vi.fn(() => pool.take())
-    const host = createProcessHost({
-      ...fixture.options,
-      deployment: {
+    /** Prewarming belongs to the retained original process binding and supervisor, not bootstrap. */
+    const binding = createSpawnProcessBinding(
+      {
         ...deployment,
         supervision: { ...deployment.supervision, budget, prewarm: { ...pool, invalidate, take } }
-      }
-    })
+      },
+      fixture.report
+    )
     try {
-      await host.ready()
+      await binding.supervisor.start()
       const initialTakes = take.mock.calls.length
       const oldLaunches = fixture.launch.mock.calls.length
-      await host.replace()
+      await binding.supervisor.replace()
       expect(invalidate).toHaveBeenCalledTimes(1)
       expect(take).toHaveBeenCalledTimes(initialTakes)
       expect(fixture.order.indexOf('invalidate')).toBeGreaterThan(
@@ -265,7 +266,8 @@ describe('process Host replacement publication', () => {
       expect(fixture.launch.mock.calls.length).toBeGreaterThan(oldLaunches)
       expect(budget.inUse).toBeLessThanOrEqual(3)
     } finally {
-      await host.release()
+      await binding.supervisor.dispose()
+      await fixture.close()
       await pool.dispose()
     }
     expect(budget.inUse).toBe(0)
@@ -503,20 +505,31 @@ describe('process Host replacement publication', () => {
   })
 
   it('[A3] stops the old owned unit before launching and retains the same facade', async () => {
-    const fixture = hostFixture()
-    const host = createProcessHost(fixture.options)
-    await host.ready()
-    const oldId = host.inspectRegistration()?.id
-    if (fixture.options.deployment.kind !== 'spawn') throw new Error('fixture deployment')
-    const spec = { ...fixture.options.deployment.supervision.spec, args: ['replacement'] }
+    const fixture = runtimeHostFixture()
+    await fixture.host.use(fixture.plugin)
+    const outlet = fixture.host.process!
+    const oldGeneration = (await outlet.get('child')).unit
+    const spec = { ...fixture.options.spawn.supervision.spec, args: ['replacement'] }
+    /** Native readiness and callable directory publication are separate existing observations. */
+    let removeReady: (() => void) | undefined
+    const prepared = new Promise<void>((resolve) => {
+      removeReady = outlet.on(RuntimeEventName.ready, () => resolve())
+    })
     try {
-      expect(await host.replace({ spec })).toBe(host)
+      expect(await outlet.replace('child', spec)).toMatchObject({ kind: 'replaced' })
+      expect(fixture.host.process).toBe(outlet)
       expect(fixture.order).toEqual(['launch:1', 'exit:1', 'launch:2'])
       expect(fixture.launch.mock.calls).toHaveLength(2)
-      expect(host.inspectRegistration()?.id).not.toBe(oldId)
-      await host.use('p')
+      await prepared
+      await vi.waitFor(async () => {
+        const current = (await outlet.get('child')).unit
+        expect(current).toHaveProperty('state', 'ready')
+        expect(current).not.toEqual(oldGeneration)
+      })
+      await outlet.request('child', RemoteMethodName.hostUse, ['p'])
     } finally {
-      await host.release()
+      removeReady?.()
+      await fixture.close()
     }
   })
 
