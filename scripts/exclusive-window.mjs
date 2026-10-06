@@ -9,6 +9,12 @@
 // readers (status, other tools that follow the file protocol). Because exactly one process can
 // hold the port, only that process creates, rewrites or removes the lock file, so heartbeat and
 // release need no compare-and-swap.
+//
+// Fairness protocol: a runner that has to wait registers itself as a waiter (one file per pid in
+// `waiters/`). A runner attempts the port only while no live waiter ranks ahead of it: higher
+// priority first, then first come, first served. Without this, a thread that issues windows back
+// to back re-acquires the port within milliseconds of each release and starves runners polling
+// every few seconds. Waiter files of dead processes are ignored, so a crash cannot block the queue.
 import { spawn } from 'node:child_process'
 import {
   appendFileSync,
@@ -17,6 +23,7 @@ import {
   linkSync,
   mkdirSync,
   openSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   renameSync,
@@ -29,12 +36,13 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /**
- * Exit codes. `busy`, `load` and `heartbeatFailed` use EX_TEMPFAIL so callers can retry later;
- * `heartbeatFailed` means the lock file could not be refreshed (for example ENOSPC), so the window
- * was ended early and its measurement is invalid. `portConflict` means an unrelated service owns
- * the mutex port, which no amount of waiting fixes (EX_UNAVAILABLE). `timeout` matches coreutils
- * `timeout`; `usage` matches common CLI usage errors. A child killed by a signal exits with 128 +
- * the signal number (130 for SIGINT, 143 for SIGTERM).
+ * Exit codes. `busy`, `load` and `heartbeatFailed` use EX_TEMPFAIL so callers can retry later; with
+ * `--end-load enforce`, `load` also covers a successful command whose window ended above the load
+ * ceiling, since its timing is not trustworthy. `heartbeatFailed` means the lock file could not be
+ * refreshed (for example ENOSPC), so the window was ended early and its measurement is invalid.
+ * `portConflict` means an unrelated service owns the mutex port, which no amount of waiting fixes
+ * (EX_UNAVAILABLE). `timeout` matches coreutils `timeout`; `usage` matches common CLI usage errors.
+ * A child killed by a signal exits with 128 + the signal number (130 for SIGINT, 143 for SIGTERM).
  */
 export const ExitCode = {
   ok: 0,
@@ -60,10 +68,42 @@ export const WindowDefault = {
   staleSeconds: 600,
   /** Poll period while `--wait` is waiting for a held window or high load. */
   pollSeconds: 5,
+  /** Shorter poll period for the head of the waiter queue, so a freed window is not left idle. */
+  headPollSeconds: 1,
+  /**
+   * A waiter refreshes its file on every poll. One not refreshed for this long beyond three of its
+   * own poll periods is skipped even if its pid is alive (a reused pid, or a long-lived process
+   * that abandoned its wait).
+   */
+  waiterStaleSeconds: 30,
   /** Grace period between SIGTERM and SIGKILL once the window must end. */
   killGraceSeconds: 10,
   /** Loopback port used as the kernel-held mutex; override with MIGAIA_EXCLUSIVE_WINDOW_PORT. */
   port: 47219
+}
+
+/**
+ * Admission priorities. A waiting runner never attempts the port while a live waiter of a higher
+ * priority, or an earlier waiter of the same priority, is queued. Delivery work uses `high` or the
+ * default `normal`; background measurement and research use `low`. Set per run with `--priority` or
+ * for a whole thread with MIGAIA_EXCLUSIVE_WINDOW_PRIORITY.
+ */
+export const WindowPriority = { high: 'high', normal: 'normal', low: 'low' }
+
+/**
+ * End-load policies. `report` (default) records an end-load breach in history and the log but keeps
+ * the command's exit code: heavy builds and test gates raise the load themselves. `enforce` turns a
+ * breach after a successful command into the `load` exit code; measurement windows (bench, soak,
+ * DA1/W3) use it because their timing is not trustworthy above the ceiling.
+ */
+export const EndLoadPolicy = { report: 'report', enforce: 'enforce' }
+
+/** Queue rank of each priority; a smaller rank is admitted first. */
+const PriorityRank = { high: 0, normal: 1, low: 2 }
+
+/** Reports whether a value names a priority; own keys only, so `toString` or `__proto__` are not. */
+function isPriority(value) {
+  return typeof value === 'string' && Object.hasOwn(PriorityRank, value)
 }
 
 /** Greeting the port holder sends to every probe, so status can tell this tool from a stranger. */
@@ -72,7 +112,16 @@ const Greeting = 'migaia-exclusive-window/1'
 /** Stable operator-facing text; tests and callers compare these prefixes. */
 export const WindowText = {
   usage:
-    'usage: exclusive-window <run|status|check|reap> [--window NAME] [--max-seconds N] [--max-load N] [--wait SECONDS] -- <command...>',
+    'usage: exclusive-window <run|status|check|reap> [--window NAME] [--max-seconds N] [--max-load N] [--wait SECONDS] [--priority high|normal|low] [--end-load report|enforce] -- <command...>',
+  queued: (waiter) =>
+    `exclusive window queue: waiting behind ${waiter.window ?? 'unnamed'} (pid ${waiter.pid}, ${waiter.priority})`,
+  invalidPriority: 'priority must be one of high, normal, low',
+  spawnFailed: (code, message) => `command failed to start (${code}): ${message}`,
+  waiterRegisterFailed: (message) =>
+    `waiter record could not be written (${message}); waiting without a queue position`,
+  waiterCleanupFailed: (message) =>
+    `waiter record cleanup failed (${message}); it expires on its own`,
+  invalidEndLoad: 'end-load must be one of report, enforce',
   missingCommand: 'run requires a command after --',
   busy: (owner) => `exclusive window is held by ${owner}`,
   load: (value, max) => `load average ${value.toFixed(2)} exceeds ${max}`,
@@ -195,6 +244,85 @@ export function inspectLock(path, now = Date.now(), staleSeconds = WindowDefault
   }
 }
 
+/** Directory holding one waiter file per queued runner. */
+export function waiterDirectory(directory) {
+  return join(directory, 'waiters')
+}
+
+/** Path of this runner's waiter file; the pid makes it unique per process. */
+function waiterPath(directory, pid) {
+  return join(waiterDirectory(directory), `${pid}.json`)
+}
+
+/**
+ * Registers a queued runner. The file is written to a temporary name and renamed, so a reader never
+ * sees a partial record.
+ */
+function registerWaiter(directory, waiter) {
+  mkdirSync(waiterDirectory(directory), { recursive: true })
+  /** Final path of the waiter file. */
+  const path = waiterPath(directory, waiter.pid)
+  /** Temporary file renamed into place. */
+  const temporary = `${path}.tmp`
+  writeFileSync(temporary, JSON.stringify(waiter))
+  renameSync(temporary, path)
+}
+
+/** Removes this runner's waiter file; absence is not an error. */
+function removeWaiter(directory, pid) {
+  rmSync(waiterPath(directory, pid), { force: true })
+}
+
+/** Orders waiters by priority, then arrival time, then pid. */
+function compareWaiters(left, right) {
+  return (
+    PriorityRank[left.priority] - PriorityRank[right.priority] ||
+    left.since - right.since ||
+    left.pid - right.pid
+  )
+}
+
+/**
+ * Lists queued runners that are still alive, best first. Unreadable files and dead processes are
+ * skipped, so a crashed waiter never blocks the queue.
+ */
+export function liveWaiters(directory) {
+  /** Waiter file names. */
+  let names
+  try {
+    names = readdirSync(waiterDirectory(directory)).filter((name) => name.endsWith('.json'))
+  } catch {
+    return []
+  }
+  /** Parsed live waiters. */
+  const waiters = []
+  for (const name of names) {
+    try {
+      /** One waiter record. */
+      const waiter = JSON.parse(readFileSync(join(waiterDirectory(directory), name), 'utf8'))
+      /** Seconds since the waiter last refreshed its file. */
+      const age = (Date.now() - waiter.seenAt) / 1000
+      if (
+        processAlive(waiter.pid) &&
+        isPriority(waiter.priority) &&
+        Number.isFinite(age) &&
+        age <= 3 * (Number(waiter.pollSeconds) || 0) + WindowDefault.waiterStaleSeconds
+      )
+        waiters.push(waiter)
+    } catch {
+      // A file being renamed or removed right now is skipped; it is re-read on the next poll.
+    }
+  }
+  return waiters.sort(compareWaiters)
+}
+
+/** Returns the first live waiter that must be admitted before `self`, or undefined. */
+export function waiterAhead(directory, self) {
+  return liveWaiters(directory).find(
+    (waiter) => waiter.pid !== self.pid && compareWaiters(waiter, self) < 0
+  )
+}
+
 /** Appends one history entry; history is append-only so no earlier window is rewritten. */
 function appendHistory(path, entry) {
   appendFileSync(path, `${JSON.stringify(entry)}\n`)
@@ -277,9 +405,15 @@ export function reapLock(directory, options = {}) {
 
 /**
  * Connects to the mutex port. Resolves `free` when nothing listens, `held` with the holder's record
- * when this tool listens, and `conflict` when something else answers or stays silent.
+ * when this tool listens, `transient` when the connection is dropped (a holder releasing the port),
+ * and `conflict` when something else answers or stays silent.
  */
 export function probePort(port, timeoutMs = 1000) {
+  /**
+   * Largest reply accepted from a listener. A real holder sends one JSON record that includes its
+   * command line, which the OS caps at ARG_MAX (1 MiB on macOS), so the limit sits above that.
+   */
+  const maxReplyBytes = 4 * 1024 * 1024
   return new Promise((resolve) => {
     /** Bytes received from the listener. */
     let data = ''
@@ -291,19 +425,36 @@ export function probePort(port, timeoutMs = 1000) {
     const finish = (result) => {
       if (settled) return
       settled = true
+      clearTimeout(deadline)
       socket.destroy()
       resolve(result)
     }
-    socket.setTimeout(timeoutMs, () => finish({ state: 'conflict' }))
+    // An absolute deadline, not an idle timeout: a listener that trickles bytes must not keep the
+    // probe open forever. A reply larger than any real record is a stranger as well.
+    /** Absolute probe deadline. */
+    const deadline = setTimeout(() => finish({ state: 'conflict' }), timeoutMs)
+    socket.on('close', () => clearTimeout(deadline))
+    // Decode as one UTF-8 stream so a multi-byte character split across chunks stays intact.
+    socket.setEncoding('utf8')
     socket.on('data', (chunk) => {
       data += chunk
+      if (data.length > maxReplyBytes) finish({ state: 'conflict' })
     })
+    // A reset, or a close with nothing received, happens while a holder is releasing the port:
+    // the pending connection is dropped. That is `transient`, never proof of a stranger.
     socket.on('error', (error) =>
-      finish(error.code === 'ECONNREFUSED' ? { state: 'free' } : { state: 'conflict' })
+      finish(
+        error.code === 'ECONNREFUSED'
+          ? { state: 'free' }
+          : error.code === 'ECONNRESET' || error.code === 'EPIPE'
+            ? { state: 'transient' }
+            : { state: 'conflict' }
+      )
     )
     socket.on('end', () => {
       /** Greeting line followed by the holder's lock record. */
       const [greeting, ...rest] = data.split('\n')
+      if (data === '') return finish({ state: 'transient' })
       if (greeting !== Greeting) return finish({ state: 'conflict' })
       /** Holder's lock record; absent while the holder is still preparing it. */
       let record
@@ -327,14 +478,33 @@ export function probePort(port, timeoutMs = 1000) {
 function acquirePort(port, recordText) {
   return new Promise((resolve, reject) => {
     /** Mutex server answering probes. */
-    const server = createServer((socket) => socket.end(`${Greeting}\n${recordText()}\n`))
+    const server = createServer((socket) => {
+      // A probing client that resets the connection raises ECONNRESET or EPIPE on this socket. The
+      // reply is informational, so the error is expected and dropped here: an unhandled socket
+      // error would crash the runner and free the port while its command group keeps running.
+      socket.on('error', () => {})
+      socket.end(`${Greeting}\n${recordText()}\n`)
+    })
     server.once('error', (error) => {
       if (error.code !== 'EADDRINUSE') return reject(error)
       probePort(port).then((probe) =>
-        resolve(probe.state === 'free' ? 'retry' : probe.state === 'held' ? 'held' : 'conflict')
+        // A transient probe is treated as held: the caller sleeps and tries again, so a holder
+        // that is releasing never turns into a false port conflict.
+        resolve(
+          probe.state === 'free'
+            ? 'retry'
+            : probe.state === 'held' || probe.state === 'transient'
+              ? 'held'
+              : 'conflict'
+        )
       )
     })
-    server.listen({ port, host: '127.0.0.1', exclusive: true }, () => resolve(server))
+    server.listen({ port, host: '127.0.0.1', exclusive: true }, () => {
+      // After listening, a server error (for example EMFILE on accept) must not crash the runner
+      // for the same reason; it only costs a probe its answer.
+      server.on('error', () => {})
+      resolve(server)
+    })
   })
 }
 
@@ -355,9 +525,18 @@ function createLockFile(paths, record) {
   }
   try {
     writeFileSync(fd, JSON.stringify(record, null, 2))
-  } finally {
+  } catch (error) {
+    // An empty or partial file would read as an unreadable lock and block everyone for the stale
+    // period; remove it before rethrowing. A removal failure must not replace the write error.
     closeSync(fd)
+    try {
+      rmSync(paths.lock, { force: true })
+    } catch {
+      // The write error below is the primary failure and stays reachable to the caller.
+    }
+    throw error
   }
+  closeSync(fd)
   return true
 }
 
@@ -379,10 +558,23 @@ function sleep(seconds) {
  * Numeric option rules: name, CLI flag, and the accepted range. NaN, infinities and out-of-range
  * values are usage errors, so a typo can neither disable the load gate nor wait forever.
  */
+/**
+ * Largest duration accepted for any timer-driven option, in seconds. Node timers overflow above
+ * 2^31-1 ms (about 24.8 days) and then fire after 1 ms, which would end a window at once.
+ */
+const MaxTimerSeconds = Math.floor((2 ** 31 - 1) / 1000)
+
+/** Accepts a positive duration that a Node timer can represent. */
+const positiveDuration = (value) => value > 0 && value <= MaxTimerSeconds
+
 const NumericOption = [
-  { name: 'maxSeconds', flag: '--max-seconds', valid: (value) => value > 0 },
+  { name: 'maxSeconds', flag: '--max-seconds', valid: positiveDuration },
   { name: 'maxLoad', flag: '--max-load', valid: (value) => value > 0 },
-  { name: 'waitSeconds', flag: '--wait', valid: (value) => value >= 0 }
+  { name: 'waitSeconds', flag: '--wait', valid: (value) => value >= 0 && value <= MaxTimerSeconds },
+  { name: 'pollSeconds', flag: 'pollSeconds', valid: positiveDuration },
+  { name: 'headPollSeconds', flag: 'headPollSeconds', valid: positiveDuration },
+  { name: 'heartbeatSeconds', flag: 'heartbeatSeconds', valid: positiveDuration },
+  { name: 'killGraceSeconds', flag: 'killGraceSeconds', valid: positiveDuration }
 ]
 
 /** Returns the usage text for the first invalid numeric option, or undefined when all are valid. */
@@ -443,7 +635,11 @@ async function groupGone(pgid) {
  *   maxSeconds?: number
  *   maxLoad?: number
  *   waitSeconds?: number
+ *   priority?: 'high' | 'normal' | 'low'
+ *   endLoad?: 'report' | 'enforce'
+ *   afterAcquire?: () => void
  *   pollSeconds?: number
+ *   headPollSeconds?: number
  *   heartbeatSeconds?: number
  *   killGraceSeconds?: number
  *   env?: NodeJS.ProcessEnv
@@ -468,6 +664,23 @@ export async function runWindow(options) {
   const maxLoad = options.maxLoad ?? WindowDefault.maxLoad
   /** Poll period while waiting; tests shorten it. */
   const pollSeconds = options.pollSeconds ?? WindowDefault.pollSeconds
+  /** Poll period at the head of the queue; never longer than the ordinary poll period. */
+  const headPollSeconds = Math.min(
+    pollSeconds,
+    options.headPollSeconds ?? WindowDefault.headPollSeconds
+  )
+  /** Admission priority: explicit option, then the thread-wide environment, then normal. */
+  const priority = options.priority ?? env.MIGAIA_EXCLUSIVE_WINDOW_PRIORITY ?? WindowPriority.normal
+  /** End-load policy for this window; see EndLoadPolicy. */
+  const endLoadPolicy = options.endLoad ?? EndLoadPolicy.report
+  if (!Object.hasOwn(EndLoadPolicy, endLoadPolicy)) {
+    log(WindowText.invalidEndLoad)
+    return ExitCode.usage
+  }
+  if (!isPriority(priority)) {
+    log(WindowText.invalidPriority)
+    return ExitCode.usage
+  }
   /** Heartbeat period; tests shorten it. */
   const heartbeatSeconds = options.heartbeatSeconds ?? WindowDefault.heartbeatSeconds
   /** Grace before SIGKILL; tests shorten it. */
@@ -487,76 +700,143 @@ export async function runWindow(options) {
   let server
   /** Reason the latest attempt did not start; reported when the deadline ends the wait. */
   let refusal
-  for (let attempt = 0; ; attempt += 1) {
-    // No attempt may start after the deadline; the first attempt always runs.
-    if (attempt > 0 && Date.now() > waitUntil) {
-      log(refusal.text)
-      return refusal.code
-    }
-    /** Load observed at this admission attempt. */
-    const startLoad = currentLoad(env)
-    if (startLoad > maxLoad)
-      refusal = { code: ExitCode.load, text: WindowText.load(startLoad, maxLoad) }
-    else {
-      /** Attempt start, shared by the record's time fields. */
-      const startedAt = Date.now()
-      record = {
-        window: options.window ?? 'unnamed',
-        owner: env.MIGAIA_EXCLUSIVE_WINDOW_OWNER ?? `pid-${process.pid}`,
-        host: hostname(),
-        pid: process.pid,
-        port,
-        startUTC: new Date(startedAt).toISOString(),
-        heartbeatUTC: new Date(startedAt).toISOString(),
-        expectedEnd: new Date(startedAt + maxSeconds * 1000).toISOString(),
-        startLoad,
-        cwd: process.cwd(),
-        command: options.command
+  /** This runner's queue entry; it is registered only once the runner actually has to wait. */
+  const self = {
+    pid: process.pid,
+    priority,
+    since: Date.now(),
+    window: options.window ?? 'unnamed'
+  }
+  /** Whether the waiter file exists and must be removed on every exit path. */
+  let queued = false
+  /** Whether a waiter-file write already failed and was reported. */
+  let registerFailed = false
+  /** Waiter that ranked ahead at the latest attempt, if any. */
+  let ahead
+  try {
+    for (let attempt = 0; ; attempt += 1) {
+      // No attempt may start after the deadline; the first attempt always runs.
+      if (attempt > 0 && Date.now() > waitUntil) {
+        log(refusal.text)
+        return refusal.code
       }
-      /** Record captured for the probe responder. */
-      const current = record
-      /** Outcome of the port attempt. */
-      const taken = await acquirePort(port, () => JSON.stringify(current))
-      if (taken === 'conflict') {
-        log(WindowText.portConflict(port))
-        return ExitCode.portConflict
-      }
-      // The previous owner released the port between our listen and the probe: try again now,
-      // subject to the deadline check at the top of the loop.
-      if (taken === 'retry') {
-        refusal = { code: ExitCode.busy, text: WindowText.busy('a window that just ended') }
-        continue
-      }
-      if (taken === 'held') {
-        /** Holder that answered the probe. */
-        const probe = await probePort(port)
-        refusal = { code: ExitCode.busy, text: WindowText.busy(probe.record?.owner ?? 'unknown') }
-      } else {
-        // Holding the port: no runner of this tool can touch the file now. A leftover file is
-        // either stale (reaped here) or owned by a tool that follows only the file protocol.
-        reapLock(directory, { heldPort: port })
-        if (createLockFile(paths, record)) {
-          server = taken
-          break
+      ahead = waiterAhead(directory, self)
+      /** Load observed at this admission attempt. */
+      const startLoad = currentLoad(env)
+      if (ahead) refusal = { code: ExitCode.busy, text: WindowText.queued(ahead) }
+      else if (startLoad > maxLoad)
+        refusal = { code: ExitCode.load, text: WindowText.load(startLoad, maxLoad) }
+      else {
+        /** Attempt start, shared by the record's time fields. */
+        const startedAt = Date.now()
+        record = {
+          window: options.window ?? 'unnamed',
+          owner: env.MIGAIA_EXCLUSIVE_WINDOW_OWNER ?? `pid-${process.pid}`,
+          host: hostname(),
+          pid: process.pid,
+          port,
+          startUTC: new Date(startedAt).toISOString(),
+          heartbeatUTC: new Date(startedAt).toISOString(),
+          expectedEnd: new Date(startedAt + maxSeconds * 1000).toISOString(),
+          startLoad,
+          cwd: process.cwd(),
+          command: options.command
         }
-        await releasePort(taken)
-        /** File-protocol owner that still holds the lock file. */
-        const file = inspectLock(paths.lock)
-        refusal = { code: ExitCode.busy, text: WindowText.busy(file.record?.owner ?? 'unknown') }
+        /** Record captured for the probe responder. */
+        const current = record
+        /** Outcome of the port attempt. */
+        const taken = await acquirePort(port, () => JSON.stringify(current))
+        if (taken === 'conflict') {
+          log(WindowText.portConflict(port))
+          return ExitCode.portConflict
+        }
+        // The previous owner released the port between our listen and the probe: try again now,
+        // subject to the deadline check at the top of the loop.
+        if (taken === 'retry') {
+          refusal = { code: ExitCode.busy, text: WindowText.busy('a window that just ended') }
+          continue
+        }
+        if (taken === 'held') {
+          /** Holder that answered the probe. */
+          const probe = await probePort(port)
+          refusal = { code: ExitCode.busy, text: WindowText.busy(probe.record?.owner ?? 'unknown') }
+        } else {
+          // Holding the port: no runner of this tool can touch the file now. A leftover file is
+          // either stale (reaped here) or owned by a tool that follows only the file protocol.
+          /** Whether this runner created the lock file and now owns the window. */
+          let created
+          try {
+            reapLock(directory, { heldPort: port })
+            created = createLockFile(paths, record)
+          } catch (error) {
+            // A filesystem failure (EACCES, ENOSPC) must not leave the port held by this process,
+            // which would block every other runner for as long as the process lives.
+            await releasePort(taken)
+            throw error
+          }
+          if (created) {
+            server = taken
+            break
+          }
+          await releasePort(taken)
+          /** File-protocol owner that still holds the lock file. */
+          const file = inspectLock(paths.lock)
+          refusal = { code: ExitCode.busy, text: WindowText.busy(file.record?.owner ?? 'unknown') }
+        }
+      }
+      /** Milliseconds left before the wait deadline. */
+      const remaining = waitUntil - Date.now()
+      if (remaining > 0) {
+        // Re-registering on every poll refreshes `seenAt`, which keeps this waiter live in the queue.
+        // A write failure only costs this runner its queue position, so it is reported once and
+        // the runner keeps waiting instead of abandoning the window.
+        queued = true
+        try {
+          registerWaiter(directory, { ...self, pollSeconds, seenAt: Date.now() })
+        } catch (error) {
+          if (!registerFailed) log(WindowText.waiterRegisterFailed(error.message))
+          registerFailed = true
+        }
+        // The head of the queue polls faster so a freed window is taken within about a second.
+        await sleep(Math.min(ahead ? pollSeconds : headPollSeconds, remaining / 1000))
       }
     }
-    /** Milliseconds left before the wait deadline. */
-    const remaining = waitUntil - Date.now()
-    if (remaining > 0) await sleep(Math.min(pollSeconds, remaining / 1000))
+  } finally {
+    // Removing the waiter file is bookkeeping. A failure here (EACCES, ENOSPC) must not escape
+    // while this runner may already hold the port; a leftover file stops counting once its
+    // `seenAt` ages out, so it is reported and the run continues.
+    if (queued)
+      try {
+        removeWaiter(directory, self.pid)
+      } catch (error) {
+        log(WindowText.waiterCleanupFailed(error.message))
+      }
   }
   // The child leads its own process group, so the cap and forwarded signals reach every
   // descendant. stdin is not inherited: a background group reading the terminal would stop.
   /** Child process running the measured command. */
-  const child = spawn(options.command[0], options.command.slice(1), {
-    stdio: ['ignore', 'inherit', 'inherit'],
-    env,
-    detached: true
-  })
+  let child
+  try {
+    // Test seam only: lets a test change the environment between taking the window and spawning.
+    options.afterAcquire?.()
+    child = spawn(options.command[0], options.command.slice(1), {
+      stdio: ['ignore', 'inherit', 'inherit'],
+      env,
+      detached: true
+    })
+  } catch (error) {
+    // A synchronous spawn failure (invalid arguments, resource limits) started nothing, so the
+    // window is handed back at once: lock file removed, port released, original error rethrown.
+    // A removal failure is reported and never skips the port release or replaces the spawn error.
+    try {
+      rmSync(paths.lock, { force: true })
+    } catch (cleanupError) {
+      log(WindowText.bookkeepingFailed(cleanupError.message))
+    } finally {
+      await releasePort(server)
+    }
+    throw error
+  }
   /** Whether the window cap ended the run. */
   let timedOut = false
   /** SIGKILL escalation timer, armed once termination starts. */
@@ -593,15 +873,37 @@ export async function runWindow(options) {
     log(WindowText.timeout(maxSeconds))
     terminate()
   }, maxSeconds * 1000)
-  /** Forwards an operator interrupt to the whole group; release happens after it exits. */
+  /** SIGKILL escalation timer for an operator interrupt, armed by the first signal. */
+  let interruptKillTimer
+  /**
+   * Forwards an operator interrupt to the whole group and arms SIGKILL after the grace period, so a
+   * group that ignores the signal cannot hold the window forever. A second interrupt kills at once.
+   * Release still happens only after the group is gone.
+   */
   const forward = (signal) => {
-    if (child.pid !== undefined) signalGroup(child.pid, signal)
+    if (child.pid === undefined) return
+    if (interruptKillTimer !== undefined) {
+      signalGroup(child.pid, 'SIGKILL')
+      return
+    }
+    signalGroup(child.pid, signal)
+    interruptKillTimer = setTimeout(
+      () => signalGroup(child.pid, 'SIGKILL'),
+      killGraceSeconds * 1000
+    )
   }
   process.on('SIGINT', forward)
   process.on('SIGTERM', forward)
   /** Child termination status. */
   const status = await new Promise((resolve) => {
-    child.on('error', (error) => resolve({ code: 127, error: error.message }))
+    child.on('error', (error) => {
+      // Keep the real cause: a missing command is 127, a non-executable one 126, as in shells.
+      log(WindowText.spawnFailed(error.code, error.message))
+      resolve({
+        code: error.code === 'EACCES' ? 126 : 127,
+        spawnError: { code: error.code, message: error.message }
+      })
+    })
     child.on('exit', (code, signal) => resolve({ code, signal }))
   })
   clearTimeout(cap)
@@ -611,17 +913,25 @@ export async function runWindow(options) {
     await groupGone(child.pid)
   }
   clearTimeout(killTimer)
+  clearTimeout(interruptKillTimer)
   clearInterval(beat)
   process.off('SIGINT', forward)
   process.off('SIGTERM', forward)
   /** Load observed at window end; reported, and a breach marks the window as environment error. */
   const endLoad = currentLoad(env)
   /** Exit code returned to the caller. */
+  /** The command's own exit code. */
+  const commandCode = childExitCode(status)
+  // Under `enforce`, a successful command whose window ended above the load ceiling still fails
+  // the window, because its timing is not trustworthy. A failing command keeps its own code, which
+  // is the more important signal. Under `report` the breach is only recorded.
   const exitCode = timedOut
     ? ExitCode.timeout
     : heartbeatError !== undefined
       ? ExitCode.heartbeatFailed
-      : childExitCode(status)
+      : endLoadPolicy === EndLoadPolicy.enforce && commandCode === 0 && endLoad > maxLoad
+        ? ExitCode.load
+        : commandCode
   // The group is gone, so releasing the port is safe even if the bookkeeping below fails (for
   // example ENOSPC); the port is released last either way.
   try {
@@ -634,6 +944,7 @@ export async function runWindow(options) {
       endLoad,
       timedOut,
       heartbeatFailed: heartbeatError !== undefined,
+      spawnError: status.spawnError ?? null,
       endLoadExceeded: endLoad > maxLoad,
       lock: record
     })
@@ -655,6 +966,7 @@ export async function windowState(env = process.env) {
   const port = mutexPort(env)
   /** Probe of the kernel-held mutex. */
   const probe = await probePort(port)
+  if (probe.state === 'transient') return { state: 'held', reason: 'holder is releasing' }
   if (probe.state !== 'free') return probe
   /** File verdict, assuming the port is still free. */
   const verdict = classifyLock(lockPaths(lockDirectory(env)).lock, { freePort: port })
@@ -685,7 +997,14 @@ export function parseArgs(argv) {
     else if (flags[index] === '--max-seconds') options.maxSeconds = Number(value)
     else if (flags[index] === '--max-load') options.maxLoad = Number(value)
     else if (flags[index] === '--wait') options.waitSeconds = Number(value)
-    else return { error: WindowText.usage }
+    else if (flags[index] === '--priority') {
+      if (!isPriority(value)) return { error: `${WindowText.invalidPriority}\n${WindowText.usage}` }
+      options.priority = value
+    } else if (flags[index] === '--end-load') {
+      if (!Object.hasOwn(EndLoadPolicy, value))
+        return { error: `${WindowText.invalidEndLoad}\n${WindowText.usage}` }
+      options.endLoad = value
+    } else return { error: WindowText.usage }
   }
   options.command = separator === -1 ? [] : rest.slice(separator + 1)
   /** First invalid numeric flag, reported as a usage error. */
@@ -725,7 +1044,7 @@ async function main() {
     const verdict = await windowState()
     if (parsed.action === 'status')
       process.stdout.write(
-        `${JSON.stringify({ path: lockPaths(directory).lock, port: mutexPort(), ...verdict }, null, 2)}\n`
+        `${JSON.stringify({ path: lockPaths(directory).lock, port: mutexPort(), ...verdict, waiters: liveWaiters(directory) }, null, 2)}\n`
       )
     return stateExitCode(verdict.state)
   }
