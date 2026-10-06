@@ -36,13 +36,21 @@ export const Da1BenchThreshold = Object.freeze({
   large: Object.freeze({ p99: 3, throughput: 0.5, cpuByPid: 3, rssByPid: 2 })
 })
 
+/** U33 keeps the historical B0 concurrency floors descriptive, separate from regression gates. */
+export const Da1ConcurrencyTrackingStatus = Object.freeze({
+  /** The complete implementation reaches the historical minimal-path comparison target. */
+  met: '达到跟踪目标',
+  /** The old B0 target is missed; this label alone must never block DA1 or W3. */
+  below: '未达跟踪目标'
+})
+
 /**
  * Judge DA1 from every retained alternating pair and match independently launched PIDs by role. A
  * shared Worker process is charged once; missing endpoint observations never yield PASS.
  *
  * @param {{ order: string[]; bare: object; rpc: object }[]} rounds Complete original receipts.
  * @param {'small' | 'large' | 'concurrency'} scenario Registered budget domain.
- * @param {number} floor Frozen throughput floor for concurrency only.
+ * @param {number} floor Historical B0 throughput tracking target for concurrency only.
  * @param {{ baseline: object; noiseBand: number }} [guard] Frozen W3 p50 and same-window A/A noise.
  * @returns {object} Median ratios, every round and exact threshold disposition.
  * @throws {Error} Incomplete measurements or absent PID denominators.
@@ -107,9 +115,8 @@ export function judgeDa1Pairs(rounds, scenario, floor, guard) {
     cpuByPid: mediansByRole('cpuByPid'),
     rssByPid: mediansByRole('rssByPid')
   }
-  /** Concurrent cells use only the six previously adjudicated throughput floors. */
-  const thresholds =
-    scenario === 'concurrency' ? { throughput: floor } : Da1BenchThreshold[scenario]
+  /** U33 retires B0 concurrency floors as gates; existing small/large budgets remain unchanged. */
+  const thresholds = scenario === 'concurrency' ? {} : Da1BenchThreshold[scenario]
   if (!thresholds || (scenario === 'concurrency' && !(floor > 0)))
     throw new Error(IpcBenchErrorText.paired)
   /** All applicable budgets must hold; missing metrics cannot be interpreted as a pass. */
@@ -125,6 +132,19 @@ export function judgeDa1Pairs(rounds, scenario, floor, guard) {
   /** Relative p50 regression is judged separately from the unchanged absolute DA1 budgets. */
   const regression = guard ? judgeW3Regression(rounds, guard.baseline, guard.noiseBand) : undefined
   if (regression?.status === 'fail') failedMetrics.push('w3.p50')
+  /** Historical targets stay visible in each complete concurrency receipt without gating it. */
+  const tracking =
+    scenario === 'concurrency'
+      ? {
+          throughput: {
+            target: floor,
+            status:
+              ratios.throughput < floor
+                ? Da1ConcurrencyTrackingStatus.below
+                : Da1ConcurrencyTrackingStatus.met
+          }
+        }
+      : undefined
   return {
     type: 'da1-ratio',
     status: failedMetrics.length ? 'fail' : 'pass',
@@ -135,6 +155,7 @@ export function judgeDa1Pairs(rounds, scenario, floor, guard) {
     ratiosByRound: original.ratiosByRound,
     endpointRatiosByRound: byRound,
     samples: original.samples,
+    ...(tracking ? { tracking } : {}),
     ...(regression ? { regression } : {})
   }
 }
