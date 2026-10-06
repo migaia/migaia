@@ -6,7 +6,19 @@ import type { IRuntimePeer as IRuntimePeerHandle } from './peer.js'
 
 /** Runtime calls retain the original core false override without widening legacy remote options. */
 export type IRuntimeCallOptions = Omit<IRemoteCallOptions, 'timeoutMs'> &
-  Readonly<{ timeoutMs?: number | false }>
+  Readonly<{ timeoutMs?: number | false; transfer?: readonly ArrayBuffer[] }>
+
+/** Process calls reject own transfer presence; thread calls accept only genuine backing types. */
+type IRuntimeFamilyCallOptions<K> =
+  K extends (typeof import('./constants.js').RuntimePluginKey)['process']
+    ? Omit<IRuntimeCallOptions, 'transfer'>
+    : IRuntimeCallOptions
+
+/** Groups use the same platform ownership boundary as request, notify and stream calls. */
+type IRuntimeFamilyGroupOptions<K> =
+  K extends (typeof import('./constants.js').RuntimePluginKey)['process']
+    ? Omit<IRpcRuntimeSendOptions, 'transfer'>
+    : Omit<IRpcRuntimeSendOptions, 'transfer'> & Readonly<{ transfer?: readonly ArrayBuffer[] }>
 
 /** Explicit dynamic invocation is opt-in and still checked against the accepted runtime catalog. */
 export type IRuntimeDynamicSurface = Readonly<
@@ -135,18 +147,28 @@ type IRuntimePayload<F> = F extends (...args: infer A) => any
   : never
 /** Stream results expose yielded values and admit only actual iterable-returning methods. */
 type IRuntimeYield<F> = F extends (...args: any[]) => infer R
-  ? Awaited<R> extends AsyncIterableIterator<infer V> | IterableIterator<infer V>
-    ? V
-    : never
+  ? [Awaited<R>] extends [never]
+    ? never
+    : Awaited<R> extends AsyncIterableIterator<infer V> | IterableIterator<infer V>
+      ? V
+      : never
   : never
+/** A never-returning scalar remains callable; an empty generator is still a stream. */
+type IRuntimeIsStream<F> = F extends (...args: any[]) => infer R
+  ? [Awaited<R>] extends [never]
+    ? false
+    : Awaited<R> extends AsyncIterableIterator<any> | IterableIterator<any>
+      ? true
+      : false
+  : false
 /** Scalar calls cannot misrepresent a generator as a portable scalar result. */
 type IRuntimeScalarKeys<S> = {
-  [K in keyof S]: IRuntimeYield<S[K]> extends never ? K : never
+  [K in keyof S]: IRuntimeIsStream<S[K]> extends true ? never : K
 }[keyof S]
 /** Generator paths are inferred purely from the provided function's return type. */
 type IRuntimeStreamKeys<S> = string extends keyof S
   ? string
-  : { [K in keyof S]: IRuntimeYield<S[K]> extends never ? never : K }[keyof S]
+  : { [K in keyof S]: IRuntimeIsStream<S[K]> extends true ? K : never }[keyof S]
 /** Awaiting a scalar call preserves its concrete application result. */
 type IRuntimeResult<F> = F extends (...args: any[]) => infer R ? Awaited<R> : never
 
@@ -160,26 +182,27 @@ type IRuntimeGroupStep<S> = {
 }[Extract<IRuntimeScalarKeys<S>, string>]
 
 /** Public Peer calls require an explicit remote surface; no generic means no callable methods. */
-export type IRuntimeTypedPeer<TRemote = Record<never, never>, S = IRuntimeFlatten<TRemote>> = Pick<
-  IRuntimePeerHandle,
-  'self' | 'describe' | 'close' | 'outcome'
-> &
+export type IRuntimeTypedPeer<
+  TRemote = Record<never, never>,
+  S = IRuntimeFlatten<TRemote>,
+  K = (typeof import('./constants.js').RuntimePluginKey)['thread']
+> = Pick<IRuntimePeerHandle, 'self' | 'describe' | 'close' | 'outcome'> &
   Readonly<{
     group<Steps extends readonly IRuntimeGroupStep<S>[]>(
       steps: Steps,
-      options?: IRpcRuntimeSendOptions
+      options?: IRuntimeFamilyGroupOptions<K>
     ): Promise<readonly IRpcRuntimeStepOutcome[]>
     request<M extends Extract<IRuntimeScalarKeys<S>, string>>(
       method: M,
-      ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeCallOptions]
+      ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]
     ): Promise<IRuntimeResult<S[M]>>
     notify<M extends Extract<IRuntimeScalarKeys<S>, string>>(
       method: M,
-      ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeCallOptions]
+      ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]
     ): Promise<void>
     stream<M extends Extract<IRuntimeStreamKeys<S>, string>>(
       method: M,
-      ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeCallOptions]
+      ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]
     ): AsyncIterableIterator<IRuntimeYield<S[M]>>
   }>
 
@@ -209,11 +232,38 @@ export type IRuntimeTypedOutlet<P extends readonly unknown[], K> =
     ? string extends keyof IRuntimeRemote<P, K, IRuntimeNames<P, K>>
       ? Omit<
           import('./outlet.js').IRuntimeOutlet,
-          keyof import('./outlet.js').IRuntimeOutletControls<K>
+          | keyof import('./outlet.js').IRuntimeOutletControls<K>
+          | 'request'
+          | 'notify'
+          | 'stream'
+          | 'group'
+          | 'broadcast'
         > &
-          import('./outlet.js').IRuntimeOutletControls<K>
+          import('./outlet.js').IRuntimeOutletControls<K> &
+          IRuntimeDynamicOutletCalls<K>
       : IRuntimeOutletCalls<P, K>
     : IRuntimeOutletCalls<P, K>
+
+/** Dynamic surfaces retain non-generic signatures while narrowing their platform call options. */
+type IRuntimeDynamicOutletCalls<K> = {
+  [M in 'request' | 'notify' | 'stream']: (
+    target: Parameters<import('./outlet.js').IRuntimeOutlet[M]>[0],
+    method: string,
+    payload?: unknown,
+    options?: IRuntimeFamilyCallOptions<K>
+  ) => ReturnType<import('./outlet.js').IRuntimeOutlet[M]>
+} & Readonly<{
+  group(
+    target: IRuntimeTarget<string>,
+    steps: readonly import('../../contract/runtime-api/types.js').IRpcRuntimeStep[],
+    options?: IRuntimeFamilyGroupOptions<K>
+  ): ReturnType<import('./outlet.js').IRuntimeOutlet['group']>
+  broadcast(
+    method: string,
+    payload?: unknown,
+    options?: IRuntimeFamilyCallOptions<K>
+  ): ReturnType<import('./outlet.js').IRuntimeOutlet['broadcast']>
+}>
 
 /** Each registered literal name keeps its own method and payload associations. */
 type IRuntimeOutletCalls<
@@ -230,7 +280,7 @@ type IRuntimeOutletCalls<
     >(
       target: IRuntimeTarget<N>,
       steps: Steps,
-      options?: IRpcRuntimeSendOptions
+      options?: IRuntimeFamilyGroupOptions<K>
     ): Promise<readonly IRpcRuntimeStepOutcome[]>
     /** Queries address the same exact registered target, independent of business method names. */
     outcome<N extends IRuntimeNames<P, K>>(
@@ -243,7 +293,10 @@ type IRuntimeOutletCalls<
     >(
       target: IRuntimeTarget<N>,
       method: M,
-      ...args: [...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>, options?: IRuntimeCallOptions]
+      ...args: [
+        ...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>,
+        options?: IRuntimeFamilyCallOptions<K>
+      ]
     ): Promise<IRuntimeResult<IRuntimeRemote<P, K, N>[M]>>
     notify<
       N extends IRuntimeNames<P, K>,
@@ -251,7 +304,10 @@ type IRuntimeOutletCalls<
     >(
       target: IRuntimeTarget<N>,
       method: M,
-      ...args: [...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>, options?: IRuntimeCallOptions]
+      ...args: [
+        ...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>,
+        options?: IRuntimeFamilyCallOptions<K>
+      ]
     ): Promise<void>
     stream<
       N extends IRuntimeNames<P, K>,
@@ -259,13 +315,16 @@ type IRuntimeOutletCalls<
     >(
       target: IRuntimeTarget<N>,
       method: M,
-      ...args: [...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>, options?: IRuntimeCallOptions]
+      ...args: [
+        ...IRuntimePayload<IRuntimeRemote<P, K, N>[M]>,
+        options?: IRuntimeFamilyCallOptions<K>
+      ]
     ): AsyncIterableIterator<IRuntimeYield<IRuntimeRemote<P, K, N>[M]>>
     /** Cold queries have the same portable format overloads as every runtime outlet. */
     get: import('./outlet.js').IRuntimeOutlet['get']
     broadcast(
       method: string,
       payload?: unknown,
-      options?: IRuntimeCallOptions
+      options?: IRuntimeFamilyCallOptions<K>
     ): Promise<readonly import('./outlet.js').IRuntimeBroadcastResult[]>
   }>

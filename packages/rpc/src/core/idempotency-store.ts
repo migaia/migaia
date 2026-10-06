@@ -1,4 +1,5 @@
-import { utf8ByteLength } from '@migaia/utils/bytes'
+import { utf8ByteLength, isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
+import { rpcBinaryBackingLength, rpcBinaryView } from '../contract/runtime-api/binary.js'
 import type { IRpcPortableValue, IRpcSerializedError } from '../contract/index.js'
 import { RpcConfigurationError, RpcContractError } from './errors.js'
 import { RpcCoreErrorText } from './error-text.js'
@@ -73,6 +74,9 @@ export function portableBytes(value: IRpcPortableValue | IRpcSerializedError | u
   if (value === undefined) return 0
   if (typeof value === 'string') return utf8ByteLength(value)
   if (value === null || typeof value === 'boolean' || typeof value === 'number') return 8
+  /** Native results charge their accessible full backing; they cannot masquerade as empty records. */
+  if (isArrayBuffer(value)) return rpcBinaryBackingLength(value)
+  if (isUint8Array(value)) return rpcBinaryBackingLength(rpcBinaryView(value).backing)
   if (Array.isArray(value))
     return value.reduce((total: number, item) => total + portableBytes(item), 0)
   if (

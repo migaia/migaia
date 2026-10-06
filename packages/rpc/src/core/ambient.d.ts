@@ -29,12 +29,16 @@ declare global {
   function clearTimeout(handle: unknown): void
   /** Schedules the memory adapter's deferred delivery in every supported host. */
   function queueMicrotask(callback: () => void): void
+  /** All supported hosts clone admitted binary outcomes without requiring DOM declarations. */
+  function structuredClone<T>(value: T): T
 
   // eslint-disable-next-line no-var
   var crypto:
     | {
         randomUUID?: () => string
         getRandomValues?: (array: Uint8Array) => Uint8Array
+        /** Optional stateless SHA-256 service; absence prevents native binary qualification. */
+        subtle?: { digest(algorithm: 'SHA-256', backing: ArrayBuffer): Promise<ArrayBuffer> }
       }
     | undefined
 }

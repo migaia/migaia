@@ -1,5 +1,7 @@
 /** Stable text retained by the core endpoint graph and its shared contracts. */
 export const RpcCoreErrorText = {
+  /** A selected binary frame failed the closed manifest grammar before provider publication. */
+  runtimeBinaryInvalid: 'Runtime binary manifest is invalid',
   /** Stable fence refusal discloses no foreign task, payload or generation identity. */
   providerGenerationMismatch: 'Provider generation does not match the selected task',
   /** D35 runtime keys are unique across methods/bodies; callers must choose a new key for new work. */

@@ -42,6 +42,7 @@ export function createThreadBinding<THandle extends IThreadHandle>(
   return {
     ownership: 'owned',
     bindEndpoint: drain.wrap,
+    trackRequest: drain.trackCurrent,
     supervisor,
     scheduler: options.scheduler,
     openChannel: (handle, signal) => options.channelFactory.open(handle, signal)

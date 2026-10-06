@@ -359,11 +359,18 @@ it('[A2][A9][A16][A18][A33] full authenticated listener publishes its actual ses
     assert.equal(second.error.code, 'OVERLOADED')
     assert.deepEqual(await calls[0], { value: 42 })
     await clients[0]!.close()
-    await vi.waitFor(() =>
-      assert.throws(
-        () => host.process!.request('client-1', 'child.echo'),
-        (error: { code?: string }) => error.code === 'TARGET_UNKNOWN'
+    /** Wait through the existing local query; sending while the slot is still live is real business. */
+    await vi.waitFor(async () =>
+      assert.equal(
+        (await host.process!.list()).connections.some(
+          (entry) => 'instanceId' in entry.identity && entry.identity.instanceId === 'client-1'
+        ),
+        false
       )
+    )
+    assert.throws(
+      () => host.process!.request('client-1', 'child.echo'),
+      (error: { code?: string }) => error.code === 'TARGET_UNKNOWN'
     )
     assert.equal(await host.process!.request('client-2', 'child.echo'), 2)
   } finally {

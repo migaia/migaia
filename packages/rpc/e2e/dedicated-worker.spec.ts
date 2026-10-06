@@ -1,5 +1,36 @@
 import { expect, test } from '@playwright/test'
 
+test('[A84][A86][A87][A90] actual Web Worker restores and transfers authenticated binary through canonical owners', async ({
+  page
+}) => {
+  const failures: string[] = []
+  page.on('pageerror', (error) => failures.push(error.message))
+  await page.goto('/e2e/fixtures/index.html?scenario=binary-thread')
+  await page.evaluate(() => globalThis.e2eReady)
+  const receipt = await page.evaluate(() => globalThis.runBrowserBinaryScenario())
+  expect(receipt.copy).toEqual({
+    senderLength: 4,
+    buffer: true,
+    view: true,
+    alias: true,
+    offset: 1,
+    bytes: [9, 1, 2, 8]
+  })
+  expect(receipt.transfer).toEqual({
+    senderLength: 0,
+    firstLength: 0,
+    secondLength: 0,
+    alias: true,
+    bytes: [9, 1, 2, 8]
+  })
+  expect(receipt.streamed).toEqual({ beforeNext: 2, senderLength: 0, buffer: true, bytes: [3, 4] })
+  expect(receipt.grouped).toEqual({ senderLength: 0, state: 'success', buffer: true, alias: true })
+  expect(receipt.notify).toEqual({ senderLength: 0 })
+  expect(receipt.count).toBe(6)
+  expect(receipt.failures).toEqual([])
+  expect(failures).toEqual([])
+})
+
 test('DedicatedWorker supports concurrent RPC and terminal convergence', async ({ page }) => {
   const pageErrors: Error[] = []
   const consoleErrors: string[] = []

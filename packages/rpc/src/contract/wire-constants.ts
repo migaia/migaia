@@ -58,6 +58,12 @@ export const RpcCapability = {
   cancelBeforeStart: 'cancel-before-start@1',
   /** The final provider's original idempotency store exposes read-only pending/done/unknown lookup. */
   outcome: 'outcome@1',
+  /** Restores Uint8Array/ArrayBuffer through the closed portable-binary manifest codec. */
+  portableBinary: 'portable-binary@1',
+  /** Complete native backing integrity is validated before the original auth replay commit. */
+  nativeBinary: 'native-binary-authenticated-manifest@1',
+  /** Actual clone-transfer carriers transfer only the caller's explicit original backings. */
+  transfer: 'transfer@1',
   /** Optional physical grouping; it never introduces a semantic envelope kind. */
   batch: 'batch@1'
 } as const

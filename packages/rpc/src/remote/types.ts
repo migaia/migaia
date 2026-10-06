@@ -34,6 +34,8 @@ export type IRemoteBinding<TUnit, TSpec> = Readonly<{
   supervisor: ISupervisor<TUnit, TSpec>
   scheduler: IScheduler
   openChannel(unit: TUnit, signal: IAbortSignal): Promise<IRemoteChannel>
+  /** Existing native drain tracks runtime requests that bypass the legacy endpoint.send wrapper. */
+  trackRequest?<T>(operation: () => Promise<T>): Promise<T>
 }>
 
 /** Endpoint assembly must install channel features in the same construction batch. */

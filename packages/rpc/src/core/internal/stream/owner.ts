@@ -1,3 +1,4 @@
+import { normalizeRuntimePortable } from '../../../contract/normalize.js'
 import {
   createOutboundEnvelope,
   retainForwardOptions,
@@ -292,6 +293,12 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     ): Promise<IteratorResult<IRpcPortableValue>> => {
       if (!state) unopenedTerminal = { done: true }
       if (state?.runtime) {
+        /**
+         * Ordinary return after local terminal keeps legacy cleanup semantics; next keeps its
+         * error.
+         */
+        if (!thrown && state.terminal && state.runtime.options.cancel !== RpcRuntimeCancel)
+          return { done: true, value: value as IRpcPortableValue }
         try {
           /** Return observes the same actual producer terminal, including concurrent callers. */
           const result = await this.#finishRuntimeConsumer(state, thrown ? value : undefined)
@@ -454,10 +461,15 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
           return envelope
         })
       state.openSend = state.runtime.prepared.then((envelope) => {
-        return outbound.sendRuntimeFrame(envelope, {
-          queueSignal: scope.signal,
-          assertCanSend: () => scope.assertActive(this.#kernel.generation)
-        })
+        return outbound.sendRuntimeFrame(
+          envelope,
+          {
+            queueSignal: scope.signal,
+            assertCanSend: () => scope.assertActive(this.#kernel.generation)
+          },
+          undefined,
+          state.runtime!.options
+        )
       })
     }
     this.#consumers.set(tupleKey(targetId, id), state)
@@ -738,7 +750,9 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     receiverId?: string,
     runtime?: IProviderRuntimeStream | IRpcRuntimeEnvelope
   ): Promise<void> {
-    const normalized = normalizeStreamPayload(payload)
+    const normalized = runtime
+      ? normalizeStreamPayload(payload, normalizeRuntimePortable)
+      : normalizeStreamPayload(payload)
     if (runtime) {
       /** The protected task is copied from accepted state, never reconstructed from business data. */
       const source = 'seal' in runtime ? runtime.envelope : runtime
@@ -1380,7 +1394,8 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
           : { value: result.value })
       }
       try {
-        normalizeStreamPayload(outboundPayload)
+        if (state.runtime) normalizeStreamPayload(outboundPayload, normalizeRuntimePortable)
+        else normalizeStreamPayload(outboundPayload)
       } catch (error) {
         const failure = new RpcError(
           RpcCoreErrorCode.payloadInvalid,

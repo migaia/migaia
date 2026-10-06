@@ -2436,3 +2436,73 @@ it.each(['process', 'thread'] as const)(
     }
   }
 )
+
+it('[A84][A115] forwarded binary notify releases B after real C business completion', async () => {
+  const owners = [owner(), owner(), owner()] as const
+  const carriers: ReturnType<typeof runtimeSources>[] = []
+  /** The real new binary profile needs its complete original generation/admission capabilities. */
+  const { RUNTIME_API_CAPABILITIES: offered } =
+    await import('../../src/remote/runtime-api/constants.js')
+  let enter!: () => void, release!: () => void
+  const entered = new Promise<void>((resolve) => {
+    enter = resolve
+  })
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let bytes = false
+  try {
+    carriers.push(
+      await attach(
+        owners[1],
+        owners[2],
+        'c',
+        'b',
+        {},
+        {
+          provide: {
+            hold: async (value) => {
+              bytes = value instanceof ArrayBuffer
+              enter()
+              await held
+            }
+          }
+        },
+        runtimeSources(offered, offered)
+      )
+    )
+    carriers.push(
+      await attach(
+        owners[0],
+        owners[1],
+        'b',
+        'a',
+        {},
+        {
+          expose: ['c.hold'],
+          providerLimits: { maxGlobal: 1, maxPerPeer: 1 }
+        },
+        runtimeSources(offered, offered)
+      )
+    )
+    const connection = readRuntimePeerConnection(
+      readRuntimeOutletConnection(owners[1].thread, 'a')!.peer
+    )
+    const admission = readEndpointOwner<ProviderAdmissionRegistry>(
+      connection.endpoint,
+      EndpointOwnerKey.providerAdmission
+    )!
+    await owners[0].thread!.notify('b', 'c.hold', new Uint8Array([1]).buffer)
+    await entered
+    assert.equal(bytes, true, '[A84] C receives actual binary through both canonical hops')
+    assert.equal(admission.size, 1)
+    release()
+    await vi.waitFor(() =>
+      assert.equal(admission.size, 0, '[A115] completed C business releases the original B lease')
+    )
+  } finally {
+    release()
+    for (const host of owners) await host.dispose()
+    for (const carrier of carriers) carrier.close()
+  }
+})

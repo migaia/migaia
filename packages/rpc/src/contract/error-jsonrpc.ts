@@ -1,6 +1,6 @@
 import { createInvalidWireError, normalizeRpcSerializedError, sanitizeText } from './error.js'
 import { normalizePortable } from './normalize.js'
-import type { IRpcJsonRpcErrorObject, IRpcPortableValue, IRpcSerializedError } from './types.js'
+import type { IRpcJsonRpcErrorObject, IRpcWirePortableValue, IRpcSerializedError } from './types.js'
 import {
   RpcJsonRpcWireError,
   RpcWireErrorFallback,
@@ -16,7 +16,7 @@ export function toJsonRpcError(error: IRpcSerializedError, code: number): IRpcJs
   return Object.freeze({
     code,
     message: wire.message,
-    data: Object.freeze({ [RpcJsonRpcWireError.dataKey]: wire }) as unknown as IRpcPortableValue
+    data: Object.freeze({ [RpcJsonRpcWireError.dataKey]: wire }) as unknown as IRpcWirePortableValue
   })
 }
 
@@ -63,7 +63,7 @@ export function fromJsonRpcError(value: unknown): IRpcSerializedError {
     name: string
     message: string
     stack: string
-    data?: IRpcPortableValue
+    data?: IRpcWirePortableValue
     truncated?: true
   } = {
     source: RpcJsonRpcWireError.foreignSource,

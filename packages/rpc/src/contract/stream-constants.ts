@@ -1,4 +1,6 @@
 import type { IRpcPortableValue } from './types.js'
+import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
+import { rpcPortableBackingLength, rpcPortableViewLength } from './normalize.js'
 
 /** The seven protocol 1.1 stream events; direction and sequence are checked by the stream owner. */
 export const RpcStreamEvent = {
@@ -34,6 +36,8 @@ export function measurePortableStreamValue(value: IRpcPortableValue): number {
   if (typeof value === 'boolean') return value ? 4 : 5
   if (typeof value === 'number') return 24
   if (typeof value === 'string') return stringBytes(value)
+  if (isArrayBuffer(value)) return rpcPortableBackingLength(value)
+  if (isUint8Array(value)) return rpcPortableViewLength(value)
   if (Array.isArray(value)) {
     let size = 2 + Math.max(0, value.length - 1)
     for (const item of value) size += measurePortableStreamValue(item)

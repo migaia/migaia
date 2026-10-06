@@ -1,3 +1,4 @@
+import { RuntimePluginKey } from '../remote/runtime-api/constants.js'
 import {
   runtimeQuery,
   runtimeDetail,
@@ -100,7 +101,8 @@ export async function createProcessListenerPeer(
             signal,
             endpoint,
             origin: { kind: RuntimeSourceKind.listen, direction: RuntimeConnectionDirection.listen }
-          }
+          },
+          RuntimePluginKey.process
         )
         return Object.freeze({ peer, close: peer.close })
       },

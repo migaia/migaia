@@ -1,3 +1,4 @@
+import { createProcessPlugin } from '../../src/process/index.js'
 import type { IRuntimeExpose } from '../../src/remote/runtime-api/typing.js'
 import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
 import {
@@ -184,3 +185,63 @@ void overview
 void overviewText
 void detail
 void detailText
+
+/** A86/A87: process and thread factories retain platform-specific ownership options purely in types. */
+const binaryProvide = { echo: (payload: ArrayBuffer) => payload }
+/** These declarations exercise public factories; no runtime fixture or extra provider is emitted. */
+const processBinary = import('../../src/process/index.js').then(({ createProcessPeer }) =>
+  createProcessPeer<typeof binaryProvide>({ report: () => undefined })
+)
+processBinary.then((peer) => {
+  // @ts-expect-error A87: process rejects an own transfer field, including an empty list.
+  peer.request('echo', new ArrayBuffer(1), { transfer: [] })
+  // @ts-expect-error A87: undefined does not erase own process transfer presence.
+  peer.notify('echo', new ArrayBuffer(1), { transfer: undefined })
+  // @ts-expect-error A87: group process calls enforce the same carrier ownership rule.
+  peer.group([{ method: 'echo', payload: new ArrayBuffer(1) }], { transfer: [] })
+})
+/** Thread accepts only original ArrayBuffer backings, rather than views or shared memory. */
+const threadBinary = createThreadPeer<typeof binaryProvide>({ report: () => undefined })
+threadBinary.then((peer) => {
+  const backing = new ArrayBuffer(1)
+  const result: Promise<ArrayBuffer> = peer.request('echo', backing, { transfer: [backing] })
+  // @ts-expect-error A87: the ownership list requires a backing, not a Uint8Array view.
+  peer.request('echo', backing, { transfer: [new Uint8Array(backing)] })
+  // @ts-expect-error A87: group uses the same precise original backing list.
+  peer.group([{ method: 'echo', payload: backing }], { transfer: [new Uint8Array(backing)] })
+  void result
+})
+
+/** A87: a process Plugin's typed Host outlet uses the same explicit process ownership boundary. */
+const processPlugin = createProcessPlugin<
+  typeof binaryProvide,
+  Record<never, never>,
+  'binary-process'
+>({
+  name: 'binary-process',
+  report: () => undefined
+})
+const processHost = defineHost<Record<string, never>, never, readonly [typeof processPlugin]>({
+  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+})
+// @ts-expect-error A87: a process Plugin does not authorize transfer through its Host facade.
+processHost.process!.request('binary-process', 'echo', new ArrayBuffer(1), { transfer: [] })
+/** Accepted thread group calls carry precise backing lists without widening payload or result. */
+threadBinary.then((peer) => {
+  const backing = new ArrayBuffer(1)
+  peer.group([{ method: 'echo', payload: backing }], { transfer: [backing] })
+})
+
+/** A77/A89: throwing scalars and empty generators preserve their actual callable mode. */
+declare const modeBoundary: IRuntimeTypedPeer<{
+  fail: () => never
+  empty: () => AsyncGenerator<never>
+}>
+const failedScalar: Promise<never> = modeBoundary.request('fail')
+const emptyStream: AsyncIterableIterator<never> = modeBoundary.stream('empty')
+// @ts-expect-error A77: an empty generator cannot become a scalar method because its yield is never.
+modeBoundary.request('empty')
+// @ts-expect-error A77: never-returning scalar functions do not manufacture a stream.
+modeBoundary.stream('fail')
+void failedScalar
+void emptyStream

@@ -11,6 +11,8 @@ import {
   recordAuthenticationReplayBinding,
   registerAuthenticationCounterSetter,
   registerAuthenticationChallengePort,
+  registerAuthenticationBinaryDigest,
+  createRpcBackingDigest,
   authenticationFrameContext,
   readAuthenticationChallengeProof,
   consumedAuthenticationFrame,
@@ -291,6 +293,13 @@ function createAuthenticationCapability(
   }
   /** Verifies/decrypts once, then admits unseen counters within a fixed 64-slot completion window. */
   const unprotect: IRpcAuthenticationTransform = async (value, context) => {
+    /**
+     * Only a failure from the installed private final validator may keep its grammar
+     * classification.
+     */
+    let binaryFailure: unknown
+    /** Throwing undefined cannot be confused with the absence of a validation failure. */
+    let binaryFailed = false
     try {
       const verified = verify ? await verify(value, context) : value
       /** Parse only after decryption, so no unsigned outer field can influence replay state. */
@@ -301,7 +310,23 @@ function createAuthenticationCapability(
       const session = authenticationReplaySession(context)
       if (!session)
         throw new RpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
-      const facts = authenticationFrameContext(context)?.challenge
+      /** Native integrity must finish before nonce pinning or any counter bitmap mutation. */
+      const frameContext = authenticationFrameContext(context)
+      const binary = frameContext?.binary
+      if (binary) {
+        try {
+          binary.result = await binary.validate(envelope.payload)
+        } catch (failure) {
+          binaryFailure = failure
+          binaryFailed = true
+          throw failure
+        }
+        if (authenticationReplaySession(context) !== session)
+          throw new RpcAuthenticationError(
+            RpcMiddlewareErrorText.authenticationReplayBindingInvalid
+          )
+      }
+      const facts = frameContext?.challenge
       if (facts) {
         if (envelope.control === RpcAuthenticationControl.unknown) {
           if (
@@ -374,6 +399,7 @@ function createAuthenticationCapability(
       recordAuthenticationReplayBinding(context)
       return envelope.payload
     } catch (error) {
+      if (binaryFailed && error === binaryFailure) throw error
       if (error instanceof RpcAuthenticationError) throw error
       throw new RpcAuthenticationError(
         RpcMiddlewareErrorText.inboundFrameAuthenticationFailed,
@@ -391,6 +417,20 @@ function createAuthenticationCapability(
   registerAuthenticationCounterSetter(capability, (value) => {
     counter = value
   })
+  /**
+   * Only the original immutable snapshot proves encrypt is absent; unknown capabilities never
+   * qualify.
+   */
+  if (
+    encrypt === undefined &&
+    sign &&
+    verify &&
+    (encodedType === undefined || encodedType === 'any')
+  ) {
+    /** A native digest owns no state and grants no authority beyond this admitted capability. */
+    const digest = createRpcBackingDigest()
+    if (digest) registerAuthenticationBinaryDigest(capability, digest)
+  }
   registerAuthenticationChallengePort(capability, {
     contextNeeded: (frame) => {
       if (

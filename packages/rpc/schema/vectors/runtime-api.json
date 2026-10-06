@@ -875,5 +875,766 @@
         "ok": true
       }
     }
-  ]
+  ],
+  "binary": {
+    "profile": "migaia.rpc.portable-binary/1",
+    "capabilities": [
+      "portable-binary@1",
+      "native-binary-authenticated-manifest@1",
+      "transfer@1"
+    ],
+    "valid": [
+      {
+        "id": "inline-call",
+        "value": {
+          "profile": "migaia.rpc.portable-binary/1",
+          "storage": "inline",
+          "envelope": {
+            "profile": "migaia.rpc.runtime-api/1",
+            "id": "REQUEST:caller:1",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "caller",
+              "targetId": "provider",
+              "receiverId": "provider",
+              "sentAt": 0
+            },
+            "task": {
+              "mode": "request",
+              "callerId": "caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "caller"
+              },
+              "targetGeneration": {
+                "kind": "restart",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "kind": "runtime-call",
+            "options": {
+              "cancel": "before-start",
+              "idempotencyKey": "key-1"
+            },
+            "payload": [
+              "uint8array",
+              1,
+              "AQI"
+            ]
+          },
+          "backings": []
+        },
+        "sidecars": []
+      },
+      {
+        "id": "inline-group",
+        "value": {
+          "profile": "migaia.rpc.portable-binary/1",
+          "storage": "inline",
+          "envelope": {
+            "profile": "migaia.rpc.runtime-api/1",
+            "id": "REQUEST:caller:1",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "caller",
+              "targetId": "provider",
+              "receiverId": "provider",
+              "sentAt": 0
+            },
+            "task": {
+              "mode": "group",
+              "callerId": "caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "caller"
+              },
+              "targetGeneration": {
+                "kind": "restart",
+                "value": 0,
+                "providerId": "provider"
+              }
+            },
+            "kind": "runtime-group",
+            "options": {},
+            "steps": [
+              {
+                "method": "echo",
+                "payload": [
+                  "buffer",
+                  "AQI"
+                ]
+              }
+            ]
+          },
+          "backings": []
+        },
+        "sidecars": []
+      },
+      {
+        "id": "inline-result",
+        "value": {
+          "profile": "migaia.rpc.portable-binary/1",
+          "storage": "inline",
+          "envelope": {
+            "profile": "migaia.rpc.runtime-api/1",
+            "id": "REQUEST:caller:1",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "caller",
+              "targetId": "provider",
+              "receiverId": "provider",
+              "sentAt": 0
+            },
+            "task": {
+              "mode": "request",
+              "callerId": "caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "caller"
+              },
+              "targetGeneration": {
+                "kind": "restart",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "kind": "runtime-control",
+            "operation": "terminal",
+            "completion": {
+              "ok": true,
+              "result": [
+                "uint8array",
+                1,
+                "AQI"
+              ]
+            }
+          },
+          "backings": []
+        },
+        "sidecars": []
+      },
+      {
+        "id": "inline-group-result",
+        "value": {
+          "profile": "migaia.rpc.portable-binary/1",
+          "storage": "inline",
+          "envelope": {
+            "profile": "migaia.rpc.runtime-api/1",
+            "id": "REQUEST:caller:1",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "caller",
+              "targetId": "provider",
+              "receiverId": "provider",
+              "sentAt": 0
+            },
+            "task": {
+              "mode": "group",
+              "callerId": "caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "caller"
+              },
+              "targetGeneration": {
+                "kind": "restart",
+                "value": 0,
+                "providerId": "provider"
+              }
+            },
+            "kind": "runtime-control",
+            "operation": "terminal",
+            "completion": {
+              "ok": true,
+              "result": [
+                {
+                  "state": "success",
+                  "result": [
+                    "uint8array",
+                    1,
+                    "AQI"
+                  ]
+                }
+              ]
+            }
+          },
+          "backings": []
+        },
+        "sidecars": []
+      },
+      {
+        "id": "inline-stream",
+        "value": {
+          "profile": "migaia.rpc.portable-binary/1",
+          "storage": "inline",
+          "envelope": {
+            "profile": "migaia.rpc.runtime-api/1",
+            "id": "REQUEST:caller:1",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "caller",
+              "targetId": "provider",
+              "receiverId": "provider",
+              "sentAt": 0
+            },
+            "task": {
+              "mode": "stream",
+              "callerId": "caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "caller"
+              },
+              "targetGeneration": {
+                "kind": "restart",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "kind": "runtime-control",
+            "operation": "stream",
+            "stream": {
+              "event": "item",
+              "seq": 0,
+              "value": [
+                "uint8array",
+                1,
+                "AQI"
+              ]
+            }
+          },
+          "backings": []
+        },
+        "sidecars": []
+      },
+      {
+        "id": "inline-outcome",
+        "value": {
+          "profile": "migaia.rpc.portable-binary/1",
+          "storage": "inline",
+          "envelope": {
+            "profile": "migaia.rpc.runtime-api/1",
+            "id": "REQUEST:caller:1",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "caller",
+              "targetId": "provider",
+              "receiverId": "provider",
+              "sentAt": 0
+            },
+            "task": {
+              "mode": "outcome",
+              "callerId": "caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "caller"
+              },
+              "targetGeneration": {
+                "kind": "restart",
+                "value": 0,
+                "providerId": "provider"
+              }
+            },
+            "kind": "runtime-outcome",
+            "operation": "result",
+            "state": "done",
+            "store": {
+              "kind": "memory",
+              "epoch": "epoch-1",
+              "continuity": "retained"
+            },
+            "outcome": {
+              "mode": "request",
+              "targetGeneration": {
+                "kind": "restart",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "completion": {
+                "ok": true,
+                "result": [
+                  "uint8array",
+                  1,
+                  "AQI"
+                ]
+              }
+            }
+          },
+          "backings": []
+        },
+        "sidecars": []
+      },
+      {
+        "id": "native-alias",
+        "value": {
+          "profile": "migaia.rpc.portable-binary/1",
+          "storage": "native",
+          "envelope": {
+            "profile": "migaia.rpc.runtime-api/1",
+            "id": "REQUEST:caller:1",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "caller",
+              "targetId": "provider",
+              "receiverId": "provider",
+              "sentAt": 0
+            },
+            "task": {
+              "mode": "request",
+              "callerId": "caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "caller"
+              },
+              "targetGeneration": {
+                "kind": "restart",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "kind": "runtime-call",
+            "options": {
+              "cancel": "before-start",
+              "idempotencyKey": "key-1"
+            },
+            "payload": [
+              "object",
+              [
+                [
+                  "buffer",
+                  [
+                    "buffer",
+                    0
+                  ]
+                ],
+                [
+                  "first",
+                  [
+                    "uint8array",
+                    0,
+                    1,
+                    2
+                  ]
+                ],
+                [
+                  "second",
+                  [
+                    "uint8array",
+                    0,
+                    2,
+                    1
+                  ]
+                ]
+              ]
+            ]
+          },
+          "backings": [
+            {
+              "byteLength": 4,
+              "sha256": "72da1306102d539d496263b20bb94f5f75090cc6d75842bc3e64062408f6f7eb"
+            }
+          ]
+        },
+        "sidecars": [
+          [
+            9,
+            1,
+            2,
+            8
+          ]
+        ]
+      }
+    ],
+    "invalid": [
+      {
+        "id": "extra-tuple-field",
+        "value": {
+          "profile": "migaia.rpc.portable-binary/1",
+          "storage": "inline",
+          "envelope": {
+            "profile": "migaia.rpc.runtime-api/1",
+            "id": "REQUEST:caller:1",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "caller",
+              "targetId": "provider",
+              "receiverId": "provider",
+              "sentAt": 0
+            },
+            "task": {
+              "mode": "request",
+              "callerId": "caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "caller"
+              },
+              "targetGeneration": {
+                "kind": "restart",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "kind": "runtime-call",
+            "options": {
+              "cancel": "before-start",
+              "idempotencyKey": "key-1"
+            },
+            "payload": [
+              "buffer",
+              "AQI",
+              0
+            ]
+          },
+          "backings": []
+        },
+        "sidecars": [],
+        "schemaAccepted": false
+      },
+      {
+        "id": "unused-base64-bits",
+        "value": {
+          "profile": "migaia.rpc.portable-binary/1",
+          "storage": "inline",
+          "envelope": {
+            "profile": "migaia.rpc.runtime-api/1",
+            "id": "REQUEST:caller:1",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "caller",
+              "targetId": "provider",
+              "receiverId": "provider",
+              "sentAt": 0
+            },
+            "task": {
+              "mode": "request",
+              "callerId": "caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "caller"
+              },
+              "targetGeneration": {
+                "kind": "restart",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "kind": "runtime-call",
+            "options": {
+              "cancel": "before-start",
+              "idempotencyKey": "key-1"
+            },
+            "payload": [
+              "buffer",
+              "AB"
+            ]
+          },
+          "backings": []
+        },
+        "sidecars": [],
+        "schemaAccepted": false
+      },
+      {
+        "id": "untagged-business",
+        "value": {
+          "profile": "migaia.rpc.portable-binary/1",
+          "storage": "inline",
+          "envelope": {
+            "profile": "migaia.rpc.runtime-api/1",
+            "id": "REQUEST:caller:1",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "caller",
+              "targetId": "provider",
+              "receiverId": "provider",
+              "sentAt": 0
+            },
+            "task": {
+              "mode": "request",
+              "callerId": "caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "caller"
+              },
+              "targetGeneration": {
+                "kind": "restart",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "kind": "runtime-call",
+            "options": {
+              "cancel": "before-start",
+              "idempotencyKey": "key-1"
+            },
+            "payload": {
+              "value": 1
+            }
+          },
+          "backings": []
+        },
+        "sidecars": [],
+        "schemaAccepted": false
+      },
+      {
+        "id": "tagged-undefined",
+        "value": {
+          "profile": "migaia.rpc.portable-binary/1",
+          "storage": "inline",
+          "envelope": {
+            "profile": "migaia.rpc.runtime-api/1",
+            "id": "REQUEST:caller:1",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "caller",
+              "targetId": "provider",
+              "receiverId": "provider",
+              "sentAt": 0
+            },
+            "task": {
+              "mode": "request",
+              "callerId": "caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "caller"
+              },
+              "targetGeneration": {
+                "kind": "restart",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "kind": "runtime-call",
+            "options": {
+              "cancel": "before-start",
+              "idempotencyKey": "key-1"
+            },
+            "payload": [
+              "undefined"
+            ]
+          },
+          "backings": []
+        },
+        "sidecars": [],
+        "schemaAccepted": false
+      },
+      {
+        "id": "duplicate-object-key",
+        "value": {
+          "profile": "migaia.rpc.portable-binary/1",
+          "storage": "inline",
+          "envelope": {
+            "profile": "migaia.rpc.runtime-api/1",
+            "id": "REQUEST:caller:1",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "caller",
+              "targetId": "provider",
+              "receiverId": "provider",
+              "sentAt": 0
+            },
+            "task": {
+              "mode": "request",
+              "callerId": "caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "caller"
+              },
+              "targetGeneration": {
+                "kind": "restart",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "kind": "runtime-call",
+            "options": {
+              "cancel": "before-start",
+              "idempotencyKey": "key-1"
+            },
+            "payload": [
+              "object",
+              [
+                [
+                  "x",
+                  [
+                    "null"
+                  ]
+                ],
+                [
+                  "x",
+                  [
+                    "null"
+                  ]
+                ]
+              ]
+            ]
+          },
+          "backings": []
+        },
+        "sidecars": [],
+        "schemaAccepted": true
+      },
+      {
+        "id": "native-reference-bounds",
+        "value": {
+          "profile": "migaia.rpc.portable-binary/1",
+          "storage": "native",
+          "envelope": {
+            "profile": "migaia.rpc.runtime-api/1",
+            "id": "REQUEST:caller:1",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "caller",
+              "targetId": "provider",
+              "receiverId": "provider",
+              "sentAt": 0
+            },
+            "task": {
+              "mode": "request",
+              "callerId": "caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "caller"
+              },
+              "targetGeneration": {
+                "kind": "restart",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "kind": "runtime-call",
+            "options": {
+              "cancel": "before-start",
+              "idempotencyKey": "key-1"
+            },
+            "payload": [
+              "uint8array",
+              0,
+              3,
+              2
+            ]
+          },
+          "backings": [
+            {
+              "byteLength": 4,
+              "sha256": "72da1306102d539d496263b20bb94f5f75090cc6d75842bc3e64062408f6f7eb"
+            }
+          ]
+        },
+        "sidecars": [
+          [
+            9,
+            1,
+            2,
+            8
+          ]
+        ],
+        "schemaAccepted": true
+      },
+      {
+        "id": "native-digest-mismatch",
+        "value": {
+          "profile": "migaia.rpc.portable-binary/1",
+          "storage": "native",
+          "envelope": {
+            "profile": "migaia.rpc.runtime-api/1",
+            "id": "REQUEST:caller:1",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "caller",
+              "targetId": "provider",
+              "receiverId": "provider",
+              "sentAt": 0
+            },
+            "task": {
+              "mode": "request",
+              "callerId": "caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "caller"
+              },
+              "targetGeneration": {
+                "kind": "restart",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "kind": "runtime-call",
+            "options": {
+              "cancel": "before-start",
+              "idempotencyKey": "key-1"
+            },
+            "payload": [
+              "object",
+              [
+                [
+                  "buffer",
+                  [
+                    "buffer",
+                    0
+                  ]
+                ],
+                [
+                  "first",
+                  [
+                    "uint8array",
+                    0,
+                    1,
+                    2
+                  ]
+                ],
+                [
+                  "second",
+                  [
+                    "uint8array",
+                    0,
+                    2,
+                    1
+                  ]
+                ]
+              ]
+            ]
+          },
+          "backings": [
+            {
+              "byteLength": 4,
+              "sha256": "72da1306102d539d496263b20bb94f5f75090cc6d75842bc3e64062408f6f7eb"
+            }
+          ]
+        },
+        "sidecars": [
+          [
+            7,
+            1,
+            2,
+            8
+          ]
+        ],
+        "schemaAccepted": true
+      }
+    ]
+  }
 }

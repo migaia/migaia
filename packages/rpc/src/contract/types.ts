@@ -8,12 +8,24 @@ export type IRpcDescriptor<TId extends string, TVersion extends number> = Readon
 
 /** Portable binary value represented without runtime-specific typed arrays. */
 export type IRpcPortableBytes = Readonly<{ $rpc: 'bytes'; base64url: string }>
+/** Codec-facing legacy wire values never contain a raw native buffer or view. */
+export type IRpcWirePortableValue =
+  | null
+  | boolean
+  | number
+  | string
+  | IRpcPortableBytes
+  | readonly IRpcWirePortableValue[]
+  | Readonly<{ [key: string]: IRpcWirePortableValue }>
 export type IRpcPortableRecord = Readonly<{ [key: string]: IRpcPortableValue }>
 export type IRpcPortableValue =
   | null
   | boolean
   | number
   | string
+  /** Native values exist only inside the independently negotiated portable-binary profile. */
+  | ArrayBuffer
+  | Uint8Array
   | IRpcPortableBytes
   | readonly IRpcPortableValue[]
   | IRpcPortableRecord
@@ -27,7 +39,7 @@ export type IRpcSerializedError = Readonly<{
   stack: string
   cause?: IRpcSerializedError
   errors?: readonly IRpcSerializedError[]
-  data?: IRpcPortableValue
+  data?: IRpcWirePortableValue
   /** Bounded node-only route diagnostics accompany transparent-forward failures. */
   route?: readonly string[]
   truncated?: true
@@ -55,7 +67,7 @@ export type IRpcSerializeErrorOptions = Readonly<{
 export type IRpcJsonRpcErrorObject = Readonly<{
   code: number
   message: string
-  data?: IRpcPortableValue
+  data?: IRpcWirePortableValue
 }>
 
 /** Optional warning hook for fields a protocol minor version may add later. */

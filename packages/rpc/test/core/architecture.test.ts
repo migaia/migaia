@@ -157,7 +157,11 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
     const bindCallApply = Object.entries(SOURCES)
       .filter(([path]) => !path.endsWith('.test.ts') && !path.endsWith('.test.tsx'))
       .flatMap(([path, source]) =>
-        (source.match(/\.(?:bind|call|apply)\s*\(/g) ?? []).map(() => path)
+        /**
+         * AGENTS permits Reflect.apply for captured builtins; mutable receiver helpers remain
+         * banned.
+         */
+        (source.match(/(?<!Reflect)\.(?:bind|call|apply)\s*\(/g) ?? []).map(() => path)
       )
     expect(bindCallApply).toEqual([])
   })
