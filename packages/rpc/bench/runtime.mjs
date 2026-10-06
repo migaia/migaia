@@ -4,17 +4,30 @@ import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { IpcBenchErrorText } from './error-text.mjs'
+import { judgeSdkRegression } from './ipc.mjs'
 
 /**
  * Record the actual supplementary SDK paths through the original 100/1000 side and PID observer.
  *
- * @param {{ output: string; selectedId?: string; prepare?: boolean }} options Fresh raw
- *   destination.
+ * @param {{
+ *   output: string
+ *   selectedId?: string
+ *   prepare?: boolean
+ *   freezeSdk?: boolean
+ *   noisePath?: string
+ * }} options
+ *   Fresh raw destination.
  * @returns {Promise<object[]>} Three retained RPC rounds per cell, with no invented bare
  *   denominator.
  * @throws {Error} Original side failure or a configuration selecting no registered cell.
  */
-export async function measureRuntimeUnits({ output, selectedId, prepare = false }) {
+export async function measureRuntimeUnits({
+  output,
+  selectedId,
+  prepare = false,
+  freezeSdk = false,
+  noisePath
+}) {
   const bytes = await readFile(new URL('./runtime-units.json', import.meta.url))
   const inventory = JSON.parse(bytes)
   const units = inventory.units.filter((unit) => !selectedId || unit.id === selectedId)
@@ -22,6 +35,15 @@ export async function measureRuntimeUnits({ output, selectedId, prepare = false 
   await mkdir(output, { recursive: true })
   /** This scope tracks SDK absolute measurements; original 76 normalized W3 cells stay untouched. */
   const results = []
+  /** Final SDK source baselines are shared with original W3, without inventing a bare topology. */
+  const baseline =
+    prepare || freezeSdk
+      ? undefined
+      : JSON.parse(await readFile(new URL('./w3-sdk-baseline.json', import.meta.url)))
+  const noise = prepare || freezeSdk ? undefined : JSON.parse(await readFile(noisePath))
+  /** Fail closed before launching if a registered supplemental cell lacks its own current A/A. */
+  if (baseline && units.some((unit) => !baseline.cells[unit.id] || !noise.sdkCells?.[unit.id]))
+    throw new TypeError(IpcBenchErrorText.paired)
   for (const unit of units) {
     const rounds = []
     for (let round = 0; round < (prepare ? 1 : 3); round++) {
@@ -72,11 +94,16 @@ export async function measureRuntimeUnits({ output, selectedId, prepare = false 
       })
       rounds.push(receipt)
     }
+    /** A supplemental regression verdict stays separate from preparation and unfrozen collection. */
+    const sdkRegression = baseline
+      ? judgeSdkRegression(rounds, baseline.cells[unit.id], noise.sdkCells[unit.id])
+      : undefined
     const result = {
       unit,
       rounds,
-      status: prepare ? 'prepared' : 'unfrozen',
-      scope: 'supplemental actual RPC topology; baseline freeze and relative verdict pending'
+      ...(sdkRegression ? { sdkRegression } : {}),
+      status: prepare ? 'prepared' : (sdkRegression?.status ?? 'unfrozen'),
+      scope: 'supplemental actual RPC topology; RPC-only final SDK relative metrics'
     }
     await writeFile(
       join(output, unit.id.replaceAll(':', '-') + '-result.json'),
@@ -84,6 +111,7 @@ export async function measureRuntimeUnits({ output, selectedId, prepare = false 
       { flag: 'wx' }
     )
     results.push(result)
+    if (result.sdkRegression?.status === 'fail') process.exitCode = 1
     console.log(JSON.stringify({ unit: unit.id, rounds: rounds.length, status: result.status }))
   }
   return results
@@ -96,6 +124,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (args[index] === '--output') options.output = args[++index]
     else if (args[index] === '--unit') options.selectedId = args[++index]
     else if (args[index] === '--prepare') options.prepare = true
+    else if (args[index] === '--freeze-sdk') options.freezeSdk = true
+    else if (args[index] === '--noise') options.noisePath = args[++index]
     else throw new TypeError(IpcBenchErrorText.configuration)
   }
   measureRuntimeUnits(options).catch((error) => {

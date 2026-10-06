@@ -120,7 +120,7 @@ Supplemental runtime paths use `runtime-units.json` and the original side,
 
 ```bash
 node bench/runtime.mjs --prepare --output /absolute/fresh-preparation
-node bench/runtime.mjs --output /absolute/fresh-runtime-raw
+node bench/runtime.mjs --freeze-sdk --output /absolute/fresh-runtime-candidates
 ```
 
 The managed cell calls the actual committed `host.thread` outlet. One-hop cells
@@ -141,3 +141,25 @@ the final I28 source and installs their relative guards. No old bare denominator
 or historical W3 value is invented for a new topology. Relay own-thread CPU
 between boundary snapshots includes diagnostic RPC work; three empty snapshot
 pairs are retained separately. It is not reported as exact business-only CPU.
+
+Final SDK guards use a separate `w3-sdk-baseline.json`. Its six U33 concurrency
+cells compare paired RPC/bare throughput; Deno compares paired p50/p95/p99 and
+throughput. Runtime supplemental cells use RPC-only values, with no fabricated
+bare denominator. Every frozen metric requires its own current-window A/A band
+in the noise receipt's `sdkCells`. Higher latency and lower throughput are
+regressions; any metric beyond its own noise keeps the verdict FAIL. Original
+pre-program p50 and absolute DA1 verdicts remain separate and unchanged.
+
+Candidate collection uses `--freeze-sdk` explicitly. It records
+`unfrozen-candidate` for new paired cells and never claims a frozen relative
+PASS. Numeric/source/raw-SHA freezing happens after final-source qualification.
+Normal concurrency, Deno and runtime runs fail closed if the baseline or
+current-window SDK noise is missing. The same noise file also retains the
+original four representative W3 A/A controls.
+
+```bash
+node bench/ipc.mjs --scenario deno --prepare --output /absolute/fresh-deno-preparation
+node bench/ipc.mjs --scenario concurrency --freeze-sdk --noise /absolute/current-noise.json --output /absolute/fresh-concurrency-candidates
+node bench/ipc.mjs --scenario deno --freeze-sdk --noise /absolute/current-noise.json --output /absolute/fresh-deno-candidates
+node bench/runtime.mjs --noise /absolute/current-noise.json --output /absolute/fresh-runtime-guard
+```
