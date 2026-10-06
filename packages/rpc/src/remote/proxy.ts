@@ -648,6 +648,15 @@ class RemoteRegistration<TUnit, TSpec> {
     })
   }
 
+  /**
+   * Public runtime admission closes immediately; admitted continuations keep the original active
+   * reader.
+   */
+  #runtimeActive(): IRemoteGeneration {
+    if (this.#releaseReason) throw this.#releaseReason
+    return this.#active()
+  }
+
   /** The original accepted directory keeps target identity while its owned unit is not ready. */
   runtimeInstanceIds(): readonly string[] {
     return this.#runtimeDirectory?.description
@@ -678,7 +687,7 @@ class RemoteRegistration<TUnit, TSpec> {
 
   /** Return only the current original generation, never a cached same-name successor handle. */
   currentPeer(): IRuntimePeer {
-    const active = this.#active()
+    const active = this.#runtimeActive()
     if (!active.runtime) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
     return active.runtime
   }
@@ -687,31 +696,41 @@ class RemoteRegistration<TUnit, TSpec> {
   invokeGroup(
     ...[steps, options]: Parameters<IRuntimePeer['group']>
   ): ReturnType<IRuntimePeer['group']> {
-    const active = this.#active()
+    const active = this.#runtimeActive()
     if (!active.runtime) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
-    if (!isForwardedOperation(options)) return active.runtime.group(steps, options)
-    /** Only this original registration's leave fact can reclassify the captured operation. */
-    let retired: Error | undefined
-    const unsubscribe = this.events.onLeave(active.number, (reason) => {
-      retired = createProviderGenerationRetired(reason)
-    })
-    try {
-      return active.runtime
-        .group(steps, options)
-        .then(
-          (result) => {
-            if (retired) throw retired
-            return result
-          },
-          (error: unknown) => {
-            throw retired ?? error
-          }
-        )
-        .finally(unsubscribe)
-    } catch (error) {
-      unsubscribe()
-      throw retired ?? error
+    /**
+     * Count the complete captured operation, including its original forwarded retirement
+     * classification.
+     */
+    const invoke = (): ReturnType<IRuntimePeer['group']> => {
+      if (!isForwardedOperation(options)) return active.runtime!.group(steps, options)
+      /** Only this original registration's leave fact can reclassify the captured operation. */
+      let retired: Error | undefined
+      const unsubscribe = this.events.onLeave(active.number, (reason) => {
+        retired = createProviderGenerationRetired(reason)
+      })
+      try {
+        return active
+          .runtime!.group(steps, options)
+          .then(
+            (result) => {
+              if (retired) throw retired
+              return result
+            },
+            (error: unknown) => {
+              throw retired ?? error
+            }
+          )
+          .finally(unsubscribe)
+      } catch (error) {
+        unsubscribe()
+        throw retired ?? error
+      }
     }
+    /** Original drain tracks one whole Promise and preserves its ordinary identity. */
+    return this.#options.binding.trackRequest
+      ? this.#options.binding.trackRequest(invoke)
+      : invoke()
   }
 
   /** Query the same canonical supervisor and accepted directory even between generations. */
