@@ -2,7 +2,7 @@ import { vi } from 'vitest'
 import { CapabilityLevel, StandardCapability, createUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle } from '@migaia/supervision/process'
 import type { IRpcEndpoint } from '../../../src/core/typing.js'
-import type { IProcessHostOptions } from '../../../src/process/host/types.js'
+import type { ISpawnProcessPluginDeployment } from '../../../src/process/plugin/types.js'
 import type { IRemoteHostCatalog } from '../../../src/remote/contract.js'
 import { remoteHarness, remoteDescription } from '../../remote/fixture.js'
 import { runtimeTestHost } from '../../runtime-api/fixture.js'
@@ -66,7 +66,13 @@ export function hostFixture() {
           ? { ok: true }
           : { name: 'p', state: 'enabled', revision: 1, features: ['f'] }
   )
-  const options: IProcessHostOptions = {
+  /** These are retained lower owner inputs, not a deprecated public Host constructor contract. */
+  const options: Readonly<{
+    catalog: IRemoteHostCatalog
+    report(error: unknown): void
+    endpointFactory: IRemoteEndpointFactory
+    deployment: ISpawnProcessPluginDeployment
+  }> = {
     catalog,
     report,
     endpointFactory: async () => ({
