@@ -5,6 +5,7 @@ import { createNodeProcessLauncher } from '../../src/process/adapters/node-child
 import { createProcessTransport } from '../../src/process/handshake.js'
 import { createNativeProcessOffer } from '../../src/process/offer.js'
 import { PROCESS_RUNTIME_API_ENV } from '../../src/process/constants.js'
+import { RpcCapability } from '../../src/contract/wire-constants.js'
 
 /** The genuine child imports built public factories, independently from Vitest's source loader. */
 const entry = fileURLToPath(new URL('./fixtures/process-source-faults.mjs', import.meta.url))
@@ -55,7 +56,8 @@ for (const mode of [
         /** Authenticated route authority cannot be replaced by a valid token from another parent. */
         const offer = createNativeProcessOffer({
           peer: { id: mode === 'wrong-parent' ? 'c3-untrusted-parent' : parent, runtime: 'node' },
-          auth: mode === 'wrong-token' ? 'c3-wrong-token' : token
+          auth: mode === 'wrong-token' ? 'c3-wrong-token' : token,
+          capabilities: [RpcCapability.runtimeApi]
         })
         const failure = await createProcessTransport(handle.channel!, {
           role: 'initiator',

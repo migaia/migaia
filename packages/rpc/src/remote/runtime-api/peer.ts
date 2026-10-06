@@ -339,16 +339,20 @@ export async function createRuntimePeer(
   /** Offer only implemented shared capabilities; the platform owner supplies the real intersection. */
   /** One acquired channel transfers to this construction's rollback/close owner. */
   const channel = await sources[0]!(sourceContext)
-  /** A local offer alone cannot enable application description or reverse registration. */
-  const supportsRuntime = channel.agreement.capabilities.includes(RpcCapability.runtimeApi)
+  /**
+   * Both negotiated baseline capabilities are required before endpoint construction or receive
+   * activation.
+   */
+  const baselineAccepted =
+    channel.agreement.capabilities.includes(RpcCapability.runtimeApi) &&
+    channel.agreement.capabilities.includes(RpcCapability.batch)
   /**
    * A negotiated binary profile selects the same original runtime task owner for bidirectional
    * results.
    */
   const supportsBinary = channel.agreement.capabilities.includes(RpcCapability.portableBinary)
   /** Generation requires the actual bilateral base and one original prepared endpoint. */
-  const supportsGeneration =
-    supportsRuntime && channel.agreement.capabilities.includes(RpcCapability.generation)
+  const supportsGeneration = channel.agreement.capabilities.includes(RpcCapability.generation)
   /** Directory handshake carries a node only after the two source offers actually agree. */
   const supportsForward = channel.agreement.capabilities.includes(RpcCapability.forwardRoute)
   /** Native rebindings preserve the Host node; a standalone callable endpoint owns its own node. */
@@ -360,8 +364,7 @@ export async function createRuntimePeer(
   /** Health and drain remain real native control operations from the original core owner. */
   const nativeControl = channel.agreement.capabilities.includes(RpcCapability.ping)
   /** The existing stream capability remains an independent AND requirement. */
-  const supportsStream =
-    supportsRuntime && channel.agreement.capabilities.includes(RpcCapability.stream)
+  const supportsStream = channel.agreement.capabilities.includes(RpcCapability.stream)
   /** Reports remain observable even when a user reporter itself throws. */
   const report = (error: unknown): void => {
     try {
@@ -413,7 +416,7 @@ export async function createRuntimePeer(
       )
     }
   }
-  if (supportsRuntime) {
+  {
     const describeProvider: IRpcProvider = (context) => {
       if (supportsGeneration) {
         const supplied = normalizeRuntimeGeneration(
@@ -499,6 +502,7 @@ export async function createRuntimePeer(
   /** A successfully created endpoint is the only owner disposed during later preparation failure. */
   let endpoint: IRuntimePeerEndpoint | undefined
   try {
+    if (!baselineAccepted) rejectRuntimeApiCapability()
     /** Default roots retain initial registration before core receive activation. */
     const initialProviders =
       !options.endpointFactory && !automatic?.endpoint && !automatic?.wrapEndpoint
@@ -683,55 +687,50 @@ export async function createRuntimePeer(
       schemaVersion: RUNTIME_API_SCHEMA_VERSION,
       self: supportsGeneration ? { ...self, generation } : self,
       ...(nodeId === undefined ? {} : { nodeId }),
-      methods: supportsRuntime
-        ? methods.map((entry) => ({
-            name: entry.name,
-            supportedModes: entry.supportedModes ?? [
-              RuntimeApiMode.request,
-              RuntimeApiMode.notify,
-              ...(supportsStream ? [RuntimeApiMode.stream] : [])
-            ],
-            modeSource: entry.supportedModes
-              ? RuntimeApiModeSource.declared
-              : RuntimeApiModeSource.generatedRoutes,
-            ...(entry.declaration ? { idempotent: entry.declaration.idempotent } : {}),
-            ...(entry.kind === 'forward' ? { forwardedVia: entry.forwardedVia } : {})
-          }))
-        : []
+      methods: methods.map((entry) => ({
+        name: entry.name,
+        supportedModes: entry.supportedModes ?? [
+          RuntimeApiMode.request,
+          RuntimeApiMode.notify,
+          ...(supportsStream ? [RuntimeApiMode.stream] : [])
+        ],
+        modeSource: entry.supportedModes
+          ? RuntimeApiModeSource.declared
+          : RuntimeApiModeSource.generatedRoutes,
+        ...(entry.declaration ? { idempotent: entry.declaration.idempotent } : {}),
+        ...(entry.kind === 'forward' ? { forwardedVia: entry.forwardedVia } : {})
+      }))
     })
     channel.activateReceive?.()
     /** Only mutually negotiated application capability permits sending the new reserved method. */
-    const remote = supportsRuntime
-      ? normalizeRuntimeDescription(
-          await endpoint.send(
-            channel.peerId,
-            RemoteMethodName.runtimeDescribe,
-            supportsGeneration || nodeId !== undefined
-              ? {
-                  ...(nodeId === undefined ? {} : { nodeId }),
-                  ...(supportsGeneration ? { generation } : {})
-                }
-              : null,
-            {
-              signal: automatic?.signal
+    const remote = normalizeRuntimeDescription(
+      await endpoint.send(
+        channel.peerId,
+        RemoteMethodName.runtimeDescribe,
+        supportsGeneration || nodeId !== undefined
+          ? {
+              ...(nodeId === undefined ? {} : { nodeId }),
+              ...(supportsGeneration ? { generation } : {})
             }
-          )
-        )
-      : undefined
-    if (remote && remote.self.instanceId !== channel.peerId)
-      invalid(RuntimeApiErrorText.identityInvalid)
+          : null,
+        {
+          signal: automatic?.signal
+        }
+      )
+    )
+    if (remote.self.instanceId !== channel.peerId) invalid(RuntimeApiErrorText.identityInvalid)
     if (supportsGeneration) {
-      if (!remote?.self.generation) invalid(RuntimeApiErrorText.identityInvalid)
+      if (!remote.self.generation) invalid(RuntimeApiErrorText.identityInvalid)
       runtimeOutbound!.bindRuntimeTarget(channel.peerId, remote.self.generation)
-    } else if (remote?.self.generation !== undefined) invalid(RuntimeApiErrorText.identityInvalid)
+    } else if (remote.self.generation !== undefined) invalid(RuntimeApiErrorText.identityInvalid)
     if (supportsForward) {
-      if (!remote?.nodeId || (remoteNodeId !== undefined && remoteNodeId !== remote.nodeId))
+      if (!remote.nodeId || (remoteNodeId !== undefined && remoteNodeId !== remote.nodeId))
         invalid(RuntimeApiErrorText.identityInvalid)
       remoteNodeId = remote.nodeId
-    } else if (remote?.nodeId !== undefined) invalid(RuntimeApiErrorText.identityInvalid)
+    } else if (remote.nodeId !== undefined) invalid(RuntimeApiErrorText.identityInvalid)
     /** Both scalar admission and aliases are compiled from the accepted remote directory once. */
     const routes = new Map(
-      remote?.methods.map(
+      remote.methods.map(
         (method) =>
           [
             method.name,
@@ -739,9 +738,8 @@ export async function createRuntimePeer(
           ] as const
       )
     )
-    /** Preserve receiver-side legacy whitelist rejection when the peer lacks the new directory. */
+    /** Every accepted baseline channel uses its actual v2 method and mode whitelist. */
     const route = (method: string, mode: RuntimeApiMode): void => {
-      if (!remote) return
       /** Admission uses the accepted generation's compiled whitelist and actual installed modes. */
       const selected = routes.get(method)
       if (!selected)
@@ -765,7 +763,7 @@ export async function createRuntimePeer(
           callOptions?.cancel !== undefined ||
           (callOptions !== undefined && Object.hasOwn(callOptions, 'transfer'))
         ) {
-          if (!runtimeOutbound || !remote?.self.generation) rejectRuntimeApiCapability()
+          if (!runtimeOutbound || !remote.self.generation) rejectRuntimeApiCapability()
           return runtimeOutbound.sendRuntimeOperation(
             channel.peerId,
             remote.self.generation,
@@ -802,7 +800,7 @@ export async function createRuntimePeer(
           callOptions?.cancel !== undefined ||
           (callOptions !== undefined && Object.hasOwn(callOptions, 'transfer'))
         ) {
-          if (!runtimeOutbound || !remote?.self.generation) rejectRuntimeApiCapability()
+          if (!runtimeOutbound || !remote.self.generation) rejectRuntimeApiCapability()
           return runtimeOutbound.sendRuntimeOperation(
             channel.peerId,
             remote.self.generation,
@@ -833,7 +831,7 @@ export async function createRuntimePeer(
           callOptions?.cancel !== undefined ||
           (callOptions !== undefined && Object.hasOwn(callOptions, 'transfer'))
         ) {
-          if (!runtimeOutbound || !remote?.self.generation) rejectRuntimeApiCapability()
+          if (!runtimeOutbound || !remote.self.generation) rejectRuntimeApiCapability()
           /** The same canonical stream owner retains its existing consumer and single-credit loop. */
           const owner = readEndpointOwner<RpcStreamOwner>(ready, EndpointOwnerKey.streamOwner)
           if (!owner) rejectRuntimeApiCapability()
@@ -856,7 +854,7 @@ export async function createRuntimePeer(
       },
       group: (steps: readonly IRpcRuntimeStep[], callOptions?: IRpcRuntimeSendOptions) => {
         assertRuntimeTransferFamily(family, callOptions)
-        if (!runtimeOutbound || !remote?.self.generation) rejectRuntimeApiCapability()
+        if (!runtimeOutbound || !remote.self.generation) rejectRuntimeApiCapability()
         /** Snapshot the owning grammar before any route read can execute a user getter. */
         let normalized: readonly IRpcRuntimeStep[]
         try {
@@ -878,7 +876,7 @@ export async function createRuntimePeer(
         ) as Promise<readonly IRpcRuntimeStepOutcome[]>
       },
       outcome: (idempotencyKey: string) => {
-        if (!runtimeOutbound || !remote?.self.generation) rejectRuntimeApiCapability()
+        if (!runtimeOutbound || !remote.self.generation) rejectRuntimeApiCapability()
         return runtimeOutbound.sendRuntimeOperation(
           channel.peerId,
           remote.self.generation,

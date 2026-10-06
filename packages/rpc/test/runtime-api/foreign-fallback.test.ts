@@ -194,7 +194,7 @@ for (const peer of [
       assert.equal(routedFrames, 0, '[A112] failing foreign frames also omit route')
       assert.equal(hiddenCalls, 0)
       assert.equal(methods.includes(RemoteMethodName.runtimeDescribe), true)
-      assert.equal(methods.includes(RemoteMethodName.describe), false)
+      assert.equal(methods.includes('migaia.remote.describe'), false)
       assert.ok(failures.every((error: any) => error.code === 'INTERNAL'))
     } finally {
       try {
