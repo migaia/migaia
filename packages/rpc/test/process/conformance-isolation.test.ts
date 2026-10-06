@@ -387,7 +387,8 @@ describe('[A7] real process session and principal isolation', () => {
           peerId: 'ts-peer',
           offer: createNativeProcessOffer({
             peer: { id: 'caller', runtime: 'node' },
-            auth: sentinel
+            auth: sentinel,
+            capabilities: ['runtime-api@1']
           }),
           ipc: {
             connectionId: 'verifier-denied',
