@@ -10,7 +10,6 @@ import { PluginHost } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
 import {
-  createProcessHost,
   createProcessPlugin,
   createProcessResilience,
   createProcessTransport,
@@ -18,11 +17,17 @@ import {
   type IProcessPluginOptions
 } from '@migaia/rpc/process'
 import {
+  createRemoteHost,
   createRemoteRetryPort,
   type IRemoteRetryPort,
   type IRemoteServeEndpoint,
   type IRemoteContract
 } from '@migaia/rpc/remote'
+import {
+  createSpawnProcessBinding,
+  createConnectProcessBinding,
+  type IProcessPluginBinding
+} from '../../src/process/plugin/binding.js'
 import {
   createRpcStreamFrameDecoder,
   encodeRpcStreamFrame,
@@ -151,14 +156,51 @@ async function faultClient(peer: IPeer, options: IFaultOptions = {}) {
   /** Host and Plugin publish the same contract with their distinct registration ownership. */
   const selectedContract = options.contract ?? (options.bridge ? bridgeContract : contract)
   if (options.host) {
-    const facade = createProcessHost({
-      catalog: { p: selectedContract },
-      deployment: selected,
-      endpointFactory,
-      resilience,
-      retryPort: options.retryPort,
-      report: (error) => fixture.reports.push(error)
-    })
+    /** The original owned or borrowed native binding retains health, stderr and real exit. */
+    const binding =
+      selected.kind === 'spawn'
+        ? createSpawnProcessBinding(selected, (error) => fixture.reports.push(error), true)
+        : createConnectProcessBinding(selected, (error) => fixture.reports.push(error))
+    /** Logical retry settlement stays inside the same original physical drain owner. */
+    let retry = options.retryPort
+    const retryPort: IRemoteRetryPort = {
+      dispatch(input) {
+        retry ??= createRemoteRetryPort({
+          events: input.events,
+          scheduler: binding.scheduler,
+          report: (error) => fixture.reports.push(error)
+        })
+        return binding.trackRequest(() => retry!.dispatch(input))
+      }
+    }
+    /** D1/M6 retains this lower Host controller; no removed process facade is recreated. */
+    const remoteFor = <TUnit extends object, TSpec>(owner: IProcessPluginBinding<TUnit, TSpec>) =>
+      createRemoteHost({
+        catalog: { p: selectedContract },
+        binding: owner,
+        endpointFactory: async (...args: Parameters<typeof endpointFactory>) =>
+          owner.bindEndpoint(args[0], await endpointFactory(...args)),
+        retryPort,
+        callGuard: resilience.callGuard('fault-host'),
+        report: (error) => fixture.reports.push(error)
+      })
+    const facade =
+      selected.kind === 'spawn'
+        ? remoteFor(binding as ReturnType<typeof createSpawnProcessBinding>)
+        : remoteFor(binding as ReturnType<typeof createConnectProcessBinding>)
+    /**
+     * One retained governance registration follows the actual native supervisor and liquidation
+     * owner.
+     */
+    const registration = resilience.attachRegistration(
+      'fault-host',
+      {
+        ownership: selected.kind === 'spawn' ? 'spawn-owned' : 'connection-borrowed',
+        health: binding.health,
+        supervisor: binding.registrationSupervisor
+      },
+      { kind: 'standalone-host', release: facade.release }
+    )
     try {
       await facade.ready()
       const installed = await facade.use('p')
@@ -170,15 +212,19 @@ async function faultClient(peer: IPeer, options: IFaultOptions = {}) {
         budget,
         resilience,
         facade,
+        registration,
         feature: installed.f as IFeature,
         close: async () => {
+          await binding.drainCurrent()
           await facade.release()
+          await registration.close()
           await resilience.close()
           await local.dispose()
         }
       }
     } catch (error) {
       await facade.release()
+      await registration.close()
       await resilience.close()
       await local.dispose()
       throw error
@@ -206,6 +252,7 @@ async function faultClient(peer: IPeer, options: IFaultOptions = {}) {
       budget,
       resilience,
       facade: undefined,
+      registration: undefined,
       feature: installed!.getFeature('f') as IFeature,
       close: async () => {
         await local.dispose()
@@ -549,7 +596,7 @@ describe('[A4] real owned terminal guards', () => {
           await current.exited
           await vi.waitFor(() =>
             expect(
-              host ? active.facade!.inspectRegistration() : active.resilience.inspect('p')
+              host ? active.registration!.inspect() : active.resilience.inspect('p')
             ).toMatchObject({ state: 'terminal' })
           )
           const writes = active.sent.length
