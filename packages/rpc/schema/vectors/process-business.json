@@ -10,7 +10,7 @@
       "producer": "independent-language-peer",
       "consumer": [
         "createProcessPlugin",
-        "createProcessHost"
+        "createProcessPeer"
       ],
       "runtimes": [
         "python",
@@ -84,7 +84,7 @@
       ],
       "consumer": [
         "createProcessPlugin",
-        "createProcessHost"
+        "createProcessPeer"
       ],
       "deployments": [
         "owned-stdio-caller-fd-launcher",
@@ -173,7 +173,7 @@
         "rust",
         "node"
       ],
-      "parent": "public-processHost",
+      "parent": "public-processPeer",
       "descendant": "sleep-600-no-protocol-fds",
       "before": "native-PID-list-child-present",
       "after": "parent-SIGKILL-peer-and-descendant-ESRCH-within-10000ms"

@@ -34,10 +34,24 @@ describe('process package layering and exports', () => {
     expect(common.createProcessTransport).toBeTypeOf('function')
     expect(common.createNativeProcessOffer).toBeTypeOf('function')
     expect(common.createProcessPlugin).toBeTypeOf('function')
-    expect(common.createServeProcessPlugin).toBeTypeOf('function')
+    expect(common.createProcessPeer).toBeTypeOf('function')
     expect(common.parseProcessPluginDescriptor).toBeTypeOf('function')
     expect(common.ProcessPluginWire).toEqual({ native: 'native', jsonrpc: 'jsonrpc' })
     expect(framing.encodeRpcStreamFrame).toBeTypeOf('function')
+  })
+
+  it('[A1][A25] ships four symmetric factories without any retired factory alias', async () => {
+    /** Built subpaths are the consumer boundary; internal imports cannot hide a leaked alias. */
+    const process = await import('@migaia/rpc/process')
+    const thread = await import('@migaia/rpc/threads')
+    for (const name of ['createProcessHost', 'createServeProcessHost', 'createServeProcessPlugin'])
+      expect(Object.hasOwn(process, name), '[A25] retired process factory must be absent').toBe(
+        false
+      )
+    for (const name of ['createThreadHost', 'createServeThreadHost', 'createServeThreadPlugin'])
+      expect(Object.hasOwn(thread, name), '[A25] retired thread factory must be absent').toBe(false)
+    expect(thread.createThreadPeer).toBeTypeOf('function')
+    expect(thread.createThreadPlugin).toBeTypeOf('function')
   })
 
   it('[A12] keeps platform peers optional and physical IPC construction singular', () => {
