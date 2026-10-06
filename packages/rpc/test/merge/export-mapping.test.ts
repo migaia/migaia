@@ -43,6 +43,7 @@ describe('A1 merged public exports', () => {
       '@migaia/rpc/core/plugins/send-queue',
       '@migaia/rpc/core/plugins/log',
       '@migaia/rpc/remote',
+      '@migaia/rpc/testing',
       '@migaia/rpc/process',
       '@migaia/rpc/process/adapters/node-child-process',
       '@migaia/rpc/process/adapters/node-socket',
@@ -59,7 +60,7 @@ describe('A1 merged public exports', () => {
         (name) => `@migaia/rpc/threads/adapters/${name}`
       )
     ].sort()
-    expect(expected).toHaveLength(48)
+    expect(expected).toHaveLength(49)
     expect(Object.keys(manifest.exports).sort()).toEqual(
       expected.map((name) => `.${name.slice('@migaia/rpc'.length)}`).sort()
     )

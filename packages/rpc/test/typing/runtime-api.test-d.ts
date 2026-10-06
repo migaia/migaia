@@ -232,6 +232,24 @@ threadBinary.then((peer) => {
   peer.group([{ method: 'echo', payload: backing }], { transfer: [backing] })
 })
 
+/** A89: pair inference is crossed without supplying a remote generic or any runtime type table. */
+const typedPair = import('../../src/testing/index.js').then(({ createPeerPair }) =>
+  createPeerPair({
+    a: { provide: { left: (value: string) => value.length } },
+    b: { provide: { right: (value: number) => String(value) } }
+  })
+)
+typedPair.then(({ a, b }) => {
+  const right: Promise<string> = a.request('right', 1)
+  const left: Promise<number> = b.request('left', 'value')
+  // @ts-expect-error A89: A calls B's provide, never its own.
+  a.request('left', 'value')
+  // @ts-expect-error A89: crossed inference retains B's payload.
+  a.request('right', 'value')
+  void right
+  void left
+})
+
 /** A77/A89: throwing scalars and empty generators preserve their actual callable mode. */
 declare const modeBoundary: IRuntimeTypedPeer<{
   fail: () => never
