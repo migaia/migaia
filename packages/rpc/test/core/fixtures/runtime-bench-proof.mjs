@@ -2,6 +2,7 @@ import { createIpcSession } from '../../../bench/ipc-session.mjs'
 import { readRuntimePeerConnection } from '../../../dist/remote/runtime-api/peer.js'
 import { readRuntimeOutletConnection } from '../../../dist/remote/runtime-api/outlet.js'
 import { threadId } from 'node:worker_threads'
+import { snapshot } from '../../../bench/observe.mjs'
 
 /** One real carrier completes ordinary business before checking the actual production Peer owner. */
 const unit = JSON.parse(process.argv[2])
@@ -28,6 +29,9 @@ if (unit.carrier === 'browser-worker') {
           ? readRuntimeOutletConnection(session.host.thread, 'bench')?.peer === session.facade
           : false,
         initiatorThreadId: session.initiatorThreadId ?? threadId,
+        ...(typeof Deno === 'undefined'
+          ? {}
+          : { parentSnapshot: snapshot(), peerSnapshot: await session.peerSnapshot() }),
         forwardedVia:
           accepted?.description?.methods.find((method) => method.name === 'leaf.bench.echo')
             ?.forwardedVia ?? null

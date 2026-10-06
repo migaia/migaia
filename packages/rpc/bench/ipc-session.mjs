@@ -13,45 +13,19 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parentPort, Worker, MessageChannel } from 'node:worker_threads'
 import { readFileSync, existsSync } from 'node:fs'
+/** Only actual Deno uses its Command/std streams and native Web Worker adapters. */
+const deno = typeof Deno !== 'undefined'
 /** Loader registration finishes before importing the actual production adapter modules. */
 const { createNodeProcessLauncher, openProcessStdioChannel } =
   await import('@migaia/rpc/process/adapters/node-child-process')
+/** Bare and RPC Deno sides share the same delivered byte carrier, without Node spawn substitution. */
+const denoProcess = deno ? await import('@migaia/rpc/process/adapters/deno-command') : undefined
 /** Both bare and RPC byte sides reuse the exact delivered physical carrier. */
 const { dialProcessByteChannel, listenProcessByteChannel } =
   await import('@migaia/rpc/process/adapters/node-socket')
 /** Channel scheduling uses the runtime-neutral canonical owner. */
 const { systemScheduler } = await import('@migaia/utils/scheduler')
-/** Recorded failures/rejections retain missing reasons explicitly, never infer a cause from code. */
-const classification = { failures: [], rejections: [], reports: [] }
-globalThis.__IPC_BENCH_CLASSIFICATION = classification
-/** Redact fixture credentials and payloads while retaining all semantic classification fields. */
-function classify(error) {
-  return {
-    source: error?.source ?? null,
-    code: error?.code ?? null,
-    name: error?.name ?? typeof error,
-    reason: error?.reason ?? null,
-    message: String(error?.message ?? error)
-      .replaceAll('bench-local', '[REDACTED_AUTH]')
-      .replace(/x{16,}/g, '[REDACTED_PAYLOAD]')
-  }
-}
-/** Provider reasons are observed through the existing owner callback before any measured window. */
-function rejected(event) {
-  classification.rejections.push({
-    ...event,
-    verifiedPeerKey: '[REDACTED]',
-    source: '@migaia/rpc/core',
-    code: 'OVERLOADED',
-    name: null,
-    message: 'provider rejection event',
-    classificationSource: 'existing onRejected; name not supplied'
-  })
-}
-/** Original report failures remain observable in the receipt rather than silently discarded. */
-function report(error) {
-  classification.reports.push(classify(error))
-}
+import { classification, classify, report, nativeProviderLimits } from './classification.mjs'
 /** Node and bare Worker memory/CPU snapshots use their original separate control port. */
 let snapshotPort
 /** Bun's native Web Worker exposes its real isolate snapshot outside the measured request window. */
@@ -86,24 +60,20 @@ async function rpcApi() {
   const bunAdapters = process.versions.bun
     ? await import('@migaia/rpc/threads/adapters/bun')
     : undefined
+  const denoAdapters = deno ? await import('@migaia/rpc/threads/adapters/deno') : undefined
   /** Capability declarations come from the actual factory source context, never a fixture guess. */
   offer = (id, capabilities) => ({
     ...processApi.createNativeProcessOffer({
-      peer: { id, runtime: process.versions.bun ? 'bun' : 'node' }
+      peer: { id, runtime: deno ? 'deno' : process.versions.bun ? 'bun' : 'node' }
     }),
     capabilities
   })
-  return { ...processApi, ...threads, ...threadAdapters, ...bunAdapters }
+  return { ...processApi, ...threads, ...threadAdapters, ...bunAdapters, ...denoAdapters }
 }
 /** Fixed benchmark method has no side effect besides returning its portable input. */
 const echoMethod = RuntimeBench.echo
 /** Both public provider factories compile the same nested tree into the original echo wire name. */
 const echoProvide = { bench: { echo: (payload) => payload } }
-/**
- * Explicit sampling capacity accommodates warmup/1000 raw-Worker echoes; product default is
- * unchanged.
- */
-const nativeProviderLimits = { maxReplayEntriesPerPeer: 1200, onRejected: rejected }
 
 /**
  * Wait for a separately started peer, retaining startup failures as preparation errors.
@@ -228,27 +198,105 @@ export async function createIpcSession({
   const api = side === 'rpc' ? await rpcApi() : undefined
   try {
     if (carrier === 'worker') {
-      if (side === 'rpc' && process.versions.bun) {
+      if (side === 'rpc' && (process.versions.bun || deno)) {
         runtime = await api.createThreadPeer({
           self: { name: 'parent', instanceId: 'parent' },
           providerLimits: nativeProviderLimits,
           report,
           spawn: async (context) => {
+            /** Deno cold imports finish before its native runtime can deliver the bootstrap event. */
+            let WorkerConstructor
+            let entry = import.meta.url
+            if (deno) {
+              entry = new URL('./deno-worker.mjs', import.meta.url).href
+              const worker = new globalThis.Worker(entry, { type: 'module', name: 'peer' })
+              /** Before launcher adoption, failed cold preparation still owns this exact Worker. */
+              cleanup.push(() => worker.terminate())
+              await new Promise((resolve, reject) => {
+                const ready = (event) => {
+                  if (event.data !== IpcBenchControl.ready) return
+                  worker.removeEventListener('message', ready)
+                  resolve()
+                }
+                worker.addEventListener('message', ready)
+                worker.addEventListener('error', (event) => reject(event.error ?? event), {
+                  once: true
+                })
+              })
+              /** Canonical launcher adopts the genuine prestarted native object without a queue. */
+              WorkerConstructor = class {
+                constructor() {
+                  return worker
+                }
+              }
+            }
             /** The Bun adapter supplies real Web bootstrap and retains unsupported exit semantics. */
-            const launcher = api.createBunThreadLauncher({ runtimeApi: context, report })
+            const launcher = (deno ? api.createDenoThreadLauncher : api.createBunThreadLauncher)({
+              runtimeApi: context,
+              report,
+              ...(WorkerConstructor ? { Worker: WorkerConstructor } : {})
+            })
             const handle = await launcher.launch(
-              { entry: import.meta.url, name: 'peer' },
+              { entry, name: 'peer' },
               { signal: new AbortController().signal }
             )
             cleanup.push(() => handle.terminate())
-            return api
-              .createBunThreadChannelFactory({ scheduler: systemScheduler })
-              .open(handle, new AbortController().signal)
+            return (deno ? api.createDenoThreadChannelFactory : api.createBunThreadChannelFactory)({
+              scheduler: systemScheduler
+            }).open(handle, new AbortController().signal)
           }
         })
         /** This extra control operation is outside timing and is reported separately from bare OOB. */
         snapshotPeer = () => runtime.request(IpcBenchControl.snapshot)
         peerPid = process.pid
+      } else if (deno) {
+        /** Bare native Web Worker keeps the same JSON business echo, with separate control port. */
+        const workerEntry = new URL(import.meta.url)
+        workerEntry.searchParams.set('bare', '1')
+        const worker = new globalThis.Worker(workerEntry.href, { type: 'module' })
+        const controls = new globalThis.MessageChannel()
+        /** All native replies retain FIFO accounting; no Node Worker compatibility events are used. */
+        const waiting = []
+        const ready = new Promise((resolve, reject) => {
+          worker.onerror = (event) => reject(event.error ?? event)
+          worker.onmessage = (event) => {
+            if (event.data === readyText) resolve()
+            else {
+              const waiter = waiting.shift()
+              if (event.data === payload) waiter?.resolve()
+              else waiter?.reject(new Error(IpcBenchErrorText.echo))
+            }
+          }
+        })
+        cleanup.push(() => {
+          controls.port1.close()
+          worker.terminate()
+        })
+        await ready
+        worker.postMessage({ kind: IpcBenchControl.observation, port: controls.port2 }, [
+          controls.port2
+        ])
+        /** Snapshot control never travels through the measured echo port or request path. */
+        snapshotPeer = () =>
+          new Promise((resolve) => {
+            controls.port1.onmessage = (event) => resolve(event.data)
+            controls.port1.postMessage('snapshot')
+          })
+        peerPid = process.pid
+        return {
+          peerPid,
+          peerSnapshot: () => peerSnapshot(peerPid),
+          classification: () => classification,
+          ready: async () => undefined,
+          exchange: () =>
+            new Promise((resolve, reject) => {
+              waiting.push({ resolve, reject })
+              worker.postMessage(payload)
+            }),
+          close: async () => {
+            for (const close of cleanup.reverse()) await close()
+          }
+        }
       } else {
         const controls = new MessageChannel()
         snapshotPort = controls.port1
@@ -362,10 +410,12 @@ export async function createIpcSession({
         }
       }
     } else if (carrier === 'stdio-framed') {
-      const handle = await createNodeProcessLauncher().launch(
+      const handle = await (
+        deno ? denoProcess.createDenoProcessLauncher() : createNodeProcessLauncher()
+      ).launch(
         {
-          command: process.execPath,
-          args: [entry, '--child', side, carrier],
+          command: deno ? Deno.execPath() : process.execPath,
+          args: [...(deno ? ['run', '-A'] : []), entry, '--child', side, carrier],
           env: { inherit: ['PATH'], set: { IPC_BENCH_STEM: process.env.IPC_BENCH_STEM + '.peer' } },
           stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' }
         },
@@ -745,13 +795,26 @@ async function createBridgeIpcSession({ carrier, side, payload, peerRuntime }) {
 async function childMain(side, carrier, address) {
   const api = side === 'rpc' ? await rpcApi() : undefined
   if (carrier === 'worker') {
+    if (side === 'bare' && deno) {
+      /** Only the cold control message carries a port; business echo retains one parse/stringify. */
+      globalThis.onmessage = (event) => {
+        if (event.data?.kind === IpcBenchControl.observation) {
+          event.data.port.onmessage = () => event.data.port.postMessage(snapshot())
+        } else globalThis.postMessage(JSON.parse(JSON.stringify(event.data)))
+      }
+      globalThis.postMessage(readyText)
+      return
+    }
     if (side === 'bare')
       parentPort.on('message', (value) =>
         parentPort.postMessage(JSON.parse(JSON.stringify(value)), undefined)
       )
     else
       await api.createThreadPeer({
-        provide: process.versions.bun ? { bench: { ...echoProvide.bench, snapshot } } : echoProvide,
+        provide:
+          process.versions.bun || deno
+            ? { bench: { ...echoProvide.bench, snapshot } }
+            : echoProvide,
         providerLimits: nativeProviderLimits,
         report
       })
@@ -800,7 +863,11 @@ async function childMain(side, carrier, address) {
     process.stderr.write(readyText)
     return
   }
-  const { channel: raw } = await openProcessStdioChannel({ bootstrap: 'none' })
+  const { channel: raw } = await (
+    deno ? denoProcess.openProcessStdioChannel : openProcessStdioChannel
+  )({
+    bootstrap: 'none'
+  })
   if (side === 'bare') {
     process.stderr.write(readyText)
     await serveBare(raw)
@@ -819,7 +886,7 @@ async function childMain(side, carrier, address) {
   }
 }
 
-if (parentPort) {
+if (parentPort && !deno) {
   const { workerData } = await import('node:worker_threads')
   await waitForObservation()
   /** The canonical launcher retains portable spec data under its original bootstrap data field. */
@@ -833,6 +900,8 @@ if (parentPort) {
     })
   } else if (input?.child) await childMain(input.side, input.carrier)
   else if (process.versions.bun && Bun.isMainThread === false) await childMain('rpc', 'worker')
+} else if (deno && typeof globalThis.postMessage === 'function') {
+  await childMain(new URL(import.meta.url).searchParams.has('bare') ? 'bare' : 'rpc', 'worker')
 } else if (process.versions.bun && Bun.isMainThread === false) {
   await childMain('rpc', 'worker')
 } else if (process.argv.includes('--runtime-child')) {
