@@ -106,6 +106,7 @@ import {
 } from '../../core/internal/stream/owner.js'
 import {
   normalizeRuntimeDescription,
+  describeRuntimeMethods,
   type IRuntimePeerIdentity,
   type IRuntimePeerDescription
 } from './description.js'
@@ -115,7 +116,6 @@ import {
   RuntimeConnectionDirection,
   RuntimeQueryStatus,
   RuntimeApiMode,
-  RuntimeApiModeSource,
   RUNTIME_API_SCHEMA_VERSION,
   RUNTIME_API_CAPABILITIES,
   RUNTIME_API_BASE_CAPABILITIES
@@ -714,19 +714,7 @@ export async function createRuntimePeer(
       schemaVersion: RUNTIME_API_SCHEMA_VERSION,
       self: supportsGeneration ? { ...self, generation } : self,
       ...(nodeId === undefined ? {} : { nodeId }),
-      methods: methods.map((entry) => ({
-        name: entry.name,
-        supportedModes: entry.supportedModes ?? [
-          RuntimeApiMode.request,
-          RuntimeApiMode.notify,
-          ...(supportsStream ? [RuntimeApiMode.stream] : [])
-        ],
-        modeSource: entry.supportedModes
-          ? RuntimeApiModeSource.declared
-          : RuntimeApiModeSource.generatedRoutes,
-        ...(entry.declaration ? { idempotent: entry.declaration.idempotent } : {}),
-        ...(entry.kind === 'forward' ? { forwardedVia: entry.forwardedVia } : {})
-      }))
+      methods: describeRuntimeMethods(methods, supportsStream)
     })
     channel.activateReceive?.()
     /** Only mutually negotiated application capability permits sending the new reserved method. */

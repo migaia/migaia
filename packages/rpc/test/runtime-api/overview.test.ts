@@ -77,6 +77,11 @@ it('[A24] describe projects local identity and connection facts without another 
       fixture.peers[1].self
     )
     assert.deepEqual(detail.provide, ['alpha'])
+    assert.deepEqual(
+      detail.methods,
+      ['alpha'],
+      '[A24][D17] local methods are names, not wire summaries'
+    )
   } finally {
     await fixture.close()
   }

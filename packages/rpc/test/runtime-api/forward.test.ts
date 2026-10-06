@@ -1965,7 +1965,7 @@ it('[A107] a forwarded iterator failure keeps C source, stack, cause and admitte
   }
 })
 
-it('[A115] forwarded notify holds B admission until the actual C provider completes', async () => {
+it('[A105] forwarded notify holds B admission until the actual C provider completes', async () => {
   /** B's provider limit is the resource under test; A's physical completion is independent. */
   const owners = [owner(), owner(), owner()] as const
   /** Both sources retain their ordinary provider and transport ownership. */
@@ -2135,7 +2135,7 @@ it('[A108] a forwarded native call retires once and a fresh call uses C replacem
   assert.equal(budget.inUse, 0)
 }, 15_000)
 
-it('[A115] unUse withdraws the forward slot and a same-name connection restores new calls', async () => {
+it('[A108] unUse withdraws the forward slot and a same-name connection restores new calls', async () => {
   /** A-to-B retains its compiled method table while B replaces only the downstream connection. */
   const owners = [owner(), owner(), owner()] as const
   /** Each real source closes after its original registration scope. */
@@ -2196,7 +2196,7 @@ it('[A115] unUse withdraws the forward slot and a same-name connection restores 
   }
 })
 
-it('[A115] closing B cancels its actual downstream provider before scope release completes', async () => {
+it('[A116] closing B cancels its actual downstream provider before scope release completes', async () => {
   /** C observes the original provider signal independently of the upstream Promise. */
   const owners = [owner(), owner(), owner()] as const
   /** Keep both actual physical sources live until all scope cleanup completes. */
@@ -2501,7 +2501,7 @@ it.each(['process', 'thread'] as const)(
   }
 )
 
-it('[A84][A115] forwarded binary notify releases B after real C business completion', async () => {
+it('[A84][A105] forwarded binary notify releases B after real C business completion', async () => {
   const owners = [owner(), owner(), owner()] as const
   const carriers: ReturnType<typeof runtimeSources>[] = []
   /** The real new binary profile needs its complete original generation/admission capabilities. */
@@ -2562,7 +2562,7 @@ it('[A84][A115] forwarded binary notify releases B after real C business complet
     assert.equal(admission.size, 1)
     release()
     await vi.waitFor(() =>
-      assert.equal(admission.size, 0, '[A115] completed C business releases the original B lease')
+      assert.equal(admission.size, 0, '[A105] completed C business releases the original B lease')
     )
   } finally {
     release()
