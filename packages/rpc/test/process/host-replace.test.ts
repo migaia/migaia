@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { IRpcEndpoint } from '../../src/core/typing.js'
-import type { IAbortSignal } from '@migaia/lifecycle'
+import { createMutationQueue, type IAbortSignal } from '@migaia/lifecycle'
 import { createProcessHost } from '../../src/process/host/client.js'
 import { hostFixture, runtimeHostFixture } from './fixtures/host-control.js'
 import { nativeHostFixture } from './fixtures/host-native.js'
@@ -534,7 +534,7 @@ describe('process Host replacement publication', () => {
   })
 
   it('[A4] holds old service until description, publishes once and queues every spec', async () => {
-    const fixture = hostFixture()
+    const fixture = runtimeHostFixture()
     let complete!: () => void
     const described = new Promise<void>((resolve) => {
       complete = resolve
@@ -545,31 +545,59 @@ describe('process Host replacement publication', () => {
         await described
       return send(peer, method)
     })
-    const host = createProcessHost({ ...fixture.options, replaceStrategy: 'start-then-switch' })
-    await host.ready()
-    if (fixture.options.deployment.kind !== 'spawn') throw new Error('fixture deployment')
-    const specA = { ...fixture.options.deployment.supervision.spec, args: ['A'] }
-    const specB = { ...fixture.options.deployment.supervision.spec, args: ['B'] }
-    const first = host.replace({ spec: specA })
-    const second = host.replace({ spec: specB })
+    await fixture.host.use(fixture.plugin)
+    const outlet = fixture.host.process!
+    const specA = { ...fixture.options.spawn.supervision.spec, args: ['A'] }
+    const specB = { ...fixture.options.spawn.supervision.spec, args: ['B'] }
+    /** The retained foundation queue owns caller ordering; Host lifecycle admission stays strict. */
+    const mutations = createMutationQueue({ scheduler: fixture.scheduler })
+    const first = mutations.enqueue(() =>
+      fixture.host.replace(
+        'child',
+        createProcessPlugin({
+          ...fixture.options,
+          spawn: {
+            ...fixture.options.spawn,
+            supervision: { ...fixture.options.spawn.supervision, spec: specA }
+          }
+        })
+      )
+    )
+    const second = mutations.enqueue(() =>
+      fixture.host.replace(
+        'child',
+        createProcessPlugin({
+          ...fixture.options,
+          spawn: {
+            ...fixture.options.spawn,
+            supervision: { ...fixture.options.spawn.supervision, spec: specB }
+          }
+        })
+      )
+    )
+    const outcomes = Promise.allSettled([first, second])
     expect(second).not.toBe(first)
     await settle()
     expect(fixture.launch.mock.calls).toHaveLength(2)
     expect(fixture.terminate).not.toHaveBeenCalled()
-    await host.use('p')
+    await outlet.request('child', RemoteMethodName.hostUse, ['p'])
     complete()
     try {
-      expect(await first).toBe(host)
-      expect(await second).toBe(host)
+      await first
+      expect(fixture.host.process).toBe(outlet)
+      await second
+      expect(fixture.host.process).toBe(outlet)
       expect(fixture.launch.mock.calls).toHaveLength(3)
       expect(fixture.order).toEqual(['launch:1', 'launch:2', 'exit:1', 'launch:3', 'exit:2'])
     } finally {
-      await host.release()
+      complete()
+      await outcomes
+      await fixture.close()
     }
   })
 
   it('[A3/A4] cancels a delayed candidate and refuses queued replacement without another launch', async () => {
-    const fixture = hostFixture()
+    const fixture = runtimeHostFixture()
     const send = fixture.send.getMockImplementation()!
     /** The actual core endpoint honors cancellation; this neutral held-send fixture must too. */
     let candidateSignal: IAbortSignal | undefined
@@ -598,20 +626,25 @@ describe('process Host replacement publication', () => {
       }
       return send(peer, method)
     })
-    const host = createProcessHost(options)
-    await host.ready()
-    const first = host.replace()
-    const second = host.replace()
+    await fixture.host.use(createProcessPlugin(options))
+    /** Original queue callbacks consult actual Host admission when they reach the head. */
+    const mutations = createMutationQueue({ scheduler: fixture.scheduler })
+    const first = mutations.enqueue(() =>
+      fixture.host.replace('child', createProcessPlugin(options))
+    )
+    const second = mutations.enqueue(() =>
+      fixture.host.replace('child', createProcessPlugin(options))
+    )
     const results = Promise.allSettled([first, second])
     await describing
-    await host.release()
+    await fixture.close()
     const outcomes = await results
     expect(outcomes[0]).toMatchObject({ status: 'rejected' })
     expect(outcomes[1]).toMatchObject({
       status: 'rejected',
-      reason: { code: 'PROCESS_HOST_CLOSED' }
+      reason: { code: 'HOST_DISPOSING' }
     })
     expect(fixture.launch.mock.calls).toHaveLength(2)
-    expect(host.inspectRegistration()).toBeUndefined()
+    expect(fixture.host.process).toBeUndefined()
   })
 })
