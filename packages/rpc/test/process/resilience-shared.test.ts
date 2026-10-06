@@ -10,10 +10,28 @@ import {
 } from '../../src/process/adapters/node-socket.js'
 import { createProcessTransport } from '../../src/process/handshake.js'
 import { createNativeProcessOffer } from '../../src/process/offer.js'
-import { createServeProcessPlugin } from '../../src/process/plugin/serve.js'
+import {
+  createProcessSessionService,
+  serveProcessSessions,
+  type IProcessSessionServiceOptions
+} from '../../src/process/plugin/serve.js'
+import { createProcessResilience } from '../../src/process/resilience/index.js'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import type {
+  IProcessServeChildIngress,
+  IProcessServeListenerIngress,
+  IProcessServeEndpointFactory
+} from '../../src/process/plugin/types.js'
 import type { IProcessSessionIdentity } from '../../src/process/resilience/types.js'
 import type { IRemoteServeEndpoint } from '../../src/remote/types.js'
 import { nativeBytePair, nativeEndpoint } from './fixtures/native-runtime.js'
+
+/** Fixture composition uses only retained target/session ports, without deprecated facade types. */
+type IServiceFixtureOptions = IProcessSessionServiceOptions &
+  Readonly<{
+    ingress: IProcessServeChildIngress | IProcessServeListenerIngress
+    endpointFactory: IProcessServeEndpointFactory
+  }>
 
 describe('default process resilience wiring', () => {
   it('[A3/A5] serves child request, one-way and generator context and removes its parent-loss guard on explicit close', async () => {
@@ -58,40 +76,55 @@ describe('default process resilience wiring', () => {
     }
     const exit = vi.fn()
     const reports: unknown[] = []
-    const serving = createServeProcessPlugin({
-      host,
-      contract,
-      createSharedTarget: () => target,
-      onInstanceUnhealthy: () => () => undefined,
-      report: (error) => reports.push(error),
-      endpointFactory: (channel, _signal, session) => nativeEndpoint(channel, 'server', session),
-      ingress: {
-        kind: 'child',
-        channelKind: 'byte',
-        parentLoss: { exit },
-        openRaw: async () => ({
-          raw: childRaw,
-          bootstrap: new TextEncoder().encode('child-secret')
-        }),
-        createVerifier: (bytes) => (auth) => {
-          expect(auth).toBe(new TextDecoder().decode(bytes))
-        },
-        establish: (raw, context) =>
-          createProcessTransport(raw as IProcessByteChannel, {
-            role: 'responder',
-            scheduler: context.scheduler,
-            peerId: 'parent',
-            offer: createNativeProcessOffer({
-              peer: { id: 'server', runtime: 'node' },
-              stream: true,
-              capabilities: ['runtime-api@1']
-            }),
-            auth: { mode: 'required', verify: context.verify! },
-            ipc: { ...context.session, log: () => undefined },
-            report: (error) => reports.push(error)
-          })
+    const serving = (() => {
+      /** The canonical session and target-selection owners retain the original default policy. */
+      const options: IServiceFixtureOptions = {
+        host,
+        contract,
+        report: (error) => reports.push(error),
+        endpointFactory: (channel, _signal, session) => nativeEndpoint(channel, 'server', session),
+        ingress: {
+          kind: 'child',
+          channelKind: 'byte',
+          parentLoss: { exit },
+          openRaw: async () => ({
+            raw: childRaw,
+            bootstrap: new TextEncoder().encode('child-secret')
+          }),
+          createVerifier: (bytes) => (auth) => {
+            expect(auth).toBe(new TextDecoder().decode(bytes))
+          },
+          establish: (raw, context) =>
+            createProcessTransport(raw as IProcessByteChannel, {
+              role: 'responder',
+              scheduler: context.scheduler,
+              peerId: 'parent',
+              offer: createNativeProcessOffer({
+                peer: { id: 'server', runtime: 'node' },
+                stream: true,
+                capabilities: ['runtime-api@1']
+              }),
+              auth: { mode: 'required', verify: context.verify! },
+              ipc: { ...context.session, log: () => undefined },
+              report: (error) => reports.push(error)
+            })
+        }
       }
-    })
+      const resilience = createProcessResilience({
+        scheduler: systemScheduler,
+        report: options.report
+      })
+      return serveProcessSessions(
+        options.ingress,
+        options.endpointFactory,
+        createProcessSessionService(options),
+        resilience,
+        options.report,
+        undefined,
+        systemScheduler,
+        { release: () => resilience.close() }
+      )
+    })()
     const parentChannel = await createProcessTransport(parentRaw, {
       role: 'initiator',
       peerId: 'server',
@@ -169,42 +202,58 @@ describe('default process resilience wiring', () => {
       const ownedTargets: PluginHost<Record<string, never>>[] = []
       const disposals: ReturnType<typeof vi.spyOn>[] = []
       let sequence = 0
-      const serving = await createServeProcessPlugin({
-        host,
-        contract,
-        instanceMode,
-        createSessionHost: async () => {
-          const owned = new PluginHost<Record<string, never>>({
-            execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-          })
-          await owned.use(target)
-          ownedTargets.push(owned)
-          disposals.push(vi.spyOn(owned, 'dispose'))
-          return owned
-        },
-        createSharedTarget: () => target,
-        onInstanceUnhealthy: () => () => undefined,
-        report: (error) => reports.push(error),
-        endpointFactory: (channel, _signal, session) => nativeEndpoint(channel, 'server', session),
-        ingress: {
-          kind: 'listener',
-          address,
-          listen: listenProcessByteChannel,
-          verify: (auth) =>
-            auth === 'alice-secret' ? 'alice' : auth === 'bob-secret' ? 'bob' : '',
-          offer: createNativeProcessOffer({
-            peer: { id: 'server', runtime: 'node' },
-            stream: true
-          }),
-          createConnectionContext: () => {
-            const id = `client-${++sequence}`
-            return {
-              peerId: id,
-              ipc: { connectionId: id, sessionId: `session-${sequence}`, log: () => undefined }
+      const serving = await (() => {
+        /** The canonical session and target-selection owners retain the original default policy. */
+        const options: IServiceFixtureOptions = {
+          host,
+          contract,
+          instanceMode,
+          createSessionHost: async () => {
+            const owned = new PluginHost<Record<string, never>>({
+              execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+            })
+            await owned.use(target)
+            ownedTargets.push(owned)
+            disposals.push(vi.spyOn(owned, 'dispose'))
+            return owned
+          },
+          report: (error) => reports.push(error),
+          endpointFactory: (channel, _signal, session) =>
+            nativeEndpoint(channel, 'server', session),
+          ingress: {
+            kind: 'listener',
+            address,
+            listen: listenProcessByteChannel,
+            verify: (auth) =>
+              auth === 'alice-secret' ? 'alice' : auth === 'bob-secret' ? 'bob' : '',
+            offer: createNativeProcessOffer({
+              peer: { id: 'server', runtime: 'node' },
+              stream: true
+            }),
+            createConnectionContext: () => {
+              const id = `client-${++sequence}`
+              return {
+                peerId: id,
+                ipc: { connectionId: id, sessionId: `session-${sequence}`, log: () => undefined }
+              }
             }
           }
         }
-      })
+        const resilience = createProcessResilience({
+          scheduler: systemScheduler,
+          report: options.report
+        })
+        return serveProcessSessions(
+          options.ingress,
+          options.endpointFactory,
+          createProcessSessionService(options),
+          resilience,
+          options.report,
+          undefined,
+          systemScheduler,
+          { release: () => resilience.close() }
+        )
+      })()
       try {
         for (const auth of ['alice-secret', 'alice-secret', 'bob-secret', 'bob-secret']) {
           const id = `client-${clients.length + 1}`
