@@ -4,7 +4,10 @@ import {
   runtimeDetail,
   runtimeConnectionDetail
 } from '../remote/runtime-api/overview.js'
-import { normalizeRuntimeDescription } from '../remote/runtime-api/description.js'
+import {
+  normalizeRuntimeDescription,
+  describeRuntimeMethods
+} from '../remote/runtime-api/description.js'
 import {
   RuntimeSourceKind,
   RuntimeConnectionDirection,
@@ -52,7 +55,10 @@ export async function createProcessListenerPeer(
   const local = normalizeRuntimeDescription({
     schemaVersion: RUNTIME_API_SCHEMA_VERSION,
     self: options.self,
-    methods: []
+    methods: describeRuntimeMethods(
+      methods,
+      ingress.offer.capabilities.includes(RpcCapability.stream)
+    )
   })
   /** This governor is closed only when this construction created it. */
   const resilience =

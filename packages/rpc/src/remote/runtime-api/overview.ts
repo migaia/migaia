@@ -122,7 +122,7 @@ export type IRuntimeConnectionDetail = Readonly<{
 export type IRuntimeDetail = Readonly<{
   identity: IRuntimePeerIdentity
   self: IRuntimePeerIdentity
-  methods: IRuntimePeerDescription['methods']
+  methods: readonly string[]
   provide: readonly string[]
   connections: readonly IRuntimeConnectionDetail[]
   unit: IRuntimeUnavailable
@@ -284,7 +284,7 @@ export function runtimeDetail(
   return Object.freeze({
     identity: self,
     self,
-    methods: local.methods,
+    methods: Object.freeze(local.methods.map((method) => method.name)),
     provide: Object.freeze([...provide]),
     connections: Object.freeze([...connections]),
     unit: runtimeUnavailable(RuntimeQueryReason.localUnit),

@@ -2,6 +2,7 @@ import { normalizePortable } from '../../contract/normalize.js'
 import { RpcWireLimit } from '../../contract/wire-constants.js'
 import { normalizeRuntimeGeneration } from '../../contract/runtime-api/normalize.js'
 import type { IRpcRuntimeGeneration } from '../../contract/runtime-api/types.js'
+import type { IRuntimeMethodEntry } from './catalog.js'
 import { RpcError, RpcCoreErrorCode } from '../../core/errors.js'
 import { RemoteCatalogLimit, REMOTE_NAME_PATTERN } from '../contract.js'
 import {
@@ -33,6 +34,26 @@ export type IRuntimePeerDescription = Readonly<{
   /** Exchanged only after both actual offers negotiate forward-route@1. */
   nodeId?: string
 }>
+
+/** Project the original compiled routes once for Peer and listener directories before any query. */
+export function describeRuntimeMethods(
+  methods: readonly IRuntimeMethodEntry[],
+  supportsStream: boolean
+): readonly IRuntimeMethodDescription[] {
+  return methods.map((entry) => ({
+    name: entry.name,
+    supportedModes: entry.supportedModes ?? [
+      RuntimeApiMode.request,
+      RuntimeApiMode.notify,
+      ...(supportsStream ? [RuntimeApiMode.stream] : [])
+    ],
+    modeSource: entry.supportedModes
+      ? RuntimeApiModeSource.declared
+      : RuntimeApiModeSource.generatedRoutes,
+    ...(entry.declaration ? { idempotent: entry.declaration.idempotent } : {}),
+    ...(entry.kind === 'forward' ? { forwardedVia: entry.forwardedVia } : {})
+  }))
+}
 
 /** A safe local report compares two accepted generations without retaining either endpoint. */
 export type IRuntimeDirectoryDiff = Readonly<{

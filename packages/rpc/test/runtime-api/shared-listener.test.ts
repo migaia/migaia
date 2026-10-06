@@ -90,6 +90,14 @@ it('[A59][A60] the real authenticated process listener injects one logical provi
   const calls: Promise<unknown>[] = []
   let firstFailure: unknown
   try {
+    /** The local compiled routes exist before a remote session can provide directory facts. */
+    const detail = await server.describe()
+    assert.deepEqual(
+      [...detail.methods].sort(),
+      ['baseline', 'first', 'other', 'second'],
+      '[A24][D17] listener methods use the same local name-array contract before any accept'
+    )
+    assert.equal(accepted, 0)
     for (const index of [1, 2]) {
       const peer = await createRuntimePeer({
         self: { name: `caller-${index}`, instanceId: `socket-caller-${index}` },

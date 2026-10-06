@@ -3,6 +3,7 @@ import { it } from 'vitest'
 import { RpcCapability } from '../../src/contract/wire-constants.js'
 import { RpcSerializationError, RpcCoreErrorCode, tagRpcError } from '../../src/core/errors.js'
 import { compileRuntimeMethods } from '../../src/remote/runtime-api/catalog.js'
+import { readRuntimePeerConnection } from '../../src/remote/runtime-api/peer.js'
 import { connected, RuntimeApiFixtureText } from './fixture.js'
 import { setTimeout as delay } from 'node:timers/promises'
 
@@ -270,12 +271,12 @@ it('[A4][A8] different automatic directories expose only explicit nested methods
   )
   try {
     assert.deepEqual(
-      (await fixture.peers[0].describe()).methods.map((method) => method.name),
+      (await fixture.peers[0].describe()).methods,
       ['doc.save'],
       '[A4] parent directory contains only its explicit own method'
     )
     assert.deepEqual(
-      (await fixture.peers[1].describe()).methods.map((method) => method.name),
+      (await fixture.peers[1].describe()).methods,
       ['math.add'],
       '[A4] child directory differs without a handshake rejection'
     )
@@ -451,7 +452,8 @@ it('[A31][A32] removing stream from either actual offer preserves ordinary calls
       '[A31] independent batch/runtime agreement still permits scalar calls'
     )
     assert.deepEqual(
-      (await fixture.peers[1].describe()).methods[0]!.supportedModes,
+      readRuntimePeerConnection(fixture.peers[1]).directory.localDescription.methods[0]!
+        .supportedModes,
       ['request', 'notify'],
       '[A32] uninstalled stream is absent from the directory'
     )
