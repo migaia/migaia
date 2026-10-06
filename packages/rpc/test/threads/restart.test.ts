@@ -27,7 +27,7 @@ describe('thread generation recovery', () => {
       expect(
         fixture.channels.every((channel) => channel.scheduler === fixture.pluginScheduler)
       ).toBe(true)
-      const sent = fixture.frames.filter(({ message }) => message.method === 'p.f.read')
+      const sent = fixture.frames.filter(({ message }) => message.method === 'p.read')
       expect(sent.map(({ generation }) => generation)).toEqual([1, 2])
       expect(sent.map(({ message }) => message.data.route.idempotencyKey)).toEqual([
         'thread-stable-key',
@@ -51,7 +51,7 @@ describe('thread generation recovery', () => {
         detail: { generation: 1 }
       })
       await until(() => fixture.handles.length === 2)
-      expect(fixture.frames.filter(({ message }) => message.method === 'p.f.write')).toHaveLength(1)
+      expect(fixture.frames.filter(({ message }) => message.method === 'p.write')).toHaveLength(1)
     } finally {
       await fixture.close()
     }
@@ -84,10 +84,10 @@ describe('thread generation recovery', () => {
       expect(inputs[0]).toMatchObject({
         idempotent: true,
         key: 'explicit-key',
-        method: 'p.f.read',
+        method: 'p.read',
         generation: 1
       })
-      expect(fixture.frames.filter(({ message }) => message.method === 'p.f.read')).toHaveLength(2)
+      expect(fixture.frames.filter(({ message }) => message.method === 'p.read')).toHaveLength(2)
     } finally {
       await fixture.close()
       factory.mockRestore()
@@ -101,12 +101,12 @@ describe('thread generation recovery', () => {
       const result = feature
         .hold([], { signal: controller.signal })
         .catch((error: unknown) => error)
-      await until(() => fixture.frames.some(({ message }) => message.method === 'p.f.hold'))
+      await until(() => fixture.frames.some(({ message }) => message.method === 'p.hold'))
       controller.abort(new Error('cancel logical call'))
       expect(await result).toMatchObject({ code: 'CANCELLED' })
       fixture.handles[0]!.terminate()
       await until(() => fixture.handles.length === 2)
-      expect(fixture.frames.filter(({ message }) => message.method === 'p.f.hold')).toHaveLength(1)
+      expect(fixture.frames.filter(({ message }) => message.method === 'p.hold')).toHaveLength(1)
     } finally {
       await fixture.close()
     }
@@ -123,10 +123,10 @@ describe('thread generation recovery', () => {
     try {
       const feature = await fixture.install()
       const result = feature.hold([], { timeoutMs: 200 }).catch((error: unknown) => error)
-      await until(() => fixture.frames.some(({ message }) => message.method === 'p.f.hold'))
+      await until(() => fixture.frames.some(({ message }) => message.method === 'p.hold'))
       scheduler.advance(100)
       expect(await result).toMatchObject({ code: 'DEADLINE_EXCEEDED' })
-      expect(fixture.frames.filter(({ message }) => message.method === 'p.f.hold')).toHaveLength(1)
+      expect(fixture.frames.filter(({ message }) => message.method === 'p.hold')).toHaveLength(1)
     } finally {
       await fixture.close()
     }
@@ -151,7 +151,7 @@ describe('thread generation recovery', () => {
         const result = feature
           .read(['bounded'], { timeoutMs: 200 })
           .catch((error: unknown) => error)
-        await until(() => fixture.frames.some(({ message }) => message.method === 'p.f.read'))
+        await until(() => fixture.frames.some(({ message }) => message.method === 'p.read'))
         await fixture.handles[0]!.exited
         for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
         scheduler.advance(delay)
@@ -160,13 +160,13 @@ describe('thread generation recovery', () => {
           await until(() => fixture.handles.length === 2)
           expect(
             fixture.frames.filter(
-              ({ generation, message }) => generation === 2 && message.method === 'p.f.read'
+              ({ generation, message }) => generation === 2 && message.method === 'p.read'
             )
           ).toHaveLength(0)
         } else {
           expect(await result).toBe('bounded')
           const sent = fixture.frames.find(
-            ({ generation, message }) => generation === 2 && message.method === 'p.f.read'
+            ({ generation, message }) => generation === 2 && message.method === 'p.read'
           )!
           expect(sent.message.data.route.timeoutMs).toBeGreaterThan(0)
           expect(sent.message.data.route.timeoutMs).toBeLessThanOrEqual(40)
@@ -208,7 +208,7 @@ describe('thread generation recovery', () => {
       for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
       resume()
       expect(await result).toMatchObject({ code: 'REMOTE_CLOSED', detail: { generation: 1 } })
-      expect(fixture.frames.filter(({ message }) => message.method === 'p.f.write')).toHaveLength(0)
+      expect(fixture.frames.filter(({ message }) => message.method === 'p.write')).toHaveLength(0)
     } finally {
       resume()
       await fixture.close()

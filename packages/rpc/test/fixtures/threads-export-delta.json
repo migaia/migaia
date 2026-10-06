@@ -2,9 +2,7 @@
   "added": {
     "@migaia/rpc/threads": [
       "createThreadPlugin",
-      "createThreadHost",
-      "createServeThreadPlugin",
-      "createServeThreadHost",
+      "createThreadPeer",
       "createNodeThreadChannel",
       "createWebThreadChannel",
       "receiveThreadData",

@@ -1,12 +1,13 @@
 import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
-import { createThreadHost } from '../../src/threads/host.js'
+import { createThreadPlugin } from '../../src/threads/plugin.js'
+import { runtimeTestHost } from '../runtime-api/fixture.js'
 import {
   createBrowserThreadLauncher,
   createBrowserThreadChannelFactory
 } from '../../src/threads/adapters/browser.js'
-import { nativeWorkerFor, nativeFixture, contract, endpointFactory } from './fixture.js'
+import { nativeWorkerFor, nativeFixture, endpointFactory } from './fixture.js'
 
 /** Flush supervisor/remote promise ownership without running a second lifecycle scheduler. */
 async function flush(): Promise<void> {
@@ -45,23 +46,29 @@ describe('thread lifecycle ownership', () => {
     }
     const launcher = createBrowserThreadLauncher({ Worker, report })
     const budget = createUnitBudget({ kind: 'thread', maxUnits: 1, scheduler })
-    const host = createThreadHost({
-      catalog: { p: contract },
-      spec: { entry: 'file:///worker.mjs', data: { value: 1 } },
-      launcher,
-      budget,
-      scheduler,
-      channelFactory: createBrowserThreadChannelFactory({ scheduler }),
-      endpointFactory,
-      report,
-      health: { check: async () => undefined },
-      supervisor: { isolation: 'best-effort', stop: { exitTimeoutMs: 5, reapTimeoutMs: 5 } }
+    const host = runtimeTestHost({
+      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
-    const ready = host.ready().catch((error: unknown) => error)
+    const plugin = createThreadPlugin({
+      name: 'p',
+      spawn: {
+        spec: { entry: 'file:///worker.mjs', data: { value: 1 } },
+        launcher,
+        budget,
+        scheduler,
+        channelFactory: createBrowserThreadChannelFactory({ scheduler }),
+        report,
+        health: { check: async () => undefined },
+        supervisor: { isolation: 'best-effort', stop: { exitTimeoutMs: 5, reapTimeoutMs: 5 } }
+      },
+      endpointFactory,
+      report
+    })
+    const ready = host.use(plugin).catch((error: unknown) => error)
     await flush()
     expect(budget.inUse).toBe(1)
-    const release = host.release()
-    expect(host.release()).toBe(release)
+    const release = host.dispose()
+    expect(host.dispose()).toBe(release)
     await flush()
     scheduler.advance(5)
     await flush()

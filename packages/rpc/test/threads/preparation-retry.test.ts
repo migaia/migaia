@@ -83,7 +83,7 @@ describe('thread preparation and retry settlement', () => {
       .dispatch({
         events,
         generation: 1,
-        method: 'p.f.read',
+        method: 'p.read',
         mode: 'request',
         idempotent: true,
         key: 'readiness-key',
@@ -124,11 +124,11 @@ describe('thread preparation and retry settlement', () => {
       })
       for (
         let turn = 0;
-        turn < 100 && !fixture.frames.some(({ message }) => message.method === 'p.f.hold');
+        turn < 100 && !fixture.frames.some(({ message }) => message.method === 'p.hold');
         turn++
       )
         await new Promise((resolve) => setTimeout(resolve, 2))
-      expect(fixture.frames.some(({ message }) => message.method === 'p.f.hold')).toBe(true)
+      expect(fixture.frames.some(({ message }) => message.method === 'p.hold')).toBe(true)
       scheduler.advance(100)
       for (let turn = 0; turn < 40; turn++) await Promise.resolve()
       expect(outcome).toMatchObject({ code: 'DEADLINE_EXCEEDED' })

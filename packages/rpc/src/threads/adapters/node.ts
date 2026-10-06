@@ -267,7 +267,12 @@ export function createNodeThreadChannelFactory(
       if (handle.runtimeApi) {
         try {
           /** Channel capabilities come from the child's real ACK and this parent's real offer. */
-          const capabilities = await awaitThreadPreparation(handle.runtimeApi.prepared, signal)
+          const negotiated = await awaitThreadPreparation(handle.runtimeApi.prepared, signal)
+          /** Explicit adapter policy may only narrow the real bilateral agreement. */
+          const capabilities =
+            options.capabilities === undefined
+              ? negotiated
+              : intersectThreadCapabilities(negotiated, options.capabilities)
           return createNodeThreadChannel(
             handle.port,
             handle.identity.fingerprint,

@@ -2,7 +2,7 @@ import { resolve } from 'node:path'
 import { vi } from 'vitest'
 import type { IThreadHandle } from '@migaia/supervision/threads'
 import { fileURLToPath } from 'node:url'
-import { PluginHost } from '@migaia/plugin-host'
+import { runtimeTestHost } from '../runtime-api/fixture.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createComposedEndpoint } from '../../src/core/composed.js'
@@ -18,6 +18,8 @@ import { framer } from '../../src/core/middleware/framer.js'
 import { connect } from '../../src/core/middleware/connect.js'
 import { ping } from '../../src/core/middleware/ping.js'
 import type { IRpcEndpoint } from '../../src/core/typing.js'
+import { createOneWayFeature } from '../../src/core/features/one-way.js'
+import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
 import type { IRemoteContract } from '../../src/remote/contract.js'
 import type { IRemoteEndpointFactory } from '../../src/remote/types.js'
 import {
@@ -26,7 +28,7 @@ import {
   type INodeThreadHandle
 } from '../../src/threads/adapters/node.js'
 import { createThreadPlugin } from '../../src/threads/plugin.js'
-import type { IThreadPluginOptions } from '../../src/threads/types.js'
+import type { IThreadCommonOptions } from '../../src/threads/types.js'
 
 /** Capture native runtime objects only at the fixture construction boundary. */
 const nativeWorkers = vi.hoisted(() => new Map<number, import('node:worker_threads').Worker>())
@@ -95,6 +97,7 @@ export const endpointFactory: IRemoteEndpointFactory = async (channel) => {
   const endpoint = await createComposedEndpoint(
     {
       id: 'client',
+      targetIds: [channel.peerId],
       transport: channel.transport,
       scheduler: channel.scheduler,
       middlewares: [
@@ -109,12 +112,17 @@ export const endpointFactory: IRemoteEndpointFactory = async (channel) => {
       'first-party-chunk': chunk,
       'first-party-outbound': outbound,
       'first-party-provider': provider,
+      'first-party-one-way': createOneWayFeature(outbound),
       'first-party-discovery': discovery,
       'first-party-control': createControlFeature(outbound, discovery),
       'first-party-stream': createStreamFeature(outbound, provider)
     }
   )
-  return { endpoint: endpoint as unknown as IRpcEndpoint, stream: endpoint.stream }
+  return {
+    endpoint: endpoint as unknown as IRpcEndpoint,
+    oneWay: endpoint,
+    stream: endpoint.stream
+  }
 }
 /** Portable proxy signatures stay explicit because contract Feature names are runtime data. */
 export type IFixtureFeature = {
@@ -126,12 +134,12 @@ export type IFixtureFeature = {
 }
 /** Record native generations and outbound frames without adding a retry or lifecycle policy. */
 export function nativeFixture(
-  overrides: Partial<IThreadPluginOptions<INodeThreadHandle>> = {},
+  overrides: Partial<IThreadCommonOptions<IThreadHandle>> = {},
   data: Record<string, unknown> = {}
 ) {
   /** Local Host owns the installed remote definition. */
-  const host = new PluginHost<Record<string, never>>({
-    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+  const host = runtimeTestHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** Every real Worker consumes the same one-unit admission budget. */
   const budget = createUnitBudget({
@@ -182,21 +190,30 @@ export function nativeFixture(
       return handle
     }
   }
-  /** No retryPort property is present unless the caller explicitly replaces it. */
-  const plugin = createThreadPlugin({
-    name: 'p',
-    contract,
-    host: host.plugin,
+  /** The same source retains the canonical supervisor, budget, launcher and caller-selected policy. */
+  const { endpointFactory: selectedFactory, keyFactory, retryPort, ...sourceOverrides } = overrides
+  const spawn = {
     spec: { entry: workerEntry },
     launcher,
     budget,
     scheduler: overrides.scheduler ?? systemScheduler,
     channelFactory,
-    endpointFactory,
-    report: (error) => reported.push(error),
+    report: (error: unknown) => reported.push(error),
     supervisor: { restart: { initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 3 } },
-    ...overrides
-  })
+    ...sourceOverrides
+  }
+  /** A true symmetric connection publishes the original shared thread outlet after Host commit. */
+  const pluginOptions = {
+    name: 'p',
+    self: { name: 'parent', instanceId: 'client' },
+    spawn,
+    endpointFactory: selectedFactory ?? endpointFactory,
+    report: (error: unknown) => reported.push(error),
+    ...(keyFactory === undefined ? {} : { keyFactory }),
+    ...(retryPort === undefined ? {} : { retryPort })
+  }
+  /** The public factory receives only the actual caller configuration recorded above. */
+  const plugin = createThreadPlugin<IRuntimeDynamicSurface>(pluginOptions)
   return {
     host,
     pluginScheduler: overrides.scheduler ?? systemScheduler,
@@ -207,9 +224,24 @@ export function nativeFixture(
     channels,
     reported,
     plugin,
-    async install() {
-      const [handle] = await host.use(plugin)
-      return handle.getFeature('f') as unknown as IFixtureFeature
+    pluginOptions,
+    spawn,
+    async install(): Promise<IFixtureFeature> {
+      await host.use(plugin)
+      /** These application payload helpers return the actual outlet Promise or iterator unchanged. */
+      const outlet = host.thread!
+      return {
+        /** Read sends the fixture business value through the new folded method name. */
+        read: (params, options) => outlet.request('p', 'p.read', params[0], options),
+        /** Non-idempotent writes retain the original managed retry classification. */
+        write: (params, options) => outlet.request('p', 'p.write', params[0], options),
+        /** A held provider exposes cancellation and total wall-cap behavior at the original owner. */
+        hold: (params, options) => outlet.request('p', 'p.hold', params[0], options),
+        /** Invalid business results still cross the real provider and serialization boundary. */
+        bad: (params) => outlet.request('p', 'p.bad', params[0]),
+        /** The helper preserves the canonical consumer iterator, including return and failure. */
+        stream: (params, options) => outlet.stream('p', 'p.stream', params[0], options)
+      } satisfies IFixtureFeature
     },
     async close() {
       await host.dispose()
