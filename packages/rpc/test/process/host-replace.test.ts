@@ -7,6 +7,7 @@ import { hostFixture } from './fixtures/host-control.js'
 import { nativeHostFixture, nativeHostOptions } from './fixtures/host-native.js'
 import { createProcessPlugin } from '../../src/process/plugin/client.js'
 import { RemoteMethodName } from '../../src/remote/constants.js'
+import { RuntimeEventName } from '../../src/remote/runtime-api/constants.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
 import { createPrewarmPool } from '@migaia/supervision/process'
@@ -331,7 +332,7 @@ describe('process Host replacement publication', () => {
     '[A3/A4] gates real Node replacement on describe and never replays installed plugins (%s)',
     async (strategy) => {
       /** A real endpoint is held only at its outbound describe boundary. */
-      const fixture = nativeHostOptions('old')
+      const fixture = nativeHostFixture('old')
       const original = fixture.options.endpointFactory
       let allow!: () => void
       let entered!: () => void
@@ -342,9 +343,12 @@ describe('process Host replacement publication', () => {
         entered = resolve
       })
       let endpoints = 0
-      const host = createProcessHost({
+      const options = {
         ...fixture.options,
-        endpointFactory: async (channel, signal) => {
+        endpointFactory: async (
+          channel: Parameters<typeof original>[0],
+          signal: Parameters<typeof original>[1]
+        ) => {
           const served = await original(channel, signal)
           const ordinal = ++endpoints
           return {
@@ -362,41 +366,61 @@ describe('process Host replacement publication', () => {
             }
           }
         }
-      })
+      }
+      /** Both transitions retain the actual shared outlet while the candidate is unpublished. */
+      let removeReadiness: (() => void) | undefined
+      /** Cleanup joins the real transaction even when an earlier assertion rejects. */
+      let replacementOutcome: Promise<PromiseSettledResult<unknown>[]> | undefined
       try {
-        await host.ready()
-        await host.use('p')
-        if (fixture.options.deployment.kind !== 'spawn') throw new Error('fixture deployment')
+        await fixture.host.use(createProcessPlugin(options))
+        const outlet = fixture.host.process!
+        await outlet.request('child', RemoteMethodName.hostUse, ['p'])
         const old = fixture.handles[0]!
         const spec = {
-          ...fixture.options.deployment.supervision.spec,
+          ...fixture.options.spawn.supervision.spec,
           env: { inherit: [], set: { RPC_VALUE: 'new' } }
         }
-        const replacing = host.replace({ spec, strategy })
-        await describing
         let ready = false
-        const readiness = host.ready().then(() => {
-          ready = true
+        const prepared = new Promise<void>((resolve) => {
+          removeReadiness = outlet.on(RuntimeEventName.ready, () => {
+            ready = true
+            resolve()
+          })
         })
+        const candidate = createProcessPlugin({
+          ...options,
+          spawn: { ...options.spawn, supervision: { ...options.spawn.supervision, spec } }
+        })
+        const replacing =
+          strategy === 'stop-then-start'
+            ? outlet.stop('child').then(() => fixture.host.replace('child', candidate))
+            : fixture.host.replace('child', candidate)
+        replacementOutcome = Promise.allSettled([replacing])
+        await describing
         await Promise.resolve()
         if (strategy === 'stop-then-start') {
           await old.exited
           expect(ready).toBe(false)
-          await expect(host.use('p')).rejects.toMatchObject({ code: 'REMOTE_CLOSED' })
+          expect(() => outlet.request('child', RemoteMethodName.hostUse, ['p'])).toThrow(
+            expect.objectContaining({ code: 'TARGET_UNKNOWN' })
+          )
         } else {
           expect(process.kill(old.identity.pid!, 0)).toBe(true)
-          const feature = await host.use('p')
-          expect(await feature.f!.request!(['old'])).toMatchObject({
+          await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+          expect(await outlet.request('child', 'p.request', 'old')).toMatchObject({
             pid: old.identity.pid,
             value: 'old'
           })
         }
         allow()
-        expect(await replacing).toBe(host)
-        await readiness
-        expect(await host.inspect()).toMatchObject({ plugins: [] })
-        const fresh = await host.use('p')
-        expect(await fresh.f!.request!(['new'])).toMatchObject({
+        await replacing
+        expect(fixture.host.process).toBe(outlet)
+        await prepared
+        expect(await outlet.request('child', RemoteMethodName.hostInspect, [])).toMatchObject({
+          plugins: []
+        })
+        await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+        expect(await outlet.request('child', 'p.request', 'new')).toMatchObject({
           pid: fixture.handles[1]!.identity.pid,
           value: 'new',
           resolutions: 1
@@ -404,7 +428,9 @@ describe('process Host replacement publication', () => {
         await old.exited
       } finally {
         allow()
-        await host.release()
+        removeReadiness?.()
+        await replacementOutcome
+        await fixture.close()
       }
     }
   )
