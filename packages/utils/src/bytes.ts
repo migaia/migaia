@@ -1,5 +1,6 @@
 import { UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
+import { attachErrorIdentity } from './error.js'
 
 /** Captured `%TypedArray%.prototype` used as the receiver-independent brand probe. */
 const typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype)
@@ -74,14 +75,30 @@ export function bytesToBase64(value: Uint8Array): string {
   return result
 }
 
-/** Decodes only canonical RFC 4648 Base64 text. */
-export function base64ToBytes(value: string): Uint8Array {
+/**
+ * Decode canonical RFC 4648 Base64. An optional exact-size destination view is returned unchanged,
+ * allowing the caller to materialize its final backing once, including an existing view prefix.
+ */
+export function base64ToBytes(value: string, target?: Uint8Array): Uint8Array {
   if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value))
     throw encodingError(0)
   if (value.length % 4 !== 0) throw encodingError(value.length)
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
   const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0
-  const output = new Uint8Array((value.length / 4) * 3 - padding)
+  /** The destination length is derived from validated text before any output write. */
+  const length = (value.length / 4) * 3 - padding
+  if (
+    target !== undefined &&
+    (!isUint8Array(target) || Reflect.get(typedArrayPrototype, 'byteLength', target) !== length)
+  )
+    throw attachErrorIdentity(
+      new TypeError(
+        UtilsErrorText.invalidArgument('target', 'a Uint8Array matching the decoded byte length')
+      ),
+      { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+    )
+  /** Default callers retain their existing one allocation; supplied targets allocate no backing. */
+  const output = target ?? new Uint8Array(length)
   let outputOffset = 0
   for (let index = 0; index < value.length; index += 4) {
     const first = alphabet.indexOf(value[index])

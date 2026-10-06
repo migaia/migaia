@@ -2,10 +2,11 @@
 export const UtilsErrorCode = {
   /**
    * A caller passed an argument outside its documented domain: a non-finite or negative delay or
-   * timeout, a non-positive limiter concurrency, or a scheduler `delayMs`/`advance(ms)` that is not
-   * a finite non-negative number or overflows the virtual clock/shared absolute deadline (FP4). The
-   * native `TypeError`/`RangeError` type is kept; the caller must fix the argument, retrying the
-   * same value fails again.
+   * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine
+   * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite
+   * non-negative number or overflows the virtual clock/shared absolute deadline (FP4). The native
+   * `TypeError`/`RangeError` type is kept; the caller must fix the argument, retrying the same
+   * value fails again.
    */
   invalidArgument: 'INVALID_ARGUMENT',
   /**
