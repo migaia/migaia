@@ -7,7 +7,7 @@ import { nativeHostFixture } from './fixtures/host-native.js'
 import { createProcessPlugin } from '../../src/process/plugin/client.js'
 import { RemoteMethodName } from '../../src/remote/constants.js'
 import type { IRemoteRetryPort } from '../../src/remote/types.js'
-import type { IAbortSignal } from '@migaia/lifecycle'
+import { createLifecycleScope, type IAbortSignal } from '@migaia/lifecycle'
 
 describe('process Host facade admission and ownership', () => {
   it('[K221/A1] drains an external retry port without changing its call count or Promise', async () => {
@@ -309,7 +309,7 @@ describe('process Host facade admission and ownership', () => {
   })
 
   it('[A1] escalates a second signal once while awaiting the owned exit and unsubscribes', async () => {
-    const fixture = hostFixture()
+    const fixture = runtimeHostFixture()
     let settleExit!: (value: { code: number; signal: null }) => void
     let notify: (() => void) | undefined
     const unsubscribe = vi.fn(() => {
@@ -318,24 +318,17 @@ describe('process Host facade admission and ownership', () => {
     const terminate = vi.fn((mode: string) => {
       if (mode === 'force') settleExit({ code: 0, signal: null })
     })
-    if (fixture.options.deployment.kind !== 'spawn') throw new Error('fixture deployment')
-    const host = createProcessHost({
+    const plugin = createProcessPlugin({
       ...fixture.options,
-      shutdownSignal: {
-        subscribe(listener) {
-          notify = () => listener('SIGTERM')
-          return unsubscribe
-        }
-      },
-      deployment: {
-        ...fixture.options.deployment,
+      spawn: {
+        ...fixture.options.spawn,
         supervision: {
-          ...fixture.options.deployment.supervision,
+          ...fixture.options.spawn.supervision,
           launcher: {
-            capabilities: fixture.options.deployment.supervision.launcher.capabilities,
+            capabilities: fixture.options.spawn.supervision.launcher.capabilities,
             launch: async () => ({
               identity: { fingerprint: 'signal-host' },
-              exited: new Promise((resolve) => {
+              exited: new Promise<{ code: number; signal: null }>((resolve) => {
                 settleExit = resolve
               }),
               terminate
@@ -344,11 +337,27 @@ describe('process Host facade admission and ownership', () => {
         }
       }
     })
-    await host.ready()
-    notify?.()
-    notify?.()
-    notify?.()
-    await host.release()
+    /** Signal subscription belongs to the caller; canonical native stop/kill own escalation. */
+    const subscription = createLifecycleScope({ scheduler: fixture.scheduler })
+    /** The original stop Promise is the only fact distinguishing initial shutdown from escalation. */
+    let stopping: Promise<void> | undefined
+    try {
+      await fixture.host.use(plugin)
+      const outlet = fixture.host.process!
+      notify = () => {
+        if (stopping) void outlet.kill('child').catch(fixture.report)
+        else stopping = outlet.stop('child')
+      }
+      subscription.own(unsubscribe, { force: () => unsubscribe() })
+      notify()
+      notify()
+      notify()
+      await stopping
+      await fixture.close()
+    } finally {
+      await fixture.close()
+      await subscription.dispose()
+    }
     expect(terminate.mock.calls.filter((row) => row[0] === 'force')).toHaveLength(1)
     expect(unsubscribe).toHaveBeenCalledTimes(1)
   })
