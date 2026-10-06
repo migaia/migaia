@@ -38,6 +38,13 @@ prepared = createThreadPeer({
       await new Promise((resolve) => setTimeout(resolve, duration))
       return 7
     },
+    /** Real provider entry is acknowledged before a short operation holds native drain open. */
+    drainGroup: async (value) => {
+      const peer = await prepared
+      await peer.request('parent.started')
+      await new Promise((resolve) => setTimeout(resolve, 80))
+      return value
+    },
     /** The original stream consumer must enforce its launcher cap from lazy first-next. */
     delayedValues: async function* (duration) {
       await new Promise((resolve) => setTimeout(resolve, duration))
