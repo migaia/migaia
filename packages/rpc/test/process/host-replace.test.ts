@@ -10,6 +10,8 @@ import { RemoteMethodName } from '../../src/remote/constants.js'
 import { RuntimeEventName } from '../../src/remote/runtime-api/constants.js'
 import { readRuntimeOutletConnection } from '../../src/remote/runtime-api/outlet.js'
 import { createSpawnProcessBinding } from '../../src/process/plugin/binding.js'
+import { createProcessResilience } from '../../src/process/resilience/index.js'
+import { createRemoteHost } from '../../src/remote/host.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
 import { createPrewarmPool } from '@migaia/supervision/process'
@@ -311,51 +313,102 @@ describe('process Host replacement publication', () => {
     async (recover) => {
       const fixture = hostFixture()
       if (fixture.options.deployment.kind !== 'spawn') throw new Error('fixture deployment')
-      const host = createProcessHost({
-        ...fixture.options,
-        deployment: {
+      /** Original governance observes the same real supervisor used by the lower remote owner. */
+      const binding = createSpawnProcessBinding(
+        {
           ...fixture.options.deployment,
           supervision: {
             ...fixture.options.deployment.supervision,
             restart: { mode: 'on-failure', maxRestarts: 0 }
           }
-        }
+        },
+        fixture.report
+      )
+      /** This retained owner supplies terminal counters, report scheduling and liquidation. */
+      const resilience = createProcessResilience({
+        scheduler: fixture.scheduler,
+        report: fixture.report
       })
+      /** Public lower remote control remains supported by D1/M6 after high factories are retired. */
+      const host = createRemoteHost({
+        catalog: fixture.options.catalog,
+        binding,
+        endpointFactory: async (...args: Parameters<typeof fixture.options.endpointFactory>) => {
+          const endpoint = await fixture.options.endpointFactory(...args)
+          return binding.bindEndpoint(args[0], endpoint)
+        },
+        report: fixture.report,
+        callGuard: resilience.callGuard('terminal-host')
+      })
+      /** Exact original registration owns its diagnostic tombstone independently of remote release. */
+      const registration = resilience.attachRegistration(
+        'terminal-host',
+        {
+          ownership: 'spawn-owned',
+          health: binding.health,
+          supervisor: binding.registrationSupervisor
+        },
+        { kind: 'standalone-host', release: host.release }
+      )
+      /** The same existing guard protects native commands after committed liquidation. */
+      const guard = resilience.callGuard('terminal-host')
+      const assertCommand = () =>
+        guard.beforeDispatch({
+          method: RemoteMethodName.hostUse,
+          mode: 'host-control',
+          generation: binding.supervisor.generation
+        })
       try {
         await host.ready()
         fixture.crashes[0]!({ code: 1, signal: null })
         await settle()
-        expect(host.inspectRegistration()).toMatchObject({ state: 'terminal', unhandled: 1 })
+        expect(registration.inspect()).toMatchObject({ state: 'terminal', unhandled: 1 })
         const frames = fixture.send.mock.calls.length
         for (const operation of [() => host.use('p'), () => host.unUse('p'), () => host.inspect()])
           await expect(operation()).rejects.toMatchObject({ code: 'PROCESS_TERMINAL_CALL' })
         expect(fixture.send.mock.calls).toHaveLength(frames)
         if (recover) {
-          expect(await host.restart()).toMatchObject({ state: 'ready' })
+          expect(await registration.restart()).toMatchObject({ state: 'ready' })
           await host.ready()
-          expect(host.inspectRegistration()).toMatchObject({ unhandled: 0, state: 'ready' })
+          expect(registration.inspect()).toMatchObject({ unhandled: 0, state: 'ready' })
           await host.use('p')
         } else {
           for (const delay of [60_000, 240_000, 600_000]) {
             fixture.scheduler.advance(delay)
             await settle()
           }
-          expect(host.inspectRegistration()).toMatchObject({ liquidated: true, unhandled: 4 })
+          expect(registration.inspect()).toMatchObject({ liquidated: true, unhandled: 4 })
           expect(
             fixture.report.mock.calls.filter(([error]) => error?.code === 'SUPERVISION_EXHAUSTED')
           ).toHaveLength(4)
           expect(
             fixture.report.mock.calls.filter(([error]) => error?.code === 'REMOTE_CLOSED')
           ).toHaveLength(2)
-          for (const operation of [() => host.ready(), () => host.replace(), () => host.restart()])
+          for (const operation of [
+            () => {
+              assertCommand()
+              return host.ready()
+            },
+            () => {
+              assertCommand()
+              return binding.supervisor.replace()
+            },
+            () => {
+              assertCommand()
+              return registration.restart()
+            }
+          ])
             expect(operation).toThrow(expect.objectContaining({ code: 'PROCESS_LIQUIDATED' }))
-          expect(() => host.use('p')).toThrow(
-            expect.objectContaining({ code: 'PROCESS_LIQUIDATED' })
-          )
+          expect(() => {
+            assertCommand()
+            return host.use('p')
+          }).toThrow(expect.objectContaining({ code: 'PROCESS_LIQUIDATED' }))
           expect(fixture.launch).toHaveBeenCalledTimes(1)
         }
       } finally {
         await host.release()
+        await registration.close()
+        await resilience.close()
       }
     }
   )
