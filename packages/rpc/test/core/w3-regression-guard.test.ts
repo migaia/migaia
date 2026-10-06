@@ -128,3 +128,48 @@ it('[A37] Deno SDK guard retains all four relative metrics and rejects p99 regre
   assert.deepEqual(judged.failedMetrics, ['p99Ns'])
   assert.deepEqual(Object.keys(judged.metrics), Object.keys(baseline.metrics))
 })
+
+it('[U45] final public Peer freeze rejects p50 loss hidden by the historical primitive value', async () => {
+  /** The existing oracle and cold reference selection execute independently of native timing. */
+  const bench = await import(/* @vite-ignore */ driverUrl)
+  /** Complete retained samples isolate baseline selection from every absolute DA1 budget. */
+  const side = (latency: number) => ({
+    unit: { carrier: 'stdio-framed' },
+    samples: 1000,
+    latenciesNs: Array.from({ length: 1000 }, () => latency)
+  })
+  const rounds = [0, 1, 2].map(() => ({ bare: side(100), rpc: side(525) }))
+  /** The older primitive value is a positive control that would hide this public-source regression. */
+  const historical = { p50Ratio: 10, sourceCommit: 'historical-primitive' }
+  /** Each final-source cell supplies its own frozen p50 while keeping history untouched. */
+  const baseline = {
+    sourceCommit: 'final-public-source',
+    cells: { 'public-fixture': { p50Ratio: 5 } }
+  }
+  /** Calibration has the final reference identity; historical noise is independently rejected. */
+  const noise = {
+    sourceCommit: baseline.sourceCommit,
+    representatives: [1, 2, 3, 4],
+    p50RatioNoiseBand: 0.02
+  }
+  /** Before U45 wiring the CLI uses the historical primitive cell regardless of public data. */
+  const guard = bench.resolveW3Guard?.('public-fixture', baseline, noise) ?? {
+    baseline: historical,
+    noiseBand: noise.p50RatioNoiseBand
+  }
+  assert.equal(bench.judgeW3Regression(rounds, historical, noise.p50RatioNoiseBand).status, 'pass')
+  assert.equal(
+    bench.judgeW3Regression(rounds, guard.baseline, guard.noiseBand).status,
+    'fail',
+    '[U45] the new public baseline must detect 5% loss beyond its own 2% noise'
+  )
+  assert.equal(guard.baseline.sourceCommit, baseline.sourceCommit)
+  assert.throws(
+    () =>
+      bench.resolveW3Guard('public-fixture', baseline, {
+        ...noise,
+        sourceCommit: historical.sourceCommit
+      }),
+    '[U45] primitive calibration cannot stand in for public-source A/A'
+  )
+})

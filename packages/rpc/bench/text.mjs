@@ -16,6 +16,14 @@ export const IpcBenchControl = Object.freeze({
   snapshot: 'bench.snapshot'
 })
 
+/** Frozen reference ownership is retained in every W3 result so primitive history stays distinct. */
+export const IpcW3Reference = Object.freeze({
+  /** Explicit final-source collection still reports the unchanged old primitive guard separately. */
+  historical: 'historical-primitive',
+  /** Ordinary final W3 uses the repaired public Peer baseline and its own current-window A/A. */
+  public: 'public-peer'
+})
+
 /** Fixed supplemental graphs declare their actual carriers and methods without changing DA1 cells. */
 export const RuntimeBench = Object.freeze({
   /** Worker itself issues and times reverse calls through the independently accepted parent route. */
