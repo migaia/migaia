@@ -4,6 +4,8 @@ import { withDistFreshness } from '../../scripts/vitest-dist-freshness.mjs'
 export default defineConfig(
   withDistFreshness({
     test: {
+      /** Large frame coverage and native child fixtures share the CI host without starving timers. */
+      maxWorkers: 2,
       include: ['test/**/*.{test,spec}.ts'],
       exclude: [
         ...configDefaults.exclude,
