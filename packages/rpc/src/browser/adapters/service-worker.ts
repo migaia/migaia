@@ -27,8 +27,11 @@ export type IServiceWorkerMessageReceiver = {
 }
 
 export type IServiceWorkerTransportOptions = {
+  /** ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target. */
   readonly target: IServiceWorkerMessageTarget
+  /** Message event owner, usually navigator.serviceWorker in a page or self in the worker. */
   readonly receiver: IServiceWorkerMessageReceiver
+  /** Expected remote Client identity; defaults to target.id when that identity is available. */
   readonly peerId?: string
 }
 
