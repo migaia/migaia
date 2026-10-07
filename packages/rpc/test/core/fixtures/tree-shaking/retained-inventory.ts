@@ -131,8 +131,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/serialize/dist/codecs/identity.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
-      'workspace:packages/utils/dist/error-text-CalhYq03.js',
-      'workspace:packages/utils/dist/error.js',
+      // 0741596c: bytes imports attachErrorIdentity, sharing the unchanged utils error chunk.
+      'workspace:packages/utils/dist/error-B4iC5cDy.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/scheduler.js',
@@ -140,6 +140,17 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/contract/wire-constants.ts'
     ),
     client: reviewed(
+      // C9 runtime-api contracts and the C10 binary lane require these identities (ruling 2).
+      // Cost-free unused binary/stream codecs through lazy loading belong to rpc-core-refactor.
+      'src/contract/runtime-api/binary-constants.ts',
+      'src/contract/runtime-api/binary.ts',
+      'src/contract/runtime-api/capabilities.ts',
+      'src/contract/runtime-api/carrier.ts',
+      'src/contract/runtime-api/constants.ts',
+      'src/contract/runtime-api/normalize.ts',
+      'src/contract/stream-constants.ts',
+      'src/contract/v1/stream.ts',
+      'src/core/middleware/error-text.ts',
       'src/contract/batch-frame.ts',
       'src/core/internal/batch-frame.ts',
       'src/core/internal/fast-path.ts',
@@ -291,8 +302,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/serialize/dist/codecs/identity.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
-      'workspace:packages/utils/dist/error-text-CalhYq03.js',
-      'workspace:packages/utils/dist/error.js',
+      // 0741596c: bytes imports attachErrorIdentity, sharing the unchanged utils error chunk.
+      'workspace:packages/utils/dist/error-B4iC5cDy.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/promise.js',
@@ -303,6 +314,17 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/protocol-constants.ts'
     ),
     provider: reviewed(
+      // C9 runtime-api contracts and the C10 binary lane require these identities (ruling 2).
+      // Cost-free unused binary/stream codecs through lazy loading belong to rpc-core-refactor.
+      'src/contract/runtime-api/binary-constants.ts',
+      'src/contract/runtime-api/binary.ts',
+      'src/contract/runtime-api/capabilities.ts',
+      'src/contract/runtime-api/carrier.ts',
+      'src/contract/runtime-api/constants.ts',
+      'src/contract/runtime-api/normalize.ts',
+      'src/contract/stream-constants.ts',
+      'src/contract/v1/stream.ts',
+      'src/core/middleware/error-text.ts',
       'src/contract/batch-frame.ts',
       'src/core/internal/batch-frame.ts',
       'src/core/internal/fast-path.ts',
@@ -331,7 +353,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/feature.ts',
       'src/core/features/canonical-chunk.ts',
       'src/core/features/outbound.ts',
-      'src/core/features/provider.ts',
+      // 3cf61889 moved the implementation; features/provider.ts now only re-exports it.
+      'src/core/internal/provider-feature.ts',
       'src/core/internal/async-control.ts',
       'src/core/internal/canonical-chunk-attachment.ts',
       'src/core/internal/composed-disposal-observer.ts',
@@ -459,8 +482,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/serialize/dist/codecs/identity.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
-      'workspace:packages/utils/dist/error-text-CalhYq03.js',
-      'workspace:packages/utils/dist/error.js',
+      // 0741596c: bytes imports attachErrorIdentity, sharing the unchanged utils error chunk.
+      'workspace:packages/utils/dist/error-B4iC5cDy.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/promise.js',
@@ -472,6 +495,17 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/idempotency-store.ts'
     ),
     full: reviewed(
+      // C9 runtime-api contracts and the C10 binary lane require these identities (ruling 2).
+      // Cost-free unused binary/stream codecs through lazy loading belong to rpc-core-refactor.
+      'src/contract/runtime-api/binary-constants.ts',
+      'src/contract/runtime-api/binary.ts',
+      'src/contract/runtime-api/capabilities.ts',
+      'src/contract/runtime-api/carrier.ts',
+      'src/contract/runtime-api/constants.ts',
+      'src/contract/runtime-api/normalize.ts',
+      'src/contract/stream-constants.ts',
+      'src/contract/v1/stream.ts',
+      'src/core/middleware/error-text.ts',
       'src/contract/batch-frame.ts',
       'src/core/internal/batch-frame.ts',
       'src/core/internal/fast-path.ts',
@@ -503,7 +537,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/features/discovery.ts',
       'src/core/features/one-way.ts',
       'src/core/features/outbound.ts',
-      'src/core/features/provider.ts',
+      // 3cf61889 moved the implementation; features/provider.ts now only re-exports it.
+      'src/core/internal/provider-feature.ts',
       'src/core/full.ts',
       'src/core/internal/async-control.ts',
       'src/core/internal/canonical-chunk-attachment.ts',
@@ -633,8 +668,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/serialize/dist/codecs/identity.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
-      'workspace:packages/utils/dist/error-text-CalhYq03.js',
-      'workspace:packages/utils/dist/error.js',
+      // 0741596c: bytes imports attachErrorIdentity, sharing the unchanged utils error chunk.
+      'workspace:packages/utils/dist/error-B4iC5cDy.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/promise.js',
@@ -646,6 +681,17 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/idempotency-store.ts'
     ),
     custom: reviewed(
+      // C9 runtime-api contracts and the C10 binary lane require these identities (ruling 2).
+      // Cost-free unused binary/stream codecs through lazy loading belong to rpc-core-refactor.
+      'src/contract/runtime-api/binary-constants.ts',
+      'src/contract/runtime-api/binary.ts',
+      'src/contract/runtime-api/capabilities.ts',
+      'src/contract/runtime-api/carrier.ts',
+      'src/contract/runtime-api/constants.ts',
+      'src/contract/runtime-api/normalize.ts',
+      'src/contract/stream-constants.ts',
+      'src/contract/v1/stream.ts',
+      'src/core/middleware/error-text.ts',
       'src/contract/batch-frame.ts',
       'src/core/internal/batch-frame.ts',
       'src/core/internal/fast-path.ts',
@@ -677,6 +723,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/features/discovery.ts',
       'src/core/features/outbound.ts',
       'src/core/features/provider.ts',
+      // 3cf61889 moved the implementation; features/provider.ts now only re-exports it.
+      'src/core/internal/provider-feature.ts',
       'src/core/internal/async-control.ts',
       'src/core/internal/canonical-chunk-attachment.ts',
       'src/core/internal/composed-disposal-observer.ts',
@@ -805,8 +853,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/serialize/dist/codecs/identity.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
-      'workspace:packages/utils/dist/error-text-CalhYq03.js',
-      'workspace:packages/utils/dist/error.js',
+      // 0741596c: bytes imports attachErrorIdentity, sharing the unchanged utils error chunk.
+      'workspace:packages/utils/dist/error-B4iC5cDy.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/promise.js',
