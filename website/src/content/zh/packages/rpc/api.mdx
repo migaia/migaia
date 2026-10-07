@@ -1,0 +1,25 @@
+---
+title: rpc - API 参考
+---
+
+# API 参考
+
+## 公开入口
+
+没有包根入口。进程工厂从 `@migaia/rpc/process` 导入，Worker 工厂从 `@migaia/rpc/threads` 导入。测试 Peer 从 `@migaia/rpc/testing` 导入；定制 codec、framing 与 envelope 使用 `@migaia/rpc/contract`。
+
+| 独立 Peer                           | Host outlet                                 | 结果与边界                        |
+| ----------------------------------- | ------------------------------------------- | --------------------------------- |
+| request(method, payload?, options?) | request(target, method, payload?, options?) | 原操作 Promise，保留结果类型      |
+| notify(method, payload?, options?)  | notify(target, method, payload?, options?)  | 只确认物理发送完成                |
+| stream(method, payload?, options?)  | stream(target, method, payload?, options?)  | 原 lazy iterator                  |
+| group(steps, options?)              | group(target, steps, options?)              | 有序 success/failure/not-executed |
+| outcome(key)                        | outcome(target, key)                        | pending/done/unknown 快照         |
+| describe(options?)                  | list/get                                    | 本地可移植目录或文本              |
+| close()                             | dispose/unUse                               | 原 owner 的关闭与排空             |
+
+## 错误与重试
+
+读取 `(source, code)` 及原 cause/errors 链。OVERLOADED 时降低并发，在总业务预算内加入抖动与有界退避。客户端当前不包含 provider rejection reason，不能仅凭该码确定零执行。
+
+deadline、普通取消、transport loss、unknown 或退休 generation 都不证明业务未执行。使用原 idempotencyKey/outcome 或业务对账；没有独立证据时不自动重复非幂等副作用。完整逐错误码策略由包使用指南维护。

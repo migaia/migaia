@@ -49,11 +49,11 @@ function isGuideNavigationSymbol(api: IApi, symbol: IApiSymbol): boolean {
   ]).has(symbol.name)
 }
 
-/** Includes callable APIs plus WebRPC's runtime specification constants in guide navigation. */
+/** Includes callable APIs plus RPC's runtime specification constants in guide navigation. */
 function isGuideApiLinkSymbol(slug: string, api: IApi, symbol: IApiSymbol): boolean {
   if (!isGuideNavigationSymbol(api, symbol)) return false
   if (isCallableApiSymbol(symbol)) return true
-  return slug === 'web-rpc' && api.module === 'transport-constants' && symbol.kind === 'const'
+  return slug === 'rpc' && api.module === 'core/transport-constants' && symbol.kind === 'const'
 }
 
 /** Projects complete lightweight API navigation without serializing documentation bodies. */
@@ -147,23 +147,31 @@ function projectSelectedApi(api: IApi, selectedSymbolPath?: string): IApi {
     architecturePath: api.architecturePath,
     aliases: api.aliases.map((alias) => ({
       name: alias.name,
-      signature: alias.signature,
+      signature: selectedSymbolPath === alias.name ? alias.signature : '',
       source: publicSourceName(alias.source),
       exportPath: alias.exportPath,
       ownerExportPath: alias.ownerExportPath,
       ownerModule: alias.ownerModule,
       ownerFragment: alias.ownerFragment
     })),
-    symbols: api.symbols.map((symbol) =>
-      selectedSymbol
-        ? symbol === selectedSymbol
-          ? projectSelectedSymbol(symbol)
-          : (symbol.kind === 'type' || symbol.kind === 'interface') &&
-              relatedTypeNames.has(symbol.name)
-            ? projectTypingSymbol(symbol)
-            : compactSymbol(symbol)
-        : projectModuleIndexSymbol(symbol)
-    )
+    symbols: api.symbols
+      .filter(
+        (symbol) =>
+          !selectedSymbol ||
+          symbol === selectedSymbol ||
+          (symbol.kind !== 'type' && symbol.kind !== 'interface') ||
+          relatedTypeNames.has(symbol.name)
+      )
+      .map((symbol) =>
+        selectedSymbol
+          ? symbol === selectedSymbol
+            ? projectSelectedSymbol(symbol)
+            : (symbol.kind === 'type' || symbol.kind === 'interface') &&
+                relatedTypeNames.has(symbol.name)
+              ? projectTypingSymbol(symbol)
+              : compactSymbol(symbol)
+          : projectModuleIndexSymbol(symbol)
+      )
   }
 }
 
@@ -221,6 +229,7 @@ function projectSelectedSymbol(symbol: IApiSymbol): IApiSymbol {
   return {
     name: symbol.name,
     kind: symbol.kind,
+    callable: symbol.callable,
     fragment: symbol.fragment,
     signature: symbol.signature,
     source: publicSourceName(symbol.source),
@@ -263,11 +272,7 @@ function projectApiIndexEntry(api: IApi, includeSymbols: boolean): IApi {
     guidePath: api.guidePath,
     architecturePath: api.architecturePath,
     aliases: [],
-    symbols: includeSymbols
-      ? api.symbols.map(compactSymbol)
-      : api.symbols
-          .filter((symbol) => symbol.kind === 'type' || symbol.kind === 'interface')
-          .map(compactSymbol)
+    symbols: includeSymbols ? api.symbols.map(compactSymbol) : []
   }
 }
 
@@ -289,6 +294,7 @@ function compactSymbol(symbol: IApiSymbol): IApiSymbol {
   return {
     name: symbol.name,
     kind: symbol.kind,
+    callable: symbol.callable,
     fragment: symbol.fragment,
     signature: compactSignature,
     // Navigation grouping is part of the stable reader contract. Keeping the

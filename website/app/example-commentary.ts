@@ -6,6 +6,8 @@ type ICommentedExample = {
 }
 
 export type IExampleCommentaryContext = {
+  /** Library that owns the maintained example and its diagnostic prose. */
+  readonly library?: string
   /** Public API whose maintained guide owns this example. */
   readonly apiName: string
   /** Distinguishes executable walkthroughs from compile-time declaration guidance. */
@@ -226,7 +228,11 @@ function describeConstruction(executable: string, locale: ILocale): string | und
     return locale === 'zh'
       ? '这是本仓测试与适配器验证专用的确定性时钟，不适合外部业务代码。外部项目应优先使用测试框架的 fake timers，生产代码使用默认的 systemScheduler。'
       : 'This deterministic clock exists for this repository’s tests and adapter verification, not external application code. External projects should prefer their test framework’s fake timers and use systemScheduler in production.'
-  if (/\blocalStorage\s*\(/.test(executable))
+  if (
+    /\b(?:localStorageHost|sessionStorageHost|cookiesHost|memoryStorageHost|indexedDbHost|localStorage)\s*\(/.test(
+      executable
+    )
+  )
     return describeLocalStorageConstruction(executable, locale)
   return undefined
 }

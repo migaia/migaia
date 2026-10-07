@@ -395,17 +395,21 @@ test('reactive Effect guide covers imports, direct lifecycle, convenience API, a
   }
 })
 
-test('WebRPC chunk feature quick start defines every renamed function and runtime input', () => {
-  const guide = findApiGuide('web-rpc', 'features/chunk', 'chunk', 'zh')
+test('RPC canonical chunk Feature quick start defines actual dependencies and runtime inputs', () => {
+  const guide = findApiGuide('rpc', 'core/stream', 'createCanonicalChunkFeature', 'zh')
   assert.ok(guide?.quickStart)
-  assert.match(guide.quickStart, /chunk as configureChunk/)
-  assert.match(guide.quickStart, /chunk as selectChunkFrames/)
+  assert.match(guide.quickStart, /createCanonicalChunkFeature/)
+  assert.match(guide.quickStart, /createOutboundFeature\(chunks\)/)
+  assert.match(guide.quickStart, /createProviderFeature\(outbound\)/)
   assert.match(
     guide.quickStart,
     /const \[clientTransport, serviceTransport\] = createMemoryTransportPair\(\)/
   )
-  assert.match(guide.quickStart, /\[(?:outbound|provider)\(\), selectChunkFrames\(\)\] as const/)
-  assert.doesNotMatch(guide.quickStart, /\bchunkFeature\b|\.\.\.config/)
+  assert.match(
+    guide.quickStart,
+    /return \{ 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider \}/
+  )
+  assert.doesNotMatch(guide.quickStart, /chunk as|\bchunkFeature\b|\.\.\.config/)
 })
 
 test('lifecycle boundedWait explains a complete production shutdown flow', () => {
@@ -558,8 +562,8 @@ test('Logger custom plugin guide covers extension, Host use, async completion, a
   assert.match(source, /usePipeline \/ useAsyncPipeline/)
 })
 
-test('WebRPC flattened chunk route keeps the complete Host composition guide', () => {
-  const guide = findApiGuide('web-rpc', 'index', 'chunk', 'zh')
+test('RPC canonical chunk route keeps the complete composition guide', () => {
+  const guide = findApiGuide('rpc', 'core/stream', 'createCanonicalChunkFeature', 'zh')
   assert.ok(guide?.quickStart)
   assert.match(guide.purpose, /组合式 endpoint/)
   assert.match(guide.quickStart, /createMemoryTransportPair/)
@@ -568,27 +572,35 @@ test('WebRPC flattened chunk route keeps the complete Host composition guide', (
   assert.match(guide.quickStart, /const client = await createComposedEndpoint/)
   assert.match(guide.quickStart, /client\.send<number>/)
   assert.match(guide.quickStart, /Promise\.all\(\[client\.dispose\(\), service\.dispose\(\)\]\)/)
-  assert.ok(guide.options.length >= 10)
-  assert.deepEqual(
-    guide.examples?.map((example) => example.id),
-    ['preset', 'iframe', 'tabs', 'worker']
+  assert.equal(
+    guide.options.length,
+    0,
+    'the canonical dependency takes no old chunk-policy options'
   )
-  assert.match(guide.examples?.[0]?.description ?? '', /createEndpoint.*createComposedEndpoint/)
-  assert.match(guide.examples?.[0]?.code ?? '', /const service = await createEndpoint/)
-  assert.match(guide.examples?.[1]?.code ?? '', /createWindowMessageTransport/)
-  assert.match(guide.examples?.[1]?.code ?? '', /targetOrigin: location\.origin/)
-  assert.match(guide.examples?.[2]?.code ?? '', /createBroadcastChannelTransport/)
-  assert.match(guide.examples?.[3]?.code ?? '', /createWebWorkerTransport/)
 })
 
-test('every WebRPC feature explains Host composition, real use, cleanup, and configuration', () => {
-  for (const feature of ['outbound', 'provider', 'discovery', 'control', 'chunk']) {
-    const guide = findApiGuide('web-rpc', `features/${feature}`, feature, 'zh')
+test('every RPC Feature explains actual dependencies, use, and composition cleanup', () => {
+  for (const [module, feature, dependencies] of [
+    ['core/features/outbound', 'createOutboundFeature', ['chunkCapability']],
+    ['core/features/provider', 'createProviderFeature', ['outboundCapability']],
+    ['core/features/discovery', 'createDiscoveryFeature', ['outboundCapability']],
+    [
+      'core/features/control',
+      'createControlFeature',
+      ['outboundCapability', 'discoveryCapability']
+    ],
+    ['core/stream', 'createCanonicalChunkFeature', []]
+  ] as const) {
+    const guide = findApiGuide('rpc', module, feature, 'zh')
     assert.ok(guide, feature)
     assert.ok(guide.purpose.length >= 100, `${feature}: purpose`)
     assert.ok(guide.scenarios.length >= 2, `${feature}: scenarios`)
     assert.ok(guide.avoidWhen.length >= 2, `${feature}: avoidWhen`)
-    assert.ok(guide.options.length >= 4, `${feature}: options`)
+    assert.deepEqual(
+      guide.options.map((option) => option.name),
+      dependencies,
+      `${feature}: exact public dependencies`
+    )
     assert.match(guide.quickStart ?? '', /createComposedEndpoint/)
     assert.match(guide.quickStart ?? '', /createMemoryTransportPair/)
     assert.match(guide.quickStart ?? '', /dispose\(\)/)
@@ -596,7 +608,7 @@ test('every WebRPC feature explains Host composition, real use, cleanup, and con
   }
 })
 
-test('every WebRPC middleware guide installs into a Host and consumes a real capability', () => {
+test('every RPC middleware guide installs into a Host and consumes a real capability', () => {
   for (const middleware of [
     'connect',
     'contract',
@@ -608,7 +620,7 @@ test('every WebRPC middleware guide installs into a Host and consumes a real cap
     'hooks',
     'uuid'
   ]) {
-    const guide = findApiGuide('web-rpc', 'index', middleware, 'zh')
+    const guide = findApiGuide('rpc', 'core', middleware, 'zh')
     assert.ok(guide?.quickStart, middleware)
     assert.match(guide.purpose, /安装到 Host 后/, `${middleware}: Host effect`)
     assert.match(guide.quickStart, /createMemoryTransportPair/, `${middleware}: transport`)

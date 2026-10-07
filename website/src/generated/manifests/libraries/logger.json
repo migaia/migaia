@@ -232,11 +232,11 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "1. 构造函数只接受同步安装的插件。`new Logger({ plugins: [.] })` 里的插件必须能同步完成安装，需要异步安装的插件用 `await log.use(plugin)`。 2. 插件实例不能跨 logger 复用。每次安装都应该重新调用一次插件工厂函数（`level()`、`http()` 等），不要把同一个插件实例装到多个 `Logger`，否则内部状态可能串联。 3. `shutdown()` 之后日志被静默忽略，不会抛错也不会有任何提示——这是有意的（避免退出流程里到处加判断），需要感知的话订阅 `onFailure()` 或自行检查状态。 4. 日志系统内部的失败不会从业务调用抛出。`log.info()` 永远不会因为 sink 挂了而抛异常——务必用 `onFailure()` 观察，否则问题会悄悄消失。 5. `pipeline."
+                "text": "1. 构造函数只接受同步安装的插件。`new Logger({ plugins: [.] })` 里的插件必须能同步完成安装，需要异步安装的插件用 `await log.use(plugin)`。 2. 插件实例不能跨 logger 复用。每次安装都应该重新调用一次插件工厂函数（`level()`、`http()` 等），不要把同一个插件实例装到多个 `Logger`，否则内部状态可能串联。 3. `shutdown()` 之后日志被静默忽略，不会抛错也不会有任何提示——这是有意的（避免退出流程里到处加判断），需要感知的话订阅 `onFailure()` 或自行检查状态。 4. 日志系统内部的失败不会从业务调用抛出。`log.info()` 永远不会因为 sink 挂了而抛异常——务必用 `onFailure()` 观察，否则问题会悄悄消失。 5. `pipeline.mode` 构造后不可切换。"
               },
               {
                 "type": "paragraph",
-                "text": "mode` 构造后不可切换，四种模式（sync/async/generator/async-generator）执行顺序有本质区别，混用会立即报错，详见 USEGUIDE。 6. `http()` 批量发送要求插件顺序正确：`plugins: [batch(), http(.)]`，顺序反了批处理不会生效。 7. `extends()` 只转发运行时输出路径，不会把目标 logger 的 TypeScript 扩展方法合并进当前变量的类型。 8. 批处理队列有界且不会静默丢日志：`maxPendingBatches` 默认 `1024`，满载时抛出/上报 `BATCH_OVERFLOW`；生产环境应通过 `onFailure()` 监控并在下游恢复后再接纳新日志。"
+                "text": "sync stage 可提升到任意模式，generator stage 还可提升到 async-generator；其余不兼容组合会立即报 `PIPELINE_MODE_MISMATCH`，详见 USEGUIDE。 6. `http()` 批量发送要求插件顺序正确：`plugins: [batch(), http(.)]`，顺序反了批处理不会生效。 7. `extends()` 只转发运行时输出路径，不会把目标 logger 的 TypeScript 扩展方法合并进当前变量的类型。 8. 批处理队列有界且不会静默丢日志：`maxPendingBatches` 默认 `1024`，满载时抛出/上报 `BATCH_OVERFLOW`；生产环境应通过 `onFailure()` 监控并在下游恢复后再接纳新日志。"
               }
             ]
           },
@@ -265,7 +265,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "完整构造选项、全部 API 精确签名、pipeline 三种模式的执行顺序差异、每个内置插件的完整配置项、`flush`/`shutdown` 的精确语义与边界情况、自定义 runtime manager（替换底层能力用于测试/特殊宿主）、以及更多组合示例，见 USEGUIDE.md。"
+                "text": "完整构造选项、全部 API 精确签名、pipeline 四种模式的执行顺序差异、每个内置插件的完整配置项、`flush`/`shutdown` 的精确语义与边界情况、自定义 runtime manager（替换底层能力用于测试/特殊宿主）、以及更多组合示例，见 USEGUIDE.md。"
               }
             ]
           }
@@ -300,7 +300,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { Logger, setLoggerRuntimeManager } from '@migaia/logger';\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';"
+                "code": "import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins'"
               },
               {
                 "type": "paragraph",
@@ -315,7 +315,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['app', 'api'],\n  topic: 'gateway',\n  options: { service: 'gateway' },\n  on: { before: (entry) => {} },\n  pipeline: { mode: 'sync' },\n  plugins: [level(), color()]\n});"
+                "code": "const log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['app', 'api'],\n  topic: 'gateway',\n  options: { service: 'gateway' },\n  on: { before: (entry) => {} },\n  pipeline: { mode: 'sync' },\n  plugins: [level(), color()]\n})"
               },
               {
                 "type": "table",
@@ -509,15 +509,6 @@
                     "`Promise<void>`",
                     "异步",
                     "浅合并 patch 并提交，见 §5。"
-                  ],
-                  [
-                    "`getShared(key)`",
-                    "`key: string`",
-                    "必填",
-                    "`T \\",
-                    "undefined`",
-                    "同步",
-                    "读取已安装插件通过 `shared()` 提供的能力。"
                   ],
                   [
                     "`hook(name, fn)`",
@@ -719,7 +710,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "log.log('info', 'user updated', userId); // userId 是 console 参数\nlog.dispatchRaw({\n  tag: 'info',\n  message: 'user updated',\n  meta: { userId },\n  data: { requestId },\n  context: ['api', 'users']\n});"
+                "code": "log.log('info', 'user updated', userId) // userId 是 console 参数\nlog.dispatchRaw({\n  tag: 'info',\n  message: 'user updated',\n  meta: { userId },\n  data: { requestId },\n  context: ['api', 'users']\n})"
               },
               {
                 "type": "paragraph",
@@ -1053,7 +1044,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const audit = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }, topic: 'audit' });\naudit.useSink((entry) => sendToAuditSystem(entry));\n\nconst api = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }, topic: 'api' });\napi.extends(audit);\n\napi.info('user created'); // 同时经过 api 自己的 pipeline/sink，也完整转发给 audit"
+                "code": "const audit = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  topic: 'audit'\n})\naudit.useSink((entry) => sendToAuditSystem(entry))\n\nconst api = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  topic: 'api'\n})\napi.extends(audit)\n\napi.info('user created') // 同时经过 api 自己的 pipeline/sink，也完整转发给 audit"
               },
               {
                 "type": "paragraph",
@@ -1080,7 +1071,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger';\n\nconst previous = getLoggerRuntimeManager();\nconst restore = setLoggerRuntimeManager({\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => console.log(text),\n  fetch: (url, init) => fetch(url, init)\n});\n\ntry {\n  // 在这段作用域内创建和使用的 Logger 都会用上面这份能力\n} finally {\n  restore(); // 恢复到替换之前的 runtime manager\n}"
+                "code": "import { getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst previous = getLoggerRuntimeManager()\nconst restore = setLoggerRuntimeManager({\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => console.log(text),\n  fetch: (url, init) => fetch(url, init)\n})\n\ntry {\n  // 在这段作用域内创建和使用的 Logger 都会用上面这份能力\n} finally {\n  restore() // 恢复到替换之前的 runtime manager\n}"
               },
               {
                 "type": "paragraph",
@@ -1095,7 +1086,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { Logger } from '@migaia/logger';\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n});\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error));\nlog.info('job started', { jobId: 'j_1' });\nawait log.flush();"
+                "code": "import { Logger } from '@migaia/logger'\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n})\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error))\nlog.info('job started', { jobId: 'j_1' })\nawait log.flush()"
               }
             ]
           },
@@ -1262,7 +1253,7 @@
           "errors": ["No documented errors are declared for getLoggerRuntimeManager."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for getLoggerRuntimeManager.",
           "examples": [
-            "import { getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger';\n\nconst previous = getLoggerRuntimeManager();\nconst restore = setLoggerRuntimeManager({\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => console.log(text),\n  fetch: (url, init) => fetch(url, init)\n});\n\ntry {\n  // 在这段作用域内创建和使用的 Logger 都会用上面这份能力\n} finally {\n  restore(); // 恢复到替换之前的 runtime manager\n}"
+            "import { getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst previous = getLoggerRuntimeManager()\nconst restore = setLoggerRuntimeManager({\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => console.log(text),\n  fetch: (url, init) => fetch(url, init)\n})\n\ntry {\n  // 在这段作用域内创建和使用的 Logger 都会用上面这份能力\n} finally {\n  restore() // 恢复到替换之前的 runtime manager\n}"
           ],
           "members": [],
           "aliasOf": "getLoggerRuntimeManager",
@@ -1317,7 +1308,7 @@
           "name": "IDimFn",
           "kind": "type",
           "signature": "export type IDimFn = (text: string) => string;",
-          "declarationLine": 182,
+          "declarationLine": 176,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "IDimFn is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDimFn.",
@@ -2054,10 +2045,10 @@
         {
           "name": "ILoggerCore",
           "kind": "type",
-          "signature": "export type ILoggerCore<TMode extends IPipelineConfig['mode'] = 'sync', TShared extends Record<string, unknown> = Record<string, never>> = { readonly config: ILoggerPluginConfig; /** 只读上下文，见 ILoggerContext 说明 */ readonly ctx: ILoggerContext; /** * 本 logger 的单调时钟源（R-9 时间域）。`flush`/`shutdown`/`batch` 的 deadline 与 `boundedWait` 都用它，缺省 lifecycle * `systemScheduler`；插件可据此与宿主 clock 对齐。 */ readonly scheduler: ILifecycleScheduler; /** 便捷方法：同步构造并处理一条 entry；插件需要异步输出时应使用 dispatchRaw 的调度参数。 */ log(tag: string, message: string, ...args: unknown[]): void; /** 更底层的方法：允许插件显式指定 entry 的任意字段（例如 meta/data/context） */ dispatchRaw(input: IRawEntryInput, options?: ILogDispatchOptions): void; /** * 注册一个管线阶段：可以修改 entry、可以调用 next 放行，也可以不调用 next 直接丢弃。 * * 下面四个 `useXPipeline` 的条件类型都按\"命中自己的 mode 才可用，其余三个 mode 一律 `never`\"显式穷举， 不使用兜底 else 分支——`TMode` * 是未收窄的 `IPipelineMode` 联合（例如插件签名里的默认值）时， 四个方法都保持可调用，交由运行时 `PIPELINE_MODE_MISMATCH` 兜底；但 `TMode` * 收窄到具体某个 mode 字面量后， 其余三个必须真的是 `never`，而不是像旧版那样落进一个\"看起来还能调用\"的兜底分支——`IPipelineMode` * 新增第四个取值（`'async-generator'`）时，旧的三选一 fallback 会把它错误地划进\"可用\"，这里改成穷举后不再有这个缺口。 */ usePipeline: [TMode] extends ['sync'] ? (stage: IPipelineStage) => ILoggerCore<TMode> : [TMode] extends ['async'] | ['generator'] | ['async-generator'] ? never : (stage: IPipelineStage) => ILoggerCore<TMode>; useAsyncPipeline: [TMode] extends ['async'] ? (stage: IAsyncPipelineStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['generator'] | ['async-generator'] ? never : (stage: IAsyncPipelineStage<ILogEntry>) => ILoggerCore<TMode>; useGeneratorPipeline: [TMode] extends ['generator'] ? (stage: IGeneratorPipelineStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] | ['async-generator'] ? never : (stage: IGeneratorPipelineStage<ILogEntry>) => ILoggerCore<TMode>; useAsyncGeneratorPipeline: [TMode] extends ['async-generator'] ? (stage: IAsyncGeneratorPipelineStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] | ['generator'] ? never : (stage: IAsyncGeneratorPipelineStage<ILogEntry>) => ILoggerCore<TMode>; /** 注册一个 sink：entry 通过完整管线后，由所有已注册 sink 各自处理（可以有多个，如控制台 + HTTP 同时存在） */ useSink(sink: ISink): IOff; /** * 注册生命周期钩子，钩子名是字符串，核心内置 \"before\"/\"after\"， 以及按 tag 派生的 `before:${tag}` / * `after:${tag}`，插件也可以自定义钩子名 */ hook(name: string, fn: ILogHookFn): () => void; fireHook(name: string, entry: ILogEntry): void; /** Observes asynchronous output failures without changing normal log-call control flow. */ onFailure(fn: ILogFailureHook): IOff; /** * 把一段工作推迟到当前同步调用栈之外执行（由 runtime manager 调度），并纳入 flush/shutdown 的等待范围——任何\"输出\"相关的工作（渲染、写 * stdout、发网络请求） 都应该通过这个方法调度，而不是在调用方的同步调用栈里直接执行， 供明确配置为异步输出的插件调度工作，并纳入 flush/shutdown 等待范围。 */ defer(task: () => void | Promise<void>): void; /** * Flush：注册一个\"缓冲区需要在 flush 时被清空\"的回调，核心统一调度； flush() 本身还会等待所有通过 defer() 调度、但尚未完成的工作， 也会等待每个 sink * 自己返回的 Promise（比如 http 插件没接 batch 时， 单条请求也会被纳入等待范围，进程退出前不会把还在飞的请求丢掉） */ onFlush(fn: IFlusher): IOff; flush(): Promise<void>; /** Shutdown disposes installed plugins after draining; subsequent log calls are ignored. */ onShutdown(fn: IShutdownHandler): IOff; shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>; use<const NewP extends readonly ILoggerPluginConstraint[]>(...plugins: NewP): ILoggerCoreWithShared<TMode, TShared & IResolvedPluginShared<NewP>> & IMergePluginExts<NewP>; unUse(name: string): Promise<void>; getShared<TKey extends Extract<keyof TShared, string>>(key: TKey): TShared[TKey] | undefined; /** * 轻量依赖注入：插件之间通过约定的字符串 key 交换能力，避免插件互相硬编码 依赖对方的具体类型（例如 http 插件按需注入 batch 插件提供的批量能力）。 同一个 shared * key 被两个插件声明会直接抛异常——这是\"插件之间不能互相冲突\" 这条要求在依赖注入这一层的具体落地：冲突在装配阶段就暴露出来， 而不是让后装的插件悄悄覆盖先装的插件却没人知道。 */ /** * 读取某个插件的配置。插件不应该在 install() 里直接读 `this.config`—— 应该统一通过 `core.config.get<TConfig>(name)` * 读取（`name` 通常传插件自己 导出的名字常量，例如 LEVEL_PLUGIN_NAME，而不是手写字符串字面量，减少打错的风险）。 这样配置的读取路径和 shared 一样统一走 * core 这一层， 而不是插件各自把配置攥在自己手里——好处是配置对 core 是\"可见的\"， 比如未来想做一个调试面板列出\"每个插件当前的配置\"，不需要挨个改插件代码。 */ /** * 绕开整条 pipeline/sink，直接写原始文本到 stdout；asyncOutput=true 时通过 defer 调度， 供需要\"逐 token * 流式输出、不想每次都套一层完整日志格式\"的插件使用（如 reasoning 插件） */ raw(text: string, options?: ILogDispatchOptions): void; /** * \"继承\"能力：log1.extends(log2, log3) 之后，log1 之后产生的每一条日志， 除了走 log1 自己的完整处理流程，还会被转发进 log2、log3 各自完整的 * pipeline/sink（也就是说 log2/log3 自己的 level 阈值、filter 照样对 转发过来的日志生效，这是\"继承\"而不是\"单纯抄送\"的关键区别）。 * * 转发时会把每一层的 topic（见 ILoggerContext.topic）依次追加进 entry.data.topicChain，配合 ansis 插件渲染出 `[topic1 -> * topic2]: xxx` 这样的链路前缀。注册 extends 时按 logger context id 检测环，运行时再按 extendPath 中的 id 做防御性跳过。 * * 注意这只组合\"运行时行为\"（转发 + topic 链路展示），不会让 log1 的 TypeScript 类型反过来获得 log2 独有的方法——如果需要拿到合并后的类型， * 接住返回值使用：`const combined = log1.extends(log2)`。 */ extends(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): ILoggerCore<TMode, TShared>; /** Removes named extension edges; returns true when at least one edge was removed. */ unextend(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): boolean; };",
+          "signature": "export type ILoggerCore<TMode extends IPipelineConfig['mode'] = 'sync', TShared extends Record<string, unknown> = Record<string, never>> = { readonly config: ILoggerPluginConfig; /** 只读上下文，见 ILoggerContext 说明 */ readonly ctx: ILoggerContext; /** * 本 logger 的单调时钟源（R-9 时间域）。`flush`/`shutdown`/`batch` 的 deadline 与 `boundedWait` 都用它，缺省 lifecycle * `systemScheduler`；插件可据此与宿主 clock 对齐。 */ readonly scheduler: IScheduler; /** 便捷方法：同步构造并处理一条 entry；插件需要异步输出时应使用 dispatchRaw 的调度参数。 */ log(tag: string, message: string, ...args: unknown[]): void; /** 更底层的方法：允许插件显式指定 entry 的任意字段（例如 meta/data/context） */ dispatchRaw(input: IRawEntryInput, options?: ILogDispatchOptions): void; /** * 注册一个管线阶段：可以修改 entry、可以调用 next 放行，也可以不调用 next 直接丢弃。 * * 可调用集合与 middleware-pipeline 的提升表一致：sync stage 可用于任意 mode，generator stage 还可提升到 * async-generator；其余 stage 只可用于同名 mode。未收窄的 mode 联合保留全部方法，由运行时兜底。 */ usePipeline: (stage: IPipelineStage) => ILoggerCore<TMode>; useAsyncPipeline: [TMode] extends ['async'] ? (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['generator'] | ['async-generator'] ? never : (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>; useGeneratorPipeline: [TMode] extends ['generator' | 'async-generator'] ? (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] ? never : (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>; useAsyncGeneratorPipeline: [TMode] extends ['async-generator'] ? (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] | ['generator'] ? never : (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>; /** 注册一个 sink：entry 通过完整管线后，由所有已注册 sink 各自处理（可以有多个，如控制台 + HTTP 同时存在） */ useSink(sink: ISink): IOff; /** * 注册生命周期钩子，钩子名是字符串，核心内置 \"before\"/\"after\"， 以及按 tag 派生的 `before:${tag}` / * `after:${tag}`，插件也可以自定义钩子名 */ hook(name: string, fn: ILogHookFn): () => void; fireHook(name: string, entry: ILogEntry): void; /** Observes asynchronous output failures without changing normal log-call control flow. */ onFailure(fn: ILogFailureHook): IOff; /** * 把一段工作推迟到当前同步调用栈之外执行（由 runtime manager 调度），并纳入 flush/shutdown 的等待范围——任何\"输出\"相关的工作（渲染、写 * stdout、发网络请求） 都应该通过这个方法调度，而不是在调用方的同步调用栈里直接执行， 供明确配置为异步输出的插件调度工作，并纳入 flush/shutdown 等待范围。 */ defer(task: () => void | Promise<void>): void; /** * Flush：注册一个\"缓冲区需要在 flush 时被清空\"的回调，核心统一调度； flush() 本身还会等待所有通过 defer() 调度、但尚未完成的工作， 也会等待每个 sink * 自己返回的 Promise（比如 http 插件没接 batch 时， 单条请求也会被纳入等待范围，进程退出前不会把还在飞的请求丢掉） */ onFlush(fn: IFlusher): IOff; flush(): Promise<void>; /** Shutdown disposes installed plugins after draining; subsequent log calls are ignored. */ onShutdown(fn: IShutdownHandler): IOff; shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>; use<const NewP extends readonly ILoggerPluginConstraint[]>(...plugins: NewP): Promise<IPluginHandleTuple<NewP>>; unUse(name: string): Promise<void>; /** Feature 名由提供方插件声明；重复插件名和依赖环在装配阶段拒绝。 */ /** * 读取某个插件的配置。插件不应该在 install() 里直接读 `this.config`—— 应该统一通过 `core.config.get<TConfig>(name)` * 读取（`name` 通常传插件自己 导出的名字常量，例如 LEVEL_PLUGIN_NAME，而不是手写字符串字面量，减少打错的风险）。 这样配置的读取路径统一走 core 这一层， * 而不是插件各自把配置攥在自己手里——好处是配置对 core 是\"可见的\"， 比如未来想做一个调试面板列出\"每个插件当前的配置\"，不需要挨个改插件代码。 */ /** * 绕开整条 pipeline/sink，直接写原始文本到 stdout；asyncOutput=true 时通过 defer 调度， 供需要\"逐 token * 流式输出、不想每次都套一层完整日志格式\"的插件使用（如 reasoning 插件） */ raw(text: string, options?: ILogDispatchOptions): void; /** * \"继承\"能力：log1.extends(log2, log3) 之后，log1 之后产生的每一条日志， 除了走 log1 自己的完整处理流程，还会被转发进 log2、log3 各自完整的 * pipeline/sink（也就是说 log2/log3 自己的 level 阈值、filter 照样对 转发过来的日志生效，这是\"继承\"而不是\"单纯抄送\"的关键区别）。 * * 转发时会把每一层的 topic（见 ILoggerContext.topic）依次追加进 entry.data.topicChain，配合 ansis 插件渲染出 `[topic1 -> * topic2]: xxx` 这样的链路前缀。注册 extends 时按 logger context id 检测环，运行时再按 extendPath 中的 id 做防御性跳过。 * * 注意这只组合\"运行时行为\"（转发 + topic 链路展示），不会让 log1 的 TypeScript 类型反过来获得 log2 独有的方法——如果需要拿到合并后的类型， * 接住返回值使用：`const combined = log1.extends(log2)`。 */ extends(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): ILoggerCore<TMode, TShared>; /** Removes named extension edges; returns true when at least one edge was removed. */ unextend(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): boolean; };",
           "declarationLine": 96,
           "source": "packages/logger/dist/typing.d.ts",
-          "purpose": "插件通过 install(core) 拿到的核心能力集合，这就是\"log 插件规范\"本身—— 任何插件只要基于这几个原语实现，就能和其它插件组合使用，互相之间不需要 知道对方的具体实现，只通过插件 shared() 与 core.getShared() 交换能力。",
+          "purpose": "插件通过 install(core) 拿到的核心能力集合，这就是\"log 插件规范\"本身—— 任何插件只要基于这几个原语实现，就能和其它插件组合使用，互相之间不需要 知道对方的具体实现；跨插件能力通过声明式 Feature 依赖注入。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoggerCore.",
           "advanced": "No additional advanced behavior is declared for ILoggerCore.",
           "parameters": ["This type declaration has no parameters."],
@@ -2070,7 +2061,7 @@
           "aliasOf": "ILoggerCore",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ILoggerCore<TMode extends IPipelineConfig['mode'] = 'sync', TShared extends Record<string, unknown> = Record<string, never>> = { readonly config: ILoggerPluginConfig; /** 只读上下文，见 ILoggerContext 说明 */ readonly ctx: ILoggerContext; /** * 本 logger 的单调时钟源（R-9 时间域）。`flush`/`shutdown`/`batch` 的 deadline 与 `boundedWait` 都用它，缺省 lifecycle * `systemScheduler`；插件可据此与宿主 clock 对齐。 */ readonly scheduler: ILifecycleScheduler; /** 便捷方法：同步构造并处理一条 entry；插件需要异步输出时应使用 dispatchRaw 的调度参数。 */ log(tag: string, message: string, ...args: unknown[]): void; /** 更底层的方法：允许插件显式指定 entry 的任意字段（例如 meta/data/context） */ dispatchRaw(input: IRawEntryInput, options?: ILogDispatchOptions): void; /** * 注册一个管线阶段：可以修改 entry、可以调用 next 放行，也可以不调用 next 直接丢弃。 * * 下面四个 `useXPipeline` 的条件类型都按\"命中自己的 mode 才可用，其余三个 mode 一律 `never`\"显式穷举， 不使用兜底 else 分支——`TMode` * 是未收窄的 `IPipelineMode` 联合（例如插件签名里的默认值）时， 四个方法都保持可调用，交由运行时 `PIPELINE_MODE_MISMATCH` 兜底；但 `TMode` * 收窄到具体某个 mode 字面量后， 其余三个必须真的是 `never`，而不是像旧版那样落进一个\"看起来还能调用\"的兜底分支——`IPipelineMode` * 新增第四个取值（`'async-generator'`）时，旧的三选一 fallback 会把它错误地划进\"可用\"，这里改成穷举后不再有这个缺口。 */ usePipeline: [TMode] extends ['sync'] ? (stage: IPipelineStage) => ILoggerCore<TMode> : [TMode] extends ['async'] | ['generator'] | ['async-generator'] ? never : (stage: IPipelineStage) => ILoggerCore<TMode>; useAsyncPipeline: [TMode] extends ['async'] ? (stage: IAsyncPipelineStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['generator'] | ['async-generator'] ? never : (stage: IAsyncPipelineStage<ILogEntry>) => ILoggerCore<TMode>; useGeneratorPipeline: [TMode] extends ['generator'] ? (stage: IGeneratorPipelineStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] | ['async-generator'] ? never : (stage: IGeneratorPipelineStage<ILogEntry>) => ILoggerCore<TMode>; useAsyncGeneratorPipeline: [TMode] extends ['async-generator'] ? (stage: IAsyncGeneratorPipelineStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] | ['generator'] ? never : (stage: IAsyncGeneratorPipelineStage<ILogEntry>) => ILoggerCore<TMode>; /** 注册一个 sink：entry 通过完整管线后，由所有已注册 sink 各自处理（可以有多个，如控制台 + HTTP 同时存在） */ useSink(sink: ISink): IOff; /** * 注册生命周期钩子，钩子名是字符串，核心内置 \"before\"/\"after\"， 以及按 tag 派生的 `before:${tag}` / * `after:${tag}`，插件也可以自定义钩子名 */ hook(name: string, fn: ILogHookFn): () => void; fireHook(name: string, entry: ILogEntry): void; /** Observes asynchronous output failures without changing normal log-call control flow. */ onFailure(fn: ILogFailureHook): IOff; /** * 把一段工作推迟到当前同步调用栈之外执行（由 runtime manager 调度），并纳入 flush/shutdown 的等待范围——任何\"输出\"相关的工作（渲染、写 * stdout、发网络请求） 都应该通过这个方法调度，而不是在调用方的同步调用栈里直接执行， 供明确配置为异步输出的插件调度工作，并纳入 flush/shutdown 等待范围。 */ defer(task: () => void | Promise<void>): void; /** * Flush：注册一个\"缓冲区需要在 flush 时被清空\"的回调，核心统一调度； flush() 本身还会等待所有通过 defer() 调度、但尚未完成的工作， 也会等待每个 sink * 自己返回的 Promise（比如 http 插件没接 batch 时， 单条请求也会被纳入等待范围，进程退出前不会把还在飞的请求丢掉） */ onFlush(fn: IFlusher): IOff; flush(): Promise<void>; /** Shutdown disposes installed plugins after draining; subsequent log calls are ignored. */ onShutdown(fn: IShutdownHandler): IOff; shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>; use<const NewP extends readonly ILoggerPluginConstraint[]>(...plugins: NewP): ILoggerCoreWithShared<TMode, TShared & IResolvedPluginShared<NewP>> & IMergePluginExts<NewP>; unUse(name: string): Promise<void>; getShared<TKey extends Extract<keyof TShared, string>>(key: TKey): TShared[TKey] | undefined; /** * 轻量依赖注入：插件之间通过约定的字符串 key 交换能力，避免插件互相硬编码 依赖对方的具体类型（例如 http 插件按需注入 batch 插件提供的批量能力）。 同一个 shared * key 被两个插件声明会直接抛异常——这是\"插件之间不能互相冲突\" 这条要求在依赖注入这一层的具体落地：冲突在装配阶段就暴露出来， 而不是让后装的插件悄悄覆盖先装的插件却没人知道。 */ /** * 读取某个插件的配置。插件不应该在 install() 里直接读 `this.config`—— 应该统一通过 `core.config.get<TConfig>(name)` * 读取（`name` 通常传插件自己 导出的名字常量，例如 LEVEL_PLUGIN_NAME，而不是手写字符串字面量，减少打错的风险）。 这样配置的读取路径和 shared 一样统一走 * core 这一层， 而不是插件各自把配置攥在自己手里——好处是配置对 core 是\"可见的\"， 比如未来想做一个调试面板列出\"每个插件当前的配置\"，不需要挨个改插件代码。 */ /** * 绕开整条 pipeline/sink，直接写原始文本到 stdout；asyncOutput=true 时通过 defer 调度， 供需要\"逐 token * 流式输出、不想每次都套一层完整日志格式\"的插件使用（如 reasoning 插件） */ raw(text: string, options?: ILogDispatchOptions): void; /** * \"继承\"能力：log1.extends(log2, log3) 之后，log1 之后产生的每一条日志， 除了走 log1 自己的完整处理流程，还会被转发进 log2、log3 各自完整的 * pipeline/sink（也就是说 log2/log3 自己的 level 阈值、filter 照样对 转发过来的日志生效，这是\"继承\"而不是\"单纯抄送\"的关键区别）。 * * 转发时会把每一层的 topic（见 ILoggerContext.topic）依次追加进 entry.data.topicChain，配合 ansis 插件渲染出 `[topic1 -> * topic2]: xxx` 这样的链路前缀。注册 extends 时按 logger context id 检测环，运行时再按 extendPath 中的 id 做防御性跳过。 * * 注意这只组合\"运行时行为\"（转发 + topic 链路展示），不会让 log1 的 TypeScript 类型反过来获得 log2 独有的方法——如果需要拿到合并后的类型， * 接住返回值使用：`const combined = log1.extends(log2)`。 */ extends(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): ILoggerCore<TMode, TShared>; /** Removes named extension edges; returns true when at least one edge was removed. */ unextend(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): boolean; };"
+            "export type ILoggerCore<TMode extends IPipelineConfig['mode'] = 'sync', TShared extends Record<string, unknown> = Record<string, never>> = { readonly config: ILoggerPluginConfig; /** 只读上下文，见 ILoggerContext 说明 */ readonly ctx: ILoggerContext; /** * 本 logger 的单调时钟源（R-9 时间域）。`flush`/`shutdown`/`batch` 的 deadline 与 `boundedWait` 都用它，缺省 lifecycle * `systemScheduler`；插件可据此与宿主 clock 对齐。 */ readonly scheduler: IScheduler; /** 便捷方法：同步构造并处理一条 entry；插件需要异步输出时应使用 dispatchRaw 的调度参数。 */ log(tag: string, message: string, ...args: unknown[]): void; /** 更底层的方法：允许插件显式指定 entry 的任意字段（例如 meta/data/context） */ dispatchRaw(input: IRawEntryInput, options?: ILogDispatchOptions): void; /** * 注册一个管线阶段：可以修改 entry、可以调用 next 放行，也可以不调用 next 直接丢弃。 * * 可调用集合与 middleware-pipeline 的提升表一致：sync stage 可用于任意 mode，generator stage 还可提升到 * async-generator；其余 stage 只可用于同名 mode。未收窄的 mode 联合保留全部方法，由运行时兜底。 */ usePipeline: (stage: IPipelineStage) => ILoggerCore<TMode>; useAsyncPipeline: [TMode] extends ['async'] ? (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['generator'] | ['async-generator'] ? never : (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>; useGeneratorPipeline: [TMode] extends ['generator' | 'async-generator'] ? (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] ? never : (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>; useAsyncGeneratorPipeline: [TMode] extends ['async-generator'] ? (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] | ['generator'] ? never : (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>; /** 注册一个 sink：entry 通过完整管线后，由所有已注册 sink 各自处理（可以有多个，如控制台 + HTTP 同时存在） */ useSink(sink: ISink): IOff; /** * 注册生命周期钩子，钩子名是字符串，核心内置 \"before\"/\"after\"， 以及按 tag 派生的 `before:${tag}` / * `after:${tag}`，插件也可以自定义钩子名 */ hook(name: string, fn: ILogHookFn): () => void; fireHook(name: string, entry: ILogEntry): void; /** Observes asynchronous output failures without changing normal log-call control flow. */ onFailure(fn: ILogFailureHook): IOff; /** * 把一段工作推迟到当前同步调用栈之外执行（由 runtime manager 调度），并纳入 flush/shutdown 的等待范围——任何\"输出\"相关的工作（渲染、写 * stdout、发网络请求） 都应该通过这个方法调度，而不是在调用方的同步调用栈里直接执行， 供明确配置为异步输出的插件调度工作，并纳入 flush/shutdown 等待范围。 */ defer(task: () => void | Promise<void>): void; /** * Flush：注册一个\"缓冲区需要在 flush 时被清空\"的回调，核心统一调度； flush() 本身还会等待所有通过 defer() 调度、但尚未完成的工作， 也会等待每个 sink * 自己返回的 Promise（比如 http 插件没接 batch 时， 单条请求也会被纳入等待范围，进程退出前不会把还在飞的请求丢掉） */ onFlush(fn: IFlusher): IOff; flush(): Promise<void>; /** Shutdown disposes installed plugins after draining; subsequent log calls are ignored. */ onShutdown(fn: IShutdownHandler): IOff; shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>; use<const NewP extends readonly ILoggerPluginConstraint[]>(...plugins: NewP): Promise<IPluginHandleTuple<NewP>>; unUse(name: string): Promise<void>; /** Feature 名由提供方插件声明；重复插件名和依赖环在装配阶段拒绝。 */ /** * 读取某个插件的配置。插件不应该在 install() 里直接读 `this.config`—— 应该统一通过 `core.config.get<TConfig>(name)` * 读取（`name` 通常传插件自己 导出的名字常量，例如 LEVEL_PLUGIN_NAME，而不是手写字符串字面量，减少打错的风险）。 这样配置的读取路径统一走 core 这一层， * 而不是插件各自把配置攥在自己手里——好处是配置对 core 是\"可见的\"， 比如未来想做一个调试面板列出\"每个插件当前的配置\"，不需要挨个改插件代码。 */ /** * 绕开整条 pipeline/sink，直接写原始文本到 stdout；asyncOutput=true 时通过 defer 调度， 供需要\"逐 token * 流式输出、不想每次都套一层完整日志格式\"的插件使用（如 reasoning 插件） */ raw(text: string, options?: ILogDispatchOptions): void; /** * \"继承\"能力：log1.extends(log2, log3) 之后，log1 之后产生的每一条日志， 除了走 log1 自己的完整处理流程，还会被转发进 log2、log3 各自完整的 * pipeline/sink（也就是说 log2/log3 自己的 level 阈值、filter 照样对 转发过来的日志生效，这是\"继承\"而不是\"单纯抄送\"的关键区别）。 * * 转发时会把每一层的 topic（见 ILoggerContext.topic）依次追加进 entry.data.topicChain，配合 ansis 插件渲染出 `[topic1 -> * topic2]: xxx` 这样的链路前缀。注册 extends 时按 logger context id 检测环，运行时再按 extendPath 中的 id 做防御性跳过。 * * 注意这只组合\"运行时行为\"（转发 + topic 链路展示），不会让 log1 的 TypeScript 类型反过来获得 log2 独有的方法——如果需要拿到合并后的类型， * 接住返回值使用：`const combined = log1.extends(log2)`。 */ extends(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): ILoggerCore<TMode, TShared>; /** Removes named extension edges; returns true when at least one edge was removed. */ unextend(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): boolean; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2080,7 +2071,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "插件通过 install(core) 拿到的核心能力集合，这就是\"log 插件规范\"本身—— 任何插件只要基于这几个原语实现，就能和其它插件组合使用，互相之间不需要 知道对方的具体实现，只通过插件 shared() 与 core.getShared() 交换能力。"
+              "content": "插件通过 install(core) 拿到的核心能力集合，这就是\"log 插件规范\"本身—— 任何插件只要基于这几个原语实现，就能和其它插件组合使用，互相之间不需要 知道对方的具体实现；跨插件能力通过声明式 Feature 依赖注入。"
             },
             {
               "id": "getting-started",
@@ -2109,7 +2100,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/typing.d.ts:ILoggerCore:export type ILoggerCore<TMode extends IPipelineConfig['mode'] = 'sync', TShared extends Record<string, unknown> = Record<string, never>> = { readonly config: ILoggerPluginConfig; /** 只读上下文，见 ILoggerContext 说明 */ readonly ctx: ILoggerContext; /** * 本 logger 的单调时钟源（R-9 时间域）。`flush`/`shutdown`/`batch` 的 deadline 与 `boundedWait` 都用它，缺省 lifecycle * `systemScheduler`；插件可据此与宿主 clock 对齐。 */ readonly scheduler: ILifecycleScheduler; /** 便捷方法：同步构造并处理一条 entry；插件需要异步输出时应使用 dispatchRaw 的调度参数。 */ log(tag: string, message: string, ...args: unknown[]): void; /** 更底层的方法：允许插件显式指定 entry 的任意字段（例如 meta/data/context） */ dispatchRaw(input: IRawEntryInput, options?: ILogDispatchOptions): void; /** * 注册一个管线阶段：可以修改 entry、可以调用 next 放行，也可以不调用 next 直接丢弃。 * * 下面四个 `useXPipeline` 的条件类型都按\"命中自己的 mode 才可用，其余三个 mode 一律 `never`\"显式穷举， 不使用兜底 else 分支——`TMode` * 是未收窄的 `IPipelineMode` 联合（例如插件签名里的默认值）时， 四个方法都保持可调用，交由运行时 `PIPELINE_MODE_MISMATCH` 兜底；但 `TMode` * 收窄到具体某个 mode 字面量后， 其余三个必须真的是 `never`，而不是像旧版那样落进一个\"看起来还能调用\"的兜底分支——`IPipelineMode` * 新增第四个取值（`'async-generator'`）时，旧的三选一 fallback 会把它错误地划进\"可用\"，这里改成穷举后不再有这个缺口。 */ usePipeline: [TMode] extends ['sync'] ? (stage: IPipelineStage) => ILoggerCore<TMode> : [TMode] extends ['async'] | ['generator'] | ['async-generator'] ? never : (stage: IPipelineStage) => ILoggerCore<TMode>; useAsyncPipeline: [TMode] extends ['async'] ? (stage: IAsyncPipelineStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['generator'] | ['async-generator'] ? never : (stage: IAsyncPipelineStage<ILogEntry>) => ILoggerCore<TMode>; useGeneratorPipeline: [TMode] extends ['generator'] ? (stage: IGeneratorPipelineStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] | ['async-generator'] ? never : (stage: IGeneratorPipelineStage<ILogEntry>) => ILoggerCore<TMode>; useAsyncGeneratorPipeline: [TMode] extends ['async-generator'] ? (stage: IAsyncGeneratorPipelineStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] | ['generator'] ? never : (stage: IAsyncGeneratorPipelineStage<ILogEntry>) => ILoggerCore<TMode>; /** 注册一个 sink：entry 通过完整管线后，由所有已注册 sink 各自处理（可以有多个，如控制台 + HTTP 同时存在） */ useSink(sink: ISink): IOff; /** * 注册生命周期钩子，钩子名是字符串，核心内置 \"before\"/\"after\"， 以及按 tag 派生的 `before:${tag}` / * `after:${tag}`，插件也可以自定义钩子名 */ hook(name: string, fn: ILogHookFn): () => void; fireHook(name: string, entry: ILogEntry): void; /** Observes asynchronous output failures without changing normal log-call control flow. */ onFailure(fn: ILogFailureHook): IOff; /** * 把一段工作推迟到当前同步调用栈之外执行（由 runtime manager 调度），并纳入 flush/shutdown 的等待范围——任何\"输出\"相关的工作（渲染、写 * stdout、发网络请求） 都应该通过这个方法调度，而不是在调用方的同步调用栈里直接执行， 供明确配置为异步输出的插件调度工作，并纳入 flush/shutdown 等待范围。 */ defer(task: () => void | Promise<void>): void; /** * Flush：注册一个\"缓冲区需要在 flush 时被清空\"的回调，核心统一调度； flush() 本身还会等待所有通过 defer() 调度、但尚未完成的工作， 也会等待每个 sink * 自己返回的 Promise（比如 http 插件没接 batch 时， 单条请求也会被纳入等待范围，进程退出前不会把还在飞的请求丢掉） */ onFlush(fn: IFlusher): IOff; flush(): Promise<void>; /** Shutdown disposes installed plugins after draining; subsequent log calls are ignored. */ onShutdown(fn: IShutdownHandler): IOff; shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>; use<const NewP extends readonly ILoggerPluginConstraint[]>(...plugins: NewP): ILoggerCoreWithShared<TMode, TShared & IResolvedPluginShared<NewP>> & IMergePluginExts<NewP>; unUse(name: string): Promise<void>; getShared<TKey extends Extract<keyof TShared, string>>(key: TKey): TShared[TKey] | undefined; /** * 轻量依赖注入：插件之间通过约定的字符串 key 交换能力，避免插件互相硬编码 依赖对方的具体类型（例如 http 插件按需注入 batch 插件提供的批量能力）。 同一个 shared * key 被两个插件声明会直接抛异常——这是\"插件之间不能互相冲突\" 这条要求在依赖注入这一层的具体落地：冲突在装配阶段就暴露出来， 而不是让后装的插件悄悄覆盖先装的插件却没人知道。 */ /** * 读取某个插件的配置。插件不应该在 install() 里直接读 `this.config`—— 应该统一通过 `core.config.get<TConfig>(name)` * 读取（`name` 通常传插件自己 导出的名字常量，例如 LEVEL_PLUGIN_NAME，而不是手写字符串字面量，减少打错的风险）。 这样配置的读取路径和 shared 一样统一走 * core 这一层， 而不是插件各自把配置攥在自己手里——好处是配置对 core 是\"可见的\"， 比如未来想做一个调试面板列出\"每个插件当前的配置\"，不需要挨个改插件代码。 */ /** * 绕开整条 pipeline/sink，直接写原始文本到 stdout；asyncOutput=true 时通过 defer 调度， 供需要\"逐 token * 流式输出、不想每次都套一层完整日志格式\"的插件使用（如 reasoning 插件） */ raw(text: string, options?: ILogDispatchOptions): void; /** * \"继承\"能力：log1.extends(log2, log3) 之后，log1 之后产生的每一条日志， 除了走 log1 自己的完整处理流程，还会被转发进 log2、log3 各自完整的 * pipeline/sink（也就是说 log2/log3 自己的 level 阈值、filter 照样对 转发过来的日志生效，这是\"继承\"而不是\"单纯抄送\"的关键区别）。 * * 转发时会把每一层的 topic（见 ILoggerContext.topic）依次追加进 entry.data.topicChain，配合 ansis 插件渲染出 `[topic1 -> * topic2]: xxx` 这样的链路前缀。注册 extends 时按 logger context id 检测环，运行时再按 extendPath 中的 id 做防御性跳过。 * * 注意这只组合\"运行时行为\"（转发 + topic 链路展示），不会让 log1 的 TypeScript 类型反过来获得 log2 独有的方法——如果需要拿到合并后的类型， * 接住返回值使用：`const combined = log1.extends(log2)`。 */ extends(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): ILoggerCore<TMode, TShared>; /** Removes named extension edges; returns true when at least one edge was removed. */ unextend(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): boolean; };",
+          "identity": "packages/logger/dist/typing.d.ts:ILoggerCore:export type ILoggerCore<TMode extends IPipelineConfig['mode'] = 'sync', TShared extends Record<string, unknown> = Record<string, never>> = { readonly config: ILoggerPluginConfig; /** 只读上下文，见 ILoggerContext 说明 */ readonly ctx: ILoggerContext; /** * 本 logger 的单调时钟源（R-9 时间域）。`flush`/`shutdown`/`batch` 的 deadline 与 `boundedWait` 都用它，缺省 lifecycle * `systemScheduler`；插件可据此与宿主 clock 对齐。 */ readonly scheduler: IScheduler; /** 便捷方法：同步构造并处理一条 entry；插件需要异步输出时应使用 dispatchRaw 的调度参数。 */ log(tag: string, message: string, ...args: unknown[]): void; /** 更底层的方法：允许插件显式指定 entry 的任意字段（例如 meta/data/context） */ dispatchRaw(input: IRawEntryInput, options?: ILogDispatchOptions): void; /** * 注册一个管线阶段：可以修改 entry、可以调用 next 放行，也可以不调用 next 直接丢弃。 * * 可调用集合与 middleware-pipeline 的提升表一致：sync stage 可用于任意 mode，generator stage 还可提升到 * async-generator；其余 stage 只可用于同名 mode。未收窄的 mode 联合保留全部方法，由运行时兜底。 */ usePipeline: (stage: IPipelineStage) => ILoggerCore<TMode>; useAsyncPipeline: [TMode] extends ['async'] ? (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['generator'] | ['async-generator'] ? never : (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>; useGeneratorPipeline: [TMode] extends ['generator' | 'async-generator'] ? (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] ? never : (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>; useAsyncGeneratorPipeline: [TMode] extends ['async-generator'] ? (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] | ['generator'] ? never : (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>; /** 注册一个 sink：entry 通过完整管线后，由所有已注册 sink 各自处理（可以有多个，如控制台 + HTTP 同时存在） */ useSink(sink: ISink): IOff; /** * 注册生命周期钩子，钩子名是字符串，核心内置 \"before\"/\"after\"， 以及按 tag 派生的 `before:${tag}` / * `after:${tag}`，插件也可以自定义钩子名 */ hook(name: string, fn: ILogHookFn): () => void; fireHook(name: string, entry: ILogEntry): void; /** Observes asynchronous output failures without changing normal log-call control flow. */ onFailure(fn: ILogFailureHook): IOff; /** * 把一段工作推迟到当前同步调用栈之外执行（由 runtime manager 调度），并纳入 flush/shutdown 的等待范围——任何\"输出\"相关的工作（渲染、写 * stdout、发网络请求） 都应该通过这个方法调度，而不是在调用方的同步调用栈里直接执行， 供明确配置为异步输出的插件调度工作，并纳入 flush/shutdown 等待范围。 */ defer(task: () => void | Promise<void>): void; /** * Flush：注册一个\"缓冲区需要在 flush 时被清空\"的回调，核心统一调度； flush() 本身还会等待所有通过 defer() 调度、但尚未完成的工作， 也会等待每个 sink * 自己返回的 Promise（比如 http 插件没接 batch 时， 单条请求也会被纳入等待范围，进程退出前不会把还在飞的请求丢掉） */ onFlush(fn: IFlusher): IOff; flush(): Promise<void>; /** Shutdown disposes installed plugins after draining; subsequent log calls are ignored. */ onShutdown(fn: IShutdownHandler): IOff; shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>; use<const NewP extends readonly ILoggerPluginConstraint[]>(...plugins: NewP): Promise<IPluginHandleTuple<NewP>>; unUse(name: string): Promise<void>; /** Feature 名由提供方插件声明；重复插件名和依赖环在装配阶段拒绝。 */ /** * 读取某个插件的配置。插件不应该在 install() 里直接读 `this.config`—— 应该统一通过 `core.config.get<TConfig>(name)` * 读取（`name` 通常传插件自己 导出的名字常量，例如 LEVEL_PLUGIN_NAME，而不是手写字符串字面量，减少打错的风险）。 这样配置的读取路径统一走 core 这一层， * 而不是插件各自把配置攥在自己手里——好处是配置对 core 是\"可见的\"， 比如未来想做一个调试面板列出\"每个插件当前的配置\"，不需要挨个改插件代码。 */ /** * 绕开整条 pipeline/sink，直接写原始文本到 stdout；asyncOutput=true 时通过 defer 调度， 供需要\"逐 token * 流式输出、不想每次都套一层完整日志格式\"的插件使用（如 reasoning 插件） */ raw(text: string, options?: ILogDispatchOptions): void; /** * \"继承\"能力：log1.extends(log2, log3) 之后，log1 之后产生的每一条日志， 除了走 log1 自己的完整处理流程，还会被转发进 log2、log3 各自完整的 * pipeline/sink（也就是说 log2/log3 自己的 level 阈值、filter 照样对 转发过来的日志生效，这是\"继承\"而不是\"单纯抄送\"的关键区别）。 * * 转发时会把每一层的 topic（见 ILoggerContext.topic）依次追加进 entry.data.topicChain，配合 ansis 插件渲染出 `[topic1 -> * topic2]: xxx` 这样的链路前缀。注册 extends 时按 logger context id 检测环，运行时再按 extendPath 中的 id 做防御性跳过。 * * 注意这只组合\"运行时行为\"（转发 + topic 链路展示），不会让 log1 的 TypeScript 类型反过来获得 log2 独有的方法——如果需要拿到合并后的类型， * 接住返回值使用：`const combined = log1.extends(log2)`。 */ extends(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): ILoggerCore<TMode, TShared>; /** Removes named extension edges; returns true when at least one edge was removed. */ unextend(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): boolean; };",
           "guidance": [],
           "usageScore": 16,
           "configuration": [],
@@ -2118,8 +2109,8 @@
         {
           "name": "ILoggerDomainCore",
           "kind": "type",
-          "signature": "export type ILoggerDomainCore<TMode extends IPipelineConfig['mode'] = 'sync', TShared extends Record<string, unknown> = Record<string, never>> = Omit<ILoggerCore<TMode, TShared>, 'config' | 'usePipeline' | 'useAsyncPipeline' | 'useGeneratorPipeline' | 'useAsyncGeneratorPipeline' | 'getShared' | 'use' | 'unUse'>;",
-          "declarationLine": 177,
+          "signature": "export type ILoggerDomainCore<TMode extends IPipelineConfig['mode'] = 'sync', TShared extends Record<string, unknown> = Record<string, never>> = Omit<ILoggerCore<TMode, TShared>, 'config' | 'usePipeline' | 'useAsyncPipeline' | 'useGeneratorPipeline' | 'useAsyncGeneratorPipeline' | 'use' | 'unUse'>;",
+          "declarationLine": 171,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "Logger-specific capabilities owned by LoggerCore, excluding PluginHost abilities.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoggerDomainCore.",
@@ -2134,7 +2125,7 @@
           "aliasOf": "ILoggerDomainCore",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ILoggerDomainCore<TMode extends IPipelineConfig['mode'] = 'sync', TShared extends Record<string, unknown> = Record<string, never>> = Omit<ILoggerCore<TMode, TShared>, 'config' | 'usePipeline' | 'useAsyncPipeline' | 'useGeneratorPipeline' | 'useAsyncGeneratorPipeline' | 'getShared' | 'use' | 'unUse'>;"
+            "export type ILoggerDomainCore<TMode extends IPipelineConfig['mode'] = 'sync', TShared extends Record<string, unknown> = Record<string, never>> = Omit<ILoggerCore<TMode, TShared>, 'config' | 'usePipeline' | 'useAsyncPipeline' | 'useGeneratorPipeline' | 'useAsyncGeneratorPipeline' | 'use' | 'unUse'>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2173,7 +2164,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/typing.d.ts:ILoggerDomainCore:export type ILoggerDomainCore<TMode extends IPipelineConfig['mode'] = 'sync', TShared extends Record<string, unknown> = Record<string, never>> = Omit<ILoggerCore<TMode, TShared>, 'config' | 'usePipeline' | 'useAsyncPipeline' | 'useGeneratorPipeline' | 'useAsyncGeneratorPipeline' | 'getShared' | 'use' | 'unUse'>;",
+          "identity": "packages/logger/dist/typing.d.ts:ILoggerDomainCore:export type ILoggerDomainCore<TMode extends IPipelineConfig['mode'] = 'sync', TShared extends Record<string, unknown> = Record<string, never>> = Omit<ILoggerCore<TMode, TShared>, 'config' | 'usePipeline' | 'useAsyncPipeline' | 'useGeneratorPipeline' | 'useAsyncGeneratorPipeline' | 'use' | 'unUse'>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -2374,8 +2365,8 @@
         {
           "name": "ILoggerOptions",
           "kind": "type",
-          "signature": "export type ILoggerOptions<P extends readonly ILoggerPluginConstraint[] = [], TMode extends IPipelineMode = 'sync'> = { /** Explicit PluginHost operation and drain budgets; `false` opts into unbounded waiting. */ execution: IPluginHostOptions['execution']; context?: string[]; /** 这个 logger 自己的 topic，用于 extends() 组合时展示 `[topic1 -> topic2]` 链路 */ topic?: string; /** 构造时直接注册钩子的语法糖，等价于逐个调用 core.hook(name, fn) */ on?: Record<string, ILogHookFn>; plugins?: P; /** * 业务自定义配置，会原样出现在每个插件都能读到的 core.ctx.options 里 （不包含 context/on/plugins 这些框架内部字段——那几个有各自的用途， * 不适合和\"业务自定义配置\"混在一起暴露给插件）。 */ options?: Record<string, unknown>; pipeline?: IPluginHostOptions['pipeline'] & { mode?: TMode; }; /** 缺省 lifecycle `systemScheduler`；`flush`/`shutdown`/`batch` 的 deadline 均用它（R-9 时间域）。 */ scheduler?: ILifecycleScheduler; };",
-          "declarationLine": 196,
+          "signature": "export type ILoggerOptions<P extends readonly ILoggerPluginConstraint[] = [], TMode extends IMiddlewarePipelineMode = 'sync'> = { /** Explicit PluginHost operation and drain budgets; `false` opts into unbounded waiting. */ execution: IPluginHostOptions['execution']; context?: string[]; /** 这个 logger 自己的 topic，用于 extends() 组合时展示 `[topic1 -> topic2]` 链路 */ topic?: string; /** 构造时直接注册钩子的语法糖，等价于逐个调用 core.hook(name, fn) */ on?: Record<string, ILogHookFn>; plugins?: P; /** * 业务自定义配置，会原样出现在每个插件都能读到的 core.ctx.options 里 （不包含 context/on/plugins 这些框架内部字段——那几个有各自的用途， * 不适合和\"业务自定义配置\"混在一起暴露给插件）。 */ options?: Record<string, unknown>; pipeline?: IPluginHostOptions['pipeline'] & { mode?: TMode; }; /** 缺省 lifecycle `systemScheduler`；`flush`/`shutdown`/`batch` 的 deadline 均用它（R-9 时间域）。 */ scheduler?: IScheduler; };",
+          "declarationLine": 187,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "ILoggerOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoggerOptions.",
@@ -2390,7 +2381,7 @@
           "aliasOf": "ILoggerOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ILoggerOptions<P extends readonly ILoggerPluginConstraint[] = [], TMode extends IPipelineMode = 'sync'> = { /** Explicit PluginHost operation and drain budgets; `false` opts into unbounded waiting. */ execution: IPluginHostOptions['execution']; context?: string[]; /** 这个 logger 自己的 topic，用于 extends() 组合时展示 `[topic1 -> topic2]` 链路 */ topic?: string; /** 构造时直接注册钩子的语法糖，等价于逐个调用 core.hook(name, fn) */ on?: Record<string, ILogHookFn>; plugins?: P; /** * 业务自定义配置，会原样出现在每个插件都能读到的 core.ctx.options 里 （不包含 context/on/plugins 这些框架内部字段——那几个有各自的用途， * 不适合和\"业务自定义配置\"混在一起暴露给插件）。 */ options?: Record<string, unknown>; pipeline?: IPluginHostOptions['pipeline'] & { mode?: TMode; }; /** 缺省 lifecycle `systemScheduler`；`flush`/`shutdown`/`batch` 的 deadline 均用它（R-9 时间域）。 */ scheduler?: ILifecycleScheduler; };"
+            "export type ILoggerOptions<P extends readonly ILoggerPluginConstraint[] = [], TMode extends IMiddlewarePipelineMode = 'sync'> = { /** Explicit PluginHost operation and drain budgets; `false` opts into unbounded waiting. */ execution: IPluginHostOptions['execution']; context?: string[]; /** 这个 logger 自己的 topic，用于 extends() 组合时展示 `[topic1 -> topic2]` 链路 */ topic?: string; /** 构造时直接注册钩子的语法糖，等价于逐个调用 core.hook(name, fn) */ on?: Record<string, ILogHookFn>; plugins?: P; /** * 业务自定义配置，会原样出现在每个插件都能读到的 core.ctx.options 里 （不包含 context/on/plugins 这些框架内部字段——那几个有各自的用途， * 不适合和\"业务自定义配置\"混在一起暴露给插件）。 */ options?: Record<string, unknown>; pipeline?: IPluginHostOptions['pipeline'] & { mode?: TMode; }; /** 缺省 lifecycle `systemScheduler`；`flush`/`shutdown`/`batch` 的 deadline 均用它（R-9 时间域）。 */ scheduler?: IScheduler; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2429,7 +2420,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/typing.d.ts:ILoggerOptions:export type ILoggerOptions<P extends readonly ILoggerPluginConstraint[] = [], TMode extends IPipelineMode = 'sync'> = { /** Explicit PluginHost operation and drain budgets; `false` opts into unbounded waiting. */ execution: IPluginHostOptions['execution']; context?: string[]; /** 这个 logger 自己的 topic，用于 extends() 组合时展示 `[topic1 -> topic2]` 链路 */ topic?: string; /** 构造时直接注册钩子的语法糖，等价于逐个调用 core.hook(name, fn) */ on?: Record<string, ILogHookFn>; plugins?: P; /** * 业务自定义配置，会原样出现在每个插件都能读到的 core.ctx.options 里 （不包含 context/on/plugins 这些框架内部字段——那几个有各自的用途， * 不适合和\"业务自定义配置\"混在一起暴露给插件）。 */ options?: Record<string, unknown>; pipeline?: IPluginHostOptions['pipeline'] & { mode?: TMode; }; /** 缺省 lifecycle `systemScheduler`；`flush`/`shutdown`/`batch` 的 deadline 均用它（R-9 时间域）。 */ scheduler?: ILifecycleScheduler; };",
+          "identity": "packages/logger/dist/typing.d.ts:ILoggerOptions:export type ILoggerOptions<P extends readonly ILoggerPluginConstraint[] = [], TMode extends IMiddlewarePipelineMode = 'sync'> = { /** Explicit PluginHost operation and drain budgets; `false` opts into unbounded waiting. */ execution: IPluginHostOptions['execution']; context?: string[]; /** 这个 logger 自己的 topic，用于 extends() 组合时展示 `[topic1 -> topic2]` 链路 */ topic?: string; /** 构造时直接注册钩子的语法糖，等价于逐个调用 core.hook(name, fn) */ on?: Record<string, ILogHookFn>; plugins?: P; /** * 业务自定义配置，会原样出现在每个插件都能读到的 core.ctx.options 里 （不包含 context/on/plugins 这些框架内部字段——那几个有各自的用途， * 不适合和\"业务自定义配置\"混在一起暴露给插件）。 */ options?: Record<string, unknown>; pipeline?: IPluginHostOptions['pipeline'] & { mode?: TMode; }; /** 缺省 lifecycle `systemScheduler`；`flush`/`shutdown`/`batch` 的 deadline 均用它（R-9 时间域）。 */ scheduler?: IScheduler; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -2438,8 +2429,8 @@
         {
           "name": "ILoggerPlugin",
           "kind": "type",
-          "signature": "export type ILoggerPlugin<TExt extends Record<string, unknown> = IEmptyPluginExt, TConfig extends IPluginConfig = IPluginConfig, TMode extends IPipelineMode = IPipelineMode, TShared extends Record<string, unknown> = IEmptyPluginExt, TRequires extends Record<string, unknown> = IEmptyPluginExt> = IPlugin<ILoggerPluginCore<TMode, TRequires>, TExt, TConfig, TShared>;",
-          "declarationLine": 192,
+          "signature": "export type ILoggerPlugin<TExt extends Record<string, unknown> = IEmptyPluginExt, TConfig extends IPluginConfig = IPluginConfig, TMode extends IMiddlewarePipelineMode = IMiddlewarePipelineMode, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = IPlugin<ILoggerPluginCore<TMode>, TExt, TConfig, Record<never, never>, TFeatures, TExpose>;",
+          "declarationLine": 183,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "ILoggerPlugin is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoggerPlugin.",
@@ -2454,7 +2445,7 @@
           "aliasOf": "ILoggerPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ILoggerPlugin<TExt extends Record<string, unknown> = IEmptyPluginExt, TConfig extends IPluginConfig = IPluginConfig, TMode extends IPipelineMode = IPipelineMode, TShared extends Record<string, unknown> = IEmptyPluginExt, TRequires extends Record<string, unknown> = IEmptyPluginExt> = IPlugin<ILoggerPluginCore<TMode, TRequires>, TExt, TConfig, TShared>;"
+            "export type ILoggerPlugin<TExt extends Record<string, unknown> = IEmptyPluginExt, TConfig extends IPluginConfig = IPluginConfig, TMode extends IMiddlewarePipelineMode = IMiddlewarePipelineMode, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = IPlugin<ILoggerPluginCore<TMode>, TExt, TConfig, Record<never, never>, TFeatures, TExpose>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2493,7 +2484,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/typing.d.ts:ILoggerPlugin:export type ILoggerPlugin<TExt extends Record<string, unknown> = IEmptyPluginExt, TConfig extends IPluginConfig = IPluginConfig, TMode extends IPipelineMode = IPipelineMode, TShared extends Record<string, unknown> = IEmptyPluginExt, TRequires extends Record<string, unknown> = IEmptyPluginExt> = IPlugin<ILoggerPluginCore<TMode, TRequires>, TExt, TConfig, TShared>;",
+          "identity": "packages/logger/dist/typing.d.ts:ILoggerPlugin:export type ILoggerPlugin<TExt extends Record<string, unknown> = IEmptyPluginExt, TConfig extends IPluginConfig = IPluginConfig, TMode extends IMiddlewarePipelineMode = IMiddlewarePipelineMode, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = IPlugin<ILoggerPluginCore<TMode>, TExt, TConfig, Record<never, never>, TFeatures, TExpose>;",
           "guidance": [],
           "usageScore": 8,
           "configuration": [],
@@ -2566,8 +2557,8 @@
         {
           "name": "ILoggerPluginCore",
           "kind": "type",
-          "signature": "export type ILoggerPluginCore<TMode extends IPipelineConfig['mode'] = IPipelineMode, TShared extends Record<string, unknown> = Record<string, never>> = Omit<ILoggerCore<TMode, TShared>, 'use' | 'unUse' | 'onDispose'> & { onDispose(resource: import('@migaia/plugin-host').IPluginResource): void; };",
-          "declarationLine": 188,
+          "signature": "export type ILoggerPluginCore<TMode extends IPipelineConfig['mode'] = IMiddlewarePipelineMode, TShared extends Record<string, unknown> = Record<string, never>> = Omit<ILoggerCore<TMode, TShared>, 'use' | 'unUse' | 'onDispose'> & { onDispose(resource: import('@migaia/plugin-host').IPluginResource): void; };",
+          "declarationLine": 179,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "Plugin-facing logger capabilities exclude Host-level topology mutation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoggerPluginCore.",
@@ -2582,7 +2573,7 @@
           "aliasOf": "ILoggerPluginCore",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ILoggerPluginCore<TMode extends IPipelineConfig['mode'] = IPipelineMode, TShared extends Record<string, unknown> = Record<string, never>> = Omit<ILoggerCore<TMode, TShared>, 'use' | 'unUse' | 'onDispose'> & { onDispose(resource: import('@migaia/plugin-host').IPluginResource): void; };"
+            "export type ILoggerPluginCore<TMode extends IPipelineConfig['mode'] = IMiddlewarePipelineMode, TShared extends Record<string, unknown> = Record<string, never>> = Omit<ILoggerCore<TMode, TShared>, 'use' | 'unUse' | 'onDispose'> & { onDispose(resource: import('@migaia/plugin-host').IPluginResource): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2621,7 +2612,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/typing.d.ts:ILoggerPluginCore:export type ILoggerPluginCore<TMode extends IPipelineConfig['mode'] = IPipelineMode, TShared extends Record<string, unknown> = Record<string, never>> = Omit<ILoggerCore<TMode, TShared>, 'use' | 'unUse' | 'onDispose'> & { onDispose(resource: import('@migaia/plugin-host').IPluginResource): void; };",
+          "identity": "packages/logger/dist/typing.d.ts:ILoggerPluginCore:export type ILoggerPluginCore<TMode extends IPipelineConfig['mode'] = IMiddlewarePipelineMode, TShared extends Record<string, unknown> = Record<string, never>> = Omit<ILoggerCore<TMode, TShared>, 'use' | 'unUse' | 'onDispose'> & { onDispose(resource: import('@migaia/plugin-host').IPluginResource): void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3013,7 +3004,7 @@
           "name": "IPaintFn",
           "kind": "type",
           "signature": "export type IPaintFn = (tag: string, text: string) => string;",
-          "declarationLine": 181,
+          "declarationLine": 175,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "染色 shared 能力的类型契约。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPaintFn.",
@@ -3392,8 +3383,8 @@
         {
           "name": "IStaticLoggerCtor",
           "kind": "type",
-          "signature": "export type IStaticLoggerCtor = { new <const LocalP extends readonly ILoggerPluginConstraint[] = readonly [], const TMode extends IPipelineMode = 'sync'>(options: ILoggerOptions<LocalP, TMode>): Omit<ILoggerCore<TMode, IResolvedPluginShared<LocalP>>, 'config' | 'onDispose'> & { readonly config: ILoggerConfig; } & IMergePluginExts<LocalP>; };",
-          "declarationLine": 217,
+          "signature": "export type IStaticLoggerCtor = { new <const LocalP extends readonly ILoggerPluginConstraint[] = readonly [], const TMode extends IMiddlewarePipelineMode = 'sync'>(options: ILoggerOptions<LocalP, TMode>): Omit<ILoggerCore<TMode, IResolvedPluginShared<LocalP>>, 'config' | 'onDispose'> & { readonly config: ILoggerConfig; } & IMergePluginExts<LocalP>; };",
+          "declarationLine": 208,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "Logger constructor type, kept separate so plugin extension types remain on instances.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStaticLoggerCtor.",
@@ -3408,7 +3399,7 @@
           "aliasOf": "IStaticLoggerCtor",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStaticLoggerCtor = { new <const LocalP extends readonly ILoggerPluginConstraint[] = readonly [], const TMode extends IPipelineMode = 'sync'>(options: ILoggerOptions<LocalP, TMode>): Omit<ILoggerCore<TMode, IResolvedPluginShared<LocalP>>, 'config' | 'onDispose'> & { readonly config: ILoggerConfig; } & IMergePluginExts<LocalP>; };"
+            "export type IStaticLoggerCtor = { new <const LocalP extends readonly ILoggerPluginConstraint[] = readonly [], const TMode extends IMiddlewarePipelineMode = 'sync'>(options: ILoggerOptions<LocalP, TMode>): Omit<ILoggerCore<TMode, IResolvedPluginShared<LocalP>>, 'config' | 'onDispose'> & { readonly config: ILoggerConfig; } & IMergePluginExts<LocalP>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3447,7 +3438,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/typing.d.ts:IStaticLoggerCtor:export type IStaticLoggerCtor = { new <const LocalP extends readonly ILoggerPluginConstraint[] = readonly [], const TMode extends IPipelineMode = 'sync'>(options: ILoggerOptions<LocalP, TMode>): Omit<ILoggerCore<TMode, IResolvedPluginShared<LocalP>>, 'config' | 'onDispose'> & { readonly config: ILoggerConfig; } & IMergePluginExts<LocalP>; };",
+          "identity": "packages/logger/dist/typing.d.ts:IStaticLoggerCtor:export type IStaticLoggerCtor = { new <const LocalP extends readonly ILoggerPluginConstraint[] = readonly [], const TMode extends IMiddlewarePipelineMode = 'sync'>(options: ILoggerOptions<LocalP, TMode>): Omit<ILoggerCore<TMode, IResolvedPluginShared<LocalP>>, 'config' | 'onDispose'> & { readonly config: ILoggerConfig; } & IMergePluginExts<LocalP>; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3468,12 +3459,12 @@
           "errors": ["No documented errors are declared for Logger."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for Logger.",
           "examples": [
-            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger';\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';",
-            "const log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['app', 'api'],\n  topic: 'gateway',\n  options: { service: 'gateway' },\n  on: { before: (entry) => {} },\n  pipeline: { mode: 'sync' },\n  plugins: [level(), color()]\n});",
+            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins'",
+            "const log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['app', 'api'],\n  topic: 'gateway',\n  options: { service: 'gateway' },\n  on: { before: (entry) => {} },\n  pipeline: { mode: 'sync' },\n  plugins: [level(), color()]\n})",
             "import { Logger } from '@migaia/logger'\nimport { file } from '@migaia/logger/plugins/file'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [file({ path: 'logs/app.jsonl', batch: { maxSize: 20 } })]\n})\nlogger.log('info', 'ready')\nawait logger.flush()\nawait logger.shutdown('manual')",
-            "const audit = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }, topic: 'audit' });\naudit.useSink((entry) => sendToAuditSystem(entry));\n\nconst api = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }, topic: 'api' });\napi.extends(audit);\n\napi.info('user created'); // 同时经过 api 自己的 pipeline/sink，也完整转发给 audit",
-            "import { getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger';\n\nconst previous = getLoggerRuntimeManager();\nconst restore = setLoggerRuntimeManager({\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => console.log(text),\n  fetch: (url, init) => fetch(url, init)\n});\n\ntry {\n  // 在这段作用域内创建和使用的 Logger 都会用上面这份能力\n} finally {\n  restore(); // 恢复到替换之前的 runtime manager\n}",
-            "import { Logger } from '@migaia/logger';\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n});\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error));\nlog.info('job started', { jobId: 'j_1' });\nawait log.flush();",
+            "const audit = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  topic: 'audit'\n})\naudit.useSink((entry) => sendToAuditSystem(entry))\n\nconst api = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  topic: 'api'\n})\napi.extends(audit)\n\napi.info('user created') // 同时经过 api 自己的 pipeline/sink，也完整转发给 audit",
+            "import { getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst previous = getLoggerRuntimeManager()\nconst restore = setLoggerRuntimeManager({\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => console.log(text),\n  fetch: (url, init) => fetch(url, init)\n})\n\ntry {\n  // 在这段作用域内创建和使用的 Logger 都会用上面这份能力\n} finally {\n  restore() // 恢复到替换之前的 runtime manager\n}",
+            "import { Logger } from '@migaia/logger'\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n})\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error))\nlog.info('job started', { jobId: 'j_1' })\nawait log.flush()",
             "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [level({ level: 'info' }), color({ format: 'pretty', color: 'auto' })]\n})\n\nlog.info('server listening on %d', 3000)\nlog.error('request failed', new Error('timeout'))\n\nawait log.flush() // 确保上面这些日志真正落地了再退出/继续",
             "import { Logger } from '@migaia/logger'\nimport { batch, http, level, process } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n})\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error))",
             "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: 'https://logs.example/v1/entries' })\n  ]\n})\n\nconst stopFailureObservation = log.onFailure(({ source, error }) => {\n  console.error(`[logger:${source}]`, error)\n})\n\ntry {\n  log.info('checkout completed: %s', 'order-42')\n  await log.flush()\n} finally {\n  stopFailureObservation()\n  await log.shutdown('manual')\n}"
@@ -3664,11 +3655,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 构造函数只接受同步安装的插件。`new Logger({ plugins: [.] })` 里的插件必须能同步完成安装，需要异步安装的插件用 `await log.use(plugin)`。 2. 插件实例不能跨 logger 复用。每次安装都应该重新调用一次插件工厂函数（`level()`、`http()` 等），不要把同一个插件实例装到多个 `Logger`，否则内部状态可能串联。 3. `shutdown()` 之后日志被静默忽略，不会抛错也不会有任何提示——这是有意的（避免退出流程里到处加判断），需要感知的话订阅 `onFailure()` 或自行检查状态。 4. 日志系统内部的失败不会从业务调用抛出。`log.info()` 永远不会因为 sink 挂了而抛异常——务必用 `onFailure()` 观察，否则问题会悄悄消失。 5. `pipeline."
+                  "text": "1. 构造函数只接受同步安装的插件。`new Logger({ plugins: [.] })` 里的插件必须能同步完成安装，需要异步安装的插件用 `await log.use(plugin)`。 2. 插件实例不能跨 logger 复用。每次安装都应该重新调用一次插件工厂函数（`level()`、`http()` 等），不要把同一个插件实例装到多个 `Logger`，否则内部状态可能串联。 3. `shutdown()` 之后日志被静默忽略，不会抛错也不会有任何提示——这是有意的（避免退出流程里到处加判断），需要感知的话订阅 `onFailure()` 或自行检查状态。 4. 日志系统内部的失败不会从业务调用抛出。`log.info()` 永远不会因为 sink 挂了而抛异常——务必用 `onFailure()` 观察，否则问题会悄悄消失。 5. `pipeline.mode` 构造后不可切换。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "mode` 构造后不可切换，四种模式（sync/async/generator/async-generator）执行顺序有本质区别，混用会立即报错，详见 USEGUIDE。 6. `http()` 批量发送要求插件顺序正确：`plugins: [batch(), http(.)]`，顺序反了批处理不会生效。 7. `extends()` 只转发运行时输出路径，不会把目标 logger 的 TypeScript 扩展方法合并进当前变量的类型。 8. 批处理队列有界且不会静默丢日志：`maxPendingBatches` 默认 `1024`，满载时抛出/上报 `BATCH_OVERFLOW`；生产环境应通过 `onFailure()` 监控并在下游恢复后再接纳新日志。"
+                  "text": "sync stage 可提升到任意模式，generator stage 还可提升到 async-generator；其余不兼容组合会立即报 `PIPELINE_MODE_MISMATCH`，详见 USEGUIDE。 6. `http()` 批量发送要求插件顺序正确：`plugins: [batch(), http(.)]`，顺序反了批处理不会生效。 7. `extends()` 只转发运行时输出路径，不会把目标 logger 的 TypeScript 扩展方法合并进当前变量的类型。 8. 批处理队列有界且不会静默丢日志：`maxPendingBatches` 默认 `1024`，满载时抛出/上报 `BATCH_OVERFLOW`；生产环境应通过 `onFailure()` 监控并在下游恢复后再接纳新日志。"
                 }
               ]
             }
@@ -4169,7 +4160,7 @@
           "errors": ["No documented errors are declared for setLoggerRuntimeManager."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for setLoggerRuntimeManager.",
           "examples": [
-            "import { getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger';\n\nconst previous = getLoggerRuntimeManager();\nconst restore = setLoggerRuntimeManager({\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => console.log(text),\n  fetch: (url, init) => fetch(url, init)\n});\n\ntry {\n  // 在这段作用域内创建和使用的 Logger 都会用上面这份能力\n} finally {\n  restore(); // 恢复到替换之前的 runtime manager\n}"
+            "import { getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst previous = getLoggerRuntimeManager()\nconst restore = setLoggerRuntimeManager({\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => console.log(text),\n  fetch: (url, init) => fetch(url, init)\n})\n\ntry {\n  // 在这段作用域内创建和使用的 Logger 都会用上面这份能力\n} finally {\n  restore() // 恢复到替换之前的 runtime manager\n}"
           ],
           "members": [],
           "aliasOf": "setLoggerRuntimeManager",
@@ -4251,7 +4242,7 @@
           "name": "ANSIS_PLUGIN_NAME",
           "kind": "const",
           "signature": "export declare const ANSIS_PLUGIN_NAME: \"ansis\";",
-          "declarationLine": 19,
+          "declarationLine": 27,
           "source": "packages/logger/dist/plugins/color.d.ts",
           "purpose": "ANSIS_PLUGIN_NAME is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ANSIS_PLUGIN_NAME.",
@@ -4312,8 +4303,8 @@
         {
           "name": "batch",
           "kind": "const",
-          "signature": "export declare const batch: (config?: IBatchPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IBatchPluginConfig, IPipelineMode, IBatchShared>;",
-          "declarationLine": 26,
+          "signature": "export declare const batch: (config?: IBatchPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IBatchPluginConfig, IMiddlewarePipelineMode, { readonly batch: typeof loggerBatchFeature; }, IBatchShared>;",
+          "declarationLine": 41,
           "source": "packages/logger/dist/plugins/batch.d.ts",
           "purpose": "batch is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for batch.",
@@ -4324,9 +4315,9 @@
           "errors": ["No documented errors are declared for batch."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for batch.",
           "examples": [
-            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger';\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';",
+            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins'",
             "import { Logger } from '@migaia/logger'\nimport { file } from '@migaia/logger/plugins/file'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [file({ path: 'logs/app.jsonl', batch: { maxSize: 20 } })]\n})\nlogger.log('info', 'ready')\nawait logger.flush()\nawait logger.shutdown('manual')",
-            "import { Logger } from '@migaia/logger';\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n});\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error));\nlog.info('job started', { jobId: 'j_1' });\nawait log.flush();",
+            "import { Logger } from '@migaia/logger'\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n})\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error))\nlog.info('job started', { jobId: 'j_1' })\nawait log.flush()",
             "import { Logger } from '@migaia/logger'\nimport { batch, http, level, process } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n})\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error))",
             "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: 'https://logs.example/v1/entries' })\n  ]\n})\n\nconst stopFailureObservation = log.onFailure(({ source, error }) => {\n  console.error(`[logger:${source}]`, error)\n})\n\ntry {\n  log.info('checkout completed: %s', 'order-42')\n  await log.flush()\n} finally {\n  stopFailureObservation()\n  await log.shutdown('manual')\n}"
           ],
@@ -4334,7 +4325,7 @@
           "aliasOf": "batch",
           "exportPath": "./plugins",
           "overloadSignatures": [
-            "export declare const batch: (config?: IBatchPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IBatchPluginConfig, IPipelineMode, IBatchShared>;"
+            "export declare const batch: (config?: IBatchPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IBatchPluginConfig, IMiddlewarePipelineMode, { readonly batch: typeof loggerBatchFeature; }, IBatchShared>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4404,7 +4395,7 @@
               "description": "批次满时是否异步调度回调；默认 true。定时触发本身已是异步。"
             }
           ],
-          "identity": "packages/logger/dist/plugins/batch.d.ts:batch:export declare const batch: (config?: IBatchPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IBatchPluginConfig, IPipelineMode, IBatchShared>;",
+          "identity": "packages/logger/dist/plugins/batch.d.ts:batch:export declare const batch: (config?: IBatchPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IBatchPluginConfig, IMiddlewarePipelineMode, { readonly batch: typeof loggerBatchFeature; }, IBatchShared>;",
           "guidance": [
             {
               "id": "9-3-batch-config",
@@ -4593,11 +4584,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 构造函数只接受同步安装的插件。`new Logger({ plugins: [.] })` 里的插件必须能同步完成安装，需要异步安装的插件用 `await log.use(plugin)`。 2. 插件实例不能跨 logger 复用。每次安装都应该重新调用一次插件工厂函数（`level()`、`http()` 等），不要把同一个插件实例装到多个 `Logger`，否则内部状态可能串联。 3. `shutdown()` 之后日志被静默忽略，不会抛错也不会有任何提示——这是有意的（避免退出流程里到处加判断），需要感知的话订阅 `onFailure()` 或自行检查状态。 4. 日志系统内部的失败不会从业务调用抛出。`log.info()` 永远不会因为 sink 挂了而抛异常——务必用 `onFailure()` 观察，否则问题会悄悄消失。 5. `pipeline."
+                  "text": "1. 构造函数只接受同步安装的插件。`new Logger({ plugins: [.] })` 里的插件必须能同步完成安装，需要异步安装的插件用 `await log.use(plugin)`。 2. 插件实例不能跨 logger 复用。每次安装都应该重新调用一次插件工厂函数（`level()`、`http()` 等），不要把同一个插件实例装到多个 `Logger`，否则内部状态可能串联。 3. `shutdown()` 之后日志被静默忽略，不会抛错也不会有任何提示——这是有意的（避免退出流程里到处加判断），需要感知的话订阅 `onFailure()` 或自行检查状态。 4. 日志系统内部的失败不会从业务调用抛出。`log.info()` 永远不会因为 sink 挂了而抛异常——务必用 `onFailure()` 观察，否则问题会悄悄消失。 5. `pipeline.mode` 构造后不可切换。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "mode` 构造后不可切换，四种模式（sync/async/generator/async-generator）执行顺序有本质区别，混用会立即报错，详见 USEGUIDE。 6. `http()` 批量发送要求插件顺序正确：`plugins: [batch(), http(.)]`，顺序反了批处理不会生效。 7. `extends()` 只转发运行时输出路径，不会把目标 logger 的 TypeScript 扩展方法合并进当前变量的类型。 8. 批处理队列有界且不会静默丢日志：`maxPendingBatches` 默认 `1024`，满载时抛出/上报 `BATCH_OVERFLOW`；生产环境应通过 `onFailure()` 监控并在下游恢复后再接纳新日志。"
+                  "text": "sync stage 可提升到任意模式，generator stage 还可提升到 async-generator；其余不兼容组合会立即报 `PIPELINE_MODE_MISMATCH`，详见 USEGUIDE。 6. `http()` 批量发送要求插件顺序正确：`plugins: [batch(), http(.)]`，顺序反了批处理不会生效。 7. `extends()` 只转发运行时输出路径，不会把目标 logger 的 TypeScript 扩展方法合并进当前变量的类型。 8. 批处理队列有界且不会静默丢日志：`maxPendingBatches` 默认 `1024`，满载时抛出/上报 `BATCH_OVERFLOW`；生产环境应通过 `onFailure()` 监控并在下游恢复后再接纳新日志。"
                 }
               ]
             }
@@ -4651,7 +4642,7 @@
           "name": "BATCH_PLUGIN_NAME",
           "kind": "const",
           "signature": "export declare const BATCH_PLUGIN_NAME: \"batch\";",
-          "declarationLine": 25,
+          "declarationLine": 33,
           "source": "packages/logger/dist/plugins/batch.d.ts",
           "purpose": "BATCH_PLUGIN_NAME is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for BATCH_PLUGIN_NAME.",
@@ -4712,8 +4703,8 @@
         {
           "name": "color",
           "kind": "const",
-          "signature": "export declare const color: (config?: IColorPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IColorPluginConfig, IPipelineMode, IColorShared>;",
-          "declarationLine": 20,
+          "signature": "export declare const color: (config?: IColorPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IColorPluginConfig, IMiddlewarePipelineMode, { readonly color: typeof loggerColorFeature; }, IColorShared>;",
+          "declarationLine": 35,
           "source": "packages/logger/dist/plugins/color.d.ts",
           "purpose": "color is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for color.",
@@ -4724,16 +4715,16 @@
           "errors": ["No documented errors are declared for color."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for color.",
           "examples": [
-            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger';\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';",
-            "const log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['app', 'api'],\n  topic: 'gateway',\n  options: { service: 'gateway' },\n  on: { before: (entry) => {} },\n  pipeline: { mode: 'sync' },\n  plugins: [level(), color()]\n});",
-            "import { Logger } from '@migaia/logger';\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n});\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error));\nlog.info('job started', { jobId: 'j_1' });\nawait log.flush();",
+            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins'",
+            "const log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['app', 'api'],\n  topic: 'gateway',\n  options: { service: 'gateway' },\n  on: { before: (entry) => {} },\n  pipeline: { mode: 'sync' },\n  plugins: [level(), color()]\n})",
+            "import { Logger } from '@migaia/logger'\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n})\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error))\nlog.info('job started', { jobId: 'j_1' })\nawait log.flush()",
             "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [level({ level: 'info' }), color({ format: 'pretty', color: 'auto' })]\n})\n\nlog.info('server listening on %d', 3000)\nlog.error('request failed', new Error('timeout'))\n\nawait log.flush() // 确保上面这些日志真正落地了再退出/继续"
           ],
           "members": [],
           "aliasOf": "color",
           "exportPath": "./plugins",
           "overloadSignatures": [
-            "export declare const color: (config?: IColorPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IColorPluginConfig, IPipelineMode, IColorShared>;"
+            "export declare const color: (config?: IColorPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IColorPluginConfig, IMiddlewarePipelineMode, { readonly color: typeof loggerColorFeature; }, IColorShared>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4803,7 +4794,7 @@
               "description": "自定义 tag -> 染色函数映射，未命中的 tag 走原样输出， 方便非 level 场景（比如 reasoning 插件的 tag）也能按需上色"
             }
           ],
-          "identity": "packages/logger/dist/plugins/color.d.ts:color:export declare const color: (config?: IColorPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IColorPluginConfig, IPipelineMode, IColorShared>;",
+          "identity": "packages/logger/dist/plugins/color.d.ts:color:export declare const color: (config?: IColorPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IColorPluginConfig, IMiddlewarePipelineMode, { readonly color: typeof loggerColorFeature; }, IColorShared>;",
           "guidance": [
             {
               "id": "9-2-color-config",
@@ -4975,8 +4966,8 @@
         {
           "name": "http",
           "kind": "const",
-          "signature": "export declare const http: (config: IHttpPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IHttpPluginConfig, IPipelineMode, {}, Partial<IBatchShared>>;",
-          "declarationLine": 28,
+          "signature": "export declare const http: (config: IHttpPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IHttpPluginConfig, IMiddlewarePipelineMode, { readonly dependencies: typeof httpDependenciesFeature; }>;",
+          "declarationLine": 40,
           "source": "packages/logger/dist/plugins/http.d.ts",
           "purpose": "http is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for http.",
@@ -4987,8 +4978,8 @@
           "errors": ["No documented errors are declared for http."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for http.",
           "examples": [
-            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger';\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';",
-            "import { Logger } from '@migaia/logger';\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n});\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error));\nlog.info('job started', { jobId: 'j_1' });\nawait log.flush();",
+            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins'",
+            "import { Logger } from '@migaia/logger'\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n})\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error))\nlog.info('job started', { jobId: 'j_1' })\nawait log.flush()",
             "import { Logger } from '@migaia/logger'\nimport { batch, http, level, process } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n})\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error))",
             "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: 'https://logs.example/v1/entries' })\n  ]\n})\n\nconst stopFailureObservation = log.onFailure(({ source, error }) => {\n  console.error(`[logger:${source}]`, error)\n})\n\ntry {\n  log.info('checkout completed: %s', 'order-42')\n  await log.flush()\n} finally {\n  stopFailureObservation()\n  await log.shutdown('manual')\n}"
           ],
@@ -4996,7 +4987,7 @@
           "aliasOf": "http",
           "exportPath": "./plugins",
           "overloadSignatures": [
-            "export declare const http: (config: IHttpPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IHttpPluginConfig, IPipelineMode, {}, Partial<IBatchShared>>;"
+            "export declare const http: (config: IHttpPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IHttpPluginConfig, IMiddlewarePipelineMode, { readonly dependencies: typeof httpDependenciesFeature; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5108,7 +5099,7 @@
               "description": "Maximum valid Retry-After delay; valid excess is clamped. Defaults to 30000ms."
             }
           ],
-          "identity": "packages/logger/dist/plugins/http.d.ts:http:export declare const http: (config: IHttpPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IHttpPluginConfig, IPipelineMode, {}, Partial<IBatchShared>>;",
+          "identity": "packages/logger/dist/plugins/http.d.ts:http:export declare const http: (config: IHttpPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IHttpPluginConfig, IMiddlewarePipelineMode, { readonly dependencies: typeof httpDependenciesFeature; }>;",
           "guidance": [
             {
               "id": "9-3-batch-config",
@@ -5297,11 +5288,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 构造函数只接受同步安装的插件。`new Logger({ plugins: [.] })` 里的插件必须能同步完成安装，需要异步安装的插件用 `await log.use(plugin)`。 2. 插件实例不能跨 logger 复用。每次安装都应该重新调用一次插件工厂函数（`level()`、`http()` 等），不要把同一个插件实例装到多个 `Logger`，否则内部状态可能串联。 3. `shutdown()` 之后日志被静默忽略，不会抛错也不会有任何提示——这是有意的（避免退出流程里到处加判断），需要感知的话订阅 `onFailure()` 或自行检查状态。 4. 日志系统内部的失败不会从业务调用抛出。`log.info()` 永远不会因为 sink 挂了而抛异常——务必用 `onFailure()` 观察，否则问题会悄悄消失。 5. `pipeline."
+                  "text": "1. 构造函数只接受同步安装的插件。`new Logger({ plugins: [.] })` 里的插件必须能同步完成安装，需要异步安装的插件用 `await log.use(plugin)`。 2. 插件实例不能跨 logger 复用。每次安装都应该重新调用一次插件工厂函数（`level()`、`http()` 等），不要把同一个插件实例装到多个 `Logger`，否则内部状态可能串联。 3. `shutdown()` 之后日志被静默忽略，不会抛错也不会有任何提示——这是有意的（避免退出流程里到处加判断），需要感知的话订阅 `onFailure()` 或自行检查状态。 4. 日志系统内部的失败不会从业务调用抛出。`log.info()` 永远不会因为 sink 挂了而抛异常——务必用 `onFailure()` 观察，否则问题会悄悄消失。 5. `pipeline.mode` 构造后不可切换。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "mode` 构造后不可切换，四种模式（sync/async/generator/async-generator）执行顺序有本质区别，混用会立即报错，详见 USEGUIDE。 6. `http()` 批量发送要求插件顺序正确：`plugins: [batch(), http(.)]`，顺序反了批处理不会生效。 7. `extends()` 只转发运行时输出路径，不会把目标 logger 的 TypeScript 扩展方法合并进当前变量的类型。 8. 批处理队列有界且不会静默丢日志：`maxPendingBatches` 默认 `1024`，满载时抛出/上报 `BATCH_OVERFLOW`；生产环境应通过 `onFailure()` 监控并在下游恢复后再接纳新日志。"
+                  "text": "sync stage 可提升到任意模式，generator stage 还可提升到 async-generator；其余不兼容组合会立即报 `PIPELINE_MODE_MISMATCH`，详见 USEGUIDE。 6. `http()` 批量发送要求插件顺序正确：`plugins: [batch(), http(.)]`，顺序反了批处理不会生效。 7. `extends()` 只转发运行时输出路径，不会把目标 logger 的 TypeScript 扩展方法合并进当前变量的类型。 8. 批处理队列有界且不会静默丢日志：`maxPendingBatches` 默认 `1024`，满载时抛出/上报 `BATCH_OVERFLOW`；生产环境应通过 `onFailure()` 监控并在下游恢复后再接纳新日志。"
                 }
               ]
             }
@@ -6440,9 +6431,9 @@
           "errors": ["No documented errors are declared for level."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for level.",
           "examples": [
-            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger';\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';",
-            "const log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['app', 'api'],\n  topic: 'gateway',\n  options: { service: 'gateway' },\n  on: { before: (entry) => {} },\n  pipeline: { mode: 'sync' },\n  plugins: [level(), color()]\n});",
-            "import { Logger } from '@migaia/logger';\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n});\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error));\nlog.info('job started', { jobId: 'j_1' });\nawait log.flush();",
+            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins'",
+            "const log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['app', 'api'],\n  topic: 'gateway',\n  options: { service: 'gateway' },\n  on: { before: (entry) => {} },\n  pipeline: { mode: 'sync' },\n  plugins: [level(), color()]\n})",
+            "import { Logger } from '@migaia/logger'\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n})\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error))\nlog.info('job started', { jobId: 'j_1' })\nawait log.flush()",
             "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [level({ level: 'info' }), color({ format: 'pretty', color: 'auto' })]\n})\n\nlog.info('server listening on %d', 3000)\nlog.error('request failed', new Error('timeout'))\n\nawait log.flush() // 确保上面这些日志真正落地了再退出/继续",
             "import { Logger } from '@migaia/logger'\nimport { batch, http, level, process } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n})\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error))",
             "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: 'https://logs.example/v1/entries' })\n  ]\n})\n\nconst stopFailureObservation = log.onFailure(({ source, error }) => {\n  console.error(`[logger:${source}]`, error)\n})\n\ntry {\n  log.info('checkout completed: %s', 'order-42')\n  await log.flush()\n} finally {\n  stopFailureObservation()\n  await log.shutdown('manual')\n}"
@@ -6621,11 +6612,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 构造函数只接受同步安装的插件。`new Logger({ plugins: [.] })` 里的插件必须能同步完成安装，需要异步安装的插件用 `await log.use(plugin)`。 2. 插件实例不能跨 logger 复用。每次安装都应该重新调用一次插件工厂函数（`level()`、`http()` 等），不要把同一个插件实例装到多个 `Logger`，否则内部状态可能串联。 3. `shutdown()` 之后日志被静默忽略，不会抛错也不会有任何提示——这是有意的（避免退出流程里到处加判断），需要感知的话订阅 `onFailure()` 或自行检查状态。 4. 日志系统内部的失败不会从业务调用抛出。`log.info()` 永远不会因为 sink 挂了而抛异常——务必用 `onFailure()` 观察，否则问题会悄悄消失。 5. `pipeline."
+                  "text": "1. 构造函数只接受同步安装的插件。`new Logger({ plugins: [.] })` 里的插件必须能同步完成安装，需要异步安装的插件用 `await log.use(plugin)`。 2. 插件实例不能跨 logger 复用。每次安装都应该重新调用一次插件工厂函数（`level()`、`http()` 等），不要把同一个插件实例装到多个 `Logger`，否则内部状态可能串联。 3. `shutdown()` 之后日志被静默忽略，不会抛错也不会有任何提示——这是有意的（避免退出流程里到处加判断），需要感知的话订阅 `onFailure()` 或自行检查状态。 4. 日志系统内部的失败不会从业务调用抛出。`log.info()` 永远不会因为 sink 挂了而抛异常——务必用 `onFailure()` 观察，否则问题会悄悄消失。 5. `pipeline.mode` 构造后不可切换。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "mode` 构造后不可切换，四种模式（sync/async/generator/async-generator）执行顺序有本质区别，混用会立即报错，详见 USEGUIDE。 6. `http()` 批量发送要求插件顺序正确：`plugins: [batch(), http(.)]`，顺序反了批处理不会生效。 7. `extends()` 只转发运行时输出路径，不会把目标 logger 的 TypeScript 扩展方法合并进当前变量的类型。 8. 批处理队列有界且不会静默丢日志：`maxPendingBatches` 默认 `1024`，满载时抛出/上报 `BATCH_OVERFLOW`；生产环境应通过 `onFailure()` 监控并在下游恢复后再接纳新日志。"
+                  "text": "sync stage 可提升到任意模式，generator stage 还可提升到 async-generator；其余不兼容组合会立即报 `PIPELINE_MODE_MISMATCH`，详见 USEGUIDE。 6. `http()` 批量发送要求插件顺序正确：`plugins: [batch(), http(.)]`，顺序反了批处理不会生效。 7. `extends()` 只转发运行时输出路径，不会把目标 logger 的 TypeScript 扩展方法合并进当前变量的类型。 8. 批处理队列有界且不会静默丢日志：`maxPendingBatches` 默认 `1024`，满载时抛出/上报 `BATCH_OVERFLOW`；生产环境应通过 `onFailure()` 监控并在下游恢复后再接纳新日志。"
                 }
               ]
             }
@@ -6736,8 +6727,8 @@
           "errors": ["No documented errors are declared for process."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for process.",
           "examples": [
-            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger';\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';",
-            "import { Logger } from '@migaia/logger';\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n});\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error));\nlog.info('job started', { jobId: 'j_1' });\nawait log.flush();",
+            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins'",
+            "import { Logger } from '@migaia/logger'\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n})\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error))\nlog.info('job started', { jobId: 'j_1' })\nawait log.flush()",
             "import { Logger } from '@migaia/logger'\nimport { batch, http, level, process } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n})\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error))"
           ],
           "members": [],
@@ -7028,8 +7019,8 @@
         {
           "name": "reasoning",
           "kind": "const",
-          "signature": "export declare const reasoning: (config?: IReasoningPluginConfig) => ILoggerPlugin<IReasoningPluginExt, IReasoningPluginConfig, IPipelineMode, {}, Partial<IColorShared>>;",
-          "declarationLine": 21,
+          "signature": "export declare const reasoning: (config?: IReasoningPluginConfig) => ILoggerPlugin<IReasoningPluginExt, IReasoningPluginConfig, IMiddlewarePipelineMode, { readonly dependencies: typeof reasoningDependenciesFeature; }>;",
+          "declarationLine": 33,
           "source": "packages/logger/dist/plugins/reasoning.d.ts",
           "purpose": "reasoning is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for reasoning.",
@@ -7040,13 +7031,13 @@
           "errors": ["No documented errors are declared for reasoning."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for reasoning.",
           "examples": [
-            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger';\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';"
+            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins'"
           ],
           "members": [],
           "aliasOf": "reasoning",
           "exportPath": "./plugins",
           "overloadSignatures": [
-            "export declare const reasoning: (config?: IReasoningPluginConfig) => ILoggerPlugin<IReasoningPluginExt, IReasoningPluginConfig, IPipelineMode, {}, Partial<IColorShared>>;"
+            "export declare const reasoning: (config?: IReasoningPluginConfig) => ILoggerPlugin<IReasoningPluginExt, IReasoningPluginConfig, IMiddlewarePipelineMode, { readonly dependencies: typeof reasoningDependenciesFeature; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7110,7 +7101,7 @@
               "description": "是否把该插件发起的流式及完整 entry 输出异步调度；默认 false。"
             }
           ],
-          "identity": "packages/logger/dist/plugins/reasoning.d.ts:reasoning:export declare const reasoning: (config?: IReasoningPluginConfig) => ILoggerPlugin<IReasoningPluginExt, IReasoningPluginConfig, IPipelineMode, {}, Partial<IColorShared>>;",
+          "identity": "packages/logger/dist/plugins/reasoning.d.ts:reasoning:export declare const reasoning: (config?: IReasoningPluginConfig) => ILoggerPlugin<IReasoningPluginExt, IReasoningPluginConfig, IMiddlewarePipelineMode, { readonly dependencies: typeof reasoningDependenciesFeature; }>;",
           "guidance": [
             {
               "id": "9-6-reasoning-config",
@@ -7262,8 +7253,8 @@
           "errors": ["No documented errors are declared for uuid."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for uuid.",
           "examples": [
-            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger';\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';",
-            "import { Logger } from '@migaia/logger';\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n});\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error));\nlog.info('job started', { jobId: 'j_1' });\nawait log.flush();"
+            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins'",
+            "import { Logger } from '@migaia/logger'\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n})\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error))\nlog.info('job started', { jobId: 'j_1' })\nawait log.flush()"
           ],
           "members": [],
           "aliasOf": "uuid",
@@ -7438,7 +7429,7 @@
         {
           "name": "file",
           "kind": "const",
-          "signature": "export declare const file: (config: IFilePluginConfig) => import(\"../typing.js\").ILoggerPlugin<import(\"../typing.js\").IEmptyPluginExt, IFilePluginConfig, import(\"@migaia/plugin-host\").IPipelineMode, {}, Partial<import(\"./batch.js\").IBatchShared>>;",
+          "signature": "export declare const file: (config: IFilePluginConfig) => import(\"../typing.js\").ILoggerPlugin<import(\"../typing.js\").IEmptyPluginExt, IFilePluginConfig, import(\"@migaia/middleware-pipeline\").IMiddlewarePipelineMode, { readonly dependencies: Readonly<{ readonly __feature: { readonly expose: Record<never, never>; readonly output: Readonly<{ readonly batch: import(\"./batch.js\").IBatchShared | undefined; }>; readonly dependencies: { readonly batch: typeof import(\"./batch.js\").optionalBatchFeature; }; }; }>; }>;",
           "declarationLine": 5,
           "source": "packages/logger/dist/plugins/file.d.ts",
           "purpose": "Creates a file plugin that prefers injected fs and otherwise uses the Node default.",
@@ -7455,7 +7446,7 @@
           "members": [],
           "exportPath": "./plugins/file",
           "overloadSignatures": [
-            "export declare const file: (config: IFilePluginConfig) => import(\"../typing.js\").ILoggerPlugin<import(\"../typing.js\").IEmptyPluginExt, IFilePluginConfig, import(\"@migaia/plugin-host\").IPipelineMode, {}, Partial<import(\"./batch.js\").IBatchShared>>;"
+            "export declare const file: (config: IFilePluginConfig) => import(\"../typing.js\").ILoggerPlugin<import(\"../typing.js\").IEmptyPluginExt, IFilePluginConfig, import(\"@migaia/middleware-pipeline\").IMiddlewarePipelineMode, { readonly dependencies: Readonly<{ readonly __feature: { readonly expose: Record<never, never>; readonly output: Readonly<{ readonly batch: import(\"./batch.js\").IBatchShared | undefined; }>; readonly dependencies: { readonly batch: typeof import(\"./batch.js\").optionalBatchFeature; }; }; }>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7508,7 +7499,7 @@
             },
             {
               "name": "rotate",
-              "type": "{ readonly maxBytes?: number; readonly maxEntries?: number; }",
+              "type": "{ /** Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit. */ readonly maxBytes?: number; /** Rotate before a write when the buffered diagnostic count reaches this limit. */ readonly maxEntries?: number; }",
               "optional": true,
               "description": "Per-batch rotation threshold; injected fs supplies the rotation operation."
             },
@@ -7516,13 +7507,13 @@
               "name": "rotate.maxBytes",
               "type": "number",
               "optional": true,
-              "description": ""
+              "description": "Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit."
             },
             {
               "name": "rotate.maxEntries",
               "type": "number",
               "optional": true,
-              "description": ""
+              "description": "Rotate before a write when the buffered diagnostic count reaches this limit."
             },
             {
               "name": "batch.maxSize",
@@ -7555,7 +7546,7 @@
               "description": "批次满时是否异步调度回调；默认 true。定时触发本身已是异步。"
             }
           ],
-          "identity": "packages/logger/dist/plugins/file.d.ts:file:export declare const file: (config: IFilePluginConfig) => import(\"../typing.js\").ILoggerPlugin<import(\"../typing.js\").IEmptyPluginExt, IFilePluginConfig, import(\"@migaia/plugin-host\").IPipelineMode, {}, Partial<import(\"./batch.js\").IBatchShared>>;",
+          "identity": "packages/logger/dist/plugins/file.d.ts:file:export declare const file: (config: IFilePluginConfig) => import(\"../typing.js\").ILoggerPlugin<import(\"../typing.js\").IEmptyPluginExt, IFilePluginConfig, import(\"@migaia/middleware-pipeline\").IMiddlewarePipelineMode, { readonly dependencies: Readonly<{ readonly __feature: { readonly expose: Record<never, never>; readonly output: Readonly<{ readonly batch: import(\"./batch.js\").IBatchShared | undefined; }>; readonly dependencies: { readonly batch: typeof import(\"./batch.js\").optionalBatchFeature; }; }; }>; }>;",
           "guidance": [
             {
               "id": "错误码速查",
@@ -7666,7 +7657,7 @@
             },
             {
               "name": "rotate",
-              "type": "{ readonly maxBytes?: number; readonly maxEntries?: number; }",
+              "type": "{ /** Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit. */ readonly maxBytes?: number; /** Rotate before a write when the buffered diagnostic count reaches this limit. */ readonly maxEntries?: number; }",
               "optional": true,
               "description": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。",
               "descriptionEn": "Per-batch rotation threshold; injected fs supplies the rotation operation.",
@@ -7677,7 +7668,7 @@
               "type": "number",
               "optional": true,
               "description": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。",
-              "descriptionEn": "",
+              "descriptionEn": "Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit.",
               "descriptionZh": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。"
             },
             {
@@ -7685,7 +7676,7 @@
               "type": "number",
               "optional": true,
               "description": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。",
-              "descriptionEn": "",
+              "descriptionEn": "Rotate before a write when the buffered diagnostic count reaches this limit.",
               "descriptionZh": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。"
             },
             {
@@ -7735,7 +7726,7 @@
           "name": "FILE_PLUGIN_NAME",
           "kind": "const",
           "signature": "export declare const FILE_PLUGIN_NAME: \"file\";",
-          "declarationLine": 14,
+          "declarationLine": 16,
           "source": "packages/logger/dist/plugins/file-core.d.ts",
           "purpose": "FILE_PLUGIN_NAME is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for FILE_PLUGIN_NAME.",
@@ -7796,7 +7787,7 @@
         {
           "name": "IFilePluginConfig",
           "kind": "type",
-          "signature": "export type IFilePluginConfig = { readonly path: string; readonly batch?: IBatchPluginConfig; /** Per-batch rotation threshold; injected fs supplies the rotation operation. */ readonly rotate?: { readonly maxBytes?: number; readonly maxEntries?: number; }; };",
+          "signature": "export type IFilePluginConfig = { readonly path: string; readonly batch?: IBatchPluginConfig; /** Per-batch rotation threshold; injected fs supplies the rotation operation. */ readonly rotate?: { /** Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit. */ readonly maxBytes?: number; /** Rotate before a write when the buffered diagnostic count reaches this limit. */ readonly maxEntries?: number; }; };",
           "declarationLine": 5,
           "source": "packages/logger/dist/plugins/file-core.d.ts",
           "purpose": "IFilePluginConfig is part of this module's public type contract.",
@@ -7812,7 +7803,7 @@
           "aliasOf": "IFilePluginConfig",
           "exportPath": "./plugins/file",
           "overloadSignatures": [
-            "export type IFilePluginConfig = { readonly path: string; readonly batch?: IBatchPluginConfig; /** Per-batch rotation threshold; injected fs supplies the rotation operation. */ readonly rotate?: { readonly maxBytes?: number; readonly maxEntries?: number; }; };"
+            "export type IFilePluginConfig = { readonly path: string; readonly batch?: IBatchPluginConfig; /** Per-batch rotation threshold; injected fs supplies the rotation operation. */ readonly rotate?: { /** Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit. */ readonly maxBytes?: number; /** Rotate before a write when the buffered diagnostic count reaches this limit. */ readonly maxEntries?: number; }; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7851,7 +7842,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/plugins/file-core.d.ts:IFilePluginConfig:export type IFilePluginConfig = { readonly path: string; readonly batch?: IBatchPluginConfig; /** Per-batch rotation threshold; injected fs supplies the rotation operation. */ readonly rotate?: { readonly maxBytes?: number; readonly maxEntries?: number; }; };",
+          "identity": "packages/logger/dist/plugins/file-core.d.ts:IFilePluginConfig:export type IFilePluginConfig = { readonly path: string; readonly batch?: IBatchPluginConfig; /** Per-batch rotation threshold; injected fs supplies the rotation operation. */ readonly rotate?: { /** Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit. */ readonly maxBytes?: number; /** Rotate before a write when the buffered diagnostic count reaches this limit. */ readonly maxEntries?: number; }; };",
           "guidance": [],
           "usageScore": 2,
           "configuration": [],

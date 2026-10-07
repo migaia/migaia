@@ -1,6 +1,7 @@
-import { webRpcApiGuides } from './web-rpc-api-guides.js'
+import { rpcApiGuides } from './rpc-api-guides.js'
 import { utilsApiGuides } from './utils-api-guides.js'
 import { completionApiGuides } from './completion-api-guides.js'
+import rpcReference from '../src/generated/manifests/libraries/rpc.json'
 import { isCallableApiSymbol, type IApiSymbol } from './content-contract.js'
 
 export type IGuideLocale = 'en' | 'zh'
@@ -35,6 +36,46 @@ export type IApiGuide = {
 const optionTranslations: Readonly<
   Record<string, Readonly<Partial<Record<IGuideLocale, string>>>>
 > = {
+  'rpc:*:*:peerId': {
+    en: 'Expected authenticated peer identity used for source admission; a display name or operating-system PID is not a routing authority.',
+    zh: 'source 准入使用的预期已认证 peer 身份；显示名称和操作系统 PID 不能作为路由授权。'
+  },
+  'rpc:*:*:capabilities': {
+    en: 'Actual static or negotiated capabilities of the paired native channel; declaring a local capability alone does not enable it on the remote peer.',
+    zh: '配对原生通道的实际静态或协商能力；只在本端声明一项能力不会自动让远端支持它。'
+  },
+  'rpc:*:*:origin': {
+    en: 'Expected origin attached to incoming messages; combine it with source proof so an unrelated sender cannot impersonate the accepted peer.',
+    zh: '入站消息预期 origin；与 source proof 配合，防止无关发送方冒充已采纳 peer。'
+  },
+  'rpc:*:*:targetOrigin': {
+    en: 'Exact trusted Window origin receiving outgoing messages; cross-origin targets must be configured explicitly rather than accepting every origin.',
+    zh: '接收出站消息的明确可信 Window origin；跨源目标应显式配置，不能默认接纳所有 origin。'
+  },
+  'rpc:*:*:allowUnsafeTargetOrigin': {
+    en: 'Explicit opt-in for wildcard outgoing target origin; it does not disable incoming source validation and is unsuitable when a fixed origin is known.',
+    zh: '对出站通配 origin 的显式授权，不会关闭入站 source 校验；已知固定 origin 时不应启用。'
+  },
+  'rpc:*:*:ownership': {
+    en: 'Select owned only when this endpoint must close the physical port; borrowed removes local listeners without claiming the external resource lifetime.',
+    zh: '只有 endpoint 必须关闭物理端口时才选择 owned；borrowed 只移除本地监听，不接管外部资源生命周期。'
+  },
+  'rpc:*:*:timeoutMs': {
+    en: 'Bounded request deadline in scheduler milliseconds; false explicitly disables it and zero expires immediately, while any launcher call cap still applies.',
+    zh: '调度器毫秒请求期限；false 显式禁用、0 立即到期，同时仍受 launcher 的总调用预算限制。'
+  },
+  'plugin-host:*:*:host.onDiagnosticFailure': {
+    en: 'Receives a failure thrown by a diagnostic listener; report it to a terminal sink without re-entering the same diagnostic channel.',
+    zh: '接收诊断监听器自身抛出的失败；写入独立终端日志，避免再次进入同一诊断通道。'
+  },
+  'rpc:*:*:target': {
+    en: 'Concrete remote Window, Worker, Client or channel receiving outbound messages; choose the authenticated object rather than accepting arbitrary senders.',
+    zh: '接收出站消息的具体 Window、Worker、Client 或通道对象；应固定已认证的目标，不能把任意消息发送方当作目标。'
+  },
+  'rpc:*:*:receiver': {
+    en: 'Local message event owner; it can differ from the send target, such as navigator.serviceWorker receiving replies from a ServiceWorker.',
+    zh: '本端消息事件的接收对象，可以不同于发送目标；例如页面通过 navigator.serviceWorker 接收 ServiceWorker 回复。'
+  },
   'supervision:*:*:id': {
     en: 'Stable supervisor identity used in unit diagnostics and durable ownership records.',
     zh: '监督器稳定标识，供单元诊断和持久化资源归属记录使用。'
@@ -922,19 +963,19 @@ const optionTranslations: Readonly<
   'utils:string:format:nullish': {
     en: 'Behavior for null and undefined values: emit empty text or stringify the value.'
   },
-  'web-rpc:*:*:id': {
+  'rpc:*:*:id': {
     zh: '本地 endpoint 的稳定标识；每个需要路由的协议 envelope 都会携带它。'
   },
-  'web-rpc:*:*:targetIds': {
+  'rpc:*:*:targetIds': {
     zh: '可选的已知 peer 初始集合；自动发现仍可在需要时解析其他 target id。'
   },
-  'web-rpc:*:*:replay': {
+  'rpc:*:*:replay': {
     zh: '限制该 endpoint 为出站 request identifier 保留的重放窗口。'
   },
-  'web-rpc:*:*:replay.ttlMs': {
+  'rpc:*:*:replay.ttlMs': {
     zh: '出站 request identifier 的保留时长，默认 310 秒。'
   },
-  'web-rpc:*:*:replay.maxEntries': {
+  'rpc:*:*:replay.maxEntries': {
     en: 'Maximum number of outbound request identifiers retained for replay protection; increase only when measured traffic requires a larger bounded window.',
     zh: '为 replay protection 保留的出站 request identifier 最大数量；仅在有测量依据表明流量需要更大 bounded window 时调高。'
   },
@@ -946,135 +987,144 @@ const optionTranslations: Readonly<
     en: 'Keeps the computed node active after observers detach; use it only when retained cache lifetime is intentional.',
     zh: 'observer 解除后保持 computed node active；仅在确实需要延长 cache lifetime 时使用。'
   },
-  'web-rpc:*:*:middlewares': {
+  'rpc:*:*:middlewares': {
     zh: 'endpoint 构造期间按 tuple 顺序原子安装的 middleware。'
   },
-  'web-rpc:*:*:construction': {
+  'rpc:*:*:construction': {
     en: 'Groups construction.signal and construction.timeoutMs so asynchronous endpoint construction can be cancelled or bounded while installed middleware is still rolled back safely.',
     zh: '组合 construction.signal 与 construction.timeoutMs；在下方分别配置中止信号和构造超时。'
   },
-  'web-rpc:index:authentication:encrypt': {
-    en: 'Outbound encryption transform. It must be configured together with decrypt and runs before signing.'
+  'rpc:core:authentication:encrypt': {
+    en: 'Outbound encryption transform. It must be configured together with decrypt and runs before signing.',
+    zh: '发送前执行的加密转换，必须与 decrypt 成对配置，并在签名前完成。'
   },
-  'web-rpc:index:authentication:decrypt': {
-    en: 'Inbound decryption transform. It must be configured together with encrypt and runs after signature verification.'
+  'rpc:core:authentication:decrypt': {
+    en: 'Inbound decryption transform. It must be configured together with encrypt and runs after signature verification.',
+    zh: '接收后的解密转换，必须与 encrypt 成对配置，并且只在验签通过后执行。'
   },
-  'web-rpc:index:authentication:sign': {
-    en: 'Outbound signing transform. It must be configured together with verify and runs after encryption.'
+  'rpc:core:authentication:sign': {
+    en: 'Outbound signing transform. It must be configured together with verify and runs after encryption.',
+    zh: '出站签名转换，必须与 verify 成对配置；签名覆盖已经加密的完整物理帧。'
   },
-  'web-rpc:index:authentication:verify': {
-    en: 'Inbound signature-verification transform. It must be configured together with sign and runs before decryption.'
+  'rpc:core:authentication:verify': {
+    en: 'Inbound signature-verification transform. It must be configured together with sign and runs before decryption.',
+    zh: '入站验签转换，必须与 sign 成对配置；在解密和业务解析前拒绝伪造或不可信帧。'
   },
-  'web-rpc:index:authentication:encodedType': {
-    en: 'Encoded representation required by the authentication transforms. It must agree with protocol output and transport requirements.'
+  'rpc:core:authentication:encodedType': {
+    en: 'Encoded representation required by the authentication transforms. It must agree with protocol output and transport requirements.',
+    zh: '鉴权转换处理的编码值类型，必须与协议输出、framer 和 transport 要求一致。'
   },
-  'web-rpc:index:chunk:chunkSize': {
+  'rpc:core:chunk:chunkSize': {
     en: 'String payload size above which outbound messages are split. Omit for no splitting; Uint8Array payloads are never split.'
   },
-  'web-rpc:index:chunk:maxMessageBytes': {
+  'rpc:core:chunk:maxMessageBytes': {
     en: 'Maximum accepted logical message size. Omit for no message-size limit; other capacity limits remain active.'
   },
-  'web-rpc:index:chunk:maxConcurrentMessages': {
+  'rpc:core:chunk:maxConcurrentMessages': {
     en: 'Maximum number of message assemblies retained across all peers.'
   },
-  'web-rpc:index:chunk:maxConcurrentMessagesPerPeer': {
+  'rpc:core:chunk:maxConcurrentMessagesPerPeer': {
     en: 'Maximum number of message assemblies retained for one peer.'
   },
-  'web-rpc:index:chunk:maxBufferedBytes': {
+  'rpc:core:chunk:maxBufferedBytes': {
     en: 'Maximum total bytes retained by incomplete message assemblies.'
   },
-  'web-rpc:index:chunk:maxChunksPerMessage': {
+  'rpc:core:chunk:maxChunksPerMessage': {
     en: 'Maximum number of chunks accepted for one logical message.'
   },
-  'web-rpc:index:chunk:maxChunkBytes': {
+  'rpc:core:chunk:maxChunkBytes': {
     en: 'Maximum encoded byte size accepted for one chunk.'
   },
-  'web-rpc:index:chunk:assemblyTimeoutMs': {
+  'rpc:core:chunk:assemblyTimeoutMs': {
     en: 'Maximum time an incomplete message assembly may remain buffered before it is discarded.'
   },
-  'web-rpc:index:chunk:byteLength': {
+  'rpc:core:chunk:byteLength': {
     en: 'Custom byte-length calculator used to enforce chunk and message limits. Invalid results reject the chunk as CHUNK_INVALID.'
   },
-  'web-rpc:index:chunk:split': {
+  'rpc:core:chunk:split': {
     en: 'Custom string-splitting strategy. It must emit valid bounded chunk frames or the message is rejected as CHUNK_INVALID.'
   },
-  'web-rpc:index:contract:version': {
-    en: 'Local protocol contract version advertised to peers.'
+  'rpc:core:contract:version': {
+    en: 'Local protocol contract version advertised to peers.',
+    zh: '本端业务 schema 的版本标识，用于生成请求路由并选择对应方法的输入与输出校验器。'
   },
-  'web-rpc:index:contract:acceptVersions': {
-    en: 'Peer protocol versions accepted by this endpoint. Defaults to the locally declared version.'
+  'rpc:core:contract:acceptVersions': {
+    en: 'Peer protocol versions accepted by this endpoint. Defaults to the locally declared version.',
+    zh: '允许接收的业务 schema 版本集合；与 v2 describe/batch 协议基线分开判断。'
   },
-  'web-rpc:index:contract:maxIdentifierLength': {
-    en: 'Maximum length for sender, target, task, method, and receiver identifiers. Defaults to 128 even without contract middleware.'
+  'rpc:core:contract:maxIdentifierLength': {
+    en: 'Maximum length for sender, target, task, method, and receiver identifiers. Defaults to 128 even without contract middleware.',
+    zh: 'method、sender 和 target 等业务标识的最长长度，用于在边界拒绝过长标识。'
   },
-  'web-rpc:index:contract:schemas': {
-    en: 'Method-indexed parameter and result schemas. Methods without an exact entry are not schema-validated.'
+  'rpc:core:contract:schemas': {
+    en: 'Method-indexed parameter and result schemas. Methods without an exact entry are not schema-validated.',
+    zh: '按方法和版本配置的参数与结果 schema 校验器，不会自动公开未注册的 provider。'
   },
-  'web-rpc:index:hooks:listeners': {
-    en: 'Initial ordered hook listeners installed with the middleware. Runtime subscriptions can be added through hooks.on().'
+  'rpc:core:hooks:listeners': {
+    en: 'Initial ordered hook listeners installed with the middleware. Runtime subscriptions can be added through hooks.on().',
+    zh: '接收 endpoint 生命周期、失败和鉴权事件的监听器；通过返回 disposer 解除自己的订阅。'
   },
-  'web-rpc:index:hooks:onHookError': {
-    en: 'Contains hook-listener failures so a broken diagnostic listener cannot alter the RPC operation.'
+  'rpc:core:hooks:onHookError': {
+    en: 'Contains hook-listener failures so a broken diagnostic listener cannot alter the RPC operation.',
+    zh: 'hooks 监听器自身失败时的上报函数，不覆盖最初的业务错误或重新执行原调用。'
   },
-  'web-rpc:index:protocol:encode': {
+  'rpc:core:protocol:encode': {
     en: 'Encodes an outbound wire envelope. Failures are reported as PROTOCOL_INVALID.'
   },
-  'web-rpc:index:protocol:decode': {
+  'rpc:core:protocol:decode': {
     en: 'Decodes an inbound wire envelope. Failures are reported as PROTOCOL_INVALID.'
   },
-  'web-rpc:index:protocol:encodedType': {
+  'rpc:core:protocol:encodedType': {
     en: 'Declares the representation produced by encode and consumed by decode so transport compatibility is checked during construction.'
   },
-  'web-rpc:index:uuid:generate': {
-    en: 'Custom identifier generator for task, message, and variation IDs. Defaults to the built-in secure random generator.'
+  'rpc:core:uuid:generate': {
+    en: 'Custom identifier generator for task, message, and variation IDs. Defaults to the built-in secure random generator.',
+    zh: '自定义语义请求 ID 生成器，必须避免当前 owner 内冲突；使用它会保留 legacy 重放账本速率边界。'
   },
-  'web-rpc:adapters-message-port:createBrowserMessagePortTransport:ownership': {
+  'rpc:adapters-message-port:createBrowserMessagePortTransport:ownership': {
     en: "MessagePort custody: 'owned' closes the port during disposal, while 'borrowed' removes installed listeners without closing the caller's port.",
     zh: 'MessagePort custody：owned 在 dispose 时关闭 port，borrowed 只移除已安装 listener，不关闭调用方拥有的 port。'
   },
-  'web-rpc:adapters/message-port:createBrowserMessagePortTransport:ownership': {
+  'rpc:adapters/message-port:createBrowserMessagePortTransport:ownership': {
     en: "MessagePort custody: 'owned' closes the port during disposal; 'borrowed' removes installed listeners without closing the caller's port.",
     zh: 'MessagePort custody：owned 在 dispose 时关闭 port，borrowed 只移除已安装 listener，不关闭调用方拥有的 port。'
   },
-  'web-rpc:adapters-message-port:createBrowserMessagePortTransport:ownership:legacy': {
+  'rpc:adapters-message-port:createBrowserMessagePortTransport:ownership:legacy': {
     en: "Controls MessagePort custody. 'owned' closes the port on dispose; 'borrowed' removes framework listeners without closing it."
   },
-  'web-rpc:adapters-service-worker:createServiceWorkerTransport:target': {
+  'rpc:adapters-service-worker:createServiceWorkerTransport:target': {
     en: 'ServiceWorker postMessage target used for outbound messages.'
   },
-  'web-rpc:adapters/service-worker:createServiceWorkerTransport:target': {
-    en: 'ServiceWorker controller or worker target receiving outbound WebRPC messages.',
-    zh: '接收 outbound WebRPC message 的 ServiceWorker controller 或 worker target。'
+  'rpc:adapters/service-worker:createServiceWorkerTransport:target': {
+    en: 'ServiceWorker controller or worker target receiving outbound RPC messages.',
+    zh: '接收 outbound RPC message 的 ServiceWorker controller 或 worker target。'
   },
-  'web-rpc:adapters/service-worker:createServiceWorkerTransport:receiver': {
-    en: 'Inbound ServiceWorker event source used to receive WebRPC messages and errors.',
-    zh: '用于接收 WebRPC message 与 error 的 inbound ServiceWorker event source。'
+  'rpc:adapters/service-worker:createServiceWorkerTransport:receiver': {
+    en: 'Inbound ServiceWorker event source used to receive RPC messages and errors.',
+    zh: '用于接收 RPC message 与 error 的 inbound ServiceWorker event source。'
   },
-  'web-rpc:adapters-service-worker:createServiceWorkerTransport:receiver': {
+  'rpc:adapters-service-worker:createServiceWorkerTransport:receiver': {
     en: 'ServiceWorker event source used to receive inbound message and error events.'
   },
-  'web-rpc:*:*:peerId': {
-    en: 'Optional statically known remote peer identity attached to transport metadata.'
-  },
-  'web-rpc:adapters-web-worker:createWebWorkerTransport:origin': {
+  'rpc:adapters-web-worker:createWebWorkerTransport:origin': {
     en: 'Optional expected origin metadata for the connected worker peer.'
   },
-  'web-rpc:adapters/web-worker:createWebWorkerTransport:origin': {
+  'rpc:adapters/web-worker:createWebWorkerTransport:origin': {
     en: 'Optional expected origin metadata used to reject worker messages from an unexpected origin.',
     zh: '用于拒绝 unexpected origin worker message 的可选 expected origin metadata。'
   },
-  'web-rpc:adapters-window:createWindowMessageTransport:target': {
+  'rpc:adapters-window:createWindowMessageTransport:target': {
     en: 'Required postMessage target, such as iframe.contentWindow or window.opener.'
   },
-  'web-rpc:adapters/window:createWindowMessageTransport:target': {
+  'rpc:adapters/window:createWindowMessageTransport:target': {
     en: 'Required postMessage target, such as iframe.contentWindow or window.opener.',
     zh: '必需的 postMessage target，例如 iframe.contentWindow 或 window.opener。'
   },
-  'web-rpc:adapters/window:createWindowMessageTransport:receiver': {
+  'rpc:adapters/window:createWindowMessageTransport:receiver': {
     en: 'Inbound message-event source used to receive frames from the window peer.',
     zh: '用于接收 window peer frame 的 inbound message-event source。'
   },
-  'web-rpc:adapters-window:createWindowMessageTransport:receiver': {
+  'rpc:adapters-window:createWindowMessageTransport:receiver': {
     en: 'Inbound message-event source. Same-origin usage may omit it and use the host default receiver.'
   }
 }
@@ -1447,7 +1497,7 @@ const workerAdapterOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGui
     {
       name: 'port',
       description:
-        'Worker, MessagePort, or SharedWorker port implementing postMessage plus message subscription. The adapter creates one exclusive WebRPC client over it.',
+        'Worker, MessagePort, or SharedWorker port implementing postMessage plus message subscription. The adapter creates one exclusive RPC client over it.',
       defaultValue: 'required',
       optional: false,
       type: 'IWorkerPort',
@@ -1456,7 +1506,7 @@ const workerAdapterOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGui
     },
     {
       name: 'options.clientId',
-      description: 'Stable local WebRPC endpoint identity used on this exclusive worker topology.',
+      description: 'Stable local RPC endpoint identity used on this exclusive worker topology.',
       defaultValue: "'main'",
       type: 'string',
       whenToUse:
@@ -1466,7 +1516,7 @@ const workerAdapterOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGui
     {
       name: 'options.timeoutMs',
       description:
-        'Default timeout applied by the WebRPC middleware to every request. Omission means no adapter-level default timeout.',
+        'Default timeout applied by the RPC middleware to every request. Omission means no adapter-level default timeout.',
       defaultValue: 'undefined',
       type: 'number',
       whenToUse: 'Bound worker operations whose caller cannot wait indefinitely.',
@@ -1495,7 +1545,7 @@ const workerAdapterOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGui
     {
       name: 'port',
       description:
-        '实现 postMessage 与 message subscription 的 Worker、MessagePort 或 SharedWorker port；adapter 在其上创建一条 exclusive WebRPC client。',
+        '实现 postMessage 与 message subscription 的 Worker、MessagePort 或 SharedWorker port；adapter 在其上创建一条 exclusive RPC client。',
       defaultValue: '必填',
       optional: false,
       type: 'IWorkerPort',
@@ -1504,7 +1554,7 @@ const workerAdapterOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGui
     },
     {
       name: 'options.clientId',
-      description: '这条 exclusive worker topology 上稳定的本地 WebRPC endpoint identity。',
+      description: '这条 exclusive worker topology 上稳定的本地 RPC endpoint identity。',
       defaultValue: "'main'",
       type: 'string',
       whenToUse: '只有多个显式 endpoint identity 共用诊断设施时才覆盖。',
@@ -1513,7 +1563,7 @@ const workerAdapterOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGui
     {
       name: 'options.timeoutMs',
       description:
-        'WebRPC middleware 为每次 request 应用的默认超时；省略表示没有 adapter 级默认超时。',
+        'RPC middleware 为每次 request 应用的默认超时；省略表示没有 adapter 级默认超时。',
       defaultValue: 'undefined',
       type: 'number',
       whenToUse: 'worker operation 不能无限等待时设置明确预算。',
@@ -1684,7 +1734,7 @@ const workerParserOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGuid
     },
     {
       name: 'clientId',
-      description: 'Stable main-side WebRPC endpoint id and prefix for generated stream ids.',
+      description: 'Stable main-side RPC endpoint id and prefix for generated stream ids.',
       defaultValue: "'main'",
       type: 'string',
       whenToUse:
@@ -1732,7 +1782,7 @@ const workerParserOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGuid
     },
     {
       name: 'clientId',
-      description: '稳定的主线程 WebRPC endpoint id，也是生成 stream id 的前缀。',
+      description: '稳定的主线程 RPC endpoint id，也是生成 stream id 的前缀。',
       defaultValue: "'main'",
       type: 'string',
       whenToUse: '多个显式 serializer client 共用诊断 transport infrastructure 时覆盖。',
@@ -2716,9 +2766,9 @@ function createStorePersistErrorGuide(
   return {
     en: {
       purpose: `Creates a ${nativeType} carrying the stable Store Persist source/code identity. ${behaviorEn}`,
-      quickStart: `import { createStorePersist\${nativeType}, StorePersistErrorCode } from '@migaia/store-persist'
+      quickStart: `import { createStorePersist${nativeType}, StorePersistErrorCode } from '@migaia/store-persist'
 
-const error = createStorePersist\${nativeType}(
+const error = createStorePersist${nativeType}(
   StorePersistErrorCode.invalidOption,
   'Invalid persistence configuration'
 )
@@ -2737,9 +2787,9 @@ console.error(error) // 把带 code 的 native error 交给边界报告`,
     },
     zh: {
       purpose: `创建带稳定 Store Persist source/code identity 的 ${nativeType}。${behaviorZh}`,
-      quickStart: `import { createStorePersist\${nativeType}, StorePersistErrorCode } from '@migaia/store-persist'
+      quickStart: `import { createStorePersist${nativeType}, StorePersistErrorCode } from '@migaia/store-persist'
 
-const error = createStorePersist\${nativeType}(
+const error = createStorePersist${nativeType}(
   StorePersistErrorCode.invalidOption,
   '持久化配置无效'
 )
@@ -3554,9 +3604,27 @@ const runtimeCompletionApiGuides = {
   })
 } satisfies Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>>
 
+/** RPC constants reuse the existing shape-aware reference guide without callable fallback prose. */
+const rpcConstantGuides = Object.fromEntries(
+  rpcReference.apis.flatMap((api) =>
+    api.symbols
+      .filter(
+        (symbol) => symbol.kind === 'const' && !isCallableApiSymbol(symbol as unknown as IApiSymbol)
+      )
+      .map((symbol) => [
+        `rpc:${api.module.replaceAll('/', '-')}:${symbol.name}`,
+        {
+          en: createSupportingContractGuide('rpc', symbol as unknown as IApiSymbol, 'en'),
+          zh: createSupportingContractGuide('rpc', symbol as unknown as IApiSymbol, 'zh')
+        }
+      ])
+  )
+)
+
 const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, IApiGuide>>>>> = {
   ...completionApiGuides,
-  ...webRpcApiGuides,
+  ...rpcApiGuides,
+  ...rpcConstantGuides,
   ...utilsApiGuides,
   ...runtimeCompletionApiGuides,
   'storage-web:memory:memoryStorageHost': createStorageWebGuide({
@@ -8809,7 +8877,8 @@ try {
       'Stable encode and decode phase values carried by SerializeCodecError and instrumentation. They identify which direction failed without parsing a message.',
     purposeZh:
       'SerializeCodecError 与 instrumentation 携带的稳定 encode/decode phase value。无需解析 message 即可识别失败方向。',
-    quickStart: `import { SerializePhase } from '@migaia/serialize'\n\nconst error: { phase: SerializePhase } = { phase: SerializePhase.decode }\nif (error.phase === SerializePhase.decode) {\n  // 解码失败时隔离原始 payload，避免继续进入业务流程。\n  console.warn('quarantine payload')\n}`,
+    quickStart: `import { SerializePhase } from '@migaia/serialize'\n\nconst error: { phase: SerializePhase } = {
+ phase: SerializePhase.decode }\nif (error.phase === SerializePhase.decode) {\n  // 解码失败时隔离原始 payload，避免继续进入业务流程。\n  console.warn('quarantine payload')\n}`,
     scenariosEn: [
       'Routing codec diagnostics.',
       'Measuring encode and decode separately.',
@@ -20370,7 +20439,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       scenarios: [
         'A dedicated Worker exposes one ordinary compute(payload, { signal }) operation.',
         'Worker-side pending work and endpoint disposal need an observable managed lifecycle.',
-        'Failures must return through WebRPC instead of becoming unhandled Worker errors.'
+        'Failures must return through RPC instead of becoming unhandled Worker errors.'
       ],
       avoidWhen: [
         'The operation is a serialize parser; use createSerializeWorkerHandler for streaming and byte ownership.',
@@ -20415,7 +20484,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       scenarios: [
         'dedicated Worker 暴露一个普通 compute(payload, { signal }) operation。',
         'worker 侧 pending work 与 endpoint disposal 需要可观察 managed lifecycle。',
-        '失败必须经 WebRPC 返回，不能成为 unhandled Worker error。'
+        '失败必须经 RPC 返回，不能成为 unhandled Worker error。'
       ],
       avoidWhen: [
         'operation 是 serialize parser；streaming 与 byte ownership 应使用 createSerializeWorkerHandler。',
@@ -27035,37 +27104,53 @@ export function findApiGuide(
     library === 'plugin-host' && guideModuleName === 'index' && symbolName === 'PluginHost'
       ? 'plugin-host:index:PluginHost'
       : `${library}:${guideModuleName}:${symbolName}`
-  const guide = (apiGuides[guideKey] ??
+  const storedGuide = (apiGuides[guideKey] ??
     (library === 'event-subscriber' && moduleName === 'subscriber'
       ? apiGuides[`event-subscriber:index:${symbolName}`]
       : undefined))?.[locale]
-  if (!guide && library === 'web-rpc') {
-    return {
-      en: {
-        purpose: `${symbolName} is a WebRPC composition API; select it when its capability is required and keep installation inside the endpoint lifecycle.`,
-        quickStart: `import { connect, defineFeature } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\nconst capability = defineFeature(() => ({ read: () => 'ready' }))\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint(\n  { id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] },\n  [capability] as const\n)\ntry {\n  console.log(service.read()) // ready：Feature 安装后，返回的能力面由业务代码直接消费。\n} finally {\n  await service.dispose()\n  void clientTransport\n}`,
-        scenarios: [
-          'A composed endpoint requires this explicit WebRPC capability; start with the memory-transport skeleton above, then replace the sample capability with the API signature you need.'
-        ],
-        avoidWhen: [
-          'A narrower endpoint capability already satisfies the use case.',
-          'The endpoint does not need this capability.'
-        ],
-        options: []
-      },
-      zh: {
-        purpose: `${symbolName} 是 WebRPC composition API；仅在需要对应 capability 时选择，并让 installation 留在 endpoint lifecycle 内。`,
-        quickStart: `import { connect, defineFeature } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\nconst capability = defineFeature(() => ({ read: () => 'ready' }))\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint(\n  { id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] },\n  [capability] as const\n)\ntry {\n  console.log(service.read()) // ready：Feature 安装后，返回的能力面由业务代码直接消费。\n} finally {\n  await service.dispose()\n  void clientTransport\n}`,
-        scenarios: [
-          '组合 endpoint 需要这个显式 WebRPC capability；可先用上面的 memory transport skeleton 验证安装、调用与释放，再按该 API 的签名替换 capability。'
-        ],
-        avoidWhen: [
-          '更窄的 endpoint capability 已经满足场景。',
-          'endpoint 不需要这个 capability。'
-        ],
-        options: []
-      }
-    }[locale]
+  /** Option translations belong to the same canonical guide, not a second rendered description. */
+  /** Existing extracted RPC fields keep their exact names and gain only maintained localized prose. */
+  const rpcFields =
+    library === 'rpc'
+      ? (rpcReference.apis
+          .find((api) => api.module === moduleName)
+          ?.symbols.find((symbol) => symbol.name === symbolName)?.configuration ?? [])
+      : []
+  const guide = storedGuide && {
+    ...storedGuide,
+    options: [
+      ...storedGuide.options.map((option) => ({
+        ...option,
+        description:
+          findOptionTranslation(library, moduleName, symbolName, option.name, locale) ??
+          option.description
+      })),
+      ...rpcFields
+        .filter((field) => !storedGuide.options.some((option) => option.name === field.name))
+        .flatMap((field) => {
+          const description = findOptionTranslation(
+            library,
+            moduleName,
+            symbolName,
+            field.name,
+            locale
+          )
+          return description
+            ? [
+                {
+                  name: field.name,
+                  type: field.type,
+                  optional: field.optional,
+                  description,
+                  whenToUse:
+                    locale === 'zh'
+                      ? '该字段属于当前公开配置形态；只在需要这项明确策略时配置。'
+                      : 'Set this public field when the named policy is required for this connection.'
+                }
+              ]
+            : []
+        })
+    ]
   }
   if (library === 'reactive' && symbolName === 'Signal' && guide) {
     return { ...guide, options: guide.options.filter((option) => option.name === 'debugName') }

@@ -16,7 +16,7 @@ const PACKAGES = [
   'storage-contract',
   'plugin-host',
   'resource',
-  'web-rpc',
+  'rpc',
   'logger',
   'storage-web'
 ]
@@ -364,7 +364,7 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
     'flush-and-shutdown',
     'runtime-and-forwarding'
   ],
-  'web-rpc': [
+  rpc: [
     'endpoint-composition',
     'extension-authoring',
     'calls-and-cancellation',
@@ -1211,6 +1211,19 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
           ? classConstructorParameters(signature)
           : []
     const parameters = parameterDetails.map((parameter) => parameter.name)
+    /** A local overloaded callable type can own an exported const's actual call signatures. */
+    const valueType =
+      kind === 'const' ? signature.match(/:\s*([A-Za-z_$][\w$]*);$/)?.[1] : undefined
+    /** Inspect the actual declaration instead of guessing callability from the export name. */
+    const valueTypeStart = valueType
+      ? source.search(new RegExp(`(?:type|interface)\\s+${valueType}\\b`))
+      : -1
+    /** Named callable aliases remain const exports, with an explicit callable declaration fact. */
+    const callable =
+      valueTypeStart >= 0 &&
+      /\{\s*(?:<|\()/.test(
+        source.slice(valueTypeStart, declarationEnd(source, valueTypeStart, 'type'))
+      )
     const open = signature.indexOf('(')
     const close = open < 0 ? -1 : closingParenthesis(signature, open)
     const returnText =
@@ -1224,6 +1237,7 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
     records.push({
       name,
       kind,
+      ...(callable ? { callable: true } : {}),
       signature,
       declarationLine: source.slice(0, lineStart).split('\n').length,
       source: filePath,

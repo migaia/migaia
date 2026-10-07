@@ -1,0 +1,39 @@
+---
+title: rpc - 快速开始
+---
+
+# 快速开始
+
+生产进程与 Worker 使用四个 Peer/Plugin 工厂。以下内存示例用真实 canonical Peer 展示类型、调用与清理；它不证明原生 transfer、进程隔离或 Worker 所有权。
+
+## 最小可运行调用链
+
+```ts
+import { createPeerPair } from '@migaia/rpc/testing'
+
+const pair = await createPeerPair({
+  a: { provide: { echo: (text: string) => text } },
+  b: { provide: { double: (value: number) => value * 2 } }
+})
+try {
+  console.log(await pair.a.request('double', 21)) // 42
+  console.log(await pair.b.request('echo', 'ready')) // ready
+} finally {
+  await Promise.all([pair.a.close(), pair.b.close()])
+}
+```
+
+## Worker 子端
+
+```ts
+import { createThreadPeer } from '@migaia/rpc/threads'
+
+await createThreadPeer({
+  provide: { math: { double: (value: number) => value * 2 } },
+  report: (error) => console.error(error)
+})
+```
+
+这个无来源写法只能在真实 launcher 创建的 Worker 与其 bootstrap 中使用。父端必须提供实际 launcher、scheduler、unit budget 与 channel factory；四个生产工厂的 API 页面给出完整父端示例。
+
+`provide` 公开可枚举 own data 函数；嵌套路径生成点分方法名。`expose` 默认为空，只公开实际接受的方法白名单。类型声明不能代替鉴权或运行时公开范围。

@@ -1,0 +1,31 @@
+---
+title: rpc
+description: 进程与 Worker 之间的类型化双向调用
+---
+
+# rpc
+
+`@migaia/rpc` 把进程与 Worker 的业务函数映射到同一套 `request`、`notify`、`stream` 调用。库从真实 `provide` 与显式 `expose` 生成远端目录，并沿原生资源 owner 管理关闭、排空与错误链。
+
+## 按所有权选择工厂
+
+| 入口                | 来源                        | 释放者                    |
+| ------------------- | --------------------------- | ------------------------- |
+| createProcessPeer   | 进程 spawn/connect/listen   | 调用方 close              |
+| createProcessPlugin | 进程 spawn/connect/listen   | PluginHost / host.process |
+| createThreadPeer    | Worker spawn/connect/listen | 调用方 close              |
+| createThreadPlugin  | Worker spawn/connect/listen | PluginHost / host.thread  |
+
+只有真实 launcher 与 validated bootstrap 可以自动识别父端来源。其它调用必须且只能选择一个来源。connect/listen 借用对端，只关闭本端连接，不取得结束对端进程或 Worker 的权限。
+
+## 适用场景
+
+- 将计算或插件隔离到 Worker，同时保留方法、参数与结果类型。
+- 通过原生进程通道调用四语言 peer，并保存错误的 source/code 与 cause 链。
+- PluginHost 管理多连接实例，使用精确 name/instanceId 选择与释放连接。
+
+## 协议与能力边界
+
+握手必须支持 v2 describe 与批量帧接收，不回退到旧 describe 或单帧。反向调用、orderKey、group、cancel before-start、outcome、binary 与 transfer 仍按实际能力协商；显式调用缺失能力时拒绝。
+
+此接口不提供事务、共享内存、透明安全重试或自动 direct/upgrade 通道。浏览器载体及自定义 endpoint 继续使用公开 core/browser 子路径。
