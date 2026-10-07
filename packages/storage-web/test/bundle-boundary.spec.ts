@@ -125,8 +125,8 @@ const expectedRetainedModules = [
   '@migaia/storage-web/dist/reactive-controller-[chunk].js',
   '@migaia/storage-web/dist/transaction-[chunk].js',
   '@migaia/utils/dist/bytes.js',
-  '@migaia/utils/dist/error-text-[chunk].js',
-  '@migaia/utils/dist/error.js',
+  // 0741596c: bytes imports attachErrorIdentity, sharing the unchanged utils error chunk.
+  '@migaia/utils/dist/error-[chunk].js',
   '@migaia/utils/dist/object-path.js',
   '@migaia/utils/dist/scheduler.js',
   '@migaia/utils/dist/promise.js',
