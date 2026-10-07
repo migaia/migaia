@@ -240,7 +240,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   readonly #pipeline: RpcOutboundSender
   /** Once-finalized private proof selects only the canonical request/response optimization. */
   readonly #fast: boolean
-  /** Immutable carrier/component agreement permits physical batch parsing and sending. */
+  /** Qualified batch sending and synchronous identity admission. */
   readonly #batch: boolean
   /** Factory-owned framing overhead is shared by ingress and the existing sender. */
   readonly #physicalLimit: number
@@ -562,7 +562,10 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                   rejectRpcPhysicalFrameSize()
               } else assertRpcPhysicalFrameSize(physical.data, limit)
             }
-            if (this.#batch && (this.#authentication || typeof frame === 'string'))
+            if (
+              hasBatchAgreement(this.kernel.transport) &&
+              (this.#authentication || typeof frame === 'string')
+            )
               assertRpcPhysicalFrameSize(frame, this.#physicalLimit)
             /** Private physical binding follows this exact context through async transforms. */
             const authenticationContext = {
@@ -680,12 +683,9 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                 receipt!,
                 restoredBinary
               )
-            /**
-             * Unknown/no-capability carriers keep their original normalize path without batch
-             * probing.
-             */
+            /** Receive negotiated batches independently of send optimization. */
             let members: readonly unknown[] | undefined
-            if (this.#batch) {
+            if (hasBatchAgreement(this.kernel.transport)) {
               try {
                 members = readRpcBatchMembers(decoded)
               } catch (cause) {
