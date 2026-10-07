@@ -1,0 +1,29 @@
+---
+title: rpc - 高阶用法
+---
+
+# 高阶用法
+
+## 容量与并发
+
+legacy 墓碑账本用于 web 载体、BroadcastChannel 与自定义 ID。默认保留 310000 ms，出站 4096/endpoint，入站 1024/peer、4096 全局；容量导出的持续上限约 13.21 次/秒/endpoint、3.30 次/秒/peer、13.21 次/秒全局。具备真实 replay-window L 资格的独占 process/Worker 通道不受此墓碑持续速率限制。
+
+provider 默认每 peer 64、全局 256 并发，超限返回 OVERLOADED。高频小调用请批量发送或使用 Promise.all，并控制并发。有依赖的串行 await 不能自动合并。当前机器稳定吞吐尚无合格测量值，不提供速度承诺。
+
+## 取消、顺序与组合
+
+默认 request/stream 超时 30000 ms；每调用 timeoutMs:false 关闭默认期限，0 表示立即到期。普通取消是协作式，不证明 provider 未执行。cancel:'before-start' 只撤销开始许可；开始先赢后保留真实结果。orderKey 在最终 provider 的原命名空间串行化。
+
+group 原子预留完整容量并按序执行，保留成功步，首个失败后的步骤标记 not-executed；不回滚副作用，不是事务。outcome 只读原结果 owner；unknown 不等于未执行。
+
+## 二进制与 transfer
+
+ArrayBuffer/Uint8Array 需要实际 binary profile，视图保留 offset/length。完整 backing 参与签名与预算，共享 backing 的视图共享所有权。thread transfer 还要求实际 clone-transfer carrier 与 sign-only 支持，物理 commit 时 detach；后续失败不能恢复 buffer，也不能自动重放。process 明确拒绝 transfer 选项。
+
+SharedArrayBuffer/Atomics 及未支持的 typed arrays 不在契约内。opaque、加密、缺 digest、byte carrier 或 chunk 的不支持组合在 commit 前拒绝，不降级为明文或自动复制。
+
+## 转发与资源释放
+
+expose 已接受连接的方法前缀可以透明转发。每跳固定实际 target/generation，最多三层，拒绝环；鉴权依直接上一跳，不委托原调用者身份。连接方法目录 ready 不证明远端 Host 安装事务已提交。
+
+close 立即撤销新准入，原在途工作沿 native drain 结算，重复调用返回同一个 Promise。stop/kill/restart/replace 只能使用真实 native owner 权限；borrowed 连接只释放本端。

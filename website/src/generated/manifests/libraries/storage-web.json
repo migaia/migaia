@@ -1814,7 +1814,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`。它是 kind-hidden 的原生 Feature：同一 `definePlugin(., { reactive })` 安装时由 PluginHost 注入 exact Store 和 Host 已快照的 scheduler，而不是由调用者传入 backend-kind token。该 API 只定义 storage-domain 的 source/visibility；generation、refresh、取消、quiescence 和 fanout 仍分别由 Resource、lifecycle 与 event-subscriber 持有，不允许自建第二套状态机或资源注册表。"
+                "text": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`。它是 kind-hidden 的原生 Feature：同一 `definePlugin(., { reactive })` 安装时由 PluginHost 注入 exact Store 和 Host 已快照的 scheduler，而不是由调用者传入 backend-kind token。"
+              },
+              {
+                "type": "paragraph",
+                "text": "该 API 只定义 storage-domain 的 source/visibility；generation、refresh、取消、quiescence 和 fanout 仍分别由 Resource、lifecycle 与 event-subscriber 持有，不允许自建第二套状态机或资源注册表。"
               }
             ]
           },
@@ -2171,7 +2175,7 @@
           "name": "IExtensionStage",
           "kind": "type",
           "signature": "export type IExtensionStage = 'schema' | 'codec' | 'migration' | 'comparator' | 'diagnostic';",
-          "declarationLine": 38,
+          "declarationLine": 52,
           "source": "packages/storage-web/dist/types/errors.d.ts",
           "purpose": "IExtensionStage is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IExtensionStage.",
@@ -2303,7 +2307,7 @@
           "name": "IStorageChannel",
           "kind": "type",
           "signature": "export type IStorageChannel = 'value' | 'bytes' | 'record';",
-          "declarationLine": 37,
+          "declarationLine": 51,
           "source": "packages/storage-web/dist/types/errors.d.ts",
           "purpose": "IStorageChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageChannel.",
@@ -2782,7 +2786,7 @@
           "name": "StorageError",
           "kind": "class",
           "signature": "export declare class StorageError extends Error { readonly source: string; readonly code: IStorageErrorCode; readonly backend?: IBackendKind; readonly key?: string | IStorageKey; readonly existingChannel?: IStorageChannel; readonly attemptedChannel?: IStorageChannel; readonly extensionStage?: IExtensionStage; readonly operation?: string; /** Internal repository stage used to apply invalid-record policy. */ readonly stage?: 'decode' | 'migrate' | 'validate'; constructor(code: IStorageErrorCode, details?: IStorageErrorDetails, message?: string, stage?: 'decode' | 'migrate' | 'validate'); }",
-          "declarationLine": 40,
+          "declarationLine": 54,
           "source": "packages/storage-web/dist/types/errors.d.ts",
           "purpose": "所有后端异常的统一归一化形态。原始异常一律进 cause，不改写其 message。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StorageError.",
@@ -3275,7 +3279,7 @@
         {
           "name": "StorageErrorText",
           "kind": "const",
-          "signature": "export declare const StorageErrorText: Readonly<{ /** Stable text for rejecting malformed backend identifiers before host mutation. */ readonly backendIdInvalid: \"storage backend id is invalid\"; /** Stable text for duplicate backend registration or install-batch identifiers. */ readonly backendDuplicate: \"storage backend is already installed\"; /** Stable text for a valid backend identifier absent from the host registry. */ readonly backendNotInstalled: \"storage backend is not installed\"; /** Stable text for backend plugin/store contract rejection. */ readonly backendPluginInvalid: \"storage backend plugin is invalid\"; /** Stable text for backend factory, preparation, or PluginHost install failure. */ readonly backendInstallFailed: \"storage backend installation failed\"; /** Stable text for rejecting host mutation while another batch is installing. */ readonly storageHostBusy: \"storage host is busy installing plugins\"; /** Stable text for host operations after seal or terminal disposal. */ readonly storageHostDisposed: \"storage host is disposed\"; /** Stable text for aggregate host cleanup failure. */ readonly storageHostDisposeFailed: \"storage host failed to dispose\"; /** Stable text for aggregate live-query cleanup failure. */ readonly liveQueryDisposeFailed: \"live query failed to dispose\"; /** Stable text for malformed reactive feature/provider/adapter descriptors. */ readonly reactiveFeatureInvalid: \"reactive feature is invalid\"; /** Stable text for rejected reactive feature topology. */ readonly reactiveTopologyInvalid: \"reactive feature topology is invalid\"; /** Stable text for live-query service lookup before service installation. */ readonly reactiveServiceNotInstalled: \"reactive live-query service is not installed\"; /** Stable text for backend reactive adapter lookup failure. */ readonly reactiveAdapterNotInstalled: \"reactive backend adapter is not installed\"; /** Stable text for recoverable adapter event, poll, or authoritative-read failure. */ readonly reactiveAdapterFailed: \"reactive backend adapter failed\"; /** Stable text for aggregate reactive adapter/service cleanup failure. */ readonly reactiveAdapterDisposeFailed: \"reactive backend adapter failed to dispose\"; /** Stable text for a live-query callback failure retained under EXTENSION_FAILED. */ readonly liveQueryFailed: \"live query extension failed\"; /** Stable text for aggregate direct backend cleanup failure. */ readonly backendDisposeFailed: \"storage backend failed to dispose\"; readonly indexOrphan: \"indexed record index contains orphan sidecar row\"; readonly indexQueryInvalidated: \"native record index query invalidated by a concurrent mutation\"; readonly liveQueryDisposed: \"live query is disposed; create a new live query\"; readonly indexBackfillStale: \"indexed record backfill handle is stale; retry the query\"; /** Stable cause text for rejecting bounded backfill projection work before sidecar writes. */ readonly indexBackfillProjectionTooLarge: \"indexed record backfill projection exceeds its fixed limit\"; /** Stable cause text for rejecting decoded backfill work before issuing a partial batch. */ readonly indexBackfillDecodedTooLarge: \"indexed record backfill decoded payload exceeds its fixed limit\"; }>;",
+          "signature": "export declare const StorageErrorText: Readonly<{ /** Standard Schema issue arrays must contain object entries with string messages. */ readonly standardSchemaIssuesInvalid: \"Standard Schema returned invalid issues\"; /** Namespace codecs must encode a physical key as a string. */ readonly namespaceCodecEncodeInvalid: \"namespace codec encode must return a string\"; /** Namespace codecs may decode only a string key or an absent foreign namespace. */ readonly namespaceCodecDecodeInvalid: \"namespace codec decode must return string or undefined\"; /** Injected Web Storage values must implement the complete Storage surface. */ readonly webStorageInjectionInvalid: \"web storage injection must implement the Storage surface\"; /** Live Web Storage length must remain a usable enumeration bound. */ readonly webStorageLengthInvalid: \"web storage length must remain a non-negative safe integer\"; /** Live Web Storage enumeration must return a string key for every visible index. */ readonly webStorageKeyInvalid: \"web storage key enumeration must return one unique string per index\"; /** Live Web Storage enumeration must not repeat the same physical key. */ readonly webStorageKeyDuplicate: \"web storage key enumeration returned a duplicate physical key\"; /** IndexedDB coordination hints must contain decodable storage keys. */ readonly indexedDbChangeHintKeyInvalid: \"invalid IndexedDB change hint key\"; /** IndexedDB upgrade events require the transaction supplied by the platform. */ readonly indexedDbUpgradeTransactionMissing: \"IndexedDB upgrade event is missing its transaction\"; /** A cookie document must keep exposing its string cookie property after admission. */ readonly cookieDocumentBecameInvalid: \"cookie document must continue exposing a string cookie property\"; /** Entity ordering extensions must return a finite comparable number. */ readonly entityComparatorInvalid: \"entity orderBy comparator must return a number\"; /** Encoded storage keys are bounded to the contract depth and node limits. */ readonly storageKeyDecodeLimitExceeded: \"storage key exceeds decode limits\"; /** Encoded storage keys must use the canonical two-slot wire tuple. */ readonly storageKeyWireInvalid: \"invalid storage key wire\"; /** Encoded binary storage keys must remain within the public key-size limit. */ readonly storageKeyBinaryTooLarge: \"key too large\"; /** Encoded storage keys must use one of the registered wire tags. */ readonly storageKeyWireTagInvalid: \"invalid storage key wire tag\"; /** Stable text for rejecting malformed backend identifiers before host mutation. */ readonly backendIdInvalid: \"storage backend id is invalid\"; /** Stable text for duplicate backend registration or install-batch identifiers. */ readonly backendDuplicate: \"storage backend is already installed\"; /** Stable text for a valid backend identifier absent from the host registry. */ readonly backendNotInstalled: \"storage backend is not installed\"; /** Stable text for backend plugin/store contract rejection. */ readonly backendPluginInvalid: \"storage backend plugin is invalid\"; /** Stable text for backend factory, preparation, or PluginHost install failure. */ readonly backendInstallFailed: \"storage backend installation failed\"; /** Stable text for rejecting host mutation while another batch is installing. */ readonly storageHostBusy: \"storage host is busy installing plugins\"; /** Stable text for host operations after seal or terminal disposal. */ readonly storageHostDisposed: \"storage host is disposed\"; /** Stable text for aggregate host cleanup failure. */ readonly storageHostDisposeFailed: \"storage host failed to dispose\"; /** Stable text for aggregate live-query cleanup failure. */ readonly liveQueryDisposeFailed: \"live query failed to dispose\"; /** Stable text for malformed reactive feature/provider/adapter descriptors. */ readonly reactiveFeatureInvalid: \"reactive feature is invalid\"; /** Stable text for rejected reactive feature topology. */ readonly reactiveTopologyInvalid: \"reactive feature topology is invalid\"; /** Stable text for live-query service lookup before service installation. */ readonly reactiveServiceNotInstalled: \"reactive live-query service is not installed\"; /** Stable text for backend reactive adapter lookup failure. */ readonly reactiveAdapterNotInstalled: \"reactive backend adapter is not installed\"; /** Stable text for recoverable adapter event, poll, or authoritative-read failure. */ readonly reactiveAdapterFailed: \"reactive backend adapter failed\"; /** Stable text for aggregate reactive adapter/service cleanup failure. */ readonly reactiveAdapterDisposeFailed: \"reactive backend adapter failed to dispose\"; /** Stable text for a live-query callback failure retained under EXTENSION_FAILED. */ readonly liveQueryFailed: \"live query extension failed\"; /** Stable text for aggregate direct backend cleanup failure. */ readonly backendDisposeFailed: \"storage backend failed to dispose\"; readonly indexOrphan: \"indexed record index contains orphan sidecar row\"; readonly indexQueryInvalidated: \"native record index query invalidated by a concurrent mutation\"; readonly liveQueryDisposed: \"live query is disposed; create a new live query\"; readonly indexBackfillStale: \"indexed record backfill handle is stale; retry the query\"; /** Stable cause text for rejecting bounded backfill projection work before sidecar writes. */ readonly indexBackfillProjectionTooLarge: \"indexed record backfill projection exceeds its fixed limit\"; /** Stable cause text for rejecting decoded backfill work before issuing a partial batch. */ readonly indexBackfillDecodedTooLarge: \"indexed record backfill decoded payload exceeds its fixed limit\"; }>;",
           "declarationLine": 2,
           "source": "packages/storage-web/dist/error-text.d.ts",
           "purpose": "Stable diagnostic text for an IndexedDB sidecar row without an authoritative record.",
@@ -3293,7 +3297,7 @@
           "aliasOf": "StorageErrorText",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const StorageErrorText: Readonly<{ /** Stable text for rejecting malformed backend identifiers before host mutation. */ readonly backendIdInvalid: \"storage backend id is invalid\"; /** Stable text for duplicate backend registration or install-batch identifiers. */ readonly backendDuplicate: \"storage backend is already installed\"; /** Stable text for a valid backend identifier absent from the host registry. */ readonly backendNotInstalled: \"storage backend is not installed\"; /** Stable text for backend plugin/store contract rejection. */ readonly backendPluginInvalid: \"storage backend plugin is invalid\"; /** Stable text for backend factory, preparation, or PluginHost install failure. */ readonly backendInstallFailed: \"storage backend installation failed\"; /** Stable text for rejecting host mutation while another batch is installing. */ readonly storageHostBusy: \"storage host is busy installing plugins\"; /** Stable text for host operations after seal or terminal disposal. */ readonly storageHostDisposed: \"storage host is disposed\"; /** Stable text for aggregate host cleanup failure. */ readonly storageHostDisposeFailed: \"storage host failed to dispose\"; /** Stable text for aggregate live-query cleanup failure. */ readonly liveQueryDisposeFailed: \"live query failed to dispose\"; /** Stable text for malformed reactive feature/provider/adapter descriptors. */ readonly reactiveFeatureInvalid: \"reactive feature is invalid\"; /** Stable text for rejected reactive feature topology. */ readonly reactiveTopologyInvalid: \"reactive feature topology is invalid\"; /** Stable text for live-query service lookup before service installation. */ readonly reactiveServiceNotInstalled: \"reactive live-query service is not installed\"; /** Stable text for backend reactive adapter lookup failure. */ readonly reactiveAdapterNotInstalled: \"reactive backend adapter is not installed\"; /** Stable text for recoverable adapter event, poll, or authoritative-read failure. */ readonly reactiveAdapterFailed: \"reactive backend adapter failed\"; /** Stable text for aggregate reactive adapter/service cleanup failure. */ readonly reactiveAdapterDisposeFailed: \"reactive backend adapter failed to dispose\"; /** Stable text for a live-query callback failure retained under EXTENSION_FAILED. */ readonly liveQueryFailed: \"live query extension failed\"; /** Stable text for aggregate direct backend cleanup failure. */ readonly backendDisposeFailed: \"storage backend failed to dispose\"; readonly indexOrphan: \"indexed record index contains orphan sidecar row\"; readonly indexQueryInvalidated: \"native record index query invalidated by a concurrent mutation\"; readonly liveQueryDisposed: \"live query is disposed; create a new live query\"; readonly indexBackfillStale: \"indexed record backfill handle is stale; retry the query\"; /** Stable cause text for rejecting bounded backfill projection work before sidecar writes. */ readonly indexBackfillProjectionTooLarge: \"indexed record backfill projection exceeds its fixed limit\"; /** Stable cause text for rejecting decoded backfill work before issuing a partial batch. */ readonly indexBackfillDecodedTooLarge: \"indexed record backfill decoded payload exceeds its fixed limit\"; }>;"
+            "export declare const StorageErrorText: Readonly<{ /** Standard Schema issue arrays must contain object entries with string messages. */ readonly standardSchemaIssuesInvalid: \"Standard Schema returned invalid issues\"; /** Namespace codecs must encode a physical key as a string. */ readonly namespaceCodecEncodeInvalid: \"namespace codec encode must return a string\"; /** Namespace codecs may decode only a string key or an absent foreign namespace. */ readonly namespaceCodecDecodeInvalid: \"namespace codec decode must return string or undefined\"; /** Injected Web Storage values must implement the complete Storage surface. */ readonly webStorageInjectionInvalid: \"web storage injection must implement the Storage surface\"; /** Live Web Storage length must remain a usable enumeration bound. */ readonly webStorageLengthInvalid: \"web storage length must remain a non-negative safe integer\"; /** Live Web Storage enumeration must return a string key for every visible index. */ readonly webStorageKeyInvalid: \"web storage key enumeration must return one unique string per index\"; /** Live Web Storage enumeration must not repeat the same physical key. */ readonly webStorageKeyDuplicate: \"web storage key enumeration returned a duplicate physical key\"; /** IndexedDB coordination hints must contain decodable storage keys. */ readonly indexedDbChangeHintKeyInvalid: \"invalid IndexedDB change hint key\"; /** IndexedDB upgrade events require the transaction supplied by the platform. */ readonly indexedDbUpgradeTransactionMissing: \"IndexedDB upgrade event is missing its transaction\"; /** A cookie document must keep exposing its string cookie property after admission. */ readonly cookieDocumentBecameInvalid: \"cookie document must continue exposing a string cookie property\"; /** Entity ordering extensions must return a finite comparable number. */ readonly entityComparatorInvalid: \"entity orderBy comparator must return a number\"; /** Encoded storage keys are bounded to the contract depth and node limits. */ readonly storageKeyDecodeLimitExceeded: \"storage key exceeds decode limits\"; /** Encoded storage keys must use the canonical two-slot wire tuple. */ readonly storageKeyWireInvalid: \"invalid storage key wire\"; /** Encoded binary storage keys must remain within the public key-size limit. */ readonly storageKeyBinaryTooLarge: \"key too large\"; /** Encoded storage keys must use one of the registered wire tags. */ readonly storageKeyWireTagInvalid: \"invalid storage key wire tag\"; /** Stable text for rejecting malformed backend identifiers before host mutation. */ readonly backendIdInvalid: \"storage backend id is invalid\"; /** Stable text for duplicate backend registration or install-batch identifiers. */ readonly backendDuplicate: \"storage backend is already installed\"; /** Stable text for a valid backend identifier absent from the host registry. */ readonly backendNotInstalled: \"storage backend is not installed\"; /** Stable text for backend plugin/store contract rejection. */ readonly backendPluginInvalid: \"storage backend plugin is invalid\"; /** Stable text for backend factory, preparation, or PluginHost install failure. */ readonly backendInstallFailed: \"storage backend installation failed\"; /** Stable text for rejecting host mutation while another batch is installing. */ readonly storageHostBusy: \"storage host is busy installing plugins\"; /** Stable text for host operations after seal or terminal disposal. */ readonly storageHostDisposed: \"storage host is disposed\"; /** Stable text for aggregate host cleanup failure. */ readonly storageHostDisposeFailed: \"storage host failed to dispose\"; /** Stable text for aggregate live-query cleanup failure. */ readonly liveQueryDisposeFailed: \"live query failed to dispose\"; /** Stable text for malformed reactive feature/provider/adapter descriptors. */ readonly reactiveFeatureInvalid: \"reactive feature is invalid\"; /** Stable text for rejected reactive feature topology. */ readonly reactiveTopologyInvalid: \"reactive feature topology is invalid\"; /** Stable text for live-query service lookup before service installation. */ readonly reactiveServiceNotInstalled: \"reactive live-query service is not installed\"; /** Stable text for backend reactive adapter lookup failure. */ readonly reactiveAdapterNotInstalled: \"reactive backend adapter is not installed\"; /** Stable text for recoverable adapter event, poll, or authoritative-read failure. */ readonly reactiveAdapterFailed: \"reactive backend adapter failed\"; /** Stable text for aggregate reactive adapter/service cleanup failure. */ readonly reactiveAdapterDisposeFailed: \"reactive backend adapter failed to dispose\"; /** Stable text for a live-query callback failure retained under EXTENSION_FAILED. */ readonly liveQueryFailed: \"live query extension failed\"; /** Stable text for aggregate direct backend cleanup failure. */ readonly backendDisposeFailed: \"storage backend failed to dispose\"; readonly indexOrphan: \"indexed record index contains orphan sidecar row\"; readonly indexQueryInvalidated: \"native record index query invalidated by a concurrent mutation\"; readonly liveQueryDisposed: \"live query is disposed; create a new live query\"; readonly indexBackfillStale: \"indexed record backfill handle is stale; retry the query\"; /** Stable cause text for rejecting bounded backfill projection work before sidecar writes. */ readonly indexBackfillProjectionTooLarge: \"indexed record backfill projection exceeds its fixed limit\"; /** Stable cause text for rejecting decoded backfill work before issuing a partial batch. */ readonly indexBackfillDecodedTooLarge: \"indexed record backfill decoded payload exceeds its fixed limit\"; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3332,7 +3336,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/error-text.d.ts:StorageErrorText:export declare const StorageErrorText: Readonly<{ /** Stable text for rejecting malformed backend identifiers before host mutation. */ readonly backendIdInvalid: \"storage backend id is invalid\"; /** Stable text for duplicate backend registration or install-batch identifiers. */ readonly backendDuplicate: \"storage backend is already installed\"; /** Stable text for a valid backend identifier absent from the host registry. */ readonly backendNotInstalled: \"storage backend is not installed\"; /** Stable text for backend plugin/store contract rejection. */ readonly backendPluginInvalid: \"storage backend plugin is invalid\"; /** Stable text for backend factory, preparation, or PluginHost install failure. */ readonly backendInstallFailed: \"storage backend installation failed\"; /** Stable text for rejecting host mutation while another batch is installing. */ readonly storageHostBusy: \"storage host is busy installing plugins\"; /** Stable text for host operations after seal or terminal disposal. */ readonly storageHostDisposed: \"storage host is disposed\"; /** Stable text for aggregate host cleanup failure. */ readonly storageHostDisposeFailed: \"storage host failed to dispose\"; /** Stable text for aggregate live-query cleanup failure. */ readonly liveQueryDisposeFailed: \"live query failed to dispose\"; /** Stable text for malformed reactive feature/provider/adapter descriptors. */ readonly reactiveFeatureInvalid: \"reactive feature is invalid\"; /** Stable text for rejected reactive feature topology. */ readonly reactiveTopologyInvalid: \"reactive feature topology is invalid\"; /** Stable text for live-query service lookup before service installation. */ readonly reactiveServiceNotInstalled: \"reactive live-query service is not installed\"; /** Stable text for backend reactive adapter lookup failure. */ readonly reactiveAdapterNotInstalled: \"reactive backend adapter is not installed\"; /** Stable text for recoverable adapter event, poll, or authoritative-read failure. */ readonly reactiveAdapterFailed: \"reactive backend adapter failed\"; /** Stable text for aggregate reactive adapter/service cleanup failure. */ readonly reactiveAdapterDisposeFailed: \"reactive backend adapter failed to dispose\"; /** Stable text for a live-query callback failure retained under EXTENSION_FAILED. */ readonly liveQueryFailed: \"live query extension failed\"; /** Stable text for aggregate direct backend cleanup failure. */ readonly backendDisposeFailed: \"storage backend failed to dispose\"; readonly indexOrphan: \"indexed record index contains orphan sidecar row\"; readonly indexQueryInvalidated: \"native record index query invalidated by a concurrent mutation\"; readonly liveQueryDisposed: \"live query is disposed; create a new live query\"; readonly indexBackfillStale: \"indexed record backfill handle is stale; retry the query\"; /** Stable cause text for rejecting bounded backfill projection work before sidecar writes. */ readonly indexBackfillProjectionTooLarge: \"indexed record backfill projection exceeds its fixed limit\"; /** Stable cause text for rejecting decoded backfill work before issuing a partial batch. */ readonly indexBackfillDecodedTooLarge: \"indexed record backfill decoded payload exceeds its fixed limit\"; }>;",
+          "identity": "packages/storage-web/dist/error-text.d.ts:StorageErrorText:export declare const StorageErrorText: Readonly<{ /** Standard Schema issue arrays must contain object entries with string messages. */ readonly standardSchemaIssuesInvalid: \"Standard Schema returned invalid issues\"; /** Namespace codecs must encode a physical key as a string. */ readonly namespaceCodecEncodeInvalid: \"namespace codec encode must return a string\"; /** Namespace codecs may decode only a string key or an absent foreign namespace. */ readonly namespaceCodecDecodeInvalid: \"namespace codec decode must return string or undefined\"; /** Injected Web Storage values must implement the complete Storage surface. */ readonly webStorageInjectionInvalid: \"web storage injection must implement the Storage surface\"; /** Live Web Storage length must remain a usable enumeration bound. */ readonly webStorageLengthInvalid: \"web storage length must remain a non-negative safe integer\"; /** Live Web Storage enumeration must return a string key for every visible index. */ readonly webStorageKeyInvalid: \"web storage key enumeration must return one unique string per index\"; /** Live Web Storage enumeration must not repeat the same physical key. */ readonly webStorageKeyDuplicate: \"web storage key enumeration returned a duplicate physical key\"; /** IndexedDB coordination hints must contain decodable storage keys. */ readonly indexedDbChangeHintKeyInvalid: \"invalid IndexedDB change hint key\"; /** IndexedDB upgrade events require the transaction supplied by the platform. */ readonly indexedDbUpgradeTransactionMissing: \"IndexedDB upgrade event is missing its transaction\"; /** A cookie document must keep exposing its string cookie property after admission. */ readonly cookieDocumentBecameInvalid: \"cookie document must continue exposing a string cookie property\"; /** Entity ordering extensions must return a finite comparable number. */ readonly entityComparatorInvalid: \"entity orderBy comparator must return a number\"; /** Encoded storage keys are bounded to the contract depth and node limits. */ readonly storageKeyDecodeLimitExceeded: \"storage key exceeds decode limits\"; /** Encoded storage keys must use the canonical two-slot wire tuple. */ readonly storageKeyWireInvalid: \"invalid storage key wire\"; /** Encoded binary storage keys must remain within the public key-size limit. */ readonly storageKeyBinaryTooLarge: \"key too large\"; /** Encoded storage keys must use one of the registered wire tags. */ readonly storageKeyWireTagInvalid: \"invalid storage key wire tag\"; /** Stable text for rejecting malformed backend identifiers before host mutation. */ readonly backendIdInvalid: \"storage backend id is invalid\"; /** Stable text for duplicate backend registration or install-batch identifiers. */ readonly backendDuplicate: \"storage backend is already installed\"; /** Stable text for a valid backend identifier absent from the host registry. */ readonly backendNotInstalled: \"storage backend is not installed\"; /** Stable text for backend plugin/store contract rejection. */ readonly backendPluginInvalid: \"storage backend plugin is invalid\"; /** Stable text for backend factory, preparation, or PluginHost install failure. */ readonly backendInstallFailed: \"storage backend installation failed\"; /** Stable text for rejecting host mutation while another batch is installing. */ readonly storageHostBusy: \"storage host is busy installing plugins\"; /** Stable text for host operations after seal or terminal disposal. */ readonly storageHostDisposed: \"storage host is disposed\"; /** Stable text for aggregate host cleanup failure. */ readonly storageHostDisposeFailed: \"storage host failed to dispose\"; /** Stable text for aggregate live-query cleanup failure. */ readonly liveQueryDisposeFailed: \"live query failed to dispose\"; /** Stable text for malformed reactive feature/provider/adapter descriptors. */ readonly reactiveFeatureInvalid: \"reactive feature is invalid\"; /** Stable text for rejected reactive feature topology. */ readonly reactiveTopologyInvalid: \"reactive feature topology is invalid\"; /** Stable text for live-query service lookup before service installation. */ readonly reactiveServiceNotInstalled: \"reactive live-query service is not installed\"; /** Stable text for backend reactive adapter lookup failure. */ readonly reactiveAdapterNotInstalled: \"reactive backend adapter is not installed\"; /** Stable text for recoverable adapter event, poll, or authoritative-read failure. */ readonly reactiveAdapterFailed: \"reactive backend adapter failed\"; /** Stable text for aggregate reactive adapter/service cleanup failure. */ readonly reactiveAdapterDisposeFailed: \"reactive backend adapter failed to dispose\"; /** Stable text for a live-query callback failure retained under EXTENSION_FAILED. */ readonly liveQueryFailed: \"live query extension failed\"; /** Stable text for aggregate direct backend cleanup failure. */ readonly backendDisposeFailed: \"storage backend failed to dispose\"; readonly indexOrphan: \"indexed record index contains orphan sidecar row\"; readonly indexQueryInvalidated: \"native record index query invalidated by a concurrent mutation\"; readonly liveQueryDisposed: \"live query is disposed; create a new live query\"; readonly indexBackfillStale: \"indexed record backfill handle is stale; retry the query\"; /** Stable cause text for rejecting bounded backfill projection work before sidecar writes. */ readonly indexBackfillProjectionTooLarge: \"indexed record backfill projection exceeds its fixed limit\"; /** Stable cause text for rejecting decoded backfill work before issuing a partial batch. */ readonly indexBackfillDecodedTooLarge: \"indexed record backfill decoded payload exceeds its fixed limit\"; }>;",
           "guidance": [
             {
               "id": "错误模块",
@@ -5219,7 +5223,7 @@
           "name": "assertStorageBackendId",
           "kind": "const",
           "signature": "export declare const assertStorageBackendId: (id: unknown) => asserts id is string;",
-          "declarationLine": 76,
+          "declarationLine": 75,
           "source": "packages/storage-web/dist/host/contracts.d.ts",
           "purpose": "Validates the bounded, case-sensitive backend identifier contract before any mutation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageBackendId.",
@@ -5283,7 +5287,7 @@
           "name": "createStorageHost",
           "kind": "const",
           "signature": "export declare const createStorageHost: <const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []>(options?: IStorageHostCreateOptions<TPlugins>) => Promise<IStorageHost<IPluginStoreMap<TPlugins>, Extract<IStoragePluginReactiveId<TPlugins[number]>, keyof IPluginStoreMap<TPlugins> & string>, IStoragePluginExtensions<TPlugins[number]>>>;",
-          "declarationLine": 55,
+          "declarationLine": 53,
           "source": "packages/storage-web/dist/host/storage-host.d.ts",
           "purpose": "Creates an async R02 facade shell; constructor sync work never reads platform globals.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStorageHost.",
@@ -5356,7 +5360,7 @@
             },
             {
               "name": "scheduler",
-              "type": "ILifecycleScheduler",
+              "type": "IScheduler",
               "optional": true,
               "description": "Supplies deterministic lifecycle time for installation, rollback, and cleanup."
             },
@@ -5389,7 +5393,7 @@
             },
             {
               "name": "scheduler",
-              "type": "ILifecycleScheduler",
+              "type": "IScheduler",
               "optional": true,
               "description": "`installTimeoutMs` 默认 30 秒，作用于整个安装 batch；`scheduler` 可注入确定性时间；`report` 只接收 late rejection/cleanup 等诊断，reporter 自己失败不会覆盖主错误。安装中再次 `use()` 会抛 `STORAGE_HOST_BUSY`。",
               "descriptionEn": "Supplies deterministic lifecycle time for installation, rollback, and cleanup.",
@@ -5409,8 +5413,8 @@
         {
           "name": "defineFeature",
           "kind": "const",
-          "signature": "export declare const defineFeature: <const TDependencies extends IFeatureRecord = Record<never, never>, TOutput extends object = Record<never, never>>(factory: (core: { readonly featureExpose: IStorageNativeFeatureExpose<Record<never, never>>; }, dependencies: IFeatureOutputs<TDependencies>) => TOutput, dependencies?: TDependencies) => IFeature<IStorageNativeFeatureExpose<Record<never, never>>, TOutput, TDependencies>;",
-          "declarationLine": 46,
+          "signature": "export declare const defineFeature: <const TDependencies extends IFeatureDependencyRecord = Record<never, never>, TOutput extends object = Record<never, never>>(factory: (core: { readonly featureExpose: IStorageNativeFeatureExpose<Record<never, never>>; }, dependencies: IFeatureOutputs<TDependencies>) => TOutput, dependencies?: TDependencies) => IFeature<IStorageNativeFeatureExpose<Record<never, never>>, TOutput, TDependencies>;",
+          "declarationLine": 44,
           "source": "packages/storage-web/dist/host/contracts.d.ts",
           "purpose": "Defines a Storage Feature with the registration-local Store capabilities available by default.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineFeature.",
@@ -5425,7 +5429,7 @@
           "aliasOf": "defineFeature",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export declare const defineFeature: <const TDependencies extends IFeatureRecord = Record<never, never>, TOutput extends object = Record<never, never>>(factory: (core: { readonly featureExpose: IStorageNativeFeatureExpose<Record<never, never>>; }, dependencies: IFeatureOutputs<TDependencies>) => TOutput, dependencies?: TDependencies) => IFeature<IStorageNativeFeatureExpose<Record<never, never>>, TOutput, TDependencies>;"
+            "export declare const defineFeature: <const TDependencies extends IFeatureDependencyRecord = Record<never, never>, TOutput extends object = Record<never, never>>(factory: (core: { readonly featureExpose: IStorageNativeFeatureExpose<Record<never, never>>; }, dependencies: IFeatureOutputs<TDependencies>) => TOutput, dependencies?: TDependencies) => IFeature<IStorageNativeFeatureExpose<Record<never, never>>, TOutput, TDependencies>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5464,7 +5468,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/host/contracts.d.ts:defineFeature:export declare const defineFeature: <const TDependencies extends IFeatureRecord = Record<never, never>, TOutput extends object = Record<never, never>>(factory: (core: { readonly featureExpose: IStorageNativeFeatureExpose<Record<never, never>>; }, dependencies: IFeatureOutputs<TDependencies>) => TOutput, dependencies?: TDependencies) => IFeature<IStorageNativeFeatureExpose<Record<never, never>>, TOutput, TDependencies>;",
+          "identity": "packages/storage-web/dist/host/contracts.d.ts:defineFeature:export declare const defineFeature: <const TDependencies extends IFeatureDependencyRecord = Record<never, never>, TOutput extends object = Record<never, never>>(factory: (core: { readonly featureExpose: IStorageNativeFeatureExpose<Record<never, never>>; }, dependencies: IFeatureOutputs<TDependencies>) => TOutput, dependencies?: TDependencies) => IFeature<IStorageNativeFeatureExpose<Record<never, never>>, TOutput, TDependencies>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5474,7 +5478,7 @@
           "name": "definePlugin",
           "kind": "const",
           "signature": "export declare const definePlugin: <const TName extends string, const TFeatures extends IFeatureRecord = Record<never, never>, TStore extends IKeyValueStore = IKeyValueStore, TDescriptor extends IStorageNativePluginDescriptor = IStorageNativePluginDescriptor>(name: TName, descriptorFactory: (core: IStoragePluginCore<TStore, TFeatures>) => TDescriptor, features?: TFeatures & IStorageFeatureStoreCompatibility<TStore, TFeatures>) => IStorageBackendPluginHandle<IStorageNativePluginExtensions<TDescriptor>, TStore> & { readonly id: TName; };",
-          "declarationLine": 57,
+          "declarationLine": 55,
           "source": "packages/storage-web/dist/host/contracts.d.ts",
           "purpose": "Defines a Storage plugin through PluginHost's canonical function form. The Host supplies the implicit per-registration store capability; callers cannot replace it.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for definePlugin.",
@@ -5538,7 +5542,7 @@
           "name": "ILiveQuery",
           "kind": "type",
           "signature": "export type ILiveQuery<T> = { readonly state: ILiveQueryStateView<T>; readonly consistency: IReactiveConsistency; readonly ready: Promise<void>; refresh(): Promise<void>; dispose(): Promise<void>; };",
-          "declarationLine": 155,
+          "declarationLine": 156,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Minimal live-query handle shell reserved for the reactive vertical slice.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILiveQuery.",
@@ -5601,7 +5605,7 @@
           "name": "ILiveQueryOptions",
           "kind": "type",
           "signature": "export type ILiveQueryOptions<TStores extends Record<string, IKeyValueStore>, TBackendId extends keyof TStores & string, T> = { readonly backendId: TBackendId; readonly runtime: IRuntime; readonly query: (context: { readonly store: TStores[TBackendId]; readonly signal: IAbortSignal; readonly scope?: string; }) => T | PromiseLike<T>; /** Optional entity scope used only to prove that an invalidation cannot be unrelated. */ readonly scope?: string; /** Optional change predicate; failures are reported and conservatively refresh the query. */ readonly matches?: (change: IStorageChange) => boolean; /** Preserve the last visible value while Resource refreshes in the background. */ readonly keepPreviousData?: boolean; /** Compare settled values before replacing the visible value projection. */ readonly equals?: (previous: T, next: T) => boolean; /** Per-generation deadline, driven by the Host scheduler. */ readonly timeoutMs?: number; /** External cancellation for the whole query instance. */ readonly signal?: IAbortSignal; /** Report-only sink for stale settlement and cleanup failures. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };",
-          "declarationLine": 163,
+          "declarationLine": 164,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Query input shell retaining the exact backend ID and store type.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILiveQueryOptions.",
@@ -5664,7 +5668,7 @@
           "name": "ILiveQueryState",
           "kind": "type",
           "signature": "export type ILiveQueryState<T> = { readonly status: 'loading'; readonly value?: T; } | { readonly status: 'ready'; readonly value: T; } | { readonly status: 'refreshing'; readonly value: T; } | { readonly status: 'error'; readonly value?: T; readonly error: unknown; } | { readonly status: 'disposed'; readonly value?: T; readonly error?: unknown; };",
-          "declarationLine": 116,
+          "declarationLine": 117,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Public live-query state; Resource settlement remains the sole state authority.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILiveQueryState.",
@@ -5727,7 +5731,7 @@
           "name": "ILiveQueryStateView",
           "kind": "type",
           "signature": "export type ILiveQueryStateView<T> = Pick<IComputedValue<ILiveQueryState<T>>, 'runtime' | 'debugName' | 'observed' | 'value' | 'peek'>;",
-          "declarationLine": 135,
+          "declarationLine": 136,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Non-disposable read-only projection of the same-runtime computed state node.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILiveQueryStateView.",
@@ -5790,7 +5794,7 @@
           "name": "IPluginStoreMap",
           "kind": "type",
           "signature": "export type IPluginStoreMap<TPlugins extends readonly IStorageBackendPluginHandle[]> = { readonly [TPlugin in TPlugins[number] as IStoragePluginId<TPlugin>]: IStoragePluginStore<TPlugin>; };",
-          "declarationLine": 81,
+          "declarationLine": 82,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Maps a plugin tuple into its exact ID-to-store registry.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginStoreMap.",
@@ -5853,7 +5857,7 @@
           "name": "IReactiveBackendHandle",
           "kind": "type",
           "signature": "export type IReactiveBackendHandle<TStore extends IKeyValueStore, TId extends string> = { readonly id: TId; readonly store: TStore; liveQuery<T>(options: Omit<ILiveQueryOptions<{ readonly [TKey in TId]: TStore; }, TId, T>, 'backendId'>): ILiveQuery<T>; };",
-          "declarationLine": 108,
+          "declarationLine": 109,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Stable handle shape reserved for the reactive vertical slice.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IReactiveBackendHandle.",
@@ -5916,7 +5920,7 @@
           "name": "IReactiveConsistency",
           "kind": "type",
           "signature": "export type IReactiveConsistency = Readonly<{ readonly mode: 'push' | 'hybrid' | 'polling'; readonly pollIntervalMs?: number; readonly visibility: IStorageReactiveVisibility; }>;",
-          "declarationLine": 137,
+          "declarationLine": 138,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Frozen consistency admitted by the installed reactive adapter.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IReactiveConsistency.",
@@ -5979,7 +5983,7 @@
           "name": "IRejectInstalledOrDuplicateIds",
           "kind": "type",
           "signature": "export type IRejectInstalledOrDuplicateIds<TStores extends Record<string, IKeyValueStore>, TPlugins extends readonly IStorageBackendPluginHandle[]> = Extract<IStoragePluginId<TPlugins[number]>, keyof TStores & string> extends never ? IHasDuplicatePluginIds<TPlugins> extends true ? never : TPlugins : never;",
-          "declarationLine": 85,
+          "declarationLine": 86,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Rejects duplicate IDs in a literal plugin tuple and IDs already installed in the host.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRejectInstalledOrDuplicateIds.",
@@ -6042,7 +6046,7 @@
           "name": "IStorageBackendKind",
           "kind": "type",
           "signature": "export type IStorageBackendKind<TName extends string, TStore extends IKeyValueStore> = { readonly name: TName; readonly [storageBackendKindBrand]: TStore; };",
-          "declarationLine": 16,
+          "declarationLine": 17,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Opaque backend identity whose store binding cannot be forged by object literals.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageBackendKind.",
@@ -6105,7 +6109,7 @@
           "name": "IStorageBackendPlugin",
           "kind": "type",
           "signature": "export type IStorageBackendPlugin<TStore extends IKeyValueStore, TBackendKind extends IStorageBackendKind<string, IKeyValueStore>, TId extends string, TReactive extends boolean = false, TExtensions extends object = Record<never, never>> = IStorageBackendPluginHandle<TExtensions, TStore> & { readonly id: TId; readonly [storageBackendPluginBrand]: TStore; readonly [storageBackendPluginKindBrand]: TBackendKind; readonly [storageBackendReactiveBrand]: TReactive; };",
-          "declarationLine": 50,
+          "declarationLine": 51,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Exact backend plugin handle returned by a definition factory.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageBackendPlugin.",
@@ -6168,7 +6172,7 @@
           "name": "IStorageBackendPluginHandle",
           "kind": "type",
           "signature": "export type IStorageBackendPluginHandle<TExtensions extends object = Record<never, never>, TStore extends IKeyValueStore = IKeyValueStore> = { readonly id: string; readonly [storageBackendPluginBrand]: TStore; readonly [storageBackendPluginKindBrand]: unknown; readonly [storageBackendReactiveBrand]: boolean; readonly [storageBackendPluginExtensionsBrand]: TExtensions; };",
-          "declarationLine": 42,
+          "declarationLine": 43,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Publicly consumable backend plugin identity shell; runtime metadata stays in WeakMaps.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageBackendPluginHandle.",
@@ -6231,7 +6235,7 @@
           "name": "IStorageHost",
           "kind": "type",
           "signature": "export type IStorageHost<TStores extends Record<string, IKeyValueStore>, TReactiveIds extends keyof TStores & string = never, TExtensions extends object = Record<never, never>> = IStorageHostBase<TStores, TReactiveIds, TExtensions> & ([TReactiveIds] extends [never] ? Record<never, never> : IStorageHostReactiveApi<TStores, TReactiveIds>);",
-          "declarationLine": 191,
+          "declarationLine": 192,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Conditional Host type shell preserving exact backend IDs and reactive capability honesty.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageHost.",
@@ -6294,7 +6298,7 @@
           "name": "IStorageHostBase",
           "kind": "type",
           "signature": "export type IStorageHostBase<TStores extends Record<string, IKeyValueStore>, TReactiveIds extends keyof TStores & string = never, TExtensions extends object = Record<never, never>> = { readonly extensions: Readonly<TExtensions>; use<const TPlugins extends readonly IStorageBackendPluginHandle[]>(...plugins: IRejectInstalledOrDuplicateIds<TStores, TPlugins>): Promise<IStorageHost<TStores & IPluginStoreMap<TPlugins>, TReactiveIds | IStoragePluginReactiveId<TPlugins[number]>, TExtensions & IStoragePluginExtensions<TPlugins[number]>>>; backend<TId extends keyof TStores & string>(id: TId): TStores[TId]; hasBackend(id: string): id is keyof TStores & string; backends(): ReadonlyMap<keyof TStores & string, TStores[keyof TStores]>; hasReactiveBackend(id: string): id is TReactiveIds; reactiveBackend<TId extends keyof TStores & string>(id: TId): IReactiveBackendHandle<TStores[TId], TId> | undefined; reactiveBackend(id: string): IReactiveBackendHandle<IKeyValueStore, string> | undefined; dispose(): Promise<void>; };",
-          "declarationLine": 143,
+          "declarationLine": 144,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Non-reactive Host operations shared by every conditional Host view.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageHostBase.",
@@ -6357,7 +6361,7 @@
           "name": "IStorageHostCreateOptions",
           "kind": "type",
           "signature": "export type IStorageHostCreateOptions<TPlugins extends readonly IStorageBackendPluginHandle[]> = IStorageHostOptions & { /** Initial plugin tuple installed atomically before the host is returned. */ readonly plugins?: IRejectInstalledOrDuplicateIds<Record<never, never>, TPlugins>; };",
-          "declarationLine": 103,
+          "declarationLine": 104,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Constructor options preserving literal plugin tuples for exact Host capabilities.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageHostCreateOptions.",
@@ -6419,8 +6423,8 @@
         {
           "name": "IStorageHostOptions",
           "kind": "type",
-          "signature": "export type IStorageHostOptions = { /** Bounds one complete plugin installation batch; defaults to 30 seconds. */ readonly installTimeoutMs?: number; /** Supplies deterministic lifecycle time for installation, rollback, and cleanup. */ readonly scheduler?: ILifecycleScheduler; /** * Receives contained late rejection and cleanup diagnostics without replacing the primary * failure. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };",
-          "declarationLine": 91,
+          "signature": "export type IStorageHostOptions = { /** Bounds one complete plugin installation batch; defaults to 30 seconds. */ readonly installTimeoutMs?: number; /** Supplies deterministic lifecycle time for installation, rollback, and cleanup. */ readonly scheduler?: IScheduler; /** * Receives contained late rejection and cleanup diagnostics without replacing the primary * failure. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };",
+          "declarationLine": 92,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Host options captured at construction; scheduler ownership remains lifecycle-owned.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageHostOptions.",
@@ -6434,7 +6438,7 @@
           "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type IStorageHostOptions = { /** Bounds one complete plugin installation batch; defaults to 30 seconds. */ readonly installTimeoutMs?: number; /** Supplies deterministic lifecycle time for installation, rollback, and cleanup. */ readonly scheduler?: ILifecycleScheduler; /** * Receives contained late rejection and cleanup diagnostics without replacing the primary * failure. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };"
+            "export type IStorageHostOptions = { /** Bounds one complete plugin installation batch; defaults to 30 seconds. */ readonly installTimeoutMs?: number; /** Supplies deterministic lifecycle time for installation, rollback, and cleanup. */ readonly scheduler?: IScheduler; /** * Receives contained late rejection and cleanup diagnostics without replacing the primary * failure. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6473,7 +6477,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/host/types.d.ts:IStorageHostOptions:export type IStorageHostOptions = { /** Bounds one complete plugin installation batch; defaults to 30 seconds. */ readonly installTimeoutMs?: number; /** Supplies deterministic lifecycle time for installation, rollback, and cleanup. */ readonly scheduler?: ILifecycleScheduler; /** * Receives contained late rejection and cleanup diagnostics without replacing the primary * failure. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };",
+          "identity": "packages/storage-web/dist/host/types.d.ts:IStorageHostOptions:export type IStorageHostOptions = { /** Bounds one complete plugin installation batch; defaults to 30 seconds. */ readonly installTimeoutMs?: number; /** Supplies deterministic lifecycle time for installation, rollback, and cleanup. */ readonly scheduler?: IScheduler; /** * Receives contained late rejection and cleanup diagnostics without replacing the primary * failure. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -6483,7 +6487,7 @@
           "name": "IStorageHostReactiveApi",
           "kind": "type",
           "signature": "export type IStorageHostReactiveApi<TStores extends Record<string, IKeyValueStore>, TReactiveIds extends keyof TStores & string> = { liveQuery<TBackendId extends TReactiveIds, _T>(options: ILiveQueryOptions<TStores, TBackendId, _T>): ILiveQuery<_T>; };",
-          "declarationLine": 187,
+          "declarationLine": 188,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Reactive API is conditionally intersected only when a reactive ID is known.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageHostReactiveApi.",
@@ -6545,8 +6549,8 @@
         {
           "name": "IStorageNativePluginDescriptor",
           "kind": "type",
-          "signature": "export type IStorageNativePluginDescriptor = { readonly install?: () => Record<string, unknown> | PromiseLike<Record<string, unknown>>; readonly expose?: () => Record<string, unknown>; readonly featureExpose?: () => object; readonly shared?: () => Record<PropertyKey, unknown>; };",
-          "declarationLine": 25,
+          "signature": "export type IStorageNativePluginDescriptor = { readonly install?: () => Record<string, unknown> | PromiseLike<Record<string, unknown>>; readonly expose?: () => Record<string, unknown>; readonly featureExpose?: () => object; };",
+          "declarationLine": 24,
           "source": "packages/storage-web/dist/host/contracts.d.ts",
           "purpose": "Native descriptor vocabulary owned by Storage's short public definition form.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageNativePluginDescriptor.",
@@ -6561,7 +6565,7 @@
           "aliasOf": "IStorageNativePluginDescriptor",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type IStorageNativePluginDescriptor = { readonly install?: () => Record<string, unknown> | PromiseLike<Record<string, unknown>>; readonly expose?: () => Record<string, unknown>; readonly featureExpose?: () => object; readonly shared?: () => Record<PropertyKey, unknown>; };"
+            "export type IStorageNativePluginDescriptor = { readonly install?: () => Record<string, unknown> | PromiseLike<Record<string, unknown>>; readonly expose?: () => Record<string, unknown>; readonly featureExpose?: () => object; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6600,7 +6604,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/host/contracts.d.ts:IStorageNativePluginDescriptor:export type IStorageNativePluginDescriptor = { readonly install?: () => Record<string, unknown> | PromiseLike<Record<string, unknown>>; readonly expose?: () => Record<string, unknown>; readonly featureExpose?: () => object; readonly shared?: () => Record<PropertyKey, unknown>; };",
+          "identity": "packages/storage-web/dist/host/contracts.d.ts:IStorageNativePluginDescriptor:export type IStorageNativePluginDescriptor = { readonly install?: () => Record<string, unknown> | PromiseLike<Record<string, unknown>>; readonly expose?: () => Record<string, unknown>; readonly featureExpose?: () => object; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -6609,7 +6613,7 @@
         {
           "name": "IStoragePluginCore",
           "kind": "type",
-          "signature": "export type IStoragePluginCore<TStore extends IKeyValueStore = IKeyValueStore, TFeatures extends IFeatureRecord = Record<never, never>> = { readonly registerStore: (store: TStore) => void; readonly getStore: () => TStore; readonly getBackendId: () => string; readonly getShared: IPluginHostCore['getShared']; readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: IStorageNativeFeatureExpose<TFeatures, TStore>; };",
+          "signature": "export type IStoragePluginCore<TStore extends IKeyValueStore = IKeyValueStore, TFeatures extends IFeatureRecord = Record<never, never>> = { readonly registerStore: (store: TStore) => void; readonly getStore: () => TStore; readonly getBackendId: () => string; readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: IStorageNativeFeatureExpose<TFeatures, TStore>; };",
           "declarationLine": 16,
           "source": "packages/storage-web/dist/host/contracts.d.ts",
           "purpose": "Storage authority supplied only to a native plugin during its own Host registration.",
@@ -6625,7 +6629,7 @@
           "aliasOf": "IStoragePluginCore",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type IStoragePluginCore<TStore extends IKeyValueStore = IKeyValueStore, TFeatures extends IFeatureRecord = Record<never, never>> = { readonly registerStore: (store: TStore) => void; readonly getStore: () => TStore; readonly getBackendId: () => string; readonly getShared: IPluginHostCore['getShared']; readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: IStorageNativeFeatureExpose<TFeatures, TStore>; };"
+            "export type IStoragePluginCore<TStore extends IKeyValueStore = IKeyValueStore, TFeatures extends IFeatureRecord = Record<never, never>> = { readonly registerStore: (store: TStore) => void; readonly getStore: () => TStore; readonly getBackendId: () => string; readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: IStorageNativeFeatureExpose<TFeatures, TStore>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6664,7 +6668,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/host/contracts.d.ts:IStoragePluginCore:export type IStoragePluginCore<TStore extends IKeyValueStore = IKeyValueStore, TFeatures extends IFeatureRecord = Record<never, never>> = { readonly registerStore: (store: TStore) => void; readonly getStore: () => TStore; readonly getBackendId: () => string; readonly getShared: IPluginHostCore['getShared']; readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: IStorageNativeFeatureExpose<TFeatures, TStore>; };",
+          "identity": "packages/storage-web/dist/host/contracts.d.ts:IStoragePluginCore:export type IStoragePluginCore<TStore extends IKeyValueStore = IKeyValueStore, TFeatures extends IFeatureRecord = Record<never, never>> = { readonly registerStore: (store: TStore) => void; readonly getStore: () => TStore; readonly getBackendId: () => string; readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: IStorageNativeFeatureExpose<TFeatures, TStore>; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -6674,7 +6678,7 @@
           "name": "IStoragePluginExtensions",
           "kind": "type",
           "signature": "export type IStoragePluginExtensions<TPlugin> = IMergePluginExts<[ IStoragePluginExtensionCarrier<TPlugin> ]> & object;",
-          "declarationLine": 68,
+          "declarationLine": 69,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "IStoragePluginExtensions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoragePluginExtensions.",
@@ -6737,7 +6741,7 @@
           "name": "IStoragePluginId",
           "kind": "type",
           "signature": "export type IStoragePluginId<TPlugin> = TPlugin extends { readonly id: infer TId extends string; } ? IIsSingletonString<TId> extends true ? TId : never : never;",
-          "declarationLine": 57,
+          "declarationLine": 58,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Plugin ID extracted from an admitted plugin tuple.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoragePluginId.",
@@ -6800,7 +6804,7 @@
           "name": "IStoragePluginReactiveId",
           "kind": "type",
           "signature": "export type IStoragePluginReactiveId<TPlugin> = TPlugin extends { readonly id: infer TId extends string; readonly [storageBackendReactiveBrand]: true; } ? IIsSingletonString<TId> extends true ? TId : never : never;",
-          "declarationLine": 72,
+          "declarationLine": 73,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Reactive backend IDs extracted without widening unknown feature tuples.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoragePluginReactiveId.",
@@ -6863,7 +6867,7 @@
           "name": "IStoragePluginStore",
           "kind": "type",
           "signature": "export type IStoragePluginStore<TPlugin> = TPlugin extends { readonly [storageBackendPluginBrand]: infer TStore extends IKeyValueStore; } ? TStore : never;",
-          "declarationLine": 61,
+          "declarationLine": 62,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Store type extracted from an admitted plugin tuple.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoragePluginStore.",
@@ -6926,7 +6930,7 @@
           "name": "IStorageReactiveFeatureMetadata",
           "kind": "type",
           "signature": "export type IStorageReactiveFeatureMetadata<TStore extends IKeyValueStore = IKeyValueStore> = { readonly mode: 'push' | 'hybrid' | 'polling'; readonly visibility: IStorageReactiveVisibility; readonly pollIntervalMs?: number; readonly subscribe?: (context: IStorageReactiveSubscribeContext<TStore>) => IStorageReactiveSourceDisposer | PromiseLike<unknown>; };",
-          "declarationLine": 35,
+          "declarationLine": 36,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Reactive consistency and optional D79 source hook retained in private feature metadata.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageReactiveFeatureMetadata.",
@@ -6989,7 +6993,7 @@
           "name": "IStorageReactiveSourceDisposer",
           "kind": "type",
           "signature": "export type IStorageReactiveSourceDisposer = () => void | Promise<void>;",
-          "declarationLine": 21,
+          "declarationLine": 22,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Reactive source metadata consumed only by the Host adapter materializer.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageReactiveSourceDisposer.",
@@ -7051,8 +7055,8 @@
         {
           "name": "IStorageReactiveSubscribeContext",
           "kind": "type",
-          "signature": "export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKeyValueStore> = { readonly store: TStore; /** Host-snapshotted scheduler shared with source timing and installation deadlines. */ readonly scheduler: ILifecycleScheduler; readonly signal: IAbortSignal; readonly report: (error: unknown) => void; /** Invalidates Resource-owned query generations after an admitted backend change. */ readonly onChange: (change: IStorageChange) => void; };",
-          "declarationLine": 23,
+          "signature": "export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKeyValueStore> = { readonly store: TStore; /** Host-snapshotted scheduler shared with source timing and installation deadlines. */ readonly scheduler: IScheduler; readonly signal: IAbortSignal; readonly report: (error: unknown) => void; /** Invalidates Resource-owned query generations after an admitted backend change. */ readonly onChange: (change: IStorageChange) => void; };",
+          "declarationLine": 24,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Exact store/context passed to an advanced adapter source at synchronous admission.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageReactiveSubscribeContext.",
@@ -7066,7 +7070,7 @@
           "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKeyValueStore> = { readonly store: TStore; /** Host-snapshotted scheduler shared with source timing and installation deadlines. */ readonly scheduler: ILifecycleScheduler; readonly signal: IAbortSignal; readonly report: (error: unknown) => void; /** Invalidates Resource-owned query generations after an admitted backend change. */ readonly onChange: (change: IStorageChange) => void; };"
+            "export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKeyValueStore> = { readonly store: TStore; /** Host-snapshotted scheduler shared with source timing and installation deadlines. */ readonly scheduler: IScheduler; readonly signal: IAbortSignal; readonly report: (error: unknown) => void; /** Invalidates Resource-owned query generations after an admitted backend change. */ readonly onChange: (change: IStorageChange) => void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7105,7 +7109,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/host/types.d.ts:IStorageReactiveSubscribeContext:export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKeyValueStore> = { readonly store: TStore; /** Host-snapshotted scheduler shared with source timing and installation deadlines. */ readonly scheduler: ILifecycleScheduler; readonly signal: IAbortSignal; readonly report: (error: unknown) => void; /** Invalidates Resource-owned query generations after an admitted backend change. */ readonly onChange: (change: IStorageChange) => void; };",
+          "identity": "packages/storage-web/dist/host/types.d.ts:IStorageReactiveSubscribeContext:export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKeyValueStore> = { readonly store: TStore; /** Host-snapshotted scheduler shared with source timing and installation deadlines. */ readonly scheduler: IScheduler; readonly signal: IAbortSignal; readonly report: (error: unknown) => void; /** Invalidates Resource-owned query generations after an admitted backend change. */ readonly onChange: (change: IStorageChange) => void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -7115,7 +7119,7 @@
           "name": "IStorageReactiveVisibility",
           "kind": "type",
           "signature": "export type IStorageReactiveVisibility = 'instance' | 'document-eventual' | 'top-level-context-eventual' | 'origin-js-visible-eventual' | 'origin-eventual';",
-          "declarationLine": 33,
+          "declarationLine": 34,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Reactive consistency and optional D79 source hook retained in private feature metadata.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageReactiveVisibility.",
@@ -7305,8 +7309,8 @@
         {
           "name": "readStorageNativePluginMetadata",
           "kind": "const",
-          "signature": "export declare const readStorageNativePluginMetadata: (plugin: object) => { readonly id: string; readonly backendKind: object | undefined; readonly storeKey: symbol; readonly reactiveFeatureName: string | undefined; readonly reactiveBundleKey: symbol | undefined; readonly reactiveExpectedKinds: readonly object[]; } | undefined;",
-          "declarationLine": 65,
+          "signature": "export declare const readStorageNativePluginMetadata: (plugin: object) => { readonly id: string; readonly backendKind: object | undefined; readonly reactiveFeatureName: string | undefined; readonly reactiveFeatureReference: IFeatureReference<{ readonly attach: (service: IStorageReactiveService, report: (error: unknown) => void) => IStorageReactiveAdapter; }, false> | undefined; readonly reactiveExpectedKinds: readonly object[]; } | undefined;",
+          "declarationLine": 63,
           "source": "packages/storage-web/dist/host/contracts.d.ts",
           "purpose": "Reads native Storage admission metadata without exposing its mutable definition authority.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for readStorageNativePluginMetadata.",
@@ -7321,7 +7325,7 @@
           "aliasOf": "readStorageNativePluginMetadata",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export declare const readStorageNativePluginMetadata: (plugin: object) => { readonly id: string; readonly backendKind: object | undefined; readonly storeKey: symbol; readonly reactiveFeatureName: string | undefined; readonly reactiveBundleKey: symbol | undefined; readonly reactiveExpectedKinds: readonly object[]; } | undefined;"
+            "export declare const readStorageNativePluginMetadata: (plugin: object) => { readonly id: string; readonly backendKind: object | undefined; readonly reactiveFeatureName: string | undefined; readonly reactiveFeatureReference: IFeatureReference<{ readonly attach: (service: IStorageReactiveService, report: (error: unknown) => void) => IStorageReactiveAdapter; }, false> | undefined; readonly reactiveExpectedKinds: readonly object[]; } | undefined;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7360,7 +7364,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/host/contracts.d.ts:readStorageNativePluginMetadata:export declare const readStorageNativePluginMetadata: (plugin: object) => { readonly id: string; readonly backendKind: object | undefined; readonly storeKey: symbol; readonly reactiveFeatureName: string | undefined; readonly reactiveBundleKey: symbol | undefined; readonly reactiveExpectedKinds: readonly object[]; } | undefined;",
+          "identity": "packages/storage-web/dist/host/contracts.d.ts:readStorageNativePluginMetadata:export declare const readStorageNativePluginMetadata: (plugin: object) => { readonly id: string; readonly backendKind: object | undefined; readonly reactiveFeatureName: string | undefined; readonly reactiveFeatureReference: IFeatureReference<{ readonly attach: (service: IStorageReactiveService, report: (error: unknown) => void) => IStorageReactiveAdapter; }, false> | undefined; readonly reactiveExpectedKinds: readonly object[]; } | undefined;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -7434,7 +7438,7 @@
           "name": "storageBackendPluginExtensionsBrand",
           "kind": "const",
           "signature": "export declare const storageBackendPluginExtensionsBrand: unique symbol;",
-          "declarationLine": 14,
+          "declarationLine": 15,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Module-private carrier keeps Plugin extensions distinct from the installed Store.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for storageBackendPluginExtensionsBrand.",
@@ -7497,7 +7501,7 @@
           "name": "StorageHostFacade",
           "kind": "class",
           "signature": "export declare class StorageHostFacade<TStores extends Record<string, IKeyValueStore> = Record<never, never>, TReactiveIds extends keyof TStores & string = never> { #private; /** Creates the shell and snapshots lifecycle/deadline inputs before any plugin runs. */ constructor(options?: IStorageHostOptions); /** Materializes one immutable plugin tuple through the canonical PluginHost batch. */ use<const TPlugins extends readonly IStorageBackendPluginHandle[]>(...plugins: IRejectInstalledOrDuplicateIds<TStores, TPlugins>): Promise<IStorageHost<TStores & IPluginStoreMap<TPlugins>, TReactiveIds | IStoragePluginReactiveId<TPlugins[number]>, IStoragePluginExtensions<TPlugins[number]>>>; /** Returns the current immutable extension plane after its corresponding batch has committed. */ get extensions(): Readonly<Record<PropertyKey, unknown>>; /** Looks up an exact store from the last atomically published registry snapshot. */ backend<TId extends keyof TStores & string>(id: TId): TStores[TId]; /** Narrows a lookup to IDs in the current immutable registry snapshot. */ hasBackend(id: string): id is keyof TStores & string; /** Returns a mutation-incapable copy of the current store registry. */ backends(): ReadonlyMap<keyof TStores & string, TStores[keyof TStores]>; /** Reports whether the committed Host registry contains an exact reactive adapter. */ hasReactiveBackend(id: string): id is TReactiveIds; /** Returns exact adapter-bound store shell and delegates query state to Resource. */ reactiveBackend<TId extends keyof TStores & string>(id: TId): IReactiveBackendHandle<TStores[TId], TId> | undefined; /** Seals the facade once and delegates lifecycle cleanup to PluginHost. */ dispose(): Promise<void>; }",
-          "declarationLine": 33,
+          "declarationLine": 31,
           "source": "packages/storage-web/dist/host/storage-host.d.ts",
           "purpose": "Storage facade over the canonical PluginHost lifecycle owner and its batch transaction.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StorageHostFacade.",
@@ -7670,7 +7674,7 @@
             },
             {
               "name": "scheduler",
-              "type": "ILifecycleScheduler",
+              "type": "IScheduler",
               "optional": true,
               "description": "Supplies deterministic lifecycle time for installation, rollback, and cleanup."
             },
@@ -7715,7 +7719,7 @@
             },
             {
               "name": "scheduler",
-              "type": "ILifecycleScheduler",
+              "type": "IScheduler",
               "optional": true,
               "description": "构造参数与 factory 共用同一契约：`installTimeoutMs` 限制完整安装 batch，`scheduler` 注入生命周期时间，`report` 只接收 late rejection 和 cleanup 诊断且不会替换主错误。`backend()`、`hasBackend()`、`backends()`、`use()` 和 `dispose()` 的行为与 factory 返回对象完全一致。",
               "descriptionEn": "Supplies deterministic lifecycle time for installation, rollback, and cleanup.",
@@ -9637,9 +9641,9 @@
               "name": "storage",
               "type": "IWebStorageLike",
               "optional": true,
-              "description": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`。它是 kind-hidden 的原生 Feature：同一 `definePlugin(., { reactive })` 安装时由 PluginHost 注入 exact Store 和 Host 已快照的 scheduler，而不是由调用者传入 backend-kind token。该 API 只定义 storage-domain 的 source/visibility；generation、refresh、取消、quiescence 和 fanout 仍分别由 Resource、lifecycle 与 event-subscriber 持有，不允许自建第二套状态机或资源注册表。",
+              "description": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`。它是 kind-hidden 的原生 Feature：同一 `definePlugin(., { reactive })` 安装时由 PluginHost 注入 exact Store 和 Host 已快照的 scheduler，而不是由调用者传入 backend-kind token。",
               "descriptionEn": "`plugins/local-storage` — `localStorageBackendPlugin` — `local`",
-              "descriptionZh": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`。它是 kind-hidden 的原生 Feature：同一 `definePlugin(., { reactive })` 安装时由 PluginHost 注入 exact Store 和 Host 已快照的 scheduler，而不是由调用者传入 backend-kind token。该 API 只定义 storage-domain 的 source/visibility；generation、refresh、取消、quiescence 和 fanout 仍分别由 Resource、lifecycle 与 event-subscriber 持有，不允许自建第二套状态机或资源注册表。"
+              "descriptionZh": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`。它是 kind-hidden 的原生 Feature：同一 `definePlugin(., { reactive })` 安装时由 PluginHost 注入 exact Store 和 Host 已快照的 scheduler，而不是由调用者传入 backend-kind token。"
             }
           ],
           "fragment": "storage-web-plugins/reactive/local-storage--localStorageReactive"
@@ -9817,9 +9821,9 @@
               "name": "storage",
               "type": "IWebStorageLike",
               "optional": true,
-              "description": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`。它是 kind-hidden 的原生 Feature：同一 `definePlugin(., { reactive })` 安装时由 PluginHost 注入 exact Store 和 Host 已快照的 scheduler，而不是由调用者传入 backend-kind token。该 API 只定义 storage-domain 的 source/visibility；generation、refresh、取消、quiescence 和 fanout 仍分别由 Resource、lifecycle 与 event-subscriber 持有，不允许自建第二套状态机或资源注册表。",
+              "description": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`。它是 kind-hidden 的原生 Feature：同一 `definePlugin(., { reactive })` 安装时由 PluginHost 注入 exact Store 和 Host 已快照的 scheduler，而不是由调用者传入 backend-kind token。",
               "descriptionEn": "`plugins/local-storage` — `localStorageBackendPlugin` — `local`",
-              "descriptionZh": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`。它是 kind-hidden 的原生 Feature：同一 `definePlugin(., { reactive })` 安装时由 PluginHost 注入 exact Store 和 Host 已快照的 scheduler，而不是由调用者传入 backend-kind token。该 API 只定义 storage-domain 的 source/visibility；generation、refresh、取消、quiescence 和 fanout 仍分别由 Resource、lifecycle 与 event-subscriber 持有，不允许自建第二套状态机或资源注册表。"
+              "descriptionZh": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`。它是 kind-hidden 的原生 Feature：同一 `definePlugin(., { reactive })` 安装时由 PluginHost 注入 exact Store 和 Host 已快照的 scheduler，而不是由调用者传入 backend-kind token。"
             }
           ],
           "fragment": "storage-web-plugins/reactive/session-storage--sessionStorageReactive"
@@ -9945,7 +9949,7 @@
           "name": "defineReactiveAdapterFeature",
           "kind": "const",
           "signature": "export declare const defineReactiveAdapterFeature: <TStore extends IKeyValueStore>(definition: IReactiveAdapterDefinition<TStore>) => IFeature<IStorageNativeFeatureExpose<Record<never, never>, TStore>, { readonly attach: (service: IStorageReactiveService, report: (error: unknown) => void) => IStorageReactiveAdapter; }>;",
-          "declarationLine": 23,
+          "declarationLine": 24,
           "source": "packages/storage-web/dist/reactive-adapter.d.ts",
           "purpose": "Creates the canonical reactive feature descriptor without exposing Host internals.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineReactiveAdapterFeature.",
@@ -10007,8 +10011,8 @@
         {
           "name": "IReactiveAdapterContext",
           "kind": "type",
-          "signature": "export type IReactiveAdapterContext<TStore extends IKeyValueStore> = { readonly store: TStore; readonly scheduler: ILifecycleScheduler; readonly signal: IAbortSignal; readonly invalidate: (change?: IStorageChange) => void; readonly report: (error: unknown) => void; };",
-          "declarationLine": 8,
+          "signature": "export type IReactiveAdapterContext<TStore extends IKeyValueStore> = { readonly store: TStore; readonly scheduler: IScheduler; readonly signal: IAbortSignal; readonly invalidate: (change?: IStorageChange) => void; readonly report: (error: unknown) => void; };",
+          "declarationLine": 9,
           "source": "packages/storage-web/dist/reactive-adapter.d.ts",
           "purpose": "Advanced adapter source context; built-in backend factories are intentionally absent.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IReactiveAdapterContext.",
@@ -10022,7 +10026,7 @@
           "members": [],
           "exportPath": "./reactive-adapter",
           "overloadSignatures": [
-            "export type IReactiveAdapterContext<TStore extends IKeyValueStore> = { readonly store: TStore; readonly scheduler: ILifecycleScheduler; readonly signal: IAbortSignal; readonly invalidate: (change?: IStorageChange) => void; readonly report: (error: unknown) => void; };"
+            "export type IReactiveAdapterContext<TStore extends IKeyValueStore> = { readonly store: TStore; readonly scheduler: IScheduler; readonly signal: IAbortSignal; readonly invalidate: (change?: IStorageChange) => void; readonly report: (error: unknown) => void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -10061,7 +10065,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/reactive-adapter.d.ts:IReactiveAdapterContext:export type IReactiveAdapterContext<TStore extends IKeyValueStore> = { readonly store: TStore; readonly scheduler: ILifecycleScheduler; readonly signal: IAbortSignal; readonly invalidate: (change?: IStorageChange) => void; readonly report: (error: unknown) => void; };",
+          "identity": "packages/storage-web/dist/reactive-adapter.d.ts:IReactiveAdapterContext:export type IReactiveAdapterContext<TStore extends IKeyValueStore> = { readonly store: TStore; readonly scheduler: IScheduler; readonly signal: IAbortSignal; readonly invalidate: (change?: IStorageChange) => void; readonly report: (error: unknown) => void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -10071,7 +10075,7 @@
           "name": "IReactiveAdapterDefinition",
           "kind": "type",
           "signature": "export type IReactiveAdapterDefinition<TStore extends IKeyValueStore = IKeyValueStore> = { readonly mode: 'push' | 'hybrid' | 'polling'; readonly pollIntervalMs?: number; readonly visibility: 'instance' | 'document-eventual' | 'top-level-context-eventual' | 'origin-js-visible-eventual' | 'origin-eventual'; readonly subscribe: (context: IReactiveAdapterContext<TStore>) => IStorageReactiveSourceDisposer | PromiseLike<unknown>; };",
-          "declarationLine": 16,
+          "declarationLine": 17,
           "source": "packages/storage-web/dist/reactive-adapter.d.ts",
           "purpose": "Advanced custom adapter definition; Plugin installation supplies its exact Store.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IReactiveAdapterDefinition.",

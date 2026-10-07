@@ -70,6 +70,8 @@ export type IApiMember = {
 
 /** Source-backed public symbol projection shown under its owning module. */
 export type IApiSymbol = {
+  /** True when the declaration refers to a named overloaded callable type. */
+  readonly callable?: boolean
   readonly name: string
   readonly kind: string
   readonly fragment: string
@@ -152,10 +154,11 @@ export function symbolSlug(
 
 /** Distinguishes callable values from supporting constant objects using the declaration head only. */
 export function isCallableApiSymbol(
-  symbol: Pick<IApiSymbol, 'kind' | 'name' | 'signature'>
+  symbol: Pick<IApiSymbol, 'kind' | 'name' | 'signature' | 'callable'>
 ): boolean {
   if (symbol.kind === 'function' || symbol.kind === 'class') return true
   if (symbol.kind !== 'const') return false
+  if (symbol.callable) return true
   const escapedName = symbol.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   return new RegExp(`export declare const ${escapedName}:\\s*(?:<|\\()`).test(symbol.signature)
 }

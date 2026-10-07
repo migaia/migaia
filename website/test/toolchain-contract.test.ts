@@ -35,7 +35,7 @@ test('SITE-T-SIGNATURES-DIRECT-ENTRY preserves unselected order through shrink, 
   const previous = [
     { library: 'utils', id: 'before' },
     { library: 'plugin-host', id: 'old-a' },
-    { library: 'web-rpc', id: 'middle' },
+    { library: 'rpc', id: 'middle' },
     { library: 'plugin-host', id: 'old-b' },
     { library: 'logger', id: 'after' }
   ]
@@ -198,7 +198,7 @@ test('SITE-T-A24 generated projections contain no volatile metadata', () => {
             'storage-contract',
             'plugin-host',
             'resource',
-            'web-rpc',
+            'rpc',
             'logger',
             'storage-web'
           ]
@@ -430,14 +430,14 @@ test('SITE-T-CONFIG-DOCS gives every public configuration field a readable contr
 
 test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual decision guide', () => {
   const runtimeSymbols = generatedApis
-    .filter((api) => api.library === 'web-rpc')
+    .filter((api) => api.library === 'rpc')
     .flatMap((api) =>
       api.symbols
         .filter((symbol) => symbol.kind !== 'type' && symbol.kind !== 'interface')
         .map((symbol) => ({ api, symbol }))
     )
 
-  assert.equal(runtimeSymbols.length, 60)
+  assert.equal(runtimeSymbols.length, 195)
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)
@@ -465,7 +465,7 @@ test('SITE-T-WEB-RPC-TRANSPORTS gives every public adapter a bilingual runnable 
   ] as const
 
   for (const locale of ['en', 'zh'] as const) {
-    const journey = findGuideJourney('web-rpc', 'transports-and-security', locale)
+    const journey = findGuideJourney('rpc', 'transports-and-security', locale)
     assert.ok(journey)
     const completeGuideCode = journey.document.sections
       .flatMap((section) => section.blocks)

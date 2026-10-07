@@ -5,7 +5,7 @@
       "slug": "capability",
       "description": "Store-neutral capability lifecycle and feature gate.",
       "version": "0.0.3",
-      "exports": [".", "./graph", "./graph/dynamic", "./graph/topology"]
+      "exports": [".", "./graph", "./graph/dependency", "./graph/dynamic", "./graph/topology"]
     },
     {
       "slug": "event-subscriber",
@@ -69,10 +69,60 @@
       "exports": ["."]
     },
     {
-      "slug": "rpc-contract",
-      "description": "Runtime-neutral RPC semantic and framing contracts.",
-      "version": "0.0.2",
-      "exports": [".", "./framing", "./framing/v1", "./v1"]
+      "slug": "rpc",
+      "description": "Type-safe bidirectional RPC — schema-typed method/params/result with transport-agnostic endpoints. No dependency on Store, React, WASM, or any specific host (DOM/Node).",
+      "version": "0.0.7",
+      "exports": [
+        "./bridge/jsonrpc",
+        "./browser/adapters/broadcast-channel",
+        "./browser/adapters/rtc-data-channel",
+        "./browser/adapters/service-worker",
+        "./browser/adapters/shared-worker",
+        "./browser/adapters/web-transport",
+        "./browser/adapters/web-worker",
+        "./browser/adapters/window",
+        "./contract",
+        "./contract/framing",
+        "./contract/framing/stream",
+        "./contract/framing/v1",
+        "./contract/v1",
+        "./core",
+        "./core/adapters/memory",
+        "./core/adapters/message-port",
+        "./core/client",
+        "./core/composed",
+        "./core/features/control",
+        "./core/features/discovery",
+        "./core/features/one-way",
+        "./core/features/outbound",
+        "./core/features/provider",
+        "./core/full",
+        "./core/plugins/flow-control",
+        "./core/plugins/log",
+        "./core/plugins/send-queue",
+        "./core/provider",
+        "./core/stream",
+        "./core/transport-constants",
+        "./core/transport-kit",
+        "./process",
+        "./process/adapters/bun-socket",
+        "./process/adapters/bun-spawn",
+        "./process/adapters/deno-command",
+        "./process/adapters/deno-socket",
+        "./process/adapters/electron-utility-process",
+        "./process/adapters/node-child-process",
+        "./process/adapters/node-socket",
+        "./process/adapters/windows-job",
+        "./remote",
+        "./testing",
+        "./threads",
+        "./threads/adapters/browser",
+        "./threads/adapters/bun",
+        "./threads/adapters/deno",
+        "./threads/adapters/electron-main",
+        "./threads/adapters/electron-renderer",
+        "./threads/adapters/node"
+      ]
     },
     {
       "slug": "serialize",
@@ -194,6 +244,12 @@
       "exports": [".", "./serialize/*"]
     },
     {
+      "slug": "supervision",
+      "description": "Runtime-neutral supervision for execution units and coroutines.",
+      "version": "0.0.1",
+      "exports": [".", "./coroutine", "./process", "./threads"]
+    },
+    {
       "slug": "tray",
       "description": null,
       "version": "0.0.3",
@@ -213,6 +269,7 @@
         "./object",
         "./object-path",
         "./promise",
+        "./scheduler",
         "./string",
         "./typing",
         "./value"
@@ -223,33 +280,6 @@
       "description": null,
       "version": "0.1.1",
       "exports": ["."]
-    },
-    {
-      "slug": "web-rpc",
-      "description": "Type-safe bidirectional RPC — schema-typed method/params/result with transport-agnostic endpoints. No dependency on Store, React, WASM, or any specific host (DOM/Node).",
-      "version": "0.0.7",
-      "exports": [
-        ".",
-        "./adapters/broadcast-channel",
-        "./adapters/memory",
-        "./adapters/message-port",
-        "./adapters/rtc-data-channel",
-        "./adapters/service-worker",
-        "./adapters/shared-worker",
-        "./adapters/web-transport",
-        "./adapters/web-worker",
-        "./adapters/window",
-        "./client",
-        "./core",
-        "./features/control",
-        "./features/discovery",
-        "./features/one-way",
-        "./features/outbound",
-        "./features/provider",
-        "./full",
-        "./provider",
-        "./transport-constants"
-      ]
     }
   ]
 }

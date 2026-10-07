@@ -47,7 +47,7 @@ function Language({ params }: ILanguageRouteProps) {
             <strong>{copy.stateStorage}</strong>
             <span>{copy.stateStorageText}</span>
           </Link>
-          <Link className="capability-item" to={domainPath(locale, 'architecture', 'web-rpc')}>
+          <Link className="capability-item" to={domainPath(locale, 'architecture', 'rpc')}>
             <strong>{copy.integration}</strong>
             <span>{copy.integrationText}</span>
           </Link>
@@ -81,7 +81,7 @@ function Language({ params }: ILanguageRouteProps) {
             <strong>{copy.capabilityPluginHost}</strong>
             <span>{copy.capabilityPluginHostText}</span>
           </Link>
-          <Link className="capability-item" to={domainPath(locale, 'architecture', 'web-rpc')}>
+          <Link className="capability-item" to={domainPath(locale, 'architecture', 'rpc')}>
             <strong>{copy.webRpcSerialize}</strong>
             <span>{copy.webRpcSerializeText}</span>
           </Link>

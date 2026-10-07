@@ -29,6 +29,7 @@ function apiSymbolPath(symbol, siblings) {
 function isCallableApiSymbol(symbol) {
   if (symbol.kind === 'function' || symbol.kind === 'class') return true
   if (symbol.kind !== 'const') return false
+  if (symbol.callable) return true
   const escapedName = symbol.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   return new RegExp(`export declare const ${escapedName}:\\s*(?:<|\\()`).test(symbol.signature)
 }
@@ -345,7 +346,7 @@ test(
       ['/en/docs', '/en/docs/utils'],
       ['/en/guides', '/en/guides/utils'],
       ['/en/docs', '/en/docs/utils'],
-      ['/en/architecture', '/en/architecture/web-rpc']
+      ['/en/architecture', '/en/architecture/rpc']
     ]
     await withChrome(async (browser) => {
       for (const journey of journeys) {
@@ -508,7 +509,7 @@ test('SITE-T-SUPPORTING-CONTRACT separates source markers and explains their rea
 test('SITE-T-LEFT-RAIL gives long desktop API menus an independent scroll boundary', async () => {
   await withChrome(async (browser) => {
     await withPage(browser, { width: 1280, height: 700 }, async (page) => {
-      await page.goto(`${baseUrl}/zh/docs/web-rpc/`)
+      await page.goto(`${baseUrl}/zh/docs/rpc/`)
       const rail = page.locator('.left-rail')
       const viewport = rail.locator('[data-radix-scroll-area-viewport]')
       await rail.waitFor()
@@ -728,8 +729,8 @@ test(
           }
         }
 
-        await page.goto(pageUrl('/zh/docs/web-rpc/createEndpoint'))
-        const transportGuide = page.locator('[data-parameter-guide="web-rpc-transport"]')
+        await page.goto(pageUrl('/zh/docs/rpc/createEndpoint'))
+        const transportGuide = page.locator('[data-parameter-guide="rpc-transport"]')
         await transportGuide.waitFor()
         assert.equal(await transportGuide.locator('li a').count(), 10)
         assert.match(await transportGuide.innerText(), /发送和接收消息/u)

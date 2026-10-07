@@ -383,7 +383,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: ILifecycleScheduler; // 默认 @migaia/lifecycle 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);"
+                "code": "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: IScheduler; // 默认 @migaia/utils/scheduler 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);"
               },
               {
                 "type": "paragraph",
@@ -399,7 +399,7 @@
                   "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回值同样必须是有限非负数，否则以贴 `INVALID_OPTION` 码的 `RangeError` reject 当次重试的 Promise。",
                   "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开依赖登记、令缓存过期），下次被观察时重新发起请求。设为 `true` 时禁用自动休眠。",
                   "`initialSnapshot?: IResourceCacheSnapshot<T>` —— SSR/持久化恢复用的初始成功快照；构造期即 `hydrate()`，格式非法抛 `INVALID_SNAPSHOT`（详见快照类型）。",
-                  "`scheduler?: ILifecycleScheduler` —— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/lifecycle` 的 `systemScheduler`。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
+                  "`scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/utils/scheduler` 的 `systemScheduler`（单调时钟）。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
                 ]
               }
             ]
@@ -471,7 +471,7 @@
                   "`createGenerationController()`（来自 `@migaia/lifecycle`）——每次 `#startRequest()` 调用 `begin()` 开一代新请求；`refetch()`/`invalidate()`/依赖变化都会使旧一代失效（`supersede()`），只有 `isCurrent(token)` 为真的那一代结果才会写回 `#stateSignal`。`dispose()` 时调用其 `dispose()` 终结控制器。",
                   "`createTerminalController()`（来自 `@migaia/lifecycle`）——驱动 `Resource` 自身的容器存活轴（`open → closing → terminal`）；`disposed` getter 直接读它的 `lifecycle === 'terminal'`。",
                   "`probeThenable()` / `assimilateCapturedThen()`（来自 `@migaia/lifecycle`）——用于安全探测 `fetcher` 同步抛出的值是否是 thenable（Suspense 抛 Promise 模式），只读一次 `.then`，避免 hostile getter 被读取两次或异常被吞掉。",
-                  "`systemScheduler` / `snapshotScheduler()`（来自 `@migaia/lifecycle`）——`scheduler` 选项的默认值与校验函数；TTL 到期判定、重试延迟计时都通过它，不直接使用宿主 `setTimeout`/`Date.now`。",
+                  "`systemScheduler`（来自 `@migaia/utils/scheduler`）/ `snapshotScheduler()`（来自 `@migaia/lifecycle`）——`scheduler` 选项的默认值与校验函数；TTL 到期判定、重试延迟计时都通过它，不直接使用宿主 `setTimeout`/`Date.now`。",
                   "`internalRuntimeOf()` / `internalsOf()` / `claimOwnership()` / `registerDeps()` / `registerDepVersions()`（来自 `@migaia/reactive` 的 `/node-factories`、`/internals`、`/ownership`、`/node-internals` 子路径）——`Resource` 把自己注册为 `@migaia/reactive` 依赖图里的一个 `IObserver`（实现 `markDirty()`/`onDependencyDisconnected()`），复用其依赖追踪、所有权登记与 `deferIdle` 挂起通道，语义与 `Computed` 的自动挂起完全对称。"
                 ]
               }
@@ -659,7 +659,7 @@
           "examples": [
             "import { Resource, type IResourceOptions } from '@migaia/resource';\nimport type { IRuntime } from '@migaia/reactive';\n\nclass Resource<T> implements IObserver, IDisposable {\n  constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>);\n\n  readonly runtime: IRuntime;\n  debugName?: string;\n  readonly deps: ReadonlySet<IObservable>;\n  readonly depVersions: ReadonlyMap<IObservable, number>;\n\n  readonly state: IResourceState<T>;\n  readonly promise: Promise<T>;\n  readonly disposed: boolean;\n  readonly refreshing: boolean;\n  readonly fetchStatus: IResourceFetchStatus;\n  readonly isStale: boolean;\n  readonly observed: boolean;\n\n  read(): T;\n  peek(): T;\n  refetch(): Promise<T>;\n  invalidate(): Promise<T>;\n  cancel(): void;\n  dehydrate(): IResourceCacheSnapshot<T> | undefined;\n  hydrate(snapshot: IResourceCacheSnapshot<T>): void;\n  dispose(): void;\n\n  // IObserver 接口成员：由 @migaia/reactive 的依赖图在内部调用，一般不需要手动调用\n  markDirty(): void;\n  onDependencyDisconnected(): void;\n}",
             "dehydrate(): IResourceCacheSnapshot<T> | undefined;\nhydrate(snapshot: IResourceCacheSnapshot<T>): void;",
-            "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: ILifecycleScheduler; // 默认 @migaia/lifecycle 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);",
+            "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: IScheduler; // 默认 @migaia/utils/scheduler 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);",
             "type IResourceCacheSnapshot<T> = {\n  readonly version: 1;\n  readonly data: T;\n  readonly updatedAt: number;\n  readonly expiresAt: number | null; // null 表示无限生命周期的 JSON 安全形式\n};"
           ],
           "members": [],
@@ -714,7 +714,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: ILifecycleScheduler; // 默认 @migaia/lifecycle 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);"
+                  "code": "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: IScheduler; // 默认 @migaia/utils/scheduler 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);"
                 },
                 {
                   "type": "paragraph",
@@ -730,7 +730,7 @@
                     "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回值同样必须是有限非负数，否则以贴 `INVALID_OPTION` 码的 `RangeError` reject 当次重试的 Promise。",
                     "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开依赖登记、令缓存过期），下次被观察时重新发起请求。设为 `true` 时禁用自动休眠。",
                     "`initialSnapshot?: IResourceCacheSnapshot<T>` —— SSR/持久化恢复用的初始成功快照；构造期即 `hydrate()`，格式非法抛 `INVALID_SNAPSHOT`（详见快照类型）。",
-                    "`scheduler?: ILifecycleScheduler` —— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/lifecycle` 的 `systemScheduler`。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
+                    "`scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/utils/scheduler` 的 `systemScheduler`（单调时钟）。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
                   ]
                 }
               ]
@@ -1139,7 +1139,7 @@
         {
           "name": "IResourceOptions",
           "kind": "type",
-          "signature": "export type IResourceOptions<T = unknown> = { /** Human-readable owner label used in reactive diagnostics and request error context. */ debugName?: string; /** * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * 时间域与排程来源（`runtime-neutrality.sdd.md` R-9 / AR-02）：TTL/`updatedAt`/`expiresAt`/retry delay 全部走同一 * scheduler，默认 lifecycle `systemScheduler`。缺宿主能力时 fail-fast，不静默降级成微任务。 */ scheduler?: ILifecycleScheduler; };",
+          "signature": "export type IResourceOptions<T = unknown> = { /** Human-readable owner label used in reactive diagnostics and request error context. */ debugName?: string; /** * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * 时间域与排程来源（`runtime-neutrality.sdd.md` R-9 / AR-02）：TTL/`updatedAt`/`expiresAt`/retry delay 全部走同一 * scheduler，默认 lifecycle `systemScheduler`。缺宿主能力时 fail-fast，不静默降级成微任务。 */ scheduler?: IScheduler; };",
           "declarationLine": 33,
           "source": "packages/resource/dist/resource.class.d.ts",
           "purpose": "IResourceOptions is part of this module's public type contract.",
@@ -1152,13 +1152,13 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IResourceOptions.",
           "examples": [
             "import { Resource, type IResourceOptions } from '@migaia/resource';\nimport type { IRuntime } from '@migaia/reactive';\n\nclass Resource<T> implements IObserver, IDisposable {\n  constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>);\n\n  readonly runtime: IRuntime;\n  debugName?: string;\n  readonly deps: ReadonlySet<IObservable>;\n  readonly depVersions: ReadonlyMap<IObservable, number>;\n\n  readonly state: IResourceState<T>;\n  readonly promise: Promise<T>;\n  readonly disposed: boolean;\n  readonly refreshing: boolean;\n  readonly fetchStatus: IResourceFetchStatus;\n  readonly isStale: boolean;\n  readonly observed: boolean;\n\n  read(): T;\n  peek(): T;\n  refetch(): Promise<T>;\n  invalidate(): Promise<T>;\n  cancel(): void;\n  dehydrate(): IResourceCacheSnapshot<T> | undefined;\n  hydrate(snapshot: IResourceCacheSnapshot<T>): void;\n  dispose(): void;\n\n  // IObserver 接口成员：由 @migaia/reactive 的依赖图在内部调用，一般不需要手动调用\n  markDirty(): void;\n  onDependencyDisconnected(): void;\n}",
-            "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: ILifecycleScheduler; // 默认 @migaia/lifecycle 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);"
+            "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: IScheduler; // 默认 @migaia/utils/scheduler 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);"
           ],
           "members": [],
           "aliasOf": "IResourceOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IResourceOptions<T = unknown> = { /** Human-readable owner label used in reactive diagnostics and request error context. */ debugName?: string; /** * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * 时间域与排程来源（`runtime-neutrality.sdd.md` R-9 / AR-02）：TTL/`updatedAt`/`expiresAt`/retry delay 全部走同一 * scheduler，默认 lifecycle `systemScheduler`。缺宿主能力时 fail-fast，不静默降级成微任务。 */ scheduler?: ILifecycleScheduler; };"
+            "export type IResourceOptions<T = unknown> = { /** Human-readable owner label used in reactive diagnostics and request error context. */ debugName?: string; /** * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * 时间域与排程来源（`runtime-neutrality.sdd.md` R-9 / AR-02）：TTL/`updatedAt`/`expiresAt`/retry delay 全部走同一 * scheduler，默认 lifecycle `systemScheduler`。缺宿主能力时 fail-fast，不静默降级成微任务。 */ scheduler?: IScheduler; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1197,7 +1197,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/resource/dist/resource.class.d.ts:IResourceOptions:export type IResourceOptions<T = unknown> = { /** Human-readable owner label used in reactive diagnostics and request error context. */ debugName?: string; /** * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * 时间域与排程来源（`runtime-neutrality.sdd.md` R-9 / AR-02）：TTL/`updatedAt`/`expiresAt`/retry delay 全部走同一 * scheduler，默认 lifecycle `systemScheduler`。缺宿主能力时 fail-fast，不静默降级成微任务。 */ scheduler?: ILifecycleScheduler; };",
+          "identity": "packages/resource/dist/resource.class.d.ts:IResourceOptions:export type IResourceOptions<T = unknown> = { /** Human-readable owner label used in reactive diagnostics and request error context. */ debugName?: string; /** * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * 时间域与排程来源（`runtime-neutrality.sdd.md` R-9 / AR-02）：TTL/`updatedAt`/`expiresAt`/retry delay 全部走同一 * scheduler，默认 lifecycle `systemScheduler`。缺宿主能力时 fail-fast，不静默降级成微任务。 */ scheduler?: IScheduler; };",
           "guidance": [
             {
               "id": "配置项-iresourceoptions",
@@ -1206,7 +1206,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: ILifecycleScheduler; // 默认 @migaia/lifecycle 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);"
+                  "code": "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: IScheduler; // 默认 @migaia/utils/scheduler 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);"
                 },
                 {
                   "type": "paragraph",
@@ -1222,7 +1222,7 @@
                     "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回值同样必须是有限非负数，否则以贴 `INVALID_OPTION` 码的 `RangeError` reject 当次重试的 Promise。",
                     "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开依赖登记、令缓存过期），下次被观察时重新发起请求。设为 `true` 时禁用自动休眠。",
                     "`initialSnapshot?: IResourceCacheSnapshot<T>` —— SSR/持久化恢复用的初始成功快照；构造期即 `hydrate()`，格式非法抛 `INVALID_SNAPSHOT`（详见快照类型）。",
-                    "`scheduler?: ILifecycleScheduler` —— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/lifecycle` 的 `systemScheduler`。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
+                    "`scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/utils/scheduler` 的 `systemScheduler`（单调时钟）。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
                   ]
                 }
               ]
@@ -1247,7 +1247,7 @@
           "errors": ["No documented errors are declared for IResourceRetryPolicy."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IResourceRetryPolicy.",
           "examples": [
-            "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: ILifecycleScheduler; // 默认 @migaia/lifecycle 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);"
+            "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: IScheduler; // 默认 @migaia/utils/scheduler 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);"
           ],
           "members": [],
           "aliasOf": "IResourceRetryPolicy",
@@ -1301,7 +1301,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: ILifecycleScheduler; // 默认 @migaia/lifecycle 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);"
+                  "code": "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: IScheduler; // 默认 @migaia/utils/scheduler 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);"
                 },
                 {
                   "type": "paragraph",
@@ -1317,7 +1317,7 @@
                     "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回值同样必须是有限非负数，否则以贴 `INVALID_OPTION` 码的 `RangeError` reject 当次重试的 Promise。",
                     "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开依赖登记、令缓存过期），下次被观察时重新发起请求。设为 `true` 时禁用自动休眠。",
                     "`initialSnapshot?: IResourceCacheSnapshot<T>` —— SSR/持久化恢复用的初始成功快照；构造期即 `hydrate()`，格式非法抛 `INVALID_SNAPSHOT`（详见快照类型）。",
-                    "`scheduler?: ILifecycleScheduler` —— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/lifecycle` 的 `systemScheduler`。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
+                    "`scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/utils/scheduler` 的 `systemScheduler`（单调时钟）。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
                   ]
                 }
               ]
@@ -1745,7 +1745,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: ILifecycleScheduler; // 默认 @migaia/lifecycle 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);"
+                  "code": "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: IScheduler; // 默认 @migaia/utils/scheduler 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);"
                 },
                 {
                   "type": "paragraph",
@@ -1761,7 +1761,7 @@
                     "`retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回值同样必须是有限非负数，否则以贴 `INVALID_OPTION` 码的 `RangeError` reject 当次重试的 Promise。",
                     "`keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开依赖登记、令缓存过期），下次被观察时重新发起请求。设为 `true` 时禁用自动休眠。",
                     "`initialSnapshot?: IResourceCacheSnapshot<T>` —— SSR/持久化恢复用的初始成功快照；构造期即 `hydrate()`，格式非法抛 `INVALID_SNAPSHOT`（详见快照类型）。",
-                    "`scheduler?: ILifecycleScheduler` —— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/lifecycle` 的 `systemScheduler`。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
+                    "`scheduler?: IScheduler`（`@migaia/utils/scheduler`）—— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/utils/scheduler` 的 `systemScheduler`（单调时钟）。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。"
                   ]
                 }
               ]
@@ -1780,7 +1780,7 @@
                     "`createGenerationController()`（来自 `@migaia/lifecycle`）——每次 `#startRequest()` 调用 `begin()` 开一代新请求；`refetch()`/`invalidate()`/依赖变化都会使旧一代失效（`supersede()`），只有 `isCurrent(token)` 为真的那一代结果才会写回 `#stateSignal`。`dispose()` 时调用其 `dispose()` 终结控制器。",
                     "`createTerminalController()`（来自 `@migaia/lifecycle`）——驱动 `Resource` 自身的容器存活轴（`open → closing → terminal`）；`disposed` getter 直接读它的 `lifecycle === 'terminal'`。",
                     "`probeThenable()` / `assimilateCapturedThen()`（来自 `@migaia/lifecycle`）——用于安全探测 `fetcher` 同步抛出的值是否是 thenable（Suspense 抛 Promise 模式），只读一次 `.then`，避免 hostile getter 被读取两次或异常被吞掉。",
-                    "`systemScheduler` / `snapshotScheduler()`（来自 `@migaia/lifecycle`）——`scheduler` 选项的默认值与校验函数；TTL 到期判定、重试延迟计时都通过它，不直接使用宿主 `setTimeout`/`Date.now`。",
+                    "`systemScheduler`（来自 `@migaia/utils/scheduler`）/ `snapshotScheduler()`（来自 `@migaia/lifecycle`）——`scheduler` 选项的默认值与校验函数；TTL 到期判定、重试延迟计时都通过它，不直接使用宿主 `setTimeout`/`Date.now`。",
                     "`internalRuntimeOf()` / `internalsOf()` / `claimOwnership()` / `registerDeps()` / `registerDepVersions()`（来自 `@migaia/reactive` 的 `/node-factories`、`/internals`、`/ownership`、`/node-internals` 子路径）——`Resource` 把自己注册为 `@migaia/reactive` 依赖图里的一个 `IObserver`（实现 `markDirty()`/`onDependencyDisconnected()`），复用其依赖追踪、所有权登记与 `deferIdle` 挂起通道，语义与 `Computed` 的自动挂起完全对称。"
                   ]
                 }

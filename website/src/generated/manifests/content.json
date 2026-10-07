@@ -241,6 +241,34 @@
     },
     {
       "locale": "zh",
+      "library": "rpc",
+      "source": "src/content/zh/packages/rpc/advanced.mdx",
+      "slug": "advanced",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "rpc",
+      "source": "src/content/zh/packages/rpc/api.mdx",
+      "slug": "api",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "rpc",
+      "source": "src/content/zh/packages/rpc/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "rpc",
+      "source": "src/content/zh/packages/rpc/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
       "library": "serialize",
       "source": "src/content/zh/packages/serialize/advanced.mdx",
       "slug": "advanced",
@@ -348,34 +376,6 @@
       "locale": "zh",
       "library": "utils",
       "source": "src/content/zh/packages/utils/quickstart.mdx",
-      "slug": "quickstart",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "web-rpc",
-      "source": "src/content/zh/packages/web-rpc/advanced.mdx",
-      "slug": "advanced",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "web-rpc",
-      "source": "src/content/zh/packages/web-rpc/api.mdx",
-      "slug": "api",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "web-rpc",
-      "source": "src/content/zh/packages/web-rpc/overview.mdx",
-      "slug": "overview",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "web-rpc",
-      "source": "src/content/zh/packages/web-rpc/quickstart.mdx",
       "slug": "quickstart",
       "format": "mdx"
     }
