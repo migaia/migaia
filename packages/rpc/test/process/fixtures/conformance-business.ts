@@ -51,6 +51,29 @@ const compiledTsPeer = execFileSync(
   [new URL('../peers/ts/node-runner.mjs', import.meta.url).pathname, '--executable'],
   { encoding: 'utf8' }
 ).trim()
+/** File-local executable paths keep every native and bridge launch free of repeated builds. */
+const nativePeerExecutables = new Map<string, string>()
+
+/**
+ * Resolve and build each Go/Rust fixture once per test file with the real tool environment.
+ * Per-launch cargo plus exec costs about 347 ms for Rust versus 4–10 ms for its direct binary; this
+ * fixture overhead is not part of the language peer contract. Source changes still build through
+ * the once-per-file --executable call, before bridge launches use an empty environment.
+ */
+function resolveNativePeerExecutable(language: 'go' | 'rust'): string {
+  /** Reuse this test file's built peer without running its shell wrapper on another launch. */
+  const cached = nativePeerExecutables.get(language)
+  if (cached !== undefined) return cached
+  /** The peer-owned wrapper remains the canonical source-freshness and build entry point. */
+  const executable = execFileSync(
+    'sh',
+    [new URL(`../peers/${language}/run.sh`, import.meta.url).pathname, '--executable'],
+    { encoding: 'utf8' }
+  ).trim()
+  nativePeerExecutables.set(language, executable)
+  return executable
+}
+
 /**
  * Four public/independent executables run directly, without language wrapping or protocol
  * forwarding.
@@ -64,14 +87,14 @@ const peers = [
   },
   {
     language: 'go',
-    command: 'sh',
-    args: [new URL('../peers/go/run.sh', import.meta.url).pathname, '--business'],
+    command: resolveNativePeerExecutable('go'),
+    args: ['--business'],
     id: 'go-peer'
   },
   {
     language: 'rust',
-    command: 'sh',
-    args: [new URL('../peers/rust/run.sh', import.meta.url).pathname, '--business'],
+    command: resolveNativePeerExecutable('rust'),
+    args: ['--business'],
     id: 'rust-peer'
   },
   {
@@ -121,14 +144,6 @@ function deployment(
   /** Exact public byte ports permit a physical EOF independent of endpoint abort/close messages. */
   const rawChannels: IProcessByteChannel[] = []
   const launcher = bridge ? fdLauncher() : createNodeProcessLauncher()
-  /** Build with the real tool environment before the existing FD fixture's intentionally empty env. */
-  const executable =
-    bridge && (peer.language === 'go' || peer.language === 'rust')
-      ? {
-          command: execFileSync('sh', [peer.args[0]!, '--executable'], { encoding: 'utf8' }).trim(),
-          args: peer.args.slice(1)
-        }
-      : peer
   const establish: IProcessPluginOptions['deployment']['establish'] = (raw, context) => {
     if (raw.kind !== 'byte') throw new TypeError('business peer requires bytes')
     rawChannels.push(raw)
@@ -212,9 +227,9 @@ function deployment(
           budget: budget ?? createUnitBudget({ kind: 'process', maxUnits: 1 }),
           report: (error) => reports.push(error),
           spec: {
-            command: executable.command,
+            command: peer.command,
             args: [
-              ...executable.args,
+              ...peer.args,
               '--stdio',
               ...(bridge ? ['--jsonrpc', '--auth-fd', '3'] : ['--bootstrap', 'stdin']),
               ...(host ? ['--host'] : [])
