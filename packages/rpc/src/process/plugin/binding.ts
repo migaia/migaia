@@ -1,4 +1,5 @@
 import { resolveAbortReason } from '../../core/internal/async-control.js'
+import { hasBatchAgreement, registerBatchAgreement } from '../../core/internal/batch-frame.js'
 import { defaultRpcId } from '../../core/internal/id.js'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
@@ -200,6 +201,7 @@ function createStderrSource(report: (error: unknown) => void) {
 /** A channel adapter receives one immutable session and the binding's scheduler identity. */
 async function establishGeneration(
   raw: IProcessByteChannel | IProcessMessageChannel,
+  wire: ProcessPluginWire | undefined,
   establish: IProcessPluginEstablish,
   signal: IAbortSignal,
   scheduler: IScheduler,
@@ -249,6 +251,13 @@ async function establishGeneration(
     }
     invalidOption('deployment.establish')
   }
+  /** The accepted native agreement reaches this receiver even through a public custom establisher. */
+  if (wire !== ProcessPluginWire.jsonrpc && !hasBatchAgreement(channel.transport))
+    registerBatchAgreement(
+      channel.transport,
+      channel.agreement.capabilities,
+      raw.kind === ProcessPluginChannelKind.byte ? 4 : 0
+    )
   return channel
 }
 
@@ -370,6 +379,7 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
       })
       const channel = await establishGeneration(
         raw,
+        deployment.wire,
         deployment.establish,
         signal,
         scheduler,
@@ -544,6 +554,7 @@ export function createConnectProcessBinding(
       })
       const channel = await establishGeneration(
         unit.channel,
+        deployment.wire,
         deployment.establish,
         signal,
         scheduler,
