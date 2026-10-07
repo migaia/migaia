@@ -211,6 +211,8 @@ describe('[A1] independent native business peers through public process facades'
     for (const host of businessVectors.hostProfiles as boolean[]) {
       it(`${peer.language} owned stdio Host=${host}`, async () => {
         const active = await client(peer, host, randomUUID())
+        /** Freeze sent bytes when native exit is observed, excluding any later teardown writes. */
+        const sentBeforeExit = active.handles[0]!.exited.then(() => Buffer.concat(active.sent))
         try {
           await business(active, peer.id)
         } finally {
@@ -232,7 +234,17 @@ describe('[A1] independent native business peers through public process facades'
           join(evidence, `${peer.language}-stdio-${host}.exit.json`),
           JSON.stringify(outcome)
         )
-        expect(outcome.code === 0 || outcome.signal === 'SIGKILL').toBe(true)
+        expect(
+          outcome.code === 0 || outcome.signal === 'SIGTERM' || outcome.signal === 'SIGKILL'
+        ).toBe(true)
+        if (outcome.signal !== null) {
+          expect(
+            wireFrames([await sentBeforeExit]).some(
+              (frame) => frame.kind === 'variation' && frame.data.route.variation === 'close'
+            ),
+            '[A1] close variation must be sent before a native signal exit'
+          ).toBe(true)
+        }
         expect(Buffer.concat(active.output).toString()).toContain('READY')
         const frames = wireFrames(active.sent)
         const closeAt = frames.findIndex(
