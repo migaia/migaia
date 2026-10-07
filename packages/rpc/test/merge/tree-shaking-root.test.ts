@@ -8,18 +8,19 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 /**
- * X14 permits exact measured pins after compression. U41 keeps v2 identity private on the canonical
- * projection and reuses the existing owned JSON byte proof for mandatory batch. The new cold
- * identity registration is compressed before pinning u41-owner-a9-compressed-r5; module count and
- * byte caps have no headroom.
+ * X14(iii) pins the exact root measured in owner-rulings/root-before-repin.json, without headroom.
+ * The required C9 runtime-api contract/normalize/provider-executor and C10 binary lane explain the
+ * growth; size reduction belongs to rpc-core-refactor. Rendered-byte increases since C6:
+ * provider-executor +29940, outbound-attachment +22164, runtime-api/binary +18088,
+ * runtime-api/normalize +15081, middleware/error-text +8739, outbound-sender +7375.
  */
 const allowedIncrease = {
-  rawBytes: 141862 / legacyRoot.rawBytes,
-  gzipBytes: 36110 / legacyRoot.gzipBytes
+  rawBytes: 311005 / legacyRoot.rawBytes,
+  gzipBytes: 76184 / legacyRoot.gzipBytes
 } as const
 
-/** I22–I26 ownership includes the two canonical physical batch modules. */
-const expectedModuleIncrease = 14
+/** Exact C9/C10 module increase includes the canonical provider implementation identity move. */
+const expectedModuleIncrease = 22
 
 describe('A9 root tree-shaking cost', () => {
   it('keeps module count exact and both byte costs within reviewed caps', () => {
