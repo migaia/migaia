@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
@@ -65,6 +65,7 @@ function migratedTitle(title: string): string | undefined {
     .replace('23 unique codes', '24 unique codes')
     .replace('24 unique codes', '25 unique codes')
     .replace('25 unique codes', '26 unique codes')
+    .replace('26 unique codes', '31 unique codes')
     .replace(
       'does not let a hostile code getter escape',
       'reports a hostile code getter as PROPERTY_READ_FAILED with the original cause'
@@ -147,24 +148,27 @@ describe('A7 migrated suite parity', () => {
       .map(migratedTitle)
       .filter((title): title is string => title !== undefined)
     for (const title of expected) expect(actual.get(title), title).toBe('passed')
-  }, 30_000)
+    // The child runs the whole default suite (2522 tests after I28, about 80-120 s here); 30 s predates that growth.
+  }, 300_000)
 
   it('contains no stale source or export-key literals in migrated tests', () => {
-    // The delivered bridge and threads owners are valid destinations; obsolete roots still fail.
+    // The delivered bridge, threads and testing owners are valid destinations; obsolete roots still fail.
     const stale: string[] = []
     for (const file of testSources(join(packageRoot, 'test'))) {
       for (const literal of stringsIn(file)) {
         if (
-          /^(?:\.\.?\/)*src\/(?!contract(?:\/|$)|core(?:\/|$)|browser(?:\/|$)|remote(?:\/|$)|process(?:\/|$)|bridge\/jsonrpc(?:\/|$)|threads(?:\/|$))/.test(
+          /^(?:\.\.?\/)*src\/(?!contract(?:\/|$)|core(?:\/|$)|browser(?:\/|$)|remote(?:\/|$)|process(?:\/|$)|bridge\/jsonrpc(?:\/|$)|threads(?:\/|$)|testing(?:\/|$))/.test(
             literal
           ) ||
-          /packages\/(?:rpc|web-rpc|rpc-contract)\/src\/(?!contract(?:\/|$)|core(?:\/|$)|browser(?:\/|$)|remote(?:\/|$)|process(?:\/|$)|bridge\/jsonrpc(?:\/|$)|threads(?:\/|$))/.test(
+          /packages\/(?:rpc|web-rpc|rpc-contract)\/src\/(?!contract(?:\/|$)|core(?:\/|$)|browser(?:\/|$)|remote(?:\/|$)|process(?:\/|$)|bridge\/jsonrpc(?:\/|$)|threads(?:\/|$)|testing(?:\/|$))/.test(
             literal
           ) ||
           literal.includes(['src/core/', 'core.ts'].join('')) ||
-          /^\.\/(?:internal|adapters|features|middleware|wire|transport-constants|client|provider|full)(?:\/|$)/.test(
+          (/^\.\/(?:internal|adapters|features|middleware|wire|transport-constants|client|provider|full)(?:\/|$)/.test(
             literal
-          )
+          ) &&
+            // A test-local helper beside the importing test is not an obsolete flat source path.
+            !existsSync(resolve(dirname(file), literal.replace(/\.js$/, '.ts'))))
         )
           stale.push(`${relative(packageRoot, file)}: ${literal}`)
       }
