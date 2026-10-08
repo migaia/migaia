@@ -126,6 +126,7 @@ ci:
 			record_gate SKIP-WARN "rpc/test:conformance (missing:$$missing_tools)" 0 0; \
 		else record_gate SKIP-BLOCKING "rpc/test:conformance (missing:$$missing_tools)" 1 0; fi; \
 	else run_gate required rpc/test:conformance $(CI_MAKE) ci-conformance; fi; \
+	run_gate required rpc/test:suite-parity pnpm --filter ./packages/rpc run test:suite-parity; \
 	for gate in fmt lint typecheck; do \
 		run_gate required "website/$$gate" $(CI_MAKE) ci-website-check GATE="$$gate"; \
 	done; \
