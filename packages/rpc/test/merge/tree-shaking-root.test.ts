@@ -8,15 +8,18 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 /**
- * X14(iii) pins the exact root measured in owner-rulings/root-before-repin.json, without headroom.
- * The required C9 runtime-api contract/normalize/provider-executor and C10 binary lane explain the
+ * X14(iii) pins the exact K285 root measured in bundle-resolution/final.json, without headroom. The
+ * required C9 runtime-api contract/normalize/provider-executor and C10 binary lane explain the
  * growth; size reduction belongs to rpc-core-refactor. Rendered-byte increases since C6:
  * provider-executor +29940, outbound-attachment +22164, runtime-api/binary +18088,
- * runtime-api/normalize +15081, middleware/error-text +8739, outbound-sender +7375.
+ * runtime-api/normalize +15081, middleware/error-text +8739, outbound-sender +7375. K285 real
+ * base/final builds add outbound-envelope +721 and utils scheduler +162 rendered bytes; root raw
+ * grows by exactly 883 bytes and gzip by 283 bytes. The final 179-module root is pinned without
+ * headroom at 903733 raw bytes and 219350 gzip bytes (legacy deltas below).
  */
 const allowedIncrease = {
-  rawBytes: 311005 / legacyRoot.rawBytes,
-  gzipBytes: 76184 / legacyRoot.gzipBytes
+  rawBytes: 311879 / legacyRoot.rawBytes,
+  gzipBytes: 76438 / legacyRoot.gzipBytes
 } as const
 
 /** Exact C9/C10 module increase includes the canonical provider implementation identity move. */
