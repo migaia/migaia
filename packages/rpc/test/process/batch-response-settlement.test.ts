@@ -147,7 +147,22 @@ for (const borrowed of [true, false]) {
           context
         )
         expect(channel.agreement.capabilities).toContain(RpcCapability.batch)
-        return channel
+        /**
+         * A supported custom establisher returns a fresh transport identity without private
+         * agreement.
+         */
+        return {
+          ...channel,
+          transport: {
+            ...channel.transport,
+            send: (
+              frame: Parameters<typeof channel.transport.send>[0],
+              options: Parameters<typeof channel.transport.send>[1]
+            ) => channel.transport.send(frame, options),
+            subscribe: (listener: Parameters<typeof channel.transport.subscribe>[0]) =>
+              channel.transport.subscribe(listener)
+          }
+        }
       }
       /** The same caller identity is offered and used by the factory's source owner. */
       const self = { name: 'caller', instanceId: 'caller' }
@@ -202,7 +217,7 @@ for (const borrowed of [true, false]) {
       expect(errors).toEqual([])
     } finally {
       if (active) {
-        await readRuntimePeerConnection(active).endpoint.dispose()
+        // The public Peer owns endpoint and source retirement; fixture must not dispose its endpoint first.
         await active.close()
       }
       if (child) {

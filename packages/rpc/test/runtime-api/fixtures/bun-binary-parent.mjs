@@ -30,4 +30,14 @@ assert.deepEqual(receipt.grouped, { senderLength: 0, state: 'success', buffer: t
 assert.deepEqual(receipt.notify, { senderLength: 0 })
 assert.equal(receipt.count, 6)
 assert.deepEqual(receipt.failures, [])
+/**
+ * All classified closing diagnostics are preserved; only the supported cancellation lifecycle
+ * signal is accepted.
+ */
+for (const event of receipt.closing) {
+  assert.equal(event.phase, 'closing')
+  assert.equal(event.source, '@migaia/rpc/core')
+  assert.equal(event.code, 'CANCELLED')
+  assert.equal(event.name, 'AbortError')
+}
 process.stdout.write(JSON.stringify(receipt) + '\n')

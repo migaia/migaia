@@ -21,7 +21,19 @@ for (const entry of cases) {
      * limit.
      */
     for (let index = 0; index < 1050; index++) {
-      assert.equal(await session.endpoint.send('peer', 'echo', index, { timeoutMs: 5000 }), index)
+      /**
+       * A qualified physical owner must release completed entries rather than hitting the legacy
+       * 1024 cap.
+       */
+      const value = await session.endpoint
+        .send('peer', 'echo', index, { timeoutMs: 5000 })
+        .catch((error) => ({ failure: error }))
+      assert.equal(
+        typeof value,
+        'number',
+        '[R14-A9] actual qualified native provider releases completed replay entries'
+      )
+      assert.equal(value, index)
       progress += 1
     }
     /** Stats itself is one live request; completed echo calls must contribute no tombstones. */
