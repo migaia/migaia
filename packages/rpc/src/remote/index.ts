@@ -15,6 +15,7 @@ export {
   type IRemoteControlDefinition
 } from './contract.js'
 export { RemoteMethodName } from './constants.js'
+export { RuntimePluginKey } from './runtime-api/constants.js'
 export { RpcRemoteLayerErrorCode } from './error-code.js'
 export { RpcRemoteLayerErrorText } from './error-text.js'
 export { createRemoteRetryPort } from './retry.js'

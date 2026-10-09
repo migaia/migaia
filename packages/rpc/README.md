@@ -94,6 +94,8 @@ ArrayBuffer / Uint8Array 使用双方实际 binary profile。线程显式 transf
 
 ## 其它入口
 
+`@migaia/rpc/remote` 的 `RuntimePluginKey` 提供 `process` / `thread` 标量标签，用于解释 Plugin 和查询中的平台元数据；标签本身不授予 Host slot、channel 或 native execution 操作权。
+
 @migaia/rpc/testing 的 createPeerPair 装配真实对称 Peer，用于应用测试，不授予 native spawn/transfer 权限。显式底层 core/client、provider、full、composed，contract/v1 语义描述与 remote ports 仍按各自层级保留；adapter 从对应 browser/process/threads 深路径导入。平台锁与部署协调由消费侧负责。
 
 本地 list/get/describe 读取原 owner 的安全投影，methods 为名称数组；资源、退出或健康事实缺失时返回 unavailable。Host outlet 的 on 返回 disposer，watch 是有界事件 iterator；目录 ready 不证明远端 Host 安装事务提交。查询、事件、控制、借用资源与 JSON-RPC bridge 的限制见 [USEGUIDE](./USEGUIDE.md)。
