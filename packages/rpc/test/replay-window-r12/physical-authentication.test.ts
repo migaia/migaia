@@ -122,11 +122,31 @@ describe('replay-window r12 real MessagePort authentication', () => {
       const frame = captured as { value: unknown; signature: string }
       const bound = readAuthenticationEnvelope(frame.value)
       assert.equal(bound.counter, '18446744073709551615')
+      /** Actual signed semantic identity fields are independent tamper positions inside the payload. */
+      const semantic = bound.payload as { data: { route: Record<string, unknown> } }
       for (const change of [
         { version: 2 },
         { nonce: '0'.repeat(32) },
         { counter: '1' },
-        { payload: 'tampered' }
+        { payload: 'tampered' },
+        {
+          payload: {
+            ...semantic,
+            data: {
+              ...semantic.data,
+              route: { ...semantic.data.route, senderId: 'r14-forged-sender' }
+            }
+          }
+        },
+        {
+          payload: {
+            ...semantic,
+            data: {
+              ...semantic.data,
+              route: { ...semantic.data.route, receiverId: 'r14-forged-receiver' }
+            }
+          }
+        }
       ]) {
         const changed = { ...bound, ...change }
         const inner =

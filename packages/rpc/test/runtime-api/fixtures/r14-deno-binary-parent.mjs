@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
 import {
-  createBunThreadLauncher,
-  createBunThreadChannelFactory
-} from '../../../dist/threads/adapters/bun.js'
-import { runWebBinaryQualification } from '../web-binary.ts'
+  createDenoThreadLauncher,
+  createDenoThreadChannelFactory
+} from '../../../dist/threads/adapters/deno.js'
+import { runWebBinaryQualification } from '../r14-web-binary.mjs'
 
-/** Actual Bun Workers execute the same canonical/native business path as the Web qualification. */
+/** Actual Deno Workers execute the same canonical/native business path as the Web qualification. */
 const receipt = await runWebBinaryQualification(
-  createBunThreadLauncher,
-  createBunThreadChannelFactory
+  createDenoThreadLauncher,
+  createDenoThreadChannelFactory
 )
 assert.deepEqual(receipt.copy, {
   senderLength: 4,
@@ -40,4 +40,5 @@ for (const event of receipt.closing) {
   assert.equal(event.code, 'CANCELLED')
   assert.equal(event.name, 'AbortError')
 }
-process.stdout.write(JSON.stringify(receipt) + '\n')
+console.log(JSON.stringify(receipt))
+Deno.exit(0)

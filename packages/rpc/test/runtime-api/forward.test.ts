@@ -725,69 +725,182 @@ it('[A59][A61][A114] forwarded order-only notify holds B original lease until C 
   }
 })
 
-it('[A37][R15] admitted runtime relay uses its compiled index without scanning the catalog', async () => {
-  /** Actual Host-owned peers establish both independent hops before dispatch is observed. */
-  const owners = [owner(), owner(), owner()] as const
-  const carriers: ReturnType<typeof runtimeSources>[] = []
-  const capabilities = [...RUNTIME_API_CAPABILITIES, RpcCapability.generation, RpcCapability.order]
-  try {
-    carriers.push(
-      await attach(
-        owners[1],
-        owners[2],
-        'c',
-        'b',
-        {},
-        {
-          provide: { value: (payload) => payload }
-        },
-        runtimeSources(capabilities, capabilities)
-      )
-    )
-    carriers.push(
-      await attach(
-        owners[0],
-        owners[1],
-        'b',
-        'a',
-        {},
-        { expose: ['c'] },
-        runtimeSources(capabilities, capabilities)
-      )
-    )
-    const upstream = owners[0].thread as unknown as IRuntimeOutlet
-    /** Count only scans of actual compiled forwarding entries, leaving every native lookup intact. */
-    const scans = vi.spyOn(Array.prototype, 'find')
-    try {
-      for (let index = 0; index < 20; index++)
-        assert.equal(
-          await upstream.request('b', 'c.value', index, { orderKey: 'same', timeoutMs: false }),
-          index
-        )
-      const catalogScans = scans.mock.contexts.filter(
-        (value: unknown) =>
-          Array.isArray(value) &&
-          value.some(
-            (entry: unknown) =>
-              typeof entry === 'object' &&
-              entry !== null &&
-              Reflect.get(entry, 'kind') === 'forward' &&
-              Reflect.get(entry, 'name') === 'c.value'
-          )
-      )
-      assert.equal(
-        catalogScans.length,
-        0,
-        '[R15] the real relay cannot scan its compiled catalog per call'
-      )
-    } finally {
-      scans.mockRestore()
+it.each([4, 32])(
+  '[R14-A30] catalog %s admitted runtime relay uses captured slots without scanning the catalog',
+  async (catalogSize) => {
+    /** Actual Host-owned peers establish both independent hops before dispatch is observed. */
+    const owners = [owner(), owner(), owner()] as const
+    const carriers: ReturnType<typeof runtimeSources>[] = []
+    const capabilities = [
+      ...RUNTIME_API_CAPABILITIES,
+      RpcCapability.generation,
+      RpcCapability.order
+    ]
+    /** Observe only complete business root admissions at B, excluding control and result traffic. */
+    const normalization = vi.spyOn(portable, 'normalizePortable')
+    /** Decoder and encoder delimit the actual forwarding interval on the two original hops. */
+    let incomingAt = 0
+    /** Every real outgoing forwarding input records extra walks and exact admitted reference reuse. */
+    const relayed: { walks: number; reused: boolean }[] = []
+    /**
+     * Actual selected identity codec remains canonical; instrumentation only records its existing
+     * calls.
+     */
+    const measuredSources = (hop: number) => {
+      const pair = runtimeSources(capabilities, capabilities)
+      const sources = pair.sources.map(
+        (source, side) => async (context: Parameters<typeof source>[0]) => {
+          const channel = await source(context)
+          const original = channel.pipeline.codec
+          const observed = {
+            ...original,
+            decode: (value: unknown) => {
+              const decoded = original.decode(value)
+              const payload = (decoded as any)?.payload ?? (decoded as any)?.data?.payload
+              if (hop === 0 && side === 1 && payload?.marker === 'r14-relay')
+                incomingAt = normalization.mock.calls.length
+              return decoded
+            },
+            encode: (value: unknown) => {
+              const payload = (value as any)?.payload ?? (value as any)?.data?.payload
+              if (hop === 1 && side === 0 && payload?.marker === 'r14-relay') {
+                const positions = normalization.mock.calls
+                  .map(([input], index) => ({ input, index }))
+                  .slice(incomingAt)
+                  .filter(({ input }) => (input as any)?.marker === 'r14-relay')
+                const admitted = normalization.mock.results[positions[0]?.index ?? -1]?.value
+                relayed.push({ walks: positions.length - 1, reused: payload === admitted })
+              }
+              return original.encode(value)
+            }
+          }
+          registerFastCodec(observed)
+          return { ...channel, pipeline: { ...channel.pipeline, codec: observed } }
+        }
+      ) as unknown as ReturnType<typeof runtimeSources>['sources']
+      return { ...pair, sources }
     }
-  } finally {
-    for (const host of owners) await host.dispose()
-    for (const carrier of carriers) carrier.close()
+    try {
+      carriers.push(
+        await attach(
+          owners[1],
+          owners[2],
+          'c',
+          'b',
+          {},
+          {
+            provide: {
+              value: (payload: unknown) => payload,
+              ...Object.fromEntries(
+                Array.from({ length: catalogSize - 1 }, (_, index) => [
+                  'unused' + index,
+                  (payload: unknown) => payload
+                ])
+              )
+            }
+          },
+          measuredSources(1)
+        )
+      )
+      carriers.push(
+        await attach(owners[0], owners[1], 'b', 'a', {}, { expose: ['c'] }, measuredSources(0))
+      )
+      const upstream = owners[0].thread as unknown as IRuntimeOutlet
+      /** Count only scans of actual compiled forwarding entries, leaving every native lookup intact. */
+      const scans = vi.spyOn(Array.prototype, 'find')
+      /**
+       * The actual compiled relay Map must select one captured entry per call at both catalog
+       * sizes.
+       */
+      const lookups = vi.spyOn(Map.prototype, 'get')
+      /** Actual enumeration of that owner, rather than lookup, would reintroduce full-catalog work. */
+      const enumerations = [
+        vi.spyOn(Map.prototype, 'values'),
+        vi.spyOn(Map.prototype, 'entries'),
+        vi.spyOn(Map.prototype, Symbol.iterator),
+        vi.spyOn(Map.prototype, 'forEach')
+      ]
+
+      try {
+        for (let index = 0; index < 20; index++)
+          assert.deepEqual(
+            await upstream.request(
+              'b',
+              'c.value',
+              { marker: 'r14-relay', nested: { value: index } },
+              { orderKey: 'same', timeoutMs: false }
+            ),
+            Object.assign(Object.create(null), {
+              marker: 'r14-relay',
+              nested: Object.assign(Object.create(null), { value: index })
+            })
+          )
+        const direct = lookups.mock.calls
+          .map(([key], index) => ({
+            key,
+            index,
+            result: lookups.mock.results[index]?.value,
+            owner: lookups.mock.contexts[index]
+          }))
+          .filter(
+            (entry) =>
+              entry.key === 'c.value' &&
+              entry.result?.kind === 'forward' &&
+              typeof entry.result?.slot === 'function'
+          )
+        assert.equal(
+          direct.length,
+          20,
+          '[R14-A30] each actual relay selects one compiled captured slot'
+        )
+        const catalogOwner = direct[0]!.owner
+        assert.equal(
+          direct.every((entry) => entry.owner === catalogOwner),
+          true
+        )
+        assert.equal(
+          enumerations.reduce(
+            (count, spy) =>
+              count + spy.mock.contexts.filter((owner) => owner === catalogOwner).length,
+            0
+          ),
+          0,
+          '[R14-A30] captured relay catalog is never enumerated during business'
+        )
+        assert.equal(relayed.length, 20, '[R14-A30] actual B forwarding encoder observed all calls')
+        assert.equal(
+          relayed.every((entry) => entry.walks === 0 && entry.reused),
+          true,
+          '[R14-A30] two-layer relay reuses admitted input with zero additional portable walk'
+        )
+        const catalogScans = scans.mock.contexts.filter(
+          (value: unknown) =>
+            Array.isArray(value) &&
+            value.some(
+              (entry: unknown) =>
+                typeof entry === 'object' &&
+                entry !== null &&
+                Reflect.get(entry, 'kind') === 'forward' &&
+                Reflect.get(entry, 'name') === 'c.value'
+            )
+        )
+        assert.equal(
+          catalogScans.length,
+          0,
+          '[R15] the real relay cannot scan its compiled catalog per call'
+        )
+      } finally {
+        scans.mockRestore()
+        lookups.mockRestore()
+        enumerations.forEach((spy) => spy.mockRestore())
+      }
+    } finally {
+      normalization.mockRestore()
+      for (const host of owners) await host.dispose()
+      for (const carrier of carriers) carrier.close()
+    }
   }
-})
+)
 
 it.each(['request', 'group', 'notify', 'stream'] as const)(
   '[A66][A67][A69][A114] C %s start wins over forwarded cancellation and stream finish retains the true final result',

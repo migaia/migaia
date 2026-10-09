@@ -186,6 +186,70 @@ try {
   assert.equal(final.state, 'done')
   assert.equal(final.outcome.completion.ok, true)
   assert.deepEqual({ ...final.outcome.completion.result }, { final: 99, aborted: false })
+  /** The actual default assembly copies portable bytes and never silently grants ownership transfer. */
+  const backing = new Uint8Array([9, 1, 2, 8]).buffer
+  const copied = await peer.request('echo', {
+    backing,
+    first: new Uint8Array(backing, 1, 2),
+    second: new Uint8Array(backing, 2, 1)
+  })
+  assert.equal(backing.byteLength, 4)
+  assert.ok(copied.backing instanceof ArrayBuffer)
+  assert.ok(copied.first instanceof Uint8Array)
+  /** Inline portable views preserve offsets and visible bytes while masking unrelated backing bytes. */
+  assert.notEqual(copied.first.buffer, copied.second.buffer)
+  assert.deepEqual([...copied.first], [1, 2])
+  assert.deepEqual([...copied.second], [2])
+  assert.equal(new Uint8Array(copied.first.buffer)[0], 0)
+  assert.equal(new Uint8Array(copied.second.buffer)[0], 0)
+  assert.equal(copied.first.byteOffset, 1)
+  assert.deepEqual([...new Uint8Array(copied.backing)], [9, 1, 2, 8])
+  const beforeTransfer = await peer.request('binaryCount')
+  await assert.rejects(
+    async () => peer.request('echo', backing, { transfer: [backing] }),
+    { code: mode === 'process' ? 'INVALID_CONFIG' : 'CAPABILITY_UNSUPPORTED' },
+    '[R14-A11] default native carrier preserves its own transfer rejection'
+  )
+  assert.equal(backing.byteLength, 4)
+  assert.equal(
+    await peer.request('binaryCount'),
+    beforeTransfer,
+    '[R14-A11] rejected transfer reaches no business'
+  )
+  /** Both supported cancellation controls keep started native business and its same-key lease alive. */
+  for (const control of ['signal', 'deadline']) {
+    const startedController = new AbortController()
+    const pending = peer
+      .request('holdOrdinary', undefined, {
+        orderKey: 'ordinary-held',
+        ...(control === 'signal' ? { signal: startedController.signal } : { timeoutMs: 100 })
+      })
+      .catch((error) => error)
+    for (let attempt = 0; !(await peer.request('ordinaryState')).started; attempt++) {
+      assert.ok(attempt < 100)
+      await new Promise((resolve) => setTimeout(resolve, 1))
+    }
+    if (control === 'signal') startedController.abort(new Error('r14-native-started-abort'))
+    const failure = await pending
+    assert.equal(failure.code, control === 'signal' ? 'CANCELLED' : 'DEADLINE_EXCEEDED')
+    for (let attempt = 0; !(await peer.request('ordinaryState')).aborted; attempt++) {
+      assert.ok(attempt < 100)
+      await new Promise((resolve) => setTimeout(resolve, 1))
+    }
+    const before = (await peer.request('ordinaryState')).followed
+    let completed = false
+    const follower = peer
+      .request('follower', undefined, { orderKey: 'ordinary-held' })
+      .then((value) => {
+        completed = true
+        return value
+      })
+    await peer.request('ordinaryState', undefined, { orderKey: 'other-key' })
+    assert.equal(completed, false, '[R14-A11] cancelled native handler retains its started lease')
+    assert.equal((await peer.request('ordinaryState')).followed, before)
+    await peer.request('ordinaryRelease', undefined, { orderKey: 'release-key' })
+    assert.equal(await follower, before + 1)
+  }
   console.log(
     JSON.stringify({
       runtime,
@@ -197,7 +261,11 @@ try {
         'ordered-queued-cancel',
         'notify-terminal',
         'stream-discard',
-        'context-generation'
+        'context-generation',
+        'portable-binary-copy',
+        'default-transfer-refusal',
+        'started-signal-lease',
+        'started-deadline-lease'
       ],
       effects: await peer.request('count'),
       reports

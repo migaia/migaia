@@ -1,42 +1,26 @@
 import { serializeRpcError } from '../../dist/contract/index.js'
+/**
+ * Fixture emit of maintained web-binary.ts for runtimes requiring concrete .js/.mjs specifiers;
+ * production is unchanged.
+ */
 import { createThreadPeer } from '../../dist/threads/index.js'
-import type { IRuntimeDynamicSurface } from '../../dist/remote/runtime-api/typing.js'
 import { RUNTIME_API_CAPABILITIES } from '../../dist/remote/runtime-api/constants.js'
 import { RpcCapability } from '../../dist/contract/wire-constants.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import type { IThreadChannelFactory } from '../../dist/threads/types.js'
-import type {
-  IWebThreadHandle,
-  IWebThreadLauncherOptions
-} from '../../dist/threads/adapters/web.js'
-import type { IThreadLauncher } from '@migaia/supervision/threads'
-import { webBinaryEndpoint } from './fixtures/web-binary-endpoint.js'
-
+import { webBinaryEndpoint } from './fixtures/r14-web-binary-endpoint.mjs'
 /** Each configured built endpoint really implements the complete profile on its native carrier. */
 const capabilities = [
   ...new Set([...RUNTIME_API_CAPABILITIES, RpcCapability.nativeBinary, RpcCapability.transfer])
 ]
-
 /** Exercise identical business operations through the original Bun/Web launcher and channel owner. */
-export async function runWebBinaryQualification(
-  createLauncher: (options: IWebThreadLauncherOptions) => IThreadLauncher<IWebThreadHandle>,
-  createChannels: (options: {
-    scheduler: typeof systemScheduler
-    capabilities: readonly string[]
-  }) => IThreadChannelFactory<IWebThreadHandle>,
-  beforeClose?: () => Promise<void>
-) {
+export async function runWebBinaryQualification(createLauncher, createChannels, beforeClose) {
   /** Native lifecycle remains explicitly unsupported where the real adapter says so. */
-  let handle: IWebThreadHandle | undefined
+  let handle
   /** Only classified native/core failures enter this test receipt. */
-  const failures: unknown[] = []
-  /**
-   * Closing reports remain visible but cannot retroactively change the already judged business
-   * interval.
-   */
-  const closing: unknown[] = []
-  /** Only native Peer teardown changes the phase; no diagnostic is swallowed. */
-  let phase: 'business' | 'closing' = 'business'
+  const failures = []
+  /** Preserve closing diagnostics independently from the completed business interval. */
+  const closing = []
+  let phase = 'business'
   /** Set only after all six actual business operations, before entering the original close. */
   let businessComplete = false
   /**
@@ -44,14 +28,9 @@ export async function runWebBinaryQualification(
    * failure.
    */
   const closure = { samePromise: false, completed: false }
-  const report = (error: unknown): void => {
-    /** Existing package wire formatter preserves complete native class and cause metadata. */
+  const report = (error) => {
     const wire = serializeRpcError(error, { report: () => undefined })
-    /** A package-specific reason is retained when present; absent reason is explicitly unavailable. */
-    const reason =
-      typeof error === 'object' && error !== null
-        ? (Reflect.get(error, 'reason') ?? Reflect.get(error, 'detail')?.reason ?? null)
-        : null
+    const reason = error?.reason ?? error?.detail?.reason ?? null
     ;(phase === 'business' ? failures : closing).push({
       ...wire,
       phase,
@@ -61,14 +40,14 @@ export async function runWebBinaryQualification(
     })
   }
   /** Every operation uses the public built Thread Peer with its actual configured auth assembly. */
-  const peer = await createThreadPeer<IRuntimeDynamicSurface>({
+  const peer = await createThreadPeer({
     self: { name: 'binary-web-parent', instanceId: 'binary-web-parent' },
     report,
     spawn: async () => {
       const launcher = createLauncher({ report })
       handle = await launcher.launch(
         {
-          entry: new URL('./fixtures/web-binary-worker.ts', import.meta.url).href,
+          entry: new URL('./fixtures/r14-web-binary-worker.mjs', import.meta.url).href,
           data: { parentId: 'binary-web-parent', capabilities }
         },
         { signal: new AbortController().signal }
@@ -85,11 +64,7 @@ export async function runWebBinaryQualification(
     const backing = new Uint8Array([9, 1, 2, 8]).buffer
     const first = new Uint8Array(backing, 1, 2)
     const second = new Uint8Array(backing, 2, 1)
-    const copied = (await peer.request('echo', { backing, first, second })) as {
-      backing: ArrayBuffer
-      first: Uint8Array
-      second: Uint8Array
-    }
+    const copied = await peer.request('echo', { backing, first, second })
     const copy = {
       senderLength: backing.byteLength,
       buffer: copied.backing instanceof ArrayBuffer,
@@ -98,11 +73,7 @@ export async function runWebBinaryQualification(
       offset: copied.first.byteOffset,
       bytes: [...new Uint8Array(copied.backing)]
     }
-    const moved = (await peer.request(
-      'echo',
-      { backing, first, second },
-      { transfer: [backing] }
-    )) as typeof copied
+    const moved = await peer.request('echo', { backing, first, second }, { transfer: [backing] })
     const transfer = {
       senderLength: backing.byteLength,
       firstLength: first.byteLength,
@@ -118,9 +89,9 @@ export async function runWebBinaryQualification(
       beforeNext,
       senderLength: streamBacking.byteLength,
       buffer: item.value instanceof ArrayBuffer,
-      bytes: [...new Uint8Array(item.value as ArrayBuffer)]
+      bytes: [...new Uint8Array(item.value)]
     }
-    await stream.return!(undefined)
+    await stream.return(undefined)
     const groupBacking = new Uint8Array([5, 6]).buffer
     const group = await peer.group(
       [
@@ -133,13 +104,13 @@ export async function runWebBinaryQualification(
     )
     const grouped = {
       senderLength: groupBacking.byteLength,
-      state: group[0]!.state,
-      buffer: group[0]!.state === 'success' && group[0]!.result instanceof ArrayBuffer,
+      state: group[0].state,
+      buffer: group[0].state === 'success' && group[0].result instanceof ArrayBuffer,
       alias:
-        group[0]!.state === 'success' &&
-        group[1]!.state === 'success' &&
-        group[1]!.result instanceof Uint8Array &&
-        group[1]!.result.buffer === group[0]!.result
+        group[0].state === 'success' &&
+        group[1].state === 'success' &&
+        group[1].result instanceof Uint8Array &&
+        group[1].result.buffer === group[0].result
     }
     const notifyBacking = new Uint8Array([7]).buffer
     await peer.notify('echo', notifyBacking, {
@@ -161,7 +132,7 @@ export async function runWebBinaryQualification(
       failures,
       closing,
       closure,
-      carrier: (await peer.describe()).connections[0]!.carrier
+      carrier: (await peer.describe()).connections[0].carrier
     }
   } finally {
     phase = 'closing'
