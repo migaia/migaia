@@ -8,7 +8,8 @@ import { createThreadRuntimeBootstrap } from '../../src/threads/bootstrap.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { fileURLToPath } from 'node:url'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createThreadPeer } from '../../src/threads/index.js'
 import {
@@ -50,21 +51,11 @@ it.each(['memory', 'external'] as const)(
       RpcCapability.cancelBeforeStart,
       RpcCapability.outcome
     ]
-    /** The actual external owner survives Worker death; its journal stays with local batch evidence. */
-    const journal =
-      kind === 'external'
-        ? join(
-            mkdtempSync(
-              fileURLToPath(
-                new URL(
-                  '../../../../docs/rpc/scratch/runtime-api/implementation-c9/external-worker-',
-                  import.meta.url
-                )
-              )
-            ),
-            'outcomes.jsonl'
-          )
-        : undefined
+    /** This test owns an OS temporary directory that survives Worker restarts until Host disposal. */
+    const journalDirectory =
+      kind === 'external' ? mkdtempSync(join(tmpdir(), 'external-worker-')) : undefined
+    /** The actual external owner retains the same journal across Worker death and replacement. */
+    const journal = journalDirectory ? join(journalDirectory, 'outcomes.jsonl') : undefined
     if (journal) writeFileSync(journal, '')
     try {
       await host.use(
@@ -165,6 +156,7 @@ it.each(['memory', 'external'] as const)(
       assert.equal(before.state === 'done' && before.outcome.targetGeneration.value, 0)
     } finally {
       await host.dispose()
+      if (journalDirectory) rmSync(journalDirectory, { recursive: true, force: true })
     }
     assert.equal(budget.inUse, 0)
   }
