@@ -180,23 +180,23 @@
     },
     "rpc": {
       "lines": {
-        "covered": 13420,
-        "total": 14719,
+        "covered": 13423,
+        "total": 14722,
         "pct": 91.17
       },
       "statements": {
-        "covered": 14671,
-        "total": 16530,
+        "covered": 14674,
+        "total": 16533,
         "pct": 88.75
       },
       "functions": {
-        "covered": 3061,
-        "total": 3352,
-        "pct": 91.31
+        "covered": 3064,
+        "total": 3355,
+        "pct": 91.32
       },
       "branches": {
-        "covered": 10099,
-        "total": 11706,
+        "covered": 10104,
+        "total": 11712,
         "pct": 86.27
       }
     },
@@ -554,24 +554,24 @@
     },
     "utils": {
       "lines": {
-        "covered": 1696,
-        "total": 1973,
-        "pct": 85.96
+        "covered": 1698,
+        "total": 1976,
+        "pct": 85.93
       },
       "statements": {
-        "covered": 1853,
-        "total": 2233,
-        "pct": 82.98
+        "covered": 1855,
+        "total": 2237,
+        "pct": 82.92
       },
       "functions": {
-        "covered": 273,
-        "total": 325,
-        "pct": 84
+        "covered": 276,
+        "total": 328,
+        "pct": 84.14
       },
       "branches": {
         "covered": 1371,
-        "total": 1683,
-        "pct": 81.46
+        "total": 1685,
+        "pct": 81.36
       }
     }
   },
@@ -6650,24 +6650,24 @@
     },
     "packages/rpc/src/core/internal/outbound-envelope.ts": {
       "lines": {
-        "covered": 73,
-        "total": 74,
-        "pct": 98.64
+        "covered": 76,
+        "total": 77,
+        "pct": 98.7
       },
       "statements": {
-        "covered": 84,
-        "total": 85,
-        "pct": 98.82
+        "covered": 87,
+        "total": 88,
+        "pct": 98.86
       },
       "functions": {
-        "covered": 19,
-        "total": 19,
+        "covered": 22,
+        "total": 22,
         "pct": 100
       },
       "branches": {
-        "covered": 103,
-        "total": 106,
-        "pct": 97.16
+        "covered": 108,
+        "total": 112,
+        "pct": 96.42
       }
     },
     "packages/rpc/src/core/internal/outbound-gate.ts": {
@@ -17188,24 +17188,24 @@
     },
     "packages/utils/src/scheduler.ts": {
       "lines": {
-        "covered": 131,
-        "total": 205,
-        "pct": 63.9
+        "covered": 133,
+        "total": 208,
+        "pct": 63.94
       },
       "statements": {
-        "covered": 141,
-        "total": 227,
-        "pct": 62.11
+        "covered": 143,
+        "total": 231,
+        "pct": 61.9
       },
       "functions": {
-        "covered": 23,
-        "total": 34,
-        "pct": 67.64
+        "covered": 26,
+        "total": 37,
+        "pct": 70.27
       },
       "branches": {
         "covered": 60,
-        "total": 97,
-        "pct": 61.85
+        "total": 99,
+        "pct": 60.6
       }
     },
     "packages/utils/src/string.ts": {
