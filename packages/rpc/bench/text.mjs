@@ -51,3 +51,17 @@ export const RuntimeBench = Object.freeze({
   /** Caller-created fixture token is bootstrap input and is always redacted from retained stderr. */
   token: 'runtime-bench-token'
 })
+
+/** Fixed directed-fixture labels are local protocol data, never resource authority. */
+export const CrossRuntimeBench = Object.freeze({
+  /** The original directed fixture bootstrap token remains outside public configuration. */
+  token: 'xrt-local',
+  /** Native TS readiness is consumed before warmup. */
+  ready: 'XRT_READY\n',
+  /** The controlled foreign loop exists only on its Content-Length fixture profile. */
+  reverse: 'peer.reverse',
+  /** Existing independent foreign business handlers keep their published fixture method. */
+  request: 'p.f.request',
+  /** Full raw timing/counter receipts retain the frozen directed inventory seed. */
+  seed: 'xrt-20261009-v1'
+})

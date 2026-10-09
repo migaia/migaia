@@ -1,5 +1,42 @@
 # IPC conformance and DA1 measurements
 
+`cross-runtime/` runs the separate R23 directed matrix: 27 Node/Bun/Deno ↔
+Node/Bun/Deno/Rust/Go/Python pairs on two carriers. Its TS endpoints import the
+actual public RPC source entries. Node uses the minimal `.js` → `.ts` resolver;
+Bun and Deno execute TS directly. Existing dependency exports remain built.
+
+The owner first calls `node packages/rpc/bench/cross-runtime/prepare.mjs <fresh-evidence-directory>`
+from the repository root context through the pinned environment wrapper. The
+prepared source records distinguish current base from the actual five-file BC14
+disposable responder candidate. Reverse candidate results are fixture evidence;
+they do not claim that the current production bridge already supports responders.
+Preparation and raw output directories must be new. Foreign launchers use the
+copied Go/Rust/Python sources, with each file's exact SHA in the source manifest.
+Each arm resolves the existing optimized native executable before warmup and
+records its SHA; this identifies the running program without claiming foreign
+internal counters. The driver also retains exact endpoint/observer/resolver
+source snapshots beside its plan.
+
+`node packages/rpc/bench/cross-runtime/run-grid.mjs <counter|base-red|timing> <prepared-directory>
+<fresh-raw-directory> <absolute-env-wrapper> [comma-separated-directed-keys]`
+runs the finite inventory through the absolute shared exclusive-window runner.
+Every N1/N2, A/A and A/B arm has a fresh independent connection. Replay defaults
+stay per-peer 1024, global 4096 and TTL 310000 ms. Counter copies observe the
+existing canonical `readCapacity` result after ordinary and bulk admission;
+they record all accepted entries, active/completed occupancy and actual provider
+leases. Warmup is 200; diagnostic matched arms use N1=128/N2=768; timing arms
+retain the directed protocol's six ABBA blocks and 800 samples. No repeated
+4000-call connection or nondefault capacity is used.
+
+`node packages/rpc/bench/cross-runtime/report.mjs <raw-directory>` recomputes each cell's latency
+and native per-PID CPU ratios with the existing r13 whole-block bootstrap. A/A
+is that cell/metric's tolerance; option A gates only start AC, low-power zero,
+and one-/five-minute load ≤3. End load is reported. Actual foreign initiators
+record their own latency series; outer reverse control remains disclosed in
+native CPU deltas. Boundary RSS from the shared parent graph has no relative
+RSS acceptance credit. Missing engine channels and foreign internal counters
+remain unavailable, never zero.
+
 `support-units.json` freezes 68 native sequential cells, two Chromium cells, and
 six concurrency cells. Capability preparation and formal timing are separate.
 `ipc.mjs` owns the bare window, nearest-rank summaries and paired judgments.
