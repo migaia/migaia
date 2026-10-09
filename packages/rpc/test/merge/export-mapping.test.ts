@@ -127,6 +127,7 @@ describe('A1 merged public exports', () => {
         'REMOTE_SCHEMA_VERSION',
         'REMOTE_METHOD_MODES',
         'RemoteMethodName',
+        'RuntimePluginKey',
         'RpcRemoteLayerErrorCode',
         'RpcRemoteLayerErrorText',
         'normalizeRemoteContract',
@@ -142,6 +143,15 @@ describe('A1 merged public exports', () => {
         'createCoroutineHost'
       ].sort()
     )
+    /** C3 exposes only scalar metadata from the existing owner, without its family tokens. */
+    const remoteNamespace = await import(pathToFileURL(join(packageRoot, remote.default)).href)
+    /** Canonical identity prevents a copied table or wrapper from becoming another vocabulary owner. */
+    const runtimeConstants = await import(
+      pathToFileURL(join(packageRoot, 'dist/remote/runtime-api/constants.js')).href
+    )
+    expect(remoteNamespace.RuntimePluginKey).toBe(runtimeConstants.RuntimePluginKey)
+    expect(remoteNamespace.RuntimePluginKey).toEqual({ process: 'process', thread: 'thread' })
+    expect(remoteNamespace).not.toHaveProperty('RuntimePluginFamily')
     for (const [name, names] of Object.entries(jsonrpcBridgeDelta.added)) {
       const entry = manifest.exports[`.${name.slice('@migaia/rpc'.length)}`]
       expect(entry).toEqual({

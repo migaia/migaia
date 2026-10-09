@@ -64,7 +64,10 @@ export const RuntimePluginFamily = {
   thread: Object.freeze({})
 } as const
 
-/** Direct Host publication uses these canonical platform keys throughout runtime assembly. */
+/**
+ * Applications use these scalar labels to identify process/thread Plugin and query metadata. A
+ * label grants no Host slot or native execution authority; those belong to held resources.
+ */
 export const RuntimePluginKey = { process: 'process', thread: 'thread' } as const
 
 /** This explicit whitelist entry alone enables the original reserved Host-control operations. */

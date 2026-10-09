@@ -91,6 +91,8 @@ process 的 1MiB inline 会受编码、规范化和 framing 成本影响；高�
 
 ## 查询、控制和事件
 
+从 `@migaia/rpc/remote` 导入 `RuntimePluginKey`，用其 `process` / `thread` 值解释 Plugin 与查询的标量元数据。这两个标签不定位未持有的 Host slot，也不授予 channel 或 native execution 操作权；控制仍由实际持有的资源决定。
+
 list/get/describe 是本地冷查询，默认返回可移植对象，格式参数选择字符串。methods 为名称数组，wire 模式目录独立保留；listener 在尚未接纳 session 时也有自己的本地方法目录。连接详情区分实际接纳的 generation 与 native launch attempt。缺资源、健康、退出或计数事实用 unavailable，不伪造0，也不遍历ledger或增加业务observer来重建。
 
 on 返回幂等 disposer；监听抛错/迟到拒绝被报告而不替换主流程。watch 是原 publisher 的有界本地事件迭代器，超过100条会报告 RUNTIME_EVENT_OVERFLOW 并结束；先查询当前状态，再新订阅。没有清算 owner 的路径不编造 liquidated 事件。
