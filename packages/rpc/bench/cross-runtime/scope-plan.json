@@ -1,0 +1,1957 @@
+{
+  "protocol": "rpc-directed-cross-runtime-scope/v1",
+  "ruling": "user ruling 2026-10-09, bidirectional cross-runtime scope",
+  "sourceCommit": "c373cc560ee168c1d9ff0c23c104ca64cee6a609",
+  "requirement": "R23",
+  "acceptanceReservations": ["A56", "A57", "A58", "A59"],
+  "directedPairs": 27,
+  "carrierRows": 54,
+  "counterCells": 108,
+  "status": "C5_INVENTORY_NOT_RUN",
+  "rows": [
+    {
+      "pairOrdinal": 1,
+      "key": "node-to-node:stdio-framed",
+      "initiator": "node",
+      "provider": "node",
+      "direction": "native",
+      "carrier": "stdio-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0001",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node",
+            "provider": "node"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0002",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node",
+            "provider": "node"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 1,
+      "key": "node-to-node:socket-framed",
+      "initiator": "node",
+      "provider": "node",
+      "direction": "native",
+      "carrier": "socket-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0003",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node",
+            "provider": "node"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0004",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node",
+            "provider": "node"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 2,
+      "key": "node-to-bun:stdio-framed",
+      "initiator": "node",
+      "provider": "bun",
+      "direction": "native",
+      "carrier": "stdio-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0005",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node",
+            "provider": "bun"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0006",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node",
+            "provider": "bun"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 2,
+      "key": "node-to-bun:socket-framed",
+      "initiator": "node",
+      "provider": "bun",
+      "direction": "native",
+      "carrier": "socket-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0007",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node",
+            "provider": "bun"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0008",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node",
+            "provider": "bun"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 3,
+      "key": "node-to-deno:stdio-framed",
+      "initiator": "node",
+      "provider": "deno",
+      "direction": "native",
+      "carrier": "stdio-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0009",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node",
+            "provider": "deno"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0010",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node",
+            "provider": "deno"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 3,
+      "key": "node-to-deno:socket-framed",
+      "initiator": "node",
+      "provider": "deno",
+      "direction": "native",
+      "carrier": "socket-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0011",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node",
+            "provider": "deno"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0012",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node",
+            "provider": "deno"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 4,
+      "key": "bun-to-node:stdio-framed",
+      "initiator": "bun",
+      "provider": "node",
+      "direction": "native",
+      "carrier": "stdio-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0013",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun",
+            "provider": "node"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0014",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun",
+            "provider": "node"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 4,
+      "key": "bun-to-node:socket-framed",
+      "initiator": "bun",
+      "provider": "node",
+      "direction": "native",
+      "carrier": "socket-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0015",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun",
+            "provider": "node"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0016",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun",
+            "provider": "node"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 5,
+      "key": "bun-to-bun:stdio-framed",
+      "initiator": "bun",
+      "provider": "bun",
+      "direction": "native",
+      "carrier": "stdio-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0017",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun",
+            "provider": "bun"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0018",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun",
+            "provider": "bun"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 5,
+      "key": "bun-to-bun:socket-framed",
+      "initiator": "bun",
+      "provider": "bun",
+      "direction": "native",
+      "carrier": "socket-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0019",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun",
+            "provider": "bun"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0020",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun",
+            "provider": "bun"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 6,
+      "key": "bun-to-deno:stdio-framed",
+      "initiator": "bun",
+      "provider": "deno",
+      "direction": "native",
+      "carrier": "stdio-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0021",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun",
+            "provider": "deno"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0022",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun",
+            "provider": "deno"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 6,
+      "key": "bun-to-deno:socket-framed",
+      "initiator": "bun",
+      "provider": "deno",
+      "direction": "native",
+      "carrier": "socket-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0023",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun",
+            "provider": "deno"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0024",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun",
+            "provider": "deno"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 7,
+      "key": "deno-to-node:stdio-framed",
+      "initiator": "deno",
+      "provider": "node",
+      "direction": "native",
+      "carrier": "stdio-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0025",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno",
+            "provider": "node"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0026",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno",
+            "provider": "node"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 7,
+      "key": "deno-to-node:socket-framed",
+      "initiator": "deno",
+      "provider": "node",
+      "direction": "native",
+      "carrier": "socket-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0027",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno",
+            "provider": "node"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0028",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno",
+            "provider": "node"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 8,
+      "key": "deno-to-bun:stdio-framed",
+      "initiator": "deno",
+      "provider": "bun",
+      "direction": "native",
+      "carrier": "stdio-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0029",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno",
+            "provider": "bun"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0030",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno",
+            "provider": "bun"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 8,
+      "key": "deno-to-bun:socket-framed",
+      "initiator": "deno",
+      "provider": "bun",
+      "direction": "native",
+      "carrier": "socket-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0031",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno",
+            "provider": "bun"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0032",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno",
+            "provider": "bun"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 9,
+      "key": "deno-to-deno:stdio-framed",
+      "initiator": "deno",
+      "provider": "deno",
+      "direction": "native",
+      "carrier": "stdio-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0033",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno",
+            "provider": "deno"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0034",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno",
+            "provider": "deno"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 9,
+      "key": "deno-to-deno:socket-framed",
+      "initiator": "deno",
+      "provider": "deno",
+      "direction": "native",
+      "carrier": "socket-framed",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0035",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno",
+            "provider": "deno"
+          },
+          "foreignInternalCounter": null
+        },
+        {
+          "evidenceId": "EV-XRT-0036",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno",
+            "provider": "deno"
+          },
+          "foreignInternalCounter": null
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 10,
+      "key": "node-to-rust:stdio-content-length",
+      "initiator": "node",
+      "provider": "rust",
+      "direction": "forward",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0037",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0038",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 10,
+      "key": "node-to-rust:socket-content-length",
+      "initiator": "node",
+      "provider": "rust",
+      "direction": "forward",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0039",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0040",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 11,
+      "key": "node-to-go:stdio-content-length",
+      "initiator": "node",
+      "provider": "go",
+      "direction": "forward",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0041",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0042",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 11,
+      "key": "node-to-go:socket-content-length",
+      "initiator": "node",
+      "provider": "go",
+      "direction": "forward",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0043",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0044",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 12,
+      "key": "node-to-python:stdio-content-length",
+      "initiator": "node",
+      "provider": "python",
+      "direction": "forward",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0045",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0046",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 12,
+      "key": "node-to-python:socket-content-length",
+      "initiator": "node",
+      "provider": "python",
+      "direction": "forward",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0047",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0048",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 13,
+      "key": "bun-to-rust:stdio-content-length",
+      "initiator": "bun",
+      "provider": "rust",
+      "direction": "forward",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0049",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0050",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 13,
+      "key": "bun-to-rust:socket-content-length",
+      "initiator": "bun",
+      "provider": "rust",
+      "direction": "forward",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0051",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0052",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 14,
+      "key": "bun-to-go:stdio-content-length",
+      "initiator": "bun",
+      "provider": "go",
+      "direction": "forward",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0053",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0054",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 14,
+      "key": "bun-to-go:socket-content-length",
+      "initiator": "bun",
+      "provider": "go",
+      "direction": "forward",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0055",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0056",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 15,
+      "key": "bun-to-python:stdio-content-length",
+      "initiator": "bun",
+      "provider": "python",
+      "direction": "forward",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0057",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0058",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 15,
+      "key": "bun-to-python:socket-content-length",
+      "initiator": "bun",
+      "provider": "python",
+      "direction": "forward",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0059",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0060",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 16,
+      "key": "deno-to-rust:stdio-content-length",
+      "initiator": "deno",
+      "provider": "rust",
+      "direction": "forward",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0061",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0062",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 16,
+      "key": "deno-to-rust:socket-content-length",
+      "initiator": "deno",
+      "provider": "rust",
+      "direction": "forward",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0063",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0064",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 17,
+      "key": "deno-to-go:stdio-content-length",
+      "initiator": "deno",
+      "provider": "go",
+      "direction": "forward",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0065",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0066",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 17,
+      "key": "deno-to-go:socket-content-length",
+      "initiator": "deno",
+      "provider": "go",
+      "direction": "forward",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0067",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0068",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 18,
+      "key": "deno-to-python:stdio-content-length",
+      "initiator": "deno",
+      "provider": "python",
+      "direction": "forward",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0069",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0070",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 18,
+      "key": "deno-to-python:socket-content-length",
+      "initiator": "deno",
+      "provider": "python",
+      "direction": "forward",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0071",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0072",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "initiator": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Matched bare initiator and echo provider with the same directed runtime pair",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 19,
+      "key": "rust-to-node:stdio-content-length",
+      "initiator": "rust",
+      "provider": "node",
+      "direction": "reverse",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0073",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0074",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 19,
+      "key": "rust-to-node:socket-content-length",
+      "initiator": "rust",
+      "provider": "node",
+      "direction": "reverse",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0075",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0076",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 20,
+      "key": "rust-to-bun:stdio-content-length",
+      "initiator": "rust",
+      "provider": "bun",
+      "direction": "reverse",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0077",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0078",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 20,
+      "key": "rust-to-bun:socket-content-length",
+      "initiator": "rust",
+      "provider": "bun",
+      "direction": "reverse",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0079",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0080",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 21,
+      "key": "rust-to-deno:stdio-content-length",
+      "initiator": "rust",
+      "provider": "deno",
+      "direction": "reverse",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0081",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0082",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 21,
+      "key": "rust-to-deno:socket-content-length",
+      "initiator": "rust",
+      "provider": "deno",
+      "direction": "reverse",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0083",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0084",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 22,
+      "key": "go-to-node:stdio-content-length",
+      "initiator": "go",
+      "provider": "node",
+      "direction": "reverse",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0085",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0086",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 22,
+      "key": "go-to-node:socket-content-length",
+      "initiator": "go",
+      "provider": "node",
+      "direction": "reverse",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0087",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0088",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 23,
+      "key": "go-to-bun:stdio-content-length",
+      "initiator": "go",
+      "provider": "bun",
+      "direction": "reverse",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0089",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0090",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 23,
+      "key": "go-to-bun:socket-content-length",
+      "initiator": "go",
+      "provider": "bun",
+      "direction": "reverse",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0091",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0092",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 24,
+      "key": "go-to-deno:stdio-content-length",
+      "initiator": "go",
+      "provider": "deno",
+      "direction": "reverse",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0093",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0094",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 24,
+      "key": "go-to-deno:socket-content-length",
+      "initiator": "go",
+      "provider": "deno",
+      "direction": "reverse",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0095",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0096",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 25,
+      "key": "python-to-node:stdio-content-length",
+      "initiator": "python",
+      "provider": "node",
+      "direction": "reverse",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0097",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0098",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 25,
+      "key": "python-to-node:socket-content-length",
+      "initiator": "python",
+      "provider": "node",
+      "direction": "reverse",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0099",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0100",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "node"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 26,
+      "key": "python-to-bun:stdio-content-length",
+      "initiator": "python",
+      "provider": "bun",
+      "direction": "reverse",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0101",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0102",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 26,
+      "key": "python-to-bun:socket-content-length",
+      "initiator": "python",
+      "provider": "bun",
+      "direction": "reverse",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0103",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0104",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "bun"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 27,
+      "key": "python-to-deno:stdio-content-length",
+      "initiator": "python",
+      "provider": "deno",
+      "direction": "reverse",
+      "carrier": "stdio-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0105",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0106",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 64,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    },
+    {
+      "pairOrdinal": 27,
+      "key": "python-to-deno:socket-content-length",
+      "initiator": "python",
+      "provider": "deno",
+      "direction": "reverse",
+      "carrier": "socket-content-length",
+      "counterCells": [
+        {
+          "evidenceId": "EV-XRT-0107",
+          "payloadBytes": 64,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        },
+        {
+          "evidenceId": "EV-XRT-0108",
+          "payloadBytes": 1024,
+          "counterStatus": "NOT_RUN",
+          "functionalStatus": "NOT_RUN",
+          "tsRolesRequired": {
+            "provider": "deno"
+          },
+          "foreignInternalCounter": "UNAVAILABLE"
+        }
+      ],
+      "timingPayloadBytes": 1024,
+      "timingStatus": "NOT_RUN",
+      "bareDefinition": "Foreign logical initiator against a bare TS echo provider",
+      "endpointForm": "Actual TypeScript program imports corresponding RPC public TS entry files; no RPC dist or build",
+      "nativeWorkerScope": "Existing same-runtime Worker scope remains separate"
+    }
+  ],
+  "limits": [
+    "Old same-runtime/dist and forward-only receipts retain their original source/form scope",
+    "Source import admission alone is not a functional pair PASS",
+    "A functional gap is routed to C5 rather than removed from the required universe",
+    "Option-A timing requires own AA tolerance and qualifying start conditions"
+  ],
+  "capacity": {
+    "maxReplayEntriesPerPeer": 1024,
+    "maxReplayEntries": 4096,
+    "replayTtlMs": 310000,
+    "source": "current canonical provider-attachment/request-replay-ledger; no override"
+  },
+  "arms": "fresh independent connection for every RPC/bare, AA/ABBA arm; full cold/control/ledger accounting",
+  "counters": {
+    "N1": 128,
+    "N2": 768,
+    "method": "matched fresh arms and N2-N1 difference, 64B/1KiB per carrier; native hooks/source instrument separate from timing"
+  }
+}
