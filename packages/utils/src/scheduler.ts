@@ -132,8 +132,27 @@ function addVirtualTime(base: number, delta: number, field: string): number {
 
 /** Endpoint-derived receiver identities retain one canonical scheduler strategy per endpoint. */
 const sharedSchedulers = new WeakMap<object, IScheduler>()
-/** Native re-reference stays private; the public scheduled-task contract remains unchanged. */
-const referenceNativeTask = new WeakMap<IScheduledTask, () => void>()
+/** Native re-reference belongs to its task, without a per-registration global identity table. */
+class NativeTaskReference extends class {
+  /** Return the original public handle so the derived private field adds no observable properties. */
+  constructor(task: IScheduledTask) {
+    return task
+  }
+} {
+  /** Restores this task's native liveness when its shared-deadline owner needs referenced work. */
+  #reference: () => void
+
+  /** Stamp the existing handle once; its cancel/unref methods and public shape remain unchanged. */
+  constructor(task: IScheduledTask, reference: () => void) {
+    super(task)
+    this.#reference = reference
+  }
+
+  /** Only scheduler-created native handles have a private reference-restoration capability. */
+  static restore(task: IScheduledTask): void {
+    if (#reference in task) task.#reference()
+  }
+}
 
 /** One logical deadline owns its callback and independent native-liveness request. */
 type ISharedDeadline = {
@@ -175,7 +194,7 @@ function sharedScheduler(receiver: object): IScheduler {
     if (unreferenced === armedUnreferenced) return
     armedUnreferenced = unreferenced
     if (unreferenced) armed.unref?.()
-    else referenceNativeTask.get(armed)?.()
+    else NativeTaskReference.restore(armed)
   }
   /** Reuses an earlier armed wakeup; native flush will re-check exact due time before execution. */
   const arm = (): void => {
@@ -352,7 +371,7 @@ export const systemScheduler: IScheduler = {
         applyUnref()
       }
     }
-    referenceNativeTask.set(task, () => {
+    new NativeTaskReference(task, () => {
       unrefRequested = false
       /** Node/Bun timer handles have ref; browsers retain their original numeric handle behavior. */
       const timer = handle as { readonly ref?: unknown } | null | undefined
