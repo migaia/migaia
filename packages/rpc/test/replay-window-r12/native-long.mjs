@@ -35,8 +35,9 @@ const latencyFile = openSync(join(directory, 'latency.jsonl'), 'wx')
 const parentFile = openSync(join(directory, 'parent.jsonl'), 'wx')
 const peerFile = join(directory, 'peer.jsonl')
 writeFileSync(peerFile, '', { flag: 'wx' })
-/** Bounded raw buffers do not retain millions of measurements on the measured heap. */
-let latencyBuffer = ''
+/** Bounded rows avoid a retained cons-string rope while preserving the original JSONL bytes. */
+const latencyBuffer = []
+/** The original 512-outcome cadence bounds fixture output without retaining the sample history. */
 let latencyBuffered = 0
 /** One bounded pacing burst covers at most 20ms of demand, matching the existing H6 fixture. */
 const maxBurst = Math.max(1, Math.ceil(rate / 50))
@@ -175,10 +176,10 @@ sample()
 const timer = setInterval(sample, 1000)
 /** Flushes bounded raw latency rows without exposing or retaining the business payload. */
 const recordLatency = (value) => {
-  latencyBuffer += JSON.stringify(value) + '\n'
+  latencyBuffer.push(JSON.stringify(value) + '\n')
   if (++latencyBuffered >= 512) {
-    writeSync(latencyFile, latencyBuffer)
-    latencyBuffer = ''
+    writeSync(latencyFile, latencyBuffer.join(''))
+    latencyBuffer.length = 0
     latencyBuffered = 0
   }
 }
@@ -277,7 +278,7 @@ try {
   )
 } finally {
   clearInterval(timer)
-  if (latencyBuffer) writeSync(latencyFile, latencyBuffer)
+  if (latencyBuffer.length) writeSync(latencyFile, latencyBuffer.join(''))
   await session.close()
   const retired = nativeSample(session)
   writeParent({ kind: 'retired', ...retired })
