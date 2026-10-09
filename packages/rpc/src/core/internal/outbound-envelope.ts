@@ -82,11 +82,31 @@ export function retainForwardOptions<T extends object>(source: unknown, target: 
   return target
 }
 
-/**
- * Weak identity proves a package-owned immutable snapshot; public freezing/metadata cannot forge
- * it.
- */
-const outbound = new WeakMap<object, symbol>()
+/** Private identity proves an owned immutable snapshot without a global per-envelope table. */
+class OutboundSnapshot extends class {
+  /** Return the original record so private branding preserves identity, prototype and descriptors. */
+  constructor(value: object) {
+    return value
+  }
+} {
+  /** The exact original admission kind stays on its snapshot and cannot be copied or reflected. */
+  #kind: symbol
+
+  /** Stamp a newly admitted record once, including records already frozen by the contract owner. */
+  constructor(value: object, kind: symbol) {
+    super(value)
+    this.#kind = kind
+  }
+
+  /** Caller freezing, field copies and inbound records cannot mint this private admission kind. */
+  static read(value: unknown): symbol | undefined {
+    return value !== null &&
+      (typeof value === 'object' || typeof value === 'function') &&
+      #kind in value
+      ? value.#kind
+      : undefined
+  }
+}
 /** Distinct private proof kinds cannot be forged by copying fields or freezing caller data. */
 const legacySnapshot = Symbol('rpc-legacy-outbound-snapshot')
 /** Runtime envelope admission remains separate from a normalized logical input. */
@@ -124,7 +144,7 @@ export function createRuntimeRequestInput(
   const input = { method, ...(portable === undefined ? {} : { payload: portable }) }
   Object.defineProperty(input, runtimeInputDepth, { value: portableDepth })
   Object.freeze(input)
-  outbound.set(input, runtimeInputSnapshot)
+  new OutboundSnapshot(input, runtimeInputSnapshot)
   return input
 }
 
@@ -157,7 +177,7 @@ export function readRuntimeRequestInput(
 
 /** In-place caller mutation and forged metadata cannot mint this original admission proof. */
 export function isRuntimeRequestInput(value: object): value is IRuntimeRequestInput {
-  return outbound.get(value) === runtimeInputSnapshot
+  return OutboundSnapshot.read(value) === runtimeInputSnapshot
 }
 
 /** Performs original first-user normalization before proving only non-opaque outbound envelopes. */
@@ -195,25 +215,27 @@ export function createOutboundEnvelope(value: unknown, options?: unknown): IRpcE
           ...(data.payload === undefined ? {} : { payload: data.payload })
         })
       })
-      outbound.set(envelope, legacySnapshot)
+      new OutboundSnapshot(envelope, legacySnapshot)
       return envelope
     }
   }
   /** The canonical contract owner retains getter order, failure pointers and portable snapshots. */
   const envelope = normalizeRpcEnvelope(value)
-  if (envelope.kind !== RpcEnvelopeKind.variation) outbound.set(envelope, legacySnapshot)
+  if (envelope.kind !== RpcEnvelopeKind.variation) new OutboundSnapshot(envelope, legacySnapshot)
   return envelope
 }
 
 /** Opaque controls, caller objects and inbound values retain full source codec admission. */
 export function isOutboundEnvelope(value: unknown): value is IRpcEnvelope {
-  return typeof value === 'object' && value !== null && outbound.get(value) === legacySnapshot
+  return (
+    typeof value === 'object' && value !== null && OutboundSnapshot.read(value) === legacySnapshot
+  )
 }
 
 /** The same canonical proof owner retains an immutable runtime snapshot after full admission. */
 export function createRuntimeOutboundEnvelope(value: unknown): IRpcRuntimeEnvelope {
   const envelope = normalizeRuntimeEnvelope(value)
-  outbound.set(envelope, runtimeSnapshot)
+  new OutboundSnapshot(envelope, runtimeSnapshot)
   return envelope
 }
 
@@ -232,7 +254,7 @@ export function createRuntimeRequestOutboundEnvelope(
     ...envelope,
     ...(input.payload === undefined ? {} : { payload: input.payload })
   }) as IRpcRuntimeEnvelope
-  outbound.set(complete, runtimeSnapshot)
+  new OutboundSnapshot(complete, runtimeSnapshot)
   return complete
 }
 
@@ -241,7 +263,7 @@ export function isRuntimeOutboundEnvelope(value: unknown): value is IRpcRuntimeE
   return (
     typeof value === 'object' &&
     value !== null &&
-    outbound.get(value) === runtimeSnapshot &&
+    OutboundSnapshot.read(value) === runtimeSnapshot &&
     Reflect.get(value, 'profile') === RpcRuntimeProfile
   )
 }
