@@ -31,7 +31,11 @@ import type {
   IRpcOutboundOperationsPort,
   IRpcVariationCoordinatorPort
 } from './plugin-shared-keys.js'
-import { ProviderAdmissionRegistry } from './provider-admission.js'
+import {
+  ProviderAdmissionRegistry,
+  prepareProviderAdmissionScope,
+  type IProviderAdmissionScope
+} from './provider-admission.js'
 import { assertContractMethod } from './contract.js'
 import { ProviderExecutor } from './provider-executor.js'
 import { ProviderRegistry } from './provider.js'
@@ -111,7 +115,8 @@ export class RpcProviderAttachment {
     kernel: IEndpointKernelHost,
     ports: IRpcProviderPorts,
     prepared: IPreparedEndpoint<string>,
-    admission?: ProviderAdmissionRegistry
+    admission?: IProviderAdmissionScope,
+    commitPolicy?: () => boolean
   ) {
     this.#kernel = kernel
     this.#chunks = readSelectedFramerChunks(prepared.options.components!)
@@ -125,15 +130,25 @@ export class RpcProviderAttachment {
         ? `${prepared.id}:${uniqueTargetId}`
         : prepared.id
     this.#abortEnabled = prepared.options.features?.abort === true
+    /** Capacity comes from the actual selected framer, never a caller-provided ingress number. */
+    const maxIngress = readRpcSingleFrameFacts(
+      prepared.options.components!.framer.accept,
+      prepared.options.components!.framer.frame
+    )?.maxConcurrentMessages
     this.#admission = new ProviderAdmissionRegistry(
       prepared.options.providerLimits?.maxGlobal ?? 256,
       prepared.options.providerLimits?.maxPerPeer ?? 64,
-      readRpcSingleFrameFacts(
-        prepared.options.components!.framer.accept,
-        prepared.options.components!.framer.frame
-      )?.maxConcurrentMessages
+      maxIngress
     )
-    this.#runtimeAdmission = admission ?? this.#admission
+    this.#runtimeAdmission = admission
+      ? prepareProviderAdmissionScope(
+          admission,
+          prepared.options.providerLimits?.maxGlobal,
+          prepared.options.providerLimits?.maxPerPeer,
+          maxIngress,
+          commitPolicy?.() ?? true
+        )
+      : this.#admission
     if (
       prepared.options.providerLimits?.onRejected !== undefined &&
       typeof prepared.options.providerLimits.onRejected !== 'function'

@@ -2,7 +2,7 @@ import { RpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import { RpcPortName } from './plugin-shared-keys.js'
 import { RpcProviderAttachment } from './provider-attachment.js'
-import type { ProviderAdmissionRegistry } from './provider-admission.js'
+import type { IProviderAdmissionScope } from './provider-admission.js'
 import { registerEndpointDebugSnapshot } from './test-observer.js'
 import type { IOutboundSurface } from '../features/outbound.js'
 import type { IRpcEventListener, IRpcProvider } from '../typing.js'
@@ -41,7 +41,9 @@ export const createProviderFeature = (
 /** Package assembly alone can borrow the final provider's original cross-session admission owner. */
 export const createProviderFeatureWithScope = (
   outboundCapability: IRpcFeature<IOutboundCapability>,
-  admission?: ProviderAdmissionRegistry
+  admission?: IProviderAdmissionScope,
+  /** Actual held Host registration determines whether this policy has committed. */
+  commitPolicy?: () => boolean
 ): IRpcFeature<
   IProviderCapability,
   { readonly outbound: IRpcFeature<IOutboundCapability> },
@@ -79,7 +81,8 @@ export const createProviderFeatureWithScope = (
             variationCoordinator: outbound.variationCoordinator
           },
           core.featureExpose.getPrepared(),
-          admission
+          admission,
+          commitPolicy
         )
         scope.own(attachment, () => attachment!.dispose())
         const provider = attachment

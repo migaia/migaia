@@ -28,8 +28,15 @@ import type {
   IProcessPluginReplaceResult
 } from './types.js'
 import { createRuntimePlugin, type IRuntimePluginOptions } from '../../remote/runtime-api/plugin.js'
+import { RuntimePluginKey } from '../../remote/index.js'
 import { createProcessPeer } from '../peer.js'
 import type { IRuntimeProcessPeerOptions } from '../runtime-peer.js'
+
+/** This physical owner alone retains the stable family token for its actual Host slot operation. */
+const processRuntimeSlotFamily = Object.freeze({})
+
+/** Capture the canonical namespace once; descriptive resource fields cannot retarget this operation. */
+const processRuntimeSlotKey = RuntimePluginKey.process
 
 /** Symmetric Plugin options reuse the process Peer source boundary and canonical Feature exposure. */
 export type IRuntimeProcessPluginOptions = IRuntimePluginOptions<
@@ -98,7 +105,11 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
   if (!('deployment' in options))
     return createRuntimePlugin(
       options,
-      'process',
+      {
+        key: processRuntimeSlotKey,
+        acquire: (integration, create) =>
+          integration.acquireSharedSlot(processRuntimeSlotKey, processRuntimeSlotFamily, create)
+      },
       createProcessPeer as Parameters<typeof createRuntimePlugin>[2]
     )
   return assembleProcessPlugin(options)

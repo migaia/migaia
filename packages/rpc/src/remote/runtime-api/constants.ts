@@ -56,17 +56,11 @@ export const RuntimeApiErrorText = {
   hostControlInvalid: 'Runtime host exposure requires its managed Host catalog and resolver'
 } as const
 
-/** Each RPC module family alone may share its canonical PluginHost extension slot. */
-export const RuntimePluginFamily = {
-  process: Object.freeze({}),
-  thread: Object.freeze({})
-} as const
-
 /**
  * Applications use these scalar labels to identify process/thread Plugin and query metadata. A
  * label grants no Host slot or native execution authority; those belong to held resources.
  */
-export const RuntimePluginKey = { process: 'process', thread: 'thread' } as const
+export const RuntimePluginKey = Object.freeze({ process: 'process', thread: 'thread' } as const)
 
 /** This explicit whitelist entry alone enables the original reserved Host-control operations. */
 export const RuntimePluginExpose = { host: 'host' } as const

@@ -1,3 +1,4 @@
+import type { IRemoteChannel } from '../../../src/remote/types.js'
 import { receiveThreadData, createWebThreadChannel } from '../../../dist/threads/index.js'
 import { createRuntimePeer } from '../../../dist/remote/runtime-api/peer.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
@@ -42,7 +43,7 @@ await receiveThreadData(port, async (value, peerId) => {
         capabilities: data.capabilities
       }),
     endpointFactory: async (channel) => {
-      const endpoint = await webBinaryEndpoint(channel, peerId, report)
+      const endpoint = await webBinaryEndpoint(channel as IRemoteChannel, peerId, report)
       subscribed()
       return endpoint
     },

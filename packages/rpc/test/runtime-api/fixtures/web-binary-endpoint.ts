@@ -35,7 +35,7 @@ export async function webBinaryEndpoint(
   report: (error: unknown) => void
 ) {
   /** The real auth configuration supplies primitives to the original per-frame owner. */
-  const endpoint = await createRuntimeApiEndpoint(
+  const endpoint = createRuntimeApiEndpoint(
     {
       id,
       scheduler: channel.scheduler,
@@ -79,9 +79,9 @@ export async function webBinaryEndpoint(
         })
       ]
     },
-    { supports: () => true },
-    true
+    channel
   )
+  await endpoint.ready
   return {
     endpoint: endpoint as unknown as IRpcEndpoint,
     oneWay: endpoint,

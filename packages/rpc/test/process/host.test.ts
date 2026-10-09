@@ -41,7 +41,7 @@ describe('process Host facade admission and ownership', () => {
       ...fixture.options,
       retryPort: external,
       endpointFactory: async (...args) => {
-        const served = await factory(...args)
+        const served = await factory(...(args as Parameters<typeof factory>))
         return {
           ...served,
           endpoint: {
@@ -120,7 +120,7 @@ describe('process Host facade admission and ownership', () => {
         }
       },
       endpointFactory: async (...args) => {
-        const served = await original(...args)
+        const served = await original(...(args as Parameters<typeof original>))
         return {
           ...served,
           endpoint: {
@@ -158,7 +158,7 @@ describe('process Host facade admission and ownership', () => {
       ...fixture.options,
       endpointFactory: async (...args) => {
         generationSignal = args[1]
-        const served = await original(...args)
+        const served = await original(...(args as Parameters<typeof original>))
         return {
           ...served,
           endpoint: {

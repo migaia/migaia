@@ -3,12 +3,7 @@ import type { IProcessHandle } from '@migaia/supervision/process'
 import { RpcRuntimeGenerationKind } from '../contract/runtime-api/constants.js'
 import { defaultRpcId } from '../core/internal/id.js'
 import { RpcError, RpcCoreErrorCode } from '../core/errors.js'
-import {
-  RuntimeApiErrorText,
-  RuntimePluginKey,
-  RuntimeSourceKind,
-  RuntimeConnectionDirection
-} from '../remote/runtime-api/constants.js'
+import { RuntimeApiErrorText, RuntimePluginKey } from '../remote/runtime-api/constants.js'
 import { createManagedRuntimePeer } from '../remote/runtime-api/managed-peer.js'
 import {
   prepareRuntimePeerSourceContext,
@@ -110,7 +105,10 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
       preparation
     )
   /** Distinct unit/spec domains retain their native types while sharing one generation assembly. */
-  const managed = <TUnit extends object, TSpec>(binding: IProcessPluginBinding<TUnit, TSpec>) =>
+  const managed = <TUnit extends object, TSpec>(
+    binding: IProcessPluginBinding<TUnit, TSpec>,
+    execution: Parameters<typeof createManagedRuntimePeer>[5]
+  ) =>
     createManagedRuntimePeer(
       {
         self,
@@ -128,43 +126,39 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
       (channel, endpoint) => binding.bindEndpoint(channel, endpoint),
       preparation,
       () => binding.drainCurrent(),
-      {
-        kind: spawn ? RuntimeSourceKind.spawn : RuntimeSourceKind.connect,
-        direction: spawn ? RuntimeConnectionDirection.spawned : RuntimeConnectionDirection.connect
-      },
-      spawn !== undefined,
-      RuntimePluginKey.process
+      execution
     )
   /** The canonical binding's native health and drain are kept, rather than disabled for v2. */
-  return spawn
-    ? managed(
-        createSpawnProcessBinding(
-          {
-            ...spawn,
-            offer,
-            supervision: {
-              ...spawn.supervision,
-              launcher: {
-                ...spawn.supervision.launcher,
-                launch: (spec, request) =>
-                  withRuntimeLaunchContext(
-                    request,
-                    {
-                      ...context,
-                      childName: spawn.supervision.id,
-                      generation: {
-                        kind: RpcRuntimeGenerationKind.restart,
-                        value: request.executionGeneration!,
-                        providerId: providerId!
-                      }
-                    },
-                    () => spawn.supervision.launcher.launch(spec, request)
-                  )
-              }
-            }
-          },
-          options.report
-        )
-      )
-    : managed(createConnectProcessBinding({ ...connect!, offer }, options.report))
+  if (spawn) {
+    /** Only an actual spawned binding supplies native execution operations. */
+    const spawnedBinding = createSpawnProcessBinding(
+      {
+        ...spawn,
+        offer,
+        supervision: {
+          ...spawn.supervision,
+          launcher: {
+            ...spawn.supervision.launcher,
+            launch: (spec, request) =>
+              withRuntimeLaunchContext(
+                request,
+                {
+                  ...context,
+                  childName: spawn.supervision.id,
+                  generation: {
+                    kind: RpcRuntimeGenerationKind.restart,
+                    value: request.executionGeneration!,
+                    providerId: providerId!
+                  }
+                },
+                () => spawn.supervision.launcher.launch(spec, request)
+              )
+          }
+        }
+      },
+      options.report
+    )
+    return managed(spawnedBinding, spawnedBinding.supervisor)
+  }
+  return managed(createConnectProcessBinding({ ...connect!, offer }, options.report), undefined)
 }

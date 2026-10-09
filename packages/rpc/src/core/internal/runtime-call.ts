@@ -30,10 +30,7 @@ import { createProviderGenerationRetired } from './provider.js'
 import { assertRpcIdempotencyKey, defaultRpcId } from './id.js'
 import { rejectRuntimeApiCapability } from './runtime-api-endpoint.js'
 import type { IRpcStreamRuntime } from '../features/stream.js'
-import {
-  assertRuntimeTransferFamily,
-  retainRuntimeTransferOptions
-} from './runtime-call-options.js'
+import { retainRuntimeTransferOptions } from './runtime-call-options.js'
 
 /** Raw local options carry no admitted input token or wire authority. */
 export type ICoreRuntimeCallOptions = Omit<ISendOptions, 'transfer' | 'trace'> &
@@ -412,7 +409,8 @@ export function createRuntimeBindingCalls(binding: ICoreRuntimeCallBinding) {
 /** Direct Peer operators retain each original transfer/timeout/route/capture prefix. */
 export function createRuntimePeerCalls(
   config: Readonly<{
-    processFamily: boolean
+    /** The held native owner supplies only its original transfer rejection policy. */
+    restrictTransfer?: (options: object | undefined) => void
     callTimeout: (options?: ICoreRuntimeCallOptions) => ICoreRuntimeCallOptions
     route: (method: string, mode: 'request' | 'notify' | 'stream') => void
     ready: Pick<IRpcEndpoint, 'send'> &
@@ -434,7 +432,7 @@ export function createRuntimePeerCalls(
   }>
 ) {
   const {
-    processFamily,
+    restrictTransfer,
     callTimeout,
     route,
     ready,
@@ -447,7 +445,7 @@ export function createRuntimePeerCalls(
   const remote = { self: { generation: config.generation } }
   return Object.freeze({
     request: (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
-      assertRuntimeTransferFamily(processFamily, callOptions)
+      restrictTransfer?.(callOptions)
       callOptions = callTimeout(callOptions)
       route(method, RpcRuntimeMode.request)
       if (
@@ -489,7 +487,7 @@ export function createRuntimePeerCalls(
         : result
     },
     notify: (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
-      assertRuntimeTransferFamily(processFamily, callOptions)
+      restrictTransfer?.(callOptions)
       route(method, RpcRuntimeMode.notify)
       /**
        * Plain notify has no binary result; its existing physical/forward completion path stays
@@ -525,7 +523,7 @@ export function createRuntimePeerCalls(
       return ready.sendOneWay(channel.peerId, method, normalizedPayload, callOptions)
     },
     stream: (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
-      assertRuntimeTransferFamily(processFamily, callOptions)
+      restrictTransfer?.(callOptions)
       callOptions = callTimeout(callOptions)
       if (!supportsStream) rejectRuntimeApiCapability()
       route(method, RpcRuntimeMode.stream)
@@ -557,7 +555,7 @@ export function createRuntimePeerCalls(
       )
     },
     group: (steps: readonly IRpcRuntimeStep[], callOptions?: IRpcRuntimeSendOptions) => {
-      assertRuntimeTransferFamily(processFamily, callOptions)
+      restrictTransfer?.(callOptions)
       if (!runtimeOutbound || !remote.self.generation) rejectRuntimeApiCapability()
       /** Snapshot the owning grammar before any route read can execute a user getter. */
       let normalized: readonly IRpcRuntimeStep[]
@@ -604,7 +602,8 @@ type ICoreRequestTracker = {
 /** Managed public prefixes delegate raw data to the existing Core binding/direct operations. */
 export function createManagedRuntimeCalls(
   config: Readonly<{
-    processFamily: boolean
+    /** The held native owner supplies only its original transfer rejection policy. */
+    restrictTransfer?: (options: object | undefined) => void
     callTimeout: (options?: ICoreRuntimeCallOptions) => ICoreRuntimeCallOptions
     callDeadlineCapMs?: number
     trackRequest?: ICoreRequestTracker
@@ -628,32 +627,32 @@ export function createManagedRuntimeCalls(
     }>
   }>
 ) {
-  const { processFamily, callTimeout, registration } = config
+  const { restrictTransfer, callTimeout, registration } = config
   const binding = { trackRequest: config.trackRequest }
   const request = (method: string, payload: unknown, callOptions: ICoreRuntimeCallOptions) =>
     registration.invokeRequest(method, payload, callOptions)
   return Object.freeze({
     request: (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
-      assertRuntimeTransferFamily(processFamily, callOptions)
+      restrictTransfer?.(callOptions)
       /** Logical retry settlement must finish before native drain can retire its generation. */
       return binding.trackRequest
         ? binding.trackRequest(request, method, payload, callTimeout(callOptions))
         : request(method, payload, callTimeout(callOptions))
     },
     notify: (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
-      assertRuntimeTransferFamily(processFamily, callOptions)
+      restrictTransfer?.(callOptions)
       return isForwardedPayload(callOptions, payload)
         ? registration.invokeRequest(method, payload, callOptions, 'notify').then(() => undefined)
         : registration.currentPeer().notify(method, payload, callOptions)
     },
     stream: (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
-      assertRuntimeTransferFamily(processFamily, callOptions)
+      restrictTransfer?.(callOptions)
       return isForwardedPayload(callOptions, payload) || config.callDeadlineCapMs !== undefined
         ? registration.invokeStream(method, payload, callTimeout(callOptions))
         : registration.currentPeer().stream(method, payload, callTimeout(callOptions))
     },
     group: (steps: readonly IRpcRuntimeStep[], callOptions?: IRpcRuntimeSendOptions) => {
-      assertRuntimeTransferFamily(processFamily, callOptions)
+      restrictTransfer?.(callOptions)
       return registration.invokeGroup(steps, callOptions)
     },
     outcome: (key: string) => registration.currentPeer().outcome(key)

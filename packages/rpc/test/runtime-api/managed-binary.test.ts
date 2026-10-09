@@ -95,7 +95,7 @@ it('[A86][A88] managed genuine Worker transfers through the original owner witho
       retryPort,
       report: () => undefined,
       endpointFactory: async (channel) => {
-        const endpoint = await createRuntimeApiEndpoint(
+        const endpoint = createRuntimeApiEndpoint(
           {
             id: 'managed-binary-parent',
             scheduler: channel.scheduler,
@@ -117,9 +117,9 @@ it('[A86][A88] managed genuine Worker transfers through the original owner witho
               })
             ]
           },
-          { supports: () => true },
-          true
+          channel
         )
+        await endpoint.ready
         return {
           endpoint: endpoint as unknown as IRpcEndpoint,
           oneWay: endpoint,

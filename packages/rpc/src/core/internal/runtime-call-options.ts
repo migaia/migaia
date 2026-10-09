@@ -14,12 +14,9 @@ export function retainRuntimeTransferOptions<T extends object>(source: object, c
   return copied
 }
 
-/** Reject only the original process family before reading a transfer getter or caller payload. */
-export function assertRuntimeTransferFamily(
-  processFamily: boolean,
-  options: object | undefined
-): void {
-  if (processFamily && options && Object.hasOwn(options, transferField))
+/** The held Process factory rejects transfer before any transfer getter or caller payload is read. */
+export function assertRuntimeProcessTransfer(options: object | undefined): void {
+  if (options && Object.hasOwn(options, transferField))
     throw new RpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.runtimeProcessTransferInvalid

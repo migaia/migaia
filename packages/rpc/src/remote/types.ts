@@ -40,6 +40,10 @@ export type IRemoteChannel = Readonly<{
   close(): Promise<void>
 }>
 
+/** Borrowing a channel grants only its supplied operations; close exists only when delegated. */
+export type IRemoteChannelResources = Omit<IRemoteChannel, 'close'> &
+  Partial<Pick<IRemoteChannel, 'close'>>
+
 /** A launcher and channel are paired without leaking a platform handle into remote. */
 export type IRemoteBinding<TUnit, TSpec> = Readonly<{
   ownership: 'owned' | 'borrowed'

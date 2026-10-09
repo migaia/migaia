@@ -1,4 +1,4 @@
-import { RuntimePluginKey } from '../remote/runtime-api/constants.js'
+import { withRuntimePreparationContext } from '../remote/runtime-api/launch-context.js'
 import {
   runtimeQuery,
   runtimeDetail,
@@ -34,7 +34,6 @@ import { reportSafely } from './plugin/binding.js'
 import { createProcessResilience } from './resilience/index.js'
 import type { IProcessResilience } from './resilience/types.js'
 import { RpcCapability } from '../contract/wire-constants.js'
-import { readRpcSingleFrameFacts } from '../contract/framing/reassembler.js'
 
 /** The original authenticated ingress retains its caller-selected connection governor. */
 export type IRuntimeProcessListen = IProcessServeListenerIngress &
@@ -86,29 +85,37 @@ export async function createProcessListenerPeer(
             providerLimits: session.limits
           },
           channel.agreement.capabilities.includes(RpcCapability.generation)
-            ? (preparation?.providerAdmission ?? manager.runtimeAdmission).prepare(
-                session.limits.maxGlobal,
-                session.limits.maxPerPeer,
-                readRpcSingleFrameFacts(
-                  channel.pipeline.framer.accept,
-                  channel.pipeline.framer.frame
-                )?.maxConcurrentMessages
-              )
-            : undefined
+            ? (preparation?.providerAdmission ?? manager.runtimeAdmission)
+            : undefined,
+          preparation?.providerAdmissionRegistration
         ),
       async ({ channel, endpoint, signal }): Promise<IRuntimeProcessService> => {
         /** Each actual accept captures current Feature output guards through the original Host. */
-        const peer = await createRuntimePeer(
-          { ...options, provide: preparation?.readProvide?.() ?? options.provide },
+        /** The original session retains physical close; this Peer borrows its channel. */
+        const { close: sessionOwnedClose, ...peerChannel } = channel
+        void sessionOwnedClose
+        /** The actual native session retains its restriction without publishing it on options. */
+        const peerOptions: IRuntimePeerOptions = {
+          ...options,
+          provide: preparation?.readProvide?.() ?? options.provide
+        }
+        const peer = await withRuntimePreparationContext(
+          peerOptions,
           {
-            self: options.self!,
-            source: async () => channel,
-            ownsChannel: false,
-            signal,
-            endpoint,
-            origin: { kind: RuntimeSourceKind.listen, direction: RuntimeConnectionDirection.listen }
+            ...preparation,
+            /** Only this actual accepted listener session supplies its descriptive origin. */
+            connectionOrigin: () => ({
+              kind: RuntimeSourceKind.listen,
+              direction: RuntimeConnectionDirection.listen
+            })
           },
-          RuntimePluginKey.process
+          () =>
+            createRuntimePeer(peerOptions, {
+              channel: peerChannel,
+              signal,
+              endpoint,
+              host: preparation?.host
+            })
         )
         return Object.freeze({ peer, close: peer.close })
       },
@@ -122,7 +129,7 @@ export async function createProcessListenerPeer(
         providerLimits: options.providerLimits,
         own: (dispose) => {
           closeSessions = dispose
-          preparation?.own(close)
+          preparation?.own?.(close)
         },
         publish: (service) =>
           preparation?.publishPeer?.((service as IRuntimeProcessService).peer) ?? (() => undefined),

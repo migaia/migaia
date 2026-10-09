@@ -20,31 +20,48 @@ function validateLimits(maxGlobal: number, maxPerPeer: number, maxIngress?: numb
     )
 }
 
-/** A cold original owner stores one registry reference, without another queue, quota or lifecycle. */
+/** The public quota handle affects only the original scope deliberately shared by its caller. */
 export type IProviderAdmissionScope = Readonly<{
-  prepare(
-    maxGlobal: number | undefined,
-    maxPerPeer: number | undefined,
-    maxIngress: number | undefined,
-    commitPolicy?: boolean
-  ): ProviderAdmissionRegistry
-  /** Original Host install commit applies only its actually prepared, successful source policy. */
-  constrain(maxGlobal: number | undefined, maxPerPeer: number | undefined): void
+  /** Narrow this scope's original business limits; omitted values retain the original defaults. */
+  constrain(maxGlobal?: number, maxPerPeer?: number): void
+  /** Clear only the registry owned by this handle, retaining the existing disposal semantics. */
   clear(): void
 }>
 
-/** Delay assembly until actual framing facts exist; every joined session then borrows this scope. */
+/** Core construction prepares the same registry after actual framing and Host commit are known. */
+type IProviderAdmissionPreparation = (
+  maxGlobal: number | undefined,
+  maxPerPeer: number | undefined,
+  maxIngress: number | undefined,
+  commitPolicy: boolean
+) => ProviderAdmissionRegistry
+
+/** Exact quota handles resolve only inside their original Core admission owner. */
+const admissionPreparations = new WeakMap<
+  IProviderAdmissionScope,
+  Readonly<{ prepare: IProviderAdmissionPreparation; owns(candidate: unknown): boolean }>
+>()
+
+/** Create one caller-owned lazy quota resource without publishing its registry or prepare port. */
 export function createProviderAdmissionScope(): IProviderAdmissionScope {
-  /** All FIFO, receipt and business state remains exclusively in this one original registry. */
+  /** All FIFO, receipt and business state remains in the existing single registry. */
   let registry: ProviderAdmissionRegistry | undefined
-  return Object.freeze({
-    /** Candidates validate framing without changing an already committed provider's business bound. */
-    prepare(
+  /** Public operations expose only this resource's constraint and cleanup behavior. */
+  const scope: IProviderAdmissionScope = Object.freeze({
+    constrain(maxGlobal = DEFAULT_MAX_GLOBAL, maxPerPeer = DEFAULT_MAX_PER_PEER) {
+      validateLimits(maxGlobal, maxPerPeer)
+      registry?.constrainBusiness(maxGlobal, maxPerPeer)
+    },
+    clear: () => registry?.clear()
+  })
+  admissionPreparations.set(scope, {
+    owns: (candidate) => registry !== undefined && candidate === registry,
+    prepare: (
       maxGlobal = DEFAULT_MAX_GLOBAL,
       maxPerPeer = DEFAULT_MAX_PER_PEER,
       maxIngress,
-      commitPolicy = true
-    ) {
+      commitPolicy
+    ) => {
       validateLimits(maxGlobal, maxPerPeer, maxIngress)
       if (maxIngress === undefined || (registry && !registry.matchesFraming(maxIngress)))
         throw new RpcError(
@@ -53,13 +70,35 @@ export function createProviderAdmissionScope(): IProviderAdmissionScope {
         )
       if (registry && commitPolicy) registry.constrainBusiness(maxGlobal, maxPerPeer)
       return (registry ??= new ProviderAdmissionRegistry(maxGlobal, maxPerPeer, maxIngress))
-    },
-    constrain(maxGlobal = DEFAULT_MAX_GLOBAL, maxPerPeer = DEFAULT_MAX_PER_PEER) {
-      validateLimits(maxGlobal, maxPerPeer)
-      registry?.constrainBusiness(maxGlobal, maxPerPeer)
-    },
-    clear: () => registry?.clear()
+    }
   })
+  return scope
+}
+
+/** Same-layer provider construction alone resolves a quota handle using its actual framing facts. */
+export function prepareProviderAdmissionScope(
+  scope: IProviderAdmissionScope,
+  maxGlobal: number | undefined,
+  maxPerPeer: number | undefined,
+  maxIngress: number | undefined,
+  commitPolicy = true
+): ProviderAdmissionRegistry {
+  /** A fabricated structural handle cannot resolve another scope's registry. */
+  const prepare = admissionPreparations.get(scope)?.prepare
+  if (!prepare)
+    throw new RpcError(
+      RpcCoreErrorCode.capabilityUnsupported,
+      RpcCoreErrorText.capabilityUnsupported
+    )
+  return prepare(maxGlobal, maxPerPeer, maxIngress, commitPolicy)
+}
+
+/** Core's custom-root operation accepts only the registry belonging to its exact held quota scope. */
+export function isProviderAdmissionScopeOwner(
+  scope: IProviderAdmissionScope,
+  candidate: unknown
+): boolean {
+  return admissionPreparations.get(scope)?.owns(candidate) === true
 }
 
 /** An opt-in physical candidate retains no unverified caller, method or order-key bucket. */

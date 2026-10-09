@@ -1,3 +1,4 @@
+import type { IRemoteChannel } from '../../src/remote/types.js'
 import { serializeRpcError } from '../../dist/contract/index.js'
 import { createThreadPeer } from '../../dist/threads/index.js'
 import type { IRuntimeDynamicSurface } from '../../dist/remote/runtime-api/typing.js'
@@ -78,7 +79,8 @@ export async function runWebBinaryQualification(
         new AbortController().signal
       )
     },
-    endpointFactory: (channel) => webBinaryEndpoint(channel, 'binary-web-parent', report)
+    endpointFactory: (channel) =>
+      webBinaryEndpoint(channel as IRemoteChannel, 'binary-web-parent', report)
   })
   try {
     /** Same backing and two views make full-byte protection and alias restoration observable. */
