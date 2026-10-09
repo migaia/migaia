@@ -744,7 +744,8 @@ describe('A32 BC6 session stderr budget prototype', () => {
       expect(records.filter((record) => record.droppedChunks !== undefined)).toHaveLength(1)
       expect(records.at(-1)?.droppedChunks).toBe(receivedChunks - 32)
       expect(records.every((record) => record.text === CHILD_STDERR_REDACTED)).toBe(true)
-      process.stdout.write(
+      // Keep the complete native receipt outside the aggregate JSON reporter's stdout document.
+      process.stderr.write(
         JSON.stringify({
           acceptance: 'A32',
           runtime: 'node',
