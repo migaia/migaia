@@ -1,3 +1,4 @@
+import type { IRemoteChannelResources } from '../../src/remote/types.js'
 import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
 import { runtimeTestHost } from './fixture.js'
 import assert from 'node:assert/strict'
@@ -405,9 +406,9 @@ it('[A9][A33] full owned Worker source uses the caller-selected original endpoin
         channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
         report: () => undefined
       },
-      endpointFactory: async (channel: IRemoteChannel): Promise<IRemoteServeEndpoint> => {
+      endpointFactory: async (channel: IRemoteChannelResources): Promise<IRemoteServeEndpoint> => {
         constructed += 1
-        const endpoint = await createRuntimeApiEndpoint(
+        const endpoint = createRuntimeApiEndpoint(
           {
             id: 'custom-parent',
             targetIds: [channel.peerId],
@@ -422,9 +423,9 @@ it('[A9][A33] full owned Worker source uses the caller-selected original endpoin
               ping()
             ]
           },
-          { supports: () => true },
-          true
+          channel
         )
+        await endpoint.ready
         const view: IRpcEndpoint = Object.create(endpoint)
         Object.defineProperty(view, 'provide', {
           value: (name: string, provider: IRpcProvider) => {

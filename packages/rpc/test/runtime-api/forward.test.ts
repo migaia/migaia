@@ -1,3 +1,6 @@
+import * as runtimePeerOwner from '../../src/remote/runtime-api/peer.js'
+import { readRuntimePreparationContext } from '../../src/remote/runtime-api/launch-context.js'
+import type { IRemoteChannelResources } from '../../src/remote/types.js'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { attachErrorIdentity } from '@migaia/utils/error'
@@ -35,7 +38,7 @@ import {
   readAuthenticationEnvelope,
   wrapAuthenticationEnvelope
 } from '../../src/core/middleware/authentication-envelope.js'
-import type { IRemoteChannel, IRemoteServeEndpoint } from '../../src/remote/types.js'
+import type { IRemoteServeEndpoint } from '../../src/remote/types.js'
 import type { IRpcEndpoint } from '../../src/core/typing.js'
 import { RpcCapability } from '../../src/contract/wire-constants.js'
 import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from './fixture.js'
@@ -43,7 +46,10 @@ import { readRuntimeCarrier } from '../../src/contract/runtime-api/carrier.js'
 import type { RpcOutboundSender } from '../../src/core/internal/outbound-sender.js'
 import { readEndpointOwner } from '../../src/core/internal/endpoint-projection.js'
 import type { IRuntimeOutlet } from '../../src/remote/runtime-api/outlet.js'
-import type { ProviderAdmissionRegistry } from '../../src/core/internal/provider-admission.js'
+import type {
+  ProviderAdmissionRegistry,
+  IProviderAdmissionScope
+} from '../../src/core/internal/provider-admission.js'
 import type { RequestReplayLedger } from '../../src/core/internal/request-replay-ledger.js'
 import { EndpointOwnerKey } from '../../src/core/endpoint-kernel.js'
 import type { IRpcAbortSignal } from '../../src/core/typing.js'
@@ -319,6 +325,8 @@ it.each(['quota', 'drain'] as const)(
     const drain = createRemoteBindingDrain(scheduler, () => undefined)
     let governor: ReturnType<typeof createProcessProviderAdmission> | undefined
     let restoreSend: (() => void) | undefined
+    /** Release the one native setup observer in the original fixture cleanup. */
+    let restoreScopeObservation: (() => void) | undefined
     let pending: Promise<unknown> | undefined
     /** Native policy and physical preparation failures stay visible throughout the fixture. */
     const failures: unknown[] = []
@@ -372,6 +380,49 @@ it.each(['quota', 'drain'] as const)(
         })
         restoreSend = () => spy.mockRestore()
       }
+      /** The selected callback borrows the genuine same Host's exact existing quota handle. */
+      let selectedScope: IProviderAdmissionScope | undefined
+      /** Observe setup provenance without replacing configuration or capture behavior. */
+      const createPeer = runtimePeerOwner.createRuntimePeer
+      const prepareSelectedEndpoint: NonNullable<
+        Parameters<typeof createPeer>[0]['endpointFactory']
+      > = async (channel, signal) => {
+        /** The original quota and drain owners retain all scalar and streaming registrations. */
+        const endpoint = await prepareRuntimePeerEndpoint(
+          { self: { name: 'a', instanceId: 'a-caller' }, report: () => undefined },
+          channel,
+          signal,
+          {},
+          selectedScope!
+        )
+        assert.equal(
+          readEndpointOwner(endpoint.endpoint, 'provider-admission'),
+          admission,
+          '[A67] custom endpoint retains genuine same Host quota'
+        )
+        governor = createProcessProviderAdmission(
+          channel as Parameters<typeof createProcessProviderAdmission>[0],
+          normalizeProcessResilienceOptions({
+            scheduler,
+            report: () => undefined,
+            maxCallsPerMinute: policy === 'quota' ? 1 : 100,
+            idleTimeoutMs: 600_000
+          }),
+          scheduler,
+          async () => undefined,
+          () => undefined
+        )
+        return drain.wrap(channel as Parameters<typeof drain.wrap>[0], governor.wrap(endpoint))
+      }
+      /** Exact callback identity distinguishes this Host from other concurrent source setup. */
+      const scopeObservation = vi
+        .spyOn(runtimePeerOwner, 'createRuntimePeer')
+        .mockImplementation((options, resources) => {
+          if (options.endpointFactory === prepareSelectedEndpoint)
+            selectedScope = readRuntimePreparationContext(options)?.providerAdmission
+          return createPeer(options, resources)
+        })
+      restoreScopeObservation = () => scopeObservation.mockRestore()
       carriers.push(
         await attach(
           owners[0],
@@ -383,29 +434,7 @@ it.each(['quota', 'drain'] as const)(
             expose: ['c'],
             report: (error) => failures.push(error),
             provide: { baseline: () => 7 },
-            endpointFactory: async (channel, signal) => {
-              /** The original quota and drain owners retain all scalar and streaming registrations. */
-              const endpoint = await prepareRuntimePeerEndpoint(
-                { self: { name: 'a', instanceId: 'a-caller' }, report: () => undefined },
-                channel,
-                signal,
-                {},
-                admission
-              )
-              governor = createProcessProviderAdmission(
-                channel,
-                normalizeProcessResilienceOptions({
-                  scheduler,
-                  report: () => undefined,
-                  maxCallsPerMinute: policy === 'quota' ? 1 : 100,
-                  idleTimeoutMs: 600_000
-                }),
-                scheduler,
-                async () => undefined,
-                () => undefined
-              )
-              return drain.wrap(channel, governor.wrap(endpoint))
-            }
+            endpointFactory: prepareSelectedEndpoint
           },
           runtimeSources(capabilities, capabilities)
         )
@@ -467,6 +496,7 @@ it.each(['quota', 'drain'] as const)(
       releaseOpen()
       finish()
       restoreSend?.()
+      restoreScopeObservation?.()
       governor?.close()
       for (const host of owners) await host.dispose()
       for (const carrier of carriers) carrier.close()
@@ -2424,8 +2454,8 @@ it.each(['process', 'thread'] as const)(
      */
     const factory =
       (id: string, hop: number, side: number) =>
-      async (channel: IRemoteChannel): Promise<IRemoteServeEndpoint> => {
-        const endpoint = await createRuntimeApiEndpoint(
+      async (channel: IRemoteChannelResources): Promise<IRemoteServeEndpoint> => {
+        const endpoint = createRuntimeApiEndpoint(
           {
             id,
             scheduler: channel.scheduler,
@@ -2466,9 +2496,9 @@ it.each(['process', 'thread'] as const)(
               })
             ]
           },
-          { supports: () => true },
-          true
+          channel
         )
+        await endpoint.ready
         const original = endpoint as unknown as IRpcEndpoint
         original.hooks.on((event) => {
           if (event.name === 'failure') failures.push(event.error)

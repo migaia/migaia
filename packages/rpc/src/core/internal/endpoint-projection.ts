@@ -25,6 +25,21 @@ export function readEndpointOwner<T extends object>(endpoint: object, key: strin
   return undefined
 }
 
+/** Attach the sync resource to its own completed composition's existing identity record. */
+export function retainEndpointProjection(source: object, target: object): void {
+  /** Existing admission projections inherit the original canonical endpoint. */
+  let projection: object | null = source
+  while (projection !== null) {
+    /** Reuse the original record; caller fields cannot manufacture an owner or identity. */
+    const record = identities.get(projection)
+    if (record) {
+      identities.set(target, record)
+      return
+    }
+    projection = Object.getPrototypeOf(projection)
+  }
+}
+
 /** Read construction identity without adding a public endpoint member or reflecting user data. */
 export function readEndpointIdentity(endpoint: object): string {
   /** Existing admission and drain views inherit from the original canonical projection. */

@@ -21,9 +21,9 @@ it('[R14-A7] borrowed public request preserves projected send Promise, getter ca
   /** A cold inherited view observes the canonical send result without allocating a Promise. */
   const projected = vi
     .spyOn(runtimeApiEndpoint, 'createRuntimeApiEndpoint')
-    .mockImplementation(async (...args) => {
+    .mockImplementation((...args) => {
       /** The genuine projection retains its original roots, providers and transport. */
-      const endpoint = await createEndpoint(...args)
+      const endpoint = createEndpoint(...args)
       /** Inheritance retains the existing private owner/projection provenance. */
       const observed = Object.create(endpoint) as typeof endpoint
       /** Synchronous delegation returns the exact canonical projection Promise, without reactions. */

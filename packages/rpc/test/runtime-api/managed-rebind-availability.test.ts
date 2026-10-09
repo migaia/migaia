@@ -40,10 +40,16 @@ for (const unavailable of [
     /** This observer preserves every original argument and returned endpoint. */
     const construction = vi
       .spyOn(runtimeEndpoint, 'createRuntimeApiEndpoint')
-      .mockImplementation(async (...args: Parameters<typeof assemble>) => {
-        const endpoint = await assemble(...args)
-        constructed += 1
-        return endpoint
+      .mockImplementation((...args: Parameters<typeof assemble>) => {
+        const endpoint = assemble(...args)
+        /** The same actual readiness boundary advances this observer before native publication. */
+        const observed = Object.create(endpoint) as typeof endpoint
+        Object.defineProperty(observed, 'ready', {
+          value: endpoint.ready.then(() => {
+            constructed += 1
+          })
+        })
+        return Object.freeze(observed)
       })
     const gate = definePlugin({
       name: 'gate',

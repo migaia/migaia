@@ -8,8 +8,15 @@ import { createRemotePlugin, type IRemotePluginDefinition } from '../remote/plug
 import { createThreadBinding } from './binding.js'
 import type { IThreadPluginOptions } from './types.js'
 import { createRuntimePlugin, type IRuntimePluginOptions } from '../remote/runtime-api/plugin.js'
+import { RuntimePluginKey } from '../remote/index.js'
 import { createThreadPeer } from './peer.js'
 import type { IRuntimeThreadPeerOptions } from './runtime-peer.js'
+
+/** This physical owner alone retains the stable family token for its actual Host slot operation. */
+const threadRuntimeSlotFamily = Object.freeze({})
+
+/** Capture the canonical namespace once; descriptive resource fields cannot retarget this operation. */
+const threadRuntimeSlotKey = RuntimePluginKey.thread
 
 /** Symmetric Plugin options share the Peer source grammar and default to an empty Feature exposure. */
 export type IRuntimeThreadPluginOptions = IRuntimePluginOptions<IRuntimeThreadPeerOptions['spawn']>
@@ -45,7 +52,11 @@ export function createThreadPlugin<THandle extends IThreadHandle>(
   if (!('spec' in options))
     return createRuntimePlugin(
       options,
-      'thread',
+      {
+        key: threadRuntimeSlotKey,
+        acquire: (integration, create) =>
+          integration.acquireSharedSlot(threadRuntimeSlotKey, threadRuntimeSlotFamily, create)
+      },
       createThreadPeer as Parameters<typeof createRuntimePlugin>[2]
     )
   return createRemotePlugin({

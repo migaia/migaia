@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { ProviderAdmissionRegistry } from '../../../src/core/internal/provider-admission.js'
+import {
+  createProviderAdmissionScope,
+  ProviderAdmissionRegistry
+} from '../../../src/core/internal/provider-admission.js'
 
 describe('ProviderAdmissionRegistry', () => {
   it('rejects non-positive or unsafe admission limits', () => {
@@ -17,4 +20,11 @@ describe('ProviderAdmissionRegistry', () => {
     admission.release('a')
     expect(admission.acquire('c', 'p3')).toBe(true)
   })
+})
+
+/** Public possession delegates quota operations without revealing Core's preparation record. */
+it('[A44] exposes only constrain and clear on a caller-owned scope', () => {
+  /** A new handle must remain cold until the real Core framer attaches. */
+  const scope = createProviderAdmissionScope()
+  expect(Reflect.ownKeys(scope).sort(), 'A44_SCOPE_PUBLIC_DTO').toEqual(['clear', 'constrain'])
 })

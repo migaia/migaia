@@ -263,6 +263,7 @@ export class InboundIdentityCoordinator {
 
   /** Resolve only the generation already bound to this exact authenticated response source. */
   readResponseGeneration(binding: string): IRpcRuntimeGeneration | undefined {
+    /** The original established table remains the only response identity owner. */
     const token = this.#established.get(binding)
     return token === undefined ? undefined : this.readGeneration(token)
   }

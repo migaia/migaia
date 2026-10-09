@@ -18,7 +18,9 @@ import {
   RuntimeRecentKind,
   RuntimeQueryClock,
   RuntimeQueryLimit,
-  RuntimeQueryReason
+  RuntimeQueryReason,
+  RuntimeSourceKind,
+  RuntimeConnectionDirection
 } from './runtime-api/constants.js'
 import { createGenerationController, type IAbortSignal } from '@migaia/lifecycle'
 import { attachErrorIdentity } from '@migaia/utils/error'
@@ -155,7 +157,7 @@ export type IRemoteRuntimeRegistrationOptions<TUnit, TSpec> = Omit<
 > &
   Readonly<{
     /** Private native factory provenance; local connection ownership cannot set execution authority. */
-    ownsExecution?: boolean
+    execution?: ISupervisor<unknown, unknown>
     prepareRuntime(
       channel: IRemoteChannel,
       signal: IAbortSignal,
@@ -172,7 +174,7 @@ type IRemoteRegistrationOptions<TUnit, TSpec> = Omit<
   'contract' | 'endpointFactory'
 > &
   Readonly<{
-    ownsExecution?: boolean
+    execution?: ISupervisor<unknown, unknown>
     contract?: IRemoteContract | IRemoteHostCatalog
     endpointFactory?: IRemoteProxyOptions<TUnit, TSpec>['endpointFactory']
     prepareRuntime?: IRemoteRuntimeRegistrationOptions<TUnit, TSpec>['prepareRuntime']
@@ -723,7 +725,7 @@ class RemoteRegistration<TUnit, TSpec> {
 
   /** Native commands use the exact original supervisor, never a channel ownership flag. */
   get execution(): ISupervisor<unknown, unknown> | undefined {
-    return this.#options.ownsExecution ? this.supervisor : undefined
+    return this.#options.execution
   }
 
   /** Passive event subscription shares the canonical generation and teardown owner. */
@@ -810,7 +812,13 @@ class RemoteRegistration<TUnit, TSpec> {
       directory.localDescription,
       [
         runtimeConnectionDetail(
-          directory,
+          this.#options.execution
+            ? {
+                ...directory,
+                kind: RuntimeSourceKind.spawn,
+                direction: RuntimeConnectionDirection.spawned
+              }
+            : directory,
           current ? RuntimeQueryStatus.ready : RuntimeQueryStatus.departed,
           {
             supervisor,

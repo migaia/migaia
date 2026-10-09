@@ -1,5 +1,5 @@
 import { createManagedRuntimeCalls } from '../../core/internal/runtime-call.js'
-import { runtimeQuery, type IRuntimeConnectionOrigin } from './overview.js'
+import { runtimeQuery } from './overview.js'
 import { createAbortController, type IAbortSignal } from '@migaia/lifecycle'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
@@ -16,7 +16,6 @@ import {
 } from '../proxy.js'
 import { observeRemoteGenerations } from '../internal/assemble-plugin.js'
 import type { IRuntimePreparationContext } from './launch-context.js'
-import { RuntimePluginKey } from './constants.js'
 import { readRuntimeDefaultTimeout, prepareRuntimeCallTimeout } from './timeout.js'
 import { RpcRuntimeGenerationKind } from '../../contract/runtime-api/constants.js'
 import { compileRuntimeMethods } from './catalog.js'
@@ -50,10 +49,10 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   bindEndpoint?: (channel: IRemoteChannel, endpoint: IRemoteServeEndpoint) => IRemoteServeEndpoint,
   preparation?: IRuntimePreparationContext,
   beforeRelease?: () => Promise<void>,
-  origin?: IRuntimeConnectionOrigin,
-  ownsExecution = false,
-  family?: keyof typeof RuntimePluginKey
+  execution?: IRemoteRuntimeRegistration['execution']
 ): Promise<IRuntimePeer> {
+  /** This private native restriction never grants execution, channel or Host authority. */
+  const restrictTransfer = preparation?.restrictTransfer
   /** The original registration receives a logical deadline before applying its launcher cap. */
   const callTimeout = prepareRuntimeCallTimeout(readRuntimeDefaultTimeout(options))
   compileRuntimeMethods(options.provide, options.contract)
@@ -62,7 +61,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   /** This is the original canonical current/leave/ready owner, shared with existing remote facades. */
   const registration = createRemoteRuntimeRegistration({
     binding,
-    ownsExecution,
+    execution,
     report: options.report,
     keyFactory: options.keyFactory,
     retryPort: options.retryPort,
@@ -76,16 +75,18 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
           providerLimits: options.providerLimits,
           defaultTimeoutMs: options.defaultTimeoutMs,
           contract: options.contract,
-          endpointFactory: options.endpointFactory,
+          endpointFactory: options.endpointFactory
+            ? (_borrowedChannel, signal) => options.endpointFactory!(channel, signal)
+            : undefined,
           report: options.report
         },
         {
-          self: context.self,
-          source: async () => channel,
-          nodeId: preparation?.nodeId,
+          channel: Object.fromEntries(
+            Object.entries(channel).filter(([key]) => key !== 'close')
+          ) as Omit<IRemoteChannel, 'close'>,
+          host: preparation?.host,
           providerAdmission: preparation?.providerAdmission,
-          origin,
-          ownsChannel: false,
+          providerAdmissionRegistration: preparation?.providerAdmissionRegistration,
           signal: preparationSignal,
           generation: {
             kind: RpcRuntimeGenerationKind.session,
@@ -95,8 +96,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
           ...(bindEndpoint
             ? { wrapEndpoint: (endpoint: IRemoteServeEndpoint) => bindEndpoint(channel, endpoint) }
             : {})
-        },
-        family
+        }
       ),
     readRuntimeEndpoint: (peer) => {
       /** Native health/drain receives the actual endpoint, never a synthetic successful ping. */
@@ -116,7 +116,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
     return holder.release()
   }
   try {
-    preparation?.own(close)
+    preparation?.own?.(close)
     await holder.prepareInitial(signal, true)
     stopObserving = observeRemoteGenerations(
       holder,
@@ -142,7 +142,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   const peer: IRuntimePeer = Object.freeze({
     self: context.self,
     ...createManagedRuntimeCalls({
-      processFamily: family === RuntimePluginKey.process,
+      restrictTransfer,
       callTimeout,
       callDeadlineCapMs: options.callDeadlineCapMs,
       trackRequest: binding.trackRequest,

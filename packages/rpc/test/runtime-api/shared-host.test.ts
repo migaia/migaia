@@ -34,15 +34,13 @@ it('[A60][A74] default custom factory retains ordinary Host calls without declar
   const cancel = new AbortController()
   const preparing = createRuntimePeer(
     {
+      self: { name: 'caller', instanceId: 'custom-caller-1' },
+      connect: sources[1]!,
       report: (error) => {
         failures.push(error)
       }
     },
-    {
-      self: { name: 'caller', instanceId: 'custom-caller-1' },
-      source: sources[1]!,
-      signal: cancel.signal
-    }
+    { signal: cancel.signal }
   )
   void preparing.catch(() => undefined)
   let caller: IRuntimePeer | undefined
@@ -208,12 +206,12 @@ it('[A59][A60] genuine process and thread Plugin installs share one final Host p
     const cancelPreparation = new AbortController()
     const primary = new Error('shared Host candidate construction failed')
     const observing = createRuntimePeer(
-      { report: () => undefined },
       {
         self: { name: 'candidate-caller', instanceId: 'candidate-caller' },
-        source: failedChannel.sources[1],
-        signal: cancelPreparation.signal
-      }
+        connect: failedChannel.sources[1],
+        report: () => undefined
+      },
+      { signal: cancelPreparation.signal }
     )
     void observing.catch(() => undefined)
     try {

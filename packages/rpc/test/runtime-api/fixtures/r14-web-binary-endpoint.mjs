@@ -30,7 +30,7 @@ function signingKey() {
 /** Compose only the same built canonical roots on both actual Web/Bun native sides. */
 export async function webBinaryEndpoint(channel, id, report) {
   /** The real auth configuration supplies primitives to the original per-frame owner. */
-  const endpoint = await createRuntimeApiEndpoint(
+  const endpoint = createRuntimeApiEndpoint(
     {
       id,
       scheduler: channel.scheduler,
@@ -74,9 +74,9 @@ export async function webBinaryEndpoint(channel, id, report) {
         })
       ]
     },
-    { supports: () => true },
-    true
+    channel
   )
+  await endpoint.ready
   return {
     endpoint: endpoint,
     oneWay: endpoint,
