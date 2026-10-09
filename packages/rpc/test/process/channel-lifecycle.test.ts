@@ -1,11 +1,16 @@
 import { asCodecValue } from '@migaia/serialize/codec'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import { createUnitBudget } from '@migaia/supervision'
+import { createNodeProcessLauncher } from '../../src/process/adapters/node-child-process.js'
+import { createSpawnProcessBinding } from '../../src/process/plugin/binding.js'
+import type { IRemoteChannel } from '../../src/remote/types.js'
 import { encodeRpcStreamFrame } from '../../src/contract/framing/stream.js'
 import { bindProcessByteWire, bindProcessMessageTransport } from '../../src/process/channel.js'
 import { CHILD_STDERR_REDACTED } from '../../src/process/constants.js'
 import { attachIpcConnection } from '../../src/process/ipc-connection.js'
-import { remoteProcessJsonCodec } from '../../src/process/pipeline.js'
+import { byteProcessPipeline, remoteProcessJsonCodec } from '../../src/process/pipeline.js'
 import { remoteProcessStringFramer } from '../../src/process/string-framer.js'
 import type { IProcessByteChannel, IProcessMessageChannel } from '../../src/process/types.js'
 import type { IRpcTransport } from '../../src/core/transport.js'
@@ -369,5 +374,405 @@ describe('process channel boundary', () => {
     const terminal: unknown[] = []
     transport.onTransportError?.((error) => terminal.push(error))
     expect(terminal).toEqual([expect.objectContaining({ code: 'PROCESS_CHANNEL_CLOSED' })])
+  })
+})
+
+/** Optional summary field lets the same semantic oracle run on the unmodified baseline. */
+type IStderrRecord = Extract<IIpcLogRecord, { name: 'ipc.stderr' }> & { droppedChunks?: number }
+
+/** Exercise the existing connection owner with a retained source callback and original scheduler. */
+function stderrBudgetFixture(
+  sessionId: string,
+  sink?: (record: IStderrRecord) => void | Promise<void>,
+  schedulerPort?: IScheduler
+) {
+  /** Virtual time separates interval boundaries from operating-system timing noise. */
+  const scheduler = createManualScheduler()
+  /** Only redacted records leave the original logging owner. */
+  const records: IStderrRecord[] = []
+  /** Reporter failures preserve the exact original object. */
+  const reports: unknown[] = []
+  /** The source deliberately retains this callback after unsubscribe to simulate late delivery. */
+  let callback: ((chunk: Uint8Array) => void) | undefined
+  /** Source unsubscribe remains idempotent through the original connection close. */
+  let removals = 0
+  /** The original physical owner closes once even if the final reporter reenters close. */
+  let physicalCloses = 0
+  /** Physical closure has no role in the diagnostic quota. */
+  const physical: IRpcTransport = {
+    platform: 'Process',
+    send: () => undefined,
+    subscribe: () => () => undefined,
+    close: () => {
+      physicalCloses += 1
+    }
+  }
+  /** Existing connection and log Features remain the sole publication owner. */
+  const attached = attachIpcConnection(
+    physical,
+    {
+      connectionId: `connection-${sessionId}`,
+      sessionId,
+      processId: 'fixture-child',
+      log: (record) => {
+        if (record.name !== 'ipc.stderr') return
+        records.push(record)
+        return sink?.(record)
+      },
+      stderr: (listener) => {
+        callback = listener
+        return () => {
+          removals += 1
+        }
+      }
+    },
+    (error) => reports.push(error),
+    schedulerPort ?? scheduler
+  )
+  return {
+    records,
+    reports,
+    scheduler,
+    attached,
+    /** Feed hostile-looking data without ever decoding it in the product owner. */
+    emit(count: number) {
+      for (let index = 0; index < count; index += 1)
+        callback?.(new TextEncoder().encode('secret-token-must-never-leave-reader'))
+    },
+    get removals() {
+      return removals
+    },
+    get physicalCloses() {
+      return physicalCloses
+    }
+  }
+}
+
+describe('A32 BC6 session stderr budget prototype', () => {
+  it.each([0, 32, 33, 1000])(
+    'A32 preserves normal records and bounds %i chunks exactly',
+    async (count) => {
+      /** One first-chunk interval decides the fixed normal and summary totals. */
+      const fixture = stderrBudgetFixture(`chunks-${count}`)
+      fixture.emit(count)
+      expect(fixture.records, 'A32 stderr normal-event budget missing').toHaveLength(
+        Math.min(count, 32)
+      )
+      expect(fixture.scheduler.pendingCount).toBe(count > 32 ? 1 : 0)
+      fixture.scheduler.advance(1000)
+      expect(fixture.records).toHaveLength(Math.min(count, 32) + (count > 32 ? 1 : 0))
+      expect(fixture.records.slice(0, Math.min(count, 32))).toEqual(
+        Array.from({ length: Math.min(count, 32) }, () => ({
+          name: 'ipc.stderr',
+          connectionId: `connection-chunks-${count}`,
+          sessionId: `chunks-${count}`,
+          processId: 'fixture-child',
+          text: CHILD_STDERR_REDACTED
+        }))
+      )
+      expect(
+        fixture.records.reduce((total, record) => total + (record.droppedChunks ?? 0), 0)
+      ).toBe(Math.max(0, count - 32))
+      expect(fixture.records.every((record) => record.text === CHILD_STDERR_REDACTED)).toBe(true)
+      expect(JSON.stringify(fixture.records)).not.toContain('secret-token')
+      await fixture.attached.close()
+      expect(fixture.scheduler.pendingCount).toBe(0)
+      expect(fixture.reports).toEqual([])
+    }
+  )
+
+  it('A32 keeps first-chunk boundaries when the host timer runs late', async () => {
+    /** A supported scheduler can run late but never invokes schedule synchronously. */
+    let now = 0
+    /** The fixture retains only the active callback, as the system scheduler does. */
+    let callback: (() => void) | undefined
+    /** Delays expose the fixed anchor even when callbacks arrive after their original due time. */
+    const delays: number[] = []
+    /** Vary lateness through the original scheduler contract without changing the product owner. */
+    const scheduler: IScheduler = {
+      now: () => now,
+      schedule(next, delayMs) {
+        delays.push(delayMs)
+        callback = next
+        return {
+          cancel: () => {
+            callback = undefined
+          }
+        }
+      }
+    }
+    /** First overflow is scheduled for 1000 but delivered by the host at 1500. */
+    const fixture = stderrBudgetFixture('late-timer', undefined, scheduler)
+    fixture.emit(33)
+    now = 1500
+    callback?.()
+    fixture.emit(33)
+    expect(delays).toEqual([1000, 500])
+    now = 2000
+    callback?.()
+    await fixture.attached.close()
+    expect(
+      fixture.records
+        .filter((record) => record.droppedChunks !== undefined)
+        .map((record) => record.droppedChunks)
+    ).toEqual([1, 1])
+  })
+
+  it('A32 isolates sessions and accounts both intervals plus final close exactly', async () => {
+    /** Independent session owners must never borrow each other's capacity or totals. */
+    const first = stderrBudgetFixture('first')
+    const second = stderrBudgetFixture('second')
+    first.emit(1000)
+    second.emit(33)
+    first.scheduler.advance(1000)
+    first.emit(33)
+    await first.attached.close()
+    await second.attached.close()
+    expect(first.records.filter((record) => record.droppedChunks === undefined)).toHaveLength(64)
+    expect(
+      first.records
+        .filter((record) => record.droppedChunks !== undefined)
+        .map((record) => record.droppedChunks)
+    ).toEqual([968, 1])
+    expect(
+      second.records
+        .filter((record) => record.droppedChunks !== undefined)
+        .map((record) => record.droppedChunks)
+    ).toEqual([1])
+    expect(first.removals).toBe(1)
+    expect(second.removals).toBe(1)
+    first.emit(1000)
+    second.emit(1000)
+    first.scheduler.advance(2000)
+    second.scheduler.advance(2000)
+    expect(first.records).toHaveLength(66)
+    expect(second.records).toHaveLength(33)
+    expect(first.scheduler.pendingCount + second.scheduler.pendingCount).toBe(0)
+  })
+
+  it('A32 detaches flush totals before synchronous reporter reentry and close', async () => {
+    /** The summary reporter delivers one next-interval chunk synchronously. */
+    let reentered = false
+    /** The fixture is assigned before any record can call its reporter. */
+    const fixture = stderrBudgetFixture('reentry', (record) => {
+      if (record.droppedChunks === undefined || reentered) return
+      reentered = true
+      fixture.emit(1)
+    })
+    fixture.emit(33)
+    fixture.scheduler.advance(1000)
+    expect(fixture.records).toHaveLength(34)
+    expect(
+      fixture.records
+        .filter((record) => record.droppedChunks !== undefined)
+        .map((record) => record.droppedChunks)
+    ).toEqual([1])
+    fixture.emit(32)
+    await fixture.attached.close()
+    expect(
+      fixture.records
+        .filter((record) => record.droppedChunks !== undefined)
+        .map((record) => record.droppedChunks)
+    ).toEqual([1, 1])
+    expect(fixture.records).toHaveLength(66)
+    expect(fixture.scheduler.pendingCount).toBe(0)
+
+    /** A summary can also retire its owner; late source delivery remains invisible. */
+    const closing = stderrBudgetFixture('close-reentry', (record) => {
+      if (record.droppedChunks !== undefined) void closing.attached.close()
+    })
+    closing.emit(33)
+    closing.scheduler.advance(1000)
+    await closing.attached.close()
+    closing.emit(33)
+    closing.scheduler.advance(1000)
+    expect(closing.records).toHaveLength(33)
+    expect(closing.removals).toBe(1)
+  })
+
+  it('A32 final summary preserves close Promise identity through synchronous reporter reentry', async () => {
+    /** The summary sink may join close before the outer call has returned. */
+    let reentrant: Promise<void> | undefined
+    /** This session overflows once so close synchronously publishes its final summary. */
+    const fixture = stderrBudgetFixture('close-summary-reentry', (record) => {
+      if (record.droppedChunks !== undefined) reentrant = fixture.attached.close()
+    })
+    fixture.emit(33)
+    /** The first caller and summary sink must receive the same original settlement Promise. */
+    const closing = fixture.attached.close()
+    expect(reentrant, 'A32 final-summary close Promise identity').toBe(closing)
+    expect(fixture.attached.close()).toBe(closing)
+    /** The original async close becomes observable after its one physical-close await. */
+    let observed = false
+    void closing.then(() => {
+      observed = true
+    })
+    await Promise.resolve()
+    expect(observed).toBe(false)
+    await Promise.resolve()
+    expect(observed).toBe(true)
+    await closing
+    expect(fixture.physicalCloses).toBe(1)
+    expect(fixture.removals).toBe(1)
+    expect(fixture.records).toHaveLength(33)
+    expect(fixture.records.at(-1)?.droppedChunks).toBe(1)
+    fixture.emit(33)
+    fixture.scheduler.advance(1000)
+    expect(fixture.records).toHaveLength(33)
+  })
+
+  it.each(['throw', 'reject'] as const)(
+    'A32 keeps reporter %s failures reachable and drains subsequent chunks',
+    async (mode) => {
+      /** The logging Feature must report this exact object rather than rebuild it. */
+      const failure = new TypeError('fixture diagnostic sink failed', {
+        cause: new Error('fixture original cause')
+      })
+      /** Every attempted record fails through the established reporter path. */
+      const fixture = stderrBudgetFixture(`report-${mode}`, () => {
+        if (mode === 'throw') throw failure
+        return Promise.reject(failure)
+      })
+      fixture.emit(1000)
+      fixture.scheduler.advance(1000)
+      await fixture.attached.close()
+      await vi.waitFor(() => expect(fixture.reports).toHaveLength(33))
+      expect(fixture.reports.every((error) => error === failure)).toBe(true)
+      expect(fixture.records).toHaveLength(33)
+      expect(fixture.records.at(-1)?.droppedChunks).toBe(968)
+      expect(fixture.scheduler.pendingCount).toBe(0)
+    }
+  )
+
+  it('A32 drains a real flooding Node child through the original binding stderr source', async () => {
+    /** Virtual intervals let exact chunk accounting ignore native scheduling variability. */
+    const scheduler = createManualScheduler()
+    /** Binding onChunk counts the actual pipe chunks before redacted projection. */
+    let receivedChunks = 0
+    /** Pipe completion is proven by bytes and the real child's normal exit. */
+    let receivedBytes = 0
+    /** Only records emitted by the existing owner are observed here. */
+    const records: IStderrRecord[] = []
+    /** Failures stay on the original binding reporter, never become quota events. */
+    const reports: unknown[] = []
+    /** The fixture waits for a parent trigger after original source subscription. */
+    const program = `const { once } = require('node:events'); let text = ''; let started = false; process.stdin.on('data', async bytes => { text += bytes.toString(); if (started || !text.includes('BC6-FLOOD')) return; started = true; for (let i = 0; i < 1000; i++) { if (!process.stderr.write(Buffer.alloc(8192, 115))) await once(process.stderr, 'drain'); await new Promise(resolve => setImmediate(resolve)); } process.stdin.destroy(); });`
+    /** The original native launcher and supervisor own the stderr reader. */
+    const binding = createSpawnProcessBinding(
+      {
+        kind: 'spawn',
+        channelKind: 'byte',
+        wire: 'native',
+        token: 'fixture-token',
+        supervision: {
+          id: 'A32-native-flood',
+          scheduler,
+          spec: {
+            command: process.execPath,
+            args: ['-e', program],
+            env: { inherit: [], set: {} },
+            stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
+            bootstrap: { via: 'stdin', payload: new TextEncoder().encode('fixture-token') }
+          },
+          launcher: createNodeProcessLauncher(),
+          budget: createUnitBudget({ kind: 'process', maxUnits: 1, scheduler }),
+          isolation: 'best-effort',
+          health: {
+            check: async () => undefined,
+            intervalMs: 100000,
+            timeoutMs: 1000,
+            failureThreshold: 1
+          },
+          report: (error) => reports.push(error),
+          output: {
+            onChunk(stream, chunk) {
+              if (stream !== 'stderr') return
+              receivedChunks += 1
+              receivedBytes += chunk.byteLength
+            }
+          }
+        },
+        rawChannel: async (handle) => handle.channel!,
+        establish: async (raw, options): Promise<IRemoteChannel> => {
+          /** No business frames are sent; the native pipe only triggers this stderr fixture. */
+          const attached = attachIpcConnection(
+            {
+              platform: 'Process',
+              send: () => undefined,
+              subscribe: () => () => undefined,
+              close: () => raw.close()
+            },
+            {
+              ...options.session,
+              stderr: options.stderr,
+              log: (record) => {
+                if (record.name === 'ipc.stderr') records.push(record)
+              }
+            },
+            (error) => reports.push(error),
+            options.scheduler
+          )
+          return {
+            transport: attached.transport,
+            peerId: 'fixture-child',
+            scheduler: options.scheduler,
+            agreement: { source: 'negotiated', codec: 'json', capabilities: [] },
+            pipeline: byteProcessPipeline,
+            features: attached.features,
+            close: attached.close
+          }
+        }
+      },
+      (error) => reports.push(error)
+    )
+    /** A real accepted native handle must exist before subscribing or triggering bytes. */
+    const ready = await binding.supervisor.start()
+    expect(ready.state).toBe('ready')
+    if (ready.state !== 'ready') return
+    /** The binding supplies its original stderr source to the existing projection owner. */
+    const channel = await binding.openChannel(ready.unit, new AbortController().signal)
+    try {
+      await ready.unit.channel!.write(new TextEncoder().encode('BC6-FLOOD'))
+      expect(await ready.unit.exited).toMatchObject({ code: 0, signal: null })
+      await channel.close()
+      expect(receivedBytes).toBe(8192 * 1000)
+      expect(receivedChunks).toBeGreaterThan(32)
+      expect(
+        records.filter((record) => record.droppedChunks === undefined),
+        'A32 native stderr budget missing'
+      ).toHaveLength(32)
+      expect(records.filter((record) => record.droppedChunks !== undefined)).toHaveLength(1)
+      expect(records.at(-1)?.droppedChunks).toBe(receivedChunks - 32)
+      expect(records.every((record) => record.text === CHILD_STDERR_REDACTED)).toBe(true)
+      process.stdout.write(
+        JSON.stringify({
+          acceptance: 'A32',
+          runtime: 'node',
+          receivedChunks,
+          receivedBytes,
+          normalRecords: 32,
+          droppedChunks: records.at(-1)?.droppedChunks,
+          childExit: 0,
+          failures: reports.map((error) => {
+            const detail = error as {
+              source?: unknown
+              code?: unknown
+              name?: unknown
+              reason?: unknown
+            }
+            return {
+              source: detail?.source ?? null,
+              code: detail?.code ?? null,
+              name: detail?.name ?? typeof error,
+              reason: detail?.reason ?? null,
+              message: '[fixture diagnostic redacted]'
+            }
+          })
+        }) + '\n'
+      )
+    } finally {
+      await channel.close()
+      await binding.supervisor.dispose()
+    }
   })
 })

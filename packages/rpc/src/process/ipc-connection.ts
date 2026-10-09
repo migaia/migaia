@@ -1,4 +1,5 @@
-import { hostRethrowReporter } from '@migaia/utils/promise'
+import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import { deferred, hostRethrowReporter } from '@migaia/utils/promise'
 import type { IRpcFeature } from '../core/feature.js'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
 import { createIpcLogFeature } from '../core/plugins/log.js'
@@ -15,7 +16,8 @@ import type { IProcessCommonOptions } from './types.js'
 export function attachIpcConnection(
   transport: IRpcTransport,
   ipc: IProcessCommonOptions['ipc'],
-  report: (error: unknown) => void
+  report: (error: unknown) => void,
+  scheduler: IScheduler = systemScheduler
 ): Readonly<{
   transport: IRpcTransport
   features: readonly IRpcFeature[]
@@ -49,16 +51,24 @@ export function attachIpcConnection(
         }
       }
     })
-    unsubscribeStderr = attachIpcStderr(log, ipc, report)
+    unsubscribeStderr = attachIpcStderr(log, ipc, report, scheduler)
     return Object.freeze({
       transport: gated,
       features: Object.freeze([queue.feature, log.feature]),
       close() {
         if (closing) return closing
-        closing = (async () => {
-          /** Child stderr subscription is released before the log and gate close. */
-          unsubscribeStderr?.()
-          await installedTransport.close?.()
+        /** Publish the existing close owner before a final-summary reporter can reenter it. */
+        const done = deferred<void>()
+        closing = done.promise
+        void (async () => {
+          try {
+            /** Child stderr subscription is released before the log and gate close. */
+            unsubscribeStderr?.()
+            await installedTransport.close?.()
+            done.resolve()
+          } catch (error) {
+            done.reject(error)
+          }
         })()
         return closing
       }

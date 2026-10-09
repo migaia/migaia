@@ -229,7 +229,7 @@ export async function createProcessTransport(
       ? agreement.peer.id
       : byteOptions.peerId
     wire.activate(agreement.capabilities, peerId)
-    const ipc = attachIpcConnection(wire.transport, byteOptions.ipc, byteOptions.report)
+    const ipc = attachIpcConnection(wire.transport, byteOptions.ipc, byteOptions.report, scheduler)
     bindNativeReplayTransport(channel, ipc.transport)
     /** Four network-order prefix bytes count toward the complete native physical frame. */
     registerBatchAgreement(ipc.transport, agreement.capabilities, 4)
