@@ -63,7 +63,7 @@ export async function createJsonRpcRemoteChannel(
     // Timer cleanup must finish before the physical connection can be published.
     drainListenerFailures(collectListenerCleanupFailures([cancelTimer]))
     /** Adopt exactly one canonical gate, log Feature and stderr subscription. */
-    const ipc = attachIpcConnection(wire.transport, options.ipc, options.report)
+    const ipc = attachIpcConnection(wire.transport, options.ipc, options.report, options.scheduler)
     registerBatchAgreement(ipc.transport, agreement.capabilities)
     wire.registerObjectPortRelease(
       registerJsonObjectPort(

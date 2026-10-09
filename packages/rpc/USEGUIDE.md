@@ -473,3 +473,7 @@ JSON-RPC byte bridge 使用 Content-Length，完成原 migaia.hello 后支持同
 ## 构建与验证
 
 拥有包配置的命令：pnpm --dir packages/rpc fmt、lint、build、typecheck、typecheck:test、test、test:e2e、test:conformance、test:packed。仓库集成由 make ci-fast / make ci 执行。重命令按仓库 Exclusive Measurement Window 规程串行；公开 API 的正确性、跨语言互通与性能是不同证据，示例执行成功不替代这些门禁。
+
+### Child stderr diagnostic budget
+
+The process connection emits at most 32 normal `ipc.stderr` records per 1000 ms interval for each session. Overflow adds at most one summary for that interval, with the same redacted text and a positive `droppedChunks` count. Closing the session flushes its remaining summary once. Normal traffic keeps its original record shape and timing. The binding continues draining the child's stderr pipe, and caller-provided supervision output callbacks still receive their original chunks. The fixed default uses the connection's existing scheduler and exposes no new option.
