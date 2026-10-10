@@ -48,7 +48,7 @@ import type {
   IRpcRuntimeStep
 } from '../../contract/runtime-api/types.js'
 import { RpcCapability, RpcBatchPhysical } from '../../contract/wire-constants.js'
-import { readRpcSingleFrameFacts } from '../../contract/framing/reassembler.js'
+
 import type { ProviderAdmissionRegistry, IProviderIngressReceipt } from './provider-admission.js'
 import {
   readRpcBatchMembers,
@@ -837,10 +837,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                * Only original paired callables prove whole acceptance and the complete frame
                * budget.
                */
-              const facts = readRpcSingleFrameFacts(
-                this.#components.framer.accept,
-                this.#components.framer.frame
-              )
+              const facts = this.#components.ingressPrepare.singleFrameLimits
               if (!facts)
                 throw new RpcError(
                   RpcCoreErrorCode.capabilityUnsupported,

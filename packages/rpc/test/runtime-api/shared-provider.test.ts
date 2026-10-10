@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { RpcCapability } from '../../src/contract/wire-constants.js'
-import { readRpcSingleFrameFacts } from '../../src/contract/framing/reassembler.js'
-import { messageFramerV1 } from '../../src/contract/framing/index.js'
+import { bindRpcFrameIngress, messageFramerV1 } from '../../src/contract/framing/index.js'
 import { EndpointOwnerKey } from '../../src/core/endpoint-kernel.js'
 import { readEndpointOwner } from '../../src/core/internal/endpoint-projection.js'
 import {
@@ -46,7 +45,8 @@ it('[A73] a custom endpoint cannot advertise shared ordering while returning a d
     admissionScope,
     8,
     8,
-    readRpcSingleFrameFacts(messageFramerV1.accept, messageFramerV1.frame)!.maxConcurrentMessages
+    bindRpcFrameIngress(messageFramerV1.accept, messageFramerV1.frame).singleFrameLimits!
+      .maxConcurrentMessages
   )
   const owner = readEndpointOwner<RpcOutboundAttachment>(
     built.endpoint,
@@ -85,7 +85,8 @@ async function sharedProvider(provide: IRuntimePeerProvide) {
     admissionScope,
     8,
     8,
-    readRpcSingleFrameFacts(messageFramerV1.accept, messageFramerV1.frame)!.maxConcurrentMessages
+    bindRpcFrameIngress(messageFramerV1.accept, messageFramerV1.frame).singleFrameLimits!
+      .maxConcurrentMessages
   )
   /** Both source offers exercise real authenticated-generation and ordering ports. */
   const capabilities = [

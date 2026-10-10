@@ -65,7 +65,7 @@ import {
 } from '../../contract/runtime-api/index.js'
 import { RpcRuntimeKind } from '../../contract/runtime-api/constants.js'
 import type { IRpcRuntimeEnvelope } from '../../contract/runtime-api/types.js'
-import { readRpcSingleFrameFacts } from '../../contract/framing/reassembler.js'
+import { bindRpcFrameIngress } from '../../contract/framing/index.js'
 
 /** Fixed native selector/wrapper JSON geometry excludes only the protected metadata slot. */
 const nativeBinaryJsonOverhead =
@@ -205,6 +205,13 @@ export class RpcOutboundSender {
   readonly #physicalLimit: number
   /** Only the original native adapter receipt authorizes a real clone/transfer boundary. */
   readonly #cloneTransfer: boolean
+  /** The framing owner supplies limits while binding the actual selected callable pair once. */
+  readonly #singleFrameLimits:
+    | Readonly<{
+        maxConcurrentMessages: number
+        maxMessageBytes: number
+      }>
+    | undefined
   /** Busy physical writes accumulate ready requests and responses in this single owner. */
   #writing = false
   /** FIFO contains semantic settlements, never serialized per-member size estimates. */
@@ -246,6 +253,10 @@ export class RpcOutboundSender {
     this.#batch = batch
     this.#physicalLimit = physicalLimit
     this.#cloneTransfer = cloneTransfer
+    this.#singleFrameLimits = this.#objectPort
+      ? bindRpcFrameIngress(this.#objectPort.framer.accept, this.#objectPort.framer.frame)
+          .singleFrameLimits
+      : components.ingressPrepare.singleFrameLimits
     this.#receiverId = receiverId
     const lifecycle = transport as Partial<IRpcOutboundLifecycle>
     this.#lifecycle =
@@ -362,7 +373,7 @@ export class RpcOutboundSender {
     /** The selected private/public frame pair must have actual first-party whole-accept facts. */
     const framer = this.#objectPort?.framer ?? this.components.framer
     /** No opaque callable is invoked merely to guess whether it fragments. */
-    const facts = readRpcSingleFrameFacts(framer.accept, framer.frame)
+    const facts = this.#singleFrameLimits
     if (!facts)
       throw new RpcError(
         RpcCoreErrorCode.capabilityUnsupported,

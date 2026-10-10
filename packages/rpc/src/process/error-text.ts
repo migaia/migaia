@@ -1,3 +1,5 @@
+import { RpcContractErrorText } from '../contract/error-text.js'
+
 /** Canonical process diagnostics never contain token, frame, or stderr payload bytes. */
 export const RpcProcessErrorText = {
   /** Native resource reads report this stable text, keeping OS diagnostics only on cause. */
@@ -20,8 +22,8 @@ export const RpcProcessErrorText = {
   connectFailed: 'process channel connection failed',
   /** Listener could not bind to the requested local address. */
   listenFailed: 'process channel listener failed',
-  /** A byte transport's JSON codec received a value outside its string wire domain. */
-  expectedString: 'process channel requires a string encoded value',
+  /** Codec admission keeps its original identity while reusing BC7's unchanged canonical text. */
+  expectedString: RpcContractErrorText.expectedString,
   /** A channel is already owned by another transport adapter. */
   duplicateBinding: 'process channel is already bound',
   /** The message channel parties did not declare the same static agreement. */
