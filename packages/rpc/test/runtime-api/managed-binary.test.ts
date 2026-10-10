@@ -11,7 +11,7 @@ import {
   type INodeThreadHandle
 } from '../../src/threads/adapters/node.js'
 import { createManagedRuntimePeer } from '../../src/remote/runtime-api/managed-peer.js'
-import { createRuntimeApiEndpoint } from '../../src/core/internal/runtime-api-endpoint.js'
+import { createRuntimeApiEndpoint } from '../../src/core/runtime-api-endpoint.js'
 import { createRemoteRetryPort } from '../../src/remote/retry.js'
 import type { IRemoteRetryPort } from '../../src/remote/types.js'
 import { readRuntimePeerConnection } from '../../src/remote/runtime-api/peer.js'
@@ -240,7 +240,7 @@ it('[A84/F1] genuine managed binding rejects UInt8Array without bilateral binary
       self: { name: parentId, instanceId: parentId },
       report: () => undefined,
       endpointFactory: async (channel) => {
-        const endpoint = await createRuntimeApiEndpoint(
+        const endpoint = createRuntimeApiEndpoint(
           {
             id: parentId,
             scheduler: channel.scheduler,
@@ -262,9 +262,9 @@ it('[A84/F1] genuine managed binding rejects UInt8Array without bilateral binary
               })
             ]
           },
-          { supports: () => true },
-          true
+          channel
         )
+        await endpoint.ready
         return {
           endpoint: endpoint as unknown as IRpcEndpoint,
           oneWay: endpoint,
