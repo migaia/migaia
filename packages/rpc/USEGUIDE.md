@@ -89,6 +89,8 @@ C10 的 before/after 数据显示 inline 与 sign-only native/transfer 的成本
 
 process 的 1MiB inline 会受编码、规范化和 framing 成本影响；高频大 binary 不应按 scalar 小调用吞吐推算。共享内存/Atomics 没有进入支持面，不能由此用 SharedArrayBuffer 绕所有权边界。未认证 transfer 按 CAPABILITY_UNSUPPORTED 拒绝，失败并非自动复制降级。
 
+inline Uint8Array 只携带 view 的可见 bytes，恢复为零前缀加原 offset/length；重复引用分别恢复。native manifest 则保留完整 backing 与 alias，并验证完整 backing 的 digest。大 binary 的编码资源与 JSON 准备复用不改变这两种 profile，也不自动选择 transfer。
+
 ## 查询、控制和事件
 
 从 `@migaia/rpc/remote` 导入 `RuntimePluginKey`，用其 `process` / `thread` 值解释 Plugin 与查询的标量元数据。这两个标签不定位未持有的 Host slot，也不授予 channel 或 native execution 操作权；控制仍由实际持有的资源决定。

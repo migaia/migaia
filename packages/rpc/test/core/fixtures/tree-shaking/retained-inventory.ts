@@ -201,6 +201,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/inbound-identity.ts',
       'src/core/internal/operation-scope.ts',
       'src/core/internal/outbound-attachment.ts',
+      // H11 actual canonical graph retains the single owned JSON codec capture owner.
+      'src/core/internal/outbound-owned-codec.ts',
       'src/core/internal/outbound-gate.ts',
       'src/core/internal/outbound-sender.ts',
       'src/core/internal/pending.ts',
@@ -375,6 +377,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/inbound-identity.ts',
       'src/core/internal/operation-scope.ts',
       'src/core/internal/outbound-attachment.ts',
+      // H11 actual canonical graph retains the single owned JSON codec capture owner.
+      'src/core/internal/outbound-owned-codec.ts',
       'src/core/internal/outbound-gate.ts',
       'src/core/internal/outbound-sender.ts',
       'src/core/internal/pending.ts',
@@ -563,6 +567,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/inbound-identity.ts',
       'src/core/internal/operation-scope.ts',
       'src/core/internal/outbound-attachment.ts',
+      // H11 actual canonical graph retains the single owned JSON codec capture owner.
+      'src/core/internal/outbound-owned-codec.ts',
       'src/core/internal/outbound-gate.ts',
       'src/core/internal/outbound-sender.ts',
       'src/core/internal/pending.ts',
@@ -748,6 +754,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/inbound-identity.ts',
       'src/core/internal/operation-scope.ts',
       'src/core/internal/outbound-attachment.ts',
+      // H11 actual canonical graph retains the single owned JSON codec capture owner.
+      'src/core/internal/outbound-owned-codec.ts',
       'src/core/internal/outbound-gate.ts',
       'src/core/internal/outbound-sender.ts',
       'src/core/internal/pending.ts',

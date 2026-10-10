@@ -9,6 +9,11 @@ import { RpcRuntimeProfile, RpcRuntimeKind } from '../../contract/runtime-api/co
 import { normalizePortable } from '../../contract/normalize.js'
 import { invalidRpcEnvelope } from '../../contract/v1/route.js'
 import { RpcEnvelopeViolation } from '../../contract/wire-constants.js'
+import {
+  captureOwnedJson,
+  readOwnedJsonSnapshot,
+  prepareOwnedJsonSnapshot
+} from './outbound-owned-codec.js'
 
 /**
  * Private options provenance is minted only by the compiled forwarding provider, never a public
@@ -274,23 +279,11 @@ export function isRuntimeOutboundEnvelope(value: unknown): value is IRpcRuntimeE
  * caller.
  */
 export function outboundJsonByteUpperBound(value: unknown): number | undefined {
+  /** Prepared codec views retain their construction bound without another graph walk. */
+  const prepared = readOwnedJsonSnapshot(value)
+  if (prepared) return prepared.byteUpperBound
   if (!isOutboundEnvelope(value)) return undefined
-  return portableJsonByteUpperBound(value)
-}
-
-/** Counts snapshot structure without encoding or visiting characters of string payloads. */
-function portableJsonByteUpperBound(value: unknown): number {
-  if (typeof value === 'string') return value.length * 6 + 2
-  /** Finite numbers, booleans, null and omitted undefined fields need at most 32 JSON bytes. */
-  if (value === null || typeof value !== 'object') return 32
-  /** Five bytes per array slot cover its JSON null/comma, including holes retained by map. */
-  let bytes = Array.isArray(value) ? 2 + value.length * 5 : 2
-  for (const key of Object.keys(value)) {
-    /** Array indices are omitted by JSON; including their names still provides a safe upper bound. */
-    bytes +=
-      key.length * 6 + 4 + portableJsonByteUpperBound((value as Record<string, unknown>)[key])
-  }
-  return bytes
+  return prepareOwnedJsonSnapshot(value).byteUpperBound
 }
 
 /**
@@ -298,20 +291,5 @@ function portableJsonByteUpperBound(value: unknown): number {
  * order.
  */
 export function materializeOutboundJson(value: unknown, sortKeys = true): unknown {
-  if (typeof value === 'number') return Object.is(value, -0) ? 0 : value
-  if (value === null || typeof value !== 'object') return value
-  if (Array.isArray(value)) return value.map((item) => materializeOutboundJson(item, sortKeys))
-  /** Ordinary records reproduce JSON.parse while defining **proto** safely as own data. */
-  const result: Record<string, unknown> = {}
-  /** Legacy bridge materialization preserves its already-admitted insertion order. */
-  const keys = Object.keys(value)
-  if (sortKeys) keys.sort()
-  for (const key of keys)
-    Object.defineProperty(result, key, {
-      value: materializeOutboundJson((value as Record<string, unknown>)[key], sortKeys),
-      enumerable: true,
-      configurable: true,
-      writable: true
-    })
-  return result
+  return captureOwnedJson(value, sortKeys).value
 }
