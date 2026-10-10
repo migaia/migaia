@@ -11,7 +11,8 @@ import {
   RpcContractError,
   RpcCoreErrorCode,
   RpcSchemaValidationError,
-  RpcTimeoutError
+  RpcTimeoutError,
+  RPC_CORE_ERROR_SOURCE
 } from '../errors.js'
 import { RpcAbortError, RpcRemoteError } from '../errors.js'
 import type { RequestReplayLedger } from './request-replay-ledger.js'
@@ -102,6 +103,8 @@ type IProviderExecutorOptions<TTargetId extends string> = {
   /** Only finalized canonical ordinary requests may defer their unread native signal. */
   readonly fast?: boolean
   /** Endpoint wall clock for response wire `sentAt` diagnostics; never used for deadlines. */
+  /** The installed response format can preserve the genuine original failure graph. */
+  readonly responseError?: (error: unknown) => IRpcSerializedError
   readonly timestamp: () => number
   /** Monotonic endpoint time and timer lifecycle used for incoming relative deadlines. */
   readonly now: () => number
@@ -1509,6 +1512,9 @@ export class ProviderExecutor<TTargetId extends string> {
           data: response.ok ? response.data : undefined,
           message: response.ok ? undefined : response.message,
           code: response.ok ? undefined : response.code,
+          ...(!response.ok && this.options.responseError
+            ? { serializedError: this.#formatResultResponseError(response.code, response.message) }
+            : {}),
           sentAt: this.options.timestamp(),
           ...((this.options.responseReceiverId?.(request) ?? request.route.route.receiverId) ===
           undefined
@@ -1589,13 +1595,16 @@ export class ProviderExecutor<TTargetId extends string> {
           : RpcCoreErrorText.providerFailed),
       data: error instanceof RpcSchemaValidationError ? error.data : undefined,
       sentAt: this.options.timestamp(),
-      ...((!localSummary || localSummary.preserveSerializedError === true) &&
-      (schemaError || includeSerializedError)
+      ...(((!localSummary || localSummary.preserveSerializedError === true) &&
+        (schemaError || includeSerializedError)) ||
+      this.options.responseError !== undefined
         ? {
-            serializedError: serializeRpcError(error, {
-              report: (failure) =>
-                this.options.emitFailure(failure.error, RpcCoreErrorCode.payloadInvalid)
-            })
+            serializedError:
+              this.#formatResponseError(error, explicitCode) ??
+              serializeRpcError(error, {
+                report: (failure) =>
+                  this.options.emitFailure(failure.error, RpcCoreErrorCode.payloadInvalid)
+              })
           }
         : {}),
       ...((this.options.responseReceiverId?.(request) ?? request.route.route.receiverId) ===
@@ -1605,6 +1614,34 @@ export class ProviderExecutor<TTargetId extends string> {
             receiverId: this.options.responseReceiverId?.(request) ?? request.route.route.receiverId
           })
     })
+  }
+
+  /** The selected wire formatter snapshots the original error; metadata projection never mutates it. */
+  #formatResponseError(error: unknown, explicitCode?: string): IRpcSerializedError | undefined {
+    /** The factory-held operation preserves its original secrecy, name, stack and cause policy. */
+    const formatted = this.options.responseError?.(error)
+    return formatted &&
+      explicitCode &&
+      error instanceof Error &&
+      !('source' in error) &&
+      !('code' in error)
+      ? Object.freeze({ ...formatted, source: RPC_CORE_ERROR_SOURCE, code: explicitCode })
+      : formatted
+  }
+
+  /**
+   * Snapshot a failed result's message through the existing formatter and project its returned code
+   * as wire metadata; no package error-code declaration is created.
+   */
+  #formatResultResponseError(
+    code: string | undefined,
+    message: string | undefined
+  ): IRpcSerializedError | undefined {
+    if (!this.options.responseError) return undefined
+    return this.#formatResponseError(
+      new Error(message ?? RpcCoreErrorText.remoteRequestFailed),
+      code ?? RpcCoreErrorCode.internal
+    )
   }
 
   /** A duplicate request waits with its own cancellation and deadline state. */
@@ -1660,7 +1697,12 @@ export class ProviderExecutor<TTargetId extends string> {
       ok: outcome.ok,
       data: outcome.data,
       ...(!outcome.ok
-        ? { code: outcome.code, message: outcome.message, serializedError: outcome.error }
+        ? {
+            code: outcome.code,
+            message: outcome.message,
+            serializedError:
+              outcome.error ?? this.#formatResultResponseError(outcome.code, outcome.message)
+          }
         : {}),
       sentAt: this.options.timestamp(),
       ...((this.options.responseReceiverId?.(request) ?? request.route.route.receiverId) ===

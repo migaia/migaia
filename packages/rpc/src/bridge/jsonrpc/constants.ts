@@ -8,7 +8,11 @@ export const JsonRpcProfile = {
   hello: 'migaia.hello',
   describe: 'migaia.describe',
   invoke: 'migaia.invoke',
-  cancel: 'migaia.cancel'
+  cancel: 'migaia.cancel',
+  /** Incoming correlations are local Core ids; the original foreign id remains on its wire reply. */
+  incomingIdPrefix: 'jsonrpc-incoming-',
+  /** The existing bridge route grammar uses this fixed application version for translated calls. */
+  applicationVersion: '1.0.0'
 } as const
 
 /** Only capabilities with a mapping in this initiator profile may be advertised. */

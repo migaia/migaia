@@ -103,3 +103,5 @@ process inline 保留原 base64 wire：Uint8Array 仅携带可见 bytes，接收
 @migaia/rpc/testing 的 createPeerPair 装配真实对称 Peer，用于应用测试，不授予 native spawn/transfer 权限。显式底层 core/client、provider、full、composed，contract/v1 语义描述与 remote ports 仍按各自层级保留；adapter 从对应 browser/process/threads 深路径导入。平台锁与部署协调由消费侧负责。
 
 本地 list/get/describe 读取原 owner 的安全投影，methods 为名称数组；资源、退出或健康事实缺失时返回 unavailable。Host outlet 的 on 返回 disposer，watch 是有界事件 iterator；目录 ready 不证明远端 Host 安装事务提交。查询、事件、控制、借用资源与 JSON-RPC bridge 的限制见 [USEGUIDE](./USEGUIDE.md)。
+
+JSON-RPC bridge 完成原 hello 后允许同连接的 invoke、describe、无 id notify 与已协商 batch 到实际已安装 provider。cancel 只选择该连接的既有调用，不新增 ACK；不支持 server stream，也不把 wire 字段作为执行权限。

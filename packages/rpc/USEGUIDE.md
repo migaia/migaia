@@ -468,7 +468,7 @@ Plugin 的 expose 可选择本地 Feature 或已接受连接的前缀：只有�
 
 旧高级 IRemoteContract 仍可声明 schema、模式和幂等性；远端 PluginHost 控制使用显式 expose: ['host'] 及本地 resolver，真实 definePlugin 函数不跨 RPC。服务端 resolver 必须同步返回本地定义。目录 ready 不等于 Host 安装事务已提交，应用必须使用真正提交屏障。
 
-JSON-RPC byte bridge 使用 Content-Length，完成 migaia.hello 后调用 migaia.describe、migaia.invoke、migaia.cancel。业务 notify 无 id，不收到应答；cancel 是协作控制，不回滚副作用。双方必需 batch 接收基线，reverse 等扩展仍按协商。非法 frame/UTF-8/JSON 或未协商的反向消息终止连接；未知/迟到 id 按原规则报告丢弃。stream 和 transfer 的 bridge 限制沿稳定错误码 fail closed；不能把它们改成其它业务求成功。跨语言整数超过 ±(2^53−1) 时使用字符串。
+JSON-RPC byte bridge 使用 Content-Length，完成原 migaia.hello 后支持同连接的 migaia.describe、migaia.invoke 与 migaia.cancel。入站 invoke 只进入实际已安装的 provider，describe 使用其原目录；无 id notify 不收到应答，batch 必须已协商。cancel 只选择同连接的既有调用，不新增 ACK、不回滚副作用，迟到 provider 结果按原规则丢弃。未知 profile、server stream、非法 params/meta、未协商 batch 或将 migaia.hello 当业务消息均拒绝；错误保留原 source/code/name/message/stack/cause 链。非法 frame/UTF-8/JSON 终止连接；未知/迟到 response id 按原规则报告丢弃。stream 和 transfer 的 bridge 限制沿稳定错误码 fail closed；不能把它们改成其它业务求成功。跨语言整数超过 ±(2^53−1) 时使用字符串。
 
 ## 构建与验证
 

@@ -1,3 +1,4 @@
+import { selectedJsonObjectPort } from './json-object-port.js'
 import { invalidRpcStream } from '../../contract/stream-error.js'
 import { createOutboundEnvelope } from './outbound-envelope.js'
 import { readProviderPreflight } from './provider.js'
@@ -156,6 +157,8 @@ export class RpcProviderAttachment {
     )
     this.#executor = new ProviderExecutor({
       fast: hasFastEndpoint(prepared.options),
+      /** Borrow only the once-selected factory response format, never caller/wire policy. */
+      responseError: selectedJsonObjectPort(prepared.options.components!)?.responseError,
       timestamp: () => kernel.time.timestamp(),
       now: () => kernel.time.now(),
       setTimeout: (task, delayMs) => kernel.time.setTimeout(task, delayMs),

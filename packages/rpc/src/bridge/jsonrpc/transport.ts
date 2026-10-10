@@ -1,7 +1,7 @@
 import { materializeJsonSnapshot } from './object-pipeline.js'
 import { deferred } from '@migaia/utils/promise'
 import { deserializeRpcError, serializeRpcError } from '../../contract/error.js'
-import { fromJsonRpcError } from '../../contract/error-jsonrpc.js'
+import { fromJsonRpcError, toJsonRpcError } from '../../contract/error-jsonrpc.js'
 import { normalizeRpcEnvelope } from '../../contract/v1/normalize.js'
 import type { IRpcRequestEnvelope } from '../../contract/v1/types.js'
 import type { IRpcSerializedError } from '../../contract/types.js'
@@ -10,6 +10,7 @@ import {
   RpcCapability,
   RpcEnvelopeKind,
   RpcRouteField,
+  RpcRouteProfile,
   RpcRouteType
 } from '../../contract/wire-constants.js'
 import { RpcJsonRpcWireError } from '../../contract/wire-error-constants.js'
@@ -57,6 +58,12 @@ export type IJsonRpcWire = Readonly<{
 export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
   /** Whole-envelope requests are retained only until response, cancel or connection release. */
   const pending = new Map<string, IRpcRequestEnvelope>()
+  /** Authenticated inbound ids belong only to this physical connection and canonical provider. */
+  const incoming = new Map<string, { wireId: string | number; method: string }>()
+  /** Local monotonic ids prevent foreign ids from aliasing locally initiated correlations. */
+  let incomingSequence = 0
+  /** Incoming requests become admissible only after the actual completed hello intersection. */
+  let incomingReady = false
   /** The one handshake promise exists before a synchronous peer can deliver its response. */
   const helloResult = deferred<unknown>()
   /** An observed rejection prevents connection failure before exchange from becoming unhandled. */
@@ -100,6 +107,7 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
     terminal = reason ?? createProcessError(RpcProcessErrorCode.channelClosed)
     decoder.close()
     pending.clear()
+    incoming.clear()
     helloResult.reject(terminal)
     for (const reject of writes) reject(terminal)
     writes.clear()
@@ -254,6 +262,144 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
       throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid)
     /** Profile checks below operate on this single parsed response object. */
     const message = value as Record<string, unknown>
+    if (Object.hasOwn(message, 'method')) {
+      /** Incoming routing is minted from authenticated/local identity, never remote metadata claims. */
+      if (message.method === JsonRpcProfile.cancel) {
+        const params = message.params as Record<string, unknown>
+        if (
+          !incomingReady ||
+          message.jsonrpc !== JsonRpcProfile.version ||
+          Object.hasOwn(message, 'id') ||
+          Object.hasOwn(message, 'result') ||
+          Object.hasOwn(message, 'error') ||
+          Object.keys(message).some((key) => !['jsonrpc', 'method', 'params'].includes(key)) ||
+          !params ||
+          typeof params !== 'object' ||
+          Array.isArray(params) ||
+          Object.keys(params).some((key) => !['id', 'reason'].includes(key)) ||
+          (typeof params.id !== 'string' && typeof params.id !== 'number')
+        )
+          throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid)
+        /** Cancellation selects only this authenticated connection's original correlation. */
+        const original = [...incoming.entries()].find(([, value]) => value.wireId === params.id)
+        if (!original) return
+        const envelope = normalizeRpcEnvelope({
+          kind: RpcEnvelopeKind.variation,
+          id: original[0],
+          data: {
+            route: {
+              profile: RpcRouteProfile,
+              type: RpcRouteType.variation,
+              applicationVersion: JsonRpcProfile.applicationVersion,
+              senderId: options.peerId,
+              targetId: options.offer.peer.id,
+              receiverId: options.offer.peer.id,
+              sentAt: options.wallClock.timestamp(),
+              variation: RpcControl.abort
+            },
+            ...(Object.hasOwn(params, 'reason') ? { payload: params.reason } : {})
+          }
+        })
+        for (const listener of listeners)
+          reportListenerFailure(
+            {
+              data: objectListeners.has(listener)
+                ? materializeJsonSnapshot(envelope)
+                : JSON.stringify(envelope),
+              peerId: options.peerId
+            },
+            [(value) => listener(value as IRpcInboundMessage)],
+            failures
+          )
+        /** The cancelling caller settles locally; Core discards the expired provider outcome. */
+        incoming.delete(original[0])
+        return
+      }
+      if (
+        !incomingReady ||
+        message.jsonrpc !== JsonRpcProfile.version ||
+        (message.method !== JsonRpcProfile.invoke && message.method !== JsonRpcProfile.describe) ||
+        Object.hasOwn(message, 'result') ||
+        Object.hasOwn(message, 'error') ||
+        (Object.hasOwn(message, 'id') &&
+          typeof message.id !== 'string' &&
+          typeof message.id !== 'number') ||
+        Object.keys(message).some((key) => !['jsonrpc', 'id', 'method', 'params'].includes(key))
+      )
+        throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid)
+      const params = message.params as Record<string, unknown>
+      if (
+        !params ||
+        typeof params !== 'object' ||
+        Array.isArray(params) ||
+        !Array.isArray(params.args) ||
+        Object.keys(params).some((key) => !['method', 'args', 'meta'].includes(key))
+      )
+        throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid)
+      const method =
+        message.method === JsonRpcProfile.describe
+          ? RemoteMethodName.runtimeDescribe
+          : params.method
+      if (
+        typeof method !== 'string' ||
+        !method.length ||
+        (message.method === JsonRpcProfile.invoke && method.startsWith('migaia.remote.'))
+      )
+        throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid)
+      const meta = (params.meta ?? {}) as Record<string, unknown>
+      if (
+        !meta ||
+        typeof meta !== 'object' ||
+        Array.isArray(meta) ||
+        Object.keys(meta).some(
+          (key) =>
+            key !== RpcRouteField.timeoutMs &&
+            key !== RpcRouteField.idempotencyKey &&
+            key !== RpcRouteField.trace
+        )
+      )
+        throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid)
+      if (
+        Object.hasOwn(message, 'id') &&
+        [...incoming.values()].some((value) => value.wireId === message.id)
+      )
+        throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid)
+      const id = JsonRpcProfile.incomingIdPrefix + ++incomingSequence
+      const oneWay = !Object.hasOwn(message, 'id')
+      /** The original strict contract remains foreign-input admission and portable normalization. */
+      const envelope = normalizeRpcEnvelope({
+        kind: RpcEnvelopeKind.request,
+        id,
+        method,
+        data: {
+          route: {
+            profile: RpcRouteProfile,
+            type: RpcRouteType.request,
+            applicationVersion: JsonRpcProfile.applicationVersion,
+            senderId: options.peerId,
+            targetId: options.offer.peer.id,
+            receiverId: options.offer.peer.id,
+            sentAt: options.wallClock.timestamp(),
+            ...meta,
+            ...(oneWay ? { dispatchOnly: true } : {})
+          },
+          payload: params.args
+        }
+      })
+      if (!oneWay) incoming.set(id, { wireId: message.id as string | number, method })
+      for (const listener of listeners)
+        reportListenerFailure(
+          {
+            data: objectListeners.has(listener)
+              ? materializeJsonSnapshot(envelope)
+              : JSON.stringify(envelope),
+            peerId: options.peerId
+          },
+          [(value) => listener(value as IRpcInboundMessage)],
+          failures
+        )
+      return
+    }
     if (
       message.jsonrpc !== JsonRpcProfile.version ||
       Object.hasOwn(message, 'method') ||
@@ -396,6 +542,27 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
   const translate = (value: unknown): Record<string, unknown> | undefined => {
     /** Each semantic member receives the original portable contract admission. */
     const envelope = normalizeRpcEnvelope(value)
+    if (envelope.kind === RpcEnvelopeKind.response) {
+      const original = incoming.get(envelope.id)
+      if (
+        !original ||
+        envelope.data.route.method !== original.method ||
+        envelope.data.route.senderId !== options.offer.peer.id ||
+        envelope.data.route.targetId !== options.peerId
+      )
+        throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid, undefined, true)
+      if (!envelope.ok && envelope.error === undefined)
+        throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid, undefined, true)
+      incoming.delete(envelope.id)
+      return {
+        jsonrpc: JsonRpcProfile.version,
+        id: original.wireId,
+        ...(envelope.ok
+          ? { result: envelope.data.payload ?? null }
+          : { error: toJsonRpcError(envelope.error!, JsonRpcErrorNumber.business) })
+      }
+    }
+
     if (
       envelope.kind === RpcEnvelopeKind.variation &&
       envelope.data.route.variation === RpcControl.abort
@@ -510,6 +677,7 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
       else releaseObjectPort = release
     },
     setCapabilities(capabilities) {
+      incomingReady = true
       batch = capabilities.includes(RpcCapability.batch)
     },
     async exchangeHello(hello) {
