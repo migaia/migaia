@@ -23,7 +23,7 @@ import { PROCESS_HANDSHAKE_MAX_FRAME_BYTES } from './constants.js'
 import { createProcessError } from './error.js'
 import { RpcProcessErrorText } from './error-text.js'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
-import { asProcessString } from './string-framer.js'
+import { asProcessString } from './string-value.js'
 import type { IProcessByteChannel, IProcessCommonOptions, IProcessMessageChannel } from './types.js'
 
 /** Prevent a second adapter from installing another physical reader on the same channel. */

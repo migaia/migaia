@@ -1,4 +1,5 @@
-import { RpcCoreErrorCode, tagRpcError } from '../core/errors.js'
+import { RpcCoreErrorCode } from '../core/index.js'
+import { tagRpcError } from '../core/transport-kit.js'
 import { RpcProcessErrorText } from './error-text.js'
 
 /** Codec and physical string admission retain their original Core error boundary; BC7 is framing. */
@@ -10,8 +11,3 @@ export function asProcessString(value: unknown): string {
     )
   return value
 }
-
-export {
-  processStringFramer,
-  remoteProcessStringFramer
-} from '../contract/framing/string-framer.js'

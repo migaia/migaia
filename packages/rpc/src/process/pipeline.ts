@@ -14,9 +14,9 @@ import {
 } from '@migaia/serialize/codec'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { identityCodecV1 } from '@migaia/serialize/codec'
-import { messageFramerV1 } from '../contract/framing/index.js'
+import { messageFramerV1, remoteProcessStringFramer } from '../contract/framing/index.js'
 import type { IRpcFramer } from '../contract/index.js'
-import { asProcessString, remoteProcessStringFramer } from './string-framer.js'
+import { asProcessString } from './string-value.js'
 
 /** The source codec remains the sole owner of JSON serialization and portable values. */
 const jsonCodec = defineJsonCodec({ version: 1 })

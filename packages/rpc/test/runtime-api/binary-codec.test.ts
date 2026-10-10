@@ -16,7 +16,7 @@ import { asCodecValue } from '@migaia/serialize/codec'
 import { rpcProtocolV1 } from '../../src/contract/index.js'
 import { bindRpcFrameIngress } from '../../src/contract/framing/reassembler.js'
 import { remoteProcessJsonCodec } from '../../src/process/pipeline.js'
-import { remoteProcessStringFramer } from '../../src/process/string-framer.js'
+import { remoteProcessStringFramer } from '../../src/contract/framing/index.js'
 import { proveFastComponents, readFastInlineEncoder } from '../../src/core/internal/fast-path.js'
 import {
   prepareOwnedBinaryJsonSnapshot,

@@ -15,6 +15,8 @@
 
 `contract/spi`、`core/spi`、`remote/spi` 是集成用途的稳定性分层，任何调用方均可使用。它们分别提供协议与 binary codec 操作、请求 ID 与 coded error-family 分类、以及 runtime description 规范化；具体入口见 [集成 API](./USEGUIDE.md#集成-api)。普通 endpoint、stream、adapter 和提供方法仍从各自现有入口导入。
 
+自定义字符串 carrier 已保证每次交付完整消息时，从 `@migaia/rpc/contract/framing` 使用 `processStringFramer`；接收未知类型的值时使用 `remoteProcessStringFramer`，由它校验字符串域。两者都不分片，也不改变 carrier 已有的消息边界。未知值 framer 的非字符串输入保留 `TypeError`、`@migaia/rpc/contract` 的 `INVALID_FRAME` 和原文本；Process codec 的字符串入参校验仍保留 Core `PAYLOAD_INVALID` 身份。
+
 ## Worker 入门
 
 子端 worker.ts：
