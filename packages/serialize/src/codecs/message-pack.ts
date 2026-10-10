@@ -1,12 +1,11 @@
+import { toCodecPortableValue } from '../portable.js'
 import { decode, encode } from '@msgpack/msgpack'
 import { SerializeErrorCode } from '../error-code.js'
 import {
   assertCodecVersion,
   asCodecValue,
-  assertPortableValue,
   CodecErrorText,
   normalizeCodecFailure,
-  toPortableValue,
   type ICodec,
   type ICodecValue
 } from '../codec.js'
@@ -25,8 +24,7 @@ export function defineMessagePackCodec<const TVersion extends number>(
     encodedType: 'uint8array' as const,
     encode: (value: ICodecValue): Uint8Array => {
       try {
-        const portable = toPortableValue(value)
-        assertPortableValue(portable)
+        const portable = toCodecPortableValue(value)
         return encode(portable, { ignoreUndefined: true, sortKeys: true })
       } catch (error) {
         throw normalizeCodecFailure(

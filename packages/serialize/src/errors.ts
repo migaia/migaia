@@ -8,6 +8,8 @@ export const SERIALIZE_SOURCE = '@migaia/serialize' as const
 
 /** Stable registry-option diagnostics used by construction-time validation. */
 export const SerializeErrorText = {
+  /** Stable boundary text for the public base64 decoder; underlying failures remain on cause. */
+  base64Invalid: 'invalid base64 input',
   /** Text output admits only portable own data; diagnostics never reflect rejected input values. */
   outputInvalid: 'serialize output requires a supported format and portable own data',
   /** Generic boundary text for an option accessor that threw during admission. */

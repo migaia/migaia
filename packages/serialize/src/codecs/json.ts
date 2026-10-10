@@ -1,12 +1,11 @@
+import { toCodecPortableValue } from '../portable.js'
 import { SerializeErrorCode } from '../error-code.js'
 import {
   assertCodecVersion,
   asCodecValue,
-  assertPortableValue,
   createCodecError,
   CodecErrorText,
   normalizeCodecFailure,
-  toPortableValue,
   type ICodec,
   type ICodecValue
 } from '../codec.js'
@@ -25,8 +24,7 @@ export function defineJsonCodec<const TVersion extends number>(
     encodedType: 'string' as const,
     encode: (value: ICodecValue): string => {
       try {
-        const portable = toPortableValue(value)
-        assertPortableValue(portable)
+        const portable = toCodecPortableValue(value)
         const encoded = JSON.stringify(portable)
         if (encoded === undefined)
           throw createCodecError(SerializeErrorCode.encodeFailed, CodecErrorText.encodeFailed)
