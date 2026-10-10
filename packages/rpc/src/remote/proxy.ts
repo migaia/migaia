@@ -26,23 +26,24 @@ import { createGenerationController, type IAbortSignal } from '@migaia/lifecycle
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
-import { normalizePortable } from '../contract/normalize.js'
+import { normalizePortable } from '../contract/index.js'
 import {} from '../core/internal/outbound-envelope.js'
 import {
   isForwardedPayload,
   isForwardedOperation,
   retainForwardOptions
 } from '../core/internal/outbound-envelope.js'
-import type { IRpcPortableValue } from '../contract/types.js'
+import type { IRpcPortableValue } from '../contract/index.js'
 import type { IRuntimePeer, IRuntimePeerSourceResult } from './runtime-api/peer.js'
 import { readRuntimePeerConnection } from './runtime-api/peer.js'
 import { RuntimeApiErrorText, RuntimeApiMode } from './runtime-api/constants.js'
 import { RpcCoreErrorText } from '../core/error-text.js'
 import { createProviderGenerationRetired } from '../core/internal/provider.js'
-import { RpcAbortError, RpcCoreErrorCode, RpcError, RpcRemoteError } from '../core/errors.js'
+import { RpcAbortError, RpcCoreErrorCode, RpcError } from '../core/index.js'
+import { isRpcRemoteError } from '../core/spi.js'
 import { nativeReplayReceipt } from '../core/internal/native-replay.js'
 import { resolveAbortReason } from '../core/internal/async-control.js'
-import { assertRpcIdempotencyKey, defaultRpcId } from '../core/internal/id.js'
+import { assertRpcIdempotencyKey, defaultRpcId } from '../core/spi.js'
 import { RemoteMethodName } from './constants.js'
 import {
   normalizeRemoteContract,
@@ -214,7 +215,7 @@ function codedAggregate(
 
 /** Preserve a wire-restored tagged provider failure instead of core's generic remote wrapper. */
 function restoreTaggedProviderFailure(error: unknown): never {
-  if (error instanceof RpcRemoteError && error.cause instanceof Error) {
+  if (isRpcRemoteError(error) && error.cause instanceof Error) {
     const restored = error.cause as Error & { readonly source?: unknown; readonly code?: unknown }
     if (typeof restored.source === 'string' && typeof restored.code === 'string') throw restored
   }

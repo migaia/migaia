@@ -7,18 +7,18 @@ import {
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import { portableBytes } from '../../core/idempotency-store.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
-import type { IRpcProviderRejection } from '../../core/provider-admission.js'
-import { RpcProviderRejectionReason } from '../../core/semantic-constants.js'
-import { RpcTimeoutError } from '../../core/errors.js'
+import type { IRpcProviderRejection } from '../../core/index.js'
+import { RpcProviderRejectionReason } from '../../core/index.js'
+import { isRpcTimeoutError } from '../../core/spi.js'
 import type {
   IRpcContext,
   IRpcEndpoint,
   IRpcProvider,
   IRpcProviderLimits,
   IRpcProviderResult
-} from '../../core/typing.js'
-import type { IRpcPortableValue } from '../../contract/types.js'
-import type { IRemoteChannel, IRemoteServeEndpoint } from '../../remote/types.js'
+} from '../../core/index.js'
+import type { IRpcPortableValue } from '../../contract/index.js'
+import type { IRemoteChannel, IRemoteServeEndpoint } from '../../remote/index.js'
 import { RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
 import type { IRequiredProcessResilienceOptions } from './session.js'
@@ -154,7 +154,7 @@ export function createProcessProviderAdmission(
       if (closed || timedOut) return
       /** This guarded read preserves the core-owned cancellation reason. */
       const reason = resolveAbortReason(context.signal)
-      if (!(reason instanceof RpcTimeoutError)) return
+      if (!isRpcTimeoutError(reason)) return
       timedOut = true
       consecutiveTimeouts += 1
       if (consecutiveTimeouts === options.maxConsecutiveTimeouts) queueMicrotask(requestClose)

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { connected, runtimeSources } from './fixture.js'
-import * as runtimeApiEndpoint from '../../src/core/internal/runtime-api-endpoint.js'
+import * as runtimeApiEndpoint from '../../src/core/index.js'
 import { createRuntimePeer } from '../../src/remote/runtime-api/peer.js'
 import { setImmediate as nextTurn } from 'node:timers'
 import type { IRpcEnvelope } from '../../src/contract/index.js'

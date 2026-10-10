@@ -15,9 +15,8 @@ import {
   type IRemoteRuntimeRegistration
 } from '../proxy.js'
 import { observeRemoteGenerations } from '../internal/assemble-plugin.js'
-import type { IRuntimePreparationContext } from './launch-context.js'
 import { readRuntimeDefaultTimeout, prepareRuntimeCallTimeout } from './timeout.js'
-import { RpcRuntimeGenerationKind } from '../../contract/runtime-api/constants.js'
+import { RpcRuntimeGenerationKind } from '../../contract/framing/v1.js'
 import { compileRuntimeMethods } from './catalog.js'
 import {
   createRuntimePeer,
@@ -47,9 +46,24 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
     Pick<IRemoteProxyOptions<TUnit, TSpec>, 'keyFactory' | 'retryPort' | 'callDeadlineCapMs'>,
   binding: IRemoteBinding<TUnit, TSpec>,
   bindEndpoint?: (channel: IRemoteChannel, endpoint: IRemoteServeEndpoint) => IRemoteServeEndpoint,
-  preparation?: IRuntimePreparationContext,
+  preparation?: Readonly<{
+    selfDefaulted?: boolean
+    connectionOrigin?(): import('./overview.js').IRuntimeConnectionOrigin
+    restrictTransfer?(options: object | undefined): void
+    host?: import('@migaia/plugin-host').IPluginRuntimeIntegration
+    providerAdmission?: import('../../core/features/provider.js').IProviderAdmissionScope
+    providerAdmissionRegistration?: Readonly<{
+      stagePolicy(maxGlobal?: number, maxPerPeer?: number): void
+      isCommitted(): boolean
+    }>
+    initialSignal?: IAbortSignal
+    lifecycleSignal?: IAbortSignal
+    own?(dispose: () => Promise<void>): void
+    readProvide?(): import('./peer.js').IRuntimePeerProvide
+    publishPeer?(peer: IRuntimePeer): () => void
+  }>,
   beforeRelease?: () => Promise<void>,
-  execution?: IRemoteRuntimeRegistration['execution']
+  execution?: import('@migaia/supervision').ISupervisor<unknown, unknown>
 ): Promise<IRuntimePeer> {
   /** This private native restriction never grants execution, channel or Host authority. */
   const restrictTransfer = preparation?.restrictTransfer

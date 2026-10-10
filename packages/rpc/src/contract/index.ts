@@ -95,3 +95,5 @@ export type {
 } from './v1/types.js'
 export type { IRpcStreamEnvelope } from './v1/types.js'
 export type { IRpcStreamPayload } from './v1/stream.js'
+
+export { RPC_PORTABLE_MAX_DEPTH } from './normalize.js'

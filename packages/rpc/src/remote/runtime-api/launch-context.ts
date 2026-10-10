@@ -1,7 +1,7 @@
 import type { IRuntimePeerSourceContext, IRuntimePeerProvide, IRuntimePeer } from './peer.js'
 import type { IAbortSignal } from '@migaia/lifecycle'
-import type { IRpcRuntimeGeneration } from '../../contract/runtime-api/types.js'
-import type { IProviderAdmissionScope } from '../../core/internal/provider-admission.js'
+import type { IRpcRuntimeGeneration } from '../../contract/index.js'
+import type { IProviderAdmissionScope } from '../../core/features/provider.js'
 
 /** Original Host operation and resource ownership travel only through exact internal options. */
 export type IRuntimePreparationContext = Readonly<{
@@ -16,7 +16,10 @@ export type IRuntimePreparationContext = Readonly<{
   /** All adapter families on this genuine Host borrow the original logical-provider scope. */
   providerAdmission?: IProviderAdmissionScope
   /** Actual Host reservation keeps commit policy separate from the public quota handle. */
-  providerAdmissionRegistration?: import('../../core/internal/runtime-api-endpoint.js').IRuntimeEndpointChannel['hostRegistration']
+  providerAdmissionRegistration?: Readonly<{
+    stagePolicy(maxGlobal?: number, maxPerPeer?: number): void
+    isCommitted(): boolean
+  }>
   initialSignal?: IAbortSignal
   lifecycleSignal?: IAbortSignal
   own?(dispose: () => Promise<void>): void
