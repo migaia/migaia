@@ -15,6 +15,8 @@ const cell = JSON.parse(process.env.XRT_CELL ?? '{}'),
   side = process.env.XRT_SIDE ?? 'rpc',
   capture = process.env.XRT_CAPTURE ?? 'plain',
   variant = process.env.XRT_VARIANT ?? 'base'
+/** Functional acceptance uses one existing arm and never gives timing or counter credit. */
+const functional = process.env.XRT_FUNCTIONAL === '1'
 /** The source tree selects diagnostic entry observations independently of timing. */
 const fixtureRoot = new URL(
   process.env.XRT_FIXTURE_ROOT ?? '../../test/process/peers/',
@@ -662,7 +664,7 @@ async function arm(kind, count, payload, measure = false) {
   return receipt
 }
 
-/** Counters use matched N1/N2 fresh arms; required payload cells never share retention. */
+/** Counters retain matched N1/N2 arms; functional rows reuse one fresh bounded RPC arm. */
 async function main() {
   /** This finite receipt identifies every requested cell and actual execution context. */
   const result = {
@@ -672,22 +674,40 @@ async function main() {
     variant,
     seed: CrossRuntimeBench.seed,
     warmup: 200,
-    N1: 128,
-    N2: 768,
+    ...(functional
+      ? {
+          mode: 'functional',
+          measureCalls: 800,
+          functionalOnly: true,
+          counterCredit: false,
+          timingCredit: false,
+          /** Plain source preserves actual rejection reasons but has no ledger occupancy hook. */
+          replayOccupancy: null,
+          replayOccupancyAvailable: false
+        }
+      : { N1: 128, N2: 768 }),
     sourceForm: 'TS public source entries; no RPC build/dist',
     head: process.env.XRT_HEAD,
     productLimits: { maxReplayEntriesPerPeer: 1024, maxReplayEntries: 4096, replayTtlMs: 310000 },
-    sessions: 'every N1/N2 arm is a fresh independent matched connection',
+    sessions: functional
+      ? 'one fresh RPC connection per row; warm200/sample800; cold/directory/reverse outer control retained'
+      : 'every N1/N2 arm is a fresh independent matched connection',
     samples: []
   }
   try {
     for (const payloadBytes of capture === 'count' ? [64, 1024] : [cell.timingPayloadBytes]) {
       /** One-off fixture data has the same encoded bytes on RPC and bare arms. */
       const payload = 'x'.repeat(payloadBytes)
-      /** Startup and warmup are subtracted independently before the N2-N1 difference. */
-      const first = await arm(side, 128, payload)
-      const second = await arm(side, 768, payload)
-      result.samples.push({ payloadBytes, first, second, deltaN: 640 })
+      if (functional) {
+        /** The unchanged arm keeps exact echo/reverse validation, snapshots and joined cleanup. */
+        const receipt = await arm(side, 800, payload)
+        result.samples.push({ payloadBytes, receipt })
+      } else {
+        /** Startup and warmup are subtracted independently before the N2-N1 difference. */
+        const first = await arm(side, 128, payload)
+        const second = await arm(side, 768, payload)
+        result.samples.push({ payloadBytes, first, second, deltaN: 640 })
+      }
     }
     result.status = 'PASS'
   } catch (error) {

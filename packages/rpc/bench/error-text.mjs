@@ -73,6 +73,14 @@ export const IpcBenchErrorText = Object.freeze({
 
 /** Directed source fixtures retain their original setup/echo diagnostics in one owner. */
 export const CrossRuntimeErrorText = Object.freeze({
+  /** Final source preparation requires the full immutable commit selected by the owner. */
+  sourceHeadRequired: 'FINAL_SOURCE_HEAD_REQUIRED',
+  /** Prepared sources and the running driver must identify the same actual final commit. */
+  sourceHeadMismatch: 'FINAL_SOURCE_HEAD_MISMATCH',
+  /** A final source freeze cannot include uncommitted tracked or untracked product changes. */
+  sourceDirty: 'FINAL_TRACKED_DIRTY',
+  /** Final source execution admits only the existing count/timing or finite functional mode. */
+  modeInvalid: 'FINAL_MODE_COUNT_TIMING_OR_FUNCTIONAL_ONLY',
   /** Frozen foreign files must still match the exact source manifest before launch. */
   foreignSource: 'Directed foreign source SHA mismatch',
   /** A peer may only start under the actual pinned owner wrapper. */

@@ -3,14 +3,17 @@ import { resolve, join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { spawnSync, execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { CrossRuntimeErrorText } from '../error-text.mjs'
 
 /** This migrated driver runs only the user's finite 27-pair directed source inventory. */
 const directory = fileURLToPath(new URL('.', import.meta.url))
 /** Existing public-source endpoints execute on the owner's checkout, never a simulated SDK. */
 const repository = resolve(directory, '../../../..')
-/** Counter, baseline reverse RED and formal timing retain distinct receipt scopes. */
+/** Count, formal timing and finite functional execution retain distinct receipt scopes. */
 const mode = process.argv[2]
-/** The owner prepares exact base/BC14 source copies before selecting any row. */
+if (!['count', 'timing', 'functional'].includes(mode))
+  throw new Error(CrossRuntimeErrorText.modeInvalid)
+/** The owner prepares exact current source copies before selecting any row. */
 const prepared = resolve(process.argv[3])
 /** Every invocation gets a new raw directory; previous failed attempts are never overwritten. */
 const output = resolve(process.argv[4])
@@ -25,6 +28,14 @@ const head = execFileSync('git', ['rev-parse', 'HEAD'], {
   cwd: repository,
   encoding: 'utf8'
 }).trim()
+if (head !== process.env.FINAL_SOURCE_HEAD)
+  throw new Error(CrossRuntimeErrorText.sourceHeadMismatch)
+if (execFileSync('git', ['status', '--porcelain'], { cwd: repository, encoding: 'utf8' }).trim())
+  throw new Error(CrossRuntimeErrorText.sourceDirty)
+/** A historical source freeze cannot be re-stamped as current functional acceptance. */
+const sourceManifest = join(prepared, 'source-manifest.json')
+if (JSON.parse(readFileSync(sourceManifest, 'utf8')).sourceCommit !== head)
+  throw new Error(CrossRuntimeErrorText.sourceHeadMismatch)
 /** Actual foreign launchers own optimized build/execution; RPC endpoints still run TS source. */
 const foreignExecutables = {
   python: '/usr/bin/python3',
@@ -32,9 +43,7 @@ const foreignExecutables = {
   rust: join(prepared, 'fixture/foreign/rust/run.sh')
 }
 /** Only these real rows belong to this invocation's accepted evidence boundary. */
-const rows = scope.rows.filter(
-  (row) => (!wanted || wanted.has(row.key)) && (mode !== 'base-red' || row.direction === 'reverse')
-)
+const rows = scope.rows.filter((row) => !wanted || wanted.has(row.key))
 mkdirSync(dirname(output), { recursive: true })
 mkdirSync(output)
 /** Exact driver bytes accompany every future raw; existing evidence is never re-stamped. */
@@ -42,6 +51,7 @@ const snapshotDirectory = join(output, 'source-snapshot')
 mkdirSync(snapshotDirectory)
 /** The endpoint, observer, resolver and plan determine the actual fixture behavior. */
 const fixtureSources = [
+  'prepare.mjs',
   'run-grid.mjs',
   'endpoint.ts',
   'observe.ts',
@@ -58,6 +68,13 @@ const fixtureSources = [
   cpSync(source, snapshot)
   return { source, sha256, snapshot }
 })
+/** The prepared disk/loaded hashes and frozen foreign sources travel with this execution receipt. */
+const preparedSource = {
+  source: sourceManifest,
+  sha256: createHash('sha256').update(readFileSync(sourceManifest)).digest('hex'),
+  snapshot: join(snapshotDirectory, 'source-manifest.json')
+}
+cpSync(preparedSource.source, preparedSource.snapshot)
 /** Branch classification is frozen before any native window; no code-only inference fills reasons. */
 const plan = {
   head,
@@ -66,6 +83,9 @@ const plan = {
   ),
   mode,
   fixtureSources,
+  preparedSource,
+  scopeSourceCommit: scope.sourceCommit,
+  sourceCommit: head,
   pairs: 27,
   carrierRows: 54,
   selected: rows.map((row) => row.key),
@@ -85,6 +105,14 @@ const plan = {
   },
   rejectionChannel:
     'actual onRejected reason and original numeric replay readCapacity in diagnostic copies only',
+  ...(mode === 'functional'
+    ? {
+        functionalOnly: true,
+        counterCredit: false,
+        timingCredit: false,
+        replayOccupancy: 'UNAVAILABLE_PLAIN_SOURCE_NO_COUNTER_OVERLAY'
+      }
+    : {}),
   admission: {
     priority: 'normal',
     maxLoad: mode === 'timing' ? 3 : 5,
@@ -92,25 +120,22 @@ const plan = {
     waitSeconds: 2700
   },
   protocol:
-    'fresh connection per every N1/N2 or AA/ABBA arm; matched actual source, defaults, warmup and sample count'
+    mode === 'functional'
+      ? 'one fresh RPC connection per row; warm200/sample800; plain actual TS source; no timing/counter credit'
+      : 'fresh connection per every N1/N2 or AA/ABBA arm; matched actual source, defaults, warmup and sample count'
 }
 writeFileSync(join(output, 'plan.json'), JSON.stringify(plan, null, 2) + '\n')
 /** Results are appended after each actual terminal runner exit, including refused windows. */
 const results = []
 for (const row of rows) {
-  /** Actual reverse TS provider selects the same prepared BC14 source graph, not another executor. */
-  const variant = row.direction === 'reverse' && mode !== 'base-red' ? 'target' : 'base'
-  /** No counter hooks are present in plain timing source. */
-  const capture = mode === 'timing' ? 'plain' : 'count'
+  /** Every direction selects the same actual final source, with BC14 already implemented. */
+  const variant = 'base'
+  /** Plain functional/timing source carries loaded hashes without counter overlays. */
+  const capture = mode === 'count' ? 'count' : 'plain'
   /** Pair direction fixes the process that executes the actual TS endpoint program. */
   const runtime = row.direction === 'reverse' ? row.provider : row.initiator
   /** The mode owns a complete distinct RPC/serialize dependency copy. */
-  const source = join(
-    prepared,
-    'fixture',
-    (variant === 'target' ? 'target-' : '') + capture,
-    'packages/rpc/src'
-  )
+  const source = join(prepared, 'fixture', capture, 'packages/rpc/src')
   /** Native runner receipts are keyed by the original directed pair and carrier. */
   const stem = join(output, row.key.replaceAll(':', '--'))
   /** Deno's original supported source flags are preserved, without a JS fallback. */
@@ -122,7 +147,7 @@ for (const row of rows) {
     '/Users/kaeo/workspack/migai/scripts/exclusive-window.mjs',
     'run',
     '--window',
-    'core-c5-' + mode + '-' + row.pairOrdinal + '-' + row.carrier.split('-')[0],
+    'core-final-' + mode + '-' + row.pairOrdinal + '-' + row.carrier.split('-')[0],
     '--priority',
     'normal',
     '--wait',
@@ -151,12 +176,13 @@ for (const row of rows) {
     XRT_STEM: stem,
     XRT_SIDE: mode === 'timing' ? 'paired' : 'rpc',
     XRT_TIMING: mode === 'timing' ? '1' : '0',
+    XRT_FUNCTIONAL: mode === 'functional' ? '1' : '0',
     XRT_CAPTURE: capture,
     XRT_VARIANT: variant,
     XRT_SOURCE_ROOT: pathToFileURL(source + '/').href,
     XRT_FIXTURE_ROOT: pathToFileURL(join(prepared, 'fixture/foreign') + '/').href,
     XRT_FOREIGN_EXECUTABLES: JSON.stringify(foreignExecutables),
-    XRT_SOURCE_MANIFEST: join(prepared, 'source-manifest.json'),
+    XRT_SOURCE_MANIFEST: preparedSource.snapshot,
     XRT_ENV_RUN: wrapper
   }
   /** Existing wrapper validates every exact tool version before the exclusive runner starts. */
@@ -168,10 +194,6 @@ for (const row of rows) {
   })
   writeFileSync(stem + '.stdout.log', run.stdout ?? '')
   writeFileSync(stem + '.stderr.log', run.stderr ?? '')
-  /**
-   * An expected baseline reverse rejection is evidence only when its real profile failure is
-   * present.
-   */
   let raw
   /** Missing or malformed raw stays a preparation/evidence failure, never a fabricated PASS. */
   let rawReadError
@@ -181,11 +203,6 @@ for (const row of rows) {
     rawReadError = { name: error.name, code: error.code ?? null, message: error.message }
   }
   /** Failure status keeps the original native exit and all actual error tuples. */
-  const expectedRed =
-    mode === 'base-red' &&
-    run.status === 1 &&
-    raw?.failure?.code === 'JSONRPC_PROFILE_INVALID' &&
-    raw?.final?.provider?.calls === 0
   const item = {
     key: row.key,
     command: ['/bin/bash', wrapper, ...args],
@@ -194,11 +211,9 @@ for (const row of rows) {
     status:
       run.status === 0 && raw?.status === 'PASS'
         ? 'PASS'
-        : expectedRed
-          ? 'EXPECTED_BASE_RED'
-          : run.status === 75
-            ? 'ADMISSION_REFUSED'
-            : 'FAIL',
+        : run.status === 75
+          ? 'ADMISSION_REFUSED'
+          : 'FAIL',
     raw: stem + '.json',
     source,
     failure: raw?.failure,
