@@ -17,7 +17,8 @@ describe('WRC-C-B01 retained graph contracts', () => {
   /** Reads the existing causal owner report for an independently structured current closure. */
   const retainedProbe = JSON.parse(
     execFileSync(process.execPath, [resolve(import.meta.dirname, 'core-retained-causal.mjs')], {
-      encoding: 'utf8'
+      encoding: 'utf8',
+      maxBuffer: 32 * 1024 * 1024
     })
   ) as { readonly consumers: IRetainedInventory }
 
