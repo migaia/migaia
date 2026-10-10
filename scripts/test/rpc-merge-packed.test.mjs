@@ -9,35 +9,53 @@ import ts from 'typescript'
 /** Public surface and retained packed checks frozen by rpc-merge A11. */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const legacy = JSON.parse(
-  readFileSync(join(root, 'packages/rpc/test/fixtures/legacy-exports.json'), 'utf8')
+  readFileSync(join(root, 'packages/rpc-integration/test/fixtures/legacy-exports.json'), 'utf8')
 )
 /** I3's admitted contract additions and retired core exports amend the frozen merge count. */
 const errorFormatDelta = JSON.parse(
-  readFileSync(join(root, 'packages/rpc/test/fixtures/error-format-export-delta.json'), 'utf8')
+  readFileSync(
+    join(root, 'packages/rpc-integration/test/fixtures/error-format-export-delta.json'),
+    'utf8'
+  )
 )
 /** I5's admitted contract and core additions extend the same frozen merge count. */
 const controlDelta = JSON.parse(
-  readFileSync(join(root, 'packages/rpc/test/fixtures/control-semantics-export-delta.json'), 'utf8')
+  readFileSync(
+    join(root, 'packages/rpc-integration/test/fixtures/control-semantics-export-delta.json'),
+    'utf8'
+  )
 )
 /** I6's stream contract names amend the reviewed packed public surface. */
 const streamingDelta = JSON.parse(
-  readFileSync(join(root, 'packages/rpc/test/fixtures/streaming-export-delta.json'), 'utf8')
+  readFileSync(
+    join(root, 'packages/rpc-integration/test/fixtures/streaming-export-delta.json'),
+    'utf8'
+  )
 )
 /** I26's registered batch limit is an exact addition; the merge baseline remains frozen. */
 const batchDelta = JSON.parse(
-  readFileSync(join(root, 'packages/rpc/test/fixtures/batch-export-delta.json'), 'utf8')
+  readFileSync(join(root, 'packages/rpc-integration/test/fixtures/batch-export-delta.json'), 'utf8')
 )
 /** I18's additive subpath extends the frozen forty entries without changing their counts. */
 const bridgeDelta = JSON.parse(
-  readFileSync(join(root, 'packages/rpc/test/fixtures/jsonrpc-bridge-export-delta.json'), 'utf8')
+  readFileSync(
+    join(root, 'packages/rpc-integration/test/fixtures/jsonrpc-bridge-export-delta.json'),
+    'utf8'
+  )
 )
 /** I19's seven new entries retain exact names alongside the frozen forty and bridge. */
 const threadsDelta = JSON.parse(
-  readFileSync(join(root, 'packages/rpc/test/fixtures/threads-export-delta.json'), 'utf8')
+  readFileSync(
+    join(root, 'packages/rpc-integration/test/fixtures/threads-export-delta.json'),
+    'utf8'
+  )
 )
 /** Approved public entry moves retarget readers while preserving the immutable legacy snapshot. */
 const coreRefactorDelta = JSON.parse(
-  readFileSync(join(root, 'packages/rpc/test/fixtures/core-refactor-export-delta.json'), 'utf8')
+  readFileSync(
+    join(root, 'packages/rpc-integration/test/fixtures/core-refactor-export-delta.json'),
+    'utf8'
+  )
 )
 const checks = [
   'subpath-imports',
@@ -67,6 +85,29 @@ const obsolete = [
   './core/internal/chunk-attachment'
 ]
 
+/**
+ * Map immutable legacy entry identities to their directly installed split public entry.
+ *
+ * @param {string} name Frozen legacy entry or reviewed relocation.
+ * @returns {string} The ordinary entry installed by the six-package consumer.
+ */
+function splitEntry(name) {
+  const entries = [
+    ['@migaia/rpc/bridge/jsonrpc', '@migaia/rpc-bridge-jsonrpc'],
+    ['@migaia/rpc/contract', '@migaia/rpc-contract'],
+    ['@migaia/rpc/core', '@migaia/rpc-core'],
+    ['@migaia/rpc/remote', '@migaia/rpc-core/remote'],
+    ['@migaia/rpc/testing', '@migaia/rpc-core/testing'],
+    ['@migaia/rpc/process', '@migaia/rpc-process'],
+    ['@migaia/rpc/threads', '@migaia/rpc-threads'],
+    ['@migaia/rpc/browser', '@migaia/rpc-browser']
+  ]
+  for (const [previous, current] of entries)
+    if (name === previous || name.startsWith(`${previous}/`))
+      return current + name.slice(previous.length)
+  return name
+}
+
 /** Read the packed script's literal obsolete-subpath probe instead of matching comments. */
 function obsoleteProbe(script) {
   const parsed = ts.createSourceFile(
@@ -92,8 +133,11 @@ function obsoleteProbe(script) {
 }
 
 test('A11 packed consumer runs every preserved check against all 40 deep exports', () => {
-  const script = readFileSync(join(root, 'packages/rpc/test/core/packed-export-smoke.mjs'), 'utf8')
-  const run = spawnSync('pnpm', ['--filter', './packages/rpc', 'run', 'test:packed'], {
+  const script = readFileSync(
+    join(root, 'packages/rpc-integration/test/core/packed-export-smoke.mjs'),
+    'utf8'
+  )
+  const run = spawnSync('pnpm', ['--filter', './packages/rpc-integration', 'run', 'test:packed'], {
     cwd: root,
     encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
@@ -109,7 +153,10 @@ test('A11 packed consumer runs every preserved check against all 40 deep exports
   assert.deepEqual(observedChecks.sort(), [...checks].sort())
   const subpaths = new Map(
     lines.flatMap((line) => {
-      const match = /^SUBPATH (@migaia\/rpc\/\S+) (\d+)$/.exec(line.trim())
+      const match =
+        /^SUBPATH (@migaia\/rpc(?:-contract|-core|-process|-threads|-bridge-jsonrpc|-browser)(?:\/\S+)?) (\d+)$/.exec(
+          line.trim()
+        )
       return match ? [[match[1], Number(match[2])]] : []
     })
   )
@@ -118,9 +165,9 @@ test('A11 packed consumer runs every preserved check against all 40 deep exports
     40 + Object.keys(bridgeDelta.added).length + Object.keys(threadsDelta.added).length
   )
   for (const [name, names] of Object.entries({ ...bridgeDelta.added, ...threadsDelta.added }))
-    assert.equal(subpaths.get(name), names.length, name)
-  assert.equal(subpaths.get('@migaia/rpc/core/transport-kit'), 16)
-  assert.equal(subpaths.get('@migaia/rpc/core/stream'), 2)
+    assert.equal(subpaths.get(splitEntry(name)), names.length, name)
+  assert.equal(subpaths.get('@migaia/rpc-core/transport-kit'), 16)
+  assert.equal(subpaths.get('@migaia/rpc-core/stream'), 2)
   for (const [name, record] of Object.entries(legacy)) {
     /** Count each reviewed export delta against the frozen merge surface. */
     const removed = [
@@ -136,7 +183,7 @@ test('A11 packed consumer runs every preserved check against all 40 deep exports
       ...(name === '@migaia/rpc/core' ? ['RpcProviderRejectionReason'] : [])
     ]
     /** The canonical Worker factory moved entry; its original symbol count stays unchanged. */
-    const currentName = coreRefactorDelta.relocations?.[name] ?? name
+    const currentName = splitEntry(coreRefactorDelta.relocations?.[name] ?? name)
     assert.equal(
       subpaths.get(currentName),
       record.names.length - removed.length + added.length,
@@ -144,7 +191,7 @@ test('A11 packed consumer runs every preserved check against all 40 deep exports
     )
   }
   assert.deepEqual([...obsoleteProbe(script)].sort(), [...obsolete].sort())
-  assert.ok(script.includes('@migaia/rpc/core/composed'))
+  assert.ok(script.includes('@migaia/rpc-core/composed'))
   assert.ok(script.includes('dist/contract/'))
-  assert.ok(script.includes('@migaia/rpc/core'))
+  assert.ok(script.includes('@migaia/rpc-core'))
 })

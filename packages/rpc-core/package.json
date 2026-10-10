@@ -1,0 +1,188 @@
+{
+  "name": "@migaia/rpc-core",
+  "version": "0.0.7",
+  "private": true,
+  "description": "RPC core owner.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kimboyeme-maker/migai.git",
+    "directory": "packages/rpc-core"
+  },
+  "files": [
+    "dist",
+    "schema",
+    "README.md",
+    "USEGUIDE.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./remote": {
+      "types": "./dist/remote/index.d.ts",
+      "default": "./dist/remote/index.js"
+    },
+    ".": {
+      "types": "./dist/core/index.d.ts",
+      "default": "./dist/core/index.js"
+    },
+    "./composed": {
+      "types": "./dist/core/composed.d.ts",
+      "default": "./dist/core/composed.js"
+    },
+    "./client": {
+      "types": "./dist/core/client.d.ts",
+      "default": "./dist/core/client.js"
+    },
+    "./provider": {
+      "types": "./dist/core/provider.d.ts",
+      "default": "./dist/core/provider.js"
+    },
+    "./full": {
+      "types": "./dist/core/full.d.ts",
+      "default": "./dist/core/full.js"
+    },
+    "./transport-constants": {
+      "types": "./dist/core/transport-constants.d.ts",
+      "default": "./dist/core/transport-constants.js"
+    },
+    "./transport-kit": {
+      "types": "./dist/core/transport-kit.d.ts",
+      "default": "./dist/core/transport-kit.js"
+    },
+    "./features/outbound": {
+      "types": "./dist/core/features/outbound.d.ts",
+      "default": "./dist/core/features/outbound.js"
+    },
+    "./features/one-way": {
+      "types": "./dist/core/features/one-way.d.ts",
+      "default": "./dist/core/features/one-way.js"
+    },
+    "./features/provider": {
+      "types": "./dist/core/features/provider.d.ts",
+      "default": "./dist/core/features/provider.js"
+    },
+    "./features/discovery": {
+      "types": "./dist/core/features/discovery.d.ts",
+      "default": "./dist/core/features/discovery.js"
+    },
+    "./features/control": {
+      "types": "./dist/core/features/control.d.ts",
+      "default": "./dist/core/features/control.js"
+    },
+    "./stream": {
+      "types": "./dist/core/stream/index.d.ts",
+      "default": "./dist/core/stream/index.js"
+    },
+    "./plugins/flow-control": {
+      "types": "./dist/core/plugins/flow-control.d.ts",
+      "default": "./dist/core/plugins/flow-control.js"
+    },
+    "./plugins/send-queue": {
+      "types": "./dist/core/plugins/send-queue.d.ts",
+      "default": "./dist/core/plugins/send-queue.js"
+    },
+    "./plugins/log": {
+      "types": "./dist/core/plugins/log.d.ts",
+      "default": "./dist/core/plugins/log.js"
+    },
+    "./adapters/memory": {
+      "types": "./dist/core/adapters/memory.d.ts",
+      "default": "./dist/core/adapters/memory.js"
+    },
+    "./adapters/message-port": {
+      "types": "./dist/core/adapters/message-port.d.ts",
+      "default": "./dist/core/adapters/message-port.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    },
+    "./adapters/web-worker": {
+      "types": "./dist/core/adapters/web-worker.d.ts",
+      "default": "./dist/core/adapters/web-worker.js"
+    },
+    "./adapter": {
+      "types": "./dist/adapter.d.ts",
+      "default": "./dist/adapter.js"
+    },
+    "./adapter/node": {
+      "types": "./dist/adapter-node.d.ts",
+      "default": "./dist/adapter-node.js"
+    },
+    "./adapter/diagnostics": {
+      "types": "./dist/adapter-diagnostics.d.ts",
+      "default": "./dist/adapter-diagnostics.js"
+    },
+    "./adapter/process-data": {
+      "types": "./dist/adapter-process-data.d.ts",
+      "default": "./dist/adapter-process-data.js"
+    },
+    "./adapter/web-streams": {
+      "types": "./dist/adapter-web-streams.d.ts",
+      "default": "./dist/adapter-web-streams.js"
+    },
+    "./adapter/process": {
+      "types": "./dist/adapter-process.d.ts",
+      "default": "./dist/adapter-process.js"
+    },
+    "./adapter/process/node": {
+      "types": "./dist/adapter-process-node.d.ts",
+      "default": "./dist/adapter-process-node.js"
+    },
+    "./adapter/threads": {
+      "types": "./dist/adapter-thread.d.ts",
+      "default": "./dist/adapter-thread.js"
+    },
+    "./adapter/jsonrpc": {
+      "types": "./dist/adapter-jsonrpc.d.ts",
+      "default": "./dist/adapter-jsonrpc.js"
+    }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "build": "node ../../scripts/dist-stamp.mjs clean && node ../../scripts/dist-stamp.mjs build-rpc && node ../../scripts/dist-stamp.mjs write",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
+    "fmt": "oxfmt src test vitest.config.ts",
+    "lint": "oxlint src test vitest.config.ts",
+    "test": "vitest run --coverage",
+    "typecheck:core": "tsc --noEmit -p tsconfig.core.json"
+  },
+  "dependencies": {
+    "@migaia/event-subscriber": "workspace:^",
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/serialize": "workspace:^",
+    "@migaia/supervision": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "peerDependencies": {
+    "@migaia/rpc-contract": "0.0.7"
+  },
+  "peerDependenciesMeta": {},
+  "devDependencies": {
+    "@types/node": "24.13.2",
+    "cborg": "6.1.1",
+    "elysia": "1.4.30",
+    "msgpackr": "2.1.0",
+    "protobufjs": "8.8.0",
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.10",
+    "@migaia/rpc-contract": "workspace:0.0.7",
+    "@migaia/capability": "workspace:^",
+    "@migaia/middleware-pipeline": "workspace:^",
+    "@migaia/rpc-bridge-jsonrpc": "workspace:0.0.7",
+    "@migaia/rpc-browser": "workspace:0.0.7",
+    "@migaia/rpc-process": "workspace:0.0.7",
+    "@migaia/rpc-threads": "workspace:0.0.7"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

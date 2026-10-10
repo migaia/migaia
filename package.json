@@ -24,7 +24,6 @@
     "website:preview": "cd website && bun run preview",
     "@logger": "pnpm --filter ./packages/logger run",
     "@event-subscriber": "pnpm --filter ./packages/event-subscriber run",
-    "@rpc": "pnpm --filter ./packages/rpc run",
     "@plugin-host": "pnpm --filter ./packages/plugin-host run",
     "@storage-web": "pnpm --filter ./packages/storage-web run",
     "@capability": "pnpm --filter ./packages/capability run",
@@ -46,7 +45,14 @@
     "@store-wasm": "pnpm --filter ./packages/store-wasm run",
     "@store-worker": "pnpm --filter ./packages/store-worker run",
     "@utils": "pnpm --filter ./packages/utils run",
-    "@wasm": "pnpm --filter ./packages/wasm run"
+    "@wasm": "pnpm --filter ./packages/wasm run",
+    "@rpc-contract": "pnpm --filter ./packages/rpc-contract run",
+    "@rpc-core": "pnpm --filter ./packages/rpc-core run",
+    "@rpc-process": "pnpm --filter ./packages/rpc-process run",
+    "@rpc-threads": "pnpm --filter ./packages/rpc-threads run",
+    "@rpc-bridge-jsonrpc": "pnpm --filter ./packages/rpc-bridge-jsonrpc run",
+    "@rpc-browser": "pnpm --filter ./packages/rpc-browser run",
+    "@rpc-integration": "pnpm --filter ./packages/rpc-integration run"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

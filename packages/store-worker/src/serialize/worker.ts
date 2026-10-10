@@ -9,8 +9,8 @@ import {
   type ISerializePlugin
 } from '@migaia/serialize'
 import { isUint8Array } from '@migaia/utils/bytes'
-import type { IWebWorkerLikePort } from '@migaia/rpc/core/adapters/web-worker'
-import { RpcLifecycleError } from '@migaia/rpc/core'
+import type { IWebWorkerLikePort } from '@migaia/rpc-core/adapters/web-worker'
+import { RpcLifecycleError } from '@migaia/rpc-core'
 import { createWorkerContractEndpoint, type IWorkerContractEndpoint } from '../worker-contract.js'
 import { toManagedRpcHandler, type IManagedRpcHandler } from '../managed-rpc-handler.js'
 import {

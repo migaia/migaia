@@ -1,0 +1,111 @@
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { describe, expect, it } from 'vitest'
+
+/** The package manifest is checked as a shipped consumer would resolve it. */
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+/** The common process directory must remain free of platform imports. */
+const processSource = join(packageRoot, 'src/process')
+/** Shared neutral Process operations are owned by Core after the six-package migration. */
+const sharedProcessSource = resolve(packageRoot, '../rpc-core/src/adapter-owned/process')
+/** Only this file owns the physical IPC gate construction. */
+const ipcOwner = join(sharedProcessSource, 'ipc-connection.ts')
+
+/** Recursively collect source files without traversing test fixtures. */
+function sources(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name)
+    return entry.isDirectory() ? sources(path) : entry.name.endsWith('.ts') ? [path] : []
+  })
+}
+
+describe('process package layering and exports', () => {
+  it('[A12] publishes the runtime-neutral process and byte-framing entries', async () => {
+    const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
+      exports: Record<string, { default: string; types: string }>
+    }
+    const contractRoot = resolve(packageRoot, '../rpc-contract')
+    const contractManifest = JSON.parse(
+      readFileSync(join(contractRoot, 'package.json'), 'utf8')
+    ) as {
+      exports: Record<string, { default: string; types: string }>
+    }
+    for (const [owner, exports, key] of [
+      [packageRoot, manifest.exports, '.'],
+      [contractRoot, contractManifest.exports, './framing/stream']
+    ] as const) {
+      const entry = exports[key]
+      expect(entry, key).toBeDefined()
+      expect(existsSync(join(owner, entry.default)), key).toBe(true)
+      expect(existsSync(join(owner, entry.types)), key).toBe(true)
+    }
+    expect(manifest.exports['./process']).toBeUndefined()
+    expect(manifest.exports['./contract/framing/stream']).toBeUndefined()
+    const common = await import('@migaia/rpc-process')
+    const framing = await import('@migaia/rpc-contract/framing/stream')
+    expect(common.createProcessTransport).toBeTypeOf('function')
+    expect(common.createNativeProcessOffer).toBeTypeOf('function')
+    expect(common.createProcessPlugin).toBeTypeOf('function')
+    expect(common.createProcessPeer).toBeTypeOf('function')
+    expect(common.parseProcessPluginDescriptor).toBeTypeOf('function')
+    expect(common.ProcessPluginWire).toEqual({ native: 'native', jsonrpc: 'jsonrpc' })
+    expect(framing.encodeRpcStreamFrame).toBeTypeOf('function')
+  })
+
+  it('[A1][A25] ships four symmetric factories without any retired factory alias', async () => {
+    /** Built subpaths are the consumer boundary; internal imports cannot hide a leaked alias. */
+    const process = await import('@migaia/rpc-process')
+    const thread = await import('@migaia/rpc-threads')
+    for (const name of ['createProcessHost', 'createServeProcessHost', 'createServeProcessPlugin'])
+      expect(Object.hasOwn(process, name), '[A25] retired process factory must be absent').toBe(
+        false
+      )
+    for (const name of ['createThreadHost', 'createServeThreadHost', 'createServeThreadPlugin'])
+      expect(Object.hasOwn(thread, name), '[A25] retired thread factory must be absent').toBe(false)
+    expect(thread.createThreadPeer).toBeTypeOf('function')
+    expect(thread.createThreadPlugin).toBeTypeOf('function')
+  })
+
+  it('[A12] keeps platform peers optional and physical IPC construction singular', () => {
+    const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
+      version: string
+      dependencies: Record<string, string>
+      peerDependencies: Record<string, string>
+      peerDependenciesMeta: Record<string, { optional: boolean }>
+    }
+    expect(Object.keys(manifest.dependencies).every((name) => name.startsWith('@migaia/'))).toBe(
+      true
+    )
+    expect(manifest.dependencies).toHaveProperty('@migaia/supervision')
+    expect(Object.keys(manifest.peerDependencies).sort()).toEqual([
+      '@migaia/rpc-contract',
+      '@migaia/rpc-core',
+      'electron',
+      'koffi'
+    ])
+    for (const peer of ['@migaia/rpc-contract', '@migaia/rpc-core']) {
+      expect(manifest.peerDependencies[peer]).toBe(manifest.version)
+      expect(manifest.peerDependenciesMeta[peer]?.optional ?? false).toBe(false)
+    }
+    expect(manifest.peerDependenciesMeta.electron.optional).toBe(true)
+    expect(manifest.peerDependenciesMeta.koffi.optional).toBe(true)
+    for (const file of [...sources(processSource), ...sources(sharedProcessSource)]) {
+      const source = readFileSync(file, 'utf8')
+      if (
+        !file.includes('/adapters/') &&
+        file !== join(sharedProcessSource, 'node-byte-stream.ts')
+      ) {
+        expect(source, file).not.toMatch(/(?:from\s*|import\s*\()['"](?:node:|bun:|electron|koffi)/)
+      }
+      if (file !== ipcOwner) expect(source, file).not.toContain('createIpcSendQueueTransport')
+    }
+    const streamFraming = readFileSync(
+      resolve(packageRoot, '../rpc-contract/src/contract/framing/stream.ts'),
+      'utf8'
+    )
+    expect(streamFraming).not.toMatch(/(?:from\s*|import\s*\()['"](?:node:|bun:|electron|koffi)/)
+    const vitestConfig = readFileSync(join(packageRoot, 'vitest.config.ts'), 'utf8')
+    expect(vitestConfig).toContain('src/process/adapters/**')
+  })
+})

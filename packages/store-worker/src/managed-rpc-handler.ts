@@ -1,4 +1,4 @@
-import type { IRpcEndpoint } from '@migaia/rpc/core'
+import type { IRpcEndpoint } from '@migaia/rpc-core'
 
 /**
  * Worker 侧托管的 RPC 消息处理器。
