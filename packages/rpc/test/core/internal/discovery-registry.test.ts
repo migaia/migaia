@@ -1,8 +1,178 @@
 import { describe, expect, it, vi } from 'vitest'
 import { DiscoveryRegistry } from '../../../src/core/internal/discovery-registry.js'
+import {
+  registerCanonicalReceiver,
+  readCanonicalReceiver
+} from '../../../src/core/internal/plugin-shared-keys.js'
 import { VerifiedPeerRegistry } from '../../../src/core/internal/identity.js'
+import type { IRpcDiscoveryResolverPort } from '../../../src/core/internal/plugin-shared-keys.js'
+
+/** The discovery owner's stable predicate supplies status and pin semantics to its routing index. */
+function activeReceiver(
+  value: { readonly status: string; readonly receiverId: string },
+  receiverId?: string
+): boolean {
+  return value.status === 'active' && (receiverId === undefined || value.receiverId === receiverId)
+}
 
 describe('DiscoveryRegistry', () => {
+  it('[C8-H5-P1] reads only the exact installed canonical port and preserves its local Promise miss', () => {
+    /** This receiver is ordinary route data; no declaration or identifier registers a reader. */
+    const receiver = { receiverId: 'receiver', verifiedPeerKey: 'held-binding' }
+    /** Public resolve remains an asynchronous operation with its original receiver shape. */
+    const port = Object.freeze({ resolve: async () => receiver })
+    /** One cold registration associates only this owner callback with this exact installed port. */
+    const read = vi.fn(() => receiver as typeof receiver | Promise<typeof receiver>)
+    registerCanonicalReceiver(port, read)
+    expect(readCanonicalReceiver(port, 'target')).toBe(receiver)
+    expect(read).toHaveBeenCalledOnce()
+    expect(read).toHaveBeenCalledWith('target', undefined)
+    /** A real asynchronous miss retains its exact local Promise without another wrapper. */
+    const pending = Promise.resolve(receiver)
+    read.mockReturnValueOnce(pending)
+    expect(readCanonicalReceiver(port, 'missing')).toBe(pending)
+    /** Copying the publicly visible callback does not copy the package's private association. */
+    const copied = Object.freeze({ resolve: port.resolve })
+    expect(readCanonicalReceiver(copied, 'target')).toBeUndefined()
+    expect(read).toHaveBeenCalledTimes(2)
+    expect(port.resolve()).toBeInstanceOf(Promise)
+  })
+
+  it('[C8-H5-P2] ignores custom port claims without reading its resolver or returned Promise', () => {
+    /** The getter makes retrieving an unknown extension's Promise independently observable. */
+    let resolveReads = 0
+    /** The public resolver will retain its original Promise if its actual caller invokes it. */
+    const pending = Promise.resolve({ receiverId: 'custom' })
+    /** A caller declaration is just data and cannot register an owned synchronous reader. */
+    const custom = {
+      sync: true,
+      get resolve() {
+        resolveReads++
+        return () => pending
+      }
+    } satisfies IRpcDiscoveryResolverPort & { readonly sync: boolean }
+    expect(readCanonicalReceiver(custom, 'target')).toBeUndefined()
+    expect(resolveReads).toBe(0)
+    /** No returned Promise or then property is reachable before that original resolver is read. */
+    expect(custom.resolve()).toBe(pending)
+    expect(resolveReads).toBe(1)
+  })
+
+  it('[C8-H5-R1] indexes active target receivers in original insertion order without a snapshot scan', () => {
+    /** Stored snapshots remain the original objects; target membership is ordinary routing data. */
+    const first = { targetId: 'target', receiverId: 'first', status: 'active' }
+    /** A second receiver distinguishes insertion order from a most-recent refresh policy. */
+    const second = { targetId: 'target', receiverId: 'second', status: 'active' }
+    /** An unrelated target must not enter this target's selected receiver set. */
+    const other = { targetId: 'other', receiverId: 'other', status: 'active' }
+    /** The same canonical owner retains snapshots and its derived target index. */
+    const registry = new DiscoveryRegistry()
+    registry.setRemote('first', first, undefined, 'target')
+    registry.setRemote('other', other, undefined, 'other')
+    registry.setRemote('second', second, undefined, 'target')
+    expect(registry.getRemote('first')).toBe(first)
+    /** A warm target read must not rebuild the public snapshot array. */
+    const snapshot = vi.spyOn(registry, 'remoteSnapshot')
+    expect(registry.firstActiveRemote('target', activeReceiver)).toBe(first)
+    expect(registry.firstActiveRemote('target', activeReceiver, 'second')).toBe(second)
+    /** Moving an existing key retains its canonical position ahead of a later receiver. */
+    const moved = { ...other, targetId: 'target' }
+    registry.setRemote('other', moved, undefined, 'target')
+    registry.setRemote('first', { ...first, status: 'inactive' })
+    expect(registry.firstActiveRemote('target', activeReceiver)).toBe(moved)
+    registry.setRemote('first', first)
+    expect(registry.firstActiveRemote('target', activeReceiver)).toBe(first)
+    expect(registry.firstActiveRemote('missing', activeReceiver)).toBeUndefined()
+    expect(snapshot).not.toHaveBeenCalled()
+  })
+
+  it('[C8-H5-R2] updates target selection with binding refusal, committed replacement, delete and close', () => {
+    /** The original identity lease can reject a new token or fail after a replacement commits. */
+    const released: string[] = []
+    /** Cleanup failure must leave the replacement snapshot and index in the same committed state. */
+    const releaseError = new Error('old indexed binding release failed')
+    /** Binding ownership stays in the existing registry, not the routing index. */
+    const registry = new DiscoveryRegistry({
+      retain: (token) => token !== 'refused',
+      release: (token) => {
+        released.push(token)
+        if (token === 'old') throw releaseError
+      }
+    })
+    /** Receiver snapshots use the exact same target key across replacement. */
+    const first = { targetId: 'target', receiverId: 'receiver', status: 'active', version: 1 }
+    /** This object must be visible only after its original lease commits. */
+    const second = { ...first, version: 2 }
+    expect(registry.setRemoteWithBinding('slot', first, 'old', undefined, 'target')).toBe(true)
+    expect(registry.getRemote('slot')).toBe(first)
+    expect(registry.firstActiveRemote('target', activeReceiver)).toBe(first)
+    expect(registry.setRemoteWithBinding('slot', second, 'refused')).toBe(false)
+    expect(registry.firstActiveRemote('target', activeReceiver)).toBe(first)
+    expect(() => registry.setRemoteWithBinding('slot', second, 'new')).toThrow(releaseError)
+    expect(registry.firstActiveRemote('target', activeReceiver)).toBe(second)
+    expect(registry.getRemoteBinding('slot')).toBe('new')
+    registry.deleteRemote('slot')
+    expect(registry.firstActiveRemote('target', activeReceiver)).toBeUndefined()
+    registry.setRemote('again', first, undefined, 'target')
+    registry.close(new Error('close indexed owner'))
+    expect(registry.firstActiveRemote('target', activeReceiver)).toBeUndefined()
+    expect(released).toEqual(['old', 'new'])
+  })
+
+  it('[C8-H5-R3] restores the prior target index when the original binding commit fails', () => {
+    /** The actual replacement operation fails between snapshot and binding Map commits. */
+    const primary = new Error('indexed binding commit failed')
+    /** The original release callback records rollback of the newly retained lease. */
+    const released: string[] = []
+    /** This native setter is delegated unchanged except at the one failing binding operation. */
+    const originalSet = Map.prototype.set
+    /** The owner already has a valid snapshot and lease before the replacement begins. */
+    const registry = new DiscoveryRegistry({
+      retain: () => true,
+      release: (token) => released.push(token)
+    })
+    /** The existing active entry must survive the failed replacement without a new order position. */
+    const first = { targetId: 'target', receiverId: 'receiver', status: 'active', version: 1 }
+    expect(registry.setRemoteWithBinding('slot', first, 'old', undefined, 'target')).toBe(true)
+    expect(registry.getRemote('slot')).toBe(first)
+    expect(registry.firstActiveRemote('target', activeReceiver)).toBe(first)
+    /** Only the binding write fails; the real native rollback setters remain available. */
+    const setter = vi.spyOn(Map.prototype, 'set').mockImplementation(function (
+      this: Map<unknown, unknown>,
+      key: unknown,
+      value: unknown
+    ) {
+      if (key === 'slot' && value === 'new') throw primary
+      return Reflect.apply(originalSet, this, [key, value])
+    })
+    try {
+      expect(() => registry.setRemoteWithBinding('slot', { ...first, version: 2 }, 'new')).toThrow(
+        primary
+      )
+    } finally {
+      setter.mockRestore()
+    }
+    expect(registry.getRemote('slot')).toBe(first)
+    expect(registry.firstActiveRemote('target', activeReceiver)).toBe(first)
+    expect(registry.getRemoteBinding('slot')).toBe('old')
+    expect(released).toEqual(['new'])
+  })
+
+  it('[C8-H5-R4] records target routing data without reading an opaque snapshot getter', () => {
+    /** Generic remote values keep their original opacity at the commit boundary. */
+    const value = { receiverId: 'receiver', status: 'active' }
+    Object.defineProperty(value, 'targetId', {
+      get: () => {
+        throw new Error('opaque target getter must not run at index commit')
+      }
+    })
+    /** The caller supplies the same already-captured target data to the canonical owner. */
+    const registry = new DiscoveryRegistry()
+    expect(registry.setRemote('opaque', value, undefined, 'target')).toBe(true)
+    expect(registry.getRemote('opaque')).toBe(value)
+    expect(registry.firstActiveRemote('target', activeReceiver)).toBe(value)
+  })
+
   it('settles an automatic waiter and owns its collection timer', () => {
     const registry = new DiscoveryRegistry()
     const clear = vi.fn()
