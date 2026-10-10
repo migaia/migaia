@@ -1207,14 +1207,6 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       )
   }
 
-  /** Read the accepted remote generation without manufacturing a new binding or capture proof. */
-  runtimeTargetGeneration(targetId: string): IRpcRuntimeGeneration | undefined {
-    this.kernel.assertActive()
-    /** Describe already authenticated this exact response-source binding. */
-    const binding = this.#responseBindings.get(targetId)
-    return binding === undefined ? undefined : this.inboundIdentity.readResponseGeneration(binding)
-  }
-
   /** Provider execution reads the same local generation reference held by the original caller owner. */
   get runtimeGeneration(): IRpcRuntimeGeneration | undefined {
     return this.#runtimeGeneration
