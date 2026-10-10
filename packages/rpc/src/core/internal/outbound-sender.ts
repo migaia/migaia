@@ -76,6 +76,25 @@ const nativeBinaryJsonOverhead =
 /** Whole-object runtime carriers add only the fixed kind/frame selector around owned metadata. */
 const runtimeObjectJsonOverhead = JSON.stringify(wrapRuntimeCarrier(null)).length - 4
 
+/** The private physical batch wrapper has fixed ASCII keys and an initially empty member array. */
+const batchJsonOverhead = measureRpcPhysicalFrame({
+  kind: RpcBatchPhysical.kind,
+  [RpcBatchPhysical.members]: []
+})
+
+/** Immutable member snapshots contribute their existing one-walk bounds to the same batch record. */
+function ownedBatchByteUpperBound(entries: readonly IQueuedEnvelope[]): number | undefined {
+  /** Array brackets belong to the fixed wrapper; only separating commas are added here. */
+  let bound = batchJsonOverhead + Math.max(0, entries.length - 1)
+  for (const entry of entries) {
+    /** A custom/opaque member never inherits another envelope's owned snapshot proof. */
+    const member = outboundJsonByteUpperBound(entry.message)
+    if (member === undefined) return undefined
+    bound += member
+  }
+  return bound
+}
+
 /** An owned metadata bound charges every sidecar's original empty-object representation and bytes. */
 function ownedNativeBinaryByteUpperBound(
   metadata: unknown,
@@ -109,7 +128,12 @@ type IQueuedEnvelope = {
 }
 
 /** One complete encoded/protected physical value retains its exact logical settlements. */
-type IPreparedBatch = Readonly<{ entries: IQueuedEnvelope[]; value: unknown }>
+type IPreparedBatch = Readonly<{
+  entries: IQueuedEnvelope[]
+  value: unknown
+  /** Only immutable strings may reuse this pre-protection bound through an identity signer. */
+  byteUpperBound?: number
+}>
 
 /** The sender becomes idle in the same reaction as its final actual host-write settlement. */
 type IPhysicalDrain = { pending: number; preparing: boolean; finish(): void }
@@ -712,13 +736,24 @@ export class RpcOutboundSender {
         value = frames[0]
       }
       /** Singleton proofs skip byte scans; exact sizing retains this queue's original error policy. */
-      const bound = entries.length === 1 ? outboundJsonByteUpperBound(value) : undefined
-      if (
-        (bound === undefined || bound > this.#physicalLimit) &&
-        measureRpcPhysicalFrame(value) > this.#physicalLimit
-      )
-        return this.#splitBatch(entries)
-      return [{ entries, value }]
+      let bound =
+        typeof value === 'string'
+          ? value.length * 3
+          : entries.length === 1
+            ? outboundJsonByteUpperBound(value)
+            : this.#fast &&
+                !this.#objectPort &&
+                this.components.codec === identityCodecV1 &&
+                value === physical
+              ? ownedBatchByteUpperBound(entries)
+              : undefined
+      if (bound === undefined || bound > this.#physicalLimit) {
+        /** Inconclusive/custom values keep the original exact sizing and split decision. */
+        const measured = measureRpcPhysicalFrame(value)
+        if (measured > this.#physicalLimit) return this.#splitBatch(entries)
+        if (typeof value === 'string') bound = measured
+      }
+      return [{ entries, value, ...(typeof value === 'string' ? { byteUpperBound: bound } : {}) }]
     } catch (cause) {
       /** Existing native contract/authentication errors retain their original instances and causes. */
       const error =
@@ -775,7 +810,17 @@ export class RpcOutboundSender {
               this.#writeBatch([...this.#prepareBatch(current), ...frames.slice(index + 1)], drain)
               return
             }
-            if (measureRpcPhysicalFrame(value) > this.#physicalLimit) {
+            /** Opaque object signers retain exact sizing; strings have no mutable business graph. */
+            const bound =
+              typeof value === 'string'
+                ? value === frame.value
+                  ? frame.byteUpperBound
+                  : value.length * 3
+                : undefined
+            if (
+              (bound === undefined || bound > this.#physicalLimit) &&
+              measureRpcPhysicalFrame(value) > this.#physicalLimit
+            ) {
               this.#writeBatch([...this.#splitBatch(current), ...frames.slice(index + 1)], drain)
               return
             }

@@ -321,7 +321,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/contract/v1/route.ts',
       'src/contract/wire-constants.ts',
       'src/contract/unknown-field.ts',
-      'src/core/protocol-constants.ts'
+      'src/core/protocol-constants.ts',
+      'src/core/internal/inbound-normalization.ts'
     ),
     provider: reviewed(
       '\u0000vite/preload-helper.js',
@@ -512,7 +513,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/contract/wire-constants.ts',
       'src/contract/unknown-field.ts',
       'src/core/protocol-constants.ts',
-      'src/core/idempotency-store.ts'
+      'src/core/idempotency-store.ts',
+      'src/core/internal/inbound-normalization.ts'
     ),
     full: reviewed(
       '\u0000vite/preload-helper.js',
@@ -708,7 +710,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/contract/wire-constants.ts',
       'src/contract/unknown-field.ts',
       'src/core/protocol-constants.ts',
-      'src/core/idempotency-store.ts'
+      'src/core/idempotency-store.ts',
+      'src/core/internal/inbound-normalization.ts'
     ),
     custom: reviewed(
       '\u0000vite/preload-helper.js',
@@ -903,6 +906,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/contract/wire-constants.ts',
       'src/contract/unknown-field.ts',
       'src/core/protocol-constants.ts',
-      'src/core/idempotency-store.ts'
+      'src/core/idempotency-store.ts',
+      'src/core/internal/inbound-normalization.ts'
     )
   })
