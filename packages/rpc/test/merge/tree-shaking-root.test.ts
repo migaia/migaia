@@ -10,8 +10,8 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 /**
  * C10 pins the actual canonical root graph, including every dynamically emitted codec chunk.
  * Error-family ownership and bound ingress add 2430 raw bytes and 685 gzip bytes over C12. Receipt:
- * docs/rpc/scratch/core-refactor-impl/c10/graph-final/root.json. No headroom or A27 approval
- * is added.
+ * docs/rpc/scratch/core-refactor-impl/c10/graph-final/root.json. No headroom or A27 approval is
+ * added.
  */
 const allowedIncrease = {
   rawBytes: 367537 / legacyRoot.rawBytes,
