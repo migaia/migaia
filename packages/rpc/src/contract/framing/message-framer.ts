@@ -27,6 +27,13 @@ type IBuffer<TEncoded extends IEncoded> = {
   timer?: unknown
 }
 
+/** One existing source/message entry also serves as the bounded terminal-order key. */
+type ITerminalState = {
+  readonly source: string
+  readonly messageId: string
+  didExpire: boolean
+}
+
 type IFrameSnapshot = {
   readonly kind: unknown
   readonly messageId: unknown
@@ -131,34 +138,40 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
 ): IValidatedFramer<TEncoded, TEncoded | IFrame> {
   const options = snapshotOptions(input)
   const buffers = new Map<string, Map<string, IBuffer<TEncoded>>>()
-  const terminal = new Map<string, Map<string, boolean>>()
-  const terminalOrder: Array<readonly [string, string]> = []
+  /** Keep opaque source/message lookup separate from global eviction order. */
+  const terminal = new Map<string, Map<string, ITerminalState>>()
+  /** Map key order avoids scanning or moving the bounded recent-terminal entries. */
+  const terminalOrder = new Map<ITerminalState, undefined>()
   let bufferedBytes = 0
   let activeBuffers = 0
   let closed = false
   /** Retain only a bounded recent terminal history for late-frame rejection. */
   const markTerminal = (source: string, messageId: string, didExpire: boolean): void => {
+    /** The original nested owner keeps source/message pairs collision-free. */
     let sourceTerminal = terminal.get(source)
     if (!sourceTerminal) {
-      sourceTerminal = new Map<string, boolean>()
+      sourceTerminal = new Map<string, ITerminalState>()
       terminal.set(source, sourceTerminal)
     }
-    if (sourceTerminal.has(messageId)) {
-      const position = terminalOrder.findIndex(
-        ([orderedSource, orderedMessageId]) =>
-          orderedSource === source && orderedMessageId === messageId
-      )
-      if (position >= 0) terminalOrder.splice(position, 1)
+    /** Reuse the canonical entry so updating a terminal also refreshes its insertion order. */
+    let state = sourceTerminal.get(messageId)
+    if (state) {
+      terminalOrder.delete(state)
+      state.didExpire = didExpire
+    } else {
+      state = { source, messageId, didExpire }
+      sourceTerminal.set(messageId, state)
     }
-    sourceTerminal.set(messageId, didExpire)
-    terminalOrder.push([source, messageId])
-    while (terminalOrder.length > options.maxConcurrentMessages * 2) {
-      const oldest = terminalOrder.shift()
+    terminalOrder.set(state, undefined)
+    while (terminalOrder.size > options.maxConcurrentMessages * 2) {
+      /** The first Map key is the same oldest source/message pair the prior array retained. */
+      const oldest = terminalOrder.keys().next().value
       if (!oldest) break
-      const [oldestSource, oldestMessageId] = oldest
-      const oldestMap = terminal.get(oldestSource)
-      oldestMap?.delete(oldestMessageId)
-      if (oldestMap?.size === 0) terminal.delete(oldestSource)
+      terminalOrder.delete(oldest)
+      /** Remove only the corresponding nested source entry; other sources remain independent. */
+      const oldestMap = terminal.get(oldest.source)
+      oldestMap?.delete(oldest.messageId)
+      if (oldestMap?.size === 0) terminal.delete(oldest.source)
     }
   }
   const sourceBuffers = (source: string): Map<string, IBuffer<TEncoded>> => {
@@ -287,7 +300,7 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
       }
     const source = context.source
     const messageId = snapshot.messageId as string
-    const terminalState = terminal.get(source)?.get(messageId)
+    const terminalState = terminal.get(source)?.get(messageId)?.didExpire
     if (terminalState !== undefined)
       return {
         status: 'rejected',
@@ -336,17 +349,28 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
       }
     }
     if (buffer.next !== buffer.count) return { status: 'pending' }
-    const complete = buffer.parts.reduce<TEncoded>(
-      (all, part) => {
-        if (kind === 'string') return ((all as string) + (part as string)) as TEncoded
-        return concatBytes(all as Uint8Array, part as Uint8Array) as TEncoded
-      },
-      (kind === 'string' ? '' : new Uint8Array()) as TEncoded
-    )
-    if (lengthOf(complete) !== buffer.expectedLength) {
+    /** String length is checked after joining, preserving the original surrogate behavior. */
+    let complete = kind === 'string' ? ((buffer.parts as string[]).join('') as TEncoded) : undefined
+    /** Re-read actual binary lengths before allocating; declared totals never pad or overrun. */
+    let actualLength = complete === undefined ? 0 : lengthOf(complete)
+    if (kind === 'binary') {
+      for (const part of buffer.parts as Uint8Array[]) actualLength += part.byteLength
+    }
+    if (actualLength !== buffer.expectedLength) {
       clearBuffer(source, messageId)
       markTerminal(source, messageId, false)
       return { status: 'rejected', error: createContractError(RpcContractErrorCode.invalidFrame) }
+    }
+    if (complete === undefined) {
+      /** Allocate the final binary carrier once, only after the actual total is valid. */
+      const output = new Uint8Array(actualLength)
+      /** Each original fragment contributes exactly one ordered copy into the final carrier. */
+      let offset = 0
+      for (const part of buffer.parts as Uint8Array[]) {
+        output.set(part, offset)
+        offset += part.byteLength
+      }
+      complete = output as TEncoded
     }
     clearBuffer(source, messageId)
     markTerminal(source, messageId, false)
@@ -358,7 +382,7 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
       for (const messageId of sourceMap.keys()) clearBuffer(source, messageId)
     }
     terminal.clear()
-    terminalOrder.length = 0
+    terminalOrder.clear()
   }
   /** Records the actual native output union without inferring it from descriptor metadata. */
   const nativeOutputDomain: IRpcNativeFrameOutputDomain = Object.freeze({
@@ -401,14 +425,6 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
     accept,
     close
   }) as IValidatedFramer<TEncoded, TEncoded | IFrame>
-}
-
-/** Concatenates binary fragments without exposing a host-specific buffer API. */
-function concatBytes(left: Uint8Array, right: Uint8Array): Uint8Array {
-  const output = new Uint8Array(left.byteLength + right.byteLength)
-  output.set(left)
-  output.set(right, left.byteLength)
-  return output
 }
 
 /** Snapshot every frame field once so validation cannot race hostile accessors. */
