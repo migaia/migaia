@@ -113,7 +113,12 @@ describe('process channel boundary', () => {
       value: 'ok'
     })
     expect(() => remoteProcessStringFramer.frame(7, context)).toThrowError(
-      expect.objectContaining({ source: '@migaia/rpc/core', code: 'PAYLOAD_INVALID' })
+      expect.objectContaining({
+        name: 'TypeError',
+        message: 'process channel requires a string encoded value',
+        source: '@migaia/rpc/contract',
+        code: 'INVALID_FRAME'
+      })
     )
   })
 

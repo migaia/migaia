@@ -28,12 +28,17 @@ export type IRpcBoundFrameIngress<TFrame> = ((
   context: IRpcFrameContext
 ) => IRpcPreparedFrame<TFrame>) & {
   readonly nativeOutputDomain?: IRpcNativeFrameOutputDomain
+  /** Construction limits belong to the exact native pair used by this ingress. */
+  readonly singleFrameLimits?: Readonly<{
+    maxConcurrentMessages: number
+    maxMessageBytes: number
+  }>
 }
 /** Stable context identifier for opaque custom frames with no native fragment identity. */
 const RpcWholeFrameMessageId = 'whole'
 
 /** Actual constructor facts bound candidate retention and complete single-frame admission. */
-export type IRpcSingleFrameFacts = Readonly<{
+type IRpcSingleFrameFacts = Readonly<{
   maxConcurrentMessages: number
   maxMessageBytes: number
 }>
@@ -66,7 +71,7 @@ export function registerRpcSingleFrameFacts(
 }
 
 /** Copies of the actual pair retain facts; a wrapped or opaque callable cannot invent them. */
-export function readRpcSingleFrameFacts(
+function readRpcSingleFrameFacts(
   accept: Function,
   frame: Function
 ): IRpcSingleFrameFacts | undefined {
@@ -107,6 +112,15 @@ export function bindRpcFrameIngress<TFrame, TEncoded>(
   if (nativeOutputDomain)
     Object.defineProperty(bound, 'nativeOutputDomain', {
       value: nativeOutputDomain,
+      enumerable: true,
+      configurable: false,
+      writable: false
+    })
+  /** Keep paired-callable membership inside normal ingress construction. */
+  const singleFrameLimits = frame ? readRpcSingleFrameFacts(accept, frame) : undefined
+  if (singleFrameLimits)
+    Object.defineProperty(bound, 'singleFrameLimits', {
+      value: singleFrameLimits,
       enumerable: true,
       configurable: false,
       writable: false

@@ -3,6 +3,7 @@ import { it } from 'vitest'
 import { identityCodecV1 } from '@migaia/serialize/codec'
 import { rpcProtocolV1 } from '../../src/contract/index.js'
 import { messageFramerV1 } from '../../src/contract/framing/message-framer.js'
+import { bindRpcFrameIngress } from '../../src/contract/framing/index.js'
 import { measureRpcPhysicalFrame } from '../../src/contract/batch-frame.js'
 import {
   createOutboundEnvelope,
@@ -50,7 +51,7 @@ for (const size of [64 * 1024, 1024 * 1024]) {
       protocol: rpcProtocolV1,
       codec: identityCodecV1 as IRpcSelectedComponents['codec'],
       framer: messageFramerV1,
-      ingressPrepare: (frame) => ({ frame, messageId: 'whole' }),
+      ingressPrepare: bindRpcFrameIngress(messageFramerV1.accept, messageFramerV1.frame),
       shadowed: []
     }
     proveFastComponents(components, rpcProtocolV1, identityCodecV1, messageFramerV1)

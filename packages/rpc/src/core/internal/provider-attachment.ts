@@ -25,7 +25,7 @@ import {
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import type { IInboundIdentityAdmission } from './inbound-identity.js'
 import { EndpointOwnerKey, type IEndpointKernelHost } from '../endpoint-kernel.js'
-import { readRpcSingleFrameFacts } from '../../contract/framing/reassembler.js'
+
 import type {
   IRpcInboundIdentityPort,
   IRpcOutboundOperationsPort,
@@ -131,10 +131,8 @@ export class RpcProviderAttachment {
         : prepared.id
     this.#abortEnabled = prepared.options.features?.abort === true
     /** Capacity comes from the actual selected framer, never a caller-provided ingress number. */
-    const maxIngress = readRpcSingleFrameFacts(
-      prepared.options.components!.framer.accept,
-      prepared.options.components!.framer.frame
-    )?.maxConcurrentMessages
+    const maxIngress =
+      prepared.options.components!.ingressPrepare.singleFrameLimits?.maxConcurrentMessages
     this.#admission = new ProviderAdmissionRegistry(
       prepared.options.providerLimits?.maxGlobal ?? 256,
       prepared.options.providerLimits?.maxPerPeer ?? 64,

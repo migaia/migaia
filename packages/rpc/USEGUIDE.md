@@ -59,6 +59,8 @@ quota.constrain(32, 8)
 
 SPI 是稳定性层级，任何调用方都可导入；调用 codec、读取 DTO 或复制回调不会建立其它 process/channel/Host 的操作权。未知/custom 路径仍执行原完整校验。
 
+String framer 接收到非字符串 encoded value 时保留原 native `TypeError` 与文本 `process channel requires a string encoded value`，错误身份为 `@migaia/rpc/contract / INVALID_FRAME`；此前针对这一场景的 `@migaia/rpc/core / PAYLOAD_INVALID` 分支需改用该身份。其它 payload 失败保持原 Core 身份。
+
 ## 类型
 
 不提供 Remote 泛型时，没有可调用的远端方法类型。声明远端函数树后，request 保留路径、参数与结果类型；stream 只接受迭代器方法。`IRuntimeSurface<THost,TPlugin>` 从现有 Host tuple、provide、expose 提取纯类型，不创建运行时目录。显式 Remote 泛型与精确 name/expose/Host 类型同时需要时，显式填写其余泛型，沿 TypeScript 的部分推导规则。
