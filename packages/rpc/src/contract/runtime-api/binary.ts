@@ -299,7 +299,11 @@ export async function prepareRpcBinary(
   storage: RpcBinaryStorage,
   limit = RpcBatchPhysical.maxBytes,
   digest?: IRpcBinaryDigest,
-  beforeDigest?: (manifest: IRpcBinaryManifest, backingBytes: number) => void
+  beforeDigest?: (manifest: IRpcBinaryManifest, backingBytes: number) => void,
+  encoding?: Readonly<{
+    encodeInline?: (bytes: Uint8Array) => string
+    capture: (manifest: IRpcBinaryManifest, roots: ReadonlyMap<object, number>) => void
+  }>
 ): Promise<IRpcPreparedBinary> {
   try {
     if (!Object.values(RpcBinaryStorage).includes(storage)) invalid()
@@ -319,6 +323,23 @@ export async function prepareRpcBinary(
     const consume = budget(limit)
     /** Full backing bytes are retained for the original sender's exact physical-size accounting. */
     let backingBytes = 0
+    /** A held byte encoder is supplied by the original platform adapter, never inferred here. */
+    const encodeInline = encoding?.encodeInline ?? encodeBytes
+    /** Only business roots survive the walk; no persistent per-node registry is introduced. */
+    const capturedRoots = encoding ? new Map<object, number>() : undefined
+    /** JSON bounds are accumulated as tag tuples are constructed, without a later sizing walk. */
+    let jsonByteUpperBound = 0
+    /** Inline JSON owns its constructed tags; native signer inputs retain their original mutability. */
+    const immutableInline = encoding !== undefined && storage === RpcBinaryStorage.inline
+    /**
+     * Owned Core preparation freezes only newly constructed inline tags, never caller
+     * backings/views.
+     */
+    const publish = (tuple: IRpcPortableValue[], ownBound: number): IRpcPortableValue => {
+      if (!encoding) return tuple
+      jsonByteUpperBound += ownBound
+      return immutableInline ? Object.freeze(tuple) : tuple
+    }
     const index = (backing: ArrayBuffer): number => {
       const known = indices.get(backing)
       if (known !== undefined) return known
@@ -332,57 +353,100 @@ export async function prepareRpcBinary(
     }
     const encode = (value: unknown, depth = 0): IRpcPortableValue => {
       if (depth > RPC_PORTABLE_MAX_DEPTH) invalid()
-      if (value === null) return [T.null]
-      if (typeof value === 'boolean') return [T.boolean, value]
+      if (value === null) return publish([T.null], T.null.length + 4)
+      if (typeof value === 'boolean') return publish([T.boolean, value], T.boolean.length + 10)
       if (typeof value === 'number') {
         if (!Number.isFinite(value)) invalid()
-        return [T.number, value]
+        return publish([T.number, value], T.number.length + 37)
       }
-      if (typeof value === 'string') return [T.string, value]
+      if (typeof value === 'string')
+        return publish([T.string, value], T.string.length + value.length * 6 + 7)
       if (isArrayBuffer(value)) {
-        if (storage === RpcBinaryStorage.native) return [T.buffer, index(value)]
+        if (storage === RpcBinaryStorage.native)
+          return publish([T.buffer, index(value)], T.buffer.length + 37)
         consume(rpcBinaryBackingLength(value))
-        return [T.buffer, encodeBytes(new Uint8Array(value).slice())]
+        /** The original inline capture occurs before the first asynchronous digest handoff. */
+        const encoded = encodeInline(new Uint8Array(value).slice())
+        return publish([T.buffer, encoded], T.buffer.length + encoded.length + 7)
       }
       if (isUint8Array(value)) {
         const selected = rpcBinaryView(value)
         if (storage === RpcBinaryStorage.native)
-          return [T.uint8array, index(selected.backing), selected.offset, selected.length]
+          return publish(
+            [T.uint8array, index(selected.backing), selected.offset, selected.length],
+            T.uint8array.length + 103
+          )
         consume(selected.offset + selected.length)
-        return [
-          T.uint8array,
-          selected.offset,
-          encodeBytes(new Uint8Array(selected.backing, selected.offset, selected.length).slice())
-        ]
+        /** The visible-byte snapshot retains the original offset and zero-prefix semantics. */
+        const encoded = encodeInline(
+          new Uint8Array(selected.backing, selected.offset, selected.length).slice()
+        )
+        return publish(
+          [T.uint8array, selected.offset, encoded],
+          T.uint8array.length + encoded.length + 40
+        )
       }
       if (!value || typeof value !== 'object' || active.has(value)) invalid()
       active.add(value)
       try {
-        if (Array.isArray(value))
-          return [T.array, array(value).map((item) => encode(item, depth + 1))]
+        if (Array.isArray(value)) {
+          /** Dense children retain their original codec order, each visited exactly once. */
+          const children = array(value).map((item) => encode(item, depth + 1))
+          return publish(
+            [T.array, immutableInline ? Object.freeze(children) : children],
+            T.array.length + 7 + Math.max(0, children.length - 1)
+          )
+        }
+        /** The original closed record capture and canonical field sort remain the sole owner. */
         const data = record(value)
-        return [T.object, keys(data).map((key) => [key, encode(data[key], depth + 1)])]
+        /** Pair delimiters and escaped key bounds are charged during the same business walk. */
+        let keyBound = 0
+        /** Independent repeated references keep their existing independently encoded tuples. */
+        const children = keys(data).map((key) => {
+          keyBound += key.length * 6 + 5
+          /** Only constructed pair containers are frozen for the private owned JSON capture. */
+          const pair = [key, encode(data[key], depth + 1)]
+          return immutableInline ? Object.freeze(pair) : pair
+        })
+        return publish(
+          [T.object, immutableInline ? Object.freeze(children) : children],
+          T.object.length + 7 + Math.max(0, children.length - 1) + keyBound
+        )
       } finally {
         active.delete(value)
       }
     }
     /** Header/task/errors remain in the original grammar; only its portable slots call this codec. */
-    const envelope = normalizeRuntimeEnvelope(message, encode)
+    const envelope = normalizeRuntimeEnvelope(
+      message,
+      capturedRoots
+        ? (value) => {
+            /** Each top-level portable slot records only its own constructed subtree bound. */
+            const before = jsonByteUpperBound
+            /** Recursive encode remains the original canonical binary visitor. */
+            const encoded = encode(value)
+            if (encoded !== null && typeof encoded === 'object')
+              capturedRoots.set(encoded, jsonByteUpperBound - before)
+            return encoded
+          }
+        : encode
+    )
     if (storage === RpcBinaryStorage.native && !digest) invalid()
     /** The original sender can prove the selected codec's full metadata budget before any hash. */
-    if (storage === RpcBinaryStorage.native && beforeDigest)
-      beforeDigest(
-        {
-          profile: RpcBinaryProfile,
-          storage,
-          envelope,
-          backings: sidecars.map((backing) => ({
-            byteLength: rpcBinaryBackingLength(backing),
-            sha256: '0'.repeat(64)
-          }))
-        },
-        backingBytes
-      )
+    if (storage === RpcBinaryStorage.native && beforeDigest) {
+      /** The real metadata geometry is known before hashing; SHA strings always have length 64. */
+      const manifest: IRpcBinaryManifest = {
+        profile: RpcBinaryProfile,
+        storage,
+        envelope,
+        backings: sidecars.map((backing) => ({
+          byteLength: rpcBinaryBackingLength(backing),
+          sha256: '0'.repeat(64)
+        }))
+      }
+      if (encoding && capturedRoots) encoding.capture(manifest, capturedRoots)
+      beforeDigest(manifest, backingBytes)
+    }
     /** All hashes cover complete original backings after the synchronous graph/budget checks. */
     const backings: IRpcBinaryBacking[] = []
     for (const backing of sidecars)
@@ -392,13 +456,16 @@ export async function prepareRpcBinary(
           sha256: digestString(await digest!(backing))
         })
       )
+    /** The visible public result retains its original fields, prototypes and insertion order. */
+    const manifest: IRpcBinaryManifest = Object.freeze({
+      profile: RpcBinaryProfile,
+      storage,
+      envelope,
+      backings: Object.freeze(backings)
+    })
+    if (encoding && capturedRoots) encoding.capture(manifest, capturedRoots)
     return Object.freeze({
-      manifest: Object.freeze({
-        profile: RpcBinaryProfile,
-        storage,
-        envelope,
-        backings: Object.freeze(backings)
-      }),
+      manifest,
       sidecars: Object.freeze(sidecars),
       backingBytes
     })

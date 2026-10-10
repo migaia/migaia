@@ -38,8 +38,14 @@ import {
 } from '../../contract/runtime-api/binary.js'
 import { RpcBinaryStorage } from '../../contract/runtime-api/binary-constants.js'
 import { RpcNativeBinaryKind } from '../../contract/runtime-api/binary-constants.js'
-import { hasFastComponents } from './fast-path.js'
+import { hasFastComponents, readFastInlineEncoder } from './fast-path.js'
+import {
+  prepareOwnedJsonSnapshot,
+  prepareOwnedBinaryJsonSnapshot,
+  readOwnedJsonSnapshot
+} from './outbound-owned-codec.js'
 import { isArrayBuffer } from '@migaia/utils/bytes'
+import { identityCodecV1 } from '@migaia/serialize/codec'
 import {
   measureRpcPhysicalFrame,
   assertRpcPhysicalFrameSize,
@@ -60,6 +66,32 @@ import {
 import { RpcRuntimeKind } from '../../contract/runtime-api/constants.js'
 import type { IRpcRuntimeEnvelope } from '../../contract/runtime-api/types.js'
 import { readRpcSingleFrameFacts } from '../../contract/framing/reassembler.js'
+
+/** Fixed native selector/wrapper JSON geometry excludes only the protected metadata slot. */
+const nativeBinaryJsonOverhead =
+  JSON.stringify(
+    wrapRuntimeCarrier({ kind: RpcNativeBinaryKind, protectedMetadata: null, sidecars: [] })
+  ).length - 4
+
+/** Whole-object runtime carriers add only the fixed kind/frame selector around owned metadata. */
+const runtimeObjectJsonOverhead = JSON.stringify(wrapRuntimeCarrier(null)).length - 4
+
+/** An owned metadata bound charges every sidecar's original empty-object representation and bytes. */
+function ownedNativeBinaryByteUpperBound(
+  metadata: unknown,
+  sidecarCount: number,
+  backingBytes: number
+): number | undefined {
+  /** Opaque/custom protection output retains the original exact measurement below. */
+  const prepared = readOwnedJsonSnapshot(metadata)
+  return prepared
+    ? nativeBinaryJsonOverhead +
+        prepared.byteUpperBound +
+        sidecarCount * 2 +
+        Math.max(0, sidecarCount - 1) +
+        backingBytes
+    : undefined
+}
 
 /** One logical settlement remains owned until its actual physical write completes. */
 type IQueuedEnvelope = {
@@ -305,7 +337,20 @@ export class RpcOutboundSender {
        * overhead.
        */
       let backingBytes = 0
+      /** Only the actual canonical string encoding retains a bound for its returned text. */
+      let encodedByteUpperBound: number | undefined
       try {
+        /**
+         * Only the exact canonical string codec consumes an owned JSON view; custom codecs stay
+         * full.
+         */
+        const ownedJson =
+          hasFastComponents(this.components) && this.components.codec.encodedType === 'string'
+        /** Worker keeps the original object; its exact canonical identity function needs no copy. */
+        const ownedIdentity =
+          hasFastComponents(this.components) &&
+          this.#objectPort === undefined &&
+          this.components.codec.encode === identityCodecV1.encode
         const prepared =
           binary || transferRequested
             ? await prepareRpcBinary(
@@ -314,6 +359,14 @@ export class RpcOutboundSender {
                 limit,
                 digest,
                 (manifest, bytes) => {
+                  /** Owned metadata geometry is captured before any hash; no dummy codec pass. */
+                  const bound = ownedNativeBinaryByteUpperBound(
+                    manifest,
+                    manifest.backings.length,
+                    bytes
+                  )
+                  if (bound !== undefined && bound <= limit) return
+                  /** An inconclusive bound preserves the original codec/exact-size/error path. */
                   const metadata = (this.#objectPort?.codec ?? this.components.codec).encode(
                     manifest as unknown as IRpcEnvelope
                   )
@@ -321,7 +374,13 @@ export class RpcOutboundSender {
                     measureRpcNativeBinaryFrame(metadata, manifest.backings.length, bytes) > limit
                   )
                     rejectRpcPhysicalFrameSize()
-                }
+                },
+                hasFastComponents(this.components)
+                  ? {
+                      encodeInline: readFastInlineEncoder(this.components),
+                      capture: prepareOwnedBinaryJsonSnapshot
+                    }
+                  : undefined
               )
             : undefined
         if (prepared) {
@@ -330,14 +389,24 @@ export class RpcOutboundSender {
           if (transfer?.some((backing) => !sidecars.includes(backing as ArrayBuffer)))
             throw new RpcSerializationError(RpcCoreErrorText.invalidTransferList)
         }
+        /**
+         * Ordinary large values get one owned JSON walk; binary preparation already retained its
+         * view.
+         */
+        const selected = prepared?.manifest ?? envelope
+        if ((ownedJson || ownedIdentity) && !prepared) prepareOwnedJsonSnapshot(selected)
         encoded = (this.#objectPort?.codec ?? this.components.codec).encode(
-          (prepared?.manifest ?? envelope) as unknown as IRpcEnvelope
+          selected as unknown as IRpcEnvelope
         )
+        if (ownedJson || (hasFastComponents(this.components) && encoded === selected))
+          encodedByteUpperBound = readOwnedJsonSnapshot(selected)?.byteUpperBound
         if (!this.#objectPort) this.assertProtocolEncodedType(encoded)
       } catch (cause) {
         throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
       }
-      assertRpcPhysicalFrameSize(encoded, limit)
+      /** Known string encodings reuse their preparation bound without a second character scan. */
+      if (!(encodedByteUpperBound !== undefined && encodedByteUpperBound <= limit))
+        assertRpcPhysicalFrameSize(encoded, limit)
       /** Native framing runs once; multiple fragments are refused before protection or host send. */
       const frames = framer.frame(encoded, { source: this.id, messageId: envelope.id })
       if (frames.length !== 1)
@@ -380,12 +449,29 @@ export class RpcOutboundSender {
           ? { kind: RpcNativeBinaryKind, protectedMetadata: protectedValue, sidecars }
           : protectedValue
       )
-      if (
-        (native
-          ? measureRpcNativeBinaryFrame(protectedValue, sidecars.length, backingBytes)
-          : measureRpcPhysicalFrame(carrier)) > limit
-      )
-        rejectRpcPhysicalFrameSize()
+      /** Real post-protection string/byte lengths are safe bounds without inspecting payload text. */
+      const finalBound = native
+        ? this.authentication
+          ? undefined
+          : ownedNativeBinaryByteUpperBound(protectedValue, sidecars.length, backingBytes)
+        : typeof carrier === 'string'
+          ? carrier.length * 3
+          : isUint8Array(carrier)
+            ? carrier.byteLength
+            : !this.authentication &&
+                protectedValue === encoded &&
+                encodedByteUpperBound !== undefined
+              ? runtimeObjectJsonOverhead + encodedByteUpperBound
+              : undefined
+      if (finalBound === undefined || finalBound > limit) {
+        /** Custom signer objects and inconclusive bounds retain complete original physical sizing. */
+        if (
+          (native
+            ? measureRpcNativeBinaryFrame(protectedValue, sidecars.length, backingBytes)
+            : measureRpcPhysicalFrame(carrier)) > limit
+        )
+          rejectRpcPhysicalFrameSize()
+      }
       /** The original result owner can seal only this fully valid frame, before physical commit. */
       await onPrepared?.()
       return this.#sendPreparedTransport(

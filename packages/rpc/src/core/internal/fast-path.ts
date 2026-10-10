@@ -12,12 +12,20 @@ const codecs = new WeakSet<object>([identityCodecV1])
 const framers = new WeakSet<object>([messageFramerV1])
 /** Proof transfers from original identities to the single immutable component snapshot. */
 const components = new WeakSet<object>()
+/** Actual native encoder resources belong to canonical codec identities, never metadata flags. */
+const inlineEncoders = new WeakMap<object, (bytes: Uint8Array) => string>()
+/** Final component admission retains the encoder held by its exact original codec owner. */
+const componentInlineEncoders = new WeakMap<object, (bytes: Uint8Array) => string>()
 /** Proof belongs to final endpoint options; public configuration never carries a trust flag. */
 const endpoints = new WeakSet<object>()
 
 /** Registers the exact foundational codec without adding a public option or descriptor property. */
-export function registerFastCodec<T extends object>(codec: T): T {
+export function registerFastCodec<T extends object>(
+  codec: T,
+  inlineEncoder?: (bytes: Uint8Array) => string
+): T {
   codecs.add(codec)
+  if (inlineEncoder) inlineEncoders.set(codec, inlineEncoder)
   return codec
 }
 
@@ -42,8 +50,12 @@ export function proveFastComponents(
     typeof framer === 'object' &&
     framer !== null &&
     framers.has(framer)
-  )
+  ) {
     components.add(snapshot)
+    /** An absent resource retains the existing pure encoder rather than inventing a host claim. */
+    const encoder = inlineEncoders.get(codec)
+    if (encoder) componentInlineEncoders.set(snapshot, encoder)
+  }
 }
 
 /** Finalizes eligibility after ordinary validation; unknown/custom/authenticated paths stay full. */
@@ -89,4 +101,11 @@ export function hasFastEndpoint(options: object): boolean {
 /** Batch grouping reuses component provenance even when authentication requires the full path. */
 export function hasFastComponents(snapshot: object): boolean {
   return components.has(snapshot)
+}
+
+/** Read only the actual encoder retained during canonical component admission. */
+export function readFastInlineEncoder(
+  snapshot: object
+): ((bytes: Uint8Array) => string) | undefined {
+  return componentInlineEncoders.get(snapshot)
 }

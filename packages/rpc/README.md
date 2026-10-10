@@ -86,6 +86,8 @@ provider 并发默认每 peer 64、全局 256；同时进行的 request/notify/s
 
 ArrayBuffer / Uint8Array 使用双方实际 binary profile。线程显式 transfer 还要求真正 native clone-transfer 与受支持的 sign-only manifest；process 不接受 own transfer 字段，空数组或 undefined 也拒绝。physical commit 后 buffer 及共享 backing 的 views 会 detach；后续失败不能恢复，禁止自动重放，不保留隐藏输入备份。支持组合和 C10 实测边界见 [USEGUIDE](./USEGUIDE.md#二进制和-transfer)，不宣称零复制。
 
+process inline 保留原 base64 wire：Uint8Array 仅携带可见 bytes，接收端恢复原 offset 与零前缀；native manifest 保留完整 backing、alias 与 digest。大载荷复用已拥有的 JSON 准备结果，能力选择与 transfer 规则不变。
+
 透明转发只公开显式 expose 的 accepted route，每跳固定实际 generation，最多三层；下一跳鉴权直接上一跳。性能固有成本不能成为绕过白名单、portable admission、replay 或 deadline 的理由。
 
 非独占载体按 receiver 身份绑定 challenge；SIEVE 管理驻留会话。SESSION_UNKNOWN 是 AUTHENTICATION_FAILED 的本地 rejection reason：只清对应 challenge 缓存，未来新调用重新发现，不自动重放旧业务帧。receiver 重启不能证明业务未执行。 CHALLENGE_INVALID 同属 AUTHENTICATION_FAILED 的本地拒绝 reason，表示 challenge 字段语法或方向非法；修帧合同，不盲重试，也不是新的顶层 code。
