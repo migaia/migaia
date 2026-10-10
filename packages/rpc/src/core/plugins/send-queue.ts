@@ -1,3 +1,4 @@
+import { RpcOutboundAdmission } from '../internal/outbound-gate.js'
 import { registerJsonObjectFeature } from '../internal/json-object-port.js'
 import { carryNativeReplayTransport } from '../internal/native-replay.js'
 import {
@@ -10,7 +11,7 @@ import { createEventChannel } from '@migaia/event-subscriber'
 import { createConcurrencyLimiter, hostRethrowReporter } from '@migaia/utils/promise'
 import { RpcStreamEvent } from '../../contract/index.js'
 import type { IRpcEnvelope, IRpcRuntimeEnvelope } from '../../contract/index.js'
-import { RpcRuntimeKind, RpcRuntimeOperation } from '../../contract/runtime-api/constants.js'
+import { RpcRuntimeKind, RpcRuntimeOperation } from '../../contract/framing/v1.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import { RpcCoreErrorCode } from '../error-code.js'
 import { RpcError, RpcLifecycleError, tagRpcError } from '../errors.js'
@@ -220,7 +221,9 @@ export function createIpcSendQueueFeature(
         } catch (error) {
           send = Promise.reject(error)
         }
-      } else
+      } else {
+        /** This existing concurrency-one lane requires a child signal only when it actually queues. */
+        const waiting = limiter.activeCount > 0 || limiter.pendingCount > 0
         send = limiter.run(
           async () => {
             admission?.assertCanSend()
@@ -231,8 +234,11 @@ export function createIpcSendQueueFeature(
               active = null
             }
           },
-          admission?.queueSignal === undefined ? undefined : { signal: admission.queueSignal }
+          RpcOutboundAdmission.queuedSignal(admission, waiting) === undefined
+            ? undefined
+            : { signal: RpcOutboundAdmission.queuedSignal(admission, waiting) }
         )
+      }
       /** Capacity and reporting retain their original per-envelope settlement boundary. */
       const settled = send
         .catch((error: unknown) => {

@@ -1,16 +1,17 @@
 import { createContractError } from '../contract/contract-error.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { resolveAbortReason } from '../core/internal/async-control.js'
-import { RpcContractErrorCode } from '../contract/error-code.js'
-import { RpcHandshakeStep, RpcReservedKind, RpcCapability } from '../contract/wire-constants.js'
+import { RpcContractErrorCode } from '../contract/index.js'
+import { RpcHandshakeStep, RpcReservedKind, RpcCapability } from '../contract/index.js'
+import { createRpcStreamFrameDecoderWithLimit } from '../contract/framing/stream.js'
+import { encodeRpcStreamTextFrame } from '../contract/framing/stream.js'
 import {
-  createRpcStreamFrameDecoderWithLimit,
-  encodeRpcStreamFrame,
   RPC_STREAM_MAX_FRAME_BYTES,
   type IRpcStreamFrameDecoder
-} from '../contract/framing/stream.js'
-import { RpcCoreErrorCode, tagRpcError } from '../core/errors.js'
-import type { IRpcTransport } from '../core/transport.js'
+} from '../contract/framing/stream-index.js'
+import { RpcCoreErrorCode } from '../core/index.js'
+import { tagRpcError } from '../core/transport-kit.js'
+import type { IRpcTransport } from '../core/index.js'
 import {
   RpcPlatform,
   RpcTransportEncoding,
@@ -114,8 +115,12 @@ export function bindProcessByteWire(
   let peerId = options.peerId
   /** The strict decoder rejects invalid UTF-8 rather than replacing bytes. */
   const textDecoder = new TextDecoder('utf-8', { fatal: true })
-  /** Frame writes each allocate one prefix plus UTF-8 payload. */
+  /** The process text encoder writes UTF-8 directly behind the frame prefix. */
   const textEncoder = new TextEncoder()
+  /** One small backing can be reused only after its previous physical writer completed. */
+  let drainedFrame: Uint8Array | undefined
+  /** Large frames remain supported; this cap bounds only the connection's retained backing. */
+  const MAX_RETAINED_FRAME_BYTES = 64 * 1024
   /** Business listeners become active only after the control handshake completes. */
   const listeners = new Set<(message: { data: unknown; peerId: string }) => void>()
   /** Default byte wires never enter this additional cold subscription phase. */
@@ -169,6 +174,7 @@ export function bindProcessByteWire(
   const terminate = (reason?: unknown): Promise<void> => {
     if (closing) return closing
     closed = true
+    drainedFrame = undefined
     terminalError = reason ?? createProcessError(RpcProcessErrorCode.channelClosed)
     decoder.close()
     handshakeWaiter?.reject(terminalError)
@@ -328,8 +334,20 @@ export function bindProcessByteWire(
   /** A byte write settles on physical drain; later rejection is still observed and reported. */
   const writeText = (value: string): Promise<void> => {
     if (closed) return Promise.reject(terminalError)
+    /** Taking the sole drained backing gives concurrent writes independent storage. */
+    const available = drainedFrame
+    drainedFrame = undefined
     /** Invalid runtime values are rejected before any physical frame is sent. */
-    const bytes = encodeRpcStreamFrame(textEncoder.encode(asProcessString(value)))
+    const bytes = encodeRpcStreamTextFrame(asProcessString(value), textEncoder, available)
+    /** Actual write settlement is the sole release point, including late settlement after close. */
+    const releaseFrame = (): void => {
+      if (
+        !closed &&
+        drainedFrame === undefined &&
+        bytes.buffer.byteLength <= MAX_RETAINED_FRAME_BYTES
+      )
+        drainedFrame = new Uint8Array(bytes.buffer)
+    }
     return new Promise<void>((resolve, reject) => {
       /** The record lets close reject even if a physical writer never drains. */
       const pending: IPendingWrite = { settled: false, reject }
@@ -349,12 +367,14 @@ export function bindProcessByteWire(
       } else result = Promise.resolve().then(invoke)
       void Promise.resolve(result).then(
         () => {
+          releaseFrame()
           pendingWrites.delete(pending)
           if (pending.settled) return
           pending.settled = true
           resolve()
         },
         (error: unknown) => {
+          releaseFrame()
           pendingWrites.delete(pending)
           if (pending.settled) {
             report(error)

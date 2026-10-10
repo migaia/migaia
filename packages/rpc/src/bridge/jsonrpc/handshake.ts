@@ -4,18 +4,18 @@ import {
   completeRpcHandshake,
   type IRpcHandshakeOffer,
   type IRpcHandshakeAgreement
-} from '../../contract/handshake.js'
-import { RpcCodecId } from '../../contract/wire-constants.js'
+} from '../../contract/index.js'
+import { RpcCodecId } from '../../contract/index.js'
 import {
   normalizeRemoteContract,
   normalizeRemoteHostCatalog,
   type IRemoteContract,
   type IRemoteHostCatalog
-} from '../../remote/contract.js'
+} from '../../remote/index.js'
 import { contractRequiresStream } from '../../remote/serve-methods.js'
-import { normalizeRuntimeDescription } from '../../remote/runtime-api/description.js'
-import { RuntimeApiMode } from '../../remote/runtime-api/constants.js'
-import type { IProcessByteChannel, IProcessCommonOptions } from '../../process/types.js'
+import { normalizeRuntimeDescription } from '../../remote/spi.js'
+import { RuntimeApiMode } from '../../remote/index.js'
+import type { IProcessByteChannel, IProcessCommonOptions } from '../../process/index.js'
 import {
   JSONRPC_ALLOWED_CAPABILITIES,
   JSONRPC_REQUIRED_CAPABILITIES,

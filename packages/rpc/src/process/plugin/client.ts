@@ -1,8 +1,4 @@
-import type {
-  IRuntimePluginTyping,
-  IRuntimeExpose,
-  IRuntimeRegistry
-} from '../../remote/runtime-api/typing.js'
+import type { IRuntimePluginTyping, IRuntimeExpose, IRuntimeRegistry } from '../../remote/index.js'
 import { createProcessResilience } from '../resilience/index.js'
 import type { IProcessRegistration } from '../resilience/types.js'
 import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
@@ -10,9 +6,9 @@ import type { IPluginBeforeReleaseContext } from '@migaia/plugin-host'
 import { ReplaceStrategy } from '@migaia/supervision'
 import { SUPERVISION_SOURCE, SupervisionErrorCode, SupervisionErrorText } from '@migaia/supervision'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { normalizeRemoteContract } from '../../remote/contract.js'
+import { normalizeRemoteContract } from '../../remote/index.js'
 import { assembleRemotePluginDefinition } from '../../remote/internal/assemble-plugin.js'
-import type { IRemoteEndpointFactory } from '../../remote/types.js'
+import type { IRemoteEndpointFactory } from '../../remote/index.js'
 import {
   createConnectProcessBinding,
   createSpawnProcessBinding,
@@ -27,9 +23,16 @@ import type {
   IProcessPluginOptions,
   IProcessPluginReplaceResult
 } from './types.js'
-import { createRuntimePlugin, type IRuntimePluginOptions } from '../../remote/runtime-api/plugin.js'
+import { createRuntimePlugin, type IRuntimePluginOptions } from '../../remote/index.js'
+import { RuntimePluginKey } from '../../remote/index.js'
 import { createProcessPeer } from '../peer.js'
 import type { IRuntimeProcessPeerOptions } from '../runtime-peer.js'
+
+/** This physical owner alone retains the stable family token for its actual Host slot operation. */
+const processRuntimeSlotFamily = Object.freeze({})
+
+/** Capture the canonical namespace once; descriptive resource fields cannot retarget this operation. */
+const processRuntimeSlotKey = RuntimePluginKey.process
 
 /** Symmetric Plugin options reuse the process Peer source boundary and canonical Feature exposure. */
 export type IRuntimeProcessPluginOptions = IRuntimePluginOptions<
@@ -74,10 +77,7 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
 /** Adds one symmetric connection to the canonical process slot. */
 export function createProcessPlugin<
   TRemote = Record<never, never>,
-  const TProvide extends import('../../remote/runtime-api/catalog.js').IRuntimePeerProvide = Record<
-    never,
-    never
-  >,
+  const TProvide extends import('../../remote/index.js').IRuntimePeerProvide = Record<never, never>,
   const TName extends string = string,
   const TExpose extends readonly string[] = readonly [],
   THost = unknown
@@ -98,7 +98,11 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
   if (!('deployment' in options))
     return createRuntimePlugin(
       options,
-      'process',
+      {
+        key: processRuntimeSlotKey,
+        acquire: (integration, create) =>
+          integration.acquireSharedSlot(processRuntimeSlotKey, processRuntimeSlotFamily, create)
+      },
       createProcessPeer as Parameters<typeof createRuntimePlugin>[2]
     )
   return assembleProcessPlugin(options)

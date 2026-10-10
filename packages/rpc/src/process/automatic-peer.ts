@@ -1,17 +1,15 @@
+import {
+  readRuntimePreparationContext,
+  withRuntimePreparationContext
+} from '../remote/runtime-api/launch-context.js'
 import { readRuntimeDefaultTimeout } from '../remote/runtime-api/timeout.js'
-import { RuntimePluginKey } from '../remote/runtime-api/constants.js'
-import { RuntimeSourceKind, RuntimeConnectionDirection } from '../remote/runtime-api/constants.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
-import { defaultRpcId } from '../core/internal/id.js'
+import { RpcCoreErrorCode, RpcError } from '../core/index.js'
+import { defaultRpcId } from '../core/spi.js'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
 import { compileRuntimeMethods } from '../remote/runtime-api/catalog.js'
 import { RuntimeApiErrorText } from '../remote/runtime-api/constants.js'
-import {
-  createRuntimePeer,
-  type IRuntimePeer,
-  type IRuntimePeerOptions
-} from '../remote/runtime-api/peer.js'
+import { createRuntimePeer, type IRuntimePeer, type IRuntimePeerOptions } from '../remote/index.js'
 import { PROCESS_RUNTIME_API_ENV_VERSION } from './constants.js'
 import { deferProcessByteReceive } from './channel.js'
 import { createProcessTransport } from './handshake.js'
@@ -50,8 +48,7 @@ export async function createAutomaticProcessPeer(
   }>
 ): Promise<IRuntimePeer> {
   readRuntimeDefaultTimeout(options)
-  if (platform.marker === undefined)
-    return createRuntimePeer(options, undefined, RuntimePluginKey.process)
+  if (platform.marker === undefined) return createRuntimePeer(options)
   if (platform.marker !== PROCESS_RUNTIME_API_ENV_VERSION || claimed)
     invalidProcessRuntimeBootstrap()
   if (options.spawn !== undefined || options.connect !== undefined || options.listen !== undefined)
@@ -66,37 +63,45 @@ export async function createAutomaticProcessPeer(
     /** Identity is still provisional until the original responder accepts its authenticated parent. */
     const bootstrap = decodeProcessRuntimeBootstrap(opened.bootstrap)
     deferProcessByteReceive(opened.channel)
-    return await createRuntimePeer(
-      options,
-      {
-        self: bootstrap.self,
-        generation: bootstrap.generation,
-        origin: {
-          kind: RuntimeSourceKind.connect,
-          direction: RuntimeConnectionDirection.spawnedBy
-        },
-        async source(context) {
-          /** Override the legacy native offer's defaults with the endpoint's actual installed roots. */
-          const offer = createNativeProcessOffer({
-            peer: { id: context.self.instanceId, runtime: platform.runtime }
-          })
-          return createProcessTransport(opened.channel, {
-            role: 'responder',
-            peerId: bootstrap.parentInstanceId,
-            offer: { ...offer, capabilities: context.capabilities },
-            auth: {
-              mode: 'required',
-              verify(auth, peer) {
-                if (!sameToken(auth, bootstrap.token) || peer.id !== bootstrap.parentInstanceId)
-                  invalidProcessRuntimeBootstrap()
-              }
-            },
-            report: options.report,
-            ipc: { connectionId: defaultRpcId(), sessionId: defaultRpcId(), log: () => undefined }
-          })
-        }
-      },
-      RuntimePluginKey.process
+    /** Keep native ACK/source ownership and exact private process restrictions together. */
+    const peerOptions: IRuntimePeerOptions = {
+      ...options,
+      self: options.self ?? bootstrap.self,
+      connect: async (context) => {
+        if (
+          options.self &&
+          (options.self.name !== bootstrap.self.name ||
+            options.self.instanceId !== bootstrap.self.instanceId)
+        )
+          throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
+        /** Override the legacy native offer's defaults with the endpoint's actual installed roots. */
+        const offer = createNativeProcessOffer({
+          peer: { id: context.self.instanceId, runtime: platform.runtime }
+        })
+        return createProcessTransport(opened.channel, {
+          role: 'responder',
+          peerId: bootstrap.parentInstanceId,
+          offer: { ...offer, capabilities: context.capabilities },
+          auth: {
+            mode: 'required',
+            verify(auth, peer) {
+              if (!sameToken(auth, bootstrap.token) || peer.id !== bootstrap.parentInstanceId)
+                invalidProcessRuntimeBootstrap()
+            }
+          },
+          report: options.report,
+          ipc: { connectionId: defaultRpcId(), sessionId: defaultRpcId(), log: () => undefined }
+        })
+      }
+    }
+    return await withRuntimePreparationContext(
+      peerOptions,
+      readRuntimePreparationContext(options) ?? {},
+      () =>
+        createRuntimePeer(peerOptions, {
+          bootstrap: opened.channel,
+          generation: bootstrap.generation
+        })
     )
   } catch (primary) {
     try {

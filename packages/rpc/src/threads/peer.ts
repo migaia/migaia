@@ -1,6 +1,6 @@
 import { readRuntimeDefaultTimeout } from '../remote/runtime-api/timeout.js'
-import type { IRuntimeTypedPeer } from '../remote/runtime-api/typing.js'
-import { createRuntimePeer, type IRuntimePeerOptions } from '../remote/runtime-api/peer.js'
+import type { IRuntimeTypedPeer } from '../remote/index.js'
+import { createRuntimePeer, type IRuntimePeerOptions } from '../remote/index.js'
 import { createAutomaticWebThreadPeer } from './automatic-peer.js'
 import type { IThreadWebPort } from './types.js'
 import { createThreadSourcePeer, type IRuntimeThreadPeerOptions } from './runtime-peer.js'

@@ -1,4 +1,5 @@
-import { RpcCoreErrorCode, tagRpcError } from '../../core/errors.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
+import { tagRpcError } from '../../core/transport-kit.js'
 import { RpcProcessErrorText } from '../error-text.js'
 import type { IListenProcessByteChannel, IProcessByteChannel } from '../types.js'
 import {

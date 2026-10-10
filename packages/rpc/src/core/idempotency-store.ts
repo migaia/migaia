@@ -1,13 +1,10 @@
 import { utf8ByteLength, isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
-import { rpcBinaryBackingLength, rpcBinaryView } from '../contract/runtime-api/binary.js'
+import { rpcBinaryBackingLength, rpcBinaryView } from '../contract/runtime-api/binary-capture.js'
 import type { IRpcPortableValue, IRpcSerializedError } from '../contract/index.js'
 import { RpcConfigurationError, RpcContractError } from './errors.js'
 import { RpcCoreErrorText } from './error-text.js'
-import { RpcRuntimeOutcomeState } from '../contract/runtime-api/constants.js'
-import {
-  RpcRuntimeStoreKind,
-  RpcRuntimeStoreContinuity
-} from '../contract/runtime-api/constants.js'
+import { RpcRuntimeOutcomeState } from '../contract/framing/v1.js'
+import { RpcRuntimeStoreKind, RpcRuntimeStoreContinuity } from '../contract/framing/v1.js'
 import type { IRpcRuntimeStore } from '../contract/runtime-api/types.js'
 import { defaultRpcId } from './internal/id.js'
 

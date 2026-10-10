@@ -1,5 +1,7 @@
 /** Stable text retained by the core endpoint graph and its shared contracts. */
 export const RpcCoreErrorText = {
+  /** Original process transfer rejection occurs before getters or first caller admission. */
+  runtimeProcessTransferInvalid: 'Runtime process calls do not accept transfer',
   /** A selected binary frame failed the closed manifest grammar before provider publication. */
   runtimeBinaryInvalid: 'Runtime binary manifest is invalid',
   /** Stable fence refusal discloses no foreign task, payload or generation identity. */

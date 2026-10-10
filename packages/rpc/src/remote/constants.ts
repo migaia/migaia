@@ -1,4 +1,4 @@
-import { RpcRuntimeStreamPrefix } from '../contract/runtime-api/constants.js'
+import { RpcRuntimeStreamPrefix } from '../contract/framing/v1.js'
 
 /** Reserved method namespace shared by plugin and host remote endpoints. */
 export const RemoteMethodName = {

@@ -241,6 +241,9 @@ def serve(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None, bri
             while (body := bridge_body(reader)) is not None:
                 # A10 includes one payload parse and serialization without RPC envelope work.
                 payload = json.loads(body)
+                if isinstance(payload,dict) and payload.get("xrtReverse") is True:
+                    bridge_write(writer,xrt_reverse(reader,writer,payload,True))
+                    continue
                 encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
                 bridge_write_body(writer, encoded)
             return
@@ -367,12 +370,35 @@ def perform_fault(method: str) -> None:
             pass
 
 
+
+def xrt_reverse(reader, writer, control, bare=False):
+    """Foreign logical initiator times only bounded request/response echoes; control is outside."""
+    import time
+    count, payload = control["count"], control["payload"]
+    if type(count) is not int or not 1 <= count <= 10000 or not isinstance(payload, str):
+        raise peer.PeerFailure("INVALID_ENVELOPE")
+    # The actual foreign initiator records each completed request, outside the outer control.
+    latencies = []
+    start = time.perf_counter_ns()
+    for index in range(count):
+        round_start = time.perf_counter_ns()
+        identifier = f"xrt-reverse-{index}"
+        request = payload if bare else {"jsonrpc":"2.0","id":identifier,"method":"migaia.invoke", "params":{"method":"bench.echo","args":[payload]}}
+        if control.get("forged"): request["params"]["meta"] = {"senderId":"forged"}
+        bridge_write(writer, request)
+        reply = bridge_read(reader)
+        if bare: valid = reply == payload
+        else: valid = isinstance(reply,dict) and reply.get("id") == identifier and reply.get("result") == payload and "error" not in reply
+        if not valid: raise peer.PeerFailure("INVALID_ENVELOPE")
+        latencies.append(time.perf_counter_ns()-round_start)
+    return {"xrtReceipt":True,"calls":count,"elapsedNs":time.perf_counter_ns()-start,"latenciesNs":latencies,"clientInFlightPeak":1,"burstSize":1}
+
 def serve_bridge(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | None) -> None:
     """Use the session's original providers over Content-Length, with v2 and ordered batch arrays."""
     business = Business(host)
     business.capabilities = set(BRIDGE_CAPABILITIES)
-    # Reverse and stream owners require native frames and are not installed by this bridge profile.
-    business.providers.pop("peer.reverse")
+    # The bounded reverse loop is handled by this bridge owner; native stream routes stay absent.
+    business.providers["peer.reverse"] = None
     authenticated = False
     while (physical := bridge_read(reader)) is not None:
         batched = isinstance(physical, list)
@@ -415,7 +441,7 @@ def serve_bridge(reader: BinaryIO, writer: BinaryIO, host: bool, token: str | No
                     business.waiting[identifier] = message
                     continue
                 provider = business.providers.get(called)
-                result, error = provider(args, params.get("meta", {}).get("trace")) if provider else (
+                result, error = (xrt_reverse(reader,writer,args[0]),None) if called == "peer.reverse" else provider(args, params.get("meta", {}).get("trace")) if provider else (
                     None, peer.wire_error("PROVIDER_NOT_FOUND", "Runtime method is not provided by this peer"))
             else:
                 result, error = None, peer.wire_error("METHOD_NOT_FOUND", "bridge peer method unavailable")

@@ -1,8 +1,13 @@
+import { readCanonicalReceiver } from './plugin-shared-keys.js'
+import { deferred } from '@migaia/utils/promise'
 import {
   createOutboundEnvelope,
   createRuntimeOutboundEnvelope,
   createRuntimeRequestOutboundEnvelope,
   isRuntimeRequestInput,
+  readRuntimeRequestInput,
+  retainRuntimeRequestInput,
+  retainForwardOptions,
   readForwardRoute
 } from './outbound-envelope.js'
 import { hasFastEndpoint, hasFastComponents } from './fast-path.js'
@@ -13,15 +18,20 @@ import {
   hasCloneTransferCarrier
 } from './batch-frame.js'
 import { readRuntimeCarrier } from '../../contract/runtime-api/carrier.js'
-import { normalizeRuntimeEnvelope } from '../../contract/runtime-api/normalize.js'
+import { normalizeRuntimeEnvelopeLazy as normalizeRuntimeEnvelope } from '../../contract/runtime-api/normalize-lazy.js'
 import {
-  restoreRpcBinary,
   readRpcNativeBinary,
   measureRpcNativeBinaryFrame,
   isRpcBinaryIntegrityFailure
-} from '../../contract/runtime-api/binary.js'
+} from '../../contract/runtime-api/binary-capture.js'
+import {
+  normalizeInboundRpcEnvelope,
+  normalizeInboundRuntimeEnvelope,
+  normalizeInboundRuntimeBinaryEnvelope,
+  restoreInboundRuntimeBinary
+} from './inbound-normalization.js'
 import { RpcMiddlewareErrorText } from '../middleware/error-text.js'
-import { RpcBinaryProfile, RpcBinaryStorage } from '../../contract/runtime-api/binary-constants.js'
+import { RpcBinaryProfile, RpcBinaryStorage } from '../../contract/framing/v1.js'
 import { runtimeOperationCapabilities } from '../../contract/runtime-api/capabilities.js'
 import {
   RpcRuntimeKind,
@@ -29,22 +39,20 @@ import {
   RpcRuntimeCancel,
   RpcRuntimeMode,
   RpcRuntimeProfile
-} from '../../contract/runtime-api/constants.js'
+} from '../../contract/framing/v1.js'
+import type { IRpcRuntimeEnvelope, IRpcRuntimeGeneration } from '../../contract/index.js'
 import type {
-  IRpcRuntimeEnvelope,
-  IRpcRuntimeGeneration,
   IRpcRuntimeTask,
   IRpcRuntimeOptions,
   IRpcRuntimeStep
 } from '../../contract/runtime-api/types.js'
-import { RpcCapability, RpcBatchPhysical } from '../../contract/wire-constants.js'
-import { readRpcSingleFrameFacts } from '../../contract/framing/reassembler.js'
+import { RpcCapability, RpcBatchPhysical } from '../../contract/index.js'
 import type { ProviderAdmissionRegistry, IProviderIngressReceipt } from './provider-admission.js'
 import {
   readRpcBatchMembers,
   assertRpcPhysicalFrameSize,
   rejectRpcPhysicalFrameSize
-} from '../../contract/batch-frame.js'
+} from '../../contract/framing/index.js'
 import type { IInboundIdentityPreparedSource } from './inbound-identity.js'
 import { RpcSerializationError } from '../errors.js'
 import { enableFastTimePort } from './time-port.js'
@@ -97,8 +105,8 @@ import {
   type IRpcResponseFailure,
   type IRpcWireErrorFailure
 } from '../../contract/index.js'
-import { createRpcUnknownFieldWarner } from '../../contract/unknown-field.js'
-import { deserializeRpcError, serializeRpcError } from '../../contract/error.js'
+import { createRpcUnknownFieldWarner } from '../../contract/index.js'
+import { deserializeRpcError, serializeRpcError } from '../../contract/index.js'
 import { RpcProtocolEvent } from '../protocol-constants.js'
 import { EndpointOwnerKey, type IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IRpcInboundMessage } from '../transport.js'
@@ -108,7 +116,7 @@ import { allocateRpcId, assertRpcIdempotencyKey } from './id.js'
 import { PendingRegistry } from './pending.js'
 import { RpcOutboundSender } from './outbound-sender.js'
 import { outboundGateMatchesFeature, readOutboundGate } from './outbound-gate.js'
-import type { IRpcOutboundGate } from './outbound-gate.js'
+import { RpcOutboundAdmission, type IRpcOutboundGate } from './outbound-gate.js'
 import { ReplayWindow } from './replay.js'
 import { claimNativeReplayTransport, type INativeReplayReceipt } from './native-replay.js'
 import { createNativeDefaultAllocator } from './native-default-id.js'
@@ -155,6 +163,26 @@ type IOutboundPending = {
 export type IRpcRuntimeSendOptions = Omit<IRpcRuntimeOptions, 'timeoutMs'> &
   Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
 
+/** The original raw operation input stays on its caller record without another payload capture. */
+type IRuntimeOperationInput = Readonly<{
+  method?: string
+  payload?: IRpcPortableValue
+  steps?: readonly IRpcRuntimeStep[]
+  idempotencyKey?: string
+}>
+
+/** One admitted runtime call carries the existing operation and original option/input objects. */
+type IRuntimeOperationPlan = Readonly<{
+  owner: RpcOutboundAttachment
+  taskId: string
+  task: IRpcRuntimeTask
+  input: IRuntimeOperationInput
+  options: IRpcRuntimeSendOptions
+  wireOptions: IRpcRuntimeOptions
+  operation: OperationScope
+  awaitNotifyTerminal: boolean
+}>
+
 /** Receiver identity selected for one logical target before a frame is emitted. */
 export type IOutboundReceiver = {
   readonly receiverId: string
@@ -199,6 +227,277 @@ export type IOutboundAttachmentHost = {
 
 /** Canonical outbound/client owner attached to one endpoint kernel. */
 export class RpcOutboundAttachment implements IOutboundAttachmentHost {
+  /** Runtime request state stays inside the original outbound owner and pending registry. */
+  static readonly #RuntimeOperation = class
+    extends RpcOutboundAdmission
+    implements IOutboundPending
+  {
+    /** Existing pending correlation reads the target without extracting any task authority. */
+    readonly targetId: string
+    /** Populated at the original pending-registration point after receiver and envelope preparation. */
+    method = ''
+    /** Same complete task tuple fences reply identity and generation. */
+    readonly runtimeTask: IRpcRuntimeTask
+    /** The original completion is the one public Promise settled by the pending record. */
+    readonly #completion = deferred<unknown>()
+    /** Captured owner, input and options are the original operation values, never a second snapshot. */
+    readonly #plan: IRuntimeOperationPlan
+
+    /** Receiver selection supplies this exact immutable envelope before any listener or write. */
+    #envelope: IRpcRuntimeEnvelope | undefined
+    /** Physical commit remains separate from an internal notification terminal receipt. */
+    #sent = false
+    /** One guard owns all replay, deadline, pending and listener cleanup. */
+    #settled = false
+    /** Original endpoint timer retains the logical caller budget. */
+    #timer: IEndpointTimer | undefined
+    /** External abort callback exists only if an actual caller signal registers it. */
+    #abortListener: (() => void) | undefined
+    /** Computed at the same original post-capture point before pending registration. */
+    #terminalReceipt = false
+    /** Admission retains original local caller signals; no native child signal is allocated here. */
+    signals!: readonly import('../typing.js').IRpcAbortSignal[]
+    /** The extension gate contract permits extracting this receiver-free admission callback. */
+    readonly assertCanSend = (): void => this.#assertActive()
+
+    constructor(targetId: string, plan: IRuntimeOperationPlan) {
+      super(plan.operation)
+      this.targetId = targetId
+      this.runtimeTask = plan.task
+      this.#plan = plan
+    }
+
+    /** Established native selection can prepare directly; a genuine miss retains its continuation. */
+    start(): Promise<unknown> {
+      try {
+        const receiver = this.#plan.owner.#selectRuntimeReceiver(this.targetId)
+        if (receiver instanceof Promise) void this.#awaitReceiver(receiver)
+        else this.#prepare(receiver)
+      } catch (error) {
+        this.#captureFailed(error)
+      }
+      return this.#completion.promise
+    }
+
+    /** Capture failure precedes public listener registration and retains its original cleanup point. */
+    #captureFailed(error: unknown): void {
+      this.#plan.owner.#replay.releaseId(this.#plan.taskId)
+      this.#plan.operation.finish()
+      this.#completion.reject(error)
+    }
+
+    /** The original selection failure releases only the id and scope, before listener registration. */
+    async #awaitReceiver(receiver: Promise<IOutboundReceiver>): Promise<void> {
+      let selected: IOutboundReceiver
+      try {
+        selected = await receiver
+        this.#prepare(selected)
+      } catch (error) {
+        this.#captureFailed(error)
+      }
+    }
+
+    /** Header preparation retains the original clock, forwarding reads and strict input policy. */
+    #prepare(receiver: IOutboundReceiver): void {
+      const { owner, taskId, task, input, options, wireOptions, operation } = this.#plan
+      const mode = task.mode
+      operation.assertActive(owner.kernel.generation)
+      const preparedInput = mode !== RpcRuntimeMode.group && isRuntimeRequestInput(input)
+      const message = {
+        profile: RpcRuntimeProfile,
+        kind:
+          mode === RpcRuntimeMode.group
+            ? RpcRuntimeKind.group
+            : mode === RpcRuntimeMode.outcome
+              ? RpcRuntimeKind.outcome
+              : RpcRuntimeKind.call,
+        id: taskId,
+        task,
+        ...(mode === RpcRuntimeMode.outcome
+          ? { operation: RpcRuntimeOperation.lookup, idempotencyKey: input.idempotencyKey }
+          : { options: wireOptions }),
+        route: {
+          applicationVersion: owner.#version,
+          senderId: owner.id,
+          targetId: this.targetId,
+          receiverId: receiver.receiverId,
+          sentAt: owner.kernel.time.timestamp(),
+          ...(readForwardRoute(options) === undefined
+            ? {}
+            : { forwardRoute: readForwardRoute(options) })
+        },
+        ...(mode === RpcRuntimeMode.group
+          ? { steps: input.steps }
+          : preparedInput || input.payload === undefined
+            ? {}
+            : { payload: input.payload })
+      }
+      this.#envelope = preparedInput
+        ? createRuntimeRequestOutboundEnvelope(message, input as { method: string })
+        : createRuntimeOutboundEnvelope(message)
+      this.#register()
+    }
+
+    /** The public Promise keeps the original executor rejection point for post-capture setup. */
+    #register(): void {
+      const { owner, taskId, task, input, options, awaitNotifyTerminal } = this.#plan
+      try {
+        this.#terminalReceipt =
+          awaitNotifyTerminal ||
+          task.mode !== RpcRuntimeMode.notify ||
+          options.cancel === RpcRuntimeCancel ||
+          options.orderKey !== undefined
+        if (this.#terminalReceipt) {
+          this.method = input.method ?? ''
+          owner.#pending.set(taskId, this)
+        }
+      } catch (error) {
+        this.#completion.reject(error)
+        return
+      }
+      try {
+        options.signal?.addEventListener('abort', (this.#abortListener ??= () => this.#onAbort()), {
+          once: true
+        })
+        if (options.signal?.aborted) this.#onAbort()
+        if (this.#settled) return
+        if (options.timeoutMs !== undefined && options.timeoutMs !== false)
+          this.#timer = owner.kernel.time.setTimeout(
+            () => this.cancel(new RpcTimeoutError()),
+            options.timeoutMs
+          )
+        this.signals = options.signal ? [options.signal] : []
+        void this.#write()
+      } catch (error) {
+        this.reject(error)
+      }
+    }
+
+    /** Actual physical completion is the only asynchronous continuation in this stable write method. */
+    async #write(): Promise<void> {
+      const { owner, task, options, awaitNotifyTerminal } = this.#plan
+      try {
+        await owner.#pipeline.sendRuntime(
+          this.#envelope!,
+          owner.#runtimeCapabilities!,
+          this,
+          this,
+          undefined,
+          options
+        )
+      } catch (error) {
+        this.reject(error)
+        // A terminal before physical settlement cannot conceal the original write failure.
+        this.#completion.reject(error)
+        return
+      }
+      if (task.mode === RpcRuntimeMode.notify) {
+        if (!this.#terminalReceipt) {
+          this.#settled = true
+          this.#plan.operation.markSuccess()
+          this.cleanup()
+        }
+        if (!awaitNotifyTerminal) this.#completion.resolve(undefined)
+      }
+    }
+
+    /** Sender calls this same record immediately before its actual physical host invocation. */
+    started(): void {
+      this.#sent = true
+    }
+
+    /** Original live checks reject a late or cancelled write without another admission pass. */
+    #assertActive(): void {
+      if (this.#settled) throw new RpcAbortError()
+      this.#plan.operation.assertActive(this.#plan.owner.kernel.generation)
+    }
+
+    /** Terminal cleanup releases each original handle before exposing the public settlement. */
+    cleanup(): void {
+      const { owner, taskId, options, operation } = this.#plan
+      if (this.#timer) owner.kernel.time.clearTimeout(this.#timer)
+      options.signal?.removeEventListener('abort', this.#abortListener!)
+      owner.#pending.delete(taskId)
+      owner.#replay.releaseId(taskId)
+      operation.finish()
+    }
+
+    /** Pending uses this stable method with its own record receiver. */
+    reject(error: unknown): void {
+      if (this.#settled) return
+      this.#settled = true
+      this.cleanup()
+      if (
+        this.runtimeTask.mode === RpcRuntimeMode.notify &&
+        this.#sent &&
+        !this.#plan.awaitNotifyTerminal
+      )
+        this.#plan.owner.emitFailure(error)
+      else this.#completion.reject(error)
+    }
+
+    /** The exact pending Promise resolves only after original success and cleanup. */
+    resolve(result: unknown): void {
+      if (this.#settled) return
+      this.#settled = true
+      this.#plan.operation.markSuccess()
+      this.cleanup()
+      if (this.runtimeTask.mode !== RpcRuntimeMode.notify || this.#plan.awaitNotifyTerminal)
+        this.#completion.resolve(result)
+    }
+
+    /** Ordinary abort/deadline preserves the original before-start or routed cancellation policy. */
+    cancel(reason: unknown): void {
+      if (this.#settled) return
+      if (!this.#sent || this.runtimeTask.mode === RpcRuntimeMode.outcome) {
+        this.reject(reason)
+        return
+      }
+      void this.#sendCancellation(reason)
+      if (this.#plan.options.cancel !== RpcRuntimeCancel) this.reject(reason)
+    }
+
+    /** Only actual cancel transmission retains a real send continuation and failure report. */
+    async #sendCancellation(reason: unknown): Promise<void> {
+      const envelope = this.#envelope!
+      const owner = this.#plan.owner
+      try {
+        await owner.sendRuntimeFrame({
+          profile: RpcRuntimeProfile,
+          id: envelope.id,
+          kind: RpcRuntimeKind.control,
+          operation: RpcRuntimeOperation.cancel,
+          task: this.runtimeTask,
+          route: envelope.route,
+          reason: serializeRpcError(reason, { report: owner.#runtimeErrorReport })
+        })
+      } catch (error) {
+        owner.emitFailure(error)
+      }
+    }
+
+    /** Native caller reason is read at the original cancellation callback point. */
+    #onAbort(): void {
+      const options = this.#plan.options
+      this.cancel(
+        new RpcAbortError(
+          undefined,
+          undefined,
+          options.signal ? resolveAbortReason(options.signal) : undefined
+        )
+      )
+    }
+  }
+  /** All runtime scopes share the original canonical clock callable, without per-call captures. */
+  readonly #runtimeNow = (): number => this.kernel.time.scheduler.now()
+  /** Id allocation still checks the original replay owner synchronously. */
+  readonly #runtimeReserved = (id: string): boolean => this.#replay.hasReservedId(id)
+  /** Existing error serializer reporting remains endpoint-owned and receiver-free. */
+  // The nested RuntimeCall record uses this private member through its held owner.
+  // eslint-disable-next-line no-unused-private-class-members
+  readonly #runtimeErrorReport = (failure: { error: unknown }): void =>
+    this.emitFailure(failure.error)
+
   /** Validated endpoint identifier. */
   readonly id: string
   /** Stable local receiver identity used by multiplexed discovery routing. */
@@ -536,10 +835,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                * Only original paired callables prove whole acceptance and the complete frame
                * budget.
                */
-              const facts = readRpcSingleFrameFacts(
-                this.#components.framer.accept,
-                this.#components.framer.frame
-              )
+              const facts = this.#components.ingressPrepare.singleFrameLimits
               if (!facts)
                 throw new RpcError(
                   RpcCoreErrorCode.capabilityUnsupported,
@@ -627,7 +923,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                     if (accepted.status !== 'complete')
                       throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
                     const manifest = this.#runtimeComponents.codec.decode(accepted.value)
-                    restoredBinary = await restoreRpcBinary(
+                    restoredBinary = await restoreInboundRuntimeBinary(
                       manifest,
                       RpcBinaryStorage.native,
                       nativeBinary.sidecars,
@@ -764,18 +1060,30 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     if (restoredBinary) envelope = restoredBinary
     else if (binary) {
       try {
-        envelope = normalizeRuntimeEnvelope(
-          await restoreRpcBinary(decoded, RpcBinaryStorage.inline, [], this.#physicalLimit)
+        const normalized = normalizeInboundRuntimeBinaryEnvelope(
+          await restoreInboundRuntimeBinary(
+            decoded,
+            RpcBinaryStorage.inline,
+            [],
+            this.#physicalLimit
+          )
         )
+        envelope = normalized instanceof Promise ? await normalized : normalized
+        if (normalized instanceof Promise) {
+          this.kernel.assertActive(generation)
+          if (this.#native && !this.#native.active) return
+        }
       } catch (cause) {
         throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid, cause)
       }
-    } else
-      envelope = normalizeRuntimeEnvelope(decoded, (value) =>
-        normalizePortable(value, 0, new Set<object>(), () => {
-          throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
-        })
-      )
+    } else {
+      const normalized = normalizeInboundRuntimeEnvelope(decoded)
+      if (normalized instanceof Promise) {
+        envelope = await normalized
+        this.kernel.assertActive(generation)
+        if (this.#native && !this.#native.active) return
+      } else envelope = normalized
+    }
     assertAuthenticationChallengeEnvelope(authenticationContext, envelope)
     markAuthenticationReplayEnvelope(authenticationContext, envelope)
     /** Every explicitly requested capability must be present in the actual completed intersection. */
@@ -897,6 +1205,12 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   /** Provider execution reads the same local generation reference held by the original caller owner. */
   get runtimeGeneration(): IRpcRuntimeGeneration | undefined {
     return this.#runtimeGeneration
+  }
+
+  /** Core raw operations reuse the existing describe binding, never an options generation claim. */
+  runtimeTargetGeneration(targetId: string): IRpcRuntimeGeneration | undefined {
+    const binding = this.#responseBindings.get(targetId)
+    return binding === undefined ? undefined : this.inboundIdentity.readResponseGeneration(binding)
   }
 
   /** Original controls and executor replies use the one codec/framer/auth/physical sender. */
@@ -1025,7 +1339,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   }
 
   /** Opted-in business uses the original task allocator, replay budget, pending registry and scope. */
-  async sendRuntimeOperation(
+  sendRuntimeOperation(
     targetId: string,
     targetGeneration: IRpcRuntimeGeneration,
     mode: 'request' | 'notify' | 'group' | 'outcome',
@@ -1038,203 +1352,54 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     options: IRpcRuntimeSendOptions = {},
     awaitNotifyTerminal = false
   ): Promise<unknown> {
-    this.kernel.assertActive()
-    /** All new modes share the same original capability and option validation owner. */
-    const wireOptions = this.#runtimeOptions(mode, options)
-    /** Existing signed route identifies a forwarded notify that needs the final provider receipt. */
-    if (
-      awaitNotifyTerminal &&
-      mode === RpcRuntimeMode.notify &&
-      wireOptions.cancel !== RpcRuntimeCancel &&
-      wireOptions.orderKey === undefined &&
-      readForwardRoute(options) === undefined
-    )
-      throw new RpcError(
-        RpcCoreErrorCode.capabilityUnsupported,
-        RpcCoreErrorText.capabilityUnsupported
-      )
-    const taskId = allocateRpcId(this.#uuid, 'task', this.id, targetId, (id) =>
-      this.#replay.hasReservedId(id)
-    )
-    if (!this.#replay.reserveId(taskId))
-      throw new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
-    /** Invalid/custom ID allocation cannot strand a child lifecycle listener. */
-    const operation = new OperationScope(
-      this.kernel.generation,
-      options.timeoutMs,
-      this.kernel.closingSignal,
-      () => this.kernel.time.scheduler.now()
-    )
-    const task: IRpcRuntimeTask = {
-      mode,
-      callerId: this.id,
-      callerGeneration: this.#runtimeGeneration!,
-      targetGeneration,
-      ...(input.method === undefined ? {} : { method: input.method })
-    }
-    let envelope: IRpcRuntimeEnvelope
     try {
-      const receiver = await this.resolveReceiver(targetId)
-      operation.assertActive(this.kernel.generation)
-      /** A logical preflight already owns this exact payload; header and task admission stay full. */
-      const preparedInput = mode !== RpcRuntimeMode.group && isRuntimeRequestInput(input)
-      const message = {
-        profile: RpcRuntimeProfile,
-        kind:
-          mode === RpcRuntimeMode.group
-            ? RpcRuntimeKind.group
-            : mode === RpcRuntimeMode.outcome
-              ? RpcRuntimeKind.outcome
-              : RpcRuntimeKind.call,
-        id: taskId,
-        task,
-        ...(mode === RpcRuntimeMode.outcome
-          ? { operation: RpcRuntimeOperation.lookup, idempotencyKey: input.idempotencyKey }
-          : { options: wireOptions }),
-        route: {
-          applicationVersion: this.#version,
-          senderId: this.id,
-          targetId,
-          receiverId: receiver.receiverId,
-          sentAt: this.kernel.time.timestamp(),
-          ...(readForwardRoute(options) === undefined
-            ? {}
-            : { forwardRoute: readForwardRoute(options) })
-        },
-        ...(mode === RpcRuntimeMode.group
-          ? { steps: input.steps }
-          : preparedInput || input.payload === undefined
-            ? {}
-            : { payload: input.payload })
-      }
-      envelope = preparedInput
-        ? createRuntimeRequestOutboundEnvelope(message, input as { method: string })
-        : createRuntimeOutboundEnvelope(message)
-    } catch (error) {
-      this.#replay.releaseId(taskId)
-      operation.finish()
-      throw error
-    }
-    return new Promise<unknown>((resolve, reject) => {
-      /** Opt-in order needs true completion for forwarding leases; public notify still ends at send. */
-      const terminalReceipt =
-        awaitNotifyTerminal ||
-        mode !== RpcRuntimeMode.notify ||
-        options.cancel === RpcRuntimeCancel ||
-        options.orderKey !== undefined
-      /** Physical commit and terminal settlement are distinct for internal notification receipts. */
-      let sent = false
-      /** Every original registry/budget/listener is released by this one terminal guard. */
-      let settled = false
-      let timer: IEndpointTimer | undefined
-      const cleanup = (): void => {
-        if (timer) this.kernel.time.clearTimeout(timer)
-        options.signal?.removeEventListener('abort', onAbort)
-        this.#pending.delete(taskId)
-        this.#replay.releaseId(taskId)
-        operation.finish()
-      }
-      const fail = (error: unknown): void => {
-        if (settled) return
-        settled = true
-        cleanup()
-        if (mode === RpcRuntimeMode.notify && sent && !awaitNotifyTerminal) this.emitFailure(error)
-        else reject(error)
-      }
-      const complete = (result: unknown): void => {
-        if (settled) return
-        settled = true
-        operation.markSuccess()
-        cleanup()
-        if (mode !== RpcRuntimeMode.notify || awaitNotifyTerminal) resolve(result)
-      }
-      const cancel = (reason: unknown): void => {
-        if (settled) return
-        if (!sent || mode === RpcRuntimeMode.outcome) {
-          fail(reason)
-          return
-        }
-        void this.sendRuntimeFrame({
-          profile: RpcRuntimeProfile,
-          id: envelope.id,
-          kind: RpcRuntimeKind.control,
-          operation: RpcRuntimeOperation.cancel,
-          task,
-          route: envelope.route,
-          reason: serializeRpcError(reason, {
-            report: (failure) => this.emitFailure(failure.error)
-          })
-        }).catch((error) => this.emitFailure(error))
-        if (options.cancel !== RpcRuntimeCancel) fail(reason)
-      }
-      const onAbort = (): void =>
-        cancel(
-          new RpcAbortError(
-            undefined,
-            undefined,
-            options.signal ? resolveAbortReason(options.signal) : undefined
-          )
+      this.kernel.assertActive()
+      /** All new modes share the same original capability and option validation owner. */
+      const wireOptions = this.#runtimeOptions(mode, options)
+      /** Existing signed route identifies a forwarded notify that needs the final provider receipt. */
+      if (
+        awaitNotifyTerminal &&
+        mode === RpcRuntimeMode.notify &&
+        wireOptions.cancel !== RpcRuntimeCancel &&
+        wireOptions.orderKey === undefined &&
+        readForwardRoute(options) === undefined
+      )
+        throw new RpcError(
+          RpcCoreErrorCode.capabilityUnsupported,
+          RpcCoreErrorText.capabilityUnsupported
         )
-      if (terminalReceipt)
-        this.#pending.set(taskId, {
-          targetId,
-          method: input.method ?? '',
-          runtimeTask: task,
-          resolve: complete,
-          reject: fail,
-          cleanup
-        })
-      try {
-        options.signal?.addEventListener('abort', onAbort, { once: true })
-        if (options.signal?.aborted) onAbort()
-        if (settled) return
-        if (options.timeoutMs !== undefined && options.timeoutMs !== false)
-          timer = this.kernel.time.setTimeout(
-            () => cancel(new RpcTimeoutError()),
-            options.timeoutMs
-          )
-        void this.#pipeline
-          .sendRuntime(
-            envelope,
-            this.#runtimeCapabilities!,
-            {
-              queueSignal: operation.signal,
-              signals: options.signal ? [options.signal] : [],
-              assertCanSend: () => {
-                if (settled) throw new RpcAbortError()
-                operation.assertActive(this.kernel.generation)
-              }
-            },
-            () => {
-              sent = true
-            },
-            undefined,
-            options
-          )
-          .then(
-            () => {
-              if (mode === RpcRuntimeMode.notify) {
-                if (!terminalReceipt) {
-                  settled = true
-                  operation.markSuccess()
-                  cleanup()
-                }
-                if (!awaitNotifyTerminal) resolve(undefined)
-              }
-            },
-            (error: unknown) => {
-              fail(error)
-              /**
-               * A terminal may arrive before the physical write settles; neither can hide write
-               * failure.
-               */
-              reject(error)
-            }
-          )
-      } catch (error) {
-        fail(error)
+      const taskId = allocateRpcId(this.#uuid, 'task', this.id, targetId, this.#runtimeReserved)
+      if (!this.#replay.reserveId(taskId))
+        throw new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
+      /** Invalid/custom ID allocation cannot strand a child lifecycle listener. */
+      const operation = new OperationScope(
+        this.kernel.generation,
+        options.timeoutMs,
+        this.kernel.closingSignal,
+        this.#runtimeNow,
+        true
+      )
+      const task: IRpcRuntimeTask = {
+        mode,
+        callerId: this.id,
+        callerGeneration: this.#runtimeGeneration!,
+        targetGeneration,
+        ...(input.method === undefined ? {} : { method: input.method })
       }
-    })
+      const record = new RpcOutboundAttachment.#RuntimeOperation(targetId, {
+        owner: this,
+        taskId,
+        task,
+        input,
+        options,
+        wireOptions,
+        operation,
+        awaitNotifyTerminal
+      })
+      return record.start()
+    } catch (error) {
+      return Promise.reject(error)
+    }
   }
 
   /** Only an authenticated terminal with the full selected task can settle the original pending. */
@@ -1353,7 +1518,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     /** Unknown fields are reported after normalize returns its once-read kind. */
     const ignored: Array<readonly [string, string]> = []
     try {
-      envelope = this.#components.protocol.normalize(decoded, {
+      envelope = normalizeInboundRpcEnvelope(decoded, this.#components.protocol, {
         onUnknownField: (pointer, field) => ignored.push([pointer, field])
       })
     } catch (error) {
@@ -1447,11 +1612,16 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     const remaining = operation.remaining(timeoutMs)
     operation.assertActive(this.kernel.generation)
     if (remaining === 0) throw new RpcTimeoutError()
+    /** The original options copy retains only Core's exact captured input and forward association. */
+    const callOptions = retainForwardOptions(options, { ...options, timeoutMs: remaining })
+    /** Private fields are deliberately not copied by spread; Core carries its own input explicitly. */
+    const input = readRuntimeRequestInput(options, method, data, 2)
+    if (input) retainRuntimeRequestInput(callOptions, input)
     return this.#requestOnce<T>(
       targetId,
       method,
       data,
-      { ...options, timeoutMs: remaining },
+      callOptions,
       this.#fast
         ? options.signal
           ? [options.signal]
@@ -1880,6 +2050,19 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   /** Installs the one discovery-backed selector for all outbound operation kinds. */
   setReceiverResolver(resolver: (targetId: string) => Promise<IOutboundReceiver>): void {
     this.#receiverResolver = resolver
+  }
+
+  /** Only the exact registered canonical port can expose a synchronous established selection. */
+  // The nested RuntimeCall record uses this private member through its held owner.
+  // eslint-disable-next-line no-unused-private-class-members
+  #selectRuntimeReceiver(targetId: string): IOutboundReceiver | Promise<IOutboundReceiver> {
+    const resolver = this.#discoveryResolver?.()
+    if (resolver) {
+      const selected = readCanonicalReceiver(resolver, targetId)
+      return selected === undefined ? Promise.resolve(resolver.resolve(targetId)) : selected
+    }
+    // Unknown installed selectors retain native assimilation without probing their then property.
+    return Promise.resolve(this.#receiverResolver(targetId))
   }
 
   /** Resolves an explicit receiver or delegates to the endpoint-local discovery owner. */

@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { RpcCapability } from '../../src/contract/wire-constants.js'
-import { readRpcSingleFrameFacts } from '../../src/contract/framing/reassembler.js'
-import { messageFramerV1 } from '../../src/contract/framing/index.js'
+import { bindRpcFrameIngress, messageFramerV1 } from '../../src/contract/framing/index.js'
 import { EndpointOwnerKey } from '../../src/core/endpoint-kernel.js'
 import { readEndpointOwner } from '../../src/core/internal/endpoint-projection.js'
-import { ProviderAdmissionRegistry } from '../../src/core/internal/provider-admission.js'
+import {
+  createProviderAdmissionScope,
+  prepareProviderAdmissionScope,
+  type ProviderAdmissionRegistry
+} from '../../src/core/internal/provider-admission.js'
 import {
   createRuntimePeer,
   prepareRuntimePeerSourceContext,
@@ -37,10 +40,13 @@ it('[A73] a custom endpoint cannot advertise shared ordering while returning a d
   ])
   const signal = new AbortController().signal
   const built = await prepareRuntimePeerEndpoint(options, sources[0], signal)
-  const scope = new ProviderAdmissionRegistry(
+  const admissionScope = createProviderAdmissionScope()
+  const scope = prepareProviderAdmissionScope(
+    admissionScope,
     8,
     8,
-    readRpcSingleFrameFacts(messageFramerV1.accept, messageFramerV1.frame)!.maxConcurrentMessages
+    bindRpcFrameIngress(messageFramerV1.accept, messageFramerV1.frame).singleFrameLimits!
+      .maxConcurrentMessages
   )
   const owner = readEndpointOwner<RpcOutboundAttachment>(
     built.endpoint,
@@ -53,7 +59,7 @@ it('[A73] a custom endpoint cannot advertise shared ordering while returning a d
         sources[0],
         signal,
         {},
-        scope
+        admissionScope
       ),
       { code: 'CAPABILITY_UNSUPPORTED' },
       '[A73] a declared capability cannot stand in for the actual original shared owner'
@@ -74,10 +80,13 @@ it('[A73] a custom endpoint cannot advertise shared ordering while returning a d
 /** The same final provider is reached by two real callers over separate physical channels. */
 async function sharedProvider(provide: IRuntimePeerProvide) {
   /** Capacity is the actual selected canonical framer's cold fact, not a fixture limiter. */
-  const scope = new ProviderAdmissionRegistry(
+  const admissionScope = createProviderAdmissionScope()
+  const scope = prepareProviderAdmissionScope(
+    admissionScope,
     8,
     8,
-    readRpcSingleFrameFacts(messageFramerV1.accept, messageFramerV1.frame)!.maxConcurrentMessages
+    bindRpcFrameIngress(messageFramerV1.accept, messageFramerV1.frame).singleFrameLimits!
+      .maxConcurrentMessages
   )
   /** Both source offers exercise real authenticated-generation and ordering ports. */
   const capabilities = [
@@ -119,7 +128,7 @@ async function sharedProvider(provide: IRuntimePeerProvide) {
               source,
               signal,
               {},
-              scope
+              admissionScope
             ])
         })
       ])

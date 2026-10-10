@@ -1,9 +1,6 @@
-import {
-  createRpcIdempotencyStore,
-  type IRpcIdempotencyStore
-} from '../../core/idempotency-store.js'
-import type { IRpcIdempotencyConfig, IRpcProviderLimits } from '../../core/typing.js'
-import { defaultRpcId } from '../../core/internal/id.js'
+import { createRpcIdempotencyStore, type IRpcIdempotencyStore } from '../../core/index.js'
+import type { IRpcIdempotencyConfig, IRpcProviderLimits } from '../../core/index.js'
+import { defaultRpcId } from '../../core/spi.js'
 import { RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError, createProcessRangeError } from '../error.js'
 import { RpcProcessErrorText } from '../error-text.js'
@@ -23,7 +20,7 @@ import { retainRuntimeIdempotencyScope } from '../../core/internal/provider.js'
 import {
   createProviderAdmissionScope,
   type IProviderAdmissionScope
-} from '../../core/internal/provider-admission.js'
+} from '../../core/features/provider.js'
 
 /** One admitted physical connection is released exactly once after transfer or rollback. */
 export type IProcessConnectionLease = Readonly<{ release(): void }>

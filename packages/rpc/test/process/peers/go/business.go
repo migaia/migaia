@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // businessStream retains the original correlation route and the next credited item.
@@ -258,6 +259,16 @@ func serveBusiness(reader io.Reader, writer io.Writer, host bool, token string, 
 				if err = decoder.Decode(&payload); err != nil {
 					return err
 				}
+				if control, ok := payload.(map[string]any); ok && control["xrtReverse"] == true {
+					result, err := xrtReverse(reader, writer, control, true)
+					if err != nil {
+						return err
+					}
+					if err = bridgeSend(writer, result); err != nil {
+						return err
+					}
+					continue
+				}
 				encoded, err := json.Marshal(payload)
 				if err != nil {
 					return err
@@ -399,7 +410,47 @@ func bridgeSend(writer io.Writer, message any) error {
 	return bridgeWriteBody(writer, body)
 }
 
-// serveBridge shares real business state while exposing only the negotiated bridge extension surface.
+// xrtReverse reuses the original framing/JSON writer and times only foreign logical business.
+func xrtReverse(reader io.Reader, writer io.Writer, control record, bare bool) (any, error) {
+	n := integerField(control, "count")
+	payload, ok := control["payload"].(string)
+	if !ok || n < 1 || n > 10000 {
+		return nil, errors.New("INVALID_ENVELOPE")
+	}
+	// Keep one bounded inner-clock observation per actual completed request.
+	latencies := make([]int64, 0, n)
+	start := time.Now()
+	for index := 0; index < n; index++ {
+		round := time.Now()
+		id := fmt.Sprintf("xrt-reverse-%d", index)
+		var request any = payload
+		if !bare {
+			request = record{"jsonrpc": "2.0", "id": id, "method": "migaia.invoke", "params": record{"method": "bench.echo", "args": []any{payload}}}
+		}
+		if err := bridgeSend(writer, request); err != nil {
+			return nil, err
+		}
+		reply, err := bridgeReceive(reader)
+		if err != nil {
+			return nil, err
+		}
+		valid := false
+		if bare {
+			text, ok := reply.(string)
+			valid = ok && text == payload
+		} else {
+			message := field(reply)
+			valid = message["id"] == id && message["result"] == payload && message["error"] == nil
+		}
+		if !valid {
+			return nil, errors.New("INVALID_ENVELOPE")
+		}
+		latencies = append(latencies, time.Since(round).Nanoseconds())
+	}
+	return record{"xrtReceipt": true, "calls": n, "elapsedNs": time.Since(start).Nanoseconds(), "latenciesNs": latencies, "clientInFlightPeak": 1, "burstSize": 1}, nil
+}
+
+// serveBridge shares real business state while exposing only negotiated bridge extensions.
 func serveBridge(reader io.Reader, writer io.Writer, host bool, token string) error {
 	b := businessState{host: host, installed: !host, received: []any{}, aborts: []any{}, waiting: map[string]record{}, streams: map[string]*businessStream{}}
 	authenticated := false
@@ -490,6 +541,9 @@ func serveBridge(reader io.Reader, writer io.Writer, host bool, token string) er
 						methods = append(methods, raw)
 					}
 				}
+				// The bounded reverse initiator exists only on this Content-Length profile.
+				// Native forward-only Go directories retain their original methods.
+				methods = append(methods, record{"name": "peer.reverse", "supportedModes": []string{"request"}, "modeSource": "declared"})
 				description["methods"] = methods
 			case "migaia.invoke":
 				if !authenticated {
@@ -501,7 +555,17 @@ func serveBridge(reader io.Reader, writer io.Writer, host bool, token string) er
 					b.waiting[message["id"].(string)] = message
 					continue
 				}
-				result, failure = b.invoke(called, args, field(params["meta"])["trace"])
+				if called == "peer.reverse" && len(args) != 1 {
+					result, failure = nil, runtimeFailure("PAYLOAD_INVALID", runtimePayloadInvalid)
+				} else if called == "peer.reverse" {
+					var err error
+					result, err = xrtReverse(reader, writer, field(args[0]), false)
+					if err != nil {
+						return err
+					}
+				} else {
+					result, failure = b.invoke(called, args, field(params["meta"])["trace"])
+				}
 			default:
 				failure = wireError("METHOD_NOT_FOUND", "bridge peer method unavailable")
 			}

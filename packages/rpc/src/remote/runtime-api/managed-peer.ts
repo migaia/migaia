@@ -1,4 +1,5 @@
-import { runtimeQuery, type IRuntimeConnectionOrigin } from './overview.js'
+import { createManagedRuntimeCalls } from '../../core/internal/runtime-call.js'
+import { runtimeQuery } from './overview.js'
 import { createAbortController, type IAbortSignal } from '@migaia/lifecycle'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
@@ -14,15 +15,9 @@ import {
   type IRemoteRuntimeRegistration
 } from '../proxy.js'
 import { observeRemoteGenerations } from '../internal/assemble-plugin.js'
-import type { IRuntimePreparationContext } from './launch-context.js'
-import { isForwardedPayload } from '../../core/internal/outbound-envelope.js'
-import { RuntimeApiMode } from './constants.js'
-import { RuntimePluginKey } from './constants.js'
-import { assertRuntimeTransferFamily } from './transfer.js'
 import { readRuntimeDefaultTimeout, prepareRuntimeCallTimeout } from './timeout.js'
-import { RpcRuntimeGenerationKind } from '../../contract/runtime-api/constants.js'
+import { RpcRuntimeGenerationKind } from '../../contract/framing/v1.js'
 import { compileRuntimeMethods } from './catalog.js'
-import type { IRuntimeCallOptions } from './typing.js'
 import {
   createRuntimePeer,
   prepareRuntimePeerSourceContext,
@@ -51,12 +46,27 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
     Pick<IRemoteProxyOptions<TUnit, TSpec>, 'keyFactory' | 'retryPort' | 'callDeadlineCapMs'>,
   binding: IRemoteBinding<TUnit, TSpec>,
   bindEndpoint?: (channel: IRemoteChannel, endpoint: IRemoteServeEndpoint) => IRemoteServeEndpoint,
-  preparation?: IRuntimePreparationContext,
+  preparation?: Readonly<{
+    selfDefaulted?: boolean
+    connectionOrigin?(): import('./overview.js').IRuntimeConnectionOrigin
+    restrictTransfer?(options: object | undefined): void
+    host?: import('@migaia/plugin-host').IPluginRuntimeIntegration
+    providerAdmission?: import('../../core/features/provider.js').IProviderAdmissionScope
+    providerAdmissionRegistration?: Readonly<{
+      stagePolicy(maxGlobal?: number, maxPerPeer?: number): void
+      isCommitted(): boolean
+    }>
+    initialSignal?: IAbortSignal
+    lifecycleSignal?: IAbortSignal
+    own?(dispose: () => Promise<void>): void
+    readProvide?(): import('./peer.js').IRuntimePeerProvide
+    publishPeer?(peer: IRuntimePeer): () => void
+  }>,
   beforeRelease?: () => Promise<void>,
-  origin?: IRuntimeConnectionOrigin,
-  ownsExecution = false,
-  family?: keyof typeof RuntimePluginKey
+  execution?: import('@migaia/supervision').ISupervisor<unknown, unknown>
 ): Promise<IRuntimePeer> {
+  /** This private native restriction never grants execution, channel or Host authority. */
+  const restrictTransfer = preparation?.restrictTransfer
   /** The original registration receives a logical deadline before applying its launcher cap. */
   const callTimeout = prepareRuntimeCallTimeout(readRuntimeDefaultTimeout(options))
   compileRuntimeMethods(options.provide, options.contract)
@@ -65,7 +75,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   /** This is the original canonical current/leave/ready owner, shared with existing remote facades. */
   const registration = createRemoteRuntimeRegistration({
     binding,
-    ownsExecution,
+    execution,
     report: options.report,
     keyFactory: options.keyFactory,
     retryPort: options.retryPort,
@@ -79,16 +89,18 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
           providerLimits: options.providerLimits,
           defaultTimeoutMs: options.defaultTimeoutMs,
           contract: options.contract,
-          endpointFactory: options.endpointFactory,
+          endpointFactory: options.endpointFactory
+            ? (_borrowedChannel, signal) => options.endpointFactory!(channel, signal)
+            : undefined,
           report: options.report
         },
         {
-          self: context.self,
-          source: async () => channel,
-          nodeId: preparation?.nodeId,
+          channel: Object.fromEntries(
+            Object.entries(channel).filter(([key]) => key !== 'close')
+          ) as Omit<IRemoteChannel, 'close'>,
+          host: preparation?.host,
           providerAdmission: preparation?.providerAdmission,
-          origin,
-          ownsChannel: false,
+          providerAdmissionRegistration: preparation?.providerAdmissionRegistration,
           signal: preparationSignal,
           generation: {
             kind: RpcRuntimeGenerationKind.session,
@@ -98,8 +110,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
           ...(bindEndpoint
             ? { wrapEndpoint: (endpoint: IRemoteServeEndpoint) => bindEndpoint(channel, endpoint) }
             : {})
-        },
-        family
+        }
       ),
     readRuntimeEndpoint: (peer) => {
       /** Native health/drain receives the actual endpoint, never a synthetic successful ping. */
@@ -119,7 +130,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
     return holder.release()
   }
   try {
-    preparation?.own(close)
+    preparation?.own?.(close)
     await holder.prepareInitial(signal, true)
     stopObserving = observeRemoteGenerations(
       holder,
@@ -141,38 +152,16 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   }
   /** Only the true accepted generation supplies identity and directory metadata for publication. */
   registration.currentPeer()
-  /** One cold dispatcher keeps drain admission ahead of dispatch without a per-call facade closure. */
-  const request = (method: string, payload: unknown, callOptions: IRuntimeCallOptions) =>
-    registration.invokeRequest(method, payload, callOptions)
   /** Calls preserve the original current-generation operation Promise and stream iterator. */
   const peer: IRuntimePeer = Object.freeze({
     self: context.self,
-    request: (method, payload, callOptions) => {
-      assertRuntimeTransferFamily(family, callOptions)
-      /** Logical retry settlement must finish before native drain can retire its generation. */
-      return binding.trackRequest
-        ? binding.trackRequest(request, method, payload, callTimeout(callOptions))
-        : request(method, payload, callTimeout(callOptions))
-    },
-    notify: (method, payload, callOptions) => {
-      assertRuntimeTransferFamily(family, callOptions)
-      return isForwardedPayload(callOptions, payload)
-        ? registration
-            .invokeRequest(method, payload, callOptions, RuntimeApiMode.notify)
-            .then(() => undefined)
-        : registration.currentPeer().notify(method, payload, callOptions)
-    },
-    stream: (method, payload, callOptions) => {
-      assertRuntimeTransferFamily(family, callOptions)
-      return isForwardedPayload(callOptions, payload) || options.callDeadlineCapMs !== undefined
-        ? registration.invokeStream(method, payload, callTimeout(callOptions))
-        : registration.currentPeer().stream(method, payload, callTimeout(callOptions))
-    },
-    group: (steps, callOptions) => {
-      assertRuntimeTransferFamily(family, callOptions)
-      return registration.invokeGroup(steps, callOptions)
-    },
-    outcome: (key) => registration.currentPeer().outcome(key),
+    ...createManagedRuntimeCalls({
+      restrictTransfer,
+      callTimeout,
+      callDeadlineCapMs: options.callDeadlineCapMs,
+      trackRequest: binding.trackRequest,
+      registration
+    }),
     describe: runtimeQuery(() => registration.inspectRuntime()),
     close
   })

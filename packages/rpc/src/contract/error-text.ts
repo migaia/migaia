@@ -10,6 +10,8 @@ export const RpcContractErrorText = {
   /** Stable diagnostic for a stream frame rejected by the contract validator. */
   invalidStream: 'rpc stream is invalid',
   invalidFrame: 'rpc frame is invalid',
+  /** BC7 preserves the original process string diagnostic at its canonical framing owner. */
+  expectedString: 'process channel requires a string encoded value',
   frameLimitExceeded: 'rpc frame limit exceeded',
   frameAssemblyExpired: 'rpc frame assembly expired',
   /** Stable message for invalid wire error payloads reported by contract validation. */

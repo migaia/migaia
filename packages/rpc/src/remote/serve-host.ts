@@ -7,10 +7,10 @@ import {
   type IPluginRemoval
 } from '@migaia/plugin-host'
 import { probeThenable, ThenableProbeKind } from '@migaia/utils/function'
-import { serializeRpcError } from '../contract/error.js'
-import { normalizePortable } from '../contract/normalize.js'
-import type { IRpcPortableValue } from '../contract/types.js'
-import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
+import { serializeRpcError } from '../contract/index.js'
+import { normalizePortable } from '../contract/index.js'
+import type { IRpcPortableValue } from '../contract/index.js'
+import { RpcCoreErrorCode, RpcError } from '../core/index.js'
 import { readEndpointIdentity } from '../core/internal/endpoint-projection.js'
 import { RemoteMethodName } from './constants.js'
 import {

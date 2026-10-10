@@ -1,3 +1,5 @@
+import { selectedJsonObjectPort } from './json-object-port.js'
+import { invalidRpcStream } from '../../contract/index.js'
 import { createOutboundEnvelope } from './outbound-envelope.js'
 import { readProviderPreflight } from './provider.js'
 import { hasFastEndpoint } from './fast-path.js'
@@ -13,7 +15,6 @@ import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcAbortSignal, IRpcContext, IRpcEventListener, IRpcProvider } from '../typing.js'
 import {
   deserializeRpcError,
-  invalidRpcStream,
   RpcStreamViolation,
   RpcControl,
   RpcRouteProfile,
@@ -24,13 +25,16 @@ import {
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import type { IInboundIdentityAdmission } from './inbound-identity.js'
 import { EndpointOwnerKey, type IEndpointKernelHost } from '../endpoint-kernel.js'
-import { readRpcSingleFrameFacts } from '../../contract/framing/reassembler.js'
 import type {
   IRpcInboundIdentityPort,
   IRpcOutboundOperationsPort,
   IRpcVariationCoordinatorPort
 } from './plugin-shared-keys.js'
-import { ProviderAdmissionRegistry } from './provider-admission.js'
+import {
+  ProviderAdmissionRegistry,
+  prepareProviderAdmissionScope,
+  type IProviderAdmissionScope
+} from './provider-admission.js'
 import { assertContractMethod } from './contract.js'
 import { ProviderExecutor } from './provider-executor.js'
 import { ProviderRegistry } from './provider.js'
@@ -44,8 +48,8 @@ import { NativeDefaultIdText } from './native-default-id-text.js'
 import { tupleKey, runtimeTaskKey } from './safe-value.js'
 import { createRpcIdempotencyStore } from '../idempotency-store.js'
 import type { RpcOutboundAttachment } from './outbound-attachment.js'
-import type { IRpcRuntimeEnvelope } from '../../contract/runtime-api/types.js'
-import { RpcRuntimeKind, RpcRuntimeOperation } from '../../contract/runtime-api/constants.js'
+import type { IRpcRuntimeEnvelope } from '../../contract/index.js'
+import { RpcRuntimeKind, RpcRuntimeOperation } from '../../contract/framing/v1.js'
 import type { IRpcEarlyProviderIntent } from './variation-coordinator.js'
 import {
   readSelectedFramerChunks,
@@ -110,7 +114,8 @@ export class RpcProviderAttachment {
     kernel: IEndpointKernelHost,
     ports: IRpcProviderPorts,
     prepared: IPreparedEndpoint<string>,
-    admission?: ProviderAdmissionRegistry
+    admission?: IProviderAdmissionScope,
+    commitPolicy?: () => boolean
   ) {
     this.#kernel = kernel
     this.#chunks = readSelectedFramerChunks(prepared.options.components!)
@@ -124,15 +129,23 @@ export class RpcProviderAttachment {
         ? `${prepared.id}:${uniqueTargetId}`
         : prepared.id
     this.#abortEnabled = prepared.options.features?.abort === true
+    /** Capacity comes from the actual selected framer, never a caller-provided ingress number. */
+    const maxIngress =
+      prepared.options.components!.ingressPrepare.singleFrameLimits?.maxConcurrentMessages
     this.#admission = new ProviderAdmissionRegistry(
       prepared.options.providerLimits?.maxGlobal ?? 256,
       prepared.options.providerLimits?.maxPerPeer ?? 64,
-      readRpcSingleFrameFacts(
-        prepared.options.components!.framer.accept,
-        prepared.options.components!.framer.frame
-      )?.maxConcurrentMessages
+      maxIngress
     )
-    this.#runtimeAdmission = admission ?? this.#admission
+    this.#runtimeAdmission = admission
+      ? prepareProviderAdmissionScope(
+          admission,
+          prepared.options.providerLimits?.maxGlobal,
+          prepared.options.providerLimits?.maxPerPeer,
+          maxIngress,
+          commitPolicy?.() ?? true
+        )
+      : this.#admission
     if (
       prepared.options.providerLimits?.onRejected !== undefined &&
       typeof prepared.options.providerLimits.onRejected !== 'function'
@@ -156,6 +169,8 @@ export class RpcProviderAttachment {
     )
     this.#executor = new ProviderExecutor({
       fast: hasFastEndpoint(prepared.options),
+      /** Borrow only the once-selected factory response format, never caller/wire policy. */
+      responseError: selectedJsonObjectPort(prepared.options.components!)?.responseError,
       timestamp: () => kernel.time.timestamp(),
       now: () => kernel.time.now(),
       setTimeout: (task, delayMs) => kernel.time.setTimeout(task, delayMs),

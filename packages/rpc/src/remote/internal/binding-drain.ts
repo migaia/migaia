@@ -3,10 +3,10 @@ import {
   wrapProviderStreamAdmission
 } from '../../core/internal/provider.js'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
-import { RpcCapability } from '../../contract/wire-constants.js'
+import { RpcCapability } from '../../contract/index.js'
 import type { IRemoteChannel, IRemoteServeEndpoint, IRemoteRequestTracker } from '../types.js'
 import type { IRuntimeCallOptions } from '../runtime-api/typing.js'
-import type { IRpcEndpoint } from '../../core/typing.js'
+import type { IRpcEndpoint } from '../../core/index.js'
 import { EndpointOwnerKey } from '../../core/endpoint-kernel.js'
 import { readEndpointOwner } from '../../core/internal/endpoint-projection.js'
 import type { RpcStreamOwner } from '../../core/internal/stream/owner.js'

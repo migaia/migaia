@@ -1,3 +1,4 @@
+import type { IRemoteChannel } from '../../../src/remote/types.js'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { createUnitBudget } from '@migaia/supervision'
@@ -168,7 +169,7 @@ export function nativeBorrowedPeer(address: string, token = nativeHostToken) {
   return createProcessPeer<IRuntimeDynamicSurface>({
     self: { name: 'host-parent', instanceId: 'host-parent' },
     report: () => undefined,
-    endpointFactory: (channel) => nativeEndpoint(channel, 'host-parent'),
+    endpointFactory: (channel) => nativeEndpoint(channel as IRemoteChannel, 'host-parent'),
     connect: {
       kind: 'connect',
       address,

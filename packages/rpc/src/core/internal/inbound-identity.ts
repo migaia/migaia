@@ -6,7 +6,7 @@ import type { IRpcConnectCapability } from '../typing.js'
 import type { IRpcInboundMessage, IRpcTransportTopology } from '../transport.js'
 import type { IRpcPlatform } from '../typing.js'
 import type { INativeReplayReceipt } from './native-replay.js'
-import type { IRpcRuntimeGeneration } from '../../contract/runtime-api/types.js'
+import type { IRpcRuntimeGeneration } from '../../contract/index.js'
 
 /** Result of shared inbound identity admission; token is leased until release. */
 export type IInboundIdentityAdmission = {
@@ -259,6 +259,13 @@ export class InboundIdentityCoordinator {
   bindResponseGeneration(binding: string, generation: IRpcRuntimeGeneration): boolean {
     const token = this.#established.get(binding)
     return token !== undefined && this.bindGeneration(token, generation)
+  }
+
+  /** Resolve only the generation already bound to this exact authenticated response source. */
+  readResponseGeneration(binding: string): IRpcRuntimeGeneration | undefined {
+    /** The original established table remains the only response identity owner. */
+    const token = this.#established.get(binding)
+    return token === undefined ? undefined : this.readGeneration(token)
   }
 
   /** Runtime fences read only previously accepted describe identity on this original peer owner. */

@@ -7,11 +7,7 @@ import {
 import { createRpcIdempotencyStore } from '../../../dist/core/idempotency-store.js'
 import { retainRuntimeIdempotencyScope } from '../../../dist/core/internal/provider.js'
 import { readFileSync, appendFileSync } from 'node:fs'
-import {
-  RUNTIME_API_CAPABILITIES,
-  RuntimeSourceKind,
-  RuntimeConnectionDirection
-} from '../../../dist/remote/runtime-api/constants.js'
+import { RUNTIME_API_CAPABILITIES } from '../../../dist/remote/runtime-api/constants.js'
 import {
   readThreadRuntimeBootstrap,
   intersectThreadCapabilities
@@ -64,8 +60,32 @@ const external = journal
       })
     }
   : undefined
+/** The actual cold handoff supplies bootstrap ownership only after native acquisition. */
+const resources = { generation: bootstrap.generation, bootstrap: undefined }
 await createRuntimePeer(
   {
+    self: bootstrap.self,
+    /** Retain the original handoff, ACK and channel activation sequence. */
+    connect: async () => {
+      const handoff = createNodeThreadBootstrapHandoff(parentPort)
+      resources.bootstrap = handoff
+      parentPort.postMessage({
+        kind: ThreadBootstrap.runtimeAcknowledged,
+        version: THREAD_RUNTIME_API_VERSION,
+        capabilities
+      })
+      const channel = createNodeThreadChannel(
+        handoff.port,
+        bootstrap.parent.instanceId,
+        {
+          scheduler: systemScheduler,
+          capabilities: intersectThreadCapabilities(capabilities, bootstrap.capabilities)
+        },
+        handoff
+      )
+      bindNativeReplayTransport(parentPort, channel.transport)
+      return channel
+    },
     provide: { value: () => ({ executions: ++executions, threadId }) },
     ...(external
       ? {
@@ -91,29 +111,5 @@ await createRuntimePeer(
     report: (error) =>
       process.stderr.write(`${error?.source ?? 'fixture'}:${error?.code ?? 'unknown'}\n`)
   },
-  {
-    self: bootstrap.self,
-    generation: bootstrap.generation,
-    origin: { kind: RuntimeSourceKind.connect, direction: RuntimeConnectionDirection.spawnedBy },
-    /** Original handoff subscribes before real ACK and transfers once to the original channel. */
-    async source() {
-      const handoff = createNodeThreadBootstrapHandoff(parentPort)
-      parentPort.postMessage({
-        kind: ThreadBootstrap.runtimeAcknowledged,
-        version: THREAD_RUNTIME_API_VERSION,
-        capabilities
-      })
-      const channel = createNodeThreadChannel(
-        handoff.port,
-        bootstrap.parent.instanceId,
-        {
-          scheduler: systemScheduler,
-          capabilities: intersectThreadCapabilities(capabilities, bootstrap.capabilities)
-        },
-        handoff
-      )
-      bindNativeReplayTransport(parentPort, channel.transport)
-      return channel
-    }
-  }
+  resources
 )

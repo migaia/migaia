@@ -25,18 +25,14 @@ import type {
   IRuntimeExpose
 } from './typing.js'
 import type { IPluginConstraint, IPluginRuntimeSharedSlot } from '@migaia/plugin-host'
-import type { IRpcPortableValue } from '../../contract/types.js'
-import { serializeRpcError } from '../../contract/error.js'
-import { RpcCoreErrorCode, RpcError } from '../../core/errors.js'
+import type { IRpcPortableValue } from '../../contract/index.js'
+import { serializeRpcError } from '../../contract/index.js'
+import { RpcCoreErrorCode, RpcError } from '../../core/index.js'
 import type { IRuntimeCallOptions } from './typing.js'
 import type { IRuntimePeerDescription, IRuntimePeerIdentity } from './description.js'
 import type { IRuntimePeer } from './peer.js'
-import type {
-  IRpcRuntimeStep,
-  IRpcRuntimeStepOutcome,
-  IRpcRuntimeOutcomeResult
-} from '../../contract/runtime-api/types.js'
-import type { IRpcRuntimeSendOptions } from '../../core/internal/outbound-attachment.js'
+import type { IRpcRuntimeStep, IRpcRuntimeOutcomeResult } from '../../contract/runtime-api/types.js'
+import type { IRpcRuntimeStepOutcome } from '../../contract/v1/index.js'
 import { RuntimeApiErrorText } from './constants.js'
 
 /** The publisher lives on the same original facade and never in a second connection registry. */
@@ -187,7 +183,14 @@ export type IRuntimeOutlet = Pick<IRuntimeEventPublisher, 'on' | 'watch'> &
     group(
       target: IRuntimeTarget<string>,
       steps: readonly IRpcRuntimeStep[],
-      options?: IRpcRuntimeSendOptions
+      options?: Omit<
+        Extract<
+          import('../../contract/index.js').IRpcRuntimeEnvelope,
+          { kind: 'runtime-call' }
+        >['options'],
+        'timeoutMs'
+      > &
+        Pick<import('../../core/index.js').ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
     ): Promise<readonly IRpcRuntimeStepOutcome[]>
     /** Read the selected provider's original result store without admission or execution. */
     outcome(

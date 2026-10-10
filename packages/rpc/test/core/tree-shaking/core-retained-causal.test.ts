@@ -5,7 +5,13 @@ import { describe, expect, it } from 'vitest'
 import type { IRetainedConsumer } from '../fixtures/tree-shaking/retained-inventory.js'
 
 type IConsumer = IRetainedConsumer
-type ICausalEdge = { readonly consumer: IConsumer; readonly from: string; readonly to: string }
+type ICausalEdge = {
+  readonly consumer: IConsumer
+  readonly from: string
+  readonly to: string
+  /** Actual resolved modules omitted by emission, when this is an import/re-export path. */
+  readonly via?: readonly string[]
+}
 type IConsumerClosure = {
   readonly roots: readonly string[]
   readonly moduleCount: number
@@ -47,7 +53,9 @@ const consumers: readonly IConsumer[] = ['core', 'client', 'provider', 'full', '
 /** Runs the five-consumer causal evidence probe from the package root. */
 function readCausalReport(): ICausalReport {
   const script = resolve(import.meta.dirname, 'core-retained-causal.mjs')
-  return JSON.parse(execFileSync(process.execPath, [script], { encoding: 'utf8' })) as ICausalReport
+  return JSON.parse(
+    execFileSync(process.execPath, [script], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
+  ) as ICausalReport
 }
 
 /** Runs the independent emitted-consumer probe rather than reusing historical inventory. */

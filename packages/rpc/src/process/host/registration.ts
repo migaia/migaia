@@ -1,8 +1,8 @@
 import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IPluginRemoval } from '@migaia/plugin-host'
-import { defaultRpcId } from '../../core/internal/id.js'
+import { defaultRpcId } from '../../core/spi.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
-import { normalizeRemoteContract } from '../../remote/contract.js'
+import { normalizeRemoteContract } from '../../remote/index.js'
 import { createRemoteGenerationHolder, createRemoteRegistration } from '../../remote/proxy.js'
 import { assembleRemotePluginDefinition } from '../../remote/internal/assemble-plugin.js'
 import type {

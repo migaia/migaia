@@ -1,4 +1,9 @@
-import type { IRpcEnvelope, IRpcFramer, IRpcProtocol } from '../../contract/index.js'
+import type {
+  IRpcEnvelope,
+  IRpcFramer,
+  IRpcProtocol,
+  IRpcSerializedError
+} from '../../contract/index.js'
 import type { ICodec } from '@migaia/serialize/codec'
 import type { IRpcInboundMessage, IRpcSendOptions } from '../transport.js'
 import type { IRpcSelectedComponents } from './endpoint-options.js'
@@ -10,6 +15,8 @@ export type IRpcJsonObjectPort = Readonly<{
   readonly publicFramer: object
   readonly codec: ICodec<IRpcEnvelope, unknown>
   readonly framer: IRpcFramer<unknown, unknown, string, number>
+  /** Only the factory-held format operation can require complete original response errors. */
+  readonly responseError?: (error: unknown) => IRpcSerializedError
   readonly send: (value: unknown, options?: IRpcSendOptions) => void | Promise<void>
   readonly subscribe: (listener: (message: IRpcInboundMessage) => void) => () => void
 }>

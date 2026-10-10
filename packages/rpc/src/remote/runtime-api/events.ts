@@ -1,7 +1,7 @@
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
-import { RpcCoreErrorCode, RpcError } from '../../core/errors.js'
+import { RpcCoreErrorCode, RpcError } from '../../core/index.js'
 import { createRemoteLayerError } from '../error.js'
 import { RpcRemoteLayerErrorCode } from '../error-code.js'
 import { RuntimeEventName, RuntimeQueryLimit, RuntimeApiErrorText } from './constants.js'

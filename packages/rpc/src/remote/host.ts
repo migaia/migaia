@@ -1,4 +1,4 @@
-import type { IRpcPortableValue } from '../contract/types.js'
+import type { IRpcPortableValue } from '../contract/index.js'
 import { RemoteMethodName } from './constants.js'
 import { normalizeRemoteHostCatalog, type IRemoteHostCatalog } from './contract.js'
 import { RpcRemoteLayerErrorCode } from './error-code.js'

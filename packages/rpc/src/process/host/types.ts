@@ -1,5 +1,5 @@
-import type { IRemoteHostCatalog } from '../../remote/contract.js'
-import type { IRemoteServeHostOptions } from '../../remote/serve-host.js'
+import type { IRemoteHostCatalog } from '../../remote/index.js'
+import type { IRemoteServeHostOptions } from '../../remote/index.js'
 import type { IProcessRegistrationListenOptions } from '../resilience/types.js'
 
 /** A verifier principal selects a local approved Host and contract, not a peer claim. */

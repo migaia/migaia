@@ -2,11 +2,11 @@ import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IPluginDependencyPlan, IPluginRemoval } from '@migaia/plugin-host'
 import type { IReadyOutcome, ISupervisorSnapshot } from '@migaia/supervision'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import type { IRpcHandshakeOffer, IRpcPeerInfo } from '../../contract/handshake.js'
-import type { IRpcPortableValue } from '../../contract/types.js'
-import type { IRpcIdempotencyConfig, IRpcProviderLimits } from '../../core/typing.js'
-import type { IRpcIdempotencyStore } from '../../core/idempotency-store.js'
-import type { IRemoteCallGuard, IRemoteChannel } from '../../remote/types.js'
+import type { IRpcHandshakeOffer, IRpcPeerInfo } from '../../contract/index.js'
+import type { IRpcPortableValue } from '../../contract/index.js'
+import type { IRpcIdempotencyConfig, IRpcProviderLimits } from '../../core/index.js'
+import type { IRpcIdempotencyStore } from '../../core/index.js'
+import type { IRemoteCallGuard, IRemoteChannel } from '../../remote/index.js'
 import type {
   IListenProcessByteChannel,
   IProcessCommonOptions,

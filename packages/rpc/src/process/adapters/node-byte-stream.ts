@@ -1,8 +1,17 @@
 import type { Readable, Writable } from 'node:stream'
+import { Buffer } from 'node:buffer'
+import { remoteProcessJsonCodec } from '../pipeline.js'
+import { registerFastCodec } from '../../core/internal/fast-path.js'
+import { RpcOwnedBinaryAlphabet } from '../../core/internal/outbound-owned-codec.js'
 import { RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
 import type { IProcessByteChannel } from '../types.js'
 import type { INativeReplayOwner } from '../../core/internal/native-replay.js'
+
+/** This adapter holds the actual native encoder; Contract imports no Node implementation. */
+registerFastCodec(remoteProcessJsonCodec, (bytes) =>
+  Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString(RpcOwnedBinaryAlphabet)
+)
 
 /** Stream construction alone is not authority; only canonical launch/stdio owners register it. */
 const nativeOwners = new WeakMap<object, INativeReplayOwner>()

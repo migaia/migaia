@@ -1,20 +1,24 @@
 import { normalizeRpcEnvelope, RpcEnvelopeKind, type IRpcEnvelope } from '../../contract/index.js'
-import type { IRpcPortableValue } from '../../contract/types.js'
+import type { IRpcPortableValue } from '../../contract/index.js'
 import type { IRpcContext } from '../typing.js'
 import { readProviderRuntimeOperation } from './provider.js'
 import type { IRpcRuntimeOptions } from '../../contract/runtime-api/types.js'
-import type { IRpcRuntimeEnvelope } from '../../contract/runtime-api/types.js'
+import type { IRpcRuntimeEnvelope } from '../../contract/index.js'
 import { normalizeRuntimeEnvelope } from '../../contract/runtime-api/normalize.js'
-import { RpcRuntimeProfile, RpcRuntimeKind } from '../../contract/runtime-api/constants.js'
-import { normalizePortable } from '../../contract/normalize.js'
-import { invalidRpcEnvelope } from '../../contract/v1/route.js'
-import { RpcEnvelopeViolation } from '../../contract/wire-constants.js'
+import { RpcRuntimeProfile, RpcRuntimeKind } from '../../contract/framing/v1.js'
+import { normalizePortable } from '../../contract/index.js'
+import {
+  captureOwnedJson,
+  readOwnedJsonSnapshot,
+  prepareOwnedJsonSnapshot
+} from './outbound-owned-codec.js'
+import { isInboundNormalizedPayload } from './inbound-normalization.js'
 
 /**
  * Private options provenance is minted only by the compiled forwarding provider, never a public
  * flag.
  */
-const forwardedPayload = Symbol('rpc-forwarded-payload')
+const forwardedPayloads = new WeakMap<object, unknown>()
 /** Route metadata travels only with the package-minted admitted payload options. */
 const forwardedRoute = Symbol('rpc-forwarded-route')
 
@@ -26,18 +30,18 @@ export function createForwardOptions(
   Readonly<{
     signal: IRpcContext['signal']
     timeoutMs?: number
-    [forwardedPayload]: unknown
     [forwardedRoute]?: readonly string[]
   }> {
   /** Opt-in relays preserve the final provider's selected semantics; ordinary metadata stays absent. */
   const runtime = readProviderRuntimeOperation(context)
-  return {
+  const options = {
     ...(runtime && 'options' in runtime ? runtime.options : {}),
     signal: context.signal,
     ...(context.timeoutMs === undefined ? {} : { timeoutMs: context.timeoutMs }),
-    [forwardedPayload]: context.data,
     ...(route === undefined ? {} : { [forwardedRoute]: route })
   }
+  forwardedPayloads.set(options, context.data)
+  return options
 }
 
 /** New-profile headers reuse the exact same canonical private route provenance as ordinary forwards. */
@@ -57,23 +61,27 @@ export function createForwardQueryOptions(route: readonly string[] | undefined):
  * hop.
  */
 export function isForwardedPayload(options: unknown, payload: unknown): boolean {
+  if (!isForwardedOperation(options) || forwardedPayloads.get(options as object) !== payload)
+    return false
   return (
-    isForwardedOperation(options) && Reflect.get(options as object, forwardedPayload) === payload
+    payload === null ||
+    payload === undefined ||
+    typeof payload === 'string' ||
+    typeof payload === 'boolean' ||
+    (typeof payload === 'number' && Number.isFinite(payload)) ||
+    (typeof payload === 'object' && isInboundNormalizedPayload(payload))
   )
 }
 
 /** The original retry owner recognizes package-minted forwarding provenance without a public flag. */
 export function isForwardedOperation(options: unknown): boolean {
-  return typeof options === 'object' && options !== null && Object.hasOwn(options, forwardedPayload)
+  return typeof options === 'object' && options !== null && forwardedPayloads.has(options)
 }
 
 /** Copy only internal provenance through a canonical owner that reconstructs its send options. */
 export function retainForwardOptions<T extends object>(source: unknown, target: T): T {
-  if (typeof source === 'object' && source !== null && Object.hasOwn(source, forwardedPayload))
-    Object.defineProperty(target, forwardedPayload, {
-      value: Reflect.get(source, forwardedPayload),
-      enumerable: true
-    })
+  if (typeof source === 'object' && source !== null && forwardedPayloads.has(source))
+    forwardedPayloads.set(target, forwardedPayloads.get(source))
   if (typeof source === 'object' && source !== null && Object.hasOwn(source, forwardedRoute))
     Object.defineProperty(target, forwardedRoute, {
       value: Reflect.get(source, forwardedRoute),
@@ -91,11 +99,14 @@ class OutboundSnapshot extends class {
 } {
   /** The exact original admission kind stays on its snapshot and cannot be copied or reflected. */
   #kind: symbol
+  /** Logical input grammar depth is private and cannot be copied from reflected properties. */
+  #depth: 0 | 2 | undefined
 
   /** Stamp a newly admitted record once, including records already frozen by the contract owner. */
-  constructor(value: object, kind: symbol) {
+  constructor(value: object, kind: symbol, depth?: 0 | 2) {
     super(value)
     this.#kind = kind
+    this.#depth = depth
   }
 
   /** Caller freezing, field copies and inbound records cannot mint this private admission kind. */
@@ -106,6 +117,10 @@ class OutboundSnapshot extends class {
       ? value.#kind
       : undefined
   }
+  /** Read only the exact input owner's original grammar association. */
+  static depth(value: object): 0 | 2 | undefined {
+    return #depth in value ? value.#depth : undefined
+  }
 }
 /** Distinct private proof kinds cannot be forged by copying fields or freezing caller data. */
 const legacySnapshot = Symbol('rpc-legacy-outbound-snapshot')
@@ -113,10 +128,24 @@ const legacySnapshot = Symbol('rpc-legacy-outbound-snapshot')
 const runtimeSnapshot = Symbol('rpc-runtime-outbound-snapshot')
 /** One logical caller admission survives its original retry owner without another portable walk. */
 const runtimeInputSnapshot = Symbol('rpc-runtime-input-snapshot')
-/** Existing options carry only a package-owned exact input reference, never a public skip flag. */
-const runtimeInput = Symbol('rpc-runtime-input')
-/** Logical input admission retains the original grammar depth when reused by a legacy frame. */
-const runtimeInputDepth = Symbol('rpc-runtime-input-depth')
+/** Core-to-Core options retain an exact input without a reflected marker or public skip flag. */
+class RuntimeInputOptions extends class {
+  /** Stamp the existing options record without changing its prototype or public property shape. */
+  constructor(value: object) {
+    return value
+  }
+} {
+  /** Only the original Core operation can retain the input owned by its capture/retry path. */
+  #input: IRuntimeRequestInput
+  constructor(value: object, input: IRuntimeRequestInput) {
+    super(value)
+    this.#input = input
+  }
+  /** A spread or foreign options object cannot carry this private association. */
+  static read(value: object): IRuntimeRequestInput | undefined {
+    return #input in value ? value.#input : undefined
+  }
+}
 
 /** A logical input belongs to the same proof owner as the final immutable outbound envelope. */
 export type IRuntimeRequestInput = Readonly<{
@@ -142,9 +171,8 @@ export function createRuntimeRequestInput(
         ? (payload as IRpcPortableValue)
         : normalizePortable(payload, portableDepth, new Set<object>(), binary)
   const input = { method, ...(portable === undefined ? {} : { payload: portable }) }
-  Object.defineProperty(input, runtimeInputDepth, { value: portableDepth })
   Object.freeze(input)
-  new OutboundSnapshot(input, runtimeInputSnapshot)
+  new OutboundSnapshot(input, runtimeInputSnapshot, portableDepth)
   return input
 }
 
@@ -153,7 +181,7 @@ export function retainRuntimeRequestInput<T extends object>(
   options: T,
   input: IRuntimeRequestInput
 ): T {
-  Object.defineProperty(options, runtimeInput, { value: input, enumerable: true })
+  new RuntimeInputOptions(options, input)
   return options
 }
 
@@ -165,10 +193,10 @@ export function readRuntimeRequestInput(
   portableDepth: 0 | 2 = 0
 ): IRuntimeRequestInput | undefined {
   if (typeof options !== 'object' || options === null) return undefined
-  const input = Reflect.get(options, runtimeInput) as IRuntimeRequestInput | undefined
+  const input = RuntimeInputOptions.read(options)
   return input &&
     isRuntimeRequestInput(input) &&
-    Reflect.get(input, runtimeInputDepth) === portableDepth &&
+    OutboundSnapshot.depth(input) === portableDepth &&
     input.method === method &&
     input.payload === payload
     ? input
@@ -246,8 +274,6 @@ export function createRuntimeRequestOutboundEnvelope(
 ): IRpcRuntimeEnvelope {
   /** Only the internal admission owner supplies this input; malformed caller headers still reject. */
   const envelope = normalizeRuntimeEnvelope(header)
-  if (!isRuntimeRequestInput(input))
-    throw invalidRpcEnvelope(RpcEnvelopeViolation.payload, '/payload')
   if (envelope.kind !== RpcRuntimeKind.call || envelope.task.method !== input.method)
     return createRuntimeOutboundEnvelope({ ...envelope, payload: input.payload })
   const complete = Object.freeze({
@@ -274,23 +300,11 @@ export function isRuntimeOutboundEnvelope(value: unknown): value is IRpcRuntimeE
  * caller.
  */
 export function outboundJsonByteUpperBound(value: unknown): number | undefined {
+  /** Prepared codec views retain their construction bound without another graph walk. */
+  const prepared = readOwnedJsonSnapshot(value)
+  if (prepared) return prepared.byteUpperBound
   if (!isOutboundEnvelope(value)) return undefined
-  return portableJsonByteUpperBound(value)
-}
-
-/** Counts snapshot structure without encoding or visiting characters of string payloads. */
-function portableJsonByteUpperBound(value: unknown): number {
-  if (typeof value === 'string') return value.length * 6 + 2
-  /** Finite numbers, booleans, null and omitted undefined fields need at most 32 JSON bytes. */
-  if (value === null || typeof value !== 'object') return 32
-  /** Five bytes per array slot cover its JSON null/comma, including holes retained by map. */
-  let bytes = Array.isArray(value) ? 2 + value.length * 5 : 2
-  for (const key of Object.keys(value)) {
-    /** Array indices are omitted by JSON; including their names still provides a safe upper bound. */
-    bytes +=
-      key.length * 6 + 4 + portableJsonByteUpperBound((value as Record<string, unknown>)[key])
-  }
-  return bytes
+  return prepareOwnedJsonSnapshot(value).byteUpperBound
 }
 
 /**
@@ -298,20 +312,5 @@ function portableJsonByteUpperBound(value: unknown): number {
  * order.
  */
 export function materializeOutboundJson(value: unknown, sortKeys = true): unknown {
-  if (typeof value === 'number') return Object.is(value, -0) ? 0 : value
-  if (value === null || typeof value !== 'object') return value
-  if (Array.isArray(value)) return value.map((item) => materializeOutboundJson(item, sortKeys))
-  /** Ordinary records reproduce JSON.parse while defining **proto** safely as own data. */
-  const result: Record<string, unknown> = {}
-  /** Legacy bridge materialization preserves its already-admitted insertion order. */
-  const keys = Object.keys(value)
-  if (sortKeys) keys.sort()
-  for (const key of keys)
-    Object.defineProperty(result, key, {
-      value: materializeOutboundJson((value as Record<string, unknown>)[key], sortKeys),
-      enumerable: true,
-      configurable: true,
-      writable: true
-    })
-  return result
+  return captureOwnedJson(value, sortKeys).value
 }

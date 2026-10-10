@@ -12,13 +12,39 @@ import type {
   IRpcUuidConfig
 } from '../typing.js'
 import type { IRpcHookFailureReporter } from './hooks.js'
-import type { IOutboundAttachmentHost } from './outbound-attachment.js'
+import type { IOutboundAttachmentHost, IOutboundReceiver } from './outbound-attachment.js'
 import type { IInboundIdentityAdmission, IInboundIdentityRequest } from './inbound-identity.js'
 import type { IVariationHandler } from './variation-coordinator.js'
 import type { RpcControl } from '../../contract/index.js'
 import type { IRpcEnvelope } from '../../contract/index.js'
 import type { IAbortSignal } from './async-control.js'
 import type { IRpcRuntimeTask } from '../../contract/runtime-api/types.js'
+
+/** Only the canonical attachment supplies local Promise misses and synchronous registry hits. */
+type ICanonicalReceiverReader = (
+  targetId: string,
+  receiverId?: string
+) => IOutboundReceiver | Promise<IOutboundReceiver>
+
+/** Exact installed ports retain their original owner function, never a second receiver state. */
+const canonicalReceiverReaders = new WeakMap<IRpcDiscoveryResolverPort, ICanonicalReceiverReader>()
+
+/** Register a package-owned port at cold installation; public resolve remains Promise-based. */
+export function registerCanonicalReceiver(
+  port: IRpcDiscoveryResolverPort,
+  reader: ICanonicalReceiverReader
+): void {
+  canonicalReceiverReaders.set(port, reader)
+}
+
+/** Unknown/custom ports return undefined without reading resolve or any then property. */
+export function readCanonicalReceiver(
+  port: IRpcDiscoveryResolverPort,
+  targetId: string,
+  receiverId?: string
+): IOutboundReceiver | Promise<IOutboundReceiver> | undefined {
+  return canonicalReceiverReaders.get(port)?.(targetId, receiverId)
+}
 
 /** Typed outbound owner port consumed by dependent feature descriptors. */
 export type IRpcOutboundAttachmentPort = IOutboundAttachmentHost

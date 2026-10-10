@@ -1,3 +1,4 @@
+import { serializeRpcError } from '../../dist/contract/index.js'
 import { createThreadPeer } from '../../dist/threads/index.js'
 import type { IRuntimeDynamicSurface } from '../../dist/remote/runtime-api/typing.js'
 import { RUNTIME_API_CAPABILITIES } from '../../dist/remote/runtime-api/constants.js'
@@ -28,10 +29,36 @@ export async function runWebBinaryQualification(
   /** Native lifecycle remains explicitly unsupported where the real adapter says so. */
   let handle: IWebThreadHandle | undefined
   /** Only classified native/core failures enter this test receipt. */
-  const failures: { source?: string; code?: string; name?: string }[] = []
+  const failures: unknown[] = []
+  /**
+   * Closing reports remain visible but cannot retroactively change the already judged business
+   * interval.
+   */
+  const closing: unknown[] = []
+  /** Only native Peer teardown changes the phase; no diagnostic is swallowed. */
+  let phase: 'business' | 'closing' = 'business'
+  /** Set only after all six actual business operations, before entering the original close. */
+  let businessComplete = false
+  /**
+   * Record close identity/completion without allowing a finally assertion to replace a primary
+   * failure.
+   */
+  const closure = { samePromise: false, completed: false }
   const report = (error: unknown): void => {
-    const failure = error as { source?: string; code?: string; name?: string }
-    failures.push({ source: failure.source, code: failure.code, name: failure.name })
+    /** Existing package wire formatter preserves complete native class and cause metadata. */
+    const wire = serializeRpcError(error, { report: () => undefined })
+    /** A package-specific reason is retained when present; absent reason is explicitly unavailable. */
+    const reason =
+      typeof error === 'object' && error !== null
+        ? (Reflect.get(error, 'reason') ?? Reflect.get(error, 'detail')?.reason ?? null)
+        : null
+    ;(phase === 'business' ? failures : closing).push({
+      ...wire,
+      phase,
+      reason,
+      businessComplete,
+      cause: wire.cause ?? null
+    })
   }
   /** Every operation uses the public built Thread Peer with its actual configured auth assembly. */
   const peer = await createThreadPeer<IRuntimeDynamicSurface>({
@@ -123,6 +150,7 @@ export async function runWebBinaryQualification(
     const count = await peer.request('count', undefined, { orderKey: 'native-notify' })
     /** Optional test inspection reads actual Worker sources after business and before cleanup. */
     await beforeClose?.()
+    businessComplete = true
     return {
       copy,
       transfer,
@@ -131,11 +159,21 @@ export async function runWebBinaryQualification(
       notify: { senderLength: notifyBacking.byteLength },
       count,
       failures,
+      closing,
+      closure,
       carrier: (await peer.describe()).connections[0]!.carrier
     }
   } finally {
+    phase = 'closing'
     try {
-      await peer.close()
+      /**
+       * Repeated close must retain the original public closure Promise; no exit capability is
+       * invented.
+       */
+      const closingPromise = peer.close()
+      closure.samePromise = peer.close() === closingPromise
+      await closingPromise
+      closure.completed = true
     } finally {
       handle?.terminate()
     }

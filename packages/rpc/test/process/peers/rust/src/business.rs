@@ -386,6 +386,11 @@ pub fn serve(
                 // A10 includes exactly one payload parse and serialization on both sides.
                 let payload = json::parse(&body)
                     .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "BRIDGE_JSON"))?;
+                if value(&payload, "xrtReverse") == &Value::Bool(true) {
+                    let result = xrt_reverse(input, output, &payload, true)?;
+                    bridge_write_body(output, result.text().as_bytes())?;
+                    continue;
+                }
                 bridge_write_body(output, payload.text().as_bytes())?;
             }
             return Ok(());
@@ -670,7 +675,71 @@ pub fn initiate_bridge(
     Ok(())
 }
 
-/// Bridge extensions share the independent local business owner and explicitly exclude streams.
+/// The bounded foreign initiator reuses bridge_read/bridge_write_body without a language SDK.
+fn xrt_reverse(
+    input: &mut impl Read,
+    output: &mut impl Write,
+    control: &Value,
+    bare: bool,
+) -> io::Result<Value> {
+    let n = value(control, "count").as_u64().unwrap_or(0);
+    let payload = value(control, "payload").clone();
+    if n < 1 || n > 10000 || payload.as_str().is_none() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "INVALID_ENVELOPE",
+        ));
+    }
+    // One bounded inner-clock sample exists for every actual completed request.
+    let mut latencies = Vec::with_capacity(n as usize);
+    let start = std::time::Instant::now();
+    for index in 0..n {
+        let round = std::time::Instant::now();
+        let id = format!("xrt-reverse-{}", index);
+        let request = if bare {
+            payload.clone()
+        } else {
+            object(&[
+                ("jsonrpc", string("2.0")),
+                ("id", string(&id)),
+                ("method", string("migaia.invoke")),
+                (
+                    "params",
+                    object(&[
+                        ("method", string("bench.echo")),
+                        ("args", Value::Array(vec![payload.clone()])),
+                    ]),
+                ),
+            ])
+        };
+        bridge_write_body(output, request.text().as_bytes())?;
+        let reply = bridge_read(input)?;
+        let valid = if bare {
+            reply == payload
+        } else {
+            value(&reply, "id").as_str() == Some(&id)
+                && value(&reply, "result") == &payload
+                && !reply.has("error")
+        };
+        if !valid {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "INVALID_ENVELOPE",
+            ));
+        }
+        latencies.push(number(round.elapsed().as_nanos() as u64));
+    }
+    Ok(object(&[
+        ("xrtReceipt", Value::Bool(true)),
+        ("calls", number(n)),
+        ("elapsedNs", number(start.elapsed().as_nanos() as u64)),
+        ("latenciesNs", Value::Array(latencies)),
+        ("clientInFlightPeak", number(1)),
+        ("burstSize", number(1)),
+    ]))
+}
+
+/// Bridge extensions share the existing business owner and explicitly exclude streams.
 pub(super) fn serve_bridge(
     input: &mut impl Read,
     output: &mut impl Write,
@@ -815,7 +884,7 @@ pub(super) fn serve_bridge(
                 }
                 Some("migaia.describe") => {
                     let mut description = business.description();
-                    let methods = value(&description, "methods")
+                    let mut methods: Vec<Value> = value(&description, "methods")
                         .as_array()
                         .unwrap_or(&[])
                         .iter()
@@ -827,6 +896,12 @@ pub(super) fn serve_bridge(
                         })
                         .cloned()
                         .collect();
+                    // Only this Content-Length owner installs the reverse initiator.
+                    methods.push(object(&[
+                        ("name", string("peer.reverse")),
+                        ("supportedModes", Value::Array(vec![string("request")])),
+                        ("modeSource", string("declared")),
+                    ]));
                     set(&mut description, "methods", Value::Array(methods));
                     (description, None)
                 }
@@ -856,7 +931,25 @@ pub(super) fn serve_bridge(
                         );
                         continue;
                     }
-                    business.invoke(called, args, value(value(params, "meta"), "trace"))
+                    if called == "peer.reverse"
+                        && args.as_array().map_or(true, |items| items.len() != 1)
+                    {
+                        (
+                            Value::Null,
+                            Some(wire_error(
+                                "@migaia/rpc/core",
+                                "PAYLOAD_INVALID",
+                                "Runtime method payload is invalid",
+                            )),
+                        )
+                    } else if called == "peer.reverse" {
+                        (
+                            xrt_reverse(input, output, &args.as_array().unwrap()[0], false)?,
+                            None,
+                        )
+                    } else {
+                        business.invoke(called, args, value(value(params, "meta"), "trace"))
+                    }
                 }
                 _ => (
                     Value::Null,

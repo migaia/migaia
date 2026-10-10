@@ -4,12 +4,12 @@ import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { ERROR_SOURCE, RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
 import { RpcProcessErrorText } from '../error-text.js'
-import { serveRemotePlugin, type IRemoteServePluginHandle } from '../../remote/serve-plugin.js'
-import type { IRuntimePeerSourceResult } from '../../remote/runtime-api/peer.js'
-import { normalizeRemoteContract } from '../../remote/contract.js'
-import type { IRemoteChannel, IRemoteServeEndpoint } from '../../remote/types.js'
+import { serveRemotePlugin, type IRemoteServePluginHandle } from '../../remote/index.js'
+import type { IRuntimePeerSourceResult } from '../../remote/index.js'
+import { normalizeRemoteContract } from '../../remote/index.js'
+import type { IRemoteChannel, IRemoteServeEndpoint } from '../../remote/index.js'
 import type { IProcessByteChannel, IProcessByteListener, IProcessMessageChannel } from '../types.js'
-import { defaultRpcId } from '../../core/internal/id.js'
+import { defaultRpcId } from '../../core/spi.js'
 import {
   createRemoteBindingDrain,
   type IRemoteBindingDrain
@@ -23,10 +23,10 @@ import { createProcessProviderAdmission } from '../resilience/provider-admission
 import type { IProcessInstanceFallback } from '../resilience/fallback.js'
 import { processSessionManager } from '../resilience/index.js'
 import type { IProcessResilience } from '../resilience/types.js'
-import { RpcCapability } from '../../contract/wire-constants.js'
+import { RpcCapability } from '../../contract/index.js'
 import type { IProcessServeListenerIngress, IProcessServeEndpointFactory } from './types.js'
 import type { IAbortSignal } from '@migaia/lifecycle'
-import type { IRpcProviderLimits } from '../../core/typing.js'
+import type { IRpcProviderLimits } from '../../core/index.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
 import type { IProcessSessionIdentity } from '../resilience/types.js'
 import { invalidOption, reportSafely } from './binding.js'
@@ -594,18 +594,18 @@ export async function serveProcessSessions(
 
 /** Only target selection and its existing remote/Host cleanup belong to this internal owner. */
 export type IProcessSessionServiceOptions = Readonly<{
-  host: import('../../remote/serve-plugin.js').IRemoteServePluginOptions['host']
-  contract: import('../../remote/contract.js').IRemoteContract
+  host: import('../../remote/index.js').IRemoteServePluginOptions['host']
+  contract: import('../../remote/index.js').IRemoteContract
   report(error: unknown): void
   instanceMode?: 'shared' | 'per-connection'
   createSessionHost?(
     session: IProcessSessionIdentity
   ):
     | Promise<
-        import('../../remote/serve-plugin.js').IRemoteServePluginOptions['host'] &
+        import('../../remote/index.js').IRemoteServePluginOptions['host'] &
           Readonly<{ dispose(): Promise<unknown> }>
       >
-    | (import('../../remote/serve-plugin.js').IRemoteServePluginOptions['host'] &
+    | (import('../../remote/index.js').IRemoteServePluginOptions['host'] &
         Readonly<{ dispose(): Promise<unknown> }>)
 }>
 

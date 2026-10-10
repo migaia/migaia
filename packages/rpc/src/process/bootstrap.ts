@@ -1,16 +1,15 @@
 import { createContractError } from '../contract/contract-error.js'
-import { RpcContractErrorCode } from '../contract/error-code.js'
-import {
-  createRpcStreamFrameDecoderWithLimit,
-  RPC_STREAM_MAX_FRAME_BYTES
-} from '../contract/framing/stream.js'
+import { RpcContractErrorCode } from '../contract/index.js'
+import { createRpcStreamFrameDecoderWithLimit } from '../contract/framing/stream.js'
+import { RPC_STREAM_MAX_FRAME_BYTES } from '../contract/framing/stream-index.js'
 import { registerProcessFrameSource } from './channel.js'
 import { PROCESS_HANDSHAKE_MAX_FRAME_BYTES } from './constants.js'
 import { RpcProcessErrorCode } from './error-code.js'
 import { createProcessError } from './error.js'
 import type { IProcessByteChannel } from './types.js'
 import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
-import { RpcCoreErrorCode, tagRpcError } from '../core/errors.js'
+import { RpcCoreErrorCode } from '../core/index.js'
+import { tagRpcError } from '../core/transport-kit.js'
 import { RpcProcessErrorText } from './error-text.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'

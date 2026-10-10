@@ -1,3 +1,4 @@
+import { OperationScope } from './operation-scope.js'
 import type { IRpcEnvelope, IRpcRuntimeEnvelope } from '../../contract/index.js'
 import type { IRpcAbortSignal } from '../typing.js'
 import { tagRpcError } from '../errors.js'
@@ -11,6 +12,31 @@ export type IRpcOutboundAdmission = Readonly<{
   signals: readonly IRpcAbortSignal[]
   assertCanSend(): void
 }>
+
+/** Core operation records alone may defer a queue signal until the existing limiter really waits. */
+export abstract class RpcOutboundAdmission {
+  /** This is the original caller lifecycle scope, not a replacement signal or cancellation owner. */
+  readonly #scope: OperationScope
+
+  constructor(scope: OperationScope) {
+    this.#scope = scope
+  }
+
+  /** An actual queue read materializes the same original lifecycle-owned signal. */
+  get queueSignal(): IRpcAbortSignal {
+    return this.#scope.signal
+  }
+
+  /** Untagged extension admissions retain their original signal getter/abort policy even at idle. */
+  static queuedSignal(
+    admission: IRpcOutboundAdmission | undefined,
+    waiting: boolean
+  ): IRpcAbortSignal | undefined {
+    if (!admission) return undefined
+    if (#scope in admission && !waiting) return undefined
+    return admission.queueSignal
+  }
+}
 
 /** Minimal port needed by core; capacity and reporting remain in the optional IPC plugin. */
 export type IRpcOutboundGate = Readonly<{

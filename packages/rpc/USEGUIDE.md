@@ -25,6 +25,42 @@ contract/v1 是仍保留的语义描述子路径名，不代表 runtime-api 支�
 
 普通函数的 request/notify 接收可移植标量结果，stream 需要实际 iterable。目录由库生成并记录实际 route，不能从擦除后的 TypeScript 类型恢复 generator 模式。显式高级 contract 仍限制 schema、模式和幂等性；它不是旧 v1 describe 回退。
 
+## 集成 API
+
+自行管理底层连接时，从 `@migaia/rpc/remote` 使用 `createRuntimePeer`、`createManagedRuntimePeer` 或 `createRuntimePlugin`。传入的实际 channel/bootstrap、binding/execution 或 Host slot 操作决定可访问的资源；`RuntimePluginKey`、`RuntimeSourceKind`、`RuntimeConnectionDirection`、`RuntimeEventName`、`RuntimeQueryStatus`、`RuntimeApiMode` 和 `RUNTIME_API_SCHEMA_VERSION` 提供配置与查询的稳定词汇。`DEFAULT_DRAIN_MS` 是原关闭预算。公开的 Peer/source/plugin、目录/query/list/recent/unavailable/event、process/thread stop DTO 及 `IRuntimeSurface`、`IRuntimeFlatten`、`IRuntimeExpose`、`IRuntimeRegistry`、`IRuntimePluginTyping` 用于描述这些既有操作，不建立额外连接。
+
+从 `@migaia/rpc/core` 构造实际通道的资源时，`createRuntimeApiEndpoint(config, channel, quota?)` 同步返回资源，`.ready` 是一次安装结果。传入的 channel 必须是实际持有的 transport、peer identity 和 agreement；借用完整绑定则使用 `createRuntimeApiEndpoint({ binding })`，保留原操作结果、stream consumer 和 dispose 的首次 Promise。未拉取的 cold stream 只保留同步 payload snapshot，首次 next/return/throw 才激活同一个 consumer。
+
+共享 provider 预算从 `@migaia/rpc/core/features/provider` 导入 `createProviderAdmissionScope` 与 `IProviderAdmissionScope`。同一个 handle 由第一次实际 endpoint attachment 配置初始 provider limits；之后 `constrain(maxGlobal?, maxPerPeer?)` 只收紧该 quota。cold `constrain` 只进行原参数校验，cold `clear` 无操作；不要把冷阶段调用当成已保存限制。实际安装后使用示例：
+
+```ts
+import { createRuntimeApiEndpoint } from '@migaia/rpc/core'
+import { createProviderAdmissionScope } from '@migaia/rpc/core/features/provider'
+
+const quota = createProviderAdmissionScope()
+const endpoint = createRuntimeApiEndpoint(config, channel, quota)
+await endpoint.ready
+quota.constrain(32, 8)
+```
+
+这里的 `config` 与 `channel` 是调用方已有的实际 endpoint 配置和通道资源。`createAuthenticationNonce` 同样从 `@migaia/rpc/core` 导入，用于现有 authentication middleware 的 nonce；它不建立认证会话。
+
+| 入口 | 集成用途 |
+| --- | --- |
+| `@migaia/rpc/contract` | `RPC_PORTABLE_MAX_DEPTH` 表示现有 portable grammar 上限。 |
+| `@migaia/rpc/contract/v1` | `IRpcBinaryDigest` 描述调用方提供的 whole-backing digest；`IRpcRuntimeStepOutcome` 描述 group 每步 success/failure/not-executed。 |
+| `@migaia/rpc/contract/framing` | `readRpcBatchMembers` 读取物理 batch；`measureRpcPhysicalFrame`、`assertRpcPhysicalFrameSize`、`rejectRpcPhysicalFrameSize` 沿实际 carrier/limit 判断物理帧预算。 |
+| `@migaia/rpc/contract/framing/v1` | `RpcBinaryProfile`、`RpcBinaryStorage`、`RpcNativeBinaryKind` 与 `RpcRuntime*` 常量提供现有 closed wire grammar 的稳定值。 |
+| `@migaia/rpc/contract/spi` | `normalizeRuntimeEnvelope`、`normalizeRuntimeGeneration`、`normalizeRuntimeSteps` 校验协议值；`runtimeOperationCapabilities` 给出操作所需能力；`readRuntimeCarrier`、`wrapRuntimeCarrier` 读写现有 carrier 表示。 |
+| `@migaia/rpc/contract/spi` | `prepareRpcBinary`、`restoreRpcBinary`、`readRpcNativeBinary`、`measureRpcNativeBinaryFrame`、`rpcBinaryBackingLength`、`rpcBinaryView` 和 `isRpcBinaryIntegrityFailure` 处理调用方提交的 binary backing/view、预算及完整性。 |
+| `@migaia/rpc/contract/spi` | `createRpcStreamFrameDecoderWithLimit` 创建有界帧 decoder；`redactHandshake` 与 `isExcerptFree` 用于安全的 handshake 诊断表示。 |
+| `@migaia/rpc/core/spi` | `defaultRpcId` 与 `assertRpcIdempotencyKey` 使用现有 ID/key 规则；`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 分类原 native 或 coded 跨 realm 等价错误，保留原对象和 cause。 |
+| `@migaia/rpc/remote/spi` | `normalizeRuntimeDescription` 校验 runtime directory description。 |
+
+SPI 是稳定性层级，任何调用方都可导入；调用 codec、读取 DTO 或复制回调不会建立其它 process/channel/Host 的操作权。未知/custom 路径仍执行原完整校验。
+
+String framer 接收到非字符串 encoded value 时保留原 native `TypeError` 与文本 `process channel requires a string encoded value`，错误身份为 `@migaia/rpc/contract / INVALID_FRAME`；此前针对这一场景的 `@migaia/rpc/core / PAYLOAD_INVALID` 分支需改用该身份。其它 payload 失败保持原 Core 身份。
+
 ## 类型
 
 不提供 Remote 泛型时，没有可调用的远端方法类型。声明远端函数树后，request 保留路径、参数与结果类型；stream 只接受迭代器方法。`IRuntimeSurface<THost,TPlugin>` 从现有 Host tuple、provide、expose 提取纯类型，不创建运行时目录。显式 Remote 泛型与精确 name/expose/Host 类型同时需要时，显式填写其余泛型，沿 TypeScript 的部分推导规则。
@@ -89,7 +125,11 @@ C10 的 before/after 数据显示 inline 与 sign-only native/transfer 的成本
 
 process 的 1MiB inline 会受编码、规范化和 framing 成本影响；高频大 binary 不应按 scalar 小调用吞吐推算。共享内存/Atomics 没有进入支持面，不能由此用 SharedArrayBuffer 绕所有权边界。未认证 transfer 按 CAPABILITY_UNSUPPORTED 拒绝，失败并非自动复制降级。
 
+inline Uint8Array 只携带 view 的可见 bytes，恢复为零前缀加原 offset/length；重复引用分别恢复。native manifest 则保留完整 backing 与 alias，并验证完整 backing 的 digest。大 binary 的编码资源与 JSON 准备复用不改变这两种 profile，也不自动选择 transfer。
+
 ## 查询、控制和事件
+
+从 `@migaia/rpc/remote` 导入 `RuntimePluginKey`，用其 `process` / `thread` 值解释 Plugin 与查询的标量元数据。这两个标签不定位未持有的 Host slot，也不授予 channel 或 native execution 操作权；控制仍由实际持有的资源决定。
 
 list/get/describe 是本地冷查询，默认返回可移植对象，格式参数选择字符串。methods 为名称数组，wire 模式目录独立保留；listener 在尚未接纳 session 时也有自己的本地方法目录。连接详情区分实际接纳的 generation 与 native launch attempt。缺资源、健康、退出或计数事实用 unavailable，不伪造0，也不遍历ledger或增加业务observer来重建。
 
@@ -464,8 +504,12 @@ Plugin 的 expose 可选择本地 Feature 或已接受连接的前缀：只有�
 
 旧高级 IRemoteContract 仍可声明 schema、模式和幂等性；远端 PluginHost 控制使用显式 expose: ['host'] 及本地 resolver，真实 definePlugin 函数不跨 RPC。服务端 resolver 必须同步返回本地定义。目录 ready 不等于 Host 安装事务已提交，应用必须使用真正提交屏障。
 
-JSON-RPC byte bridge 使用 Content-Length，完成 migaia.hello 后调用 migaia.describe、migaia.invoke、migaia.cancel。业务 notify 无 id，不收到应答；cancel 是协作控制，不回滚副作用。双方必需 batch 接收基线，reverse 等扩展仍按协商。非法 frame/UTF-8/JSON 或未协商的反向消息终止连接；未知/迟到 id 按原规则报告丢弃。stream 和 transfer 的 bridge 限制沿稳定错误码 fail closed；不能把它们改成其它业务求成功。跨语言整数超过 ±(2^53−1) 时使用字符串。
+JSON-RPC byte bridge 使用 Content-Length，完成原 migaia.hello 后支持同连接的 migaia.describe、migaia.invoke 与 migaia.cancel。入站 invoke 只进入实际已安装的 provider，describe 使用其原目录；无 id notify 不收到应答，batch 必须已协商。cancel 只选择同连接的既有调用，不新增 ACK、不回滚副作用，迟到 provider 结果按原规则丢弃。未知 profile、server stream、非法 params/meta、未协商 batch 或将 migaia.hello 当业务消息均拒绝；错误保留原 source/code/name/message/stack/cause 链。非法 frame/UTF-8/JSON 终止连接；未知/迟到 response id 按原规则报告丢弃。stream 和 transfer 的 bridge 限制沿稳定错误码 fail closed；不能把它们改成其它业务求成功。跨语言整数超过 ±(2^53−1) 时使用字符串。
 
 ## 构建与验证
 
 拥有包配置的命令：pnpm --dir packages/rpc fmt、lint、build、typecheck、typecheck:test、test、test:e2e、test:conformance、test:packed。仓库集成由 make ci-fast / make ci 执行。重命令按仓库 Exclusive Measurement Window 规程串行；公开 API 的正确性、跨语言互通与性能是不同证据，示例执行成功不替代这些门禁。
+
+### Child stderr diagnostic budget
+
+The process connection emits at most 32 normal `ipc.stderr` records per 1000 ms interval for each session. Overflow adds at most one summary for that interval, with the same redacted text and a positive `droppedChunks` count. Closing the session flushes its remaining summary once. Normal traffic keeps its original record shape and timing. The binding continues draining the child's stderr pipe, and caller-provided supervision output callbacks still receive their original chunks. The fixed default uses the connection's existing scheduler and exposes no new option.

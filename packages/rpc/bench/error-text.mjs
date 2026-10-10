@@ -70,3 +70,50 @@ export const IpcBenchErrorText = Object.freeze({
    */
   carrier: (carrier) => `Undelivered carrier: ${carrier}`
 })
+
+/** Directed source fixtures retain their original setup/echo diagnostics in one owner. */
+export const CrossRuntimeErrorText = Object.freeze({
+  /** Final source preparation requires the full immutable commit selected by the owner. */
+  sourceHeadRequired: 'FINAL_SOURCE_HEAD_REQUIRED',
+  /** Prepared sources and the running driver must identify the same actual final commit. */
+  sourceHeadMismatch: 'FINAL_SOURCE_HEAD_MISMATCH',
+  /** A final source freeze cannot include uncommitted tracked or untracked product changes. */
+  sourceDirty: 'FINAL_TRACKED_DIRTY',
+  /** Final source execution admits only the existing count/timing or finite functional mode. */
+  modeInvalid: 'FINAL_MODE_COUNT_TIMING_OR_FUNCTIONAL_ONLY',
+  /** Frozen foreign files must still match the exact source manifest before launch. */
+  foreignSource: 'Directed foreign source SHA mismatch',
+  /** A peer may only start under the actual pinned owner wrapper. */
+  wrapper: 'XRT_ENV_RUN must name the pinned toolchain wrapper',
+  /** A confirmed native exit cannot satisfy a pending atomic peer snapshot. */
+  snapshotExit: 'Fixture peer exited before snapshot completion',
+  /** Any changed raw byte invalidates this row's current-source join. */
+  rawSHA: 'Directed raw SHA mismatch',
+  /** Missing blocks or admission prevents a full timing value from freezing. */
+  timingScope: 'Directed timing scope incomplete',
+  /** Actual arm order is part of the existing cross-runtime protocol. */
+  order: 'Directed ABBA order mismatch',
+  /** Warmup, samples and latency length must equal the retained arm's actual workload. */
+  parameters: 'Directed arm parameters mismatch',
+  /** Missing native CPU or latency denominators are unavailable, never numeric zero acceptance. */
+  metric: 'Directed native metric is missing or nonpositive',
+  /** Partial or malformed bare frames cannot become an echo sample. */
+  frame: 'Fixture physical frame invalid',
+  /** Physical closure retires all pending fixture echoes. */
+  closed: 'Fixture bare channel closed',
+  /** The fixture's local token is checked before the original source accepts a peer. */
+  authentication: 'Fixture authentication mismatch',
+  /** Inner reverse clocks and sample counts must match the actual foreign initiator. */
+  reverse: 'Fixture reverse receipt mismatch',
+  /** Actual scalar payload equality is checked on both matched arms. */
+  echo: 'Fixture echo mismatch',
+  /** Cleanup never discards its primary measurement failure. */
+  cleanup: 'Cross-runtime arm cleanup failed',
+  /**
+   * Retain native startup status rather than treating a missing peer as a product budget failure.
+   *
+   * @param {number | null} code Native exit status.
+   * @returns {string} Stable setup diagnostic.
+   */
+  peerExit: (code) => 'Fixture peer exited before readiness ' + code
+})

@@ -70,6 +70,8 @@ export type IIpcLogRecord =
       sessionId: string
       processId?: string
       text: string
+      /** Overflow summaries count omitted source chunks without exposing their bytes. */
+      droppedChunks?: number
     }>
 
 /** The reporter Feature and explicit stderr intake share one installation lifetime. */
