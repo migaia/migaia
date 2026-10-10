@@ -1,6 +1,6 @@
 import { readRuntimeDefaultTimeout } from '../../remote/runtime-api/timeout.js'
 import { createAutomaticProcessPeer } from '../automatic-peer.js'
-import type { IRuntimePeerOptions } from '../../remote/runtime-api/peer.js'
+import type { IRuntimePeerOptions } from '../../remote/index.js'
 import { createProcessSourcePeer, type IRuntimeProcessPeerOptions } from '../runtime-peer.js'
 import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS } from '../constants.js'
 import { openProcessStdioChannel } from './deno-command.js'

@@ -1,6 +1,6 @@
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
-import type { IRemoteChannel } from '../../remote/types.js'
+import type { IRemoteChannel } from '../../remote/index.js'
 import { RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
 import type { IProcessByteListener, IProcessPendingByteConnection } from '../types.js'

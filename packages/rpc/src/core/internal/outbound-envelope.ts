@@ -1,12 +1,12 @@
 import { normalizeRpcEnvelope, RpcEnvelopeKind, type IRpcEnvelope } from '../../contract/index.js'
-import type { IRpcPortableValue } from '../../contract/types.js'
+import type { IRpcPortableValue } from '../../contract/index.js'
 import type { IRpcContext } from '../typing.js'
 import { readProviderRuntimeOperation } from './provider.js'
 import type { IRpcRuntimeOptions } from '../../contract/runtime-api/types.js'
-import type { IRpcRuntimeEnvelope } from '../../contract/runtime-api/types.js'
+import type { IRpcRuntimeEnvelope } from '../../contract/index.js'
 import { normalizeRuntimeEnvelope } from '../../contract/runtime-api/normalize.js'
-import { RpcRuntimeProfile, RpcRuntimeKind } from '../../contract/runtime-api/constants.js'
-import { normalizePortable } from '../../contract/normalize.js'
+import { RpcRuntimeProfile, RpcRuntimeKind } from '../../contract/framing/v1.js'
+import { normalizePortable } from '../../contract/index.js'
 import {
   captureOwnedJson,
   readOwnedJsonSnapshot,

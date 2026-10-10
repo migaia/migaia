@@ -4,12 +4,12 @@ import {
 } from '../remote/runtime-api/launch-context.js'
 import { readRuntimeDefaultTimeout } from '../remote/runtime-api/timeout.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
+import { RpcCoreErrorCode, RpcError } from '../core/index.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
 import { compileRuntimeMethods } from '../remote/runtime-api/catalog.js'
 import { RuntimeApiErrorText } from '../remote/runtime-api/constants.js'
-import { createRuntimePeer, type IRuntimePeerOptions } from '../remote/runtime-api/peer.js'
+import { createRuntimePeer, type IRuntimePeerOptions } from '../remote/index.js'
 import {
   readThreadRuntimeBootstrap,
   intersectThreadCapabilities,

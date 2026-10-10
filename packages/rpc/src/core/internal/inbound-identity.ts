@@ -6,7 +6,7 @@ import type { IRpcConnectCapability } from '../typing.js'
 import type { IRpcInboundMessage, IRpcTransportTopology } from '../transport.js'
 import type { IRpcPlatform } from '../typing.js'
 import type { INativeReplayReceipt } from './native-replay.js'
-import type { IRpcRuntimeGeneration } from '../../contract/runtime-api/types.js'
+import type { IRpcRuntimeGeneration } from '../../contract/index.js'
 
 /** Result of shared inbound identity admission; token is leased until release. */
 export type IInboundIdentityAdmission = {

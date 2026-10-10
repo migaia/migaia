@@ -1,6 +1,6 @@
 import { resolveAbortReason } from '../../core/internal/async-control.js'
-import { RpcCapability } from '../../contract/wire-constants.js'
-import type { IRemoteChannel, IRemoteServeEndpoint } from '../../remote/types.js'
+import { RpcCapability } from '../../contract/index.js'
+import type { IRemoteChannel, IRemoteServeEndpoint } from '../../remote/index.js'
 import {
   checkNativePing,
   createProcessConnectionSupervisor,

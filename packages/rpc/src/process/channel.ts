@@ -1,16 +1,17 @@
 import { createContractError } from '../contract/contract-error.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { resolveAbortReason } from '../core/internal/async-control.js'
-import { RpcContractErrorCode } from '../contract/error-code.js'
-import { RpcHandshakeStep, RpcReservedKind, RpcCapability } from '../contract/wire-constants.js'
+import { RpcContractErrorCode } from '../contract/index.js'
+import { RpcHandshakeStep, RpcReservedKind, RpcCapability } from '../contract/index.js'
+import { createRpcStreamFrameDecoderWithLimit } from '../contract/framing/stream.js'
+import { encodeRpcStreamTextFrame } from '../contract/framing/stream.js'
 import {
-  createRpcStreamFrameDecoderWithLimit,
-  encodeRpcStreamTextFrame,
   RPC_STREAM_MAX_FRAME_BYTES,
   type IRpcStreamFrameDecoder
-} from '../contract/framing/stream.js'
-import { RpcCoreErrorCode, tagRpcError } from '../core/errors.js'
-import type { IRpcTransport } from '../core/transport.js'
+} from '../contract/framing/stream-index.js'
+import { RpcCoreErrorCode } from '../core/index.js'
+import { tagRpcError } from '../core/transport-kit.js'
+import type { IRpcTransport } from '../core/index.js'
 import {
   RpcPlatform,
   RpcTransportEncoding,

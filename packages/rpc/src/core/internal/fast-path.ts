@@ -1,6 +1,6 @@
 import { identityCodecV1 } from '@migaia/serialize/codec'
 import { rpcProtocolV1 } from '../../contract/index.js'
-import { messageFramerV1 } from '../../contract/framing/message-framer.js'
+import { messageFramerV1 } from '../../contract/framing/index.js'
 import { readCanonicalMiddlewareProof } from './json-object-port.js'
 import { RpcFastMiddlewareNames } from './plugin-shared-keys.js'
 import type { IRpcEndpointOptions, IRpcSelectedComponents } from './endpoint-options.js'

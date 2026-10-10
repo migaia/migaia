@@ -3,7 +3,7 @@ import type { ICanonicalEventChannel } from '@migaia/event-subscriber'
 import type { IRpcEventListener, IRpcProvider, IRpcProviderResult } from '../typing.js'
 import { probeThenable, ThenableProbeKind, assimilateCapturedThen } from '@migaia/utils/function'
 import type { IRpcAbortSignal, IRpcContext } from '../typing.js'
-import type { IRpcRouteHeader } from '../../contract/v1/route.js'
+import type { IRpcRouteHeader } from '../../contract/index.js'
 import {
   registerLocalErrorWireSummary,
   registerLocalErrorWireRoute,
@@ -11,13 +11,13 @@ import {
 } from '../../contract/contract-error.js'
 import { RpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
-import type { IRpcPortableValue } from '../../contract/types.js'
+import type { IRpcPortableValue } from '../../contract/index.js'
 import type {
   IRpcRuntimeCompletion,
-  IRpcRuntimeEnvelope,
   IRpcRuntimeStream,
   IRpcRuntimeOutcomeResult
 } from '../../contract/runtime-api/types.js'
+import type { IRpcRuntimeEnvelope } from '../../contract/index.js'
 
 /**
  * Project one actual business return through the existing provider completion boundary. Synchronous

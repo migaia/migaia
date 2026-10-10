@@ -4,16 +4,12 @@ import {
 } from '../remote/runtime-api/launch-context.js'
 import { readRuntimeDefaultTimeout } from '../remote/runtime-api/timeout.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
-import { defaultRpcId } from '../core/internal/id.js'
+import { RpcCoreErrorCode, RpcError } from '../core/index.js'
+import { defaultRpcId } from '../core/spi.js'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
 import { compileRuntimeMethods } from '../remote/runtime-api/catalog.js'
 import { RuntimeApiErrorText } from '../remote/runtime-api/constants.js'
-import {
-  createRuntimePeer,
-  type IRuntimePeer,
-  type IRuntimePeerOptions
-} from '../remote/runtime-api/peer.js'
+import { createRuntimePeer, type IRuntimePeer, type IRuntimePeerOptions } from '../remote/index.js'
 import { PROCESS_RUNTIME_API_ENV_VERSION } from './constants.js'
 import { deferProcessByteReceive } from './channel.js'
 import { createProcessTransport } from './handshake.js'

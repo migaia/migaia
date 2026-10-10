@@ -1,13 +1,9 @@
-import type {
-  IRuntimePluginTyping,
-  IRuntimeExpose,
-  IRuntimeRegistry
-} from '../remote/runtime-api/typing.js'
+import type { IRuntimePluginTyping, IRuntimeExpose, IRuntimeRegistry } from '../remote/index.js'
 import type { IThreadHandle } from '@migaia/supervision/threads'
-import { createRemotePlugin, type IRemotePluginDefinition } from '../remote/plugin.js'
+import { createRemotePlugin, type IRemotePluginDefinition } from '../remote/index.js'
 import { createThreadBinding } from './binding.js'
 import type { IThreadPluginOptions } from './types.js'
-import { createRuntimePlugin, type IRuntimePluginOptions } from '../remote/runtime-api/plugin.js'
+import { createRuntimePlugin, type IRuntimePluginOptions } from '../remote/index.js'
 import { RuntimePluginKey } from '../remote/index.js'
 import { createThreadPeer } from './peer.js'
 import type { IRuntimeThreadPeerOptions } from './runtime-peer.js'
@@ -28,10 +24,7 @@ export function createThreadPlugin<THandle extends IThreadHandle>(
 /** Install a symmetric connection into the original canonical thread slot. */
 export function createThreadPlugin<
   TRemote = Record<never, never>,
-  const TProvide extends import('../remote/runtime-api/catalog.js').IRuntimePeerProvide = Record<
-    never,
-    never
-  >,
+  const TProvide extends import('../remote/index.js').IRuntimePeerProvide = Record<never, never>,
   const TName extends string = string,
   const TExpose extends readonly string[] = readonly [],
   THost = unknown

@@ -1,5 +1,5 @@
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
-import type { IRemoteCallGuard } from '../../remote/types.js'
+import type { IRemoteCallGuard } from '../../remote/index.js'
 import { RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
 import type {

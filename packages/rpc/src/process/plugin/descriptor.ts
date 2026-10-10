@@ -7,15 +7,15 @@ import {
   type IProcessBootstrap,
   type IProcessSpec
 } from '@migaia/supervision/process'
-import { normalizePortable } from '../../contract/normalize.js'
-import type { IRpcPortableValue } from '../../contract/types.js'
+import { normalizePortable } from '../../contract/index.js'
+import type { IRpcPortableValue } from '../../contract/index.js'
 import {
   normalizeRemoteContract,
   normalizeRemoteHostCatalog,
   REMOTE_NAME_PATTERN,
   type IRemoteContract,
   type IRemoteHostCatalog
-} from '../../remote/contract.js'
+} from '../../remote/index.js'
 import { RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
 import {

@@ -10,8 +10,8 @@ import type {
   IRemoteEndpointFactory,
   IRemoteRetryPort,
   IRemotePluginHostPort
-} from '../remote/types.js'
-import type { IRemoteContract } from '../remote/contract.js'
+} from '../remote/index.js'
+import type { IRemoteContract } from '../remote/index.js'
 
 /** Message channels retain the scheduler identity and static capability declaration. */
 export type IThreadChannelOptions = Readonly<{

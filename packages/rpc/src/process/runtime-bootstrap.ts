@@ -1,7 +1,7 @@
-import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
-import { RpcWireLimit } from '../contract/wire-constants.js'
-import type { IRuntimePeerIdentity } from '../remote/runtime-api/description.js'
-import type { IRpcRuntimeGeneration } from '../contract/runtime-api/types.js'
+import { RpcCoreErrorCode, RpcError } from '../core/index.js'
+import { RpcWireLimit } from '../contract/index.js'
+import type { IRuntimePeerIdentity } from '../remote/index.js'
+import type { IRpcRuntimeGeneration } from '../contract/index.js'
 import { normalizeRuntimeGeneration } from '../contract/runtime-api/metadata.js'
 import {
   PROCESS_HANDSHAKE_MAX_FRAME_BYTES,

@@ -31,7 +31,7 @@ import {
   restoreInboundRuntimeBinary
 } from './inbound-normalization.js'
 import { RpcMiddlewareErrorText } from '../middleware/error-text.js'
-import { RpcBinaryProfile, RpcBinaryStorage } from '../../contract/runtime-api/binary-constants.js'
+import { RpcBinaryProfile, RpcBinaryStorage } from '../../contract/framing/v1.js'
 import { runtimeOperationCapabilities } from '../../contract/runtime-api/capabilities.js'
 import {
   RpcRuntimeKind,
@@ -39,22 +39,20 @@ import {
   RpcRuntimeCancel,
   RpcRuntimeMode,
   RpcRuntimeProfile
-} from '../../contract/runtime-api/constants.js'
+} from '../../contract/framing/v1.js'
+import type { IRpcRuntimeEnvelope, IRpcRuntimeGeneration } from '../../contract/index.js'
 import type {
-  IRpcRuntimeEnvelope,
-  IRpcRuntimeGeneration,
   IRpcRuntimeTask,
   IRpcRuntimeOptions,
   IRpcRuntimeStep
 } from '../../contract/runtime-api/types.js'
-import { RpcCapability, RpcBatchPhysical } from '../../contract/wire-constants.js'
-
+import { RpcCapability, RpcBatchPhysical } from '../../contract/index.js'
 import type { ProviderAdmissionRegistry, IProviderIngressReceipt } from './provider-admission.js'
 import {
   readRpcBatchMembers,
   assertRpcPhysicalFrameSize,
   rejectRpcPhysicalFrameSize
-} from '../../contract/batch-frame.js'
+} from '../../contract/framing/index.js'
 import type { IInboundIdentityPreparedSource } from './inbound-identity.js'
 import { RpcSerializationError } from '../errors.js'
 import { enableFastTimePort } from './time-port.js'
@@ -107,8 +105,8 @@ import {
   type IRpcResponseFailure,
   type IRpcWireErrorFailure
 } from '../../contract/index.js'
-import { createRpcUnknownFieldWarner } from '../../contract/unknown-field.js'
-import { deserializeRpcError, serializeRpcError } from '../../contract/error.js'
+import { createRpcUnknownFieldWarner } from '../../contract/index.js'
+import { deserializeRpcError, serializeRpcError } from '../../contract/index.js'
 import { RpcProtocolEvent } from '../protocol-constants.js'
 import { EndpointOwnerKey, type IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IRpcInboundMessage } from '../transport.js'

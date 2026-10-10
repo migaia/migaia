@@ -4,36 +4,32 @@ import {
   runtimeDetail,
   runtimeConnectionDetail
 } from '../remote/runtime-api/overview.js'
-import {
-  normalizeRuntimeDescription,
-  describeRuntimeMethods
-} from '../remote/runtime-api/description.js'
+import { normalizeRuntimeDescription } from '../remote/spi.js'
+import { describeRuntimeMethods } from '../remote/runtime-api/description.js'
 import {
   RuntimeSourceKind,
   RuntimeConnectionDirection,
   RuntimeQueryStatus,
   RUNTIME_API_SCHEMA_VERSION
-} from '../remote/runtime-api/constants.js'
+} from '../remote/index.js'
 import { ProcessPluginChannelKind } from './plugin/constants.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
+import { RpcCoreErrorCode, RpcError } from '../core/index.js'
 import { RuntimeApiErrorText } from '../remote/runtime-api/constants.js'
 import { compileRuntimeMethods } from '../remote/runtime-api/catalog.js'
+import { createRuntimePeer, type IRuntimePeer, type IRuntimePeerOptions } from '../remote/index.js'
 import {
-  createRuntimePeer,
   prepareRuntimePeerEndpoint,
-  retainRuntimePeerSessions,
-  type IRuntimePeer,
-  type IRuntimePeerOptions
+  retainRuntimePeerSessions
 } from '../remote/runtime-api/peer.js'
 import type { IRuntimePreparationContext } from '../remote/runtime-api/launch-context.js'
-import type { IRemoteServePluginHandle } from '../remote/serve-plugin.js'
+import type { IRemoteServePluginHandle } from '../remote/index.js'
 import { serveProcessSessions, type IProcessSessionsHandle } from './plugin/serve.js'
 import type { IProcessServeListenerIngress } from './plugin/types.js'
 import { reportSafely } from './plugin/binding.js'
 import { createProcessResilience } from './resilience/index.js'
 import type { IProcessResilience } from './resilience/types.js'
-import { RpcCapability } from '../contract/wire-constants.js'
+import { RpcCapability } from '../contract/index.js'
 
 /** The original authenticated ingress retains its caller-selected connection governor. */
 export type IRuntimeProcessListen = IProcessServeListenerIngress &

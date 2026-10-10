@@ -7,10 +7,10 @@ import {
   getPluginRuntimeIntegration,
   type IPluginRuntimeFeatureSnapshot
 } from '@migaia/plugin-host'
-import { defaultRpcId } from '../../core/internal/id.js'
+import { defaultRpcId } from '../../core/spi.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
-import { RpcCoreErrorCode, RpcError } from '../../core/errors.js'
+import { RpcCoreErrorCode, RpcError } from '../../core/index.js'
 import {
   createRuntimeOutlet,
   readRuntimeOutletConnection,
@@ -51,7 +51,7 @@ import { RuntimeApiMode } from './constants.js'
 import { withRuntimePreparationContext } from './launch-context.js'
 import { readManagedRuntimeRegistration } from './managed-peer.js'
 import { readRuntimeDefaultTimeout } from './timeout.js'
-import { createProviderAdmissionScope } from '../../core/internal/provider-admission.js'
+import { createProviderAdmissionScope } from '../../core/features/provider.js'
 import { attachProviderPreflight } from '../../core/internal/provider.js'
 
 /** A private extension uses the original atomic shared-slot owner across both adapter families. */

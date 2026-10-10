@@ -2,25 +2,26 @@ import { hostRethrowReporter } from '@migaia/utils/promise'
 import { bindNativeReplayTransport } from '../core/internal/native-replay.js'
 import { registerBatchAgreement } from '../core/internal/batch-frame.js'
 import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
-import { serializeRpcError } from '../contract/error.js'
+import { serializeRpcError } from '../contract/index.js'
 import {
   acceptRpcHandshake,
   completeRpcHandshake,
   createRpcHello,
   normalizeRpcHandshake,
   type IRpcHandshakeAgreement
-} from '../contract/handshake.js'
+} from '../contract/index.js'
 import {
   RpcCodecId,
   RpcHandshakeStep,
   RpcProtocol,
   RpcReservedKind,
   RpcCapability
-} from '../contract/wire-constants.js'
-import { RpcCoreErrorCode, tagRpcError } from '../core/errors.js'
+} from '../contract/index.js'
+import { RpcCoreErrorCode } from '../core/index.js'
+import { tagRpcError } from '../core/transport-kit.js'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
-import type { IRemoteChannel } from '../remote/types.js'
-import type { IRuntimePeerSourceResult } from '../remote/runtime-api/peer.js'
+import type { IRemoteChannel } from '../remote/index.js'
+import type { IRuntimePeerSourceResult } from '../remote/index.js'
 import {
   bindProcessByteWire,
   deferProcessByteReceive,

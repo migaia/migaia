@@ -1,5 +1,5 @@
 import { deferred, type IDeferred } from '@migaia/utils/promise'
-import { invalidRpcStream } from '../../contract/stream-error.js'
+import { invalidRpcStream } from '../../contract/index.js'
 import type { IRpcProviderRejection } from '../provider-admission.js'
 import {
   createGenerationController,
@@ -17,17 +17,16 @@ import {
 } from '../errors.js'
 import { RpcAbortError, RpcRemoteError } from '../errors.js'
 import type { RequestReplayLedger } from './request-replay-ledger.js'
+import type { IRpcRuntimeEnvelope, IRpcRuntimeGeneration } from '../../contract/index.js'
 import type {
-  IRpcRuntimeEnvelope,
-  IRpcRuntimeGeneration,
   IRpcRuntimeCompletion,
   IRpcRuntimeTask,
   IRpcRuntimeStep,
-  IRpcRuntimeStepOutcome,
   IRpcRuntimeOutcome,
   IRpcRuntimeOutcomeResult,
   IRpcRuntimeStore
 } from '../../contract/runtime-api/types.js'
+import type { IRpcRuntimeStepOutcome } from '../../contract/v1/index.js'
 import {
   RpcRuntimeKind,
   RpcRuntimeMode,
@@ -41,8 +40,8 @@ import {
   RpcRuntimeStoreContinuity,
   RpcRuntimeGenerationKind,
   RpcRuntimeStreamPrefix
-} from '../../contract/runtime-api/constants.js'
-import { RpcRouteProfile, RpcRouteType } from '../../contract/wire-constants.js'
+} from '../../contract/framing/v1.js'
+import { RpcRouteProfile, RpcRouteType } from '../../contract/index.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import { ERROR_SOURCE as RpcCoreErrorSource } from '../error-code.js'
 import {
@@ -65,17 +64,17 @@ import {
   type IProviderRuntimeStream,
   type IProviderRuntimeRelay
 } from './provider.js'
-import type { IRpcPortableValue } from '../../contract/types.js'
+import type { IRpcPortableValue } from '../../contract/index.js'
 import { normalizeRuntimePortable, hasRpcPortableBinary } from '../../contract/normalize.js'
 import { hasRpcBinaryEnvelope } from '../../contract/runtime-api/binary-capture.js'
 import { prepareRpcBinaryLazy as prepareRpcBinary } from '../../contract/runtime-api/binary-lazy.js'
-import { RpcBinaryStorage } from '../../contract/runtime-api/binary-constants.js'
+import { RpcBinaryStorage } from '../../contract/framing/v1.js'
 import { createRpcBackingDigest } from './authentication-replay.js'
 import { safeRead, safeString, tupleKey, runtimeTaskKey } from './safe-value.js'
 import { RpcMessageKind, RpcProviderRejectionReason } from '../semantic-constants.js'
 import { localErrorWireSummary } from '../../contract/contract-error.js'
-import { serializeRpcError, deserializeRpcError } from '../../contract/error.js'
-import { RpcContractErrorCode } from '../../contract/error-code.js'
+import { serializeRpcError, deserializeRpcError } from '../../contract/index.js'
+import { RpcContractErrorCode } from '../../contract/index.js'
 import type {
   IRpcIdempotencyClaim,
   IRpcIdempotencyOutcome,

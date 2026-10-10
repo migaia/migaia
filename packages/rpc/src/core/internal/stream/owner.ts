@@ -40,15 +40,12 @@ import { resolveAbortReason, type IAbortSignal } from '../async-control.js'
 import { authenticationReplyReceiverId } from '../authentication-replay.js'
 import type { IEndpointTimer } from '../time-port.js'
 import type { IRpcAbortSignal, IRpcContext } from '../../typing.js'
-import { RpcStreamLimit } from '../../../contract/stream-constants.js'
+import { RpcStreamLimit } from '../../../contract/index.js'
 import type { IProviderRuntimeStream } from '../provider.js'
 import type { RpcOutboundAttachment, IRpcRuntimeSendOptions } from '../outbound-attachment.js'
 import type { IInboundIdentityAdmission } from '../inbound-identity.js'
-import type {
-  IRpcRuntimeEnvelope,
-  IRpcRuntimeGeneration,
-  IRpcRuntimeTask
-} from '../../../contract/runtime-api/types.js'
+import type { IRpcRuntimeEnvelope, IRpcRuntimeGeneration } from '../../../contract/index.js'
+import type { IRpcRuntimeTask } from '../../../contract/runtime-api/types.js'
 import {
   RpcRuntimeKind,
   RpcRuntimeOperation,
@@ -56,7 +53,7 @@ import {
   RpcRuntimeCancel,
   RpcRuntimeFinish,
   RpcRuntimeField
-} from '../../../contract/runtime-api/constants.js'
+} from '../../../contract/framing/v1.js'
 
 /** Only an original opt-in consumer exposes its existing lazy open/ready boundary to a relay. */
 const runtimeStreamReady = Symbol('rpc-runtime-stream-ready')
@@ -655,7 +652,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
   /** Exact opt-in consumer control uses the original accepted task and physical-hop receiver. */
   #sendRuntimeIntent(
     state: IConsumerState,
-    reason: import('../../../contract/types.js').IRpcSerializedError | undefined,
+    reason: import('../../../contract/index.js').IRpcSerializedError | undefined,
     finish: boolean
   ): Promise<void> {
     /** Open preparation completes before this original control is emitted. */

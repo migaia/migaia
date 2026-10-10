@@ -1,4 +1,4 @@
-import { RpcCapability } from '../../contract/wire-constants.js'
+import { RpcCapability } from '../../contract/index.js'
 
 /** Stable profile version and hello correlation id used by every external peer. */
 export const JsonRpcProfile = {

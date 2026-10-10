@@ -4,8 +4,8 @@ import {
   type IThreadHandle,
   type IThreadSpec
 } from '@migaia/supervision/threads'
-import { defaultRpcId } from '../core/internal/id.js'
-import type { IRemoteBinding, IRemoteChannel, IRemoteServeEndpoint } from '../remote/types.js'
+import { defaultRpcId } from '../core/spi.js'
+import type { IRemoteBinding, IRemoteChannel, IRemoteServeEndpoint } from '../remote/index.js'
 import { portableThreadSpec } from './error.js'
 import type { IThreadCommonOptions } from './types.js'
 

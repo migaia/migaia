@@ -9,22 +9,22 @@ import type {
   IRemoteEndpointFactory,
   IRemotePluginHostPort,
   IRemoteRetryPort
-} from '../../remote/types.js'
-import type { IRemoteContract } from '../../remote/contract.js'
-import type { IRemotePluginDefinition } from '../../remote/plugin.js'
+} from '../../remote/index.js'
+import type { IRemoteContract } from '../../remote/index.js'
+import type { IRemotePluginDefinition } from '../../remote/index.js'
 import type { IProcessByteChannel, IProcessMessageChannel } from '../types.js'
 import type {
   IListenProcessByteChannel,
   IProcessCommonOptions,
   IProcessPendingByteConnection
 } from '../types.js'
-import type { IRpcHandshakeOffer, IRpcPeerInfo } from '../../contract/handshake.js'
-import type { IRpcPortableValue } from '../../contract/types.js'
+import type { IRpcHandshakeOffer, IRpcPeerInfo } from '../../contract/index.js'
+import type { IRpcPortableValue } from '../../contract/index.js'
 import type { ProcessPluginChannelKind, ProcessPluginWire } from './constants.js'
 import type { IProcessDependencyHostPort, IProcessResilience } from '../resilience/types.js'
 import type { IProcessSessionIdentity } from '../resilience/types.js'
-import type { IRpcIdempotencyConfig, IRpcProviderLimits } from '../../core/typing.js'
-import type { IRemoteServeEndpoint } from '../../remote/types.js'
+import type { IRpcIdempotencyConfig, IRpcProviderLimits } from '../../core/index.js'
+import type { IRemoteServeEndpoint } from '../../remote/index.js'
 
 /** Session labels are created once per generation and forwarded unchanged to the channel adapter. */
 export type IProcessPluginSession = Readonly<{

@@ -1,8 +1,8 @@
 import type { IScheduler } from '@migaia/utils/scheduler'
-import type { IRpcHandshakeOffer, IRpcPeerInfo } from '../contract/handshake.js'
-import type { IRpcPortableValue } from '../contract/types.js'
+import type { IRpcHandshakeOffer, IRpcPeerInfo } from '../contract/index.js'
+import type { IRpcPortableValue } from '../contract/index.js'
 import type { IIpcLogRecord } from '../core/plugins/flow-control.js'
-import type { IRemoteChannel } from '../remote/types.js'
+import type { IRemoteChannel } from '../remote/index.js'
 
 /** Message channels already have framing and do not perform a byte handshake. */
 export type IProcessMessageChannel = Readonly<{

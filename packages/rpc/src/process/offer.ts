@@ -1,5 +1,5 @@
-import type { IRpcHandshakeOffer, IRpcPeerInfo } from '../contract/handshake.js'
-import { RpcCapability, RpcCodecId, RpcProtocol } from '../contract/wire-constants.js'
+import type { IRpcHandshakeOffer, IRpcPeerInfo } from '../contract/index.js'
+import { RpcCapability, RpcCodecId, RpcProtocol } from '../contract/index.js'
 
 /** Native byte connections advertise only capabilities installed by their endpoint owner. */
 export function createNativeProcessOffer(

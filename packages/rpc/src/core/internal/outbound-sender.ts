@@ -30,14 +30,12 @@ import type { IRpcSelectedComponents } from './endpoint-options.js'
 import { RpcEnvelopeKind, type IRpcEnvelope } from '../../contract/index.js'
 import type { IRpcOutboundAdmission, IRpcOutboundGate } from './outbound-gate.js'
 import { registerBatchWriter, type IBatchWriteGuard } from './batch-frame.js'
-import { RpcBatchPhysical, RpcCapability } from '../../contract/wire-constants.js'
-import {
-  hasRpcBinaryEnvelope,
-  measureRpcNativeBinaryFrame
-} from '../../contract/runtime-api/binary-capture.js'
+import { RpcBatchPhysical, RpcCapability } from '../../contract/index.js'
+import { hasRpcBinaryEnvelope } from '../../contract/runtime-api/binary-capture.js'
+import { measureRpcNativeBinaryFrame } from '../../contract/runtime-api/binary-capture.js'
 import { prepareRpcBinaryLazy as prepareRpcBinary } from '../../contract/runtime-api/binary-lazy.js'
-import { RpcBinaryStorage } from '../../contract/runtime-api/binary-constants.js'
-import { RpcNativeBinaryKind } from '../../contract/runtime-api/binary-constants.js'
+import { RpcBinaryStorage } from '../../contract/framing/v1.js'
+import { RpcNativeBinaryKind } from '../../contract/framing/v1.js'
 import { hasFastComponents, readFastInlineEncoder } from './fast-path.js'
 import {
   prepareOwnedJsonSnapshot,
@@ -50,7 +48,7 @@ import {
   measureRpcPhysicalFrame,
   assertRpcPhysicalFrameSize,
   rejectRpcPhysicalFrameSize
-} from '../../contract/batch-frame.js'
+} from '../../contract/framing/index.js'
 import { resolveAbortReason } from './async-control.js'
 import {
   isOutboundEnvelope,
@@ -63,8 +61,8 @@ import {
   runtimeOperationCapabilities,
   wrapRuntimeCarrier
 } from '../../contract/runtime-api/index.js'
-import { RpcRuntimeKind } from '../../contract/runtime-api/constants.js'
-import type { IRpcRuntimeEnvelope } from '../../contract/runtime-api/types.js'
+import { RpcRuntimeKind } from '../../contract/framing/v1.js'
+import type { IRpcRuntimeEnvelope } from '../../contract/index.js'
 import { bindRpcFrameIngress } from '../../contract/framing/index.js'
 
 /** Fixed native selector/wrapper JSON geometry excludes only the protected metadata slot. */

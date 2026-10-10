@@ -1,15 +1,13 @@
 import { readRuntimeDefaultTimeout } from '../remote/runtime-api/timeout.js'
 import type { IProcessHandle } from '@migaia/supervision/process'
-import { RpcRuntimeGenerationKind } from '../contract/runtime-api/constants.js'
-import { defaultRpcId } from '../core/internal/id.js'
-import { RpcError, RpcCoreErrorCode } from '../core/errors.js'
-import { RuntimeApiErrorText, RuntimePluginKey } from '../remote/runtime-api/constants.js'
-import { createManagedRuntimePeer } from '../remote/runtime-api/managed-peer.js'
-import {
-  prepareRuntimePeerSourceContext,
-  type IRuntimePeerOptions,
-  type IRuntimePeerSource
-} from '../remote/runtime-api/peer.js'
+import { RpcRuntimeGenerationKind } from '../contract/framing/v1.js'
+import { defaultRpcId } from '../core/spi.js'
+import { RpcError, RpcCoreErrorCode } from '../core/index.js'
+import { RuntimeApiErrorText } from '../remote/runtime-api/constants.js'
+import { RuntimePluginKey } from '../remote/index.js'
+import { createManagedRuntimePeer } from '../remote/index.js'
+import { prepareRuntimePeerSourceContext } from '../remote/runtime-api/peer.js'
+import { type IRuntimePeerOptions, type IRuntimePeerSource } from '../remote/index.js'
 import {
   withRuntimeLaunchContext,
   readRuntimePreparationContext

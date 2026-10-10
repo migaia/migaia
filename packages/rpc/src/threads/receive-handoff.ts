@@ -1,5 +1,6 @@
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { RpcCoreErrorCode, tagRpcError } from '../core/errors.js'
+import { RpcCoreErrorCode } from '../core/index.js'
+import { tagRpcError } from '../core/transport-kit.js'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
 import { ThreadErrorText } from './error-text.js'
 import { ThreadEvent } from './constants.js'

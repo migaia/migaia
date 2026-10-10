@@ -8,18 +8,18 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 /**
- * C12 pins the integrated canonical root graph, including every dynamically emitted codec chunk.
- * Held runtime resources add 1095 raw bytes and 271 gzip bytes over the C8 graph. Receipt:
- * docs/rpc/scratch/core-refactor-impl/c12-integration/graph-integrated/root.json. No headroom or
- * A27 approval is added.
+ * C10 pins the actual canonical root graph, including every dynamically emitted codec chunk.
+ * Error-family ownership and bound ingress add 2430 raw bytes and 685 gzip bytes over C12. Receipt:
+ * docs/rpc/scratch/core-refactor-impl/c10/graph-final/root.json. No headroom or A27 approval
+ * is added.
  */
 const allowedIncrease = {
-  rawBytes: 365107 / legacyRoot.rawBytes,
-  gzipBytes: 90833 / legacyRoot.gzipBytes
+  rawBytes: 367537 / legacyRoot.rawBytes,
+  gzipBytes: 91518 / legacyRoot.gzipBytes
 } as const
 
-/** Exact C9/C10 module increase includes the canonical provider implementation identity move. */
-const expectedModuleIncrease = 33
+/** Exact C10 module increase includes the new canonical Error.name owner. */
+const expectedModuleIncrease = 34
 
 describe('A9 root tree-shaking cost', () => {
   it('keeps module count exact and both byte costs within reviewed caps', () => {

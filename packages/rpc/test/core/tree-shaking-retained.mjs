@@ -77,6 +77,34 @@ for (const [entry, entrySource] of Object.entries(entries)) {
   const modules = [...new Set(chunks.flatMap((item) => Object.keys(item.modules)))].sort()
   /** Dependencies whose source and target both survive in this emitted consumer closure. */
   const retainedModuleIds = new Set(modules)
+  /** Preserve the actual resolved path when an import/re-export barrel has no emitted body. */
+  const retainedDependencies = (module) => {
+    /** Breadth-first traversal keeps one shortest observed path for each surviving dependency. */
+    const pending = (runtimeImports.get(module) ?? []).map((dependency) => ({
+      dependency,
+      via: []
+    }))
+    /** Resolved-module identity terminates import cycles without inventing a source edge. */
+    const visited = new Set([module])
+    /** Each result records either the original direct edge or its actual elided module path. */
+    const dependencies = []
+    for (let index = 0; index < pending.length; index += 1) {
+      const { dependency, via } = pending[index]
+      if (visited.has(dependency)) continue
+      visited.add(dependency)
+      if (retainedModuleIds.has(dependency)) {
+        dependencies.push({
+          from: normalizeModule(module),
+          to: normalizeModule(dependency),
+          ...(via.length === 0 ? {} : { via: via.map(normalizeModule) })
+        })
+        continue
+      }
+      for (const next of runtimeImports.get(dependency) ?? [])
+        pending.push({ dependency: next, via: [...via, dependency] })
+    }
+    return dependencies
+  }
   const edges = modules
     .filter((module) => {
       const path = normalizeModule(module)
@@ -86,14 +114,7 @@ for (const [entry, entrySource] of Object.entries(entries)) {
         path.startsWith('src/browser/')
       )
     })
-    .flatMap((module) =>
-      (runtimeImports.get(module) ?? [])
-        .filter((dependency) => retainedModuleIds.has(dependency))
-        .map((dependency) => ({
-          from: normalizeModule(module),
-          to: normalizeModule(dependency)
-        }))
-    )
+    .flatMap(retainedDependencies)
     .sort((left, right) =>
       `${left.from}\u0000${left.to}`.localeCompare(`${right.from}\u0000${right.to}`)
     )

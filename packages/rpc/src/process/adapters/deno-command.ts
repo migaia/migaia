@@ -6,8 +6,9 @@ import {
   type IProcessHandle,
   type IProcessLauncher
 } from '@migaia/supervision/process'
-import { encodeRpcStreamFrame } from '../../contract/framing/stream.js'
-import { RpcCoreErrorCode, tagRpcError } from '../../core/errors.js'
+import { encodeRpcStreamFrame } from '../../contract/framing/stream-index.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
+import { tagRpcError } from '../../core/transport-kit.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import { openBootstrapFrameChannel } from '../bootstrap.js'
@@ -15,7 +16,7 @@ import { RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'
 import { RpcProcessErrorText } from '../error-text.js'
 import type { IProcessByteChannel } from '../types.js'
-import type { IRuntimePeerIdentity } from '../../remote/runtime-api/description.js'
+import type { IRuntimePeerIdentity } from '../../remote/index.js'
 import { readRuntimeLaunchContext } from '../../remote/runtime-api/launch-context.js'
 import {
   prepareProcessRuntimeBootstrap,
