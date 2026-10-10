@@ -1,11 +1,5 @@
 import { RpcCoreErrorCode, RpcError } from '../../core/errors.js'
-import {
-  isForwardedOperation,
-  retainForwardOptions
-} from '../../core/internal/outbound-envelope.js'
 import { RUNTIME_API_DEFAULT_TIMEOUT_MS, RuntimeApiErrorText } from './constants.js'
-import type { IRuntimeCallOptions } from './typing.js'
-import { retainRuntimeTransferOptions } from './transfer.js'
 
 /** Validate the simple factory's default before any original native/source owner is acquired. */
 export function readRuntimeDefaultTimeout(
@@ -19,21 +13,4 @@ export function readRuntimeDefaultTimeout(
   return value
 }
 
-/** Reuse one default input and retain private forwarding proof when optional fields need a copy. */
-export function prepareRuntimeCallTimeout(
-  timeoutMs: number
-): (options?: IRuntimeCallOptions) => IRuntimeCallOptions {
-  /** Ordinary calls with no options borrow this immutable input rather than allocate per request. */
-  const defaults = Object.freeze({ timeoutMs })
-  return (options) => {
-    if (options?.timeoutMs !== undefined) return options
-    if (options === undefined) return defaults
-    /** The existing options copy must preserve an explicit own ownership selector. */
-    const copied: IRuntimeCallOptions = {
-      ...options,
-      /** An admitted upstream call already owns its budget, including an absent deadline. */
-      timeoutMs: isForwardedOperation(options) ? false : timeoutMs
-    }
-    return retainForwardOptions(options, retainRuntimeTransferOptions(options, copied))
-  }
-}
+export { prepareRuntimeCallTimeout } from '../../core/internal/runtime-call-options.js'

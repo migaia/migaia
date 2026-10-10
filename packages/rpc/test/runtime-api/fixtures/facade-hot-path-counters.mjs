@@ -8,6 +8,7 @@ import { RuntimeBench } from '../../../bench/text.mjs'
 const counters = {
   payloadValue: 0,
   requestClosure: 0,
+  runtimeInput: 0,
   runtimeEnvelope: 0,
   binaryPrepare: 0,
   materialize: 0
@@ -19,14 +20,25 @@ registerHooks({
   load(url, context, nextLoad) {
     const result = nextLoad(url, context)
     if (!url.startsWith('file:') || result.source == null) return result
-    /** Source replacement is diagnostic-only and confined to the two actual delivered facades. */
+    /** Source replacement counts actual Core owners; the Remote facades remain raw delegates. */
     let source = Buffer.from(result.source).toString()
-    if (url.endsWith('/rpc/dist/remote/runtime-api/peer.js'))
-      source = source.replace(
-        'function payloadValue(payload, binary = false) {',
-        'function payloadValue(payload, binary = false) { globalThis.__rpcFacadeCounters.payloadValue++;'
+    if (url.endsWith('/rpc/dist/remote/runtime-api/peer.js')) {
+      assert.ok(source.includes('createRuntimePeerCalls('), 'public facade delegates to Core')
+      assert.equal(
+        source.includes('function payloadValue('),
+        false,
+        'Remote adds no payload walker'
       )
-    if (url.endsWith('/rpc/dist/remote/runtime-api/managed-peer.js'))
+    }
+    if (url.endsWith('/rpc/dist/remote/runtime-api/managed-peer.js')) {
+      assert.ok(source.includes('createManagedRuntimeCalls('), 'managed facade delegates to Core')
+      assert.equal(
+        source.includes('binding.trackRequest('),
+        false,
+        'Remote adds no request closure'
+      )
+    }
+    if (url.endsWith('/rpc/dist/core/internal/runtime-call.js'))
       if (source.includes('binding.trackRequest(() => registration.invokeRequest'))
         source = source.replace(
           'binding.trackRequest(() => registration.invokeRequest(method, payload, callTimeout(callOptions)))',
@@ -53,6 +65,13 @@ registerHooks({
       source = source.replace(pattern, '$& globalThis.__rpcFacadeCounters.binaryPrepare++;')
     }
     if (url.endsWith('/rpc/dist/core/internal/outbound-envelope.js')) {
+      /**
+       * Capture moved into Core; instrument its delivered body rather than observing an absent
+       * facade.
+       */
+      const capture = /export function createRuntimeRequestInput\([^]*?\) \{/
+      assert.ok(capture.test(source), 'Core request capture declaration required')
+      source = source.replace(capture, '$& globalThis.__rpcFacadeCounters.runtimeInput++;')
       /** Count the delivered materialization owner without adding any production diagnostic API. */
       const pattern = /export function materializeOutboundJson\(/
       assert.ok(pattern.test(source), 'materialization declaration required')
@@ -84,6 +103,7 @@ try {
   assert.ok(session.facade)
   counters.payloadValue = 0
   counters.requestClosure = 0
+  counters.runtimeInput = 0
   counters.runtimeEnvelope = 0
   counters.binaryPrepare = 0
   counters.materialize = 0

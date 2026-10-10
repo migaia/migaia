@@ -1,3 +1,4 @@
+import { createRuntimePeerCalls } from '../../core/internal/runtime-call.js'
 import {
   runtimeConnectionDetail,
   runtimeDetail,
@@ -10,15 +11,8 @@ import {
 } from './overview.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { createAbortController, type IAbortSignal } from '@migaia/lifecycle'
-import { normalizePortable, hasRpcPortableBinary } from '../../contract/normalize.js'
-import {
-  createRuntimeRequestInput,
-  retainRuntimeRequestInput
-} from '../../core/internal/outbound-envelope.js'
-import {
-  normalizeRuntimeGeneration,
-  normalizeRuntimeSteps
-} from '../../contract/runtime-api/metadata.js'
+import { normalizePortable } from '../../contract/normalize.js'
+import { normalizeRuntimeGeneration } from '../../contract/runtime-api/metadata.js'
 import type {
   IRpcRuntimeGeneration,
   IRpcRuntimeStep,
@@ -40,12 +34,7 @@ import {
   rejectRuntimeApiCapability,
   type IRuntimeApiEndpoint
 } from '../../core/internal/runtime-api-endpoint.js'
-import {
-  RpcError,
-  RpcCoreErrorCode,
-  RpcSerializationError,
-  RpcRemoteError
-} from '../../core/errors.js'
+import { RpcError, RpcCoreErrorCode, RpcSerializationError } from '../../core/errors.js'
 import { completeProviderReturn } from '../../core/internal/provider.js'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import { abort } from '../../core/middleware/abort.js'
@@ -55,14 +44,12 @@ import { framer } from '../../core/middleware/framer.js'
 import { timeout } from '../../core/middleware/timeout.js'
 import {
   createForwardOptions,
-  createForwardQueryOptions,
-  isForwardedPayload
+  createForwardQueryOptions
 } from '../../core/internal/outbound-envelope.js'
 import { retainProviderFailureRoute } from '../../core/internal/provider.js'
 import { RpcCoreErrorText } from '../../core/error-text.js'
 import { readRuntimePreparationContext } from './launch-context.js'
 import { readRuntimeDefaultTimeout, prepareRuntimeCallTimeout } from './timeout.js'
-import { assertRuntimeTransferFamily } from './transfer.js'
 import { RuntimePluginKey } from './constants.js'
 import type { IRuntimeCallOptions } from './typing.js'
 import type {
@@ -100,10 +87,7 @@ import {
   type ProviderRegistry
 } from '../../core/internal/provider.js'
 import type { IRpcStreamRun } from '../../core/features/stream.js'
-import {
-  prepareRuntimeStreamConsumer,
-  type RpcStreamOwner
-} from '../../core/internal/stream/owner.js'
+import { prepareRuntimeStreamConsumer } from '../../core/internal/stream/owner.js'
 import {
   normalizeRuntimeDescription,
   describeRuntimeMethods,
@@ -245,19 +229,6 @@ export function retainRuntimePeerSessions(
 /** Configuration rejection keeps its canonical code and does not reflect source secrets. */
 function invalid(message: string): never {
   throw new RpcError(RpcCoreErrorCode.invalidConfig, message)
-}
-
-/** Normalize one provided payload; an omitted optional argument remains omitted on the wire. */
-function payloadValue(payload: unknown, binary = false): IRpcPortableValue | undefined {
-  return payload === undefined
-    ? undefined
-    : normalizePortable(payload, 0, new Set<object>(), binary || rejectRuntimeApiCapability)
-}
-
-/** A forwarded business failure keeps the serialized provider identity and its original stack. */
-function restoreForwardError(error: unknown): never {
-  if (error instanceof RpcRemoteError && error.cause instanceof Error) throw error.cause
-  throw error
 }
 
 /** Both raw and supervised factories validate safe identity through this same cold owner. */
@@ -768,148 +739,18 @@ export async function createRuntimePeer(
     /** This exact facade is minted only after both directory and endpoint preparation succeed. */
     const peer: IRuntimePeer = Object.freeze({
       self,
-      request: (method: string, payload?: unknown, callOptions?: IRuntimeCallOptions) => {
-        assertRuntimeTransferFamily(family, callOptions)
-        callOptions = callTimeout(callOptions)
-        route(method, RuntimeApiMode.request)
-        if (
-          supportsBinary ||
-          callOptions?.orderKey !== undefined ||
-          callOptions?.cancel !== undefined ||
-          (callOptions !== undefined && Object.hasOwn(callOptions, 'transfer'))
-        ) {
-          if (!runtimeOutbound || !remote.self.generation) rejectRuntimeApiCapability()
-          return runtimeOutbound.sendRuntimeOperation(
-            channel.peerId,
-            remote.self.generation,
-            'request',
-            createRuntimeRequestInput(
-              method,
-              payload,
-              supportsBinary || rejectRuntimeApiCapability,
-              callOptions
-            ),
-            callOptions
-          ) as Promise<IRpcPortableValue | undefined>
-        }
-        /** Original legacy framing retains its depth-two payload boundary without a facade walk. */
-        const input = createRuntimeRequestInput(
-          method,
-          payload,
-          supportsBinary || rejectRuntimeApiCapability,
-          callOptions,
-          2
-        )
-        const result = ready.send<IRpcPortableValue | undefined>(
-          channel.peerId,
-          method,
-          input.payload,
-          retainRuntimeRequestInput({ ...callOptions }, input)
-        )
-        return routes.get(method)?.forwardedVia || isForwardedPayload(callOptions, payload)
-          ? result.catch(restoreForwardError)
-          : result
-      },
-      notify: (method: string, payload?: unknown, callOptions?: IRuntimeCallOptions) => {
-        assertRuntimeTransferFamily(family, callOptions)
-        route(method, RuntimeApiMode.notify)
-        /**
-         * Plain notify has no binary result; its existing physical/forward completion path stays
-         * intact.
-         */
-        const normalizedPayload = isForwardedPayload(callOptions, payload)
-          ? (payload as IRpcPortableValue | undefined)
-          : payloadValue(payload, supportsBinary)
-        if (
-          hasRpcPortableBinary(normalizedPayload) ||
-          callOptions?.orderKey !== undefined ||
-          callOptions?.cancel !== undefined ||
-          (callOptions !== undefined && Object.hasOwn(callOptions, 'transfer'))
-        ) {
-          if (!runtimeOutbound || !remote.self.generation) rejectRuntimeApiCapability()
-          return runtimeOutbound.sendRuntimeOperation(
-            channel.peerId,
-            remote.self.generation,
-            'notify',
-            { method, payload: normalizedPayload },
-            callOptions,
-            isForwardedPayload(callOptions, payload)
-          ) as Promise<void>
-        }
-        /**
-         * The private forward operation awaits C's existing provider response, unlike ordinary
-         * notify.
-         */
-        if (isForwardedPayload(callOptions, payload))
-          return ready
-            .send(channel.peerId, method, payload, callOptions)
-            .then(() => undefined, restoreForwardError)
-        return ready.sendOneWay(channel.peerId, method, normalizedPayload, callOptions)
-      },
-      stream: (method: string, payload?: unknown, callOptions?: IRuntimeCallOptions) => {
-        assertRuntimeTransferFamily(family, callOptions)
-        callOptions = callTimeout(callOptions)
-        if (!supportsStream) rejectRuntimeApiCapability()
-        route(method, RuntimeApiMode.stream)
-        if (
-          supportsBinary ||
-          callOptions?.orderKey !== undefined ||
-          callOptions?.cancel !== undefined ||
-          (callOptions !== undefined && Object.hasOwn(callOptions, 'transfer'))
-        ) {
-          if (!runtimeOutbound || !remote.self.generation) rejectRuntimeApiCapability()
-          /** The same canonical stream owner retains its existing consumer and single-credit loop. */
-          const owner = readEndpointOwner<RpcStreamOwner>(ready, EndpointOwnerKey.streamOwner)
-          if (!owner) rejectRuntimeApiCapability()
-          return owner.openRuntime(
-            channel.peerId,
-            method,
-            payloadValue(payload, supportsBinary),
-            remote.self.generation,
-            callOptions
-          )
-        }
-        return ready.stream!.open(
-          channel.peerId,
-          routes.get(method)!.stream,
-          isForwardedPayload(callOptions, payload)
-            ? (payload as IRpcPortableValue | undefined)
-            : payloadValue(payload, supportsBinary),
-          callOptions
-        )
-      },
-      group: (steps: readonly IRpcRuntimeStep[], callOptions?: IRpcRuntimeSendOptions) => {
-        assertRuntimeTransferFamily(family, callOptions)
-        if (!runtimeOutbound || !remote.self.generation) rejectRuntimeApiCapability()
-        /** Snapshot the owning grammar before any route read can execute a user getter. */
-        let normalized: readonly IRpcRuntimeStep[]
-        try {
-          normalized = normalizeRuntimeSteps(steps)
-        } catch (cause) {
-          throw new RpcError(
-            RpcCoreErrorCode.invalidConfig,
-            RpcCoreErrorText.runtimeGroupStepsInvalid,
-            cause
-          )
-        }
-        for (const step of normalized) route(step.method, RuntimeApiMode.request)
-        return runtimeOutbound.sendRuntimeOperation(
-          channel.peerId,
-          remote.self.generation,
-          'group',
-          { steps: normalized },
-          callOptions
-        ) as Promise<readonly IRpcRuntimeStepOutcome[]>
-      },
-      outcome: (idempotencyKey: string) => {
-        if (!runtimeOutbound || !remote.self.generation) rejectRuntimeApiCapability()
-        return runtimeOutbound.sendRuntimeOperation(
-          channel.peerId,
-          remote.self.generation,
-          'outcome',
-          { idempotencyKey }
-        ) as Promise<IRpcRuntimeOutcomeResult>
-      },
+      ...createRuntimePeerCalls({
+        processFamily: family === RuntimePluginKey.process,
+        callTimeout,
+        route,
+        ready,
+        runtimeOutbound,
+        peerId: channel.peerId,
+        generation: remote.self.generation,
+        supportsBinary,
+        supportsStream,
+        routes
+      }),
       describe: runtimeQuery(() => {
         /** The original adapter alone can prove physical closure; absent proof remains unavailable. */
         const state =

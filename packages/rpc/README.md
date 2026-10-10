@@ -90,6 +90,8 @@ process inline 保留原 base64 wire：Uint8Array 仅携带可见 bytes，接收
 
 透明转发只公开显式 expose 的 accepted route，每跳固定实际 generation，最多三层；下一跳鉴权直接上一跳。性能固有成本不能成为绕过白名单、portable admission、replay 或 deadline 的理由。
 
+每个调用入口保留原选项读取与 payload 捕获顺序；重试复用同一逻辑调用的快照。stream 保持原首次 next/return/throw 触发，准备沿原条件执行；iterator 复用同一 consumer。转发复用接收端完整验证的原对象；复制对象、反射字段或 custom protocol 不能取得这项复用。
+
 非独占载体按 receiver 身份绑定 challenge；SIEVE 管理驻留会话。SESSION_UNKNOWN 是 AUTHENTICATION_FAILED 的本地 rejection reason：只清对应 challenge 缓存，未来新调用重新发现，不自动重放旧业务帧。receiver 重启不能证明业务未执行。 CHALLENGE_INVALID 同属 AUTHENTICATION_FAILED 的本地拒绝 reason，表示 challenge 字段语法或方向非法；修帧合同，不盲重试，也不是新的顶层 code。
 
 先看 (source,code)、原 cause/errors 和已发送/已执行事实。OVERLOADED、transport loss、deadline、普通取消或恢复 ready 都不单独证明安全重试；使用原 key/outcome 或业务对账，剩余总预算内退避。客户端 provider 错误当前不含 reason。完整 68 项策略见 [USEGUIDE](./USEGUIDE.md#逐错误码处理与重试)。

@@ -3,6 +3,9 @@ import {
   createRuntimeOutboundEnvelope,
   createRuntimeRequestOutboundEnvelope,
   isRuntimeRequestInput,
+  readRuntimeRequestInput,
+  retainRuntimeRequestInput,
+  retainForwardOptions,
   readForwardRoute
 } from './outbound-envelope.js'
 import { hasFastEndpoint, hasFastComponents } from './fast-path.js'
@@ -916,6 +919,12 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     return this.#runtimeGeneration
   }
 
+  /** Core raw operations reuse the existing describe binding, never an options generation claim. */
+  runtimeTargetGeneration(targetId: string): IRpcRuntimeGeneration | undefined {
+    const binding = this.#responseBindings.get(targetId)
+    return binding === undefined ? undefined : this.inboundIdentity.readResponseGeneration(binding)
+  }
+
   /** Original controls and executor replies use the one codec/framer/auth/physical sender. */
   sendRuntimeFrame(
     envelope: IRpcRuntimeEnvelope,
@@ -1464,11 +1473,16 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     const remaining = operation.remaining(timeoutMs)
     operation.assertActive(this.kernel.generation)
     if (remaining === 0) throw new RpcTimeoutError()
+    /** The original options copy retains only Core's exact captured input and forward association. */
+    const callOptions = retainForwardOptions(options, { ...options, timeoutMs: remaining })
+    /** Private fields are deliberately not copied by spread; Core carries its own input explicitly. */
+    const input = readRuntimeRequestInput(options, method, data, 2)
+    if (input) retainRuntimeRequestInput(callOptions, input)
     return this.#requestOnce<T>(
       targetId,
       method,
       data,
-      { ...options, timeoutMs: remaining },
+      callOptions,
       this.#fast
         ? options.signal
           ? [options.signal]

@@ -23,7 +23,8 @@ import {
   abort,
   timeout,
   authentication,
-  type IRpcEndpoint
+  type IRpcEndpoint,
+  RpcCoreErrorCode
 } from '../../src/core/index.js'
 import fixture from './fixtures/managed-binary-key.json'
 
@@ -194,6 +195,106 @@ it('[A86][A88] managed genuine Worker transfers through the original owner witho
     assert.equal(handles.length, 2)
     assert.equal(starts, 1, '[A88] actual replacement never re-enters the detached operation')
     assert.equal(retries, 0)
+  } finally {
+    await peer.close()
+    for (const handle of handles) handle.terminate()
+    await Promise.all(handles.map((handle) => handle.exited))
+  }
+  assert.equal(budget.inUse, 0)
+})
+
+it('[A84/F1] genuine managed binding rejects UInt8Array without bilateral binary before physical send', async () => {
+  /** Both actual Worker channels negotiate the original scalar profile, omitting binary/transfer. */
+  const scalarCapabilities = capabilities.filter(
+    (value) =>
+      !['portable-binary@1', 'native-binary-authenticated-manifest@1', 'transfer@1'].includes(value)
+  )
+  const budget = createUnitBudget({ kind: 'thread', maxUnits: 1 })
+  const native = createNodeThreadLauncher()
+  /** Real native handles retain the original close and exit ownership during the negative case. */
+  const handles: INodeThreadHandle[] = []
+  const parentId = 'managed-no-binary-parent'
+  const signature = (value: unknown) =>
+    createHmac('sha256', fixture.key).update(JSON.stringify(value)).digest('hex')
+  const binding = createThreadBinding({
+    spec: { entry, data: { parentId, capabilities: scalarCapabilities } },
+    budget,
+    scheduler: systemScheduler,
+    launcher: {
+      ...native,
+      launch: async (spec, context) => {
+        const handle = await native.launch(spec, context)
+        handles.push(handle)
+        return handle
+      }
+    },
+    channelFactory: createNodeThreadChannelFactory({
+      scheduler: systemScheduler,
+      capabilities: scalarCapabilities
+    }),
+    supervisor: { restart: { maxRestarts: 0 } },
+    report: () => undefined
+  })
+  const peer = await createManagedRuntimePeer(
+    {
+      self: { name: parentId, instanceId: parentId },
+      report: () => undefined,
+      endpointFactory: async (channel) => {
+        const endpoint = await createRuntimeApiEndpoint(
+          {
+            id: parentId,
+            scheduler: channel.scheduler,
+            transport: channel.transport,
+            targetIds: [channel.peerId],
+            middlewares: [
+              codec(channel.pipeline.codec),
+              framer(channel.pipeline.framer),
+              connect({ transport: channel.transport }),
+              abort(),
+              timeout(),
+              authentication({
+                sign: (value) => ({ body: value, signature: signature(value) }),
+                verify: (value) => {
+                  const signed = value as { body: unknown; signature: string }
+                  assert.equal(signed.signature, signature(signed.body))
+                  return signed.body
+                }
+              })
+            ]
+          },
+          { supports: () => true },
+          true
+        )
+        return {
+          endpoint: endpoint as unknown as IRpcEndpoint,
+          oneWay: endpoint,
+          stream: endpoint.stream
+        }
+      }
+    },
+    binding,
+    (channel, endpoint) => binding.bindEndpoint(channel, endpoint)
+  )
+  try {
+    assert.equal(await peer.request('service.data.echo', 'scalar-control'), 'scalar-control')
+    const channel = readRuntimePeerConnection(peer).channel
+    assert.equal(channel.agreement.capabilities.includes('portable-binary@1'), false)
+    const send = vi.spyOn(channel.transport, 'send')
+    try {
+      const bytes = new Uint8Array([1, 2])
+      const failure = await peer
+        .request('service.data.echo', bytes)
+        .catch((error: unknown) => error)
+      assert.equal((failure as { code: string }).code, RpcCoreErrorCode.capabilityUnsupported)
+      assert.equal(
+        send.mock.calls.length,
+        0,
+        'binding cannot silently convert bytes to legacy numeric arrays'
+      )
+      assert.equal(bytes.byteLength, 2)
+    } finally {
+      send.mockRestore()
+    }
   } finally {
     await peer.close()
     for (const handle of handles) handle.terminate()
