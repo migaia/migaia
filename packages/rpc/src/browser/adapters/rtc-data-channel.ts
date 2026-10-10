@@ -15,7 +15,7 @@ import {
   safeRead,
   tagRpcError
 } from '../../core/transport-kit.js'
-import { RpcCoreErrorCode, RpcTransportError } from '../../core/errors.js'
+import { RpcCoreErrorCode, RpcTransportError } from '../../core/index.js'
 import { BrowserRpcErrorText } from '../error-text.js'
 
 /** Minimal RTCDataChannel surface accepted by the adapter. */

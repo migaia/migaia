@@ -12,7 +12,7 @@ import {
   reportListenerFailure,
   tagRpcError
 } from '../../core/transport-kit.js'
-import { RpcCoreErrorCode } from '../../core/errors.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
 
 /** Minimal SharedWorker port surface accepted by the adapter. */
 export type ISharedWorkerPort = {

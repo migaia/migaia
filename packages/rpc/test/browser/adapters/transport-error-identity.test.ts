@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createRtcDataChannelTransport } from '../../../src/browser/adapters/rtc-data-channel.js'
 import { createSharedWorkerTransport } from '../../../src/browser/adapters/shared-worker.js'
 import { createWebTransportDatagramTransport } from '../../../src/browser/adapters/web-transport.js'
-import { createWebWorkerTransport } from '../../../src/browser/adapters/web-worker.js'
+import { createWebWorkerTransport } from '../../../src/core/adapters/web-worker.js'
 
 type IListener = (event: unknown) => void
 

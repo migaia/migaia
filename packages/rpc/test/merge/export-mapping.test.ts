@@ -61,17 +61,20 @@ describe('A1 merged public exports', () => {
       ...['node', 'deno', 'bun', 'electron-main', 'electron-renderer', 'browser'].map(
         (name) => `@migaia/rpc/threads/adapters/${name}`
       )
-    ].sort()
+    ]
+      .map((name) => (coreRefactorDelta.relocations as Record<string, string>)[name] ?? name)
+      .sort()
     expect(expected).toHaveLength(52)
     expect(Object.keys(manifest.exports).sort()).toEqual(
       expected.map((name) => `.${name.slice('@migaia/rpc'.length)}`).sort()
     )
     for (const [name, baseline] of Object.entries(legacyExports)) {
-      const key = `.${name.slice('@migaia/rpc'.length)}`
+      const currentName = (coreRefactorDelta.relocations as Record<string, string>)[name] ?? name
+      const key = `.${currentName.slice('@migaia/rpc'.length)}`
       const entry = manifest.exports[key]
       expect(entry, name).toBeDefined()
       const relative = entry.default.replace(/^\.\//, '')
-      const suffix = name.slice('@migaia/rpc/'.length)
+      const suffix = currentName.slice('@migaia/rpc/'.length)
       const indexed = new Set(['contract', 'contract/v1', 'contract/framing', 'core'])
       const expectedRelative = `dist/${suffix}${indexed.has(suffix) ? '/index' : ''}.js`
       expect(relative.startsWith('dist/'), name).toBe(true)

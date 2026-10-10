@@ -55,21 +55,6 @@ export const BrowserRpcErrorText = {
   webTransportRequiresUint8ArrayEncodedMessages:
     'WebTransport requires Uint8Array encoded messages',
   /**
-   * Stable browser error text consumed by browser/adapters/web-worker.ts; preserves its existing
-   * caller-facing wording.
-   */
-  workerMessageReadFailed: (detail: string): string =>
-    `[rpc] worker message could not be read: ${detail}`,
-  /**
-   * Stable browser error text consumed by browser/adapters/web-worker.ts; preserves its existing
-   * caller-facing wording.
-   */
-  workerFailure: (reason: string, detail: string): string => `[rpc] worker ${reason}: ${detail}`,
-  /** Stable reason for a Worker error event consumed by the Web Worker adapter. */
-  workerFailedReason: 'failed',
-  /** Stable reason for a Worker messageerror event consumed by the Web Worker adapter. */
-  workerMessageErrorReason: 'could not deserialize a message',
-  /**
    * Stable browser error text consumed by browser/adapters/window.ts; preserves its existing
    * caller-facing wording.
    */

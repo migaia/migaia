@@ -56596,10 +56596,10 @@
       "aliases": []
     },
     {
-      "id": "rpc:browser/adapters/web-worker",
+      "id": "rpc:core/adapters/web-worker",
       "library": "rpc",
-      "module": "browser/adapters/web-worker",
-      "exportPath": "./browser/adapters/web-worker",
+      "module": "core/adapters/web-worker",
+      "exportPath": "./core/adapters/web-worker",
       "sections": [
         "introduction",
         "getting-started",
@@ -56616,7 +56616,7 @@
           "kind": "function",
           "signature": "export declare function createWebWorkerTransport(\n  port: IWebWorkerLikePort,\n  options?: IWebWorkerTransportOptions,\n): IRpcTransport<unknown, Transferable>;",
           "declarationLine": 27,
-          "source": "packages/rpc/dist/browser/adapters/web-worker.d.ts",
+          "source": "packages/rpc/dist/core/adapters/web-worker.d.ts",
           "purpose": "Wraps a Worker/MessagePort-like object as an `RpcTransport`. `error` and `messageerror` (script failure, structured-clone failure) have no message payload of their own — they're surfaced through `onTransportError`, which the endpoint uses to fail every pending call at once instead of leaving them hanging with no response ever coming.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWebWorkerTransport.",
           "advanced": "No additional advanced behavior is declared for createWebWorkerTransport.",
@@ -56641,7 +56641,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWebWorkerTransport.",
           "examples": [],
           "members": [],
-          "exportPath": "./browser/adapters/web-worker",
+          "exportPath": "./core/adapters/web-worker",
           "overloadSignatures": [
             "export declare function createWebWorkerTransport(port: IWebWorkerLikePort, options?: IWebWorkerTransportOptions): IRpcTransport<unknown, Transferable>;"
           ],
@@ -56671,7 +56671,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import createWebWorkerTransport from @migaia/rpc/browser/adapters/web-worker, then follow a maintained task example for your use case."
+              "content": "Import createWebWorkerTransport from @migaia/rpc/core/adapters/web-worker, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -56714,7 +56714,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/rpc/dist/browser/adapters/web-worker.d.ts:createWebWorkerTransport:export declare function createWebWorkerTransport(port: IWebWorkerLikePort, options?: IWebWorkerTransportOptions): IRpcTransport<unknown, Transferable>;",
+          "identity": "packages/rpc/dist/core/adapters/web-worker.d.ts:createWebWorkerTransport:export declare function createWebWorkerTransport(port: IWebWorkerLikePort, options?: IWebWorkerTransportOptions): IRpcTransport<unknown, Transferable>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [
@@ -56743,14 +56743,14 @@
               "descriptionZh": ""
             }
           ],
-          "fragment": "rpc-browser/adapters/web-worker--createWebWorkerTransport"
+          "fragment": "rpc-core/adapters/web-worker--createWebWorkerTransport"
         },
         {
           "name": "IWebWorkerLikePort",
           "kind": "type",
           "signature": "export type IWebWorkerLikePort = {\n  postMessage(message: unknown, transfer?: readonly Transferable[]): void;\n  addEventListener(\n    type: 'message' | 'error' | 'messageerror',\n    listener: (event: MessageEvent<unknown> | Event) => void,\n  ): void;\n  removeEventListener(\n    type: 'message' | 'error' | 'messageerror',\n    listener: (event: MessageEvent<unknown> | Event) => void,\n  ): void;\n};",
           "declarationLine": 9,
-          "source": "packages/rpc/dist/browser/adapters/web-worker.d.ts",
+          "source": "packages/rpc/dist/core/adapters/web-worker.d.ts",
           "purpose": "Minimal event-listener worker/port surface — a real `Worker`, `MessagePort`, or `SharedWorker.port` all satisfy this. Deliberately not `Worker` itself: shared workers and ports must not use a mutable `onmessage` slot (that would silently steal another listener's subscription), and this file has no other DOM dependency beyond the ambient `Transferable`/`MessageEvent` types.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWebWorkerLikePort.",
           "advanced": "No additional advanced behavior is declared for IWebWorkerLikePort.",
@@ -56761,7 +56761,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWebWorkerLikePort.",
           "examples": [],
           "members": [],
-          "exportPath": "./browser/adapters/web-worker",
+          "exportPath": "./core/adapters/web-worker",
           "overloadSignatures": [
             "export type IWebWorkerLikePort = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; addEventListener(type: 'message' | 'error' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; removeEventListener(type: 'message' | 'error' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; };"
           ],
@@ -56778,7 +56778,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import IWebWorkerLikePort from @migaia/rpc/browser/adapters/web-worker, then follow a maintained task example for your use case."
+              "content": "Import IWebWorkerLikePort from @migaia/rpc/core/adapters/web-worker, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -56802,18 +56802,18 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc/dist/browser/adapters/web-worker.d.ts:IWebWorkerLikePort:export type IWebWorkerLikePort = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; addEventListener(type: 'message' | 'error' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; removeEventListener(type: 'message' | 'error' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; };",
+          "identity": "packages/rpc/dist/core/adapters/web-worker.d.ts:IWebWorkerLikePort:export type IWebWorkerLikePort = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; addEventListener(type: 'message' | 'error' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; removeEventListener(type: 'message' | 'error' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
-          "fragment": "rpc-browser/adapters/web-worker--IWebWorkerLikePort"
+          "fragment": "rpc-core/adapters/web-worker--IWebWorkerLikePort"
         },
         {
           "name": "IWebWorkerTransportOptions",
           "kind": "type",
           "signature": "export type IWebWorkerTransportOptions = {\n  /** Explicit static agreement; both deployment endpoints must use the same capabilities. */ readonly capabilities?: readonly string[];\n  readonly peerId?: string;\n  readonly origin?: string;\n};",
           "declarationLine": 15,
-          "source": "packages/rpc/dist/browser/adapters/web-worker.d.ts",
+          "source": "packages/rpc/dist/core/adapters/web-worker.d.ts",
           "purpose": "Static metadata for a dedicated worker channel whose peer is known by construction.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWebWorkerTransportOptions.",
           "advanced": "No additional advanced behavior is declared for IWebWorkerTransportOptions.",
@@ -56824,7 +56824,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWebWorkerTransportOptions.",
           "examples": [],
           "members": [],
-          "exportPath": "./browser/adapters/web-worker",
+          "exportPath": "./core/adapters/web-worker",
           "overloadSignatures": [
             "export type IWebWorkerTransportOptions = { /** Explicit static agreement; both deployment endpoints must use the same capabilities. */ readonly capabilities?: readonly string[]; readonly peerId?: string; readonly origin?: string; };"
           ],
@@ -56841,7 +56841,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import IWebWorkerTransportOptions from @migaia/rpc/browser/adapters/web-worker, then follow a maintained task example for your use case."
+              "content": "Import IWebWorkerTransportOptions from @migaia/rpc/core/adapters/web-worker, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -56865,11 +56865,11 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc/dist/browser/adapters/web-worker.d.ts:IWebWorkerTransportOptions:export type IWebWorkerTransportOptions = { /** Explicit static agreement; both deployment endpoints must use the same capabilities. */ readonly capabilities?: readonly string[]; readonly peerId?: string; readonly origin?: string; };",
+          "identity": "packages/rpc/dist/core/adapters/web-worker.d.ts:IWebWorkerTransportOptions:export type IWebWorkerTransportOptions = { /** Explicit static agreement; both deployment endpoints must use the same capabilities. */ readonly capabilities?: readonly string[]; readonly peerId?: string; readonly origin?: string; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
-          "fragment": "rpc-browser/adapters/web-worker--IWebWorkerTransportOptions"
+          "fragment": "rpc-core/adapters/web-worker--IWebWorkerTransportOptions"
         }
       ],
       "aliases": []

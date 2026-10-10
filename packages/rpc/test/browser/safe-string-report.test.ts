@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createWebWorkerTransport } from '../../src/browser/adapters/web-worker.js'
+import { createWebWorkerTransport } from '../../src/core/adapters/web-worker.js'
 
 describe('[A11] safeString failure reporting', () => {
   it('reports Worker conversion and message getter failures before primary errors', () => {

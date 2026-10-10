@@ -79,7 +79,7 @@
         "./browser/adapters/service-worker",
         "./browser/adapters/shared-worker",
         "./browser/adapters/web-transport",
-        "./browser/adapters/web-worker",
+        "./core/adapters/web-worker",
         "./browser/adapters/window",
         "./contract",
         "./contract/framing",

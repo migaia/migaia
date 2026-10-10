@@ -72,5 +72,8 @@
       "createRuntimePlugin"
     ],
     "@migaia/rpc/remote/spi": ["normalizeRuntimeDescription"]
+  },
+  "relocations": {
+    "@migaia/rpc/browser/adapters/web-worker": "@migaia/rpc/core/adapters/web-worker"
   }
 }
