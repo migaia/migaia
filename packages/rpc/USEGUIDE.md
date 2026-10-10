@@ -25,6 +25,40 @@ contract/v1 是仍保留的语义描述子路径名，不代表 runtime-api 支�
 
 普通函数的 request/notify 接收可移植标量结果，stream 需要实际 iterable。目录由库生成并记录实际 route，不能从擦除后的 TypeScript 类型恢复 generator 模式。显式高级 contract 仍限制 schema、模式和幂等性；它不是旧 v1 describe 回退。
 
+## 集成 API
+
+自行管理底层连接时，从 `@migaia/rpc/remote` 使用 `createRuntimePeer`、`createManagedRuntimePeer` 或 `createRuntimePlugin`。传入的实际 channel/bootstrap、binding/execution 或 Host slot 操作决定可访问的资源；`RuntimePluginKey`、`RuntimeSourceKind`、`RuntimeConnectionDirection`、`RuntimeEventName`、`RuntimeQueryStatus`、`RuntimeApiMode` 和 `RUNTIME_API_SCHEMA_VERSION` 提供配置与查询的稳定词汇。`DEFAULT_DRAIN_MS` 是原关闭预算。公开的 Peer/source/plugin、目录/query/list/recent/unavailable/event、process/thread stop DTO 及 `IRuntimeSurface`、`IRuntimeFlatten`、`IRuntimeExpose`、`IRuntimeRegistry`、`IRuntimePluginTyping` 用于描述这些既有操作，不建立额外连接。
+
+从 `@migaia/rpc/core` 构造实际通道的资源时，`createRuntimeApiEndpoint(config, channel, quota?)` 同步返回资源，`.ready` 是一次安装结果。传入的 channel 必须是实际持有的 transport、peer identity 和 agreement；借用完整绑定则使用 `createRuntimeApiEndpoint({ binding })`，保留原操作结果、stream consumer 和 dispose 的首次 Promise。未拉取的 cold stream 只保留同步 payload snapshot，首次 next/return/throw 才激活同一个 consumer。
+
+共享 provider 预算从 `@migaia/rpc/core/features/provider` 导入 `createProviderAdmissionScope` 与 `IProviderAdmissionScope`。同一个 handle 由第一次实际 endpoint attachment 配置初始 provider limits；之后 `constrain(maxGlobal?, maxPerPeer?)` 只收紧该 quota。cold `constrain` 只进行原参数校验，cold `clear` 无操作；不要把冷阶段调用当成已保存限制。实际安装后使用示例：
+
+```ts
+import { createRuntimeApiEndpoint } from '@migaia/rpc/core'
+import { createProviderAdmissionScope } from '@migaia/rpc/core/features/provider'
+
+const quota = createProviderAdmissionScope()
+const endpoint = createRuntimeApiEndpoint(config, channel, quota)
+await endpoint.ready
+quota.constrain(32, 8)
+```
+
+这里的 `config` 与 `channel` 是调用方已有的实际 endpoint 配置和通道资源。`createAuthenticationNonce` 同样从 `@migaia/rpc/core` 导入，用于现有 authentication middleware 的 nonce；它不建立认证会话。
+
+| 入口 | 集成用途 |
+| --- | --- |
+| `@migaia/rpc/contract` | `RPC_PORTABLE_MAX_DEPTH` 表示现有 portable grammar 上限。 |
+| `@migaia/rpc/contract/v1` | `IRpcBinaryDigest` 描述调用方提供的 whole-backing digest；`IRpcRuntimeStepOutcome` 描述 group 每步 success/failure/not-executed。 |
+| `@migaia/rpc/contract/framing` | `readRpcBatchMembers` 读取物理 batch；`measureRpcPhysicalFrame`、`assertRpcPhysicalFrameSize`、`rejectRpcPhysicalFrameSize` 沿实际 carrier/limit 判断物理帧预算。 |
+| `@migaia/rpc/contract/framing/v1` | `RpcBinaryProfile`、`RpcBinaryStorage`、`RpcNativeBinaryKind` 与 `RpcRuntime*` 常量提供现有 closed wire grammar 的稳定值。 |
+| `@migaia/rpc/contract/spi` | `normalizeRuntimeEnvelope`、`normalizeRuntimeGeneration`、`normalizeRuntimeSteps` 校验协议值；`runtimeOperationCapabilities` 给出操作所需能力；`readRuntimeCarrier`、`wrapRuntimeCarrier` 读写现有 carrier 表示。 |
+| `@migaia/rpc/contract/spi` | `prepareRpcBinary`、`restoreRpcBinary`、`readRpcNativeBinary`、`measureRpcNativeBinaryFrame`、`rpcBinaryBackingLength`、`rpcBinaryView` 和 `isRpcBinaryIntegrityFailure` 处理调用方提交的 binary backing/view、预算及完整性。 |
+| `@migaia/rpc/contract/spi` | `createRpcStreamFrameDecoderWithLimit` 创建有界帧 decoder；`redactHandshake` 与 `isExcerptFree` 用于安全的 handshake 诊断表示。 |
+| `@migaia/rpc/core/spi` | `defaultRpcId` 与 `assertRpcIdempotencyKey` 使用现有 ID/key 规则；`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 分类原 native 或 coded 跨 realm 等价错误，保留原对象和 cause。 |
+| `@migaia/rpc/remote/spi` | `normalizeRuntimeDescription` 校验 runtime directory description。 |
+
+SPI 是稳定性层级，任何调用方都可导入；调用 codec、读取 DTO 或复制回调不会建立其它 process/channel/Host 的操作权。未知/custom 路径仍执行原完整校验。
+
 ## 类型
 
 不提供 Remote 泛型时，没有可调用的远端方法类型。声明远端函数树后，request 保留路径、参数与结果类型；stream 只接受迭代器方法。`IRuntimeSurface<THost,TPlugin>` 从现有 Host tuple、provide、expose 提取纯类型，不创建运行时目录。显式 Remote 泛型与精确 name/expose/Host 类型同时需要时，显式填写其余泛型，沿 TypeScript 的部分推导规则。

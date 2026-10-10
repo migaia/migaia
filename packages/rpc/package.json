@@ -66,6 +66,10 @@
       "types": "./dist/contract/index.d.ts",
       "default": "./dist/contract/index.js"
     },
+    "./contract/spi": {
+      "types": "./dist/contract/spi.d.ts",
+      "default": "./dist/contract/spi.js"
+    },
     "./contract/v1": {
       "types": "./dist/contract/v1/index.d.ts",
       "default": "./dist/contract/v1/index.js"
@@ -85,6 +89,10 @@
     "./core": {
       "types": "./dist/core/index.d.ts",
       "default": "./dist/core/index.js"
+    },
+    "./core/spi": {
+      "types": "./dist/core/spi.d.ts",
+      "default": "./dist/core/spi.js"
     },
     "./core/composed": {
       "types": "./dist/core/composed.d.ts",
@@ -209,6 +217,10 @@
     "./threads/adapters/browser": {
       "types": "./dist/threads/adapters/browser.d.ts",
       "default": "./dist/threads/adapters/browser.js"
+    },
+    "./remote/spi": {
+      "types": "./dist/remote/spi.d.ts",
+      "default": "./dist/remote/spi.js"
     },
     "./testing": {
       "types": "./dist/testing/index.d.ts",

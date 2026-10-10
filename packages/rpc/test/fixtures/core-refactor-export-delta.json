@@ -1,0 +1,76 @@
+{
+  "source": "rpc-core-refactor r17 PD101 frozen surface-expectations.r17.json",
+  "manifestAdditions": [
+    "@migaia/rpc/contract/spi",
+    "@migaia/rpc/core/spi",
+    "@migaia/rpc/remote/spi"
+  ],
+  "added": {
+    "@migaia/rpc/contract": ["RPC_PORTABLE_MAX_DEPTH"],
+    "@migaia/rpc/contract/framing": [
+      "assertRpcPhysicalFrameSize",
+      "measureRpcPhysicalFrame",
+      "readRpcBatchMembers",
+      "rejectRpcPhysicalFrameSize"
+    ],
+    "@migaia/rpc/contract/framing/v1": [
+      "RpcBinaryProfile",
+      "RpcBinaryStorage",
+      "RpcNativeBinaryKind",
+      "RpcRuntimeCancel",
+      "RpcRuntimeField",
+      "RpcRuntimeFinish",
+      "RpcRuntimeGenerationKind",
+      "RpcRuntimeKind",
+      "RpcRuntimeMode",
+      "RpcRuntimeOperation",
+      "RpcRuntimeOutcomeState",
+      "RpcRuntimeProfile",
+      "RpcRuntimeStepState",
+      "RpcRuntimeStoreContinuity",
+      "RpcRuntimeStoreKind",
+      "RpcRuntimeStreamPrefix"
+    ],
+    "@migaia/rpc/contract/spi": [
+      "createRpcStreamFrameDecoderWithLimit",
+      "isExcerptFree",
+      "isRpcBinaryIntegrityFailure",
+      "measureRpcNativeBinaryFrame",
+      "normalizeRuntimeEnvelope",
+      "normalizeRuntimeGeneration",
+      "normalizeRuntimeSteps",
+      "prepareRpcBinary",
+      "readRpcNativeBinary",
+      "readRuntimeCarrier",
+      "redactHandshake",
+      "restoreRpcBinary",
+      "rpcBinaryBackingLength",
+      "rpcBinaryView",
+      "runtimeOperationCapabilities",
+      "wrapRuntimeCarrier"
+    ],
+    "@migaia/rpc/core": ["createAuthenticationNonce", "createRuntimeApiEndpoint"],
+    "@migaia/rpc/core/features/provider": ["createProviderAdmissionScope"],
+    "@migaia/rpc/core/spi": [
+      "assertRpcIdempotencyKey",
+      "defaultRpcId",
+      "isRpcErrorInstance",
+      "isRpcRemoteError",
+      "isRpcTimeoutError"
+    ],
+    "@migaia/rpc/remote": [
+      "DEFAULT_DRAIN_MS",
+      "RUNTIME_API_SCHEMA_VERSION",
+      "RuntimeApiMode",
+      "RuntimeConnectionDirection",
+      "RuntimeEventName",
+      "RuntimePluginKey",
+      "RuntimeQueryStatus",
+      "RuntimeSourceKind",
+      "createManagedRuntimePeer",
+      "createRuntimePeer",
+      "createRuntimePlugin"
+    ],
+    "@migaia/rpc/remote/spi": ["normalizeRuntimeDescription"]
+  }
+}

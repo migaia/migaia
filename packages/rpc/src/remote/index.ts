@@ -68,3 +68,46 @@ export type {
   IRuntimeTypedPeer,
   IRuntimeCallOptions
 } from './runtime-api/typing.js'
+
+export { DEFAULT_DRAIN_MS } from './constants.js'
+export { type IRuntimePeerProvide } from './runtime-api/catalog.js'
+export {
+  RUNTIME_API_SCHEMA_VERSION,
+  RuntimeApiMode,
+  RuntimeConnectionDirection,
+  RuntimeEventName,
+  RuntimeQueryStatus,
+  RuntimeSourceKind
+} from './runtime-api/constants.js'
+export { type IRuntimePeerIdentity } from './runtime-api/description.js'
+export { type IRuntimeEvent } from './runtime-api/events.js'
+export { createManagedRuntimePeer } from './runtime-api/managed-peer.js'
+export {
+  type IRuntimeListFilter,
+  type IRuntimeListOptions,
+  type IRuntimeProcessStopOptions,
+  type IRuntimeThreadStopOptions
+} from './runtime-api/outlet.js'
+export {
+  type IRuntimeConnectionDetail,
+  type IRuntimeDetail,
+  type IRuntimeOverview,
+  type IRuntimeQueryOptions,
+  type IRuntimeRecent,
+  type IRuntimeUnavailable
+} from './runtime-api/overview.js'
+export {
+  createRuntimePeer,
+  type IRuntimePeer,
+  type IRuntimePeerOptions,
+  type IRuntimePeerSource,
+  type IRuntimePeerSourceContext,
+  type IRuntimePeerSourceResult
+} from './runtime-api/peer.js'
+export { createRuntimePlugin, type IRuntimePluginOptions } from './runtime-api/plugin.js'
+export {
+  type IRuntimeExpose,
+  type IRuntimeFlatten,
+  type IRuntimePluginTyping,
+  type IRuntimeRegistry
+} from './runtime-api/typing.js'

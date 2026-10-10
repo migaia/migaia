@@ -4,3 +4,8 @@ export type {
   IProviderSurface,
   IProviderRegistrationSurface
 } from '../internal/provider-feature.js'
+
+export {
+  createProviderAdmissionScope,
+  type IProviderAdmissionScope
+} from '../internal/provider-admission.js'

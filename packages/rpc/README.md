@@ -9,6 +9,12 @@
 | createThreadPeer    | @migaia/rpc/threads | 独立 Worker 连接，调用者 close         |
 | createThreadPlugin  | @migaia/rpc/threads | PluginHost 拥有，host.thread 共享出口  |
 
+需要自行组装连接时，可从 `@migaia/rpc/remote` 导入 `createRuntimePeer`、`createManagedRuntimePeer`、`createRuntimePlugin`。它们使用调用方实际持有的通道、执行资源或 Host slot 操作；显示名称、协议字段和复制的配置不会授予其它连接的操作权。`RuntimePluginKey` 提供稳定的 Host namespace 名称。
+
+`@migaia/rpc/core` 的 `createRuntimeApiEndpoint` 同步返回 endpoint 资源；先等待其稳定的 readonly `ready`，再使用已安装的控制与 provider。也可传入完整的 `{ binding }`，借用该对象已有的 request、notify、stream 和生命周期操作。`@migaia/rpc/core/features/provider` 的 `createProviderAdmissionScope` 用于在多个 endpoint 间共享同一个 quota handle；初始限制由第一次实际 attachment 的配置决定，ready 后的 `constrain` 只收紧限制，cold `constrain` 只校验而不保存策略，`clear` 清除该 handle 的现有占用。
+
+`contract/spi`、`core/spi`、`remote/spi` 是集成用途的稳定性分层，任何调用方均可使用。它们分别提供协议与 binary codec 操作、请求 ID 与 coded error-family 分类、以及 runtime description 规范化；具体入口见 [集成 API](./USEGUIDE.md#集成-api)。普通 endpoint、stream、adapter 和提供方法仍从各自现有入口导入。
+
 ## Worker 入门
 
 子端 worker.ts：

@@ -49,3 +49,6 @@ export * from './middleware/index.js'
 
 export { RpcProviderRejectionReason } from './semantic-constants.js'
 export type { IRpcProviderRejection } from './provider-admission.js'
+
+export { createAuthenticationNonce } from './middleware/authentication-envelope.js'
+export { createRuntimeApiEndpoint } from './runtime-api-endpoint.js'

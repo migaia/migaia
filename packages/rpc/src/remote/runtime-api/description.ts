@@ -1,9 +1,10 @@
-import { normalizePortable } from '../../contract/normalize.js'
-import { RpcWireLimit } from '../../contract/wire-constants.js'
+import { normalizePortable } from '../../contract/index.js'
+import { RpcWireLimit } from '../../contract/index.js'
 import { normalizeRuntimeGeneration } from '../../contract/runtime-api/metadata.js'
-import type { IRpcRuntimeGeneration } from '../../contract/runtime-api/types.js'
+import type { IRpcRuntimeGeneration } from '../../contract/index.js'
 import type { IRuntimeMethodEntry } from './catalog.js'
-import { RpcError, RpcCoreErrorCode } from '../../core/errors.js'
+import { RpcError, RpcCoreErrorCode } from '../../core/index.js'
+import { isRpcErrorInstance } from '../../core/spi.js'
 import { RemoteCatalogLimit, REMOTE_NAME_PATTERN } from '../contract.js'
 import {
   RuntimeApiErrorText,
@@ -245,7 +246,7 @@ export function normalizeRuntimeDescription(value: unknown): IRuntimePeerDescrip
     }) as unknown as IRuntimePeerDescription
   } catch (cause) {
     if (
-      cause instanceof RpcError &&
+      isRpcErrorInstance(cause) &&
       cause.code === RpcCoreErrorCode.contractInvalid &&
       cause.message === RuntimeApiErrorText.descriptionInvalid
     )

@@ -11,7 +11,7 @@ import {
   createNodeThreadChannelFactory,
   type INodeThreadHandle
 } from '../../src/threads/adapters/node.js'
-import * as runtimeEndpoint from '../../src/core/internal/runtime-api-endpoint.js'
+import * as runtimeEndpoint from '../../src/core/index.js'
 
 /** Every case restarts the same genuine Worker used by the original generation acceptance. */
 const entry = fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url))

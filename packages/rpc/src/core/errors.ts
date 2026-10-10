@@ -1,6 +1,8 @@
+import { RpcErrorFamily } from './error-family.js'
 import { RpcCoreErrorText } from './error-text.js'
 import { ERROR_SOURCE, RpcCoreErrorCode, type IRpcCoreErrorCode } from './error-code.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
+import { safeRead } from './internal/safe-value.js'
 export { RpcCoreErrorCode, type IRpcCoreErrorCode }
 
 /** Core-layer `source` stamped onto each locally thrown Rpc error. */
@@ -19,7 +21,7 @@ export class RpcError extends Error implements IRpcError {
   readonly cleanupErrors?: readonly IRpcCleanupError[]
   constructor(code: IRpcCoreErrorCode, message: string, cause?: unknown) {
     super(message)
-    this.name = 'RpcError'
+    this.name = RpcErrorFamily.rpc
     this.source = RPC_CORE_ERROR_SOURCE
     this.code = code
     this.cause = cause
@@ -42,14 +44,14 @@ export class RpcSchemaValidationError extends RpcError {
   readonly data: unknown
   constructor(message: string, data: unknown, cause?: unknown) {
     super(RpcCoreErrorCode.schemaInvalid, message, cause)
-    this.name = 'RpcSchemaValidationError'
+    this.name = RpcErrorFamily.schema
     this.data = data
   }
 }
 export class RpcConfigurationError extends RpcError {
   constructor(message: string, cause?: unknown) {
     super(RpcCoreErrorCode.invalidConfig, message, cause)
-    this.name = 'RpcConfigurationError'
+    this.name = RpcErrorFamily.configuration
   }
 }
 export class RpcConstructionError extends RpcConfigurationError {
@@ -62,7 +64,7 @@ export class RpcConstructionError extends RpcConfigurationError {
     cleanupPromise?: Promise<readonly IRpcCleanupError[]>
   ) {
     super(message, cause)
-    this.name = 'RpcConstructionError'
+    this.name = RpcErrorFamily.construction
     this.cleanupErrors = cleanupErrors
     this.cleanupPromise = cleanupPromise
   }
@@ -71,44 +73,44 @@ export class RpcLifecycleError extends RpcError {
   readonly cleanupErrors?: readonly IRpcCleanupError[]
   constructor(message: string, cause?: unknown, cleanupErrors?: readonly IRpcCleanupError[]) {
     super(RpcCoreErrorCode.endpointDisposed, message, cause)
-    this.name = 'RpcLifecycleError'
+    this.name = RpcErrorFamily.lifecycle
     this.cleanupErrors = cleanupErrors
   }
 }
 export class RpcSerializationError extends RpcError {
   constructor(message: string, cause?: unknown) {
     super(RpcCoreErrorCode.payloadInvalid, message, cause)
-    this.name = 'RpcSerializationError'
+    this.name = RpcErrorFamily.serialization
   }
 }
 export class RpcProtocolError extends RpcError {
   constructor(message: string, cause?: unknown) {
     super(RpcCoreErrorCode.protocolInvalid, message, cause)
-    this.name = 'RpcProtocolError'
+    this.name = RpcErrorFamily.protocol
   }
 }
 export class RpcContractError extends RpcError {
   constructor(message: string, cause?: unknown) {
     super(RpcCoreErrorCode.contractInvalid, message, cause)
-    this.name = 'RpcContractError'
+    this.name = RpcErrorFamily.contract
   }
 }
 export class RpcTransportError extends RpcError {
   constructor(message: string, cause?: unknown) {
     super(RpcCoreErrorCode.transport, message, cause)
-    this.name = 'RpcTransportError'
+    this.name = RpcErrorFamily.transport
   }
 }
 export class RpcAuthenticationError extends RpcError {
   constructor(message: string, cause?: unknown) {
     super(RpcCoreErrorCode.authenticationFailed, message, cause)
-    this.name = 'RpcAuthenticationError'
+    this.name = RpcErrorFamily.authentication
   }
 }
 export class RpcChunkError extends RpcError {
   constructor(message: string, cause?: unknown) {
     super(RpcCoreErrorCode.chunkInvalid, message, cause)
-    this.name = 'RpcChunkError'
+    this.name = RpcErrorFamily.chunk
   }
 }
 export class RpcRemoteError extends Error {
@@ -118,7 +120,7 @@ export class RpcRemoteError extends Error {
   readonly cause?: unknown
   constructor(code: string, message: string, data?: unknown, cause?: unknown) {
     super(message)
-    this.name = 'RpcRemoteError'
+    this.name = RpcErrorFamily.remote
     this.source = RPC_CORE_ERROR_SOURCE
     this.code = code
     this.data = data
@@ -134,7 +136,7 @@ export class RpcAbortError extends RpcError {
   ) {
     super(RpcCoreErrorCode.cancelled, message, cause)
     // 按 web-rpc.sdd.md §5.5：name 用标准 `AbortError`，供调用方与跨 realm 复原按 `name` 判定取消语义。
-    this.name = 'AbortError'
+    this.name = RpcErrorFamily.abort
     this.cleanupPromise = cleanupPromise
   }
 }
@@ -146,10 +148,57 @@ export class RpcTimeoutError extends RpcError {
   ) {
     super(RpcCoreErrorCode.deadlineExceeded, message)
     // 按 web-rpc.sdd.md §5.5：name 用标准 `TimeoutError`，供调用方与跨 realm 复原按 `name` 判定超时语义。
-    this.name = 'TimeoutError'
+    this.name = RpcErrorFamily.timeout
     this.cleanupPromise = cleanupPromise
   }
 }
 export const isRpcError = (value: unknown): value is IRpcError =>
   typeof value === 'object' && value !== null && typeof safeRead(value, 'code') === 'string'
-import { safeRead } from './internal/safe-value.js'
+
+/** Known Core codes constrain structural family classification without granting operation rights. */
+const coreErrorCodes = new Set<string>(Object.values(RpcCoreErrorCode))
+/** The remote family has its own code domain and is not a RpcError subclass. */
+const coreErrorFamilies = new Set<string>(
+  Object.values(RpcErrorFamily).filter((name) => name !== RpcErrorFamily.remote)
+)
+
+/** Recognize the original native class or a coded equivalent received from another realm. */
+export function isRpcErrorInstance(value: unknown): value is RpcError {
+  if (value instanceof RpcError) return true
+  if (typeof value !== 'object' || value === null) return false
+  /** Reading hostile diagnostics retains the existing safe getter boundary. */
+  const code = safeRead(value, 'code')
+  /** A standard family name alone cannot make an arbitrary error a Core failure. */
+  const name = safeRead(value, 'name')
+  return (
+    safeRead(value, 'source') === RPC_CORE_ERROR_SOURCE &&
+    typeof code === 'string' &&
+    coreErrorCodes.has(code) &&
+    typeof name === 'string' &&
+    coreErrorFamilies.has(name)
+  )
+}
+
+/** Classify a received remote failure while retaining its unrestricted remote code domain. */
+export function isRpcRemoteError(value: unknown): value is RpcRemoteError {
+  return (
+    value instanceof RpcRemoteError ||
+    (typeof value === 'object' &&
+      value !== null &&
+      safeRead(value, 'source') === RPC_CORE_ERROR_SOURCE &&
+      safeRead(value, 'name') === RpcErrorFamily.remote &&
+      typeof safeRead(value, 'code') === 'string')
+  )
+}
+
+/** Recognize a genuine native deadline error or its exact coded cross-realm equivalent. */
+export function isRpcTimeoutError(value: unknown): value is RpcTimeoutError {
+  return (
+    value instanceof RpcTimeoutError ||
+    (typeof value === 'object' &&
+      value !== null &&
+      safeRead(value, 'source') === RPC_CORE_ERROR_SOURCE &&
+      safeRead(value, 'name') === RpcErrorFamily.timeout &&
+      safeRead(value, 'code') === RpcCoreErrorCode.deadlineExceeded)
+  )
+}

@@ -1,4 +1,4 @@
-import type { IRpcPortableValue } from '../contract/types.js'
+import type { IRpcPortableValue, IRpcRuntimeEnvelope } from '../contract/index.js'
 import {
   createRuntimeRequestInput,
   retainRuntimeRequestInput,
@@ -7,17 +7,11 @@ import {
 } from './internal/outbound-envelope.js'
 import { readEndpointOwner, retainEndpointProjection } from './internal/endpoint-projection.js'
 import { EndpointOwnerKey } from './endpoint-kernel.js'
-import type {
-  RpcOutboundAttachment,
-  IRpcRuntimeSendOptions
-} from './internal/outbound-attachment.js'
+import type { RpcOutboundAttachment } from './internal/outbound-attachment.js'
 import { createComposedEndpoint } from './composed.js'
 import { createCanonicalChunkFeature } from './features/canonical-chunk.js'
 import { createOutboundFeature, type IOutboundSurface } from './features/outbound.js'
-import {
-  createProviderFeatureWithScope,
-  type IProviderRegistrationSurface
-} from './internal/provider-feature.js'
+import { createProviderFeatureWithScope } from './internal/provider-feature.js'
 import { createOneWayFeature, type IOneWaySurface } from './features/one-way.js'
 import { createDiscoveryFeature, type IDiscoverySurface } from './features/discovery.js'
 import { createControlFeature, type IControlSurface } from './features/control.js'
@@ -29,11 +23,16 @@ import {
 import type { IRpcFactoryConfig, IRpcEndpoint, ISendOptions } from './typing.js'
 import { RpcError, RpcCoreErrorCode } from './errors.js'
 import { RpcCoreErrorText } from './error-text.js'
-import type { IProviderAdmissionScope } from './internal/provider-admission.js'
+import type { IProviderAdmissionScope, IProviderRegistrationSurface } from './features/provider.js'
 import { RpcCapability } from '../contract/wire-constants.js'
 
+/** Constructor controls derive their portable fields from the existing public call envelope. */
+type IRpcRuntimeOptions = Extract<IRpcRuntimeEnvelope, { kind: 'runtime-call' }>['options']
+/** Groups retain the existing portable controls and local signal/ownership selectors. */
+type IRuntimeEndpointGroupOptions = Omit<IRpcRuntimeOptions, 'timeoutMs'> &
+  Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
 /** Neutral channel resources grant rights only over the supplied transport and peer. */
-export type IRuntimeEndpointChannel = Readonly<{
+type IRuntimeEndpointChannel = Readonly<{
   agreement: Readonly<{ capabilities: readonly string[] }>
   peerId: string
   transport: IRpcFactoryConfig['transport']
@@ -50,7 +49,7 @@ export function rejectRuntimeApiCapability(): never {
 }
 
 /** The internal symmetric preset exposes only its existing canonical owner surfaces. */
-export type IRuntimeApiEndpoint = IOutboundSurface &
+type IRuntimeApiEndpoint = IOutboundSurface &
   IProviderRegistrationSurface &
   IOneWaySurface &
   Partial<IDiscoverySurface & IControlSurface> &
@@ -60,9 +59,15 @@ export type IRuntimeApiEndpoint = IOutboundSurface &
     request(
       method: string,
       payload?: unknown,
-      options?: IRpcRuntimeSendOptions
+      options?: Omit<IRpcRuntimeOptions, 'timeoutMs'> &
+        Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
     ): Promise<IRpcPortableValue | undefined>
-    notify(method: string, payload?: unknown, options?: IRpcRuntimeSendOptions): Promise<void>
+    notify(
+      method: string,
+      payload?: unknown,
+      options?: Omit<IRpcRuntimeOptions, 'timeoutMs'> &
+        Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
+    ): Promise<void>
     dispose(): Promise<void>
   }>
 
@@ -70,19 +75,26 @@ export type IRuntimeApiEndpoint = IOutboundSurface &
 type IRuntimePhysicalEndpoint = Omit<IRuntimeApiEndpoint, 'ready' | 'request' | 'notify'>
 
 /** Held caller operations keep their existing capture, retry and lazy consumer owners. */
-export type IRuntimeEndpointBinding = Readonly<{
+type IRuntimeEndpointBinding = Readonly<{
   ready: Promise<void>
   request(
     method: string,
     payload?: unknown,
-    options?: IRpcRuntimeSendOptions
+    options?: Omit<IRpcRuntimeOptions, 'timeoutMs'> &
+      Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
   ): Promise<IRpcPortableValue | undefined>
-  notify(method: string, payload?: unknown, options?: IRpcRuntimeSendOptions): Promise<void>
+  notify(
+    method: string,
+    payload?: unknown,
+    options?: Omit<IRpcRuntimeOptions, 'timeoutMs'> &
+      Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
+  ): Promise<void>
   stream: Readonly<{
     open(
       method: string,
       payload?: unknown,
-      options?: IRpcRuntimeSendOptions
+      options?: Omit<IRpcRuntimeOptions, 'timeoutMs'> &
+        Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
     ): AsyncIterableIterator<IRpcPortableValue>
   }>
   dispose(): Promise<void>
@@ -112,8 +124,10 @@ export function createRuntimeApiEndpoint(
       get ready() {
         return binding.ready
       },
-      request: (method, payload, options) => binding.request(method, payload, options),
-      notify: (method, payload, options) => binding.notify(method, payload, options),
+      request: (method: string, payload?: unknown, options?: IRuntimeEndpointGroupOptions) =>
+        binding.request(method, payload, options),
+      notify: (method: string, payload?: unknown, options?: IRuntimeEndpointGroupOptions) =>
+        binding.notify(method, payload, options),
       stream: binding.stream,
       dispose: () => (closing ??= binding.dispose())
     })
@@ -176,7 +190,10 @@ export function createRuntimeApiEndpoint(
   /** Ancillary synchronous controls require the real installed composition. */
   const current = (): IRuntimePhysicalEndpoint => physical ?? rejectRuntimeApiCapability()
   /** Select grammar once at each operation's original position relative to payload capture. */
-  const usesNativeGrammar = (callOptions: IRpcRuntimeSendOptions): boolean =>
+  const usesNativeGrammar = (
+    callOptions: Omit<IRpcRuntimeOptions, 'timeoutMs'> &
+      Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
+  ): boolean =>
     channel.agreement.capabilities.includes(RpcCapability.portableBinary) ||
     callOptions.orderKey !== undefined ||
     callOptions.cancel !== undefined ||
@@ -184,7 +201,8 @@ export function createRuntimeApiEndpoint(
   /** New physical requests reuse the existing input and transport operations. */
   const dispatch = (
     input: IRuntimeRequestInput,
-    callOptions: IRpcRuntimeSendOptions,
+    callOptions: Omit<IRpcRuntimeOptions, 'timeoutMs'> &
+      Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>,
     mode: 'request' | 'notify',
     native: boolean
   ): Promise<IRpcPortableValue | undefined | void> => {
@@ -215,7 +233,8 @@ export function createRuntimeApiEndpoint(
   const request = (
     method: string,
     payload: unknown,
-    callOptions: IRpcRuntimeSendOptions = {},
+    callOptions: Omit<IRpcRuntimeOptions, 'timeoutMs'> &
+      Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'> = {},
     mode: 'request' | 'notify' = 'request'
   ) => {
     /** Request selects before capture; notify selects after its original depth-zero capture. */
@@ -240,13 +259,21 @@ export function createRuntimeApiEndpoint(
   Object.defineProperties(facade, {
     ready: { value: ready, enumerable: true },
     request: {
-      value: (method: string, payload?: unknown, options?: IRpcRuntimeSendOptions) =>
-        request(method, payload, options),
+      value: (
+        method: string,
+        payload?: unknown,
+        options?: Omit<IRpcRuntimeOptions, 'timeoutMs'> &
+          Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
+      ) => request(method, payload, options),
       enumerable: true
     },
     notify: {
-      value: (method: string, payload?: unknown, options?: IRpcRuntimeSendOptions) =>
-        request(method, payload, options, 'notify'),
+      value: (
+        method: string,
+        payload?: unknown,
+        options?: Omit<IRpcRuntimeOptions, 'timeoutMs'> &
+          Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
+      ) => request(method, payload, options, 'notify'),
       enumerable: true
     },
     send: {
