@@ -11,7 +11,7 @@ import { bindProcessByteWire, bindProcessMessageTransport } from '../../src/proc
 import { CHILD_STDERR_REDACTED } from '../../src/process/constants.js'
 import { attachIpcConnection } from '../../src/process/ipc-connection.js'
 import { byteProcessPipeline, remoteProcessJsonCodec } from '../../src/process/pipeline.js'
-import { remoteProcessStringFramer } from '../../src/process/string-framer.js'
+import { remoteProcessStringFramer } from '../../src/contract/framing/index.js'
 import type { IProcessByteChannel, IProcessMessageChannel } from '../../src/process/types.js'
 import type { IRpcTransport } from '../../src/core/transport.js'
 import type { IIpcLogRecord } from '../../src/core/plugins/flow-control.js'

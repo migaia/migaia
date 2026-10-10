@@ -13,7 +13,7 @@ import {
 } from '@migaia/serialize/codec'
 import type { IRpcEnvelope, IRpcFramer } from '../../contract/index.js'
 import { remoteProcessJsonCodec } from '../../process/pipeline.js'
-import { remoteProcessStringFramer } from '../../process/string-framer.js'
+import { remoteProcessStringFramer } from '../../contract/framing/index.js'
 
 /**
  * Copies already validated data-only snapshots as JSON.parse(JSON.stringify()) would materialize

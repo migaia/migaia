@@ -49,7 +49,7 @@ quota.constrain(32, 8)
 | --- | --- |
 | `@migaia/rpc/contract` | `RPC_PORTABLE_MAX_DEPTH` 表示现有 portable grammar 上限。 |
 | `@migaia/rpc/contract/v1` | `IRpcBinaryDigest` 描述调用方提供的 whole-backing digest；`IRpcRuntimeStepOutcome` 描述 group 每步 success/failure/not-executed。 |
-| `@migaia/rpc/contract/framing` | `readRpcBatchMembers` 读取物理 batch；`measureRpcPhysicalFrame`、`assertRpcPhysicalFrameSize`、`rejectRpcPhysicalFrameSize` 沿实际 carrier/limit 判断物理帧预算。 |
+| `@migaia/rpc/contract/framing` | `readRpcBatchMembers` 读取物理 batch；`measureRpcPhysicalFrame`、`assertRpcPhysicalFrameSize`、`rejectRpcPhysicalFrameSize` 沿实际 carrier/limit 判断物理帧预算。`processStringFramer` 用于每次交付完整字符串消息的自定义 carrier；`remoteProcessStringFramer` 接收未知值并校验字符串域，二者均不分片。 |
 | `@migaia/rpc/contract/framing/v1` | `RpcBinaryProfile`、`RpcBinaryStorage`、`RpcNativeBinaryKind` 与 `RpcRuntime*` 常量提供现有 closed wire grammar 的稳定值。 |
 | `@migaia/rpc/contract/spi` | `normalizeRuntimeEnvelope`、`normalizeRuntimeGeneration`、`normalizeRuntimeSteps` 校验协议值；`runtimeOperationCapabilities` 给出操作所需能力；`readRuntimeCarrier`、`wrapRuntimeCarrier` 读写现有 carrier 表示。 |
 | `@migaia/rpc/contract/spi` | `prepareRpcBinary`、`restoreRpcBinary`、`readRpcNativeBinary`、`measureRpcNativeBinaryFrame`、`rpcBinaryBackingLength`、`rpcBinaryView` 和 `isRpcBinaryIntegrityFailure` 处理调用方提交的 binary backing/view、预算及完整性。 |

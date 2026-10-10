@@ -102,6 +102,9 @@ describe('A1 merged public exports', () => {
             ...((streamingDelta.added as Record<string, string[]>)[name] ?? []),
             ...(name === '@migaia/rpc/core' ? ['RpcProviderRejectionReason'] : []),
             ...(name === '@migaia/rpc/contract' ? ['RpcBatchPhysical'] : []),
+            ...(name === '@migaia/rpc/contract/framing'
+              ? ['processStringFramer', 'remoteProcessStringFramer']
+              : []),
             ...((coreRefactorDelta.added as Record<string, string[]>)[name] ?? [])
           ])
         ].sort()
