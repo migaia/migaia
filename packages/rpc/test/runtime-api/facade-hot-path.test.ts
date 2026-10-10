@@ -87,8 +87,8 @@ for (const carrier of ['stdio-framed', 'worker'] as const) {
     )
     for (const suffix of [
       '/remote/runtime-api/peer.js',
-      '/contract/runtime-api/normalize.js',
-      '/contract/runtime-api/binary.js',
+      '/contract/runtime-api/normalize-envelope.js',
+      '/contract/runtime-api/binary-capture.js',
       '/core/internal/outbound-envelope.js'
     ]) {
       const witness = observed.loaded.find((row) => row.url.endsWith(suffix))
@@ -98,6 +98,11 @@ for (const carrier of ['stdio-framed', 'worker'] as const) {
     }
     assert.ok(
       observed.loaded.some((row) => row.url.endsWith('/remote/runtime-api/managed-peer.js'))
+    )
+    assert.equal(
+      observed.loaded.some((row) => row.url.endsWith('/contract/runtime-api/binary.js')),
+      false,
+      '[A27] scalar dispatch does not load the heavy binary codec'
     )
   })
 }

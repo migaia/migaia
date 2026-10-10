@@ -140,6 +140,14 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/contract/wire-constants.ts'
     ),
     client: reviewed(
+      '\u0000vite/preload-helper.js',
+      'src/contract/runtime-api/binary-capture.ts',
+      'src/contract/runtime-api/binary-lazy.ts',
+      'src/contract/runtime-api/metadata.ts',
+      'src/contract/runtime-api/normalize-envelope.ts',
+      'src/contract/runtime-api/normalize-lazy.ts',
+      'src/contract/stream-error.ts',
+      'src/contract/stream-lazy.ts',
       // C9 runtime-api contracts and the C10 binary lane require these identities (ruling 2).
       // Cost-free unused binary/stream codecs through lazy loading belong to rpc-core-refactor.
       'src/contract/runtime-api/binary-constants.ts',
@@ -316,6 +324,14 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/protocol-constants.ts'
     ),
     provider: reviewed(
+      '\u0000vite/preload-helper.js',
+      'src/contract/runtime-api/binary-capture.ts',
+      'src/contract/runtime-api/binary-lazy.ts',
+      'src/contract/runtime-api/metadata.ts',
+      'src/contract/runtime-api/normalize-envelope.ts',
+      'src/contract/runtime-api/normalize-lazy.ts',
+      'src/contract/stream-error.ts',
+      'src/contract/stream-lazy.ts',
       // C9 runtime-api contracts and the C10 binary lane require these identities (ruling 2).
       // Cost-free unused binary/stream codecs through lazy loading belong to rpc-core-refactor.
       'src/contract/runtime-api/binary-constants.ts',
@@ -499,6 +515,14 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/idempotency-store.ts'
     ),
     full: reviewed(
+      '\u0000vite/preload-helper.js',
+      'src/contract/runtime-api/binary-capture.ts',
+      'src/contract/runtime-api/binary-lazy.ts',
+      'src/contract/runtime-api/metadata.ts',
+      'src/contract/runtime-api/normalize-envelope.ts',
+      'src/contract/runtime-api/normalize-lazy.ts',
+      'src/contract/stream-error.ts',
+      'src/contract/stream-lazy.ts',
       // C9 runtime-api contracts and the C10 binary lane require these identities (ruling 2).
       // Cost-free unused binary/stream codecs through lazy loading belong to rpc-core-refactor.
       'src/contract/runtime-api/binary-constants.ts',
@@ -687,6 +711,14 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/idempotency-store.ts'
     ),
     custom: reviewed(
+      '\u0000vite/preload-helper.js',
+      'src/contract/runtime-api/binary-capture.ts',
+      'src/contract/runtime-api/binary-lazy.ts',
+      'src/contract/runtime-api/metadata.ts',
+      'src/contract/runtime-api/normalize-envelope.ts',
+      'src/contract/runtime-api/normalize-lazy.ts',
+      'src/contract/stream-error.ts',
+      'src/contract/stream-lazy.ts',
       // C9 runtime-api contracts and the C10 binary lane require these identities (ruling 2).
       // Cost-free unused binary/stream codecs through lazy loading belong to rpc-core-refactor.
       'src/contract/runtime-api/binary-constants.ts',

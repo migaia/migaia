@@ -18,7 +18,7 @@ import {
 import {
   normalizeRuntimeGeneration,
   normalizeRuntimeSteps
-} from '../../contract/runtime-api/normalize.js'
+} from '../../contract/runtime-api/metadata.js'
 import type {
   IRpcRuntimeGeneration,
   IRpcRuntimeStep,

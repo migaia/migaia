@@ -8,17 +8,18 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 /**
- * H11 pins the actual canonical root graph after native encoder and owned JSON preparation. The new
- * outbound-owned-codec module and binary/sender capture explain the change. Exact build receipt:
- * docs/rpc/scratch/core-refactor-impl/h11/graph-actual-r2/root.json. No headroom is added.
+ * C6 pins the actual canonical root graph, including every dynamically emitted codec chunk. Light
+ * capture/metadata modules and the generated loader helper explain the exact increase. Receipt:
+ * docs/rpc/scratch/core-refactor-impl/c6/graph-actual/root.json. No headroom or A27 approval is
+ * added.
  */
 const allowedIncrease = {
-  rawBytes: 322444 / legacyRoot.rawBytes,
-  gzipBytes: 79160 / legacyRoot.gzipBytes
+  rawBytes: 335547 / legacyRoot.rawBytes,
+  gzipBytes: 83124 / legacyRoot.gzipBytes
 } as const
 
 /** Exact C9/C10 module increase includes the canonical provider implementation identity move. */
-const expectedModuleIncrease = 23
+const expectedModuleIncrease = 32
 
 describe('A9 root tree-shaking cost', () => {
   it('keeps module count exact and both byte costs within reviewed caps', () => {

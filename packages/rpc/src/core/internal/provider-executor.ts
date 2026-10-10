@@ -1,3 +1,4 @@
+import { invalidRpcStream } from '../../contract/stream-error.js'
 import type { IRpcProviderRejection } from '../provider-admission.js'
 import {
   createGenerationController,
@@ -44,7 +45,6 @@ import { RpcCoreErrorText } from '../error-text.js'
 import { ERROR_SOURCE as RpcCoreErrorSource } from '../error-code.js'
 import {
   normalizePortable,
-  invalidRpcStream,
   RpcStreamViolation,
   RpcStreamEvent,
   type IRpcEnvelope,
@@ -65,7 +65,8 @@ import {
 } from './provider.js'
 import type { IRpcPortableValue } from '../../contract/types.js'
 import { normalizeRuntimePortable, hasRpcPortableBinary } from '../../contract/normalize.js'
-import { prepareRpcBinary, hasRpcBinaryEnvelope } from '../../contract/runtime-api/binary.js'
+import { hasRpcBinaryEnvelope } from '../../contract/runtime-api/binary-capture.js'
+import { prepareRpcBinaryLazy as prepareRpcBinary } from '../../contract/runtime-api/binary-lazy.js'
 import { RpcBinaryStorage } from '../../contract/runtime-api/binary-constants.js'
 import { createRpcBackingDigest } from './authentication-replay.js'
 import { safeRead, safeString, tupleKey, runtimeTaskKey } from './safe-value.js'

@@ -36,6 +36,11 @@ for (const [entry, entrySource] of Object.entries(entries)) {
   const virtualId = `virtual:web-rpc-${entry}`
   /** Runtime dependency ids reported after TypeScript erasure and module resolution. */
   const runtimeImports = new Map()
+  /**
+   * Virtual loader/runtime source is captured from the same canonical build, never a fake disk
+   * file.
+   */
+  const generatedArtifacts = new Map()
   const output = await build({
     root: packageDirectory,
     configFile: false,
@@ -56,6 +61,12 @@ for (const [entry, entrySource] of Object.entries(entries)) {
         },
         moduleParsed(module) {
           runtimeImports.set(module.id, [...module.importedIds, ...module.dynamicallyImportedIds])
+          if (module.id.startsWith('\u0000') && typeof module.code === 'string')
+            generatedArtifacts.set(module.id, {
+              artifactSha256: createHash('sha256').update(module.code).digest('hex'),
+              generator: 'canonical Vite moduleParsed source',
+              sourceBytes: Buffer.byteLength(module.code)
+            })
         }
       }
     ]
@@ -96,6 +107,9 @@ for (const [entry, entrySource] of Object.entries(entries)) {
     gzipBytes: gzipSync(code).byteLength,
     bundleSha256: createHash('sha256').update(code).digest('hex'),
     modules: modules.map(normalizeModule).sort(),
+    generatedArtifacts: modules
+      .filter((module) => generatedArtifacts.has(module))
+      .map((module) => ({ artifact: normalizeModule(module), ...generatedArtifacts.get(module) })),
     ...(includeEdges ? { edges } : {})
   }
 }

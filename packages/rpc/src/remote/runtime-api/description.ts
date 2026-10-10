@@ -1,6 +1,6 @@
 import { normalizePortable } from '../../contract/normalize.js'
 import { RpcWireLimit } from '../../contract/wire-constants.js'
-import { normalizeRuntimeGeneration } from '../../contract/runtime-api/normalize.js'
+import { normalizeRuntimeGeneration } from '../../contract/runtime-api/metadata.js'
 import type { IRpcRuntimeGeneration } from '../../contract/runtime-api/types.js'
 import type { IRuntimeMethodEntry } from './catalog.js'
 import { RpcError, RpcCoreErrorCode } from '../../core/errors.js'

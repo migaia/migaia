@@ -39,19 +39,18 @@ registerHooks({
           ),
           'managed request must load the original cold dispatcher'
         )
-    if (url.endsWith('/rpc/dist/contract/runtime-api/normalize.js'))
-      source = source.replace(
-        'export function normalizeRuntimeEnvelope(value, portable = normalizeRuntimePortable) {',
-        'export function normalizeRuntimeEnvelope(value, portable = normalizeRuntimePortable) { globalThis.__rpcFacadeCounters.runtimeEnvelope++;'
-      )
-    if (url.endsWith('/rpc/dist/contract/runtime-api/binary.js')) {
-      /** Wrap the real preparation declaration; an absent site fails before business starts. */
-      const pattern = /(export )?async function prepareRpcBinary\(/
-      assert.ok(pattern.test(source), 'binary preparation declaration required')
-      source = source.replace(
-        pattern,
-        'export function prepareRpcBinary(...args) { globalThis.__rpcFacadeCounters.binaryPrepare++; return countedPrepareRpcBinary(...args) }\nasync function countedPrepareRpcBinary('
-      )
+    if (url.endsWith('/rpc/dist/contract/runtime-api/normalize-envelope.js')) {
+      /** Both synchronous outbound and lazy inbound use this one full union admission owner. */
+      const pattern =
+        /export function normalizeRuntimeEnvelope\(value, portable, normalizeStreamPayload\) \{/
+      assert.ok(pattern.test(source), 'shared runtime normalization declaration required')
+      source = source.replace(pattern, '$& globalThis.__rpcFacadeCounters.runtimeEnvelope++;')
+    }
+    if (url.endsWith('/rpc/dist/contract/runtime-api/binary-capture.js')) {
+      /** The loaded canonical capture owner proves scalar zero without preloading the heavy codec. */
+      const pattern = /export function captureRpcBinary\([^]*?\) \{/
+      assert.ok(pattern.test(source), 'binary capture declaration required')
+      source = source.replace(pattern, '$& globalThis.__rpcFacadeCounters.binaryPrepare++;')
     }
     if (url.endsWith('/rpc/dist/core/internal/outbound-envelope.js')) {
       /** Count the delivered materialization owner without adding any production diagnostic API. */
