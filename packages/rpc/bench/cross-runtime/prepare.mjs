@@ -13,9 +13,18 @@ import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 import { execFileSync } from 'node:child_process'
+import { CrossRuntimeErrorText } from '../error-text.mjs'
 
 /** All writes stay inside the handed-off fixture directory. */
 const wt = resolve(fileURLToPath(new URL('../../../../', import.meta.url)))
+/** The final owner supplies the exact current source commit before any fixture writes. */
+const expected = process.env.FINAL_SOURCE_HEAD
+if (!/^[0-9a-f]{40}$/.test(expected ?? ''))
+  throw new Error(CrossRuntimeErrorText.sourceHeadRequired)
+if (execFileSync('git', ['rev-parse', 'HEAD'], { cwd: wt, encoding: 'utf8' }).trim() !== expected)
+  throw new Error(CrossRuntimeErrorText.sourceHeadMismatch)
+if (execFileSync('git', ['status', '--porcelain'], { cwd: wt, encoding: 'utf8' }).trim())
+  throw new Error(CrossRuntimeErrorText.sourceDirty)
 /** Only the explicit owner evidence directory receives generated source trees. */
 const root = resolve(process.argv[2])
 mkdirSync(resolve(root, '..'), { recursive: true })
@@ -161,22 +170,8 @@ function instrument(path, source) {
 /** Plain timing and diagnostic trees have the same pinned RPC source and existing dependency graph. */
 const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: wt, encoding: 'utf8' }).trim()
 const manifest = { sourceCommit: head, built: false, trees: {}, foreign: [] }
-/** The real BC14 patch applies before dependency mapping or diagnostic insertion. */
-const rawTarget = join(root, 'fixture', 'target-raw')
-cpSync(join(wt, 'packages/rpc/src'), join(rawTarget, 'packages/rpc/src'), { recursive: true })
-execFileSync(
-  'git',
-  [
-    'apply',
-    '--directory=' + resolve(rawTarget).slice(wt.length + 1),
-    join(
-      wt,
-      'docs/rpc/scratch/core-refactor-2026-10-07/target-evidence/cross-runtime/bc14-responder-v19.patch'
-    )
-  ],
-  { cwd: wt, stdio: 'inherit' }
-)
-for (const mode of ['plain', 'count', 'target-plain', 'target-count']) {
+/** BC14 is already product code; final plain/count use the same actual final source. */
+for (const mode of ['plain', 'count']) {
   const pkg = join(root, 'fixture', mode, 'packages', 'rpc'),
     target = join(pkg, 'src')
   mkdirSync(target, { recursive: true })
@@ -197,9 +192,7 @@ for (const mode of ['plain', 'count', 'target-plain', 'target-count']) {
   for (const from of files(join(wt, 'packages/rpc/src'))) {
     const relative = from.slice(join(wt, 'packages/rpc/src').length + 1),
       original = readFileSync(from, 'utf8')
-    let effective = mode.startsWith('target-')
-      ? readFileSync(join(rawTarget, 'packages/rpc/src', relative), 'utf8')
-      : original
+    let effective = original
     effective = effective.replace(
       /(['"])@migaia\/serialize(\/[^'"]*)?\1/g,
       (_all, quote, suffix) => {
