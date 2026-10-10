@@ -1,19 +1,35 @@
 {
   "name": "@migaia/supervision",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Runtime-neutral supervision for execution units and coroutines.",
   "license": "MIT",
-  "files": ["dist", "README.md", "USEGUIDE.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "USEGUIDE.md"
+  ],
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./coroutine": { "types": "./dist/coroutine/index.d.ts", "default": "./dist/coroutine/index.js" },
-    "./process": { "types": "./dist/process/index.d.ts", "default": "./dist/process/index.js" },
-    "./threads": { "types": "./dist/threads/index.d.ts", "default": "./dist/threads/index.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./coroutine": {
+      "types": "./dist/coroutine/index.d.ts",
+      "default": "./dist/coroutine/index.js"
+    },
+    "./process": {
+      "types": "./dist/process/index.d.ts",
+      "default": "./dist/process/index.js"
+    },
+    "./threads": {
+      "types": "./dist/threads/index.d.ts",
+      "default": "./dist/threads/index.js"
+    }
   },
   "scripts": {
     "fmt": "oxfmt src test",
