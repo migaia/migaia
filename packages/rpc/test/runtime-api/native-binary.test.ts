@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
+import { Buffer } from 'node:buffer'
+import { fileURLToPath } from 'node:url'
 import { MessageChannel } from 'node:worker_threads'
 import { it, vi } from 'vitest'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { authentication } from '../../src/core/middleware/authentication.js'
 import {
   createRpcIdempotencyStore,
@@ -11,16 +14,29 @@ import { createNodeMessagePortTransport } from '../../src/core/adapters/message-
 import { registerBatchAgreement } from '../../src/core/internal/batch-frame.js'
 import {
   createRuntimePeer,
+  readRuntimePeerConnection,
   type IRuntimePeer,
   type IRuntimePeerOptions
 } from '../../src/remote/runtime-api/peer.js'
 import { createProcessPeer } from '../../src/process/index.js'
+import { createProcessTransport } from '../../src/process/handshake.js'
+import { createNativeProcessOffer } from '../../src/process/offer.js'
+import { nativeBytePair } from '../process/fixtures/native-runtime.js'
+import { createRpcStreamFrameDecoder } from '../../src/contract/framing/stream.js'
+import { readRuntimeCarrier } from '../../src/contract/runtime-api/carrier.js'
+import { createThreadPeer } from '../../src/threads/index.js'
+import {
+  createNodeThreadLauncher,
+  createNodeThreadChannelFactory
+} from '../../src/threads/adapters/node.js'
+import { RpcCapability } from '../../src/contract/wire-constants.js'
 import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
 import { RUNTIME_API_CAPABILITIES } from '../../src/remote/runtime-api/constants.js'
 import { runtimeSources } from './fixture.js'
 import {
   RpcNativeBinaryKind,
-  RpcBinaryProfile
+  RpcBinaryProfile,
+  RpcBinaryStorage
 } from '../../src/contract/runtime-api/binary-constants.js'
 import { readAuthenticationEnvelope } from '../../src/core/middleware/authentication-envelope.js'
 import * as authenticationReplay from '../../src/core/internal/authentication-replay.js'
@@ -159,6 +175,310 @@ async function nativePair(
     }
   }
 }
+
+/** Observe physical native storage rather than treating a successful binary result as proof. */
+function isNativeFrame(value: unknown): value is {
+  frame: { kind: string; sidecars: readonly ArrayBuffer[] }
+} {
+  return (value as { frame?: { kind?: string } })?.frame?.kind === RpcNativeBinaryKind
+}
+
+/** Separate supported binary brands while keeping a complete, owned backing in every case. */
+function binaryInput(kind: 'ArrayBuffer' | 'Uint8Array' | 'Buffer') {
+  /** Prefix/suffix bytes prove the default clone retains the complete backing of a narrow view. */
+  const backing = new Uint8Array([9, 1, 2, 8]).buffer
+  return {
+    backing,
+    input:
+      kind === 'ArrayBuffer'
+        ? backing
+        : kind === 'Buffer'
+          ? Buffer.from(backing, 1, 2)
+          : new Uint8Array(backing, 1, 2),
+    bytes: kind === 'ArrayBuffer' ? [9, 1, 2, 8] : [1, 2]
+  }
+}
+
+it.each(['none', 'sign-only'] as const)(
+  'negotiated clone defaults to native request, response and stream without detach with %s authentication',
+  async (authMode) => {
+    /** Both actual ports share only the accepted offer and the original binary/security owners. */
+    const fixture = await nativePair(
+      undefined,
+      undefined,
+      [capabilities, capabilities],
+      undefined,
+      authMode
+    )
+    /** Observe each physical direction independently from the provider's restored values. */
+    const sends = fixture.transports.map((transport) => vi.spyOn(transport, 'send'))
+    try {
+      for (const kind of ['ArrayBuffer', 'Uint8Array', 'Buffer'] as const) {
+        const { backing, input, bytes } = binaryInput(kind)
+        sends.forEach((send) => send.mockClear())
+        /** No transfer option is supplied; selecting native must remain a structured clone. */
+        const result = await fixture.peers[0]!.request('echo', input)
+        assert.ok(
+          kind === 'ArrayBuffer' ? result instanceof ArrayBuffer : result instanceof Uint8Array
+        )
+        assert.deepEqual(
+          [...(result instanceof ArrayBuffer ? new Uint8Array(result) : (result as Uint8Array))],
+          bytes
+        )
+        assert.equal(backing.byteLength, 4)
+        assert.deepEqual([...new Uint8Array(backing)], [9, 1, 2, 8])
+        assert.notEqual(result, input)
+        for (const send of sends) {
+          /** One physical native frame must carry binary in each request/response direction. */
+          const native = send.mock.calls.filter(([message]) => isNativeFrame(message))
+          assert.equal(
+            native.length,
+            1,
+            `${kind} request and response must each use native storage`
+          )
+          assert.ok(
+            native.every(([message]) => isNativeFrame(message) && message.frame.sidecars.length > 0)
+          )
+          assert.ok(send.mock.calls.every(([, options]) => options?.transfer === undefined))
+        }
+        sends.forEach((send) => send.mockClear())
+        /** The same value crosses stream input and its returned item without an ownership request. */
+        const stream = fixture.peers[0]!.stream('values', input)
+        try {
+          const item = await stream.next()
+          assert.equal(item.done, false)
+          assert.ok(
+            kind === 'ArrayBuffer'
+              ? item.value instanceof ArrayBuffer
+              : item.value instanceof Uint8Array
+          )
+          assert.deepEqual(
+            [
+              ...(item.value instanceof ArrayBuffer
+                ? new Uint8Array(item.value)
+                : (item.value as Uint8Array))
+            ],
+            bytes
+          )
+          assert.equal(backing.byteLength, 4)
+          for (const send of sends) {
+            assert.equal(
+              send.mock.calls.filter(([message]) => isNativeFrame(message)).length,
+              1,
+              `${kind} stream input and item must each use native storage`
+            )
+            assert.ok(send.mock.calls.every(([, options]) => options?.transfer === undefined))
+          }
+        } finally {
+          await stream.return!(undefined)
+        }
+      }
+      assert.deepEqual(fixture.reports, [])
+    } finally {
+      sends.forEach((send) => send.mockRestore())
+      await fixture.close()
+    }
+  }
+)
+
+it('default public Thread Peer negotiates native clone for Worker request, response and stream', async () => {
+  /** This built fixture runs in a genuine Worker and creates its own default public Thread Peer. */
+  const entry = fileURLToPath(new URL('./fixtures/automatic-worker.mjs', import.meta.url))
+  /** Keep the original launcher handle so every failure still releases the actual Worker. */
+  let handle: Awaited<ReturnType<ReturnType<typeof createNodeThreadLauncher>['launch']>> | undefined
+  /** Default channel offers must come from production owners; the test adds no capability list. */
+  const channels = createNodeThreadChannelFactory({ scheduler: systemScheduler })
+  /** Fixture reports remain independent evidence of receiver failures. */
+  const reports: unknown[] = []
+  /** Real source preparation carries the public factory's trusted bootstrap into the Worker. */
+  const peer = await createThreadPeer<IRuntimeDynamicSurface>({
+    self: { name: 'native-default-parent', instanceId: 'native-default-parent' },
+    provide: { parentEcho: () => 'native-default-parent' },
+    spawn: async (context) => {
+      const launcher = createNodeThreadLauncher({ runtimeApi: context })
+      handle = await launcher.launch(
+        { entry, name: 'native-default-child' },
+        { signal: new AbortController().signal }
+      )
+      return channels.open(handle, new AbortController().signal)
+    },
+    report: (error) => reports.push(error)
+  })
+  /** Read the accepted physical channel; a descriptive platform label alone grants no native right. */
+  const channel = readRuntimePeerConnection(peer).channel
+  /** Native responses/items are observed after the Worker's genuine postMessage boundary. */
+  const incoming: unknown[] = []
+  /** Independent observer does not replace the canonical inbound receiver. */
+  const remove = channel.transport.subscribe((message) => incoming.push(message.data))
+  /** Outbound observation delegates the real channel transport unchanged. */
+  const send = vi.spyOn(channel.transport, 'send')
+  try {
+    assert.ok(
+      channel.agreement.capabilities.includes(RpcCapability.nativeBinary),
+      'both default public Thread Peers must negotiate native binary'
+    )
+    for (const kind of ['ArrayBuffer', 'Uint8Array', 'Buffer'] as const) {
+      const { backing, input, bytes } = binaryInput(kind)
+      send.mockClear()
+      incoming.length = 0
+      /**
+       * The fixture's probe echoes nested binary and calls the parent over its normal reverse
+       * route.
+       */
+      const result = (await peer.request('probe', input)) as unknown as {
+        value: ArrayBuffer | Uint8Array
+      }
+      assert.ok(
+        kind === 'ArrayBuffer'
+          ? result.value instanceof ArrayBuffer
+          : result.value instanceof Uint8Array
+      )
+      assert.deepEqual(
+        [...(result.value instanceof ArrayBuffer ? new Uint8Array(result.value) : result.value)],
+        bytes
+      )
+      assert.equal(send.mock.calls.filter(([message]) => isNativeFrame(message)).length, 1)
+      assert.equal(incoming.filter(isNativeFrame).length, 1)
+      assert.ok(send.mock.calls.every(([, options]) => options?.transfer === undefined))
+      assert.equal(backing.byteLength, 4)
+      send.mockClear()
+      incoming.length = 0
+      /** Stream input/item use the same held Worker channel and no explicit ownership option. */
+      const stream = peer.stream('values', input)
+      try {
+        const item = await stream.next()
+        /** Dynamic public typing cannot assume a binary brand; verify the actual Worker value. */
+        const value: unknown = item.value
+        assert.equal(item.done, false)
+        assert.ok(
+          kind === 'ArrayBuffer' ? value instanceof ArrayBuffer : value instanceof Uint8Array
+        )
+        assert.deepEqual(
+          [...(value instanceof ArrayBuffer ? new Uint8Array(value) : (value as Uint8Array))],
+          bytes
+        )
+        assert.equal(send.mock.calls.filter(([message]) => isNativeFrame(message)).length, 1)
+        assert.equal(incoming.filter(isNativeFrame).length, 1)
+        assert.ok(send.mock.calls.every(([, options]) => options?.transfer === undefined))
+        assert.deepEqual([...new Uint8Array(backing)], [9, 1, 2, 8])
+      } finally {
+        await stream.return!(undefined)
+      }
+    }
+    assert.deepEqual(reports, [])
+  } finally {
+    send.mockRestore()
+    remove()
+    try {
+      await peer.close()
+    } finally {
+      handle?.terminate()
+      await handle?.exited
+    }
+  }
+})
+
+it('clone carrier keeps inline storage when the peer does not negotiate native', async () => {
+  /** Only one real source omits native; its independently accepted offer remains authoritative. */
+  const fixture = await nativePair(
+    undefined,
+    undefined,
+    [capabilities, capabilities.filter((value) => value !== RpcCapability.nativeBinary)],
+    undefined,
+    'none'
+  )
+  /** Both physical directions must retain the established inline manifest profile. */
+  const sends = fixture.transports.map((transport) => vi.spyOn(transport, 'send'))
+  /** This owned view needs no transfer and stays available after inline restoration. */
+  const input = new Uint8Array([1, 2])
+  try {
+    assert.deepEqual([...((await fixture.peers[0]!.request('echo', input)) as Uint8Array)], [1, 2])
+    for (const send of sends) {
+      assert.equal(send.mock.calls.filter(([message]) => isNativeFrame(message)).length, 0)
+      assert.ok(
+        send.mock.calls.some(([message]) => {
+          const manifest = (message as { frame?: { profile?: string; storage?: string } }).frame
+          return (
+            manifest?.profile === RpcBinaryProfile && manifest.storage === RpcBinaryStorage.inline
+          )
+        })
+      )
+    }
+    assert.equal(input.byteLength, 2)
+    assert.deepEqual(fixture.reports, [])
+  } finally {
+    sends.forEach((send) => send.mockRestore())
+    await fixture.close()
+  }
+})
+
+it('process byte carriers keep inline binary despite bilateral native capability offers', async () => {
+  /** Reuse the established byte fixture and production handshake/framing, without a clone carrier. */
+  const physical = nativeBytePair()
+  /** Independent physical decoding proves both sent manifests after actual byte framing. */
+  const storage: string[] = []
+  /** Framing and endpoint reports remain visible instead of accepting a partial roundtrip. */
+  const reports: unknown[] = []
+  /** Each physical direction has its own canonical frame decoder and disposable observation. */
+  const observations = physical.map((channel) => {
+    const decoder = createRpcStreamFrameDecoder({
+      onFrame: (bytes) => {
+        const selected = readRuntimeCarrier(new TextDecoder().decode(bytes))
+        if (typeof selected?.frame !== 'string') return
+        const manifest = JSON.parse(selected.frame) as { profile?: string; storage?: string }
+        if (manifest.profile === RpcBinaryProfile) storage.push(manifest.storage!)
+      },
+      onError: (error) => reports.push(error)
+    })
+    const remove = channel.onData((bytes) => decoder.push(bytes))
+    return () => {
+      remove()
+      decoder.close()
+    }
+  })
+  /** Both genuine process factories negotiate native support while retaining real byte transports. */
+  const peers = await Promise.all(
+    [0, 1].map((index) =>
+      createProcessPeer<IRuntimeDynamicSurface>({
+        self: { name: `byte-${index}`, instanceId: `byte-${index}` },
+        provide: { echo: (value: unknown) => value },
+        connect: (context) =>
+          createProcessTransport(physical[index]!, {
+            ...(index === 0
+              ? { role: 'initiator' as const }
+              : { role: 'responder' as const, auth: { mode: 'none' as const } }),
+            peerId: `byte-${1 - index}`,
+            offer: createNativeProcessOffer({
+              peer: { id: context.self.instanceId, runtime: 'node' },
+              capabilities
+            }),
+            ipc: { connectionId: 'binary-byte', sessionId: 'binary-byte', log: () => undefined },
+            report: (error) => reports.push(error)
+          }),
+        report: (error) => reports.push(error)
+      })
+    )
+  )
+  /** The caller still owns these bytes after the established inline request/result path. */
+  const input = new Uint8Array([1, 2])
+  try {
+    assert.ok(
+      readRuntimePeerConnection(peers[0]!).channel.agreement.capabilities.includes(
+        RpcCapability.nativeBinary
+      )
+    )
+    const result: unknown = await peers[0]!.request('echo', input)
+    assert.ok(result instanceof Uint8Array)
+    assert.deepEqual([...result], [1, 2])
+    assert.deepEqual([...input], [1, 2])
+    assert.deepEqual(storage, [RpcBinaryStorage.inline, RpcBinaryStorage.inline])
+    assert.deepEqual(reports, [])
+  } finally {
+    observations.forEach((remove) => remove())
+    await Promise.all(peers.map((peer) => peer.close()))
+    await Promise.all(physical.map((channel) => channel.close()))
+  }
+})
 
 it('[A86] real sign-only MessagePort transfer detaches all sender views and restores the complete receiver backing', async () => {
   /** The same genuine native fixture retains independent physical/provider observations. */
@@ -673,7 +993,29 @@ it('[A84][A68] native keyed bytes remain part of the operation fingerprint after
   }
 })
 
-it.each(['none', 'encrypt-presence', 'missing-digest'] as const)(
+it('unauthenticated negotiated native transfer remains explicit and detaches the sender backing', async () => {
+  /** Removing authentication must not prevent the already-negotiated explicit ownership option. */
+  const fixture = await nativePair(
+    undefined,
+    undefined,
+    [capabilities, capabilities],
+    undefined,
+    'none'
+  )
+  /** Detachment is observed on the original caller-owned backing, independently of returned bytes. */
+  const backing = new Uint8Array([1, 2]).buffer
+  try {
+    const result = await fixture.peers[0]!.request('echo', backing, { transfer: [backing] })
+    assert.equal(backing.byteLength, 0)
+    assert.ok(result instanceof ArrayBuffer)
+    assert.deepEqual([...new Uint8Array(result)], [1, 2])
+    assert.deepEqual(fixture.reports, [])
+  } finally {
+    await fixture.close()
+  }
+})
+
+it.each(['encrypt-presence', 'missing-digest'] as const)(
   '[A87] actual native carrier refuses transfer when its canonical auth facts are %s',
   async (mode) => {
     /** This required unavailable-API case removes only digest access, without faking crypto outputs. */

@@ -1,5 +1,5 @@
 import { ThreadBootstrap, ThreadEvent, THREAD_RUNTIME_API_VERSION } from './constants.js'
-import { RpcWireLimit } from '../contract/index.js'
+import { RpcCapability, RpcWireLimit } from '../contract/index.js'
 import type { IRuntimePeerIdentity } from '../remote/index.js'
 import type { IRuntimePeerSourceContext } from '../remote/index.js'
 import type { IRpcRuntimeGeneration } from '../contract/index.js'
@@ -54,6 +54,21 @@ export function threadCapabilityOffer(value: unknown): readonly string[] {
   )
     return invalidThreadConfig('runtimeApi.capabilities', ThreadErrorText.bootstrapFailed)
   return Object.freeze([...value] as string[])
+}
+
+/**
+ * A local clone adapter offers native storage only when its compiled endpoint restores portable
+ * binary. Peer declarations stay untouched; core still requires the actual clone carrier.
+ */
+export function createThreadRuntimeCapabilityOffer(
+  capabilities: readonly string[]
+): readonly string[] {
+  return threadCapabilityOffer(
+    capabilities.includes(RpcCapability.portableBinary) &&
+      !capabilities.includes(RpcCapability.nativeBinary)
+      ? [...capabilities, RpcCapability.nativeBinary]
+      : capabilities
+  )
 }
 
 /** Enable only independent declarations shared by both endpoints. */
@@ -121,7 +136,7 @@ export function createThreadRuntimeBootstrap(
       version: THREAD_RUNTIME_API_VERSION,
       self: { name, instanceId: fingerprint },
       parent: context.self,
-      capabilities: context.capabilities,
+      capabilities: createThreadRuntimeCapabilityOffer(context.capabilities),
       ...(context.generation ? { generation: context.generation } : {})
     }
   })
