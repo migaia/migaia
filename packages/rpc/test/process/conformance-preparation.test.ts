@@ -81,9 +81,13 @@ describe('I20 preparation only; no A-total or A10 performance PASS', () => {
     expect(defaultConfig.test?.exclude).toEqual([
       ...configDefaults.exclude,
       'test/process/conformance*.test.ts',
+      'test/bridge/conformance-faults.test.ts',
       'test/merge/suite-parity.test.ts'
     ])
-    expect(conformanceConfig.test?.include).toEqual(['test/process/conformance*.test.ts'])
+    expect(conformanceConfig.test?.include).toEqual([
+      'test/process/conformance*.test.ts',
+      'test/bridge/conformance-faults.test.ts'
+    ])
     expect(conformanceConfig.test?.fileParallelism).toBe(false)
     expect(conformanceConfig.test?.maxWorkers).toBe(1)
     expect(conformanceConfig.test?.testTimeout).toBe(120_000)
