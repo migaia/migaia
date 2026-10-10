@@ -1,3 +1,4 @@
+import { createRuntimeBindingCalls } from '../core/internal/runtime-call.js'
 import type { IRuntimeCallOptions } from './runtime-api/typing.js'
 import { SupervisorState, type ISupervisor } from '@migaia/supervision'
 import {
@@ -17,42 +18,32 @@ import {
   RuntimeRecentKind,
   RuntimeQueryClock,
   RuntimeQueryLimit,
-  RuntimeQueryReason
+  RuntimeQueryReason,
+  RuntimeSourceKind,
+  RuntimeConnectionDirection
 } from './runtime-api/constants.js'
 import { createGenerationController, type IAbortSignal } from '@migaia/lifecycle'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
-import {
-  normalizePortable,
-  normalizeRuntimePortable,
-  hasRpcPortableBinary
-} from '../contract/normalize.js'
-import {
-  createRuntimeRequestInput,
-  retainRuntimeRequestInput
-} from '../core/internal/outbound-envelope.js'
-import { RpcCapability } from '../contract/wire-constants.js'
+import { normalizePortable } from '../contract/index.js'
+import {} from '../core/internal/outbound-envelope.js'
 import {
   isForwardedPayload,
   isForwardedOperation,
   retainForwardOptions
 } from '../core/internal/outbound-envelope.js'
-import type { IRpcPortableValue } from '../contract/types.js'
+import type { IRpcPortableValue } from '../contract/index.js'
 import type { IRuntimePeer, IRuntimePeerSourceResult } from './runtime-api/peer.js'
 import { readRuntimePeerConnection } from './runtime-api/peer.js'
 import { RuntimeApiErrorText, RuntimeApiMode } from './runtime-api/constants.js'
-import { retainRuntimeTransferOptions } from './runtime-api/transfer.js'
 import { RpcCoreErrorText } from '../core/error-text.js'
 import { createProviderGenerationRetired } from '../core/internal/provider.js'
-import {
-  prepareRuntimeStreamConsumer,
-  retainRuntimeStreamPreparation
-} from '../core/internal/stream/owner.js'
-import { RpcAbortError, RpcCoreErrorCode, RpcError, RpcRemoteError } from '../core/errors.js'
+import { RpcAbortError, RpcCoreErrorCode, RpcError } from '../core/index.js'
+import { isRpcRemoteError } from '../core/spi.js'
 import { nativeReplayReceipt } from '../core/internal/native-replay.js'
 import { resolveAbortReason } from '../core/internal/async-control.js'
-import { assertRpcIdempotencyKey, defaultRpcId } from '../core/internal/id.js'
+import { assertRpcIdempotencyKey, defaultRpcId } from '../core/spi.js'
 import { RemoteMethodName } from './constants.js'
 import {
   normalizeRemoteContract,
@@ -167,7 +158,7 @@ export type IRemoteRuntimeRegistrationOptions<TUnit, TSpec> = Omit<
 > &
   Readonly<{
     /** Private native factory provenance; local connection ownership cannot set execution authority. */
-    ownsExecution?: boolean
+    execution?: ISupervisor<unknown, unknown>
     prepareRuntime(
       channel: IRemoteChannel,
       signal: IAbortSignal,
@@ -184,7 +175,7 @@ type IRemoteRegistrationOptions<TUnit, TSpec> = Omit<
   'contract' | 'endpointFactory'
 > &
   Readonly<{
-    ownsExecution?: boolean
+    execution?: ISupervisor<unknown, unknown>
     contract?: IRemoteContract | IRemoteHostCatalog
     endpointFactory?: IRemoteProxyOptions<TUnit, TSpec>['endpointFactory']
     prepareRuntime?: IRemoteRuntimeRegistrationOptions<TUnit, TSpec>['prepareRuntime']
@@ -224,7 +215,7 @@ function codedAggregate(
 
 /** Preserve a wire-restored tagged provider failure instead of core's generic remote wrapper. */
 function restoreTaggedProviderFailure(error: unknown): never {
-  if (error instanceof RpcRemoteError && error.cause instanceof Error) {
+  if (isRpcRemoteError(error) && error.cause instanceof Error) {
     const restored = error.cause as Error & { readonly source?: unknown; readonly code?: unknown }
     if (typeof restored.source === 'string' && typeof restored.code === 'string') throw restored
   }
@@ -243,6 +234,8 @@ class RemoteRegistration<TUnit, TSpec> {
   readonly #options: IRemoteRegistrationOptions<TUnit, TSpec>
   /** An explicit port replaces the shared default for this registration. */
   readonly #retryPort: IRemoteRetryPort
+  /** Core owns runtime raw capture, retry and conditional lazy consumer preparation. */
+  readonly #coreCalls: ReturnType<typeof createRuntimeBindingCalls> | undefined
   /** Most recent described and active generation. */
   #current: IRemoteGeneration | undefined
   /** Accepted runtime sessions start at zero; failed channel/describe candidates never advance it. */
@@ -324,6 +317,58 @@ class RemoteRegistration<TUnit, TSpec> {
         scheduler: options.binding.scheduler,
         report: options.report
       })
+    this.#coreCalls = options.prepareRuntime
+      ? createRuntimeBindingCalls({
+          scheduler: options.binding.scheduler,
+          events: this.events,
+          dispatch: (input, forwarded) =>
+            forwarded
+              ? dispatchRemoteRetry(
+                  {
+                    events: this.events,
+                    scheduler: options.binding.scheduler,
+                    report: options.report
+                  },
+                  input
+                )
+              : this.#retryPort.dispatch(input),
+          current: () => {
+            const active = this.#active()
+            return {
+              number: active.number,
+              channel: active.channel,
+              endpoint: active.served.endpoint
+            }
+          },
+          observedGeneration: () => this.#current?.number ?? options.binding.supervisor.generation,
+          declaration: (method, mode) => this.#runtimeMethod(method, mode),
+          validateOptions: (input) => this.#callOptions(input as IRuntimeCallOptions, true),
+          ...(options.callGuard
+            ? {
+                guard: (method, mode, generation) =>
+                  options.callGuard!.beforeDispatch({
+                    method,
+                    mode:
+                      mode === 'stream'
+                        ? RemoteMethodMode.asyncGenerator
+                        : mode === 'notify'
+                          ? RemoteMethodMode.oneWay
+                          : RemoteMethodMode.request,
+                    generation
+                  })
+              }
+            : {}),
+          keyFactory: options.keyFactory,
+          timeout: (requested) => this.#timeout(requested),
+          closed: (generation, cause) =>
+            createRemoteLayerError(RpcRemoteLayerErrorCode.closed, cause, { generation }),
+          departureCause: (generation) => this.#departed.get(generation),
+          restoreFailure: restoreTaggedProviderFailure,
+          ...(options.binding.trackRequest
+            ? { trackRequest: (invoke) => options.binding.trackRequest!(invoke) }
+            : {})
+        })
+      : undefined
     this.#unsubscribe = options.binding.supervisor.subscribe((event) => {
       if (event.type === 'exit') this.#leave(event.generation, event.error)
       if (
@@ -681,7 +726,7 @@ class RemoteRegistration<TUnit, TSpec> {
 
   /** Native commands use the exact original supervisor, never a channel ownership flag. */
   get execution(): ISupervisor<unknown, unknown> | undefined {
-    return this.#options.ownsExecution ? this.supervisor : undefined
+    return this.#options.execution
   }
 
   /** Passive event subscription shares the canonical generation and teardown owner. */
@@ -768,7 +813,13 @@ class RemoteRegistration<TUnit, TSpec> {
       directory.localDescription,
       [
         runtimeConnectionDetail(
-          directory,
+          this.#options.execution
+            ? {
+                ...directory,
+                kind: RuntimeSourceKind.spawn,
+                direction: RuntimeConnectionDirection.spawned
+              }
+            : directory,
           current ? RuntimeQueryStatus.ready : RuntimeQueryStatus.departed,
           {
             supervisor,
@@ -844,20 +895,13 @@ class RemoteRegistration<TUnit, TSpec> {
     options: IRemoteCallOptions | IRuntimeCallOptions = {},
     mode: RuntimeApiMode = RuntimeApiMode.request
   ): Promise<IRpcPortableValue> {
-    /** Direct runtime admission keeps its existing synchronous failure boundary. */
-    const runtime = this.#options.prepareRuntime !== undefined
-    /** The portable runtime payload is normalized once before dispatch allocates any work. */
+    if (this.#coreCalls)
+      return this.#coreCalls.request(method, params, options, mode as 'request' | 'notify')
     const forwarded = isForwardedPayload(options, params)
-    const preparedInput = runtime
-      ? createRuntimeRequestInput(method, params, true, options)
-      : undefined
-    const runtimeData = preparedInput?.payload
-    /** The original accepted route index supplies the declaration without a directory query. */
-    const runtimeDeclaration = runtime ? this.#runtimeMethod(method, mode) : undefined
     try {
-      const data = runtime ? runtimeData : this.#params(params)
+      const data = this.#params(params)
       /** Runtime routes share the accepted cold index, while frozen v1 retains its original lookup. */
-      const declaration = runtime ? runtimeDeclaration : this.#method(method)
+      const declaration = this.#method(method)
       if (declaration && 'mode' in declaration && declaration.mode !== RemoteMethodMode.request)
         throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
       this.#callOptions(options, true)
@@ -875,55 +919,6 @@ class RemoteRegistration<TUnit, TSpec> {
         (declaration?.idempotent ? (this.#options.keyFactory?.() ?? defaultRpcId()) : undefined)
       if (key !== undefined) assertRpcIdempotencyKey(key)
       const timeoutMs = this.#timeout(options.timeoutMs)
-      /** The final runtime owner alone settles opted-in cancellation and start deadlines. */
-      if (
-        active.runtime &&
-        (options.orderKey !== undefined ||
-          options.cancel !== undefined ||
-          Object.hasOwn(options, 'transfer'))
-      ) {
-        /** Preserve the selected mode, full options and original private forwarding provenance. */
-        const callOptions = retainForwardOptions(
-          options,
-          retainRuntimeTransferOptions(options, {
-            ...options,
-            ...(timeoutMs === undefined ? {} : { timeoutMs }),
-            ...(key === undefined ? {} : { idempotencyKey: key })
-          })
-        )
-        if (preparedInput) retainRuntimeRequestInput(callOptions, preparedInput)
-        /** This is the actual downstream result, without the legacy retry timer or abort winner. */
-        /** The accepted runtime is captured before a tracking callback can observe replacement. */
-        const runtimePeer = active.runtime
-        const invoke = () =>
-          (mode === RuntimeApiMode.notify
-            ? runtimePeer.notify(method, data, callOptions)
-            : runtimePeer.request(method, data, callOptions)) as Promise<IRpcPortableValue>
-        /**
-         * The original native drain counts this runtime operation without changing Promise
-         * identity.
-         */
-        const operation = this.#options.binding.trackRequest
-          ? this.#options.binding.trackRequest(invoke)
-          : invoke()
-        if (!forwarded) return operation
-        /** The existing leave receipt wins only when this captured downstream generation retires. */
-        let retired: Error | undefined
-        const unsubscribe = this.events.onLeave(active.number, (reason) => {
-          retired = createProviderGenerationRetired(reason)
-        })
-        return operation
-          .then(
-            (result) => {
-              if (retired) throw retired
-              return result
-            },
-            (error: unknown) => {
-              throw retired ?? error
-            }
-          )
-          .finally(unsubscribe)
-      }
       const deadlineAt =
         timeoutMs === undefined ? undefined : this.#options.binding.scheduler.now() + timeoutMs
       /** Retry ports see the same event source and a sendOnce bound to the logical key. */
@@ -961,43 +956,18 @@ class RemoteRegistration<TUnit, TSpec> {
             ...(options.signal ? { signal: options.signal } : {}),
             ...(input.remainingMs === undefined
               ? timeoutMs === undefined
-                ? runtime && options.timeoutMs === false
-                  ? { timeoutMs: false as const }
-                  : {}
+                ? {}
                 : { timeoutMs }
               : { timeoutMs: input.remainingMs }),
             ...(key === undefined ? {} : { idempotencyKey: key })
           })
-          if (preparedInput) retainRuntimeRequestInput(sendOptions, preparedInput)
           /** Native results can be returned without native input; this retains the same retry owner. */
-          const result =
-            live.runtime &&
-            (hasRpcPortableBinary(data) ||
-              live.channel.agreement.capabilities.includes(RpcCapability.portableBinary))
-              ? this.#options.binding.trackRequest
-                ? this.#options.binding.trackRequest(
-                    () =>
-                      (mode === RuntimeApiMode.notify
-                        ? live.runtime!.notify(method, data, sendOptions)
-                        : live.runtime!.request(
-                            method,
-                            data,
-                            sendOptions
-                          )) as Promise<IRpcPortableValue>
-                  )
-                : ((mode === RuntimeApiMode.notify
-                    ? live.runtime.notify(method, data, sendOptions)
-                    : live.runtime.request(
-                        method,
-                        data,
-                        sendOptions
-                      )) as Promise<IRpcPortableValue>)
-              : live.served.endpoint.send<IRpcPortableValue>(
-                  live.channel.peerId,
-                  method,
-                  data,
-                  sendOptions
-                )
+          const result = live.served.endpoint.send<IRpcPortableValue>(
+            live.channel.peerId,
+            method,
+            data,
+            sendOptions
+          )
           return result.catch(restoreTaggedProviderFailure)
         }
       }
@@ -1096,87 +1066,7 @@ class RemoteRegistration<TUnit, TSpec> {
     params: unknown,
     options: IRemoteCallOptions | IRuntimeCallOptions = {}
   ): AsyncIterableIterator<IRpcPortableValue> {
-    if (this.#options.prepareRuntime) {
-      /** The existing registration facade delegates all controls to exactly one original consumer. */
-      let consumer: AsyncIterableIterator<IRpcPortableValue> | undefined
-      /** A genuine leave overrides only errors from the captured downstream generation. */
-      let retired: Error | undefined
-      /** The original leave subscription survives preparation until that consumer terminates. */
-      let unsubscribe: (() => void) | undefined
-      /** Create only the one lazy canonical consumer and capture its accepted generation. */
-      const current = (): AsyncIterableIterator<IRpcPortableValue> => {
-        if (consumer) return consumer
-        /** Only package-minted forwarding can reuse the previous hop's admitted payload. */
-        const forwarded = isForwardedPayload(options, params)
-        /** Caller values otherwise enter the same canonical portable admission as before. */
-        const data =
-          params === undefined
-            ? undefined
-            : forwarded
-              ? (params as IRpcPortableValue)
-              : normalizeRuntimePortable(params)
-        this.#runtimeMethod(method, RuntimeApiMode.stream)
-        this.#callOptions(options, true)
-        this.#options.callGuard?.beforeDispatch({
-          method,
-          mode: RemoteMethodMode.asyncGenerator,
-          generation: this.#current?.number ?? this.#options.binding.supervisor.generation
-        })
-        /** All controls keep this original generation rather than resolving another target later. */
-        const active = this.#active()
-        /** The native registration's existing wall-time cap still bounds this call. */
-        const timeoutMs = this.#timeout(options.timeoutMs)
-        consumer = active.runtime!.stream(
-          method,
-          data,
-          retainForwardOptions(
-            options,
-            retainRuntimeTransferOptions(options, {
-              ...options,
-              ...(timeoutMs === undefined ? {} : { timeoutMs })
-            })
-          )
-        )
-        if (forwarded)
-          unsubscribe = this.events.onLeave(active.number, (reason) => {
-            retired = createProviderGenerationRetired(reason)
-          })
-        return consumer
-      }
-      /** The facade owns no credit, pending or terminal state; the original iterator settles each. */
-      const observe = async (
-        operation: () => Promise<IteratorResult<IRpcPortableValue>>
-      ): Promise<IteratorResult<IRpcPortableValue>> => {
-        try {
-          /** Completion and cleanup remain facts from the original consumer's terminal boundary. */
-          const result = await operation()
-          if (result.done) unsubscribe?.()
-          return result
-        } catch (error) {
-          unsubscribe?.()
-          throw retired ?? error
-        }
-      }
-      /** Replace the existing generator wrapper with direct control delegation, without pre-pull. */
-      const facade: AsyncIterableIterator<IRpcPortableValue> = {
-        next: () => observe(() => current().next()),
-        return: (value) => observe(() => current().return!(value)),
-        throw: (reason) => observe(() => current().throw!(reason)),
-        [Symbol.asyncIterator]() {
-          return this
-        }
-      }
-      if (options.orderKey !== undefined || options.cancel !== undefined)
-        retainRuntimeStreamPreparation(facade, async () => {
-          try {
-            await prepareRuntimeStreamConsumer(current())
-          } catch (error) {
-            unsubscribe?.()
-            throw retired ?? error
-          }
-        })
-      return Object.freeze(facade)
-    }
+    if (this.#coreCalls) return this.#coreCalls.stream(method, params, options)
     return this.#legacyStream(method, params, options)
   }
 

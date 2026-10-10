@@ -63,7 +63,7 @@ describe('native process plugin socket', () => {
         report: () => undefined,
         endpointFactory: async (channel) => {
           endpoints += 1
-          return endpointFor(channel, 'server')
+          return endpointFor(channel as IRemoteChannel, 'server')
         },
         listen: {
           kind: 'listener',
@@ -106,7 +106,7 @@ describe('native process plugin socket', () => {
         name: 'server',
         self: { name: 'client', instanceId: clientId },
         report: () => undefined,
-        endpointFactory: (channel) => endpointFor(channel, clientId),
+        endpointFactory: (channel) => endpointFor(channel as IRemoteChannel, clientId),
         connect: {
           kind: 'connect',
           address,

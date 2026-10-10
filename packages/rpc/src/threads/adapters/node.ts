@@ -16,7 +16,7 @@ import {
   intersectThreadCapabilities
 } from '../bootstrap.js'
 import { createNodeThreadBootstrapHandoff } from '../receive-handoff.js'
-import type { IRuntimePeerSourceContext } from '../../remote/runtime-api/peer.js'
+import type { IRuntimePeerSourceContext } from '../../remote/index.js'
 import { readRuntimeLaunchContext } from '../../remote/runtime-api/launch-context.js'
 import { invalidThreadConfig } from '../error.js'
 import { ThreadErrorText } from '../error-text.js'

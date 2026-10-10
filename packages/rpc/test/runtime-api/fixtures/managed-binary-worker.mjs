@@ -23,7 +23,7 @@ prepared = createRuntimePeer({
       capabilities: data.capabilities
     }),
   endpointFactory: async (channel) => {
-    const endpoint = await createRuntimeApiEndpoint(
+    const endpoint = createRuntimeApiEndpoint(
       {
         id: peerId,
         scheduler: channel.scheduler,
@@ -45,9 +45,9 @@ prepared = createRuntimePeer({
           })
         ]
       },
-      { supports: () => true },
-      true
+      channel
     )
+    await endpoint.ready
     return { endpoint, oneWay: endpoint, stream: endpoint.stream }
   },
   contract: {

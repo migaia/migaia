@@ -1,19 +1,28 @@
 import type { IRuntimePeerSourceContext, IRuntimePeerProvide, IRuntimePeer } from './peer.js'
 import type { IAbortSignal } from '@migaia/lifecycle'
-import type { IRpcRuntimeGeneration } from '../../contract/runtime-api/types.js'
-import type { IProviderAdmissionScope } from '../../core/internal/provider-admission.js'
+import type { IRpcRuntimeGeneration } from '../../contract/index.js'
+import type { IProviderAdmissionScope } from '../../core/features/provider.js'
 
 /** Original Host operation and resource ownership travel only through exact internal options. */
 export type IRuntimePreparationContext = Readonly<{
   /** Local configuration provenance distinguishes a library default from an explicit self claim. */
   selfDefaulted?: boolean
+  /** Native source owner describes only its own connection; metadata grants no operation rights. */
+  connectionOrigin?(): import('./overview.js').IRuntimeConnectionOrigin
+  /** Native process construction preserves transfer rejection before caller capture. */
+  restrictTransfer?(options: object | undefined): void
   /** Adapter-independent node identity is minted by the original Host, never a physical generation. */
-  nodeId?: string
+  host?: import('@migaia/plugin-host').IPluginRuntimeIntegration
   /** All adapter families on this genuine Host borrow the original logical-provider scope. */
-  providerAdmission?: Pick<IProviderAdmissionScope, 'prepare'>
-  initialSignal: IAbortSignal
-  lifecycleSignal: IAbortSignal
-  own(dispose: () => Promise<void>): void
+  providerAdmission?: IProviderAdmissionScope
+  /** Actual Host reservation keeps commit policy separate from the public quota handle. */
+  providerAdmissionRegistration?: Readonly<{
+    stagePolicy(maxGlobal?: number, maxPerPeer?: number): void
+    isCommitted(): boolean
+  }>
+  initialSignal?: IAbortSignal
+  lifecycleSignal?: IAbortSignal
+  own?(dispose: () => Promise<void>): void
   /** New native generations compile current Feature snapshots from the original integration port. */
   readProvide?(): IRuntimePeerProvide
   /** Authenticated listener sessions publish through the same original Plugin install slot. */
@@ -36,11 +45,14 @@ export async function withRuntimePreparationContext<T>(
   context: IRuntimePreparationContext,
   prepare: () => Promise<T>
 ): Promise<T> {
+  /** Nested preparation restores the previous exact options context after startup. */
+  const previous = runtimePreparationContexts.get(options)
   runtimePreparationContexts.set(options, context)
   try {
     return await prepare()
   } finally {
-    runtimePreparationContexts.delete(options)
+    if (previous) runtimePreparationContexts.set(options, previous)
+    else runtimePreparationContexts.delete(options)
   }
 }
 

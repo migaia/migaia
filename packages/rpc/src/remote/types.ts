@@ -2,12 +2,12 @@ import type { IAbortSignal } from '@migaia/lifecycle'
 import type { ICodec } from '@migaia/serialize/codec'
 import type { ISupervisor } from '@migaia/supervision'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import type { IRpcFramer, IRpcPortableValue } from '../contract/types.js'
-import type { IRpcFeature } from '../core/feature.js'
+import type { IRpcFramer, IRpcPortableValue } from '../contract/index.js'
+import type { IRpcFeature } from '../core/index.js'
 import type { IOneWaySurface } from '../core/features/one-way.js'
-import type { IRpcStreamRuntime } from '../core/features/stream.js'
-import type { IRpcEndpoint, IRpcAbortSignal } from '../core/typing.js'
-import type { IRpcTransport } from '../core/transport.js'
+import type { IRpcStreamRuntime } from '../core/stream/index.js'
+import type { IRpcEndpoint, IRpcAbortSignal } from '../core/index.js'
+import type { IRpcTransport } from '../core/index.js'
 import type { IRemoteContract, IRemoteHostCatalog, RemoteMethodMode } from './contract.js'
 import type { IRuntimeCallOptions } from './runtime-api/typing.js'
 
@@ -39,6 +39,10 @@ export type IRemoteChannel = Readonly<{
   features: readonly IRpcFeature[]
   close(): Promise<void>
 }>
+
+/** Borrowing a channel grants only its supplied operations; close exists only when delegated. */
+export type IRemoteChannelResources = Omit<IRemoteChannel, 'close'> &
+  Partial<Pick<IRemoteChannel, 'close'>>
 
 /** A launcher and channel are paired without leaking a platform handle into remote. */
 export type IRemoteBinding<TUnit, TSpec> = Readonly<{

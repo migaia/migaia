@@ -32,6 +32,28 @@ export function encodeRpcStreamFrame(payload: Uint8Array): Uint8Array {
   return framed
 }
 
+/** Encode process text into its final frame; a drained backing remains owned by its connection. */
+export function encodeRpcStreamTextFrame(
+  text: string,
+  encoder: {
+    encode(input: string): Uint8Array
+    encodeInto(input: string, destination: Uint8Array): Readonly<{ written: number }>
+  },
+  storage?: Uint8Array
+): Uint8Array {
+  /** Three bytes per UTF-16 code unit is a conclusive bound, including lone surrogates. */
+  const upper = text.length * 3
+  if (text.length === 0 || upper > RPC_STREAM_MAX_FRAME_BYTES)
+    return encodeRpcStreamFrame(encoder.encode(text))
+  /** A connection lends this backing only after the previous physical write completed. */
+  const frame = storage && storage.byteLength >= upper + 4 ? storage : new Uint8Array(upper + 4)
+  /** One UTF-8 pass writes the payload after the original network-order prefix. */
+  const result = encoder.encodeInto(text, frame.subarray(4))
+  if (result.written === 0) throw createContractError(RpcContractErrorCode.invalidFrame)
+  new DataView(frame.buffer, frame.byteOffset).setUint32(0, result.written, false)
+  return frame.subarray(0, result.written + 4)
+}
+
 /** Decode arbitrary chunk boundaries while retaining at most one frame. */
 export function createRpcStreamFrameDecoder(
   options: IRpcStreamFrameDecoderOptions

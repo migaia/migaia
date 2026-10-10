@@ -9,6 +9,7 @@ export default defineConfig(
       exclude: [
         ...configDefaults.exclude,
         'test/process/conformance*.test.ts',
+        'test/bridge/conformance-faults.test.ts',
         'test/merge/suite-parity.test.ts'
       ],
       /**
@@ -24,6 +25,7 @@ export default defineConfig(
             exclude: [
               ...configDefaults.exclude,
               'test/process/conformance*.test.ts',
+              'test/bridge/conformance-faults.test.ts',
               'test/merge/suite-parity.test.ts',
               'test/runtime-api/single-frame.test.ts'
             ],

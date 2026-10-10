@@ -1,16 +1,16 @@
 import { runtimeUnavailable, runtimeErrorIdentity } from './overview.js'
 import {
   definePlugin,
+  type IDefinedPluginConstraint,
   PluginHostError,
   PluginHostErrorCode,
   getPluginRuntimeIntegration,
-  type IDefinedPluginConstraint,
   type IPluginRuntimeFeatureSnapshot
 } from '@migaia/plugin-host'
-import { defaultRpcId } from '../../core/internal/id.js'
+import { defaultRpcId } from '../../core/spi.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
-import { RpcCoreErrorCode, RpcError } from '../../core/errors.js'
+import { RpcCoreErrorCode, RpcError } from '../../core/index.js'
 import {
   createRuntimeOutlet,
   readRuntimeOutletConnection,
@@ -20,7 +20,6 @@ import {
 } from './outlet.js'
 import {
   RuntimeApiErrorText,
-  RuntimePluginFamily,
   RuntimePluginKey,
   RuntimePluginExpose,
   RuntimeEventName,
@@ -52,11 +51,25 @@ import { RuntimeApiMode } from './constants.js'
 import { withRuntimePreparationContext } from './launch-context.js'
 import { readManagedRuntimeRegistration } from './managed-peer.js'
 import { readRuntimeDefaultTimeout } from './timeout.js'
-import { createProviderAdmissionScope } from '../../core/internal/provider-admission.js'
+import { createProviderAdmissionScope } from '../../core/features/provider.js'
 import { attachProviderPreflight } from '../../core/internal/provider.js'
 
 /** A private extension uses the original atomic shared-slot owner across both adapter families. */
 const providerAdmissionSlot = Symbol('runtime-provider-admission')
+
+/** One Host logical provider keeps the same shared family identity across physical adapters. */
+const providerAdmissionFamily = Object.freeze({})
+
+/** An actual owner operation reserves only its captured Host slot; key is descriptive data only. */
+type IRuntimePluginSlotResource = Readonly<{
+  key: keyof typeof RuntimePluginKey
+  acquire(
+    integration: import('@migaia/plugin-host').IPluginRuntimeIntegration,
+    create: (
+      slot: import('@migaia/plugin-host').IPluginRuntimeSharedSlot<IRuntimeOutlet>
+    ) => IRuntimeOutlet
+  ): import('@migaia/plugin-host').IPluginRuntimeSharedSlot<IRuntimeOutlet>
+}>
 
 /** Platform factories share this application contract while retaining their original source owner. */
 export type IRuntimePluginOptions<
@@ -302,14 +315,14 @@ function exposedCatalogMethods(
  */
 export function createRuntimePlugin<TSpawn, TConnect, TListen>(
   options: IRuntimePluginOptions<TSpawn, TConnect, TListen>,
-  kind: keyof typeof RuntimePluginFamily,
+  slotResource: IRuntimePluginSlotResource,
   createPeer: (options: IRuntimePeerOptions) => Promise<IRuntimePeer> = createRuntimePeer
 ): IDefinedPluginConstraint<Record<string, never>, never, Record<string, never>> {
   /** Invalid defaults fail during cold Plugin construction, before any installation side effects. */
   const defaultTimeoutMs = readRuntimeDefaultTimeout(options)
   /** Registration name is copied before installation; caller mutation cannot change publication. */
   const name = options.name
-  if (typeof name !== 'string' || !name || !Object.hasOwn(RuntimePluginFamily, kind))
+  if (typeof name !== 'string' || !name || !Object.hasOwn(RuntimePluginKey, slotResource.key))
     throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.pluginNameInvalid)
   /** The whitelist is snapshotted before physical source effects, and defaults to empty. */
   const input = options.expose ?? []
@@ -432,21 +445,19 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
         ...forwards.values()
       ])
       /** Later same-family installs reuse this facade while retaining separate endpoint owners. */
-      const slot = integration.acquireSharedSlot<IRuntimeOutlet>(
-        RuntimePluginKey[kind],
-        RuntimePluginFamily[kind],
-        (shared) =>
-          createRuntimeOutlet(
-            shared,
-            Object.freeze({ name: integration.identity.name, instanceId: integration.identity.id }),
-            kind
-          )
+      /** Each install gets its own reservation; the resource fixes acquisition independently of key. */
+      const slot = slotResource.acquire(integration, (shared) =>
+        createRuntimeOutlet(
+          shared,
+          Object.freeze({ name: integration.identity.name, instanceId: integration.identity.id }),
+          slotResource.key
+        )
       )
       /** This private cold reference owns no connections, callable catalog or additional quota map. */
       const admission = integration.acquireSharedSlot(
         providerAdmissionSlot,
-        RuntimePluginFamily,
-        createProviderAdmissionScope
+        providerAdmissionFamily,
+        () => createProviderAdmissionScope()
       )
       /**
        * Policy metadata belongs to this original reservation, so failed candidates never publish
@@ -460,12 +471,11 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
        * Cold source preparation reads the actual original commit index rather than a readiness
        * flag.
        */
-      const providerAdmission = Object.freeze({
-        prepare: (
-          maxGlobal: number | undefined,
-          maxPerPeer: number | undefined,
-          maxIngress: number | undefined
-        ) => {
+      /** Core resolves only this exact quota handle after selecting its real framer. */
+      const providerAdmission = admission.facade
+      /** Stage the original reservation policy before Core asks its real committed index. */
+      const providerAdmissionRegistration = Object.freeze({
+        stagePolicy(maxGlobal?: number, maxPerPeer?: number): void {
           if (maxGlobal !== undefined)
             admissionPolicy.maxGlobal = Math.min(admissionPolicy.maxGlobal ?? maxGlobal, maxGlobal)
           if (maxPerPeer !== undefined)
@@ -473,13 +483,8 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
               admissionPolicy.maxPerPeer ?? maxPerPeer,
               maxPerPeer
             )
-          return admission.facade.prepare(
-            maxGlobal,
-            maxPerPeer,
-            maxIngress,
-            admission.registered().includes(admissionPolicy)
-          )
-        }
+        },
+        isCommitted: () => admission.registered().includes(admissionPolicy)
       })
       /**
        * Automatic bootstrap retains its trusted identity; explicit sources use the original id
@@ -520,8 +525,9 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
         preparationOptions,
         {
           selfDefaulted: peerOptions.self === undefined,
-          nodeId: integration.nodeId,
+          host: integration,
           providerAdmission,
+          providerAdmissionRegistration,
           initialSignal: core.operation.signal,
           lifecycleSignal: core.lifecycle.signal,
           own: (dispose) => core.onDispose(dispose),

@@ -12,8 +12,6 @@ export const RuntimeReportKind = {
 
 /** Automatic provide descriptor errors are stable, non-reflecting configuration diagnostics. */
 export const RuntimeApiErrorText = {
-  /** Every own process transfer field is invalid, including empty or undefined values. */
-  processTransferInvalid: 'Runtime process calls do not accept transfer',
   /** Factory admission rejects this value before bootstrap or physical resource acquisition. */
   defaultTimeoutInvalid: 'Runtime defaultTimeoutMs must be a positive finite number',
   /** A foreign origin without a negotiated node cannot safely begin a native forwarding route. */
@@ -58,14 +56,11 @@ export const RuntimeApiErrorText = {
   hostControlInvalid: 'Runtime host exposure requires its managed Host catalog and resolver'
 } as const
 
-/** Each RPC module family alone may share its canonical PluginHost extension slot. */
-export const RuntimePluginFamily = {
-  process: Object.freeze({}),
-  thread: Object.freeze({})
-} as const
-
-/** Direct Host publication uses these canonical platform keys throughout runtime assembly. */
-export const RuntimePluginKey = { process: 'process', thread: 'thread' } as const
+/**
+ * Applications use these scalar labels to identify process/thread Plugin and query metadata. A
+ * label grants no Host slot or native execution authority; those belong to held resources.
+ */
+export const RuntimePluginKey = Object.freeze({ process: 'process', thread: 'thread' } as const)
 
 /** This explicit whitelist entry alone enables the original reserved Host-control operations. */
 export const RuntimePluginExpose = { host: 'host' } as const
@@ -158,7 +153,7 @@ export const RuntimeEventName = {
 export type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName]
 /** Original scheduler timestamps are monotonic milliseconds, not wall-clock epoch time. */
 export const RuntimeQueryClock = { scheduler: 'scheduler' } as const
-import { RpcCapability } from '../../contract/wire-constants.js'
+import { RpcCapability } from '../../contract/index.js'
 
 /** Existing custom roots can offer ordinary calls without promising a private Host admission scope. */
 export const RUNTIME_API_BASE_CAPABILITIES = Object.freeze([

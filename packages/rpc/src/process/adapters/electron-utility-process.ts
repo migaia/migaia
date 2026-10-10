@@ -8,7 +8,8 @@ import {
   type IProcessHandle,
   type IProcessLauncher
 } from '@migaia/supervision/process'
-import { RpcCoreErrorCode, tagRpcError } from '../../core/errors.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
+import { tagRpcError } from '../../core/transport-kit.js'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import { ERROR_SOURCE, RpcProcessErrorCode } from '../error-code.js'
 import { createProcessError } from '../error.js'

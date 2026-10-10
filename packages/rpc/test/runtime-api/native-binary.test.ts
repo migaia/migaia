@@ -114,7 +114,7 @@ async function nativePair(
         },
         endpointFactory: async (channel) => {
           /** Original native assembly installs the real auth middleware, not a Feature lookalike. */
-          const endpoint = await createRuntimeApiEndpoint(
+          const endpoint = createRuntimeApiEndpoint(
             {
               id: index === 0 ? 'parent-1' : 'child-1',
               scheduler: channel.scheduler,
@@ -131,9 +131,9 @@ async function nativePair(
                 ...(authMode === 'none' ? [] : [auth(index)])
               ]
             },
-            { supports: () => channel.agreement.capabilities.includes('stream@1') },
-            true
+            channel
           )
+          await endpoint.ready
           return {
             endpoint: endpoint as unknown as IRpcEndpoint,
             oneWay: endpoint,

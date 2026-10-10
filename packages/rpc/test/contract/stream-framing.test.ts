@@ -6,6 +6,7 @@ import {
   createRpcStreamFrameDecoder,
   encodeRpcStreamFrame
 } from '../../src/contract/framing/stream-index.js'
+import { encodeRpcStreamTextFrame } from '../../src/contract/framing/stream.js'
 
 /** A compressed vector avoids storing a 16 MiB fixture in source control. */
 type IVectorBytes = string | Readonly<{ repeatHex: string; count: number; prefixHex?: string }>
@@ -44,6 +45,32 @@ const vectors = JSON.parse(
 ) as readonly IStreamVector[]
 
 describe('rpc native stream framing', () => {
+  it('[C6-F1][A21][A35] direct text encoding preserves wire bytes with a drained backing and an inconclusive bound', () => {
+    /** The production text encoder supplies the same UTF-8 behavior as the original byte path. */
+    const encoder = new TextEncoder()
+    /** A nonzero offset proves prefix writes honor the borrowed view's real boundary. */
+    const storage = new Uint8Array(new ArrayBuffer(1024), 8, 512)
+    for (const text of ['plain', '汉字', '😀', '\ud83d']) {
+      /** The original encoder is an independent byte-for-byte wire oracle. */
+      const expected = encodeRpcStreamFrame(encoder.encode(text))
+      /** Each sequential call lends storage only after the prior consumer has finished reading. */
+      const actual = encodeRpcStreamTextFrame(text, encoder, storage)
+      expect(actual.buffer).toBe(storage.buffer)
+      expect(Buffer.compare(actual, expected)).toBe(0)
+    }
+    /** ASCII can fit the frame even when the conservative UTF-16 bound is inconclusive. */
+    const text = 'a'.repeat(Math.floor(RPC_STREAM_MAX_FRAME_BYTES / 3) + 1)
+    expect(
+      Buffer.compare(
+        encodeRpcStreamTextFrame(text, encoder),
+        encodeRpcStreamFrame(encoder.encode(text))
+      )
+    ).toBe(0)
+    expect(() => encodeRpcStreamTextFrame('', encoder)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_FRAME' })
+    )
+  })
+
   it('[A3] encodes the vector prefixes and delivers fragmented/coalesced frames in order', () => {
     for (const vector of vectors) {
       const input = vector.payloadHex ?? vector.payload

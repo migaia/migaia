@@ -30,21 +30,25 @@ import type { IRpcSelectedComponents } from './endpoint-options.js'
 import { RpcEnvelopeKind, type IRpcEnvelope } from '../../contract/index.js'
 import type { IRpcOutboundAdmission, IRpcOutboundGate } from './outbound-gate.js'
 import { registerBatchWriter, type IBatchWriteGuard } from './batch-frame.js'
-import { RpcBatchPhysical, RpcCapability } from '../../contract/wire-constants.js'
+import { RpcBatchPhysical, RpcCapability } from '../../contract/index.js'
+import { hasRpcBinaryEnvelope } from '../../contract/runtime-api/binary-capture.js'
+import { measureRpcNativeBinaryFrame } from '../../contract/runtime-api/binary-capture.js'
+import { prepareRpcBinaryLazy as prepareRpcBinary } from '../../contract/runtime-api/binary-lazy.js'
+import { RpcBinaryStorage } from '../../contract/framing/v1.js'
+import { RpcNativeBinaryKind } from '../../contract/framing/v1.js'
+import { hasFastComponents, readFastInlineEncoder } from './fast-path.js'
 import {
-  hasRpcBinaryEnvelope,
-  prepareRpcBinary,
-  measureRpcNativeBinaryFrame
-} from '../../contract/runtime-api/binary.js'
-import { RpcBinaryStorage } from '../../contract/runtime-api/binary-constants.js'
-import { RpcNativeBinaryKind } from '../../contract/runtime-api/binary-constants.js'
-import { hasFastComponents } from './fast-path.js'
+  prepareOwnedJsonSnapshot,
+  prepareOwnedBinaryJsonSnapshot,
+  readOwnedJsonSnapshot
+} from './outbound-owned-codec.js'
 import { isArrayBuffer } from '@migaia/utils/bytes'
+import { identityCodecV1 } from '@migaia/serialize/codec'
 import {
   measureRpcPhysicalFrame,
   assertRpcPhysicalFrameSize,
   rejectRpcPhysicalFrameSize
-} from '../../contract/batch-frame.js'
+} from '../../contract/framing/index.js'
 import { resolveAbortReason } from './async-control.js'
 import {
   isOutboundEnvelope,
@@ -57,9 +61,54 @@ import {
   runtimeOperationCapabilities,
   wrapRuntimeCarrier
 } from '../../contract/runtime-api/index.js'
-import { RpcRuntimeKind } from '../../contract/runtime-api/constants.js'
-import type { IRpcRuntimeEnvelope } from '../../contract/runtime-api/types.js'
-import { readRpcSingleFrameFacts } from '../../contract/framing/reassembler.js'
+import { RpcRuntimeKind } from '../../contract/framing/v1.js'
+import type { IRpcRuntimeEnvelope } from '../../contract/index.js'
+import { bindRpcFrameIngress } from '../../contract/framing/index.js'
+
+/** Fixed native selector/wrapper JSON geometry excludes only the protected metadata slot. */
+const nativeBinaryJsonOverhead =
+  JSON.stringify(
+    wrapRuntimeCarrier({ kind: RpcNativeBinaryKind, protectedMetadata: null, sidecars: [] })
+  ).length - 4
+
+/** Whole-object runtime carriers add only the fixed kind/frame selector around owned metadata. */
+const runtimeObjectJsonOverhead = JSON.stringify(wrapRuntimeCarrier(null)).length - 4
+
+/** The private physical batch wrapper has fixed ASCII keys and an initially empty member array. */
+const batchJsonOverhead = measureRpcPhysicalFrame({
+  kind: RpcBatchPhysical.kind,
+  [RpcBatchPhysical.members]: []
+})
+
+/** Immutable member snapshots contribute their existing one-walk bounds to the same batch record. */
+function ownedBatchByteUpperBound(entries: readonly IQueuedEnvelope[]): number | undefined {
+  /** Array brackets belong to the fixed wrapper; only separating commas are added here. */
+  let bound = batchJsonOverhead + Math.max(0, entries.length - 1)
+  for (const entry of entries) {
+    /** A custom/opaque member never inherits another envelope's owned snapshot proof. */
+    const member = outboundJsonByteUpperBound(entry.message)
+    if (member === undefined) return undefined
+    bound += member
+  }
+  return bound
+}
+
+/** An owned metadata bound charges every sidecar's original empty-object representation and bytes. */
+function ownedNativeBinaryByteUpperBound(
+  metadata: unknown,
+  sidecarCount: number,
+  backingBytes: number
+): number | undefined {
+  /** Opaque/custom protection output retains the original exact measurement below. */
+  const prepared = readOwnedJsonSnapshot(metadata)
+  return prepared
+    ? nativeBinaryJsonOverhead +
+        prepared.byteUpperBound +
+        sidecarCount * 2 +
+        Math.max(0, sidecarCount - 1) +
+        backingBytes
+    : undefined
+}
 
 /** One logical settlement remains owned until its actual physical write completes. */
 type IQueuedEnvelope = {
@@ -77,10 +126,43 @@ type IQueuedEnvelope = {
 }
 
 /** One complete encoded/protected physical value retains its exact logical settlements. */
-type IPreparedBatch = Readonly<{ entries: IQueuedEnvelope[]; value: unknown }>
+type IPreparedBatch = Readonly<{
+  entries: IQueuedEnvelope[]
+  value: unknown
+  /** Only immutable strings may reuse this pre-protection bound through an identity signer. */
+  byteUpperBound?: number
+}>
 
 /** The sender becomes idle in the same reaction as its final actual host-write settlement. */
 type IPhysicalDrain = { pending: number; preparing: boolean; finish(): void }
+
+/** One actual host write retains its generation and the original admission failure identity. */
+type IPhysicalWriteRecord = {
+  readonly value: unknown
+  readonly transfer: readonly unknown[] | undefined
+  readonly generation: number | undefined
+  readonly beforeSend: (() => void) | undefined
+  readonly immediate: boolean
+  admissionFailure: unknown
+  /** Runtime preparation supplies its existing start admission without a per-frame callback. */
+  runtimeStart?: IRuntimeWriteRecord
+}
+
+/** One runtime frame retains captured codec/auth/backing facts through its actual write. */
+type IRuntimeWriteRecord = Readonly<{
+  envelope: IRpcRuntimeEnvelope
+  binary: boolean
+  transferRequested: boolean
+  transfer: readonly unknown[] | undefined
+  native: boolean
+  digest: ReturnType<typeof readAuthenticationBinaryDigest>
+  framer: IRpcSelectedComponents['framer']
+  generation: number | undefined
+  limit: number
+  admission: IRpcOutboundAdmission | undefined
+  onStarted: (() => void) | Readonly<{ started(): void }> | undefined
+  onPrepared: (() => Promise<void>) | undefined
+}>
 
 /** Minimal canonical send port consumed by the outbound owner. */
 export type IRpcOutboundTransport = {
@@ -121,6 +203,13 @@ export class RpcOutboundSender {
   readonly #physicalLimit: number
   /** Only the original native adapter receipt authorizes a real clone/transfer boundary. */
   readonly #cloneTransfer: boolean
+  /** The framing owner supplies limits while binding the actual selected callable pair once. */
+  readonly #singleFrameLimits:
+    | Readonly<{
+        maxConcurrentMessages: number
+        maxMessageBytes: number
+      }>
+    | undefined
   /** Busy physical writes accumulate ready requests and responses in this single owner. */
   #writing = false
   /** FIFO contains semantic settlements, never serialized per-member size estimates. */
@@ -162,6 +251,10 @@ export class RpcOutboundSender {
     this.#batch = batch
     this.#physicalLimit = physicalLimit
     this.#cloneTransfer = cloneTransfer
+    this.#singleFrameLimits = this.#objectPort
+      ? bindRpcFrameIngress(this.#objectPort.framer.accept, this.#objectPort.framer.frame)
+          .singleFrameLimits
+      : components.ingressPrepare.singleFrameLimits
     this.#receiverId = receiverId
     const lifecycle = transport as Partial<IRpcOutboundLifecycle>
     this.#lifecycle =
@@ -228,7 +321,7 @@ export class RpcOutboundSender {
     message: IRpcRuntimeEnvelope,
     capabilities: readonly string[],
     admission?: IRpcOutboundAdmission,
-    onStarted?: () => void,
+    onStarted?: (() => void) | Readonly<{ started(): void }>,
     onPrepared?: () => Promise<void>,
     transferOptions?: Pick<ISendOptions, 'transfer'>
   ): Promise<void> {
@@ -278,7 +371,7 @@ export class RpcOutboundSender {
     /** The selected private/public frame pair must have actual first-party whole-accept facts. */
     const framer = this.#objectPort?.framer ?? this.components.framer
     /** No opaque callable is invoked merely to guess whether it fragments. */
-    const facts = readRpcSingleFrameFacts(framer.accept, framer.frame)
+    const facts = this.#singleFrameLimits
     if (!facts)
       throw new RpcError(
         RpcCoreErrorCode.capabilityUnsupported,
@@ -290,116 +383,181 @@ export class RpcOutboundSender {
     /** This whole byte bound already includes the original channel framing overhead. */
     const limit = Math.min(RpcBatchPhysical.maxBytes, this.#physicalLimit, facts.maxMessageBytes)
     /** The original gate owns physical FIFO/capacity; this branch never enters batch/chunk queues. */
-    const write = async (): Promise<void> => {
-      this.#lifecycle?.assertActive(generation)
-      admission?.assertCanSend()
-      /** Codec descriptors encode data; this independent normalized union is never a legacy wrapper. */
-      let encoded: unknown
-      /**
-       * Native metadata retains these exact original buffers through protection and physical
-       * commit.
-       */
-      let sidecars: readonly ArrayBuffer[] = []
-      /**
-       * Unique full backing bytes are charged in addition to metadata and selector/framing
-       * overhead.
-       */
-      let backingBytes = 0
-      try {
-        const prepared =
-          binary || transferRequested
-            ? await prepareRpcBinary(
-                envelope,
-                native ? RpcBinaryStorage.native : RpcBinaryStorage.inline,
-                limit,
-                digest,
-                (manifest, bytes) => {
-                  const metadata = (this.#objectPort?.codec ?? this.components.codec).encode(
-                    manifest as unknown as IRpcEnvelope
-                  )
-                  if (
-                    measureRpcNativeBinaryFrame(metadata, manifest.backings.length, bytes) > limit
-                  )
-                    rejectRpcPhysicalFrameSize()
-                }
-              )
-            : undefined
-        if (prepared) {
-          sidecars = prepared.sidecars
-          backingBytes = prepared.backingBytes
-          if (transfer?.some((backing) => !sidecars.includes(backing as ArrayBuffer)))
-            throw new RpcSerializationError(RpcCoreErrorText.invalidTransferList)
-        }
-        encoded = (this.#objectPort?.codec ?? this.components.codec).encode(
-          (prepared?.manifest ?? envelope) as unknown as IRpcEnvelope
-        )
-        if (!this.#objectPort) this.assertProtocolEncodedType(encoded)
-      } catch (cause) {
-        throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
+    /** The same sender owns every captured fact; no replacement gate or queue is introduced. */
+    const record: IRuntimeWriteRecord = {
+      envelope,
+      binary,
+      transferRequested,
+      transfer,
+      native,
+      digest,
+      framer,
+      generation,
+      limit,
+      admission,
+      onStarted,
+      onPrepared
+    }
+    return this.#gate
+      ? this.#gate.run(envelope, () => this.#writeRuntime(record), admission)
+      : this.#writeRuntime(record)
+  }
+
+  /** Stable sender preparation yields only for actual binary, crypto, sealing or physical work. */
+  async #writeRuntime(record: IRuntimeWriteRecord): Promise<void> {
+    const {
+      envelope,
+      binary,
+      transferRequested,
+      transfer,
+      native,
+      digest,
+      framer,
+      generation,
+      limit,
+      admission,
+      onPrepared
+    } = record
+
+    this.#lifecycle?.assertActive(generation)
+    admission?.assertCanSend()
+    /** Codec descriptors encode data; this independent normalized union is never a legacy wrapper. */
+    let encoded: unknown
+    /** Native metadata retains these exact original buffers through protection and physical commit. */
+    let sidecars: readonly ArrayBuffer[] = []
+    /** Unique full backing bytes are charged in addition to metadata and selector/framing overhead. */
+    let backingBytes = 0
+    /** Only the actual canonical string encoding retains a bound for its returned text. */
+    let encodedByteUpperBound: number | undefined
+    try {
+      /** Only the exact canonical string codec consumes an owned JSON view; custom codecs stay full. */
+      const ownedJson =
+        hasFastComponents(this.components) && this.components.codec.encodedType === 'string'
+      /** Worker keeps the original object; its exact canonical identity function needs no copy. */
+      const ownedIdentity =
+        hasFastComponents(this.components) &&
+        this.#objectPort === undefined &&
+        this.components.codec.encode === identityCodecV1.encode
+      const prepared =
+        binary || transferRequested
+          ? await prepareRpcBinary(
+              envelope,
+              native ? RpcBinaryStorage.native : RpcBinaryStorage.inline,
+              limit,
+              digest,
+              (manifest, bytes) => {
+                /** Owned metadata geometry is captured before any hash; no dummy codec pass. */
+                const bound = ownedNativeBinaryByteUpperBound(
+                  manifest,
+                  manifest.backings.length,
+                  bytes
+                )
+                if (bound !== undefined && bound <= limit) return
+                /** An inconclusive bound preserves the original codec/exact-size/error path. */
+                const metadata = (this.#objectPort?.codec ?? this.components.codec).encode(
+                  manifest as unknown as IRpcEnvelope
+                )
+                if (measureRpcNativeBinaryFrame(metadata, manifest.backings.length, bytes) > limit)
+                  rejectRpcPhysicalFrameSize()
+              },
+              hasFastComponents(this.components)
+                ? {
+                    encodeInline: readFastInlineEncoder(this.components),
+                    capture: prepareOwnedBinaryJsonSnapshot
+                  }
+                : undefined
+            )
+          : undefined
+      if (prepared) {
+        sidecars = prepared.sidecars
+        backingBytes = prepared.backingBytes
+        if (transfer?.some((backing) => !sidecars.includes(backing as ArrayBuffer)))
+          throw new RpcSerializationError(RpcCoreErrorText.invalidTransferList)
       }
+      /**
+       * Ordinary large values get one owned JSON walk; binary preparation already retained its
+       * view.
+       */
+      const selected = prepared?.manifest ?? envelope
+      if ((ownedJson || ownedIdentity) && !prepared) prepareOwnedJsonSnapshot(selected)
+      encoded = (this.#objectPort?.codec ?? this.components.codec).encode(
+        selected as unknown as IRpcEnvelope
+      )
+      if (ownedJson || (hasFastComponents(this.components) && encoded === selected))
+        encodedByteUpperBound = readOwnedJsonSnapshot(selected)?.byteUpperBound
+      if (!this.#objectPort) this.assertProtocolEncodedType(encoded)
+    } catch (cause) {
+      throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
+    }
+    /** Known string encodings reuse their preparation bound without a second character scan. */
+    if (!(encodedByteUpperBound !== undefined && encodedByteUpperBound <= limit))
       assertRpcPhysicalFrameSize(encoded, limit)
-      /** Native framing runs once; multiple fragments are refused before protection or host send. */
-      const frames = framer.frame(encoded, { source: this.id, messageId: envelope.id })
-      if (frames.length !== 1)
-        throw new RpcError(
-          RpcCoreErrorCode.capabilityUnsupported,
-          RpcCoreErrorText.capabilityUnsupported
-        )
-      /** Receiver freshness is selected by the same original auth context owner for either profile. */
-      const context = { ...this.#authenticationContext }
-      bindAuthenticationOutboundFrame(
-        context,
-        undefined,
-        this.#receiverId,
-        undefined,
-        envelope.route
+    /** Native framing runs once; multiple fragments are refused before protection or host send. */
+    const frames = framer.frame(encoded, { source: this.id, messageId: envelope.id })
+    if (frames.length !== 1)
+      throw new RpcError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        RpcCoreErrorText.capabilityUnsupported
       )
-      /** Complete protection and selector construction precede the sole physical write. */
-      const protectedValue = await this.#prepareTransportValue(
-        frames[0],
-        undefined,
-        false,
-        generation,
-        context
+    /** Receiver freshness is selected by the same original auth context owner for either profile. */
+    const context = { ...this.#authenticationContext }
+    bindAuthenticationOutboundFrame(context, undefined, this.#receiverId, undefined, envelope.route)
+    /** Complete protection and selector construction precede the sole physical write. */
+    const protectedValue = this.authentication
+      ? await this.#prepareTransportValue(frames[0], undefined, false, generation, context)
+      : this.#unprotectedTransportValue(frames[0], generation)
+    /** Selector overhead is charged after auth, without splitting or re-signing this frame. */
+    if (
+      native &&
+      (!protectedValue ||
+        typeof protectedValue !== 'object' ||
+        Array.isArray(protectedValue) ||
+        isUint8Array(protectedValue) ||
+        ![Object.prototype, null].includes(Object.getPrototypeOf(protectedValue)))
+    )
+      throw new RpcError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        RpcCoreErrorText.capabilityUnsupported
       )
-      /** Selector overhead is charged after auth, without splitting or re-signing this frame. */
-      if (
-        native &&
-        (!protectedValue ||
-          typeof protectedValue !== 'object' ||
-          Array.isArray(protectedValue) ||
-          isUint8Array(protectedValue) ||
-          ![Object.prototype, null].includes(Object.getPrototypeOf(protectedValue)))
-      )
-        throw new RpcError(
-          RpcCoreErrorCode.capabilityUnsupported,
-          RpcCoreErrorText.capabilityUnsupported
-        )
-      const carrier = wrapRuntimeCarrier(
-        native
-          ? { kind: RpcNativeBinaryKind, protectedMetadata: protectedValue, sidecars }
-          : protectedValue
-      )
+    const carrier = wrapRuntimeCarrier(
+      native
+        ? { kind: RpcNativeBinaryKind, protectedMetadata: protectedValue, sidecars }
+        : protectedValue
+    )
+    /** Real post-protection string/byte lengths are safe bounds without inspecting payload text. */
+    const finalBound = native
+      ? this.authentication
+        ? undefined
+        : ownedNativeBinaryByteUpperBound(protectedValue, sidecars.length, backingBytes)
+      : typeof carrier === 'string'
+        ? carrier.length * 3
+        : isUint8Array(carrier)
+          ? carrier.byteLength
+          : !this.authentication &&
+              protectedValue === encoded &&
+              encodedByteUpperBound !== undefined
+            ? runtimeObjectJsonOverhead + encodedByteUpperBound
+            : undefined
+    if (finalBound === undefined || finalBound > limit) {
+      /** Custom signer objects and inconclusive bounds retain complete original physical sizing. */
       if (
         (native
           ? measureRpcNativeBinaryFrame(protectedValue, sidecars.length, backingBytes)
           : measureRpcPhysicalFrame(carrier)) > limit
       )
         rejectRpcPhysicalFrameSize()
-      /** The original result owner can seal only this fully valid frame, before physical commit. */
-      await onPrepared?.()
-      return this.#sendPreparedTransport(
-        carrier,
-        transfer,
-        generation,
-        () => {
-          admission?.assertCanSend()
-          onStarted?.()
-        },
-        true
-      )
     }
-    return this.#gate ? this.#gate.run(envelope, write, admission) : write()
+    /** The original result owner can seal only this fully valid frame, before physical commit. */
+    if (onPrepared) await onPrepared()
+    return this.#writePreparedTransport({
+      value: carrier,
+      transfer,
+      generation,
+      beforeSend: undefined,
+      immediate: true,
+      admissionFailure: undefined,
+      runtimeStart: record
+    })
   }
 
   /**
@@ -626,13 +784,24 @@ export class RpcOutboundSender {
         value = frames[0]
       }
       /** Singleton proofs skip byte scans; exact sizing retains this queue's original error policy. */
-      const bound = entries.length === 1 ? outboundJsonByteUpperBound(value) : undefined
-      if (
-        (bound === undefined || bound > this.#physicalLimit) &&
-        measureRpcPhysicalFrame(value) > this.#physicalLimit
-      )
-        return this.#splitBatch(entries)
-      return [{ entries, value }]
+      let bound =
+        typeof value === 'string'
+          ? value.length * 3
+          : entries.length === 1
+            ? outboundJsonByteUpperBound(value)
+            : this.#fast &&
+                !this.#objectPort &&
+                this.components.codec === identityCodecV1 &&
+                value === physical
+              ? ownedBatchByteUpperBound(entries)
+              : undefined
+      if (bound === undefined || bound > this.#physicalLimit) {
+        /** Inconclusive/custom values keep the original exact sizing and split decision. */
+        const measured = measureRpcPhysicalFrame(value)
+        if (measured > this.#physicalLimit) return this.#splitBatch(entries)
+        if (typeof value === 'string') bound = measured
+      }
+      return [{ entries, value, ...(typeof value === 'string' ? { byteUpperBound: bound } : {}) }]
     } catch (cause) {
       /** Existing native contract/authentication errors retain their original instances and causes. */
       const error =
@@ -689,7 +858,17 @@ export class RpcOutboundSender {
               this.#writeBatch([...this.#prepareBatch(current), ...frames.slice(index + 1)], drain)
               return
             }
-            if (measureRpcPhysicalFrame(value) > this.#physicalLimit) {
+            /** Opaque object signers retain exact sizing; strings have no mutable business graph. */
+            const bound =
+              typeof value === 'string'
+                ? value === frame.value
+                  ? frame.byteUpperBound
+                  : value.length * 3
+                : undefined
+            if (
+              (bound === undefined || bound > this.#physicalLimit) &&
+              measureRpcPhysicalFrame(value) > this.#physicalLimit
+            ) {
               this.#writeBatch([...this.#splitBatch(current), ...frames.slice(index + 1)], drain)
               return
             }
@@ -1015,6 +1194,18 @@ export class RpcOutboundSender {
     }
   }
 
+  /** An absent protection resource needs only the original category and generation checks. */
+  #unprotectedTransportValue(value: unknown, generation?: number): unknown {
+    try {
+      this.#lifecycle?.assertActive(generation)
+      if (!this.#objectPort) this.assertTransportEncodedType(value)
+      return value
+    } catch (cause) {
+      if (cause instanceof RpcLifecycleError) throw cause
+      throw new RpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
+    }
+  }
+
   /** Normalizes synchronous and asynchronous transport failures without changing send ordering. */
   #prepareTransportValue(
     value: unknown,
@@ -1030,14 +1221,7 @@ export class RpcOutboundSender {
     const authentication = this.authentication
     if (!authentication)
       return Promise.resolve().then(() => {
-        try {
-          this.#lifecycle?.assertActive(generation)
-          if (!this.#objectPort) this.assertTransportEncodedType(value)
-          return value
-        } catch (cause) {
-          if (cause instanceof RpcLifecycleError) throw cause
-          throw new RpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
-        }
+        return this.#unprotectedTransportValue(value, generation)
       })
 
     return Promise.resolve()
@@ -1070,7 +1254,7 @@ export class RpcOutboundSender {
       })
   }
 
-  /** Sends a fully prepared value while preserving the transport method receiver. */
+  /** Capture one physical write for a stable continuation in this existing sender owner. */
   #sendPreparedTransport(
     value: unknown,
     transfer: readonly unknown[] | undefined,
@@ -1078,39 +1262,45 @@ export class RpcOutboundSender {
     beforeSend?: () => void,
     immediate = false
   ): Promise<void> {
-    let admissionFailure: unknown
-    /** Batch FIFO is the synchronous invocation sequence, never chained physical completions. */
-    const write = () => {
-      this.#lifecycle?.assertActive(generation)
+    return this.#writePreparedTransport({
+      value,
+      transfer,
+      generation,
+      beforeSend,
+      immediate,
+      admissionFailure: undefined
+    })
+  }
+
+  /** Only a real write or the original deferred invocation suspends this stable owner method. */
+  async #writePreparedTransport(record: IPhysicalWriteRecord): Promise<void> {
+    /** Non-immediate callers retain their original deferred host invocation. */
+    if (!record.immediate) await undefined
+    try {
+      this.#lifecycle?.assertActive(record.generation)
       try {
-        beforeSend?.()
+        if (record.runtimeStart) {
+          record.runtimeStart.admission?.assertCanSend()
+          const start = record.runtimeStart.onStarted
+          if (typeof start === 'function') start()
+          else start?.started()
+        } else record.beforeSend?.()
       } catch (error) {
-        admissionFailure = error
+        record.admissionFailure = error
         throw error
       }
-      return this.#objectPort
-        ? this.#objectPort.send(value, { transfer })
-        : this.transport.send(value, { transfer })
+      /** The actual transport method keeps its receiver and remains adjacent to admission/start. */
+      await (this.#objectPort
+        ? this.#objectPort.send(record.value, { transfer: record.transfer })
+        : this.transport.send(record.value, { transfer: record.transfer }))
+      /** A late physical completion cannot commit across the captured endpoint generation. */
+      this.#lifecycle?.assertActive(record.generation)
+    } catch (cause) {
+      if (cause === record.admissionFailure && (record.beforeSend || record.runtimeStart))
+        throw cause
+      if (cause instanceof RpcAuthenticationError) throw cause
+      if (cause instanceof RpcLifecycleError) throw cause
+      throw new RpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
     }
-    /** Synchronous host exceptions still use the same asynchronous boundary classification. */
-    let result: void | Promise<void>
-    if (immediate) {
-      try {
-        result = write()
-      } catch (error) {
-        result = Promise.reject(error)
-      }
-    } else result = Promise.resolve().then(write)
-    return Promise.resolve(result)
-      .then(() => {
-        this.#lifecycle?.assertActive(generation)
-      })
-      .then(() => undefined)
-      .catch((cause) => {
-        if (cause === admissionFailure && beforeSend) throw cause
-        if (cause instanceof RpcAuthenticationError) throw cause
-        if (cause instanceof RpcLifecycleError) throw cause
-        throw new RpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
-      })
   }
 }

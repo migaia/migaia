@@ -3,11 +3,17 @@ import { it } from 'vitest'
 import { identityCodecV1 } from '@migaia/serialize/codec'
 import { rpcProtocolV1 } from '../../src/contract/index.js'
 import { messageFramerV1 } from '../../src/contract/framing/message-framer.js'
+import { bindRpcFrameIngress } from '../../src/contract/framing/index.js'
 import { measureRpcPhysicalFrame } from '../../src/contract/batch-frame.js'
 import {
   createOutboundEnvelope,
-  outboundJsonByteUpperBound
+  outboundJsonByteUpperBound,
+  createRuntimeOutboundEnvelope
 } from '../../src/core/internal/outbound-envelope.js'
+import vectors from '../../schema/vectors/runtime-api.json'
+import { proveFastComponents } from '../../src/core/internal/fast-path.js'
+import { readOwnedJsonSnapshot } from '../../src/core/internal/outbound-owned-codec.js'
+import { RUNTIME_API_CAPABILITIES } from '../../src/remote/runtime-api/constants.js'
 import { RpcSerializationError } from '../../src/core/errors.js'
 import { RpcOutboundSender } from '../../src/core/internal/outbound-sender.js'
 import type { IRpcSelectedComponents } from '../../src/core/internal/endpoint-options.js'
@@ -29,6 +35,64 @@ function sizeRequest(payload: unknown) {
         sentAt: 0
       },
       payload
+    }
+  })
+}
+
+for (const size of [64 * 1024, 1024 * 1024]) {
+  it(`[A61][A21] Worker ${size} runtime data reuses one owned bound and preserves frame identity`, async () => {
+    /** The real runtime union receives the same canonical first-user portable admission. */
+    const message = createRuntimeOutboundEnvelope({
+      ...vectors.valid[0],
+      payload: { z: 'x'.repeat(size), a: { text: '汉字\ud83d', value: -0 } }
+    })
+    /** These exact first-party descriptors select the production identity/frame path. */
+    const components: IRpcSelectedComponents = {
+      protocol: rpcProtocolV1,
+      codec: identityCodecV1 as IRpcSelectedComponents['codec'],
+      framer: messageFramerV1,
+      ingressPrepare: bindRpcFrameIngress(messageFramerV1.accept, messageFramerV1.frame),
+      shadowed: []
+    }
+    proveFastComponents(components, rpcProtocolV1, identityCodecV1, messageFramerV1)
+    /** The existing sender owns physical admission; this sink observes its exact delivered object. */
+    const frames: unknown[] = []
+    const sender = new RpcOutboundSender(
+      {
+        platform: 'Memory',
+        send: (value) => {
+          frames.push(value)
+        }
+      },
+      'a',
+      components
+    )
+    /**
+     * Count actual object serialization, with a same-value positive control before the business
+     * call.
+     */
+    const descriptor = Object.getOwnPropertyDescriptor(JSON, 'stringify')!
+    let serializations = 0
+    Object.defineProperty(JSON, 'stringify', {
+      ...descriptor,
+      value: (...args: unknown[]) => {
+        serializations++
+        return Reflect.apply(descriptor.value, JSON, args)
+      }
+    })
+    try {
+      assert.ok(measureRpcPhysicalFrame(message) > size)
+      assert.equal(serializations, 1)
+      serializations = 0
+      await sender.sendRuntime(message, RUNTIME_API_CAPABILITIES)
+      assert.equal(serializations, 0, '[A61] both runtime size gates reuse owned facts')
+      assert.equal(frames.length, 1)
+      assert.equal((frames[0] as { frame: unknown }).frame, message)
+      assert.ok(readOwnedJsonSnapshot(message))
+      assert.ok('payload' in message)
+      assert.equal(Object.is((message.payload as { a: { value: number } }).a.value, -0), true)
+    } finally {
+      Object.defineProperty(JSON, 'stringify', descriptor)
     }
   })
 }

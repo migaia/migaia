@@ -1,8 +1,13 @@
 import { RpcCoreErrorText } from '../error-text.js'
+
 /** Owns all discovery, DNS, pinning and manual-candidate state for one endpoint. */
 export class DiscoveryRegistry {
   readonly #localTargets = new Map<unknown, unknown>()
   readonly #remoteTargets = new Map<string, unknown>()
+  /** Target groups are a derived view of the same committed snapshot identities and order. */
+  readonly #remoteTargetsByTarget = new Map<string, Map<string, unknown>>()
+  /** Existing opaque keys retain target membership without reading snapshot getters at commit. */
+  readonly #remoteTargetIds = new Map<string, string>()
   readonly #remoteBindings = new Map<string, string>()
   readonly #pinnedReceivers = new Map<unknown, string>()
   readonly #lostPinnedReceivers = new Set<unknown>()
@@ -64,22 +69,32 @@ export class DiscoveryRegistry {
   }
 
   /** Commits one remote receiver snapshot. */
-  setRemote(key: string, value: unknown, maxEntries = 4096): boolean {
+  setRemote(key: string, value: unknown, maxEntries = 4096, targetId?: string): boolean {
     if (!this.#remoteTargets.has(key) && this.#remoteTargets.size >= maxEntries) return false
     this.#remoteTargets.set(key, value)
+    this.#indexRemote(key, value, targetId ?? this.#remoteTargetIds.get(key))
     return true
   }
 
   /** Atomically commits a remote snapshot together with its verified identity lease. */
-  setRemoteWithBinding(key: string, value: unknown, token: string, maxEntries = 4096): boolean {
+  setRemoteWithBinding(
+    key: string,
+    value: unknown,
+    token: string,
+    maxEntries = 4096,
+    targetId?: string
+  ): boolean {
     if (!this.#remoteTargets.has(key) && this.#remoteTargets.size >= maxEntries) return false
     const hadTarget = this.#remoteTargets.has(key)
     const previousTarget = this.#remoteTargets.get(key)
     const previous = this.#remoteBindings.get(key)
+    /** Failed original Map commits restore the exact previous routing membership as well. */
+    const previousTargetId = this.#remoteTargetIds.get(key)
     if (previous !== token && this.#retainBinding && !this.#retainBinding(token)) return false
     try {
       this.#remoteTargets.set(key, value)
       this.#remoteBindings.set(key, token)
+      this.#indexRemote(key, value, targetId ?? previousTargetId)
     } catch (error) {
       if (!hadTarget) {
         this.#remoteTargets.delete(key)
@@ -89,6 +104,7 @@ export class DiscoveryRegistry {
         if (previous === undefined) this.#remoteBindings.delete(key)
         else this.#remoteBindings.set(key, previous)
       }
+      this.#indexRemote(key, previousTarget, hadTarget ? previousTargetId : undefined)
       if (previous !== token) this.#releaseBinding?.(token)
       throw error
     }
@@ -104,6 +120,48 @@ export class DiscoveryRegistry {
   /** Reads the verified source token owned by one remote snapshot. */
   getRemoteBinding(key: string): string | undefined {
     return this.#remoteBindings.get(key)
+  }
+
+  /** Select from this target only, retaining original insertion order and the owner's predicate. */
+  firstActiveRemote<T>(
+    targetId: string,
+    matches: (value: T, receiverId: string | undefined) => boolean,
+    receiverId?: string
+  ): T | undefined {
+    /** No public snapshot or per-request filter closure is created by the established lookup. */
+    const entries = this.#remoteTargetsByTarget.get(targetId)
+    if (!entries) return undefined
+    for (const value of entries.values()) if (matches(value as T, receiverId)) return value as T
+    return undefined
+  }
+
+  /** Update only the derived routing view; binding admission and authority remain in their owner. */
+  #indexRemote(key: string, value: unknown, targetId: string | undefined): void {
+    /** A moved or removed key must disappear from its previous target's insertion sequence. */
+    const previousTargetId = this.#remoteTargetIds.get(key)
+    if (previousTargetId !== undefined && previousTargetId !== targetId) {
+      /** Empty target groups carry no retained snapshot or owner state. */
+      const previous = this.#remoteTargetsByTarget.get(previousTargetId)!
+      previous.delete(key)
+      if (previous.size === 0) this.#remoteTargetsByTarget.delete(previousTargetId)
+      this.#remoteTargetIds.delete(key)
+    }
+    if (targetId === undefined) return
+    /** Refreshing an existing key preserves Map insertion order and exact snapshot identity. */
+    let entries = this.#remoteTargetsByTarget.get(targetId)
+    if (!entries) {
+      entries = new Map()
+      this.#remoteTargetsByTarget.set(targetId, entries)
+    }
+    entries.set(key, value)
+    this.#remoteTargetIds.set(key, targetId)
+    if (previousTargetId !== undefined && previousTargetId !== targetId) {
+      /** Moving a preexisting opaque key keeps its original position in the canonical global Map. */
+      const ordered = new Map<string, unknown>()
+      for (const [entryKey, entryValue] of this.#remoteTargets)
+        if (this.#remoteTargetIds.get(entryKey) === targetId) ordered.set(entryKey, entryValue)
+      this.#remoteTargetsByTarget.set(targetId, ordered)
+    }
   }
 
   /** Returns an immutable snapshot of remote receiver entries. */
@@ -137,7 +195,10 @@ export class DiscoveryRegistry {
     const value = this.#remoteTargets.get(key)
     if (value !== undefined) this.#releaseRemote?.(value)
     this.#releaseRemoteBinding(key)
-    return this.#remoteTargets.delete(key)
+    /** External cleanup runs before removal exactly as it did without a derived index. */
+    const removed = this.#remoteTargets.delete(key)
+    this.#indexRemote(key, undefined, undefined)
+    return removed
   }
 
   /** Commits one automatic discovery waiter. */
@@ -567,6 +628,8 @@ export class DiscoveryRegistry {
     const clearState = (): void => {
       this.#localTargets.clear()
       this.#remoteTargets.clear()
+      this.#remoteTargetsByTarget.clear()
+      this.#remoteTargetIds.clear()
       this.#remoteBindings.clear()
       this.#pinnedReceivers.clear()
       this.#lostPinnedReceivers.clear()

@@ -8,3 +8,10 @@ export {
   type IRpcNativeFrameOutputDomain,
   type IRpcReassembler
 } from './reassembler.js'
+
+export {
+  assertRpcPhysicalFrameSize,
+  measureRpcPhysicalFrame,
+  readRpcBatchMembers,
+  rejectRpcPhysicalFrameSize
+} from '../batch-frame.js'

@@ -3,6 +3,17 @@ import { workerData } from 'node:worker_threads'
 
 /** The original launcher nests business data inside its validated bootstrap envelope. */
 const data = readThreadBootstrap(workerData).data ?? {}
+/** Only requested catalog cases add inert methods, preserving other fixture callers. */
+const paddingMethods = Object.fromEntries(
+  Array.from({ length: Math.max(0, (data.catalogSize ?? 1) - 1) }, (_, index) => [
+    'unused' + index,
+    () => index
+  ])
+)
+/** Advanced declarations publish exactly the same padding entries as their real provider. */
+const paddingDeclarations = Object.fromEntries(
+  Object.keys(paddingMethods).map((name) => [name, { mode: 'request', idempotent: false }])
+)
 /** Native automatic bootstrap supplies this generation's actual identity and parent route. */
 let prepared
 prepared = createThreadPeer({
@@ -28,7 +39,11 @@ prepared = createThreadPeer({
           contract: {
             schemaVersion: 1,
             plugin: 'service',
-            features: { data: { methods: { read: { mode: 'request', idempotent: true } } } }
+            features: {
+              data: {
+                methods: { read: { mode: 'request', idempotent: true }, ...paddingDeclarations }
+              }
+            }
           }
         }
       : {}),
@@ -68,6 +83,7 @@ prepared = createThreadPeer({
     },
     service: {
       data: {
+        ...paddingMethods,
         tell: async (value) => {
           const peer = await prepared
           await peer.request(value === 'hold' ? 'parent.started' : 'parent.fresh')
@@ -84,7 +100,11 @@ prepared = createThreadPeer({
             const peer = await prepared
             await peer.request('parent.echo')
           }
-          if (data.crash && data.sequence === 1 && value === 'retry') {
+          if (
+            data.crash &&
+            data.sequence === 1 &&
+            (value === 'retry' || value?.marker === 'r14-retry')
+          ) {
             const peer = await prepared
             await peer.request('parent.started')
             process.exit(7)

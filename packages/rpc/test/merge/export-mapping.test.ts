@@ -7,6 +7,7 @@ import errorFormatDelta from '../fixtures/error-format-export-delta.json'
 import controlSemanticsDelta from '../fixtures/control-semantics-export-delta.json'
 import streamingDelta from '../fixtures/streaming-export-delta.json'
 import jsonrpcBridgeDelta from '../fixtures/jsonrpc-bridge-export-delta.json'
+import coreRefactorDelta from '../fixtures/core-refactor-export-delta.json'
 
 /** Package root whose manifest and built files define the new public surface. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
@@ -54,13 +55,14 @@ describe('A1 merged public exports', () => {
       '@migaia/rpc/process/adapters/electron-utility-process',
       '@migaia/rpc/process/adapters/windows-job',
       '@migaia/rpc/contract/framing/stream',
+      ...coreRefactorDelta.manifestAdditions,
       ...Object.keys(jsonrpcBridgeDelta.added),
       '@migaia/rpc/threads',
       ...['node', 'deno', 'bun', 'electron-main', 'electron-renderer', 'browser'].map(
         (name) => `@migaia/rpc/threads/adapters/${name}`
       )
     ].sort()
-    expect(expected).toHaveLength(49)
+    expect(expected).toHaveLength(52)
     expect(Object.keys(manifest.exports).sort()).toEqual(
       expected.map((name) => `.${name.slice('@migaia/rpc'.length)}`).sort()
     )
@@ -82,23 +84,26 @@ describe('A1 merged public exports', () => {
         name
       ).toEqual(
         [
-          ...(name.startsWith('@migaia/rpc/core')
-            ? baseline.names.map(layeredName)
-            : baseline.names
-          ).filter(
-            (item) =>
-              !((errorFormatDelta.removed as Record<string, string[]>)[name] ?? []).includes(
-                item
-              ) &&
-              !((controlSemanticsDelta.removed as Record<string, string[]>)[name] ?? []).includes(
-                item
-              )
-          ),
-          ...((errorFormatDelta.added as Record<string, string[]>)[name] ?? []),
-          ...((controlSemanticsDelta.added as Record<string, string[]>)[name] ?? []),
-          ...((streamingDelta.added as Record<string, string[]>)[name] ?? []),
-          ...(name === '@migaia/rpc/core' ? ['RpcProviderRejectionReason'] : []),
-          ...(name === '@migaia/rpc/contract' ? ['RpcBatchPhysical'] : [])
+          ...new Set([
+            ...(name.startsWith('@migaia/rpc/core')
+              ? baseline.names.map(layeredName)
+              : baseline.names
+            ).filter(
+              (item) =>
+                !((errorFormatDelta.removed as Record<string, string[]>)[name] ?? []).includes(
+                  item
+                ) &&
+                !((controlSemanticsDelta.removed as Record<string, string[]>)[name] ?? []).includes(
+                  item
+                )
+            ),
+            ...((errorFormatDelta.added as Record<string, string[]>)[name] ?? []),
+            ...((controlSemanticsDelta.added as Record<string, string[]>)[name] ?? []),
+            ...((streamingDelta.added as Record<string, string[]>)[name] ?? []),
+            ...(name === '@migaia/rpc/core' ? ['RpcProviderRejectionReason'] : []),
+            ...(name === '@migaia/rpc/contract' ? ['RpcBatchPhysical'] : []),
+            ...((coreRefactorDelta.added as Record<string, string[]>)[name] ?? [])
+          ])
         ].sort()
       )
       // A leaf export maps to its own source path; index entries map to directory roots.
@@ -121,27 +126,49 @@ describe('A1 merged public exports', () => {
       Object.keys(await import(pathToFileURL(join(packageRoot, remote.default)).href)).sort()
     ).toEqual(
       [
-        'RemoteMethodMode',
-        'REMOTE_NAME_PATTERN',
-        'REMOTE_METHOD_MAX_LENGTH',
-        'REMOTE_SCHEMA_VERSION',
-        'REMOTE_METHOD_MODES',
-        'RemoteMethodName',
-        'RpcRemoteLayerErrorCode',
-        'RpcRemoteLayerErrorText',
-        'normalizeRemoteContract',
-        'normalizeRemoteHostCatalog',
-        'normalizeRemoteControlShape',
-        'sameRemoteContract',
-        'createRemotePlugin',
-        'createRemoteRetryPort',
-        'serveRemotePlugin',
-        'createRemoteHost',
-        'serveRemoteHost',
-        'createCoroutinePlugin',
-        'createCoroutineHost'
+        ...new Set([
+          'RemoteMethodMode',
+          'REMOTE_NAME_PATTERN',
+          'REMOTE_METHOD_MAX_LENGTH',
+          'REMOTE_SCHEMA_VERSION',
+          'REMOTE_METHOD_MODES',
+          'RemoteMethodName',
+          'RuntimePluginKey',
+          'RpcRemoteLayerErrorCode',
+          'RpcRemoteLayerErrorText',
+          'normalizeRemoteContract',
+          'normalizeRemoteHostCatalog',
+          'normalizeRemoteControlShape',
+          'sameRemoteContract',
+          'createRemotePlugin',
+          'createRemoteRetryPort',
+          'serveRemotePlugin',
+          'createRemoteHost',
+          'serveRemoteHost',
+          'createCoroutinePlugin',
+          'createCoroutineHost',
+          ...coreRefactorDelta.added['@migaia/rpc/remote']
+        ])
       ].sort()
     )
+    /** New SPI entries have exact frozen namespaces, with no private preparation exports. */
+    for (const name of coreRefactorDelta.manifestAdditions) {
+      const entry = manifest.exports[`.${name.slice('@migaia/rpc'.length)}`]!
+      expect(existsSync(join(packageRoot, entry.types)), name).toBe(true)
+      expect(
+        Object.keys(await import(pathToFileURL(join(packageRoot, entry.default)).href)).sort(),
+        name
+      ).toEqual((coreRefactorDelta.added as Record<string, string[]>)[name]!.sort())
+    }
+    /** C3 exposes only scalar metadata from the existing owner, without its family tokens. */
+    const remoteNamespace = await import(pathToFileURL(join(packageRoot, remote.default)).href)
+    /** Canonical identity prevents a copied table or wrapper from becoming another vocabulary owner. */
+    const runtimeConstants = await import(
+      pathToFileURL(join(packageRoot, 'dist/remote/runtime-api/constants.js')).href
+    )
+    expect(remoteNamespace.RuntimePluginKey).toBe(runtimeConstants.RuntimePluginKey)
+    expect(remoteNamespace.RuntimePluginKey).toEqual({ process: 'process', thread: 'thread' })
+    expect(remoteNamespace).not.toHaveProperty('RuntimePluginFamily')
     for (const [name, names] of Object.entries(jsonrpcBridgeDelta.added)) {
       const entry = manifest.exports[`.${name.slice('@migaia/rpc'.length)}`]
       expect(entry).toEqual({

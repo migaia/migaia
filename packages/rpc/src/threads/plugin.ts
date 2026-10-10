@@ -1,15 +1,18 @@
-import type {
-  IRuntimePluginTyping,
-  IRuntimeExpose,
-  IRuntimeRegistry
-} from '../remote/runtime-api/typing.js'
+import type { IRuntimePluginTyping, IRuntimeExpose, IRuntimeRegistry } from '../remote/index.js'
 import type { IThreadHandle } from '@migaia/supervision/threads'
-import { createRemotePlugin, type IRemotePluginDefinition } from '../remote/plugin.js'
+import { createRemotePlugin, type IRemotePluginDefinition } from '../remote/index.js'
 import { createThreadBinding } from './binding.js'
 import type { IThreadPluginOptions } from './types.js'
-import { createRuntimePlugin, type IRuntimePluginOptions } from '../remote/runtime-api/plugin.js'
+import { createRuntimePlugin, type IRuntimePluginOptions } from '../remote/index.js'
+import { RuntimePluginKey } from '../remote/index.js'
 import { createThreadPeer } from './peer.js'
 import type { IRuntimeThreadPeerOptions } from './runtime-peer.js'
+
+/** This physical owner alone retains the stable family token for its actual Host slot operation. */
+const threadRuntimeSlotFamily = Object.freeze({})
+
+/** Capture the canonical namespace once; descriptive resource fields cannot retarget this operation. */
+const threadRuntimeSlotKey = RuntimePluginKey.thread
 
 /** Symmetric Plugin options share the Peer source grammar and default to an empty Feature exposure. */
 export type IRuntimeThreadPluginOptions = IRuntimePluginOptions<IRuntimeThreadPeerOptions['spawn']>
@@ -21,10 +24,7 @@ export function createThreadPlugin<THandle extends IThreadHandle>(
 /** Install a symmetric connection into the original canonical thread slot. */
 export function createThreadPlugin<
   TRemote = Record<never, never>,
-  const TProvide extends import('../remote/runtime-api/catalog.js').IRuntimePeerProvide = Record<
-    never,
-    never
-  >,
+  const TProvide extends import('../remote/index.js').IRuntimePeerProvide = Record<never, never>,
   const TName extends string = string,
   const TExpose extends readonly string[] = readonly [],
   THost = unknown
@@ -45,7 +45,11 @@ export function createThreadPlugin<THandle extends IThreadHandle>(
   if (!('spec' in options))
     return createRuntimePlugin(
       options,
-      'thread',
+      {
+        key: threadRuntimeSlotKey,
+        acquire: (integration, create) =>
+          integration.acquireSharedSlot(threadRuntimeSlotKey, threadRuntimeSlotFamily, create)
+      },
       createThreadPeer as Parameters<typeof createRuntimePlugin>[2]
     )
   return createRemotePlugin({

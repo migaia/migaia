@@ -1,3 +1,4 @@
+import type { IRemoteChannelResources } from '../../src/remote/types.js'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { RpcCapability } from '../../src/contract/wire-constants.js'
@@ -12,7 +13,6 @@ import { abort } from '../../src/core/middleware/abort.js'
 import { timeout } from '../../src/core/middleware/timeout.js'
 import { hooks } from '../../src/core/middleware/hooks.js'
 import { ping } from '../../src/core/middleware/ping.js'
-import type { IRemoteChannel } from '../../src/remote/types.js'
 import type { IRpcEndpoint } from '../../src/core/typing.js'
 import { createRuntimePeer } from '../../src/remote/runtime-api/peer.js'
 import {
@@ -50,8 +50,8 @@ it('[A68][A69] a genuine response signing failure retains the completed keyed gr
       .update(JSON.stringify(value))
       .digest('hex')
   /** Select the original endpoint composition, including its real auth and result store owners. */
-  const factory = (id: string, provider: boolean) => async (channel: IRemoteChannel) => {
-    const endpoint = await createRuntimeApiEndpoint(
+  const factory = (id: string, provider: boolean) => async (channel: IRemoteChannelResources) => {
+    const endpoint = createRuntimeApiEndpoint(
       {
         id,
         scheduler: channel.scheduler,
@@ -81,9 +81,9 @@ it('[A68][A69] a genuine response signing failure retains the completed keyed gr
           })
         ]
       },
-      { supports: () => true },
-      true
+      channel
     )
+    await endpoint.ready
     return {
       endpoint: endpoint as unknown as IRpcEndpoint,
       oneWay: endpoint,

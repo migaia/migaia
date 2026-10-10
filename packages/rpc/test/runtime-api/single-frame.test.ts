@@ -8,7 +8,7 @@ import {
   readRuntimeCarrier
 } from '../../src/contract/runtime-api/index.js'
 import { messageFramerV1, createStringFramer } from '../../src/contract/framing/message-framer.js'
-import * as framing from '../../src/contract/framing/reassembler.js'
+import * as framing from '../../src/contract/framing/index.js'
 import type { IRpcRuntimeEnvelope } from '../../src/contract/runtime-api/types.js'
 import { RpcOutboundSender } from '../../src/core/internal/outbound-sender.js'
 import type { IRpcSelectedComponents } from '../../src/core/internal/endpoint-options.js'
@@ -165,9 +165,8 @@ it('[A64] complete carrier at 16 MiB or a tighter channel limit sends once; one 
 })
 
 it('[A59][A64] single-frame facts come from the actual paired native callables and once-read framing limits', () => {
-  const read = Reflect.get(framing, 'readRpcSingleFrameFacts')
   assert.equal(
-    typeof read,
+    typeof framing.bindRpcFrameIngress,
     'function',
     '[A59][A64] original framing owner supplies bounded whole-frame facts'
   )
@@ -181,20 +180,22 @@ it('[A59][A64] single-frame facts come from the actual paired native callables a
     }
   })
   assert.equal(reads, 1)
-  assert.deepEqual(read(native.accept, native.frame), {
+  assert.deepEqual(framing.bindRpcFrameIngress(native.accept, native.frame).singleFrameLimits, {
     maxConcurrentMessages: 3,
     maxMessageBytes: 32
   })
   assert.equal(reads, 1, '[A59] runtime selection never rereads user framing options')
   assert.equal(
-    read(() => ({ status: 'pending' }), native.frame),
+    framing.bindRpcFrameIngress(() => ({ status: 'pending' }), native.frame).singleFrameLimits,
     undefined
   )
   assert.equal(
-    read(native.accept, () => ['opaque']),
+    framing.bindRpcFrameIngress(native.accept, () => ['opaque']).singleFrameLimits,
     undefined
   )
-  assert.ok(read(messageFramerV1.accept, messageFramerV1.frame))
+  assert.ok(
+    framing.bindRpcFrameIngress(messageFramerV1.accept, messageFramerV1.frame).singleFrameLimits
+  )
 })
 
 it('[A64][A73] one complete group uses the original codec/protect/write once and missing capabilities send nothing', async () => {

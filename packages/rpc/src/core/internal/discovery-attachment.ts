@@ -609,22 +609,57 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
 
   /** Refreshes invalidated exact receivers without retargeting; otherwise selects an active peer. */
   async resolveReceiver(targetId: TTargetId, receiverId?: string): Promise<IOutboundReceiver> {
+    return this.selectReceiver(targetId, receiverId)
+  }
+
+  /** Package-owned selection yields only for the same original discovery or challenge operation. */
+  selectReceiver(
+    targetId: TTargetId,
+    receiverId?: string
+  ): IOutboundReceiver | Promise<IOutboundReceiver> {
     if (receiverId !== undefined) {
       if (readAuthenticationChallengePort(this.#authentication)?.needed(receiverId))
-        await this.#automaticDiscovery(targetId, false)
+        return this.#refreshReceiver(targetId, receiverId)
       return { receiverId }
     }
+    /** The pin snapshot remains fixed across a real miss, as in the original async selector. */
     const pinned = this.#registry.getPin(targetId)
-    let entries = this.#activeReceivers(targetId, pinned)
+    /** Only this target's saved status and original insertion order participate in selection. */
+    const selected = this.#registry.firstActiveRemote<IRpcServerMetadata<TTargetId>>(
+      targetId,
+      this.#matchesActiveReceiver,
+      pinned
+    )
     if (
-      entries.length === 0 ||
-      readAuthenticationChallengePort(this.#authentication)?.needed(entries[0]!.receiverId)
-    ) {
-      await this.#automaticDiscovery(targetId, false)
-      entries = this.#activeReceivers(targetId, pinned)
-    }
-    const selected = entries[0]
-    if (!selected) return { receiverId: String(targetId) }
+      selected === undefined ||
+      readAuthenticationChallengePort(this.#authentication)?.needed(selected.receiverId)
+    )
+      return this.#refreshReceiver(targetId, undefined, pinned)
+    return this.#selectedReceiver(selected)
+  }
+
+  /** A true miss uses the original query owner, then rereads the originally selected target/pin. */
+  async #refreshReceiver(
+    targetId: TTargetId,
+    receiverId?: string,
+    pinned?: string
+  ): Promise<IOutboundReceiver> {
+    await this.#automaticDiscovery(targetId, false)
+    if (receiverId !== undefined) return { receiverId }
+    /** The original post-await branch did not add another challenge or display-only stale check. */
+    const selected = this.#registry.firstActiveRemote<IRpcServerMetadata<TTargetId>>(
+      targetId,
+      this.#matchesActiveReceiver,
+      pinned
+    )
+    return selected ? this.#selectedReceiver(selected) : { receiverId: String(targetId) }
+  }
+
+  /**
+   * Routing data carries only the original registry-owned identity lease, never ID-derived
+   * authority.
+   */
+  #selectedReceiver(selected: IRpcServerMetadata<TTargetId>): IOutboundReceiver {
     return {
       receiverId: selected.receiverId,
       verifiedPeerKey: this.#registry.getRemoteBinding(
@@ -815,20 +850,12 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     }
   }
 
-  /** Reads active receivers while honoring a pinned receiver contract. */
-  #activeReceivers(
-    targetId: TTargetId,
+  /** Stable receiver-free predicate preserves saved active status and exact pin semantics. */
+  #matchesActiveReceiver(
+    value: IRpcServerMetadata<TTargetId>,
     pinned: string | undefined
-  ): readonly IRpcServerMetadata<TTargetId>[] {
-    return this.#registry
-      .remoteSnapshot<IRpcServerMetadata<TTargetId>>()
-      .map(([, value]) => value)
-      .filter(
-        (value) =>
-          value.targetId === targetId &&
-          value.status === 'active' &&
-          (pinned === undefined || value.receiverId === pinned)
-      )
+  ): boolean {
+    return value.status === 'active' && (pinned === undefined || value.receiverId === pinned)
   }
 
   /** Executes manual discovery against the same authenticated query path without exposing internals. */
@@ -1007,7 +1034,9 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
           pinned: previous?.pinned ?? false,
           status: 'active'
         },
-        candidateProof.verifiedPeerKey
+        candidateProof.verifiedPeerKey,
+        undefined,
+        candidate.targetId
       )
     )
       throw new RpcError(
@@ -1470,7 +1499,9 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
             this.#registry.getPin(resolvedTargetId as TTargetId) === receiverId,
           status: 'active'
         },
-        verifiedPeerKey
+        verifiedPeerKey,
+        undefined,
+        resolvedTargetId
       )
     ) {
       this.#emit({ name: 'connect.receiver-announcement.failure', code: 'DISCOVERY_LIMIT' })
@@ -1749,7 +1780,9 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         pinned: false,
         status: 'active'
       },
-      record.admission.token
+      record.admission.token,
+      undefined,
+      route.route.resolvedTargetId
     )
     const waiter = this.#registry.getWaiter<{ resolve: () => void }>(targetId)
     waiter?.resolve()

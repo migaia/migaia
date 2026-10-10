@@ -1,7 +1,11 @@
 import { RpcDiscoveryAttachment } from '../internal/discovery-attachment.js'
 import { RpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
-import { RpcPortName } from '../internal/plugin-shared-keys.js'
+import {
+  registerCanonicalReceiver,
+  RpcPortName,
+  type IRpcDiscoveryResolverPort
+} from '../internal/plugin-shared-keys.js'
 import type { IRpcEndpoint } from '../typing.js'
 import type { IRpcFeature } from '../feature.js'
 import type {
@@ -50,6 +54,8 @@ export const createDiscoveryFeature = (
         let installation: IDiscoverySurface | undefined
         let preparedInstallation: IDiscoveryInstallation | undefined
         let attachment: RpcDiscoveryAttachment | undefined
+        /** All installation views retain one exact Promise port and its package-owned lookup. */
+        let resolver: IRpcDiscoveryResolverPort | undefined
         const prepare = (
           scope: import('../typing.js').IRpcPluginInstallScope
         ): IDiscoveryInstallation => {
@@ -77,10 +83,14 @@ export const createDiscoveryFeature = (
             discovery: attachment.controls
           })
           scope.own(surface, () => surface.dispose())
-          dependencies.outbound.connectResolver({
+          resolver = Object.freeze({
             resolve: (id: string, receiverId?: string) =>
               attachment!.resolveReceiver(id, receiverId)
           })
+          registerCanonicalReceiver(resolver, (id, receiverId) =>
+            attachment!.selectReceiver(id, receiverId)
+          )
+          dependencies.outbound.connectResolver(resolver)
           installation = surface
           const publicSurface = Object.freeze({
             connect: surface.connect,
@@ -105,10 +115,7 @@ export const createDiscoveryFeature = (
           )
           preparedInstallation = Object.freeze({
             public: publicSurface,
-            resolver: Object.freeze({
-              resolve: (id: string, receiverId?: string) =>
-                attachment!.resolveReceiver(id, receiverId)
-            }),
+            resolver,
             cleanupTarget: surface
           })
           return preparedInstallation
@@ -120,10 +127,7 @@ export const createDiscoveryFeature = (
               RpcCoreErrorText.endpointModuleDependencyMissing
             )
           return Object.freeze({
-            [RpcPortName.discoveryResolver]: Object.freeze({
-              resolve: (id: string, receiverId?: string) =>
-                attachment!.resolveReceiver(id, receiverId)
-            })
+            [RpcPortName.discoveryResolver]: resolver!
           })
         }
         return Object.freeze({ prepare, ports })

@@ -1,3 +1,4 @@
+import * as portable from '../../src/contract/normalize.js'
 import { readRuntimeCarrier } from '../../src/contract/runtime-api/carrier.js'
 import { readRuntimeOutletConnection } from '../../src/remote/runtime-api/outlet.js'
 import type { IRuntimeDynamicSurface } from '../../src/remote/runtime-api/typing.js'
@@ -250,126 +251,162 @@ it('[A3][A34] Host startup cancellation reaches the original owned source before
   }
 })
 
-for (const idempotent of [false, true]) {
-  it(`[A35][A36] original retry owner settles a sent ${idempotent ? 'idempotent' : 'non-idempotent'} native request`, async () => {
-    /** Actual one-unit admission proves that replay never spawns a parallel owned execution. */
-    const budget = createUnitBudget({ kind: 'thread', maxUnits: 1 })
-    /** Every recorded handle remains the native launcher result with its original identity. */
-    const handles: INodeThreadHandle[] = []
-    /** The native messages independently record physical send count and exact replay key. */
-    const frames: any[] = []
-    /** The original caller-selected launcher is reused for both real generations. */
-    const native = createNodeThreadLauncher()
-    /** Generation fixture data is supplied by the actual launch sequence, never provider claims. */
-    let sequence = 0
-    /** Independent logical calls use fresh keys; replacement sends retain the same logical key. */
-    let keys = 0
-    /** The child reports actual provider start through the independently exposed parent method. */
-    let started!: () => void
-    /** Only real started business permits departure; queued/unsent work is not mislabeled. */
-    const entered = new Promise<void>((resolve) => {
-      started = resolve
-    })
-    /** Cleanup closes the canonical generation holder and actual native unit. */
-    let peer: IRuntimePeer | undefined
-    try {
-      peer = await createThreadPeer<IRuntimeDynamicSurface>({
-        self: { name: 'retry-parent', instanceId: 'retry-parent' },
-        provide: { parent: { echo: () => 42, started: () => started() } },
-        report: () => undefined,
-        spawn: {
-          spec: { entry, name: 'retry-child', data: { advanced: idempotent, crash: idempotent } },
-          budget,
-          scheduler: systemScheduler,
-          launcher: {
-            ...native,
-            launch: async (spec, context) => {
-              const handle = await native.launch(
-                {
-                  ...spec,
-                  data: { ...(spec.data as object), sequence: ++sequence }
-                },
-                context
-              )
-              const send = handle.port.postMessage
-              handle.port.postMessage = (message, transfer) => {
-                frames.push(message)
-                Reflect.apply(send, handle.port, [message, transfer])
-              }
-              handles.push(handle)
-              return handle
-            }
-          },
-          channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
-          supervisor: { restart: { initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 } },
-          keyFactory: () => `native-original-key-${++keys}`,
-          report: () => undefined
-        }
+for (const catalogSize of [4, 32])
+  for (const idempotent of [false, true]) {
+    it(`[R14-A30][A35][A36] catalog ${catalogSize} original retry owner settles a sent ${idempotent ? 'idempotent' : 'non-idempotent'} native request`, async () => {
+      /** Count only the two-level business root on the actual parent admission owner. */
+      const normalize = vi.spyOn(portable, 'normalizePortable')
+      /** Ready-directory and parent control traffic cannot satisfy this private-input count. */
+      const walks = () =>
+        normalize.mock.calls.filter(
+          ([value]) =>
+            typeof value === 'object' &&
+            value !== null &&
+            Reflect.get(value, 'marker') === 'r14-retry'
+        ).length
+      /** Actual one-unit admission proves that replay never spawns a parallel owned execution. */
+      const budget = createUnitBudget({ kind: 'thread', maxUnits: 1 })
+      /** Every recorded handle remains the native launcher result with its original identity. */
+      const handles: INodeThreadHandle[] = []
+      /** The native messages independently record physical send count and exact replay key. */
+      const frames: any[] = []
+      /** The original caller-selected launcher is reused for both real generations. */
+      const native = createNodeThreadLauncher()
+      /** Generation fixture data is supplied by the actual launch sequence, never provider claims. */
+      let sequence = 0
+      /** Independent logical calls use fresh keys; replacement sends retain the same logical key. */
+      let keys = 0
+      /** The child reports actual provider start through the independently exposed parent method. */
+      let started!: () => void
+      /** Only real started business permits departure; queued/unsent work is not mislabeled. */
+      const entered = new Promise<void>((resolve) => {
+        started = resolve
       })
-      if (!idempotent)
-        assert.equal(((await peer.request('probe', 'ordinary')) as { parent: number }).parent, 42)
-      assert.equal(await peer.request('service.data.read', 'ordinary'), 'ordinary')
-      if (idempotent)
+      /** Cleanup closes the canonical generation holder and actual native unit. */
+      let peer: IRuntimePeer | undefined
+      try {
+        peer = await createThreadPeer<IRuntimeDynamicSurface>({
+          self: { name: 'retry-parent', instanceId: 'retry-parent' },
+          provide: { parent: { echo: () => 42, started: () => started() } },
+          report: () => undefined,
+          spawn: {
+            spec: {
+              entry,
+              name: 'retry-child',
+              data: { advanced: idempotent, crash: idempotent, catalogSize }
+            },
+            budget,
+            scheduler: systemScheduler,
+            launcher: {
+              ...native,
+              launch: async (spec, context) => {
+                const handle = await native.launch(
+                  {
+                    ...spec,
+                    data: { ...(spec.data as object), sequence: ++sequence }
+                  },
+                  context
+                )
+                const send = handle.port.postMessage
+                handle.port.postMessage = (message, transfer) => {
+                  frames.push(message)
+                  Reflect.apply(send, handle.port, [message, transfer])
+                }
+                handles.push(handle)
+                return handle
+              }
+            },
+            channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+            supervisor: { restart: { initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 } },
+            keyFactory: () => `native-original-key-${++keys}`,
+            report: () => undefined
+          }
+        })
+        if (!idempotent)
+          assert.equal(((await peer.request('probe', 'ordinary')) as { parent: number }).parent, 42)
+        assert.equal(await peer.request('service.data.read', 'ordinary'), 'ordinary')
+        if (idempotent)
+          assert.equal(
+            readRuntimePeerConnection(peer).description!.methods.find(
+              (method) => method.name === 'service.data.read'
+            )!.idempotent,
+            true,
+            '[A36] optional advanced declaration retains the original idempotency authorization'
+          )
         assert.equal(
-          readRuntimePeerConnection(peer).description!.methods.find(
-            (method) => method.name === 'service.data.read'
-          )!.idempotent,
-          true,
-          '[A36] optional advanced declaration retains the original idempotency authorization'
+          readRuntimePeerConnection(peer).description!.methods.filter((entry) =>
+            entry.name.startsWith('service.data.')
+          ).length,
+          idempotent ? catalogSize : catalogSize + 2,
+          '[R14-A30] actual accepted catalog dimension'
         )
-      const method = idempotent ? 'service.data.read' : 'hold'
-      const result = peer
-        .request(method, 'retry', { timeoutMs: 3000 })
-        .catch((error: unknown) => error)
-      await entered
-      if (!idempotent) handles[0]!.terminate()
-      await handles[0]!.exited
-      const outcome = await result
-      if (idempotent) {
+        normalize.mockClear()
+        const method = idempotent ? 'service.data.read' : 'hold'
+        const result = peer
+          .request(
+            method,
+            { marker: 'r14-retry', nested: { value: catalogSize } },
+            { timeoutMs: 3000 }
+          )
+          .catch((error: unknown) => error)
+        await entered
+        if (!idempotent) handles[0]!.terminate()
+        await handles[0]!.exited
+        const outcome = await result
         assert.equal(
-          outcome,
-          'retry',
-          '[A36] one original logical dispatch replays on the actual ready replacement'
+          walks(),
+          idempotent ? 2 : 1,
+          '[R14-A30] genuine native retry reuses original private input without another portable walk'
         )
-        const sends = frames
-          .filter((frame) => {
-            const carrier = readRuntimeCarrier(frame)
-            return carrier
-              ? (carrier.frame as { task?: { method?: string } }).task?.method === method
-              : frame.method === method
-          })
-          .slice(1)
-        assert.equal(sends.length, 2)
-        assert.deepEqual(
-          sends.map((frame) => {
-            const carrier = readRuntimeCarrier(frame)
-            return carrier
-              ? (carrier.frame as { options: { idempotencyKey: string } }).options.idempotencyKey
-              : frame.data.route.idempotencyKey
-          }),
-          ['native-original-key-2', 'native-original-key-2']
-        )
-      } else {
-        assert.equal(
-          (outcome as { code?: string }).code,
-          'REMOTE_RESULT_UNKNOWN',
-          '[A35] sent non-idempotent work is never silently retargeted'
-        )
-        assert.equal(
-          frames.filter((frame) => {
-            const carrier = readRuntimeCarrier(frame)
-            return carrier
-              ? (carrier.frame as { task?: { method?: string } }).task?.method === method
-              : frame.method === method
-          }).length,
-          1
-        )
+        if (idempotent) {
+          assert.deepEqual(
+            outcome,
+            Object.assign(Object.create(null), {
+              marker: 'r14-retry',
+              nested: Object.assign(Object.create(null), { value: catalogSize })
+            }),
+            '[A36] one original logical dispatch replays on the actual ready replacement'
+          )
+          const sends = frames
+            .filter((frame) => {
+              const carrier = readRuntimeCarrier(frame)
+              return carrier
+                ? (carrier.frame as { task?: { method?: string } }).task?.method === method
+                : frame.method === method
+            })
+            .slice(1)
+          assert.equal(sends.length, 2)
+          assert.deepEqual(
+            sends.map((frame) => {
+              const carrier = readRuntimeCarrier(frame)
+              return carrier
+                ? (carrier.frame as { options: { idempotencyKey: string } }).options.idempotencyKey
+                : frame.data.route.idempotencyKey
+            }),
+            ['native-original-key-2', 'native-original-key-2']
+          )
+        } else {
+          assert.equal(
+            (outcome as { code?: string }).code,
+            'REMOTE_RESULT_UNKNOWN',
+            '[A35] sent non-idempotent work is never silently retargeted'
+          )
+          assert.equal(
+            frames.filter((frame) => {
+              const carrier = readRuntimeCarrier(frame)
+              return carrier
+                ? (carrier.frame as { task?: { method?: string } }).task?.method === method
+                : frame.method === method
+            }).length,
+            1
+          )
+        }
+      } finally {
+        normalize.mockRestore()
+        await peer?.close()
+        for (const handle of handles) handle.terminate()
+        await Promise.all(handles.map((handle) => handle.exited))
       }
-    } finally {
-      await peer?.close()
-      for (const handle of handles) handle.terminate()
-      await Promise.all(handles.map((handle) => handle.exited))
-    }
-    await vi.waitFor(() => assert.equal(budget.inUse, 0), { timeout: 3000 })
-  })
-}
+      await vi.waitFor(() => assert.equal(budget.inUse, 0), { timeout: 3000 })
+    })
+  }

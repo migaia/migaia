@@ -1,4 +1,4 @@
-import { createRuntimeApiEndpoint } from '../../../dist/core/internal/runtime-api-endpoint.js'
+import { createRuntimeApiEndpoint } from '../../../dist/core/runtime-api-endpoint.js'
 import {
   codec,
   framer,
@@ -11,7 +11,7 @@ import {
   type IRpcEndpoint
 } from '../../../dist/core/index.js'
 import { RpcMiddlewareErrorText } from '../../../dist/core/middleware/error-text.js'
-import type { IRemoteChannel } from '../../../dist/remote/types.js'
+import type { IRemoteChannelResources } from '../../../src/remote/types.js'
 import fixture from './managed-binary-key.json'
 
 /** A genuine runtime key is imported lazily after the original Worker listener is installed. */
@@ -30,12 +30,12 @@ function signingKey(): Promise<CryptoKey> {
 
 /** Compose only the same built canonical roots on both actual Web/Bun native sides. */
 export async function webBinaryEndpoint(
-  channel: IRemoteChannel,
+  channel: IRemoteChannelResources,
   id: string,
   report: (error: unknown) => void
 ) {
   /** The real auth configuration supplies primitives to the original per-frame owner. */
-  const endpoint = await createRuntimeApiEndpoint(
+  const endpoint = createRuntimeApiEndpoint(
     {
       id,
       scheduler: channel.scheduler,
@@ -79,9 +79,9 @@ export async function webBinaryEndpoint(
         })
       ]
     },
-    { supports: () => true },
-    true
+    channel
   )
+  await endpoint.ready
   return {
     endpoint: endpoint as unknown as IRpcEndpoint,
     oneWay: endpoint,

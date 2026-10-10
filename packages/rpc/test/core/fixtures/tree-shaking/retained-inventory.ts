@@ -28,6 +28,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/composed.ts',
       'src/core/endpoint-kernel.ts',
       'src/core/error-code.ts',
+      'src/core/error-family.ts',
       'src/core/error-text.ts',
       'src/core/errors.ts',
       'src/core/internal/async-control.ts',
@@ -140,6 +141,14 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/contract/wire-constants.ts'
     ),
     client: reviewed(
+      '\u0000vite/preload-helper.js',
+      'src/contract/runtime-api/binary-capture.ts',
+      'src/contract/runtime-api/binary-lazy.ts',
+      'src/contract/runtime-api/metadata.ts',
+      'src/contract/runtime-api/normalize-envelope.ts',
+      'src/contract/runtime-api/normalize-lazy.ts',
+      'src/contract/stream-error.ts',
+      'src/contract/stream-lazy.ts',
       // C9 runtime-api contracts and the C10 binary lane require these identities (ruling 2).
       // Cost-free unused binary/stream codecs through lazy loading belong to rpc-core-refactor.
       'src/contract/runtime-api/binary-constants.ts',
@@ -175,6 +184,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/composed.ts',
       'src/core/endpoint-kernel.ts',
       'src/core/error-code.ts',
+      'src/core/error-family.ts',
       'src/core/error-text.ts',
       'src/core/errors.ts',
       'src/core/feature.ts',
@@ -201,6 +211,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/inbound-identity.ts',
       'src/core/internal/operation-scope.ts',
       'src/core/internal/outbound-attachment.ts',
+      // H11 actual canonical graph retains the single owned JSON codec capture owner.
+      'src/core/internal/outbound-owned-codec.ts',
       'src/core/internal/outbound-gate.ts',
       'src/core/internal/outbound-sender.ts',
       'src/core/internal/pending.ts',
@@ -311,9 +323,18 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/contract/v1/route.ts',
       'src/contract/wire-constants.ts',
       'src/contract/unknown-field.ts',
-      'src/core/protocol-constants.ts'
+      'src/core/protocol-constants.ts',
+      'src/core/internal/inbound-normalization.ts'
     ),
     provider: reviewed(
+      '\u0000vite/preload-helper.js',
+      'src/contract/runtime-api/binary-capture.ts',
+      'src/contract/runtime-api/binary-lazy.ts',
+      'src/contract/runtime-api/metadata.ts',
+      'src/contract/runtime-api/normalize-envelope.ts',
+      'src/contract/runtime-api/normalize-lazy.ts',
+      'src/contract/stream-error.ts',
+      'src/contract/stream-lazy.ts',
       // C9 runtime-api contracts and the C10 binary lane require these identities (ruling 2).
       // Cost-free unused binary/stream codecs through lazy loading belong to rpc-core-refactor.
       'src/contract/runtime-api/binary-constants.ts',
@@ -348,6 +369,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/composed.ts',
       'src/core/endpoint-kernel.ts',
       'src/core/error-code.ts',
+      'src/core/error-family.ts',
       'src/core/error-text.ts',
       'src/core/errors.ts',
       'src/core/feature.ts',
@@ -375,6 +397,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/inbound-identity.ts',
       'src/core/internal/operation-scope.ts',
       'src/core/internal/outbound-attachment.ts',
+      // H11 actual canonical graph retains the single owned JSON codec capture owner.
+      'src/core/internal/outbound-owned-codec.ts',
       'src/core/internal/outbound-gate.ts',
       'src/core/internal/outbound-sender.ts',
       'src/core/internal/pending.ts',
@@ -492,9 +516,18 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/contract/wire-constants.ts',
       'src/contract/unknown-field.ts',
       'src/core/protocol-constants.ts',
-      'src/core/idempotency-store.ts'
+      'src/core/idempotency-store.ts',
+      'src/core/internal/inbound-normalization.ts'
     ),
     full: reviewed(
+      '\u0000vite/preload-helper.js',
+      'src/contract/runtime-api/binary-capture.ts',
+      'src/contract/runtime-api/binary-lazy.ts',
+      'src/contract/runtime-api/metadata.ts',
+      'src/contract/runtime-api/normalize-envelope.ts',
+      'src/contract/runtime-api/normalize-lazy.ts',
+      'src/contract/stream-error.ts',
+      'src/contract/stream-lazy.ts',
       // C9 runtime-api contracts and the C10 binary lane require these identities (ruling 2).
       // Cost-free unused binary/stream codecs through lazy loading belong to rpc-core-refactor.
       'src/contract/runtime-api/binary-constants.ts',
@@ -529,6 +562,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/composed.ts',
       'src/core/endpoint-kernel.ts',
       'src/core/error-code.ts',
+      'src/core/error-family.ts',
       'src/core/error-text.ts',
       'src/core/errors.ts',
       'src/core/feature.ts',
@@ -563,6 +597,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/inbound-identity.ts',
       'src/core/internal/operation-scope.ts',
       'src/core/internal/outbound-attachment.ts',
+      // H11 actual canonical graph retains the single owned JSON codec capture owner.
+      'src/core/internal/outbound-owned-codec.ts',
       'src/core/internal/outbound-gate.ts',
       'src/core/internal/outbound-sender.ts',
       'src/core/internal/pending.ts',
@@ -678,9 +714,18 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/contract/wire-constants.ts',
       'src/contract/unknown-field.ts',
       'src/core/protocol-constants.ts',
-      'src/core/idempotency-store.ts'
+      'src/core/idempotency-store.ts',
+      'src/core/internal/inbound-normalization.ts'
     ),
     custom: reviewed(
+      '\u0000vite/preload-helper.js',
+      'src/contract/runtime-api/binary-capture.ts',
+      'src/contract/runtime-api/binary-lazy.ts',
+      'src/contract/runtime-api/metadata.ts',
+      'src/contract/runtime-api/normalize-envelope.ts',
+      'src/contract/runtime-api/normalize-lazy.ts',
+      'src/contract/stream-error.ts',
+      'src/contract/stream-lazy.ts',
       // C9 runtime-api contracts and the C10 binary lane require these identities (ruling 2).
       // Cost-free unused binary/stream codecs through lazy loading belong to rpc-core-refactor.
       'src/contract/runtime-api/binary-constants.ts',
@@ -715,6 +760,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/composed.ts',
       'src/core/endpoint-kernel.ts',
       'src/core/error-code.ts',
+      'src/core/error-family.ts',
       'src/core/error-text.ts',
       'src/core/errors.ts',
       'src/core/feature.ts',
@@ -748,6 +794,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/core/internal/inbound-identity.ts',
       'src/core/internal/operation-scope.ts',
       'src/core/internal/outbound-attachment.ts',
+      // H11 actual canonical graph retains the single owned JSON codec capture owner.
+      'src/core/internal/outbound-owned-codec.ts',
       'src/core/internal/outbound-gate.ts',
       'src/core/internal/outbound-sender.ts',
       'src/core/internal/pending.ts',
@@ -863,6 +911,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'src/contract/wire-constants.ts',
       'src/contract/unknown-field.ts',
       'src/core/protocol-constants.ts',
-      'src/core/idempotency-store.ts'
+      'src/core/idempotency-store.ts',
+      'src/core/internal/inbound-normalization.ts'
     )
   })

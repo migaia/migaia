@@ -19,3 +19,6 @@ export type {
 } from './types.js'
 export type { IRpcStreamEnvelope } from './types.js'
 export type { IRpcStreamPayload } from './stream.js'
+
+export type { IRpcBinaryDigest } from '../runtime-api/binary.js'
+export type { IRpcRuntimeStepOutcome } from '../runtime-api/types.js'

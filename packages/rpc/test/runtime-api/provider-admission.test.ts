@@ -2,16 +2,17 @@ import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import {
   createProviderAdmissionScope,
-  ProviderAdmissionRegistry
+  ProviderAdmissionRegistry,
+  prepareProviderAdmissionScope
 } from '../../src/core/internal/provider-admission.js'
 
 it('[A60] valid narrower connection policies share the same logical scope without relaxing prior bounds or revoking admitted work', () => {
   const scope = createProviderAdmissionScope()
-  const first = scope.prepare(4, 3, 8)
+  const first = prepareProviderAdmissionScope(scope, 4, 3, 8)
   assert.equal(first.acquireMany(['a', 'b', 'c'], 'peer'), true)
   let later: ProviderAdmissionRegistry | undefined
   assert.doesNotThrow(() => {
-    later = scope.prepare(2, 1, 8)
+    later = prepareProviderAdmissionScope(scope, 2, 1, 8)
   }, '[A60] joining a stricter valid connection cannot split the target FIFO')
   assert.equal(later, first)
   assert.equal(first.size, 3, '[A60] already admitted work retains its original lease')
@@ -24,14 +25,14 @@ it('[A60] valid narrower connection policies share the same logical scope withou
     '[A60] narrower per-peer policy applies to subsequent admission'
   )
   assert.equal(first.acquire('d', 'other'), true)
-  assert.equal(scope.prepare(8, 8, 8), first)
+  assert.equal(prepareProviderAdmissionScope(scope, 8, 8, 8), first)
   assert.equal(
     first.acquire('e', 'third'),
     false,
     '[A60] later wider offers cannot loosen a shared bound'
   )
   assert.throws(
-    () => scope.prepare(2, 1, 4),
+    () => prepareProviderAdmissionScope(scope, 2, 1, 4),
     { code: 'CAPABILITY_UNSUPPORTED' },
     '[A60] candidate framing policy stays fixed'
   )

@@ -1,6 +1,6 @@
 import { rpcProtocolV1, type IRpcEnvelope } from '../contract/index.js'
 import type { IRpcWirePortableValue } from '../contract/types.js'
-import type { IRpcEnvelopeData } from '../contract/v1/route.js'
+import type { IRpcEnvelopeData } from '../contract/index.js'
 import type { identityCodecV1 } from '@migaia/serialize/codec'
 import type { messageFramerV1 } from '../contract/framing/index.js'
 import type { IRpcFactoryConfig, IRpcMiddleware } from './typing.js'

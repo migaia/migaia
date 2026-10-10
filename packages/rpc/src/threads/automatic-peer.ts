@@ -1,12 +1,15 @@
+import {
+  readRuntimePreparationContext,
+  withRuntimePreparationContext
+} from '../remote/runtime-api/launch-context.js'
 import { readRuntimeDefaultTimeout } from '../remote/runtime-api/timeout.js'
-import { RuntimeSourceKind, RuntimeConnectionDirection } from '../remote/runtime-api/constants.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { RpcCoreErrorCode, RpcError } from '../core/errors.js'
+import { RpcCoreErrorCode, RpcError } from '../core/index.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
 import { compileRuntimeMethods } from '../remote/runtime-api/catalog.js'
 import { RuntimeApiErrorText } from '../remote/runtime-api/constants.js'
-import { createRuntimePeer, type IRuntimePeerOptions } from '../remote/runtime-api/peer.js'
+import { createRuntimePeer, type IRuntimePeerOptions } from '../remote/index.js'
 import {
   readThreadRuntimeBootstrap,
   intersectThreadCapabilities,
@@ -65,11 +68,17 @@ export async function createAutomaticWebThreadPeer(
     /** No top-level asynchronous boundary precedes physical bootstrap subscription. */
     const bootstrap = await prepared
     deadline.cancel()
-    return await createRuntimePeer(options, {
-      self: bootstrap.self,
-      generation: bootstrap.generation,
-      origin: { kind: RuntimeSourceKind.connect, direction: RuntimeConnectionDirection.spawnedBy },
-      async source(context) {
+    /** Carry the original Host quota and node resources through this native options copy. */
+    const peerOptions: IRuntimePeerOptions = {
+      ...options,
+      self: options.self ?? bootstrap.self,
+      connect: async (context) => {
+        if (
+          options.self &&
+          (options.self.name !== bootstrap.self.name ||
+            options.self.instanceId !== bootstrap.self.instanceId)
+        )
+          throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
         native.postMessage(
           {
             kind: ThreadBootstrap.runtimeAcknowledged,
@@ -88,7 +97,12 @@ export async function createAutomaticWebThreadPeer(
           handoff
         )
       }
-    })
+    }
+    return await withRuntimePreparationContext(
+      peerOptions,
+      readRuntimePreparationContext(options) ?? {},
+      () => createRuntimePeer(peerOptions, { bootstrap: handoff, generation: bootstrap.generation })
+    )
   } catch (primary) {
     try {
       handoff.close()

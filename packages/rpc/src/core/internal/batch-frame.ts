@@ -1,4 +1,4 @@
-import { RpcCapability, RpcBatchPhysical } from '../../contract/wire-constants.js'
+import { RpcCapability, RpcBatchPhysical } from '../../contract/index.js'
 
 /** Exact final transport identities carry only their completed/static capability intersection. */
 const agreements = new WeakMap<

@@ -9,6 +9,12 @@
 | createThreadPeer    | @migaia/rpc/threads | 独立 Worker 连接，调用者 close         |
 | createThreadPlugin  | @migaia/rpc/threads | PluginHost 拥有，host.thread 共享出口  |
 
+需要自行组装连接时，可从 `@migaia/rpc/remote` 导入 `createRuntimePeer`、`createManagedRuntimePeer`、`createRuntimePlugin`。它们使用调用方实际持有的通道、执行资源或 Host slot 操作；显示名称、协议字段和复制的配置不会授予其它连接的操作权。`RuntimePluginKey` 提供稳定的 Host namespace 名称。
+
+`@migaia/rpc/core` 的 `createRuntimeApiEndpoint` 同步返回 endpoint 资源；先等待其稳定的 readonly `ready`，再使用已安装的控制与 provider。也可传入完整的 `{ binding }`，借用该对象已有的 request、notify、stream 和生命周期操作。`@migaia/rpc/core/features/provider` 的 `createProviderAdmissionScope` 用于在多个 endpoint 间共享同一个 quota handle；初始限制由第一次实际 attachment 的配置决定，ready 后的 `constrain` 只收紧限制，cold `constrain` 只校验而不保存策略，`clear` 清除该 handle 的现有占用。
+
+`contract/spi`、`core/spi`、`remote/spi` 是集成用途的稳定性分层，任何调用方均可使用。它们分别提供协议与 binary codec 操作、请求 ID 与 coded error-family 分类、以及 runtime description 规范化；具体入口见 [集成 API](./USEGUIDE.md#集成-api)。普通 endpoint、stream、adapter 和提供方法仍从各自现有入口导入。
+
 ## Worker 入门
 
 子端 worker.ts：
@@ -86,7 +92,11 @@ provider 并发默认每 peer 64、全局 256；同时进行的 request/notify/s
 
 ArrayBuffer / Uint8Array 使用双方实际 binary profile。线程显式 transfer 还要求真正 native clone-transfer 与受支持的 sign-only manifest；process 不接受 own transfer 字段，空数组或 undefined 也拒绝。physical commit 后 buffer 及共享 backing 的 views 会 detach；后续失败不能恢复，禁止自动重放，不保留隐藏输入备份。支持组合和 C10 实测边界见 [USEGUIDE](./USEGUIDE.md#二进制和-transfer)，不宣称零复制。
 
+process inline 保留原 base64 wire：Uint8Array 仅携带可见 bytes，接收端恢复原 offset 与零前缀；native manifest 保留完整 backing、alias 与 digest。大载荷复用已拥有的 JSON 准备结果，能力选择与 transfer 规则不变。
+
 透明转发只公开显式 expose 的 accepted route，每跳固定实际 generation，最多三层；下一跳鉴权直接上一跳。性能固有成本不能成为绕过白名单、portable admission、replay 或 deadline 的理由。
+
+每个调用入口保留原选项读取与 payload 捕获顺序；重试复用同一逻辑调用的快照。stream 保持原首次 next/return/throw 触发，准备沿原条件执行；iterator 复用同一 consumer。转发复用接收端完整验证的原对象；复制对象、反射字段或 custom protocol 不能取得这项复用。
 
 非独占载体按 receiver 身份绑定 challenge；SIEVE 管理驻留会话。SESSION_UNKNOWN 是 AUTHENTICATION_FAILED 的本地 rejection reason：只清对应 challenge 缓存，未来新调用重新发现，不自动重放旧业务帧。receiver 重启不能证明业务未执行。 CHALLENGE_INVALID 同属 AUTHENTICATION_FAILED 的本地拒绝 reason，表示 challenge 字段语法或方向非法；修帧合同，不盲重试，也不是新的顶层 code。
 
@@ -94,6 +104,10 @@ ArrayBuffer / Uint8Array 使用双方实际 binary profile。线程显式 transf
 
 ## 其它入口
 
+`@migaia/rpc/remote` 的 `RuntimePluginKey` 提供 `process` / `thread` 标量标签，用于解释 Plugin 和查询中的平台元数据；标签本身不授予 Host slot、channel 或 native execution 操作权。
+
 @migaia/rpc/testing 的 createPeerPair 装配真实对称 Peer，用于应用测试，不授予 native spawn/transfer 权限。显式底层 core/client、provider、full、composed，contract/v1 语义描述与 remote ports 仍按各自层级保留；adapter 从对应 browser/process/threads 深路径导入。平台锁与部署协调由消费侧负责。
 
 本地 list/get/describe 读取原 owner 的安全投影，methods 为名称数组；资源、退出或健康事实缺失时返回 unavailable。Host outlet 的 on 返回 disposer，watch 是有界事件 iterator；目录 ready 不证明远端 Host 安装事务提交。查询、事件、控制、借用资源与 JSON-RPC bridge 的限制见 [USEGUIDE](./USEGUIDE.md)。
+
+JSON-RPC bridge 完成原 hello 后允许同连接的 invoke、describe、无 id notify 与已协商 batch 到实际已安装 provider。cancel 只选择该连接的既有调用，不新增 ACK；不支持 server stream，也不把 wire 字段作为执行权限。

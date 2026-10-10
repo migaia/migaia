@@ -364,6 +364,7 @@
         "RemoteMethodName",
         "RpcRemoteLayerErrorCode",
         "RpcRemoteLayerErrorText",
+        "RuntimePluginKey",
         "createCoroutineHost",
         "createCoroutinePlugin",
         "createRemoteHost",

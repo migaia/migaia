@@ -1,12 +1,15 @@
 import type { IFeatureOutput, IFeatureRecord, IPluginConstraint } from '@migaia/plugin-host'
-import type { IRemoteCallOptions } from '../types.js'
-import type { IRpcRuntimeSendOptions } from '../../core/internal/outbound-attachment.js'
-import type { IRpcRuntimeStepOutcome } from '../../contract/runtime-api/types.js'
+import type { ISendOptions } from '../../core/index.js'
+import type { IRpcRuntimeEnvelope } from '../../contract/index.js'
+import type { IRpcRuntimeStepOutcome } from '../../contract/v1/index.js'
 import type { IRuntimePeer as IRuntimePeerHandle } from './peer.js'
 
+/** Group controls reuse the existing public envelope's portable option fields. */
+type IRpcRuntimeOptions = Extract<IRpcRuntimeEnvelope, { kind: 'runtime-call' }>['options']
+
 /** Runtime calls retain the original core false override without widening legacy remote options. */
-export type IRuntimeCallOptions = Omit<IRemoteCallOptions, 'timeoutMs'> &
-  Readonly<{ timeoutMs?: number | false; transfer?: readonly ArrayBuffer[] }>
+export type IRuntimeCallOptions = Omit<ISendOptions, 'transfer' | 'trace'> &
+  Readonly<{ orderKey?: string; cancel?: 'before-start'; transfer?: readonly ArrayBuffer[] }>
 
 /** Process calls reject own transfer presence; thread calls accept only genuine backing types. */
 type IRuntimeFamilyCallOptions<K> =
@@ -17,14 +20,16 @@ type IRuntimeFamilyCallOptions<K> =
 /** Groups use the same platform ownership boundary as request, notify and stream calls. */
 type IRuntimeFamilyGroupOptions<K> =
   K extends (typeof import('./constants.js').RuntimePluginKey)['process']
-    ? Omit<IRpcRuntimeSendOptions, 'transfer'>
-    : Omit<IRpcRuntimeSendOptions, 'transfer'> & Readonly<{ transfer?: readonly ArrayBuffer[] }>
+    ? Omit<IRpcRuntimeOptions, 'timeoutMs'> & Pick<ISendOptions, 'timeoutMs' | 'signal'>
+    : Omit<IRpcRuntimeOptions, 'timeoutMs'> &
+        Pick<ISendOptions, 'timeoutMs' | 'signal'> &
+        Readonly<{ transfer?: readonly ArrayBuffer[] }>
 
 /** Explicit dynamic invocation is opt-in and still checked against the accepted runtime catalog. */
 export type IRuntimeDynamicSurface = Readonly<
   Record<
     string,
-    (payload?: unknown) => import('../../contract/types.js').IRpcPortableValue | undefined
+    (payload?: unknown) => import('../../contract/index.js').IRpcPortableValue | undefined
   >
 >
 
@@ -55,7 +60,7 @@ export type IRuntimeFlatten<
   D extends readonly unknown[] = []
 > = 0 extends 1 & T
   ? IRuntimeDynamicSurface
-  : D['length'] extends typeof import('../../contract/normalize.js').RPC_PORTABLE_MAX_DEPTH
+  : D['length'] extends typeof import('../../contract/index.js').RPC_PORTABLE_MAX_DEPTH
     ? Record<never, never>
     : T extends object
       ? IRuntimeIntersection<

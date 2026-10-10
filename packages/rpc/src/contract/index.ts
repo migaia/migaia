@@ -5,7 +5,8 @@ export { normalizePortable } from './normalize.js'
 export type { IRpcRuntimeEnvelope, IRpcRuntimeGeneration } from './runtime-api/types.js'
 export type { IRpcBatchFrame } from './batch-frame.js'
 export { normalizeRpcEnvelope, rpcProtocol as rpcProtocolV1 } from './v1/index.js'
-export { invalidRpcStream, normalizeStreamPayload } from './v1/stream.js'
+export { invalidRpcStream } from './stream-error.js'
+export { normalizeStreamPayload } from './v1/stream.js'
 export {
   measurePortableStreamValue,
   RpcStreamEvent,
@@ -94,3 +95,5 @@ export type {
 } from './v1/types.js'
 export type { IRpcStreamEnvelope } from './v1/types.js'
 export type { IRpcStreamPayload } from './v1/stream.js'
+
+export { RPC_PORTABLE_MAX_DEPTH } from './normalize.js'

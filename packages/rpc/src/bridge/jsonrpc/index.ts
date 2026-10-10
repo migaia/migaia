@@ -1,3 +1,4 @@
+import { serializeRpcError } from '../../contract/error.js'
 import { registerJsonObjectPort } from '../../core/internal/json-object-port.js'
 import { registerBatchAgreement } from '../../core/internal/batch-frame.js'
 import { rpcProtocolV1 } from '../../contract/index.js'
@@ -62,7 +63,7 @@ export async function createJsonRpcRemoteChannel(
     // Timer cleanup must finish before the physical connection can be published.
     drainListenerFailures(collectListenerCleanupFailures([cancelTimer]))
     /** Adopt exactly one canonical gate, log Feature and stderr subscription. */
-    const ipc = attachIpcConnection(wire.transport, options.ipc, options.report)
+    const ipc = attachIpcConnection(wire.transport, options.ipc, options.report, options.scheduler)
     registerBatchAgreement(ipc.transport, agreement.capabilities)
     wire.registerObjectPortRelease(
       registerJsonObjectPort(
@@ -73,6 +74,9 @@ export async function createJsonRpcRemoteChannel(
           publicFramer: byteProcessPipeline.framer,
           codec: jsonObjectCodec,
           framer: jsonObjectFramer,
+          /** The existing held object port owns the bridge full-wire-error format. */
+          responseError: (error: unknown) =>
+            serializeRpcError(error, { report: ({ error: failure }) => options.report(failure) }),
           send: wire.sendObject,
           subscribe: wire.subscribeObject
         })
