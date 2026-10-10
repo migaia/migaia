@@ -356,20 +356,30 @@
         "createWindowsJobProcessLauncher"
       ],
       "./remote": [
+        "DEFAULT_DRAIN_MS",
         "REMOTE_METHOD_MAX_LENGTH",
         "REMOTE_METHOD_MODES",
         "REMOTE_NAME_PATTERN",
         "REMOTE_SCHEMA_VERSION",
+        "RUNTIME_API_SCHEMA_VERSION",
         "RemoteMethodMode",
         "RemoteMethodName",
         "RpcRemoteLayerErrorCode",
         "RpcRemoteLayerErrorText",
+        "RuntimeApiMode",
+        "RuntimeConnectionDirection",
+        "RuntimeEventName",
         "RuntimePluginKey",
+        "RuntimeQueryStatus",
+        "RuntimeSourceKind",
         "createCoroutineHost",
         "createCoroutinePlugin",
+        "createManagedRuntimePeer",
         "createRemoteHost",
         "createRemotePlugin",
         "createRemoteRetryPort",
+        "createRuntimePeer",
+        "createRuntimePlugin",
         "normalizeRemoteContract",
         "normalizeRemoteControlShape",
         "normalizeRemoteHostCatalog",
@@ -378,6 +388,7 @@
         "serveRemotePlugin"
       ],
       "./contract": [
+        "RPC_PORTABLE_MAX_DEPTH",
         "RpcBatchPhysical",
         "RpcCapability",
         "RpcCodecId",
@@ -425,6 +436,24 @@
         "serializeRpcError",
         "toJsonRpcError"
       ],
+      "./contract/spi": [
+        "createRpcStreamFrameDecoderWithLimit",
+        "isExcerptFree",
+        "isRpcBinaryIntegrityFailure",
+        "measureRpcNativeBinaryFrame",
+        "normalizeRuntimeEnvelope",
+        "normalizeRuntimeGeneration",
+        "normalizeRuntimeSteps",
+        "prepareRpcBinary",
+        "readRpcNativeBinary",
+        "readRuntimeCarrier",
+        "redactHandshake",
+        "restoreRpcBinary",
+        "rpcBinaryBackingLength",
+        "rpcBinaryView",
+        "runtimeOperationCapabilities",
+        "wrapRuntimeCarrier"
+      ],
       "./contract/v1": [
         "default",
         "invalidRpcStream",
@@ -433,13 +462,33 @@
         "rpcProtocol"
       ],
       "./contract/framing": [
+        "assertRpcPhysicalFrameSize",
         "bindRpcFrameIngress",
         "createBinaryFramer",
         "createReassembler",
         "createStringFramer",
-        "messageFramerV1"
+        "measureRpcPhysicalFrame",
+        "messageFramerV1",
+        "readRpcBatchMembers",
+        "rejectRpcPhysicalFrameSize"
       ],
       "./contract/framing/v1": [
+        "RpcBinaryProfile",
+        "RpcBinaryStorage",
+        "RpcNativeBinaryKind",
+        "RpcRuntimeCancel",
+        "RpcRuntimeField",
+        "RpcRuntimeFinish",
+        "RpcRuntimeGenerationKind",
+        "RpcRuntimeKind",
+        "RpcRuntimeMode",
+        "RpcRuntimeOperation",
+        "RpcRuntimeOutcomeState",
+        "RpcRuntimeProfile",
+        "RpcRuntimeStepState",
+        "RpcRuntimeStoreContinuity",
+        "RpcRuntimeStoreKind",
+        "RpcRuntimeStreamPrefix",
         "messageFramer"
       ],
       "./contract/framing/stream": [
@@ -477,10 +526,12 @@
         "codec",
         "connect",
         "contract",
+        "createAuthenticationNonce",
         "createEndpoint",
         "createFullEndpoint",
         "createFullOneWayEndpoint",
         "createRpcIdempotencyStore",
+        "createRuntimeApiEndpoint",
         "defineFeature",
         "defineMiddleware",
         "framer",
@@ -490,6 +541,13 @@
         "protocol",
         "timeout",
         "uuid"
+      ],
+      "./core/spi": [
+        "assertRpcIdempotencyKey",
+        "defaultRpcId",
+        "isRpcErrorInstance",
+        "isRpcRemoteError",
+        "isRpcTimeoutError"
       ],
       "./core/composed": [
         "createComposedEndpoint"
@@ -538,6 +596,7 @@
         "createOneWayFeature"
       ],
       "./core/features/provider": [
+        "createProviderAdmissionScope",
         "createProviderFeature"
       ],
       "./core/features/discovery": [
@@ -620,6 +679,9 @@
       "./threads/adapters/browser": [
         "createBrowserThreadChannelFactory",
         "createBrowserThreadLauncher"
+      ],
+      "./remote/spi": [
+        "normalizeRuntimeDescription"
       ],
       "./testing": [
         "createPeerPair"
