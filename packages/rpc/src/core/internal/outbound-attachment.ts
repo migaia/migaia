@@ -19,7 +19,12 @@ import {
   measureRpcNativeBinaryFrame,
   isRpcBinaryIntegrityFailure
 } from '../../contract/runtime-api/binary-capture.js'
-import { restoreRpcBinaryLazy as restoreRpcBinary } from '../../contract/runtime-api/binary-lazy.js'
+import {
+  normalizeInboundRpcEnvelope,
+  normalizeInboundRuntimeEnvelope,
+  normalizeInboundRuntimeBinaryEnvelope,
+  restoreInboundRuntimeBinary
+} from './inbound-normalization.js'
 import { RpcMiddlewareErrorText } from '../middleware/error-text.js'
 import { RpcBinaryProfile, RpcBinaryStorage } from '../../contract/runtime-api/binary-constants.js'
 import { runtimeOperationCapabilities } from '../../contract/runtime-api/capabilities.js'
@@ -627,7 +632,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                     if (accepted.status !== 'complete')
                       throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
                     const manifest = this.#runtimeComponents.codec.decode(accepted.value)
-                    restoredBinary = await restoreRpcBinary(
+                    restoredBinary = await restoreInboundRuntimeBinary(
                       manifest,
                       RpcBinaryStorage.native,
                       nativeBinary.sidecars,
@@ -764,8 +769,13 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     if (restoredBinary) envelope = restoredBinary
     else if (binary) {
       try {
-        const normalized = normalizeRuntimeEnvelope(
-          await restoreRpcBinary(decoded, RpcBinaryStorage.inline, [], this.#physicalLimit)
+        const normalized = normalizeInboundRuntimeBinaryEnvelope(
+          await restoreInboundRuntimeBinary(
+            decoded,
+            RpcBinaryStorage.inline,
+            [],
+            this.#physicalLimit
+          )
         )
         envelope = normalized instanceof Promise ? await normalized : normalized
         if (normalized instanceof Promise) {
@@ -776,11 +786,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid, cause)
       }
     } else {
-      const normalized = normalizeRuntimeEnvelope(decoded, (value) =>
-        normalizePortable(value, 0, new Set<object>(), () => {
-          throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
-        })
-      )
+      const normalized = normalizeInboundRuntimeEnvelope(decoded)
       if (normalized instanceof Promise) {
         envelope = await normalized
         this.kernel.assertActive(generation)
@@ -1364,7 +1370,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     /** Unknown fields are reported after normalize returns its once-read kind. */
     const ignored: Array<readonly [string, string]> = []
     try {
-      envelope = this.#components.protocol.normalize(decoded, {
+      envelope = normalizeInboundRpcEnvelope(decoded, this.#components.protocol, {
         onUnknownField: (pointer, field) => ignored.push([pointer, field])
       })
     } catch (error) {

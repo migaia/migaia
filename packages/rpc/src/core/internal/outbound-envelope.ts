@@ -14,12 +14,13 @@ import {
   readOwnedJsonSnapshot,
   prepareOwnedJsonSnapshot
 } from './outbound-owned-codec.js'
+import { isInboundNormalizedPayload } from './inbound-normalization.js'
 
 /**
  * Private options provenance is minted only by the compiled forwarding provider, never a public
  * flag.
  */
-const forwardedPayload = Symbol('rpc-forwarded-payload')
+const forwardedPayloads = new WeakMap<object, unknown>()
 /** Route metadata travels only with the package-minted admitted payload options. */
 const forwardedRoute = Symbol('rpc-forwarded-route')
 
@@ -31,18 +32,18 @@ export function createForwardOptions(
   Readonly<{
     signal: IRpcContext['signal']
     timeoutMs?: number
-    [forwardedPayload]: unknown
     [forwardedRoute]?: readonly string[]
   }> {
   /** Opt-in relays preserve the final provider's selected semantics; ordinary metadata stays absent. */
   const runtime = readProviderRuntimeOperation(context)
-  return {
+  const options = {
     ...(runtime && 'options' in runtime ? runtime.options : {}),
     signal: context.signal,
     ...(context.timeoutMs === undefined ? {} : { timeoutMs: context.timeoutMs }),
-    [forwardedPayload]: context.data,
     ...(route === undefined ? {} : { [forwardedRoute]: route })
   }
+  forwardedPayloads.set(options, context.data)
+  return options
 }
 
 /** New-profile headers reuse the exact same canonical private route provenance as ordinary forwards. */
@@ -62,23 +63,27 @@ export function createForwardQueryOptions(route: readonly string[] | undefined):
  * hop.
  */
 export function isForwardedPayload(options: unknown, payload: unknown): boolean {
+  if (!isForwardedOperation(options) || forwardedPayloads.get(options as object) !== payload)
+    return false
   return (
-    isForwardedOperation(options) && Reflect.get(options as object, forwardedPayload) === payload
+    payload === null ||
+    payload === undefined ||
+    typeof payload === 'string' ||
+    typeof payload === 'boolean' ||
+    (typeof payload === 'number' && Number.isFinite(payload)) ||
+    (typeof payload === 'object' && isInboundNormalizedPayload(payload))
   )
 }
 
 /** The original retry owner recognizes package-minted forwarding provenance without a public flag. */
 export function isForwardedOperation(options: unknown): boolean {
-  return typeof options === 'object' && options !== null && Object.hasOwn(options, forwardedPayload)
+  return typeof options === 'object' && options !== null && forwardedPayloads.has(options)
 }
 
 /** Copy only internal provenance through a canonical owner that reconstructs its send options. */
 export function retainForwardOptions<T extends object>(source: unknown, target: T): T {
-  if (typeof source === 'object' && source !== null && Object.hasOwn(source, forwardedPayload))
-    Object.defineProperty(target, forwardedPayload, {
-      value: Reflect.get(source, forwardedPayload),
-      enumerable: true
-    })
+  if (typeof source === 'object' && source !== null && forwardedPayloads.has(source))
+    forwardedPayloads.set(target, forwardedPayloads.get(source))
   if (typeof source === 'object' && source !== null && Object.hasOwn(source, forwardedRoute))
     Object.defineProperty(target, forwardedRoute, {
       value: Reflect.get(source, forwardedRoute),
