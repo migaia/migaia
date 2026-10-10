@@ -46,6 +46,36 @@ function pair(capabilities: readonly string[] = []) {
 }
 
 describe('C12 resource possession', () => {
+  it('[A45/BC13] selects physical request grammar once before capture', async () => {
+    /** No binary agreement selects the original scalar legacy grammar. */
+    const fixture = pair()
+    /** The selector and original options spread each read this accessor once. */
+    let orderReads = 0
+    /** The second selector field has the same original read boundary. */
+    let cancelReads = 0
+    /** The first selector mutation must be included in the synchronous snapshot. */
+    const payload = { value: 41 }
+    /** Real accessor reads expose any repeated selector before legacy dispatch. */
+    const options = {
+      get orderKey() {
+        orderReads += 1
+        payload.value += 1
+        return undefined
+      },
+      get cancel() {
+        cancelReads += 1
+        return undefined
+      }
+    }
+    try {
+      expect(await fixture.endpoints[0]!.request('echo', payload, options)).toEqual({ value: 42 })
+      expect(orderReads).toBe(2)
+      expect(cancelReads).toBe(2)
+    } finally {
+      await fixture.close()
+    }
+  })
+
   it('[A44/BC13] returns sync resource and snapshots a cold request before ready', async () => {
     /** Mutation after invocation must not change the captured new resource request. */
     const fixture = pair()
