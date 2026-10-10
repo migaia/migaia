@@ -13,13 +13,13 @@ import {
   hasCloneTransferCarrier
 } from './batch-frame.js'
 import { readRuntimeCarrier } from '../../contract/runtime-api/carrier.js'
-import { normalizeRuntimeEnvelope } from '../../contract/runtime-api/normalize.js'
+import { normalizeRuntimeEnvelopeLazy as normalizeRuntimeEnvelope } from '../../contract/runtime-api/normalize-lazy.js'
 import {
-  restoreRpcBinary,
   readRpcNativeBinary,
   measureRpcNativeBinaryFrame,
   isRpcBinaryIntegrityFailure
-} from '../../contract/runtime-api/binary.js'
+} from '../../contract/runtime-api/binary-capture.js'
+import { restoreRpcBinaryLazy as restoreRpcBinary } from '../../contract/runtime-api/binary-lazy.js'
 import { RpcMiddlewareErrorText } from '../middleware/error-text.js'
 import { RpcBinaryProfile, RpcBinaryStorage } from '../../contract/runtime-api/binary-constants.js'
 import { runtimeOperationCapabilities } from '../../contract/runtime-api/capabilities.js'
@@ -764,18 +764,29 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     if (restoredBinary) envelope = restoredBinary
     else if (binary) {
       try {
-        envelope = normalizeRuntimeEnvelope(
+        const normalized = normalizeRuntimeEnvelope(
           await restoreRpcBinary(decoded, RpcBinaryStorage.inline, [], this.#physicalLimit)
         )
+        envelope = normalized instanceof Promise ? await normalized : normalized
+        if (normalized instanceof Promise) {
+          this.kernel.assertActive(generation)
+          if (this.#native && !this.#native.active) return
+        }
       } catch (cause) {
         throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid, cause)
       }
-    } else
-      envelope = normalizeRuntimeEnvelope(decoded, (value) =>
+    } else {
+      const normalized = normalizeRuntimeEnvelope(decoded, (value) =>
         normalizePortable(value, 0, new Set<object>(), () => {
           throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
         })
       )
+      if (normalized instanceof Promise) {
+        envelope = await normalized
+        this.kernel.assertActive(generation)
+        if (this.#native && !this.#native.active) return
+      } else envelope = normalized
+    }
     assertAuthenticationChallengeEnvelope(authenticationContext, envelope)
     markAuthenticationReplayEnvelope(authenticationContext, envelope)
     /** Every explicitly requested capability must be present in the actual completed intersection. */

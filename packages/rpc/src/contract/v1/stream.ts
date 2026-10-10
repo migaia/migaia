@@ -1,14 +1,15 @@
-import { createContractError } from '../contract-error.js'
-import { RpcContractErrorCode } from '../error-code.js'
+import { invalidRpcStream } from '../stream-error.js'
+import { registerRpcStreamParser } from '../stream-lazy.js'
+export { invalidRpcStream } from '../stream-error.js'
 import { normalizeRpcSerializedError } from '../error.js'
 import { normalizePortable } from '../normalize.js'
+import { RpcContractErrorCode } from '../error-code.js'
 import {
   measurePortableStreamValue,
   RpcStreamEvent,
   RpcStreamLimit,
   RpcStreamViolation,
-  type RpcStreamEvent as IRpcStreamEvent,
-  type RpcStreamViolation as IRpcStreamViolation
+  type RpcStreamEvent as IRpcStreamEvent
 } from '../stream-constants.js'
 import type { IRpcPortableValue, IRpcSerializedError } from '../types.js'
 
@@ -20,20 +21,6 @@ export type IRpcStreamPayload = Readonly<{
   error?: IRpcSerializedError
   reason?: IRpcSerializedError
 }>
-
-/** Preserve the first stream violation and its payload-relative pointer on a native TypeError. */
-export function invalidRpcStream(
-  violation: IRpcStreamViolation,
-  pointer: string,
-  cause?: unknown
-): TypeError {
-  const error = createContractError(RpcContractErrorCode.invalidStream, cause) as TypeError
-  Object.defineProperties(error, {
-    violation: { value: violation, enumerable: true },
-    pointer: { value: pointer, enumerable: true }
-  })
-  return error
-}
 
 /** Validate event shape and portable value budget before core touches stream state. */
 export function normalizeStreamPayload(
@@ -104,3 +91,6 @@ function isStreamError(value: unknown): value is TypeError {
     (value as { readonly code?: unknown }).code === RpcContractErrorCode.invalidStream
   )
 }
+
+/** The explicit synchronous entry and internal cold entry share this one parser object. */
+registerRpcStreamParser(normalizeStreamPayload)

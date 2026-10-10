@@ -32,6 +32,61 @@ const envelope = (payload: unknown) => normalizeRuntimeEnvelope({ ...vectors.val
 const digest = async (backing: ArrayBuffer) =>
   createHash('sha256').update(new Uint8Array(backing)).digest('hex')
 
+it('[C6-L1][A27][A21] cold binary preparation captures inline bytes and starts the first native digest synchronously', async () => {
+  /** The internal lazy seam is the same preparation function used by actual outbound owners. */
+  const { prepareRpcBinaryLazy } = await import('../../src/contract/runtime-api/binary-lazy.js')
+  /** Hidden bytes distinguish the captured visible slice from a whole-backing copy. */
+  const inline = new Uint8Array([9, 1, 2, 8])
+  /** This first operation begins cold loading only after the original synchronous byte slice. */
+  const pendingInline = prepareRpcBinaryLazy(
+    envelope(new Uint8Array(inline.buffer, 1, 2)),
+    RpcBinaryStorage.inline
+  )
+  inline.fill(7)
+  /** Separate native backings expose the original sequential digest order. */
+  const first = new Uint8Array([3, 4]).buffer
+  const second = new Uint8Array([5, 6]).buffer
+  /** The first digest is deliberately held while the codec module finishes loading. */
+  let releaseFirst!: (value: string) => void
+  /** Actual digest calls establish ordering independently of prepared manifest equality. */
+  const order: ArrayBuffer[] = []
+  /** The prehash callback must run exactly once before any native digest call. */
+  let before = 0
+  /** This operation shares only module loading; captured backings remain operation-local. */
+  const pendingNative = prepareRpcBinaryLazy(
+    envelope({ first, second }),
+    RpcBinaryStorage.native,
+    undefined,
+    (backing) => {
+      order.push(backing)
+      return backing === first
+        ? new Promise<string>((resolve) => {
+            releaseFirst = resolve
+          })
+        : digest(backing)
+    },
+    () => {
+      before++
+      assert.equal(order.length, 0)
+    }
+  )
+  assert.equal(before, 1)
+  assert.deepEqual(order, [first])
+  /** A cold asynchronous codec handoff must not reread the caller's mutated inline bytes. */
+  const capturedInline = await pendingInline
+  const restored = await restoreRpcBinary(capturedInline.manifest, RpcBinaryStorage.inline)
+  assert.ok('payload' in restored)
+  assert.deepEqual(restored.payload, new Uint8Array(new Uint8Array([0, 1, 2]).buffer, 1, 2))
+  assert.deepEqual(order, [first])
+  releaseFirst(await digest(first))
+  /** Later hashes start only after the original first digest settles. */
+  const prepared = await pendingNative
+  assert.deepEqual(order, [first, second])
+  assert.equal(before, 1)
+  assert.equal(prepared.sidecars[0], first)
+  assert.equal(prepared.sidecars[1], second)
+})
+
 for (const size of [64 * 1024, 1024 * 1024]) {
   it(`[A61][A21] ${size} owned inline bytes encode natively once without a second business walk`, async () => {
     /** The same real codec/framer identities select the encoder held by the Node byte adapter. */

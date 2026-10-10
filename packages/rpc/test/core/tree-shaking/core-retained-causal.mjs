@@ -77,7 +77,17 @@ function uniqueSortedEdges(edges) {
 }
 
 /** Records source/artifact custody for generated workspace modules without inventing edges. */
-function generatedArtifactProvenance(module) {
+function generatedArtifactProvenance(module, retained, live) {
+  /** Generated loader helpers have an actual virtual source in the canonical consumer build. */
+  const generated = [
+    ...live.generatedArtifacts,
+    ...consumerNames.flatMap((consumer) => retained[consumer].generatedArtifacts)
+  ].find((artifact) => artifact.artifact === module)
+  if (generated)
+    return {
+      kind: 'generated-artifact',
+      locator: generated
+    }
   if (!module.startsWith('workspace:packages/')) return undefined
   const relativeArtifact = module.slice('workspace:'.length)
   const artifactPath = resolve(workspaceDirectory, relativeArtifact)
@@ -141,7 +151,9 @@ function main() {
       ),
       incomingEdges,
       provenance:
-        incomingEdges.length > 0 ? { kind: 'import-edge' } : generatedArtifactProvenance(module)
+        incomingEdges.length > 0
+          ? { kind: 'import-edge' }
+          : generatedArtifactProvenance(module, retained, live)
     }
   })
 

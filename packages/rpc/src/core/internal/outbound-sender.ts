@@ -33,9 +33,9 @@ import { registerBatchWriter, type IBatchWriteGuard } from './batch-frame.js'
 import { RpcBatchPhysical, RpcCapability } from '../../contract/wire-constants.js'
 import {
   hasRpcBinaryEnvelope,
-  prepareRpcBinary,
   measureRpcNativeBinaryFrame
-} from '../../contract/runtime-api/binary.js'
+} from '../../contract/runtime-api/binary-capture.js'
+import { prepareRpcBinaryLazy as prepareRpcBinary } from '../../contract/runtime-api/binary-lazy.js'
 import { RpcBinaryStorage } from '../../contract/runtime-api/binary-constants.js'
 import { RpcNativeBinaryKind } from '../../contract/runtime-api/binary-constants.js'
 import { hasFastComponents, readFastInlineEncoder } from './fast-path.js'

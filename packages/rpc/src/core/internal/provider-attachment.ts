@@ -1,3 +1,4 @@
+import { invalidRpcStream } from '../../contract/stream-error.js'
 import { createOutboundEnvelope } from './outbound-envelope.js'
 import { readProviderPreflight } from './provider.js'
 import { hasFastEndpoint } from './fast-path.js'
@@ -13,7 +14,6 @@ import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcAbortSignal, IRpcContext, IRpcEventListener, IRpcProvider } from '../typing.js'
 import {
   deserializeRpcError,
-  invalidRpcStream,
   RpcStreamViolation,
   RpcControl,
   RpcRouteProfile,
