@@ -175,18 +175,19 @@ export function createRuntimeApiEndpoint(
   })
   /** Ancillary synchronous controls require the real installed composition. */
   const current = (): IRuntimePhysicalEndpoint => physical ?? rejectRuntimeApiCapability()
+  /** Select grammar once at each operation's original position relative to payload capture. */
+  const usesNativeGrammar = (callOptions: IRpcRuntimeSendOptions): boolean =>
+    channel.agreement.capabilities.includes(RpcCapability.portableBinary) ||
+    callOptions.orderKey !== undefined ||
+    callOptions.cancel !== undefined ||
+    Object.hasOwn(callOptions, 'transfer')
   /** New physical requests reuse the existing input and transport operations. */
   const dispatch = (
     input: IRuntimeRequestInput,
     callOptions: IRpcRuntimeSendOptions,
-    mode: 'request' | 'notify'
+    mode: 'request' | 'notify',
+    native: boolean
   ): Promise<IRpcPortableValue | undefined | void> => {
-    /** Actual bilateral agreement chooses native request grammar; options grant no capability. */
-    const native =
-      channel.agreement.capabilities.includes(RpcCapability.portableBinary) ||
-      callOptions.orderKey !== undefined ||
-      callOptions.cancel !== undefined ||
-      Object.hasOwn(callOptions, 'transfer')
     if (native) {
       /** The original sender and already accepted remote generation remain authoritative. */
       const sender = readEndpointOwner<RpcOutboundAttachment>(
@@ -217,16 +218,10 @@ export function createRuntimeApiEndpoint(
     callOptions: IRpcRuntimeSendOptions = {},
     mode: 'request' | 'notify' = 'request'
   ) => {
+    /** Request selects before capture; notify selects after its original depth-zero capture. */
+    let native = mode === 'request' ? usesNativeGrammar(callOptions) : false
     /** Preserve depth zero for native grammar and depth two for the legacy request carrier. */
-    const depth =
-      mode === 'notify'
-        ? 0
-        : channel.agreement.capabilities.includes(RpcCapability.portableBinary) ||
-            callOptions.orderKey !== undefined ||
-            callOptions.cancel !== undefined ||
-            Object.hasOwn(callOptions, 'transfer')
-          ? 0
-          : 2
+    const depth = mode === 'notify' || native ? 0 : 2
     /** Reuse the existing canonical capture operation; no new proof pipeline is installed. */
     const input = createRuntimeRequestInput(
       method,
@@ -236,10 +231,11 @@ export function createRuntimeApiEndpoint(
       callOptions,
       depth
     )
+    if (mode === 'notify') native = usesNativeGrammar(callOptions)
     /** Only new cold requests await installation; an installed operation returns its own Promise. */
     return physical
-      ? dispatch(input, callOptions, mode)
-      : ready.then(() => dispatch(input, callOptions, mode))
+      ? dispatch(input, callOptions, mode, native)
+      : ready.then(() => dispatch(input, callOptions, mode, native))
   }
   Object.defineProperties(facade, {
     ready: { value: ready, enumerable: true },
