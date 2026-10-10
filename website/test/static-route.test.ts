@@ -315,19 +315,22 @@ test('SITE-T-NESTED-MODULES preserves export hierarchy in routes and navigation'
 
   /** Current RPC features come from package exports rather than a hard-coded plugin inventory. */
   const webRpcFeatures = nestedApis.filter(
-    (api) => api.library === 'rpc' && api.module.startsWith('core/features/')
+    (api) => api.library === 'rpc-core' && api.module.startsWith('features/')
   )
   assert.ok(webRpcFeatures.length > 0, 'expected RPC feature modules')
   const webRpcFeatureHtml = readFileSync(
-    join(buildRoot, artifactPath(publicModulePath('zh', 'rpc', webRpcFeatures[0].module))),
+    join(buildRoot, artifactPath(publicModulePath('zh', 'rpc-core', webRpcFeatures[0].module))),
     'utf8'
   )
   const featureRail = stableLeftRail(webRpcFeatureHtml)
   assert.match(featureRail, />功能插件</)
   assert.doesNotMatch(featureRail, />features</)
   for (const feature of webRpcFeatures)
-    assert.match(featureRail, new RegExp(`href="${publicModulePath('zh', 'rpc', feature.module)}"`))
-  assert.doesNotMatch(featureRail, /rpc\/features-[^/"]+/)
+    assert.match(
+      featureRail,
+      new RegExp(`href="${publicModulePath('zh', 'rpc-core', feature.module)}"`)
+    )
+  assert.doesNotMatch(featureRail, /rpc-core\/features-[^/"]+/)
 })
 
 test('SITE-T-LEFT-RAIL-INVARIANT keeps every module tree stable across all API routes', () => {

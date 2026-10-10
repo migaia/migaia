@@ -396,7 +396,7 @@ test('reactive Effect guide covers imports, direct lifecycle, convenience API, a
 })
 
 test('RPC canonical chunk Feature quick start defines actual dependencies and runtime inputs', () => {
-  const guide = findApiGuide('rpc', 'core/stream', 'createCanonicalChunkFeature', 'zh')
+  const guide = findApiGuide('rpc-core', 'stream', 'createCanonicalChunkFeature', 'zh')
   assert.ok(guide?.quickStart)
   assert.match(guide.quickStart, /createCanonicalChunkFeature/)
   assert.match(guide.quickStart, /createOutboundFeature\(chunks\)/)
@@ -563,7 +563,7 @@ test('Logger custom plugin guide covers extension, Host use, async completion, a
 })
 
 test('RPC canonical chunk route keeps the complete composition guide', () => {
-  const guide = findApiGuide('rpc', 'core/stream', 'createCanonicalChunkFeature', 'zh')
+  const guide = findApiGuide('rpc-core', 'stream', 'createCanonicalChunkFeature', 'zh')
   assert.ok(guide?.quickStart)
   assert.match(guide.purpose, /组合式 endpoint/)
   assert.match(guide.quickStart, /createMemoryTransportPair/)
@@ -581,17 +581,13 @@ test('RPC canonical chunk route keeps the complete composition guide', () => {
 
 test('every RPC Feature explains actual dependencies, use, and composition cleanup', () => {
   for (const [module, feature, dependencies] of [
-    ['core/features/outbound', 'createOutboundFeature', ['chunkCapability']],
-    ['core/features/provider', 'createProviderFeature', ['outboundCapability']],
-    ['core/features/discovery', 'createDiscoveryFeature', ['outboundCapability']],
-    [
-      'core/features/control',
-      'createControlFeature',
-      ['outboundCapability', 'discoveryCapability']
-    ],
-    ['core/stream', 'createCanonicalChunkFeature', []]
+    ['features/outbound', 'createOutboundFeature', ['chunkCapability']],
+    ['features/provider', 'createProviderFeature', ['outboundCapability']],
+    ['features/discovery', 'createDiscoveryFeature', ['outboundCapability']],
+    ['features/control', 'createControlFeature', ['outboundCapability', 'discoveryCapability']],
+    ['stream', 'createCanonicalChunkFeature', []]
   ] as const) {
-    const guide = findApiGuide('rpc', module, feature, 'zh')
+    const guide = findApiGuide('rpc-core', module, feature, 'zh')
     assert.ok(guide, feature)
     assert.ok(guide.purpose.length >= 100, `${feature}: purpose`)
     assert.ok(guide.scenarios.length >= 2, `${feature}: scenarios`)
@@ -620,7 +616,7 @@ test('every RPC middleware guide installs into a Host and consumes a real capabi
     'hooks',
     'uuid'
   ]) {
-    const guide = findApiGuide('rpc', 'core', middleware, 'zh')
+    const guide = findApiGuide('rpc-core', 'index', middleware, 'zh')
     assert.ok(guide?.quickStart, middleware)
     assert.match(guide.purpose, /安装到 Host 后/, `${middleware}: Host effect`)
     assert.match(guide.quickStart, /createMemoryTransportPair/, `${middleware}: transport`)

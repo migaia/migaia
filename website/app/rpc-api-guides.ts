@@ -66,8 +66,8 @@ function endpointGuide(input: {
     purposeEn: `Creates an endpoint that can ${input.surfaceEn}. Setup is all-or-nothing: if one installation step fails, RPC removes the listeners and resources installed by earlier steps.`,
     purposeZh: `创建可${input.surfaceZh}的端点。初始化会整体成功或整体失败；如果中途出错，RPC 会清理此前已经安装的监听器和资源。`,
     quickStart: `import { ${input.name} } from '${input.importPath}'
-import { connect, createEndpoint as createServiceEndpoint } from '@migaia/rpc/core'
-import { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'
+import { connect, createEndpoint as createServiceEndpoint } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
 
 const [transport, serviceTransport] = createMemoryTransportPair()
 const service = await createServiceEndpoint({
@@ -132,8 +132,8 @@ function middlewareTransportExamples(
       id: 'iframe-transport',
       title: locale === 'zh' ? '父页面调用 iframe' : 'Parent page to iframe',
       description: descriptions.iframe,
-      code: `import { ${imports} } from '@migaia/rpc/core'
-import { createWindowMessageTransport } from '@migaia/rpc/browser/adapters/window'
+      code: `import { ${imports} } from '@migaia/rpc-core'
+import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
 
 const frame = document.querySelector<HTMLIFrameElement>('#embedded-app')!
 const transport = createWindowMessageTransport({
@@ -148,8 +148,8 @@ const endpoint = await createEndpoint({
       id: 'worker-transport',
       title: locale === 'zh' ? '页面调用 Dedicated Worker' : 'Page to Dedicated Worker',
       description: descriptions.worker,
-      code: `import { ${imports} } from '@migaia/rpc/core'
-import { createWebWorkerTransport } from '@migaia/rpc/core/adapters/web-worker'
+      code: `import { ${imports} } from '@migaia/rpc-core'
+import { createWebWorkerTransport } from '@migaia/rpc-core/adapters/web-worker'
 
 const worker = new Worker(new URL('./task.worker.ts', import.meta.url), { type: 'module' })
 const transport = createWebWorkerTransport(worker, { peerId: 'task-worker' })
@@ -165,8 +165,8 @@ const endpoint = await createEndpoint({
           ? '同源 Tab 通过 BroadcastChannel 通信'
           : 'Same-origin tabs through BroadcastChannel',
       description: descriptions.tabs,
-      code: `import { ${imports} } from '@migaia/rpc/core'
-import { createBroadcastChannelTransport } from '@migaia/rpc/browser/adapters/broadcast-channel'
+      code: `import { ${imports} } from '@migaia/rpc-core'
+import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'
 
 const channel = new BroadcastChannel('application-rpc-v1')
 const transport = createBroadcastChannelTransport(channel)
@@ -179,8 +179,8 @@ const endpoint = await createEndpoint({
       id: 'service-worker-transport',
       title: locale === 'zh' ? '页面调用 Service Worker' : 'Page to Service Worker',
       description: descriptions.serviceWorker,
-      code: `import { ${imports} } from '@migaia/rpc/core'
-import { createServiceWorkerTransport } from '@migaia/rpc/browser/adapters/service-worker'
+      code: `import { ${imports} } from '@migaia/rpc-core'
+import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'
 
 await navigator.serviceWorker.ready
 const controller = navigator.serviceWorker.controller
@@ -247,7 +247,7 @@ function pingUsageExamples(locale: IGuideLocale): readonly IApiGuideExample[] {
       id: 'preflight-liveness',
       title: copy.preflight[0],
       description: copy.preflight[1],
-      code: `import type { IRpcEndpoint } from '@migaia/rpc/core'
+      code: `import type { IRpcEndpoint } from '@migaia/rpc-core'
 
 type IPreviewDocument = { pages: number }
 
@@ -291,7 +291,7 @@ export async function refreshPeerStatus(
       id: 'cancel-liveness',
       title: copy.cancel[0],
       description: copy.cancel[1],
-      code: `import type { IRpcEndpoint } from '@migaia/rpc/core'
+      code: `import type { IRpcEndpoint } from '@migaia/rpc-core'
 
 export async function checkWorkerBeforePageExit(client: IRpcEndpoint) {
   const controller = new AbortController()
@@ -314,7 +314,7 @@ export async function checkWorkerBeforePageExit(client: IRpcEndpoint) {
       id: 'periodic-liveness',
       title: copy.heartbeat[0],
       description: copy.heartbeat[1],
-      code: `import type { IRpcEndpoint } from '@migaia/rpc/core'
+      code: `import type { IRpcEndpoint } from '@migaia/rpc-core'
 
 type IConnectionState = 'online' | 'reconnecting'
 
@@ -366,8 +366,8 @@ function middlewareGuide(input: {
     purposeZh: `${input.purposeZh} 安装到 Host 后，这项策略会参与每一次匹配的 endpoint 操作。send()、provide()、ping() 等可调用能力由 endpoint 的 Feature 提供；middleware 负责改变这些操作的连接、校验、保护、观测或边界规则，并不会凭空增加一套无关的业务 API。`,
     examplesEn: input.examplesEn ?? middlewareTransportExamples(input.name, input.code, 'en'),
     examplesZh: input.examplesZh ?? middlewareTransportExamples(input.name, input.code, 'zh'),
-    quickStart: `import { ${imports} } from '@migaia/rpc/core'
-import { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'
+    quickStart: `import { ${imports} } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
 
 ${input.setup ? `${input.setup}\n\n` : ''}// 用内存通道模拟真实的客户端与服务宿主；浏览器中可替换成 Worker、MessagePort 等 adapter。
 const [clientTransport, serviceTransport] = createMemoryTransportPair()
@@ -429,7 +429,7 @@ function transportGuide(input: {
   return guide({
     purposeEn: `Wraps ${input.boundaryEn} as the send/receive connection expected by a RPC endpoint. The adapter also records how the two sides are connected, how messages are encoded, and which side must close the host resource.`,
     purposeZh: `把${input.boundaryZh}包装成 RPC endpoint 所需的消息收发连接。适配器还会记录两端如何连接、消息如何编码，以及由哪一端负责关闭宿主资源。`,
-    quickStart: `import { ${input.name} } from '${input.importPath}'\nimport { connect, createEndpoint } from '@migaia/rpc/core'\n\nconst transport = ${input.expression}\nconst endpoint = await createEndpoint({\n  id: 'local',\n  transport,\n  middlewares: [connect({ transport })]\n})\nendpoint.provide('health', ({ success }) => success({ ok: true }))\ntry {\n  console.log('health provider ready:', typeof endpoint.provide)\n} finally {\n  await endpoint.dispose()\n}`,
+    quickStart: `import { ${input.name} } from '${input.importPath}'\nimport { connect, createEndpoint } from '@migaia/rpc-core'\n\nconst transport = ${input.expression}\nconst endpoint = await createEndpoint({\n  id: 'local',\n  transport,\n  middlewares: [connect({ transport })]\n})\nendpoint.provide('health', ({ success }) => success({ ok: true }))\ntry {\n  console.log('health provider ready:', typeof endpoint.provide)\n} finally {\n  await endpoint.dispose()\n}`,
     useEn: [
       `The two endpoints communicate through ${input.boundaryEn}.`,
       'Use the adapter when RPC should register the message listener and remove it when the endpoint is disposed.'
@@ -457,7 +457,7 @@ function errorGuide(input: {
   return guide({
     purposeEn: `${input.name} represents ${input.conditionEn}. Its stable source and code let callers handle the failure without parsing message text, while cause and cleanup fields retain the original error.`,
     purposeZh: `${input.name} 表示${input.conditionZh}。调用方可以读取稳定的 source 与 code 处理失败，无需解析 message；原始错误仍保留在 cause 或清理结果字段中。`,
-    quickStart: `import type { IRpcEndpoint } from '@migaia/rpc/core'\nimport { ${input.name} } from '@migaia/rpc/core'\n\n// endpoint 已由应用按 transport、connect 和服务端 handler 完成组装。\nexport async function callWorker(endpoint: IRpcEndpoint) {\n  try {\n    await endpoint.send('worker', 'load', [])\n  } catch (error) {\n    if (error instanceof ${input.name}) {\n      console.error(error.code, error.cause)\n    }\n    throw error\n  }\n}\n\n// 服务端返回失败时，错误会沿 endpoint 边界传回这里；上层可在页面或重试层调用 callWorker(endpoint)。`,
+    quickStart: `import type { IRpcEndpoint } from '@migaia/rpc-core'\nimport { ${input.name} } from '@migaia/rpc-core'\n\n// endpoint 已由应用按 transport、connect 和服务端 handler 完成组装。\nexport async function callWorker(endpoint: IRpcEndpoint) {\n  try {\n    await endpoint.send('worker', 'load', [])\n  } catch (error) {\n    if (error instanceof ${input.name}) {\n      console.error(error.code, error.cause)\n    }\n    throw error\n  }\n}\n\n// 服务端返回失败时，错误会沿 endpoint 边界传回这里；上层可在页面或重试层调用 callWorker(endpoint)。`,
     useEn: [
       input.distinctionEn,
       'Catch it only where the caller can recover, translate, report, or apply a bounded retry policy.'
@@ -485,7 +485,7 @@ function constantGuide(input: {
   return guide({
     purposeEn: `Provides the canonical ${input.roleEn}. Use its members instead of repeating wire-visible or cross-module string literals.`,
     purposeZh: `提供规范的${input.roleZh}。应引用其 member，不要重复书写 wire-visible 或 cross-module string literal。`,
-    quickStart: `import { ${input.name} } from '@migaia/rpc/core'\n\nconst value = ${input.name}.${input.member}\nif (value === ${input.name}.${input.member}) {\n  console.log(value) // ${input.value}\n}\n// Business code reads the same canonical member instead of copying the wire-visible string.`,
+    quickStart: `import { ${input.name} } from '@migaia/rpc-core'\n\nconst value = ${input.name}.${input.member}\nif (value === ${input.name}.${input.member}) {\n  console.log(value) // ${input.value}\n}\n// Business code reads the same canonical member instead of copying the wire-visible string.`,
     useEn: [
       'Code must produce, compare, log, or test the corresponding stable discriminant.',
       'A custom adapter or diagnostic consumer interoperates with RPC metadata.'
@@ -507,8 +507,8 @@ function constantGuide(input: {
 
 /** Copyable chunk examples for the preset/composed distinction and browser host boundaries. */
 const chunkScenarioCode = {
-  preset: `import { chunk, connect, createEndpoint } from '@migaia/rpc/core'
-import { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'
+  preset: `import { chunk, connect, createEndpoint } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
 
 const [clientTransport, serviceTransport] = createMemoryTransportPair()
 const policy = { chunkSize: 64 * 1024, maxMessageBytes: 8 * 1024 * 1024 }
@@ -535,8 +535,8 @@ try {
   await Promise.all([client.dispose(), service.dispose()])
 }`,
   iframe: `// parent.ts：父页面创建调用端，targetOrigin 必须固定为 iframe 的真实 origin。
-import { chunk, connect, createEndpoint } from '@migaia/rpc/core'
-import { createWindowMessageTransport } from '@migaia/rpc/browser/adapters/window'
+import { chunk, connect, createEndpoint } from '@migaia/rpc-core'
+import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
 
 const frame = document.querySelector<HTMLIFrameElement>('#report-frame')
 if (!frame?.contentWindow) throw new Error('report iframe is unavailable')
@@ -571,8 +571,8 @@ const render = (value: unknown) => '<main>' + String(value) + '</main>'
 iframeEndpoint.provide('renderReport', ({ data, success }) => success(render(data)))
 window.addEventListener('pagehide', () => void iframeEndpoint.dispose(), { once: true })`,
   tabs: `// 两个同源 Tab 运行同一入口；URL 中的 role 决定当前 Tab 是服务端还是调用端。
-import { chunk, connect, createEndpoint } from '@migaia/rpc/core'
-import { createBroadcastChannelTransport } from '@migaia/rpc/browser/adapters/broadcast-channel'
+import { chunk, connect, createEndpoint } from '@migaia/rpc-core'
+import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'
 
 const role = new URL(location.href).searchParams.get('role')
 const endpointId = role === 'service' ? 'document-owner' : 'document-viewer'
@@ -599,8 +599,8 @@ if (role === 'service') {
 
 window.addEventListener('pagehide', () => void endpoint.dispose(), { once: true })`,
   worker: `// main.ts：页面端持有 Worker，并把大任务交给 Worker endpoint。
-import { chunk, connect, createEndpoint } from '@migaia/rpc/core'
-import { createWebWorkerTransport } from '@migaia/rpc/core/adapters/web-worker'
+import { chunk, connect, createEndpoint } from '@migaia/rpc-core'
+import { createWebWorkerTransport } from '@migaia/rpc-core/adapters/web-worker'
 
 const worker = new Worker(new URL('./image-worker.ts', import.meta.url), { type: 'module' })
 const pageTransport = createWebWorkerTransport(worker, { peerId: 'image-worker' })
@@ -633,8 +633,8 @@ workerEndpoint.provide('buildPreview', async ({ data, success }) => {
 /** Contract examples prove that the same middleware policy works across real host boundaries. */
 const contractTransportCode = {
   iframe: `// parent.ts：父页面通过 Window transport 调用 iframe。
-import { connect, contract, createEndpoint } from '@migaia/rpc/core'
-import { createWindowMessageTransport } from '@migaia/rpc/browser/adapters/window'
+import { connect, contract, createEndpoint } from '@migaia/rpc-core'
+import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
 
 const frame = document.querySelector<HTMLIFrameElement>('#billing')!
 const transport = createWindowMessageTransport({
@@ -655,8 +655,8 @@ const billing = await createEndpoint({
 })
 const total = await billing.send<number>('billing-frame', 'calculateTotal', { prices: [12, 30] })`,
   worker: `// main.ts：页面通过 Dedicated Worker transport 调用后台计算宿主。
-import { connect, contract, createEndpoint, timeout } from '@migaia/rpc/core'
-import { createWebWorkerTransport } from '@migaia/rpc/core/adapters/web-worker'
+import { connect, contract, createEndpoint, timeout } from '@migaia/rpc-core'
+import { createWebWorkerTransport } from '@migaia/rpc-core/adapters/web-worker'
 
 const worker = new Worker(new URL('./image.worker.ts', import.meta.url), { type: 'module' })
 const transport = createWebWorkerTransport(worker, { peerId: 'image-worker' })
@@ -674,8 +674,8 @@ const images = await createEndpoint({
 })
 const thumbnail = await images.send<Blob>('image-worker', 'resize', { file: new Blob(['demo']), width: 320 })`,
   tabs: `// client-tab.ts：同源 Tab 通过 BroadcastChannel 调用服务 Tab。
-import { connect, contract, createEndpoint, timeout } from '@migaia/rpc/core'
-import { createBroadcastChannelTransport } from '@migaia/rpc/browser/adapters/broadcast-channel'
+import { connect, contract, createEndpoint, timeout } from '@migaia/rpc-core'
+import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'
 
 const channel = new BroadcastChannel('settings-v1')
 const transport = createBroadcastChannelTransport(channel)
@@ -693,8 +693,8 @@ const settings = await createEndpoint({
 })
 const theme = await settings.send<string>('settings-service', 'readTheme', undefined)`,
   serviceWorker: `// page.ts：受控页面通过 ServiceWorker transport 调用离线缓存宿主。
-import { connect, contract, createEndpoint } from '@migaia/rpc/core'
-import { createServiceWorkerTransport } from '@migaia/rpc/browser/adapters/service-worker'
+import { connect, contract, createEndpoint } from '@migaia/rpc-core'
+import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'
 
 await navigator.serviceWorker.ready
 const controller = navigator.serviceWorker.controller
@@ -720,13 +720,13 @@ const cached = await cache.send<boolean>('service-worker', 'hasCache', '/catalog
 
 /** Human-maintained RPC guides keyed by stable public route identity. */
 const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> = {
-  'rpc:core-features-discovery:createDiscoveryFeature': guide({
+  'rpc-core:features-discovery:createDiscoveryFeature': guide({
     purposeEn:
       'Adds the peer discovery and verified bindings to a composed endpoint through the original Feature dependency graph. It creates no socket by itself: the construction scope owns installation, shared dependencies, provider visibility and reverse cleanup after failure.',
     purposeZh:
       '为组合式 endpoint 增加目标发现与已验证绑定，通过原 Feature 依赖图进行装配。工厂本身不创建 socket，也不越过 transport/source 鉴权；construction scope 持有原依赖、原子安装、provider 可见性和失败时的逆序清理。业务仍通过实际 provide/send 能力调用，不能把 Feature 定义当作已安装的服务实例。',
     quickStart:
-      "import { connect } from '@migaia/rpc/core'\nimport { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'\nimport { createOutboundFeature } from '@migaia/rpc/core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc/core/features/provider'\nimport { createDiscoveryFeature } from '@migaia/rpc/core/features/discovery'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  const discovery = createDiscoveryFeature(outbound)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider, 'first-party-discovery': discovery }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
+      "import { connect } from '@migaia/rpc-core'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc-core/features/provider'\nimport { createDiscoveryFeature } from '@migaia/rpc-core/features/discovery'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  const discovery = createDiscoveryFeature(outbound)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider, 'first-party-discovery': discovery }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
     useEn: [
       'A custom endpoint needs this explicit capability together with its declared outbound/provider dependencies.',
       'The application must retain one shared identity, pending registry and cleanup scope while selecting its precise runtime surface.'
@@ -753,13 +753,13 @@ const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale,
       }
     ]
   }),
-  'rpc:core-stream:createCanonicalChunkFeature': guide({
+  'rpc-core:stream:createCanonicalChunkFeature': guide({
     purposeEn:
       'Adds the canonical physical reassembly dependency to a composed endpoint through the original Feature dependency graph. It creates no socket by itself: the construction scope owns installation, shared dependencies, provider visibility and reverse cleanup after failure.',
     purposeZh:
       '为组合式 endpoint 增加规范物理分片重组依赖，通过原 Feature 依赖图进行装配。工厂本身不创建 socket，也不越过 transport/source 鉴权；construction scope 持有原依赖、原子安装、provider 可见性和失败时的逆序清理。业务仍通过实际 provide/send 能力调用，不能把 Feature 定义当作已安装的服务实例。',
     quickStart:
-      "import { connect } from '@migaia/rpc/core'\nimport { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'\nimport { createOutboundFeature } from '@migaia/rpc/core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc/core/features/provider'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
+      "import { connect } from '@migaia/rpc-core'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc-core/features/provider'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
     useEn: [
       'A custom endpoint needs this explicit capability together with its declared outbound/provider dependencies.',
       'The application must retain one shared identity, pending registry and cleanup scope while selecting its precise runtime surface.'
@@ -777,46 +777,46 @@ const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale,
       '不要在选定 Feature 图旁另造接收器、重放账本或 provider 队列。'
     ]
   }),
-  'rpc:core:createEndpoint': endpointGuide({
+  'rpc-core:index:createEndpoint': endpointGuide({
     name: 'createEndpoint',
-    importPath: '@migaia/rpc/core',
+    importPath: '@migaia/rpc-core',
     surfaceEn:
       'call remote methods, provide local methods, discover peers, send control messages, and transfer chunked payloads',
     surfaceZh: '调用远端方法、提供本地方法、发现对端、发送控制消息，并传输需要分片的大数据',
     useEn: 'Use the root preset only when one endpoint needs all five operations listed above.',
     useZh: '只有同一个 endpoint 确实需要上面五类操作时，才使用根入口的完整预设。'
   }),
-  'rpc:core-full:createFullEndpoint': endpointGuide({
+  'rpc-core:full:createFullEndpoint': endpointGuide({
     name: 'createFullEndpoint',
-    importPath: '@migaia/rpc/core/full',
+    importPath: '@migaia/rpc-core/full',
     surfaceEn: 'the explicit full outbound, provider, discovery, control, and chunk surface',
     surfaceZh: '显式完整的 outbound、provider、discovery、control 与 chunk surface',
     useEn: 'The full preset is intentional and the import should make that choice visible.',
     useZh: '明确选择 full preset，并希望 import 直接表达该意图。'
   }),
-  'rpc:core-client:createClientEndpoint': endpointGuide({
+  'rpc-core:client:createClientEndpoint': endpointGuide({
     name: 'createClientEndpoint',
-    importPath: '@migaia/rpc/core/client',
+    importPath: '@migaia/rpc-core/client',
     surfaceEn: 'kernel and outbound call capabilities only',
     surfaceZh: '仅 kernel 与 outbound call capability',
     useEn: 'This endpoint only calls or dispatches to remote providers.',
     useZh: '该 endpoint 只调用远端 provider 或发送单向 dispatch。'
   }),
-  'rpc:core-provider:createProviderEndpoint': endpointGuide({
+  'rpc-core:provider:createProviderEndpoint': endpointGuide({
     name: 'createProviderEndpoint',
-    importPath: '@migaia/rpc/core/provider',
+    importPath: '@migaia/rpc-core/provider',
     surfaceEn: 'outbound calls plus provider registration',
     surfaceZh: 'outbound call 与 provider registration',
     useEn: 'This endpoint exposes methods and may also call its peer.',
     useZh: '该 endpoint 需要暴露 method，并且也可能回调 peer。'
   }),
-  'rpc:core-composed:createComposedEndpoint': guide({
+  'rpc-core:composed:createComposedEndpoint': guide({
     purposeEn:
       'Builds the smallest endpoint from an explicit Feature root record. Private Feature dependencies are installed and deduplicated without silently widening the public root surface.',
     purposeZh:
       '从显式、原生 Feature root record 构造最小 endpoint。私有 Feature dependency 会被安装并去重，但不会静默扩大 public root surface。',
     quickStart:
-      "import { connect } from '@migaia/rpc/core'\nimport { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createOutboundFeature } from '@migaia/rpc/core/features/outbound'\nimport { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'\n\nconst [transport] = createMemoryTransportPair()\nconst chunks = createCanonicalChunkFeature()\nconst outbound = createOutboundFeature(chunks)\nconst endpoint = await createComposedEndpoint(\n  { id: 'client', transport, middlewares: [connect({ transport })] },\n  { 'first-party-outbound': outbound }\n)\n\ntry {\n  console.log('outbound capability installed:', typeof endpoint.send)\n} finally {\n  await endpoint.dispose()\n}",
+      "import { connect } from '@migaia/rpc-core'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\n\nconst [transport] = createMemoryTransportPair()\nconst chunks = createCanonicalChunkFeature()\nconst outbound = createOutboundFeature(chunks)\nconst endpoint = await createComposedEndpoint(\n  { id: 'client', transport, middlewares: [connect({ transport })] },\n  { 'first-party-outbound': outbound }\n)\n\ntry {\n  console.log('outbound capability installed:', typeof endpoint.send)\n} finally {\n  await endpoint.dispose()\n}",
     useEn: [
       'Bundle custody or least-authority design requires an exact capability surface.',
       'A custom endpoint combines only selected first-party Features.'
@@ -831,13 +831,13 @@ const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale,
     ],
     avoidZh: ['确实需要 complete preset。', '传入旧 iterable roots 或重复 Feature owner。']
   }),
-  'rpc:core:defineFeature': guide({
+  'rpc-core:index:defineFeature': guide({
     purposeEn:
       'Defines a reusable RPC Feature that contributes capabilities to an endpoint without installing an uncontrolled parallel host.',
     purposeZh:
       '定义可复用的 RPC Feature，为 endpoint 增加明确的 capability surface，同时不建立失控的平行 host。Feature factory 在 endpoint 安装时才执行，返回的对象就是调用方随后能够使用的能力面；数据通常从 transport 进入，由已有 Feature 处理后，再通过这个 surface 暴露给业务代码。Feature 也可以通过 dependencies 声明必须先安装的前置能力。',
     quickStart:
-      "import { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { connect, defineFeature } from '@migaia/rpc/core'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\n\nconst audit = defineFeature(() => {\n  let received = 0\n  return {\n    recordMessage: (message: string) => {\n      received += 1\n      console.log('received:', message)\n    },\n    receivedCount: () => received\n  }\n})\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint(\n  { id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] },\n  { audit }\n)\ntry {\n  const message = 'order-created'\n  service.recordMessage(message) // 输入数据进入业务能力；Feature 内部累计处理次数。\n  console.log(service.receivedCount()) // 1：返回值就是 endpoint 安装 audit 后获得的能力面。\n} finally {\n  await service.dispose()\n}",
+      "import { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { connect, defineFeature } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst audit = defineFeature(() => {\n  let received = 0\n  return {\n    recordMessage: (message: string) => {\n      received += 1\n      console.log('received:', message)\n    },\n    receivedCount: () => received\n  }\n})\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint(\n  { id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] },\n  { audit }\n)\ntry {\n  const message = 'order-created'\n  service.recordMessage(message) // 输入数据进入业务能力；Feature 内部累计处理次数。\n  console.log(service.receivedCount()) // 1：返回值就是 endpoint 安装 audit 后获得的能力面。\n} finally {\n  await service.dispose()\n}",
     useEn: [
       'A feature is reused across several explicitly composed endpoints.',
       'Business data needs a narrow, typed surface after transport or protocol processing.',
@@ -851,37 +851,37 @@ const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale,
     avoidEn: ['Using a feature to hide endpoint-wide transport or lifecycle ownership.'],
     avoidZh: ['用 feature 隐藏 endpoint-wide transport 或 lifecycle ownership。']
   }),
-  'rpc:core:defineMiddleware': guide({
+  'rpc-core:index:defineMiddleware': guide({
     purposeEn:
       'Defines a reusable middleware descriptor whose installation and ordering remain owned by the endpoint composition.',
     purposeZh:
       '定义可复用 middleware descriptor，同时让 installation 与 ordering 继续由 endpoint composition 拥有。',
     quickStart:
-      "import { connect, createEndpoint, defineMiddleware } from '@migaia/rpc/core'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\n\nconst audit = defineMiddleware('audit', (core) => ({\n  install: () => {\n    console.log('installing audit for', core.id)\n    return {}\n  }\n}))\nconst [transport] = createMemoryTransportPair()\nconst endpoint = await createEndpoint({\n  id: 'audited-client', transport,\n  middlewares: [audit, connect({ transport })] as const\n})\ntry {\n  console.log('audit middleware installed')\n} finally {\n  await endpoint.dispose()\n}",
+      "import { connect, createEndpoint, defineMiddleware } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst audit = defineMiddleware('audit', (core) => ({\n  install: () => {\n    console.log('installing audit for', core.id)\n    return {}\n  }\n}))\nconst [transport] = createMemoryTransportPair()\nconst endpoint = await createEndpoint({\n  id: 'audited-client', transport,\n  middlewares: [audit, connect({ transport })] as const\n})\ntry {\n  console.log('audit middleware installed')\n} finally {\n  await endpoint.dispose()\n}",
     useEn: ['A cross-cutting concern must be installed consistently on selected endpoints.'],
     useZh: ['cross-cutting concern 需要在选定 endpoint 上一致安装。'],
     avoidEn: ['Mutating endpoint state outside the declared middleware lifecycle.'],
     avoidZh: ['在声明的 middleware lifecycle 之外修改 endpoint state。']
   }),
-  'rpc:core:framer': guide({
+  'rpc-core:index:framer': guide({
     purposeEn:
       'Defines the frame boundary used to encode and decode transport messages, keeping chunking and message ownership explicit.',
     purposeZh:
       '定义 transport message 使用的 frame boundary，让分片与 message ownership 保持显式。',
     quickStart:
-      "import { framer, codec, connect, createEndpoint } from '@migaia/rpc/core'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createStringFramer } from '@migaia/rpc/contract/framing'\nimport { defineJsonCodec } from '@migaia/serialize/codecs/json'\n\nconst [transport] = createMemoryTransportPair()\nconst framePlugin = framer(createStringFramer({ chunkBytes: 64, maxMessageBytes: 16 * 1024 }))\nconst endpoint = await createEndpoint({\n  id: 'client', transport,\n  middlewares: [codec(defineJsonCodec({ version: 1 })), framePlugin, connect({ transport })] as const\n})\ntry {\n  console.log('bounded string framing ready')\n} finally {\n  await endpoint.dispose()\n}",
+      "import { framer, codec, connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createStringFramer } from '@migaia/rpc-contract/framing'\nimport { defineJsonCodec } from '@migaia/serialize/codecs/json'\n\nconst [transport] = createMemoryTransportPair()\nconst framePlugin = framer(createStringFramer({ chunkBytes: 64, maxMessageBytes: 16 * 1024 }))\nconst endpoint = await createEndpoint({\n  id: 'client', transport,\n  middlewares: [codec(defineJsonCodec({ version: 1 })), framePlugin, connect({ transport })] as const\n})\ntry {\n  console.log('bounded string framing ready')\n} finally {\n  await endpoint.dispose()\n}",
     useEn: ['A transport needs an explicit framing policy for bounded messages.'],
     useZh: ['transport 需要为 bounded message 指定显式 framing policy。'],
     avoidEn: ['Treating framing as an unbounded or implicitly shared transport detail.'],
     avoidZh: ['把 framing 当作无界或隐式共享的 transport detail。']
   }),
-  'rpc:core-features-control:createControlFeature': guide({
+  'rpc-core:features-control:createControlFeature': guide({
     purposeEn:
       'Adds the bounded ping, cancellation and close control to a composed endpoint through the original Feature dependency graph. It creates no socket by itself: the construction scope owns installation, shared dependencies, provider visibility and reverse cleanup after failure.',
     purposeZh:
       '为组合式 endpoint 增加受限探活、取消和关闭控制，通过原 Feature 依赖图进行装配。工厂本身不创建 socket，也不越过 transport/source 鉴权；construction scope 持有原依赖、原子安装、provider 可见性和失败时的逆序清理。业务仍通过实际 provide/send 能力调用，不能把 Feature 定义当作已安装的服务实例。',
     quickStart:
-      "import { connect } from '@migaia/rpc/core'\nimport { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'\nimport { createOutboundFeature } from '@migaia/rpc/core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc/core/features/provider'\nimport { createDiscoveryFeature } from '@migaia/rpc/core/features/discovery'\nimport { createControlFeature } from '@migaia/rpc/core/features/control'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  const discovery = createDiscoveryFeature(outbound)\n  const selected = createControlFeature(outbound, discovery)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider, 'first-party-discovery': discovery, 'first-party-control': selected }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
+      "import { connect } from '@migaia/rpc-core'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc-core/features/provider'\nimport { createDiscoveryFeature } from '@migaia/rpc-core/features/discovery'\nimport { createControlFeature } from '@migaia/rpc-core/features/control'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  const discovery = createDiscoveryFeature(outbound)\n  const selected = createControlFeature(outbound, discovery)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider, 'first-party-discovery': discovery, 'first-party-control': selected }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
     useEn: [
       'A custom endpoint needs this explicit capability together with its declared outbound/provider dependencies.',
       'The application must retain one shared identity, pending registry and cleanup scope while selecting its precise runtime surface.'
@@ -915,7 +915,7 @@ const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale,
       }
     ]
   }),
-  'rpc:core:connect': middlewareGuide({
+  'rpc-core:index:connect': middlewareGuide({
     name: 'connect',
     purposeEn:
       'Installs the single transport authority, subscribes inbound frames, and owns transport cleanup according to declared custody.',
@@ -928,13 +928,13 @@ const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale,
       'Installing more than one connect middleware or providing conflicting transport objects.',
     avoidZh: '安装多个 connect middleware，或提供互相冲突的 transport object。'
   }),
-  'rpc:core:contract': middlewareGuide({
+  'rpc-core:index:contract': middlewareGuide({
     name: 'contract',
     purposeEn:
       'Negotiates an accepted protocol version and validates method parameters and results through small parse-compatible schemas at the network boundary.',
     purposeZh:
       '协商可接受的 protocol version，并通过 parse-compatible schema 在 network boundary 校验 method parameter 与 result。',
-    code: "import { connect, contract, createEndpoint } from '@migaia/rpc/core'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\n\nconst [clientTransport, serverTransport] = createMemoryTransportPair()\nconst productContract = contract({\n  version: '1',\n  schemas: {\n    findProduct: {\n      params: { parse: (value: unknown) => String(value) },\n      result: { parse: (value: unknown) => value }\n    }\n  }\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  transport: clientTransport,\n  middlewares: [productContract, connect({ transport: clientTransport })]\n})\nconst server = await createEndpoint({\n  id: 'server',\n  transport: serverTransport,\n  middlewares: [productContract, connect({ transport: serverTransport })]\n})\n\n// 两端共享同一个 contract；请求参数和返回值都会在 wire boundary 校验。\nconsole.log('contract ready:', client.id, server.id)\n\ntry {\n  console.log('业务调用应把 client 接到 outbound、server 接到 provider，双方都会经过上面的参数和返回值校验。')\n} finally {\n  await Promise.all([client.dispose(), server.dispose()])\n}",
+    code: "import { connect, contract, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [clientTransport, serverTransport] = createMemoryTransportPair()\nconst productContract = contract({\n  version: '1',\n  schemas: {\n    findProduct: {\n      params: { parse: (value: unknown) => String(value) },\n      result: { parse: (value: unknown) => value }\n    }\n  }\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  transport: clientTransport,\n  middlewares: [productContract, connect({ transport: clientTransport })]\n})\nconst server = await createEndpoint({\n  id: 'server',\n  transport: serverTransport,\n  middlewares: [productContract, connect({ transport: serverTransport })]\n})\n\n// 两端共享同一个 contract；请求参数和返回值都会在 wire boundary 校验。\nconsole.log('contract ready:', client.id, server.id)\n\ntry {\n  console.log('业务调用应把 client 接到 outbound、server 接到 provider，双方都会经过上面的参数和返回值校验。')\n} finally {\n  await Promise.all([client.dispose(), server.dispose()])\n}",
     examplesEn: [
       {
         id: 'iframe-transport',
@@ -1000,20 +1000,20 @@ const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale,
     avoidEn: 'Treating a version string as peer authentication.',
     avoidZh: '把 version string 当作 peer authentication。'
   }),
-  'rpc:core:protocol': middlewareGuide({
+  'rpc-core:index:protocol': middlewareGuide({
     name: 'protocol',
     purposeEn:
       'Defines the outbound encoder and inbound decoder for wire envelopes and declares the encoded representation expected by the transport.',
     purposeZh:
       '定义 wire envelope 的 outbound encoder 与 inbound decoder，并声明 transport 期望的 encoded representation。',
-    code: "import { protocol } from '@migaia/rpc/core'\n\n// protocol only encodes and decodes the wire envelope; endpoint code supplies business data.\nconst jsonProtocol = protocol({ encodedType: 'string', encode: JSON.stringify, decode: JSON.parse })\nconsole.log(jsonProtocol)",
+    code: "import { protocol } from '@migaia/rpc-core'\n\n// protocol only encodes and decodes the wire envelope; endpoint code supplies business data.\nconst jsonProtocol = protocol({ encodedType: 'string', encode: JSON.stringify, decode: JSON.parse })\nconsole.log(jsonProtocol)",
     useEn:
       'The transport cannot carry structured objects directly or a stable wire codec is required.',
     useZh: 'transport 不能直接承载 structured object，或需要稳定 wire codec。',
     avoidEn: 'Encoding business payloads independently outside the envelope codec.',
     avoidZh: '在 envelope codec 外独立编码 business payload。'
   }),
-  'rpc:core:authentication': middlewareGuide({
+  'rpc-core:index:authentication': middlewareGuide({
     name: 'authentication',
     purposeEn:
       'Protects every outbound and inbound frame, including control and chunk frames, by applying paired encryption/decryption and signing/verification transforms in the defined order.',
@@ -1054,7 +1054,7 @@ const decrypt = async (value: unknown) => {
       'Configuring only one half of an encryption or signature pair, or requiring transferable zero-copy buffers.',
     avoidZh: '只配置 encryption/signature pair 的一半，或仍要求 transferable zero-copy buffer。'
   }),
-  'rpc:core:chunk': middlewareGuide({
+  'rpc-core:index:chunk': middlewareGuide({
     name: 'chunk',
     purposeEn:
       'Configures bounded splitting and reassembly for large string envelopes, with limits for message size, peers, buffered bytes, chunk count, and assembly lifetime.',
@@ -1066,7 +1066,7 @@ const decrypt = async (value: unknown) => {
     avoidEn: 'Splitting Uint8Array payloads or disabling bounds on an untrusted channel.',
     avoidZh: '拆分 Uint8Array payload，或在 untrusted channel 上关闭边界。'
   }),
-  'rpc:core:timeout': middlewareGuide({
+  'rpc-core:index:timeout': middlewareGuide({
     name: 'timeout',
     purposeEn:
       'Applies a bounded deadline to outbound request/response work and rejects timed-out calls with a stable RpcTimeoutError contract.',
@@ -1078,7 +1078,7 @@ const decrypt = async (value: unknown) => {
     avoidEn: 'Using a large timeout to conceal an overloaded or unreachable provider.',
     avoidZh: '用很大的 timeout 掩盖 overloaded 或 unreachable provider。'
   }),
-  'rpc:core:ping': middlewareGuide({
+  'rpc-core:index:ping': middlewareGuide({
     name: 'ping',
     purposeEn:
       'Adds control-frame liveness probes and exposes ping or pingAll only when the selected endpoint surface also owns control capability.',
@@ -1098,7 +1098,7 @@ const decrypt = async (value: unknown) => {
     avoidEn: 'Treating a successful ping as authentication or business-service readiness.',
     avoidZh: '把 ping 成功当作 authentication 或 business-service readiness。'
   }),
-  'rpc:core:abort': middlewareGuide({
+  'rpc-core:index:abort': middlewareGuide({
     name: 'abort',
     purposeEn:
       'Enables propagation of caller cancellation to in-flight remote provider work while preserving the original abort reason at the local boundary.',
@@ -1110,7 +1110,7 @@ const decrypt = async (value: unknown) => {
     avoidEn: 'Assuming cancellation can undo remote side effects that already committed.',
     avoidZh: '假设 cancellation 能撤销远端已经 commit 的 side effect。'
   }),
-  'rpc:core:hooks': middlewareGuide({
+  'rpc-core:index:hooks': middlewareGuide({
     name: 'hooks',
     purposeEn:
       'Installs ordered observability listeners for endpoint lifecycle and operation events while containing listener failures away from RPC results.',
@@ -1123,7 +1123,7 @@ const decrypt = async (value: unknown) => {
       'Implementing business control flow or mutating RPC results from a diagnostic listener.',
     avoidZh: '在 diagnostic listener 中实现 business control flow 或修改 RPC result。'
   }),
-  'rpc:core:uuid': middlewareGuide({
+  'rpc-core:index:uuid': middlewareGuide({
     name: 'uuid',
     purposeEn:
       'Supplies the identifier generator used for tasks, messages, and variations while retaining collision and replay checks.',
@@ -1135,13 +1135,13 @@ const decrypt = async (value: unknown) => {
     avoidEn: 'Using sequential or low-entropy identifiers on an untrusted channel.',
     avoidZh: '在 untrusted channel 上使用 sequential 或 low-entropy identifier。'
   }),
-  'rpc:core:codec': guide({
+  'rpc-core:index:codec': guide({
     purposeEn:
       'Declares the wire representation used by an endpoint so encoding and decoding remain symmetric across the transport boundary.',
     purposeZh:
       '声明 endpoint 使用的 wire representation，确保 transport boundary 两侧的 encode 与 decode 保持对称。',
-    quickStart: `import { codec, connect, createEndpoint } from '@migaia/rpc/core'
-import { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'
+    quickStart: `import { codec, connect, createEndpoint } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
 
 const [transport] = createMemoryTransportPair()
 const endpointCodec = codec({
@@ -1166,13 +1166,13 @@ try {
     avoidEn: ['Changing codec identity after peers adopt the contract.'],
     avoidZh: ['peer 采用 contract 后再改变 codec identity。']
   }),
-  'rpc:core-features-outbound:createOutboundFeature': guide({
+  'rpc-core:features-outbound:createOutboundFeature': guide({
     purposeEn:
       'Adds the outbound calls and response correlation to a composed endpoint through the original Feature dependency graph. It creates no socket by itself: the construction scope owns installation, shared dependencies, provider visibility and reverse cleanup after failure.',
     purposeZh:
       '为组合式 endpoint 增加出站请求与响应关联，通过原 Feature 依赖图进行装配。工厂本身不创建 socket，也不越过 transport/source 鉴权；construction scope 持有原依赖、原子安装、provider 可见性和失败时的逆序清理。业务仍通过实际 provide/send 能力调用，不能把 Feature 定义当作已安装的服务实例。',
     quickStart:
-      "import { connect } from '@migaia/rpc/core'\nimport { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'\nimport { createOutboundFeature } from '@migaia/rpc/core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc/core/features/provider'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
+      "import { connect } from '@migaia/rpc-core'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc-core/features/provider'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
     useEn: [
       'A custom endpoint needs this explicit capability together with its declared outbound/provider dependencies.',
       'The application must retain one shared identity, pending registry and cleanup scope while selecting its precise runtime surface.'
@@ -1199,13 +1199,13 @@ try {
       }
     ]
   }),
-  'rpc:core-features-provider:createProviderFeature': guide({
+  'rpc-core:features-provider:createProviderFeature': guide({
     purposeEn:
       'Adds the explicit method registration and provider admission to a composed endpoint through the original Feature dependency graph. It creates no socket by itself: the construction scope owns installation, shared dependencies, provider visibility and reverse cleanup after failure.',
     purposeZh:
       '为组合式 endpoint 增加显式方法注册与 provider 准入，通过原 Feature 依赖图进行装配。工厂本身不创建 socket，也不越过 transport/source 鉴权；construction scope 持有原依赖、原子安装、provider 可见性和失败时的逆序清理。业务仍通过实际 provide/send 能力调用，不能把 Feature 定义当作已安装的服务实例。',
     quickStart:
-      "import { connect } from '@migaia/rpc/core'\nimport { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'\nimport { createOutboundFeature } from '@migaia/rpc/core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc/core/features/provider'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
+      "import { connect } from '@migaia/rpc-core'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc-core/features/provider'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
     useEn: [
       'A custom endpoint needs this explicit capability together with its declared outbound/provider dependencies.',
       'The application must retain one shared identity, pending registry and cleanup scope while selecting its precise runtime surface.'
@@ -1237,12 +1237,12 @@ try {
       'Lets a composed endpoint receive, validate, and reassemble chunk frames. The feature token selects that runtime owner; the root chunk({...}) middleware separately defines how outgoing strings are split and how much incomplete data may be buffered. Real two-way use normally installs both on every peer.',
     purposeZh:
       '让组合式 endpoint 能接收、校验并重组分片消息。Feature token 负责安装分片帧处理器；根入口的 chunk({...}) middleware 负责配置发送端如何拆分字符串，以及接收端最多允许缓存多少未完成数据。真实双向通信通常要求两端都同时选择 Feature 并安装 middleware。',
-    quickStart: `import { chunk as configureChunk, connect } from '@migaia/rpc/core'
-import { createComposedEndpoint } from '@migaia/rpc/core/composed'
-import { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'
-import { chunk as selectChunkFrames } from '@migaia/rpc/core/features/chunk'
-import { outbound } from '@migaia/rpc/core/features/outbound'
-import { provider } from '@migaia/rpc/core/features/provider'
+    quickStart: `import { chunk as configureChunk, connect } from '@migaia/rpc-core'
+import { createComposedEndpoint } from '@migaia/rpc-core/composed'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+import { chunk as selectChunkFrames } from '@migaia/rpc-core/features/chunk'
+import { outbound } from '@migaia/rpc-core/features/outbound'
+import { provider } from '@migaia/rpc-core/features/provider'
 
 const [clientTransport, serviceTransport] = createMemoryTransportPair()
 const chunkPolicy = {
@@ -1418,9 +1418,9 @@ try {
       }
     ]
   }),
-  'rpc:core-adapters-memory:createMemoryTransportPair': transportGuide({
+  'rpc-core:adapters-memory:createMemoryTransportPair': transportGuide({
     name: 'createMemoryTransportPair',
-    importPath: '@migaia/rpc/core/adapters/memory',
+    importPath: '@migaia/rpc-core/adapters/memory',
     expression: 'createMemoryTransportPair()',
     boundaryEn: 'an isolated in-process paired channel',
     boundaryZh: '隔离的 in-process paired channel',
@@ -1429,7 +1429,7 @@ try {
   }),
   'rpc:browser-adapters-broadcast-channel:createBroadcastChannelTransport': transportGuide({
     name: 'createBroadcastChannelTransport',
-    importPath: '@migaia/rpc/browser/adapters/broadcast-channel',
+    importPath: '@migaia/rpc-browser/adapters/broadcast-channel',
     expression: "createBroadcastChannelTransport(new BroadcastChannel('migaia'))",
     boundaryEn: 'a BroadcastChannel shared by same-origin contexts',
     boundaryZh: '由 same-origin context 共享的 BroadcastChannel',
@@ -1438,18 +1438,18 @@ try {
     cautionZh:
       '需要把 channel 当作 authentication boundary；BroadcastChannel 只提供 honest-node routing。'
   }),
-  'rpc:core-adapters-message-port:createBrowserMessagePortTransport': transportGuide({
+  'rpc-core:adapters-message-port:createBrowserMessagePortTransport': transportGuide({
     name: 'createBrowserMessagePortTransport',
-    importPath: '@migaia/rpc/core/adapters/message-port',
+    importPath: '@migaia/rpc-core/adapters/message-port',
     expression: "createBrowserMessagePortTransport(port, { ownership: 'owned' })",
     boundaryEn: 'a browser MessagePort',
     boundaryZh: 'browser MessagePort',
     cautionEn: 'The port lifecycle is owned elsewhere; use borrowed custody instead of closing it.',
     cautionZh: 'port lifecycle 由外部拥有；应使用 borrowed custody，不能关闭它。'
   }),
-  'rpc:core-adapters-message-port:createNodeMessagePortTransport': transportGuide({
+  'rpc-core:adapters-message-port:createNodeMessagePortTransport': transportGuide({
     name: 'createNodeMessagePortTransport',
-    importPath: '@migaia/rpc/core/adapters/message-port',
+    importPath: '@migaia/rpc-core/adapters/message-port',
     expression: 'createNodeMessagePortTransport(port)',
     boundaryEn: 'a Node-compatible MessagePort',
     boundaryZh: 'Node-compatible MessagePort',
@@ -1458,7 +1458,7 @@ try {
   }),
   'rpc:browser-adapters-web-worker:createWebWorkerTransport': transportGuide({
     name: 'createWebWorkerTransport',
-    importPath: '@migaia/rpc/core/adapters/web-worker',
+    importPath: '@migaia/rpc-core/adapters/web-worker',
     expression: 'createWebWorkerTransport(worker)',
     boundaryEn: 'a dedicated Worker or WorkerGlobalScope-like port',
     boundaryZh: 'dedicated Worker 或 WorkerGlobalScope-like port',
@@ -1467,7 +1467,7 @@ try {
   }),
   'rpc:browser-adapters-shared-worker:createSharedWorkerTransport': transportGuide({
     name: 'createSharedWorkerTransport',
-    importPath: '@migaia/rpc/browser/adapters/shared-worker',
+    importPath: '@migaia/rpc-browser/adapters/shared-worker',
     expression: 'createSharedWorkerTransport(worker.port)',
     boundaryEn: 'a SharedWorker MessagePort with multiplexed peer assumptions',
     boundaryZh: '具有 multiplexed peer assumption 的 SharedWorker MessagePort',
@@ -1476,7 +1476,7 @@ try {
   }),
   'rpc:browser-adapters-service-worker:createServiceWorkerTransport': transportGuide({
     name: 'createServiceWorkerTransport',
-    importPath: '@migaia/rpc/browser/adapters/service-worker',
+    importPath: '@migaia/rpc-browser/adapters/service-worker',
     expression:
       'createServiceWorkerTransport({ target: controller, receiver: navigator.serviceWorker })',
     boundaryEn: 'a ServiceWorker target and its separate message receiver',
@@ -1486,7 +1486,7 @@ try {
   }),
   'rpc:browser-adapters-window:createWindowMessageTransport': transportGuide({
     name: 'createWindowMessageTransport',
-    importPath: '@migaia/rpc/browser/adapters/window',
+    importPath: '@migaia/rpc-browser/adapters/window',
     expression:
       "createWindowMessageTransport({ target: frame.contentWindow!, receiver: window, targetOrigin: 'https://trusted.example' })",
     boundaryEn: 'window.postMessage between a window and an iframe or opener',
@@ -1496,7 +1496,7 @@ try {
   }),
   'rpc:browser-adapters-rtc-data-channel:createRtcDataChannelTransport': transportGuide({
     name: 'createRtcDataChannelTransport',
-    importPath: '@migaia/rpc/browser/adapters/rtc-data-channel',
+    importPath: '@migaia/rpc-browser/adapters/rtc-data-channel',
     expression: 'createRtcDataChannelTransport(dataChannel)',
     boundaryEn: 'an open RTCDataChannel',
     boundaryZh: '已打开的 RTCDataChannel',
@@ -1506,7 +1506,7 @@ try {
   }),
   'rpc:browser-adapters-web-transport:createWebTransportDatagramTransport': transportGuide({
     name: 'createWebTransportDatagramTransport',
-    importPath: '@migaia/rpc/browser/adapters/web-transport',
+    importPath: '@migaia/rpc-browser/adapters/web-transport',
     expression: 'createWebTransportDatagramTransport(session.datagrams)',
     boundaryEn: 'WebTransport unreliable datagrams',
     boundaryZh: 'WebTransport unreliable datagram',
@@ -1517,13 +1517,13 @@ try {
 
 /** RPC Contract guide entries introduced by rpc-contract exports used by RPC runtime setup. */
 const rpcContractGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> = {
-  'rpc:contract:createDescriptor': guide({
+  'rpc-contract:index:createDescriptor': guide({
     purposeEn:
       'Creates a typed contract descriptor for versioned RPC operations and keeps the resulting identity stable across endpoint creation and test coverage.',
     purposeZh:
       '创建可用于版本化 RPC 的类型化契约 descriptor。它只记录“这个 RPC 契约叫什么、当前是第几版”，不会自动发送请求；业务协议可以把它登记起来，在接收请求前按 ID 和版本找到同一份契约。',
     quickStart:
-      "import { createDescriptor } from '@migaia/rpc/contract'\n\nconst readOrders = createDescriptor('read-orders', 1)\n// 注册表让 endpoint 或协议处理器按稳定 ID 找到契约。\nconst contracts = new Map([[readOrders.id, readOrders]])\nconst selected = contracts.get('read-orders')\nconsole.log(selected?.id, selected?.version) // read-orders 1",
+      "import { createDescriptor } from '@migaia/rpc-contract'\n\nconst readOrders = createDescriptor('read-orders', 1)\n// 注册表让 endpoint 或协议处理器按稳定 ID 找到契约。\nconst contracts = new Map([[readOrders.id, readOrders]])\nconst selected = contracts.get('read-orders')\nconsole.log(selected?.id, selected?.version) // read-orders 1",
     useEn: [
       'A public endpoint method or custom protocol needs a stable descriptor before any request is accepted.'
     ],
@@ -1551,13 +1551,103 @@ const webRpcCoreGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IA
 
 /** Cross-realm error utilities and stable failure contracts. */
 const webRpcErrorGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> = {
-  'rpc:contract:serializeRpcError': guide({
+  'rpc-contract:errors:classifyRpcContractError': guide({
+    purposeEn:
+      'Reads the stable diagnostic code and message for the exact error raised by this protocol instance. A receiver can present an invalid envelope safely without reading hostile error getters or exposing its local cause.',
+    purposeZh:
+      '读取当前协议实例实际产生的错误所对应的稳定 code 与 message。接收方可展示无效 envelope 的受控诊断，不读取错误 getter，也不遍历可能含本地输入的 cause。',
+    quickStart: `import { classifyRpcContractError, normalizeRpcEnvelope } from '@migaia/rpc-contract'
+
+try {
+  normalizeRpcEnvelope({})
+} catch (error) {
+  const diagnostic = classifyRpcContractError(error)
+  if (!diagnostic) throw error
+  console.error(diagnostic.code, diagnostic.message)
+}`,
+    useEn: [
+      'A protocol receiver needs controlled diagnostics for an envelope rejected by the actual normalizer.',
+      'A diagnostic UI must display a protocol violation without inspecting the error cause or invoking its getters.'
+    ],
+    useZh: [
+      '协议接收方需要展示实际 normalizer 拒绝 envelope 后产生的受控诊断。',
+      '诊断界面需要显示协议违例，同时避免访问错误 cause 或调用其 getter。'
+    ],
+    avoidEn: [
+      'A foreign or copied error needs classification; this operation returns undefined for those values.',
+      'Core or Remote errors need their own wire presentation; use the Core error operations instead.'
+    ],
+    avoidZh: [
+      '要分类外部或复制得到的错误；此操作对这些值返回 undefined。',
+      '要编码 Core 或 Remote 错误的线上诊断；应使用 Core 自己的错误操作。'
+    ]
+  }),
+  'rpc-core:index:serializeRpcError': guide({
+    purposeEn:
+      'Encodes a held Core or Remote error as bounded protocol data using its existing presentation and forwarding-route policy. Custom carriers retain the local error and cause while sending the same controlled diagnostic fields as the built-in transport.',
+    purposeZh:
+      '按原诊断与 forwarding-route 策略，把持有的 Core 或 Remote 错误编码为有界协议数据。自定义载体保留本地错误及 cause，线上使用与内置 transport 相同的受控诊断字段。',
+    quickStart: `import { RpcConfigurationError, serializeRpcError } from '@migaia/rpc-core'
+
+const local = new RpcConfigurationError('Carrier configuration is invalid', new Error('Native setup failed'))
+const wire = serializeRpcError(local, { report: ({ error }) => console.error(error) })
+const message = JSON.stringify({ error: wire })
+console.log(message)`,
+    useEn: [
+      'A custom carrier needs to transmit an actual Core or Remote failure with its existing redaction policy.',
+      'A relay must preserve admitted forwarding routes when it re-encodes a received failure.'
+    ],
+    useZh: [
+      '自定义载体需要传输实际 Core 或 Remote 错误，并沿用其原脱敏策略。',
+      '中继重新编码收到的错误时，需要保留已接纳的 forwarding route。'
+    ],
+    avoidEn: [
+      'Only independent protocol data is handled; use the Contract serializer for that implementation.',
+      'The application wants to send arbitrary objects or raw private causes without the error owner policy.'
+    ],
+    avoidZh: [
+      '只处理独立协议实现的数据；该实现应使用 Contract 的错误编码操作。',
+      '要发送任意对象或绕过错误 owner 策略暴露原私有 cause。'
+    ]
+  }),
+  'rpc-core:index:deserializeRpcError': guide({
+    purposeEn:
+      'Validates received error protocol data and restores its native error graph without replacing the transmitted stack. Core retains the admitted route for subsequent forwarding or re-encoding by a custom carrier.',
+    purposeZh:
+      '校验接收到的错误协议数据并恢复原生错误图，不替换传来的 stack。Core 持有已接纳的 route，供自定义载体随后转发或重新编码同一个错误。',
+    quickStart: `import { RpcConfigurationError, serializeRpcError, deserializeRpcError } from '@migaia/rpc-core'
+
+const sent = serializeRpcError(new RpcConfigurationError('Carrier configuration is invalid'), {
+  report: ({ error }) => console.error(error)
+})
+const received: unknown = JSON.parse(JSON.stringify(sent))
+const restored = deserializeRpcError(received)
+console.log(Reflect.get(restored, 'source'), Reflect.get(restored, 'code'))
+console.log(restored.stack === sent.stack)`,
+    useEn: [
+      'A custom carrier receives error data that must be validated before it becomes a local throwable value.',
+      'A relay needs the same restored error and route when it forwards or serializes a failure again.'
+    ],
+    useZh: [
+      '自定义载体收到错误数据，需要先校验再恢复为可在本地抛出的值。',
+      '中继转发或再次编码失败时，需要保留恢复后的同一个错误及 route。'
+    ],
+    avoidEn: [
+      'A local Error already exists; retain that object instead of reconstructing it.',
+      'Received stack or data is treated as executable input rather than diagnostic content.'
+    ],
+    avoidZh: [
+      '本地已经持有 Error；应保留原对象，而不是再次恢复。',
+      '要把收到的 stack 或 data 当作可执行输入，而不是诊断内容。'
+    ]
+  }),
+  'rpc-contract:index:serializeRpcError': guide({
     purposeEn:
       'Serializes an Error and its bounded cause or AggregateError graph into a cross-realm record containing name, message, stack, source, code, data, and nested failures.',
     purposeZh:
       '把 Error 及其有界 cause/AggregateError graph 序列化成跨 realm record，保留 name、message、stack、source、code、data 与 nested failure。',
     quickStart:
-      "import { serializeRpcError } from '@migaia/rpc/contract'\n\nconst error = new Error('remote failure')\nconst payload = serializeRpcError(error, { report: console.error })\nconsole.log(payload)",
+      "import { serializeRpcError } from '@migaia/rpc-contract'\n\nconst error = new Error('remote failure')\nconst payload = serializeRpcError(error, { report: console.error })\nconsole.log(payload)",
     useEn: [
       'An error must cross a Worker, window, or transport boundary without losing diagnostic identity.'
     ],
@@ -1570,13 +1660,13 @@ const webRpcErrorGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, I
     ],
     avoidZh: ['序列化任意 application data。', '用 receiver-side stack 替换原始 stack。']
   }),
-  'rpc:contract:deserializeRpcError': guide({
+  'rpc-contract:index:deserializeRpcError': guide({
     purposeEn:
       'Reconstructs a received serialized failure into the closest supported Error class while retaining the transmitted stack, source/code identity, data, and cause graph.',
     purposeZh:
       '把收到的 serialized failure 重建为最接近的受支持 Error class，同时保留 transmitted stack、source/code identity、data 与 cause graph。',
     quickStart:
-      "import { deserializeRpcError, serializeRpcError } from '@migaia/rpc/contract'\n\nconst message = { error: serializeRpcError(new Error('remote failure'), { report: console.error }) }\nconst remoteError = deserializeRpcError(message.error)\nconsole.error(remoteError)",
+      "import { deserializeRpcError, serializeRpcError } from '@migaia/rpc-contract'\n\nconst message = { error: serializeRpcError(new Error('remote failure'), { report: console.error }) }\nconst remoteError = deserializeRpcError(message.error)\nconsole.error(remoteError)",
     useEn: [
       'A serialized remote failure must become a throwable local value with inspectable provenance.'
     ],
@@ -1590,13 +1680,13 @@ const webRpcErrorGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, I
       '重新生成 local error 并丢弃 transmitted identity。'
     ]
   }),
-  'rpc:contract:reachRpcError': guide({
+  'rpc-contract:index:reachRpcError': guide({
     purposeEn:
       'Traverses an error, its cause chain, and AggregateError.errors in bounded identity order so reporting and contract checks can find every reachable original failure.',
     purposeZh:
       '按有界 identity order 遍历 error、cause chain 与 AggregateError.errors，让 reporting 与 contract check 能找到每个可达的原始 failure。',
     quickStart:
-      "import { reachRpcError } from '@migaia/rpc/contract'\n\nconst originalError = new Error('database unavailable')\nconst error = new Error('request failed', { cause: originalError })\nfor (const cause of reachRpcError(error, { report: console.error })) {\n  if (cause === originalError) console.log('original reached')\n}",
+      "import { reachRpcError } from '@migaia/rpc-contract'\n\nconst originalError = new Error('database unavailable')\nconst error = new Error('request failed', { cause: originalError })\nfor (const cause of reachRpcError(error, { report: console.error })) {\n  if (cause === originalError) console.log('original reached')\n}",
     useEn: ['Diagnostics or tests must prove that wrapping preserved original error identity.'],
     useZh: ['diagnostics 或 test 必须证明 wrapping 保留了 original error identity。'],
     avoidEn: [
@@ -1605,13 +1695,13 @@ const webRpcErrorGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, I
     ],
     avoidZh: ['遍历期间修改 error。', '假设每个 yielded value 都是 Error instance。']
   }),
-  'rpc:core:isRpcError': guide({
+  'rpc-core:index:isRpcError': guide({
     purposeEn:
       'Detects the public RPC error shape without same-realm instanceof, making it useful after cross-realm reconstruction.',
     purposeZh:
       '不依赖 same-realm instanceof，按 public RPC error shape 做窄化，因此适用于 cross-realm reconstruction 之后。',
     quickStart:
-      "import { isRpcError } from '@migaia/rpc/core'\n\nconst error: unknown = { source: '@migaia/rpc/core', code: 'DEADLINE_EXCEEDED' }\nif (isRpcError(error) && error.code === 'DEADLINE_EXCEEDED') {\n  console.log('retrying after remote deadline')\n}",
+      "import { isRpcError } from '@migaia/rpc-core'\n\nconst error: unknown = { source: '@migaia/rpc/core', code: 'DEADLINE_EXCEEDED' }\nif (isRpcError(error) && error.code === 'DEADLINE_EXCEEDED') {\n  console.log('retrying after remote deadline')\n}",
     useEn: ['A catch boundary needs machine-readable source/code handling across realms.'],
     useZh: ['catch boundary 需要跨 realm 的 machine-readable source/code handling。'],
     avoidEn: [
@@ -1623,13 +1713,13 @@ const webRpcErrorGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, I
       '在需要 AbortError/TimeoutError semantics 时替代 name check。'
     ]
   }),
-  'rpc:core:WEBRPC_SOURCE': guide({
+  'rpc-core:index:WEBRPC_SOURCE': guide({
     purposeEn:
       'Exposes the stable source discriminator stamped onto locally produced RPC failures so catch boundaries can distinguish ownership without parsing messages.',
     purposeZh:
       '公开写入本地 RPC failure 的稳定 source discriminator，让 catch boundary 无需解析 message 即可区分 ownership。',
     quickStart:
-      "import { isRpcError, WEBRPC_SOURCE } from '@migaia/rpc/core'\n\nconst error: unknown = { source: WEBRPC_SOURCE, code: 'REMOTE_FAILURE' }\nif (isRpcError(error) && error.source === WEBRPC_SOURCE) {\n  console.error('RPC failure:', error)\n}",
+      "import { isRpcError, WEBRPC_SOURCE } from '@migaia/rpc-core'\n\nconst error: unknown = { source: WEBRPC_SOURCE, code: 'REMOTE_FAILURE' }\nif (isRpcError(error) && error.source === WEBRPC_SOURCE) {\n  console.error('RPC failure:', error)\n}",
     useEn: ['A shared error boundary handles failures from several libraries.'],
     useZh: ['shared error boundary 需要处理来自多个 library 的 failure。'],
     avoidEn: [
@@ -1638,28 +1728,28 @@ const webRpcErrorGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, I
     ],
     avoidZh: ['把 source 当作 security credential。', '在多个 consumer 中硬编码同一个 string。']
   }),
-  'rpc:core:RpcError': errorGuide({
+  'rpc-core:index:RpcError': errorGuide({
     name: 'RpcError',
     conditionEn: 'a coded local RPC failure without a more specific public subclass',
     conditionZh: '没有更具体 public subclass 的 coded local RPC failure',
     distinctionEn: 'Handle a stable RPC code not represented by a narrower class.',
     distinctionZh: '处理没有 narrower class 表达的稳定 RPC code。'
   }),
-  'rpc:core:RpcSchemaValidationError': errorGuide({
+  'rpc-core:index:RpcSchemaValidationError': errorGuide({
     name: 'RpcSchemaValidationError',
     conditionEn: 'schema rejection of method parameters or results and retains rejected data',
     conditionZh: 'method parameter 或 result 被 schema 拒绝，并保留 rejected data',
     distinctionEn: 'Reject malformed data at the network contract boundary.',
     distinctionZh: '在 network contract boundary 拒绝 malformed data。'
   }),
-  'rpc:core:RpcConfigurationError': errorGuide({
+  'rpc-core:index:RpcConfigurationError': errorGuide({
     name: 'RpcConfigurationError',
     conditionEn: 'invalid or conflicting endpoint configuration before operation begins',
     conditionZh: 'operation 开始前的 invalid 或 conflicting endpoint configuration',
     distinctionEn: 'Fix setup; retrying unchanged configuration cannot succeed.',
     distinctionZh: '应修正 setup；原样重试不会成功。'
   }),
-  'rpc:core:RpcConstructionError': errorGuide({
+  'rpc-core:index:RpcConstructionError': errorGuide({
     name: 'RpcConstructionError',
     conditionEn:
       'atomic endpoint construction failure with cleanup results from rolled-back resources',
@@ -1669,63 +1759,63 @@ const webRpcErrorGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, I
     distinctionZh:
       '以 cause 为 primary failure，以 cleanupErrors 或 cleanupPromise 为 secondary rollback evidence。'
   }),
-  'rpc:core:RpcLifecycleError': errorGuide({
+  'rpc-core:index:RpcLifecycleError': errorGuide({
     name: 'RpcLifecycleError',
     conditionEn: 'use after endpoint disposal or a terminal lifecycle transition',
     conditionZh: 'endpoint dispose 后继续使用，或发生 terminal lifecycle transition',
     distinctionEn: 'Create a new endpoint instead of reviving a terminal one.',
     distinctionZh: '应创建新 endpoint，不能 revive terminal endpoint。'
   }),
-  'rpc:core:RpcSerializationError': errorGuide({
+  'rpc-core:index:RpcSerializationError': errorGuide({
     name: 'RpcSerializationError',
     conditionEn: 'payload or error serialization that cannot preserve the wire contract',
     conditionZh: 'payload 或 error serialization 无法保留 wire contract',
     distinctionEn: 'Correct the payload shape or codec before resending.',
     distinctionZh: '重新发送前修正 payload shape 或 codec。'
   }),
-  'rpc:core:RpcProtocolError': errorGuide({
+  'rpc-core:index:RpcProtocolError': errorGuide({
     name: 'RpcProtocolError',
     conditionEn: 'a malformed, undecodable, or semantically invalid wire envelope',
     conditionZh: 'malformed、无法 decode 或语义无效的 wire envelope',
     distinctionEn: 'Treat the peer or codec as incompatible until the mismatch is resolved.',
     distinctionZh: '在 mismatch 解决前，把 peer 或 codec 视为 incompatible。'
   }),
-  'rpc:core:RpcContractError': errorGuide({
+  'rpc-core:index:RpcContractError': errorGuide({
     name: 'RpcContractError',
     conditionEn: 'protocol-version or declared contract incompatibility between peers',
     conditionZh: 'peer 之间的 protocol-version 或 declared contract incompatibility',
     distinctionEn: 'Negotiate a supported version or deploy matching contracts.',
     distinctionZh: '协商 supported version，或部署匹配 contract。'
   }),
-  'rpc:core:RpcTransportError': errorGuide({
+  'rpc-core:index:RpcTransportError': errorGuide({
     name: 'RpcTransportError',
     conditionEn: 'send, subscription, listener, or channel failure owned by the transport boundary',
     conditionZh: '由 transport boundary 拥有的 send、subscription、listener 或 channel failure',
     distinctionEn: 'Reconnect or replace the transport only when owner policy permits it.',
     distinctionZh: '仅在 owner policy 允许时 reconnect 或 replace transport。'
   }),
-  'rpc:core:RpcAuthenticationError': errorGuide({
+  'rpc-core:index:RpcAuthenticationError': errorGuide({
     name: 'RpcAuthenticationError',
     conditionEn: 'failed frame verification, signing, encryption, or decryption',
     conditionZh: 'frame verification、signing、encryption 或 decryption 失败',
     distinctionEn: 'Reject the frame and inspect keys, peer identity, or transform ordering.',
     distinctionZh: '拒绝 frame，并检查 key、peer identity 或 transform order。'
   }),
-  'rpc:core:RpcChunkError': errorGuide({
+  'rpc-core:index:RpcChunkError': errorGuide({
     name: 'RpcChunkError',
     conditionEn: 'invalid chunk structure or an exceeded reassembly capacity bound',
     conditionZh: 'chunk structure 无效，或超过 reassembly capacity bound',
     distinctionEn: 'Reject the assembly instead of retaining unbounded peer-controlled memory.',
     distinctionZh: '拒绝 assembly，不能保留无界 peer-controlled memory。'
   }),
-  'rpc:core:RpcRemoteError': errorGuide({
+  'rpc-core:index:RpcRemoteError': errorGuide({
     name: 'RpcRemoteError',
     conditionEn: 'a provider-declared remote business failure reconstructed on the caller',
     conditionZh: 'provider 声明的 remote business failure 在 caller 侧重建',
     distinctionEn: 'Handle provider code and optional data as a remote application contract.',
     distinctionZh: '把 provider code 与 optional data 作为 remote application contract 处理。'
   }),
-  'rpc:core:RpcAbortError': errorGuide({
+  'rpc-core:index:RpcAbortError': errorGuide({
     name: 'RpcAbortError',
     conditionEn: 'caller or owner cancellation with the standard AbortError name',
     conditionZh: 'caller 或 owner cancellation，并公开标准 AbortError name',
@@ -1733,7 +1823,7 @@ const webRpcErrorGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, I
       'Stop dependent work and preserve the reason; do not report expected cancellation as a fault.',
     distinctionZh: '停止 dependent work 并保留 reason；不要把预期 cancellation 报告成 fault。'
   }),
-  'rpc:core:RpcTimeoutError': errorGuide({
+  'rpc-core:index:RpcTimeoutError': errorGuide({
     name: 'RpcTimeoutError',
     conditionEn: 'an exceeded call deadline with the standard TimeoutError name',
     conditionZh: 'call deadline 超限，并公开标准 TimeoutError name',

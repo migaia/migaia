@@ -198,7 +198,12 @@ test('SITE-T-A24 generated projections contain no volatile metadata', () => {
             'storage-contract',
             'plugin-host',
             'resource',
-            'rpc',
+            'rpc-contract',
+            'rpc-core',
+            'rpc-process',
+            'rpc-threads',
+            'rpc-bridge-jsonrpc',
+            'rpc-browser',
             'logger',
             'storage-web'
           ]
@@ -430,14 +435,24 @@ test('SITE-T-CONFIG-DOCS gives every public configuration field a readable contr
 
 test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual decision guide', () => {
   const runtimeSymbols = generatedApis
-    .filter((api) => api.library === 'rpc')
+    .filter((api) =>
+      [
+        'rpc-contract',
+        'rpc-core',
+        'rpc-process',
+        'rpc-threads',
+        'rpc-bridge-jsonrpc',
+        'rpc-browser'
+      ].includes(api.library)
+    )
     .flatMap((api) =>
       api.symbols
         .filter((symbol) => symbol.kind !== 'type' && symbol.kind !== 'interface')
         .map((symbol) => ({ api, symbol }))
     )
 
-  assert.equal(runtimeSymbols.length, 195)
+  /** Three ordinary error operations extend the actual six-package runtime inventory. */
+  assert.equal(runtimeSymbols.length, 314)
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)
@@ -465,7 +480,7 @@ test('SITE-T-WEB-RPC-TRANSPORTS gives every public adapter a bilingual runnable 
   ] as const
 
   for (const locale of ['en', 'zh'] as const) {
-    const journey = findGuideJourney('rpc', 'transports-and-security', locale)
+    const journey = findGuideJourney('rpc-core', 'transports-and-security', locale)
     assert.ok(journey)
     const completeGuideCode = journey.document.sections
       .flatMap((section) => section.blocks)

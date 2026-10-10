@@ -1,5 +1,5 @@
 ---
-title: rpc - 快速开始
+title: rpc-core - 快速开始
 ---
 
 # 快速开始
@@ -9,7 +9,7 @@ title: rpc - 快速开始
 ## 最小可运行调用链
 
 ```ts
-import { createPeerPair } from '@migaia/rpc/testing'
+import { createPeerPair } from '@migaia/rpc-core/testing'
 
 const pair = await createPeerPair({
   a: { provide: { echo: (text: string) => text } },
@@ -26,7 +26,7 @@ try {
 ## Worker 子端
 
 ```ts
-import { createThreadPeer } from '@migaia/rpc/threads'
+import { createThreadPeer } from '@migaia/rpc-threads'
 
 await createThreadPeer({
   provide: { math: { double: (value: number) => value * 2 } },
