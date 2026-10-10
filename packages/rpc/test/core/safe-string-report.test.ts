@@ -285,7 +285,7 @@ describe('[A11] safeString failure reporting', () => {
       'core/internal/provider-executor.ts',
       'core/internal/contract.ts',
       'core/adapters/message-port.ts',
-      'browser/adapters/web-worker.ts'
+      'core/adapters/web-worker.ts'
     ]
     let calls = 0
     for (const path of files) {

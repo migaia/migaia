@@ -3689,25 +3689,25 @@
       "library": "rpc"
     },
     {
-      "path": "/en/docs/rpc/browser/adapters/web-worker",
+      "path": "/en/docs/rpc/core/adapters/web-worker",
       "locale": "en",
       "domain": "docs",
       "library": "rpc"
     },
     {
-      "path": "/en/docs/rpc/browser/adapters/web-worker/IWebWorkerLikePort",
+      "path": "/en/docs/rpc/core/adapters/web-worker/IWebWorkerLikePort",
       "locale": "en",
       "domain": "docs",
       "library": "rpc"
     },
     {
-      "path": "/en/docs/rpc/browser/adapters/web-worker/IWebWorkerTransportOptions",
+      "path": "/en/docs/rpc/core/adapters/web-worker/IWebWorkerTransportOptions",
       "locale": "en",
       "domain": "docs",
       "library": "rpc"
     },
     {
-      "path": "/en/docs/rpc/browser/adapters/web-worker/createWebWorkerTransport",
+      "path": "/en/docs/rpc/core/adapters/web-worker/createWebWorkerTransport",
       "locale": "en",
       "domain": "docs",
       "library": "rpc"
@@ -17387,25 +17387,25 @@
       "library": "rpc"
     },
     {
-      "path": "/zh/docs/rpc/browser/adapters/web-worker",
+      "path": "/zh/docs/rpc/core/adapters/web-worker",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc"
     },
     {
-      "path": "/zh/docs/rpc/browser/adapters/web-worker/IWebWorkerLikePort",
+      "path": "/zh/docs/rpc/core/adapters/web-worker/IWebWorkerLikePort",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc"
     },
     {
-      "path": "/zh/docs/rpc/browser/adapters/web-worker/IWebWorkerTransportOptions",
+      "path": "/zh/docs/rpc/core/adapters/web-worker/IWebWorkerTransportOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc"
     },
     {
-      "path": "/zh/docs/rpc/browser/adapters/web-worker/createWebWorkerTransport",
+      "path": "/zh/docs/rpc/core/adapters/web-worker/createWebWorkerTransport",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc"

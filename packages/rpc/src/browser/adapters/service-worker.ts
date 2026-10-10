@@ -11,7 +11,7 @@ import {
   reportListenerFailure,
   safeRead
 } from '../../core/transport-kit.js'
-import { RpcCoreErrorCode, RpcTransportError } from '../../core/errors.js'
+import { RpcCoreErrorCode, RpcTransportError } from '../../core/index.js'
 import { BrowserRpcErrorText } from '../error-text.js'
 
 /** Outbound ServiceWorker or Client target. */

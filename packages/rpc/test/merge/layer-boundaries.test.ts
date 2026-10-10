@@ -9,7 +9,7 @@ const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../src')
 /** Only byte classification and error identity utilities may cross into contract. */
 const contractBareAllowlist = new Set(['@migaia/utils/bytes', '@migaia/utils/error'])
 /** Published adapter boundary: shared primitives, errors, and local text only. */
-const browserCoreAllowlist = new Set(['core/transport-kit.ts', 'core/errors.ts'])
+const browserCoreAllowlist = new Set(['core/transport-kit.ts', 'core/index.ts'])
 
 /** Return each import or re-export that violates the contract/core/browser direction. */
 function layerViolations(file: string, source: string): string[] {
@@ -47,14 +47,7 @@ function layerViolations(file: string, source: string): string[] {
       invalid ||=
         outside ||
         (!isRelative && specifier !== '@migaia/utils/bytes') ||
-        (target.startsWith('core/') &&
-          !browserCoreAllowlist.has(target) &&
-          !(
-            relative(sourceRoot, file).split(sep).join('/') === 'browser/adapters/web-worker.ts' &&
-            target === 'core/internal/batch-frame.ts' &&
-            ts.isImportDeclaration(statement) &&
-            statement.importClause?.namedBindings?.getText(parsed) === '{ registerBatchAgreement }'
-          ))
+        (target.startsWith('core/') && !browserCoreAllowlist.has(target))
     }
     if (owner === 'bridge')
       invalid ||=
@@ -97,7 +90,7 @@ describe('A2 layer dependency direction', () => {
 
   it.each([
     ['threads to process', 'threads/plugin.ts', "import '../process/index.js'"],
-    ['threads to browser', 'threads/plugin.ts', "import '../browser/adapters/web-worker.js'"],
+    ['threads to browser', 'threads/plugin.ts', "import '../browser/adapters/shared-worker.js'"],
     ['process to threads', 'process/x.ts', "import '../threads/index.js'"],
     ['browser to threads', 'browser/x.ts', "import '../threads/index.js'"],
     ['core to threads', 'core/x.ts', "import '../threads/index.js'"],

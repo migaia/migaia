@@ -149,7 +149,7 @@ const endpoint = await createEndpoint({
       title: locale === 'zh' ? '页面调用 Dedicated Worker' : 'Page to Dedicated Worker',
       description: descriptions.worker,
       code: `import { ${imports} } from '@migaia/rpc/core'
-import { createWebWorkerTransport } from '@migaia/rpc/browser/adapters/web-worker'
+import { createWebWorkerTransport } from '@migaia/rpc/core/adapters/web-worker'
 
 const worker = new Worker(new URL('./task.worker.ts', import.meta.url), { type: 'module' })
 const transport = createWebWorkerTransport(worker, { peerId: 'task-worker' })
@@ -600,7 +600,7 @@ if (role === 'service') {
 window.addEventListener('pagehide', () => void endpoint.dispose(), { once: true })`,
   worker: `// main.ts：页面端持有 Worker，并把大任务交给 Worker endpoint。
 import { chunk, connect, createEndpoint } from '@migaia/rpc/core'
-import { createWebWorkerTransport } from '@migaia/rpc/browser/adapters/web-worker'
+import { createWebWorkerTransport } from '@migaia/rpc/core/adapters/web-worker'
 
 const worker = new Worker(new URL('./image-worker.ts', import.meta.url), { type: 'module' })
 const pageTransport = createWebWorkerTransport(worker, { peerId: 'image-worker' })
@@ -656,7 +656,7 @@ const billing = await createEndpoint({
 const total = await billing.send<number>('billing-frame', 'calculateTotal', { prices: [12, 30] })`,
   worker: `// main.ts：页面通过 Dedicated Worker transport 调用后台计算宿主。
 import { connect, contract, createEndpoint, timeout } from '@migaia/rpc/core'
-import { createWebWorkerTransport } from '@migaia/rpc/browser/adapters/web-worker'
+import { createWebWorkerTransport } from '@migaia/rpc/core/adapters/web-worker'
 
 const worker = new Worker(new URL('./image.worker.ts', import.meta.url), { type: 'module' })
 const transport = createWebWorkerTransport(worker, { peerId: 'image-worker' })
@@ -1458,7 +1458,7 @@ try {
   }),
   'rpc:browser-adapters-web-worker:createWebWorkerTransport': transportGuide({
     name: 'createWebWorkerTransport',
-    importPath: '@migaia/rpc/browser/adapters/web-worker',
+    importPath: '@migaia/rpc/core/adapters/web-worker',
     expression: 'createWebWorkerTransport(worker)',
     boundaryEn: 'a dedicated Worker or WorkerGlobalScope-like port',
     boundaryZh: 'dedicated Worker 或 WorkerGlobalScope-like port',

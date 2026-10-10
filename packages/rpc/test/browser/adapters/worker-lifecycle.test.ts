@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createServiceWorkerTransport } from '../../../src/browser/adapters/service-worker.js'
 import { createSharedWorkerTransport } from '../../../src/browser/adapters/shared-worker.js'
-import { createWebWorkerTransport } from '../../../src/browser/adapters/web-worker.js'
+import { createWebWorkerTransport } from '../../../src/core/adapters/web-worker.js'
 
 describe('shared-worker adapter lifecycle', () => {
   it('shares one underlying subscription and isolates delivery failures', () => {

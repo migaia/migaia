@@ -70,22 +70,12 @@ describe('public transport kit', () => {
       for (const statement of source.statements) {
         if (!ts.isImportDeclaration(statement)) continue
         const specifier = (statement.moduleSpecifier as ts.StringLiteral).text
-        /** I26 permits only the canonical private batch receipt and capability in this factory. */
-        if (
-          name === 'web-worker.ts' &&
-          ((specifier === '../../core/internal/batch-frame.js' &&
-            statement.importClause?.namedBindings?.getText(source) ===
-              '{ registerBatchAgreement }') ||
-            (specifier === '../../contract/wire-constants.js' &&
-              statement.importClause?.namedBindings?.getText(source) === '{ RpcCapability }'))
-        )
-          continue
         if (!specifier.startsWith('.')) {
           expect(specifier, path).toMatch(/^@migaia\/utils\//u)
           continue
         }
         expect(specifier, path).toMatch(
-          /^(\.\.\/\.\.\/core\/(transport-kit|errors)|\.\.\/error-text)\.js$/u
+          /^(\.\.\/\.\.\/core\/(transport-kit|index)|\.\.\/error-text)\.js$/u
         )
       }
     }

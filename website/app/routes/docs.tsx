@@ -1288,7 +1288,7 @@ const webRpcTransportChoices = [
     'Node.js worker_threads 的 MessagePort'
   ],
   ['createWindowMessageTransport', 'browser/adapters/window', '窗口、iframe 或弹窗之间通信'],
-  ['createWebWorkerTransport', 'browser/adapters/web-worker', '页面与 Dedicated Worker 通信'],
+  ['createWebWorkerTransport', 'core/adapters/web-worker', '页面与 Dedicated Worker 通信'],
   [
     'createSharedWorkerTransport',
     'browser/adapters/shared-worker',

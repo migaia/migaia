@@ -11,7 +11,7 @@ import {
   releaseListenerRegistration,
   reportListenerFailure
 } from '../../core/transport-kit.js'
-import { RpcCoreErrorCode } from '../../core/errors.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
 
 /** Adapts BroadcastChannel for tab-to-tab and storage-backed coordination. */
 export function createBroadcastChannelTransport(channel: BroadcastChannel): IRpcTransport {

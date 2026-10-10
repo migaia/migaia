@@ -1,7 +1,7 @@
-import { registerBatchAgreement } from '../../core/internal/batch-frame.js'
+import { registerBatchAgreement } from '../internal/batch-frame.js'
 import { RpcCapability } from '../../contract/wire-constants.js'
-import { BrowserRpcErrorText } from '../error-text.js'
-import type { IRpcSendOptions, IRpcTransport } from '../../core/transport-kit.js'
+import { RpcAdapterErrorText as BrowserRpcErrorText } from './error-text.js'
+import type { IRpcSendOptions, IRpcTransport } from '../transport-kit.js'
 import {
   RpcPlatform,
   RpcTransportOwnership,
@@ -14,8 +14,8 @@ import {
   reportListenerFailure,
   safeString,
   tagRpcError
-} from '../../core/transport-kit.js'
-import { RpcCoreErrorCode, RpcTransportError } from '../../core/errors.js'
+} from '../transport-kit.js'
+import { RpcCoreErrorCode, RpcTransportError } from '../index.js'
 
 /**
  * Minimal event-listener worker/port surface — a real `Worker`, `MessagePort`, or

@@ -1,4 +1,4 @@
-import { createWebWorkerTransport } from '../../src/browser/adapters/web-worker.js'
+import { createWebWorkerTransport } from '../../src/core/adapters/web-worker.js'
 import { readEndpointDebugSnapshot } from '../../src/core/internal/test-observer.js'
 import { createRpc, installErrorGuards } from './rpc.js'
 

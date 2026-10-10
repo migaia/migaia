@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'vitest'
 import { createFullOneWayEndpoint, connect } from '../../src/core/index.js'
-import { createWebWorkerTransport } from '../../src/browser/adapters/web-worker.js'
+import { createWebWorkerTransport } from '../../src/core/adapters/web-worker.js'
 import { envelope } from '../core/fixtures/p2-b-envelope.js'
 
 describe('P2-B optimal physical writer', () => {

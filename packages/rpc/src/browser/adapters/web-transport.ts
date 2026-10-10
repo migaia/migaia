@@ -12,7 +12,7 @@ import {
   tagRpcError
 } from '../../core/transport-kit.js'
 import { isUint8Array } from '@migaia/utils/bytes'
-import { RpcCoreErrorCode, RpcTransportError } from '../../core/errors.js'
+import { RpcCoreErrorCode, RpcTransportError } from '../../core/index.js'
 import { BrowserRpcErrorText } from '../error-text.js'
 
 /** Minimal datagram surface accepted by the WebTransport adapter. */

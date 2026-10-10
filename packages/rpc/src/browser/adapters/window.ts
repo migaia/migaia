@@ -11,7 +11,7 @@ import {
   releaseListenerRegistration,
   reportListenerFailure
 } from '../../core/transport-kit.js'
-import { RpcError, RpcCoreErrorCode } from '../../core/errors.js'
+import { RpcError, RpcCoreErrorCode } from '../../core/index.js'
 
 /** Outbound Window-like target that owns postMessage delivery. */
 export type IWindowMessageTarget = {

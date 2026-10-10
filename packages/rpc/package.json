@@ -166,10 +166,6 @@
       "types": "./dist/browser/adapters/window.d.ts",
       "default": "./dist/browser/adapters/window.js"
     },
-    "./browser/adapters/web-worker": {
-      "types": "./dist/browser/adapters/web-worker.d.ts",
-      "default": "./dist/browser/adapters/web-worker.js"
-    },
     "./browser/adapters/shared-worker": {
       "types": "./dist/browser/adapters/shared-worker.d.ts",
       "default": "./dist/browser/adapters/shared-worker.js"
@@ -225,6 +221,10 @@
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "default": "./dist/testing/index.js"
+    },
+    "./core/adapters/web-worker": {
+      "types": "./dist/core/adapters/web-worker.d.ts",
+      "default": "./dist/core/adapters/web-worker.js"
     }
   },
   "publishConfig": {
@@ -264,8 +264,12 @@
     "koffi": "^3.1.6"
   },
   "peerDependenciesMeta": {
-    "electron": { "optional": true },
-    "koffi": { "optional": true }
+    "electron": {
+      "optional": true
+    },
+    "koffi": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "24.13.2",

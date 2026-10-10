@@ -370,10 +370,10 @@ describe('error text inventory', () => {
       BrowserRpcErrorText.webTransportRequiresUint8ArrayEncodedMessages,
       'webTransportRequiresUint8ArrayEncodedMessages'
     ).toBe('WebTransport requires Uint8Array encoded messages')
-    expect(BrowserRpcErrorText.workerMessageReadFailed('x'), 'workerMessageReadFailed').toBe(
+    expect(RpcAdapterErrorText.workerMessageReadFailed('x'), 'workerMessageReadFailed').toBe(
       '[rpc] worker message could not be read: x'
     )
-    expect(BrowserRpcErrorText.workerFailure('x', 'x'), 'workerFailure').toBe('[rpc] worker x: x')
+    expect(RpcAdapterErrorText.workerFailure('x', 'x'), 'workerFailure').toBe('[rpc] worker x: x')
     expect(
       BrowserRpcErrorText.receiverIsRequiredOutsideAWindowLikeRealm,
       'receiverIsRequiredOutsideAWindowLikeRealm'

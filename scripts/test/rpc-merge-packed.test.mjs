@@ -35,6 +35,10 @@ const bridgeDelta = JSON.parse(
 const threadsDelta = JSON.parse(
   readFileSync(join(root, 'packages/rpc/test/fixtures/threads-export-delta.json'), 'utf8')
 )
+/** Approved public entry moves retarget readers while preserving the immutable legacy snapshot. */
+const coreRefactorDelta = JSON.parse(
+  readFileSync(join(root, 'packages/rpc/test/fixtures/core-refactor-export-delta.json'), 'utf8')
+)
 const checks = [
   'subpath-imports',
   'obsolete-subpaths',
@@ -131,7 +135,13 @@ test('A11 packed consumer runs every preserved check against all 40 deep exports
       // K215 admits exactly one core runtime export; every other packed count stays frozen.
       ...(name === '@migaia/rpc/core' ? ['RpcProviderRejectionReason'] : [])
     ]
-    assert.equal(subpaths.get(name), record.names.length - removed.length + added.length, name)
+    /** The canonical Worker factory moved entry; its original symbol count stays unchanged. */
+    const currentName = coreRefactorDelta.relocations?.[name] ?? name
+    assert.equal(
+      subpaths.get(currentName),
+      record.names.length - removed.length + added.length,
+      currentName
+    )
   }
   assert.deepEqual([...obsoleteProbe(script)].sort(), [...obsolete].sort())
   assert.ok(script.includes('@migaia/rpc/core/composed'))

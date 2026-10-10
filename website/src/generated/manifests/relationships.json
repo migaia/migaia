@@ -6322,43 +6322,43 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker",
+      "from": "/en/docs/rpc/core/adapters/web-worker",
       "to": "/en/guides/rpc",
       "type": "domain-peer"
     },
     {
       "from": "/en/guides/rpc",
-      "to": "/en/docs/rpc/browser/adapters/web-worker",
+      "to": "/en/docs/rpc/core/adapters/web-worker",
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker/createWebWorkerTransport",
+      "from": "/en/docs/rpc/core/adapters/web-worker/createWebWorkerTransport",
       "to": "/en/guides/rpc",
       "type": "domain-peer"
     },
     {
       "from": "/en/guides/rpc",
-      "to": "/en/docs/rpc/browser/adapters/web-worker/createWebWorkerTransport",
+      "to": "/en/docs/rpc/core/adapters/web-worker/createWebWorkerTransport",
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker/IWebWorkerLikePort",
+      "from": "/en/docs/rpc/core/adapters/web-worker/IWebWorkerLikePort",
       "to": "/en/guides/rpc",
       "type": "domain-peer"
     },
     {
       "from": "/en/guides/rpc",
-      "to": "/en/docs/rpc/browser/adapters/web-worker/IWebWorkerLikePort",
+      "to": "/en/docs/rpc/core/adapters/web-worker/IWebWorkerLikePort",
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker/IWebWorkerTransportOptions",
+      "from": "/en/docs/rpc/core/adapters/web-worker/IWebWorkerTransportOptions",
       "to": "/en/guides/rpc",
       "type": "domain-peer"
     },
     {
       "from": "/en/guides/rpc",
-      "to": "/en/docs/rpc/browser/adapters/web-worker/IWebWorkerTransportOptions",
+      "to": "/en/docs/rpc/core/adapters/web-worker/IWebWorkerTransportOptions",
       "type": "domain-peer"
     },
     {
@@ -28892,43 +28892,43 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker",
+      "from": "/zh/docs/rpc/core/adapters/web-worker",
       "to": "/zh/guides/rpc",
       "type": "domain-peer"
     },
     {
       "from": "/zh/guides/rpc",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker",
+      "to": "/zh/docs/rpc/core/adapters/web-worker",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker/createWebWorkerTransport",
+      "from": "/zh/docs/rpc/core/adapters/web-worker/createWebWorkerTransport",
       "to": "/zh/guides/rpc",
       "type": "domain-peer"
     },
     {
       "from": "/zh/guides/rpc",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker/createWebWorkerTransport",
+      "to": "/zh/docs/rpc/core/adapters/web-worker/createWebWorkerTransport",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker/IWebWorkerLikePort",
+      "from": "/zh/docs/rpc/core/adapters/web-worker/IWebWorkerLikePort",
       "to": "/zh/guides/rpc",
       "type": "domain-peer"
     },
     {
       "from": "/zh/guides/rpc",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker/IWebWorkerLikePort",
+      "to": "/zh/docs/rpc/core/adapters/web-worker/IWebWorkerLikePort",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker/IWebWorkerTransportOptions",
+      "from": "/zh/docs/rpc/core/adapters/web-worker/IWebWorkerTransportOptions",
       "to": "/zh/guides/rpc",
       "type": "domain-peer"
     },
     {
       "from": "/zh/guides/rpc",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker/IWebWorkerTransportOptions",
+      "to": "/zh/docs/rpc/core/adapters/web-worker/IWebWorkerTransportOptions",
       "type": "domain-peer"
     },
     {
@@ -80822,223 +80822,223 @@
       "type": "architecture-symbol"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker",
+      "from": "/en/docs/rpc/core/adapters/web-worker",
       "to": "/en/guides/rpc/getting-started",
       "type": "api-guide"
     },
     {
       "from": "/en/guides/rpc/getting-started",
-      "to": "/en/docs/rpc/browser/adapters/web-worker",
+      "to": "/en/docs/rpc/core/adapters/web-worker",
       "type": "guide-api"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker",
+      "from": "/en/docs/rpc/core/adapters/web-worker",
       "to": "/en/architecture/rpc",
       "type": "api-architecture"
     },
     {
       "from": "/en/architecture/rpc",
-      "to": "/en/docs/rpc/browser/adapters/web-worker",
+      "to": "/en/docs/rpc/core/adapters/web-worker",
       "type": "architecture-api"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker",
-      "to": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--createWebWorkerTransport",
+      "from": "/en/docs/rpc/core/adapters/web-worker",
+      "to": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--createWebWorkerTransport",
       "type": "api-symbol"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--createWebWorkerTransport",
-      "to": "/en/docs/rpc/browser/adapters/web-worker",
+      "from": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--createWebWorkerTransport",
+      "to": "/en/docs/rpc/core/adapters/web-worker",
       "type": "symbol-api"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--createWebWorkerTransport",
+      "from": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--createWebWorkerTransport",
       "to": "/en/guides/rpc/getting-started",
       "type": "symbol-guide"
     },
     {
       "from": "/en/guides/rpc/getting-started",
-      "to": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--createWebWorkerTransport",
+      "to": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--createWebWorkerTransport",
       "type": "guide-symbol"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--createWebWorkerTransport",
+      "from": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--createWebWorkerTransport",
       "to": "/en/architecture/rpc",
       "type": "symbol-architecture"
     },
     {
       "from": "/en/architecture/rpc",
-      "to": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--createWebWorkerTransport",
+      "to": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--createWebWorkerTransport",
       "type": "architecture-symbol"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker",
-      "to": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerLikePort",
+      "from": "/en/docs/rpc/core/adapters/web-worker",
+      "to": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerLikePort",
       "type": "api-symbol"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerLikePort",
-      "to": "/en/docs/rpc/browser/adapters/web-worker",
+      "from": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerLikePort",
+      "to": "/en/docs/rpc/core/adapters/web-worker",
       "type": "symbol-api"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerLikePort",
+      "from": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerLikePort",
       "to": "/en/guides/rpc/getting-started",
       "type": "symbol-guide"
     },
     {
       "from": "/en/guides/rpc/getting-started",
-      "to": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerLikePort",
+      "to": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerLikePort",
       "type": "guide-symbol"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerLikePort",
+      "from": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerLikePort",
       "to": "/en/architecture/rpc",
       "type": "symbol-architecture"
     },
     {
       "from": "/en/architecture/rpc",
-      "to": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerLikePort",
+      "to": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerLikePort",
       "type": "architecture-symbol"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker",
-      "to": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerTransportOptions",
+      "from": "/en/docs/rpc/core/adapters/web-worker",
+      "to": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerTransportOptions",
       "type": "api-symbol"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerTransportOptions",
-      "to": "/en/docs/rpc/browser/adapters/web-worker",
+      "from": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerTransportOptions",
+      "to": "/en/docs/rpc/core/adapters/web-worker",
       "type": "symbol-api"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerTransportOptions",
+      "from": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerTransportOptions",
       "to": "/en/guides/rpc/getting-started",
       "type": "symbol-guide"
     },
     {
       "from": "/en/guides/rpc/getting-started",
-      "to": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerTransportOptions",
+      "to": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerTransportOptions",
       "type": "guide-symbol"
     },
     {
-      "from": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerTransportOptions",
+      "from": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerTransportOptions",
       "to": "/en/architecture/rpc",
       "type": "symbol-architecture"
     },
     {
       "from": "/en/architecture/rpc",
-      "to": "/en/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerTransportOptions",
+      "to": "/en/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerTransportOptions",
       "type": "architecture-symbol"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker",
+      "from": "/zh/docs/rpc/core/adapters/web-worker",
       "to": "/zh/guides/rpc/getting-started",
       "type": "api-guide"
     },
     {
       "from": "/zh/guides/rpc/getting-started",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker",
+      "to": "/zh/docs/rpc/core/adapters/web-worker",
       "type": "guide-api"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker",
+      "from": "/zh/docs/rpc/core/adapters/web-worker",
       "to": "/zh/architecture/rpc",
       "type": "api-architecture"
     },
     {
       "from": "/zh/architecture/rpc",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker",
+      "to": "/zh/docs/rpc/core/adapters/web-worker",
       "type": "architecture-api"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--createWebWorkerTransport",
+      "from": "/zh/docs/rpc/core/adapters/web-worker",
+      "to": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--createWebWorkerTransport",
       "type": "api-symbol"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--createWebWorkerTransport",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker",
+      "from": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--createWebWorkerTransport",
+      "to": "/zh/docs/rpc/core/adapters/web-worker",
       "type": "symbol-api"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--createWebWorkerTransport",
+      "from": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--createWebWorkerTransport",
       "to": "/zh/guides/rpc/getting-started",
       "type": "symbol-guide"
     },
     {
       "from": "/zh/guides/rpc/getting-started",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--createWebWorkerTransport",
+      "to": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--createWebWorkerTransport",
       "type": "guide-symbol"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--createWebWorkerTransport",
+      "from": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--createWebWorkerTransport",
       "to": "/zh/architecture/rpc",
       "type": "symbol-architecture"
     },
     {
       "from": "/zh/architecture/rpc",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--createWebWorkerTransport",
+      "to": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--createWebWorkerTransport",
       "type": "architecture-symbol"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerLikePort",
+      "from": "/zh/docs/rpc/core/adapters/web-worker",
+      "to": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerLikePort",
       "type": "api-symbol"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerLikePort",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker",
+      "from": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerLikePort",
+      "to": "/zh/docs/rpc/core/adapters/web-worker",
       "type": "symbol-api"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerLikePort",
+      "from": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerLikePort",
       "to": "/zh/guides/rpc/getting-started",
       "type": "symbol-guide"
     },
     {
       "from": "/zh/guides/rpc/getting-started",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerLikePort",
+      "to": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerLikePort",
       "type": "guide-symbol"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerLikePort",
+      "from": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerLikePort",
       "to": "/zh/architecture/rpc",
       "type": "symbol-architecture"
     },
     {
       "from": "/zh/architecture/rpc",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerLikePort",
+      "to": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerLikePort",
       "type": "architecture-symbol"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerTransportOptions",
+      "from": "/zh/docs/rpc/core/adapters/web-worker",
+      "to": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerTransportOptions",
       "type": "api-symbol"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerTransportOptions",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker",
+      "from": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerTransportOptions",
+      "to": "/zh/docs/rpc/core/adapters/web-worker",
       "type": "symbol-api"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerTransportOptions",
+      "from": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerTransportOptions",
       "to": "/zh/guides/rpc/getting-started",
       "type": "symbol-guide"
     },
     {
       "from": "/zh/guides/rpc/getting-started",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerTransportOptions",
+      "to": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerTransportOptions",
       "type": "guide-symbol"
     },
     {
-      "from": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerTransportOptions",
+      "from": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerTransportOptions",
       "to": "/zh/architecture/rpc",
       "type": "symbol-architecture"
     },
     {
       "from": "/zh/architecture/rpc",
-      "to": "/zh/docs/rpc/browser/adapters/web-worker#rpc-browser/adapters/web-worker--IWebWorkerTransportOptions",
+      "to": "/zh/docs/rpc/core/adapters/web-worker#rpc-core/adapters/web-worker--IWebWorkerTransportOptions",
       "type": "architecture-symbol"
     },
     {
