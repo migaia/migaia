@@ -298,16 +298,20 @@ export function createRuntimeApiEndpoint(
           /** One options association and one original consumer serve every cold control. */
           const options = { ...args[3] }
           retainRuntimeRequestInput(options, input)
-          /** Activation remains with the original stream owner after resource installation. */
-          const consumer = ready.then(() =>
-            current().stream.open(args[0], input.method, input.payload, options)
-          )
+          /** An unpulled stream observes only ready; the first control activates one consumer. */
+          let consumer: Promise<AsyncIterableIterator<IRpcPortableValue>> | undefined
+          /** Controls share installation failure and the same original lazy stream iterator. */
+          const activeConsumer = () =>
+            (consumer ??= ready.then(() =>
+              current().stream.open(args[0], input.method, input.payload, options)
+            ))
           return Object.freeze({
             next: (...values: Parameters<AsyncIterableIterator<IRpcPortableValue>['next']>) =>
-              consumer.then((iterator) => iterator.next(...values)),
+              activeConsumer().then((iterator) => iterator.next(...values)),
             return: (value?: IRpcPortableValue) =>
-              consumer.then((iterator) => iterator.return!(value)),
-            throw: (reason?: unknown) => consumer.then((iterator) => iterator.throw!(reason)),
+              activeConsumer().then((iterator) => iterator.return!(value)),
+            throw: (reason?: unknown) =>
+              activeConsumer().then((iterator) => iterator.throw!(reason)),
             [Symbol.asyncIterator]() {
               return this
             }
