@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ISerializeChunk, ISerializeParser } from '@migaia/serialize'
 import { SerializeChunkKind } from '@migaia/serialize'
-import { RpcRemoteError, type IRpcAbortSignal, type IRpcEndpoint } from '@migaia/rpc/core'
+import { RpcRemoteError, type IRpcAbortSignal, type IRpcEndpoint } from '@migaia/rpc-core'
 import { WorkerAdapter, createWorkerHandler, workerComputed, workerParser } from '../src/index'
 import * as storeWorker from '../src/index'
 import { toManagedRpcHandler } from '../src/managed-rpc-handler'

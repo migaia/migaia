@@ -6,7 +6,7 @@ export PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN := false
 
 # Publish foundations before every consumer. scripts/release-plan.mjs verifies
 # that this remains a closed, dependency-topological release set.
-RELEASE_PACKAGES := utils event-subscriber lifecycle reactive middleware-pipeline serialize resource storage-contract capability plugin-host tray supervision rpc logger storage-web
+RELEASE_PACKAGES := utils event-subscriber lifecycle reactive middleware-pipeline serialize resource storage-contract capability plugin-host tray supervision rpc-contract rpc-core rpc-process rpc-threads rpc-bridge-jsonrpc rpc-browser logger storage-web
 # Store packages release independently from the foundation ship. `wasm` is the
 # package-owned prerequisite for store-wasm and therefore leads this plan.
 STORE_RELEASE_PACKAGES := wasm store-light store-keyed store-shared store-ssr store-worker store-indexed store-middleware store-react store-persist store-devtools store-wasm
@@ -126,7 +126,7 @@ ci:
 			record_gate SKIP-WARN "rpc/test:conformance (missing:$$missing_tools)" 0 0; \
 		else record_gate SKIP-BLOCKING "rpc/test:conformance (missing:$$missing_tools)" 1 0; fi; \
 	else run_gate required rpc/test:conformance $(CI_MAKE) ci-conformance; fi; \
-	run_gate required rpc/test:suite-parity pnpm --filter ./packages/rpc run test:suite-parity; \
+	run_gate required rpc/test:suite-parity pnpm --filter ./packages/rpc-integration run test:suite-parity; \
 	for gate in fmt lint typecheck; do \
 		run_gate required "website/$$gate" $(CI_MAKE) ci-website-check GATE="$$gate"; \
 	done; \
@@ -175,7 +175,7 @@ ci-conformance:
 		if [ "$(CI_ALLOW_MISSING_TOOLCHAINS)" = 1 ]; then echo "==> WARN CI_ALLOW_MISSING_TOOLCHAINS=1"; exit 0; fi; \
 		exit 1; \
 	fi; \
-	pnpm --filter ./packages/rpc run test:conformance
+	pnpm --filter ./packages/rpc-integration run test:conformance
 
 # Performance matrices and W3 guards are reference-machine ratios, need an
 # exclusive calibrated measurement window, and take too long for ordinary CI.
@@ -184,7 +184,7 @@ ci-conformance:
 perf-guard:
 	@echo "==> manual RPC performance matrix / W3 guard ($(PERF_SCENARIO))"
 	@test -n "$(PERF_NOISE)" || { echo "Set PERF_NOISE to the current exclusive window calibration" >&2; exit 2; }
-	@pnpm --filter ./packages/rpc run bench:ipc --scenario "$(PERF_SCENARIO)" \
+	@pnpm --filter ./packages/rpc-integration run bench:ipc --scenario "$(PERF_SCENARIO)" \
 		$(if $(PERF_UNIT),--unit "$(PERF_UNIT)") --noise "$(PERF_NOISE)" \
 		$(if $(PERF_OUTPUT),--output "$(PERF_OUTPUT)")
 
@@ -196,7 +196,7 @@ long-test:
 	@echo "==> manual sustained RPC cell ($(LONG_MODE), $(LONG_RATE) RPS, $(LONG_SECONDS)s)"
 	@test -n "$(LONG_OUTPUT)" || { echo "Set LONG_OUTPUT to a fresh raw directory" >&2; exit 2; }
 	@test "$(LONG_SECONDS)" -ge 400 || { echo "LONG_SECONDS must be at least 400" >&2; exit 2; }
-	@node packages/rpc/test/replay-window-r12/native-long.mjs \
+	@node packages/rpc-browser/test/replay-window-r12/native-long.mjs \
 		"$(LONG_MODE)" "$(LONG_RATE)" "$(LONG_SECONDS)" "$(LONG_OUTPUT)"
 
 ship-preflight:
