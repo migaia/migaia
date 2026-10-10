@@ -1,19 +1,20 @@
 import { materializeJsonSnapshot } from './object-pipeline.js'
 import { deferred } from '@migaia/utils/promise'
-import { deserializeRpcError, serializeRpcError } from '../../contract/error.js'
-import { fromJsonRpcError, toJsonRpcError } from '../../contract/error-jsonrpc.js'
-import { normalizeRpcEnvelope } from '../../contract/v1/normalize.js'
-import type { IRpcRequestEnvelope } from '../../contract/v1/types.js'
-import type { IRpcSerializedError } from '../../contract/types.js'
+import { deserializeRpcError, serializeRpcError } from '../../contract/index.js'
+import { fromJsonRpcError } from '../../contract/index.js'
+import { toJsonRpcError } from '../../contract/error-jsonrpc.js'
+import { normalizeRpcEnvelope } from '../../contract/index.js'
+import type { IRpcRequestEnvelope } from '../../contract/index.js'
+import type { IRpcSerializedError } from '../../contract/index.js'
 import {
   RpcControl,
   RpcCapability,
   RpcEnvelopeKind,
   RpcRouteField,
-  RpcRouteProfile,
   RpcRouteType
-} from '../../contract/wire-constants.js'
-import { RpcJsonRpcWireError } from '../../contract/wire-error-constants.js'
+} from '../../contract/index.js'
+import { RpcRouteProfile } from '../../contract/index.js'
+import { RpcJsonRpcWireError } from '../../contract/index.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
 import {
   collectListenerCleanupFailures,
@@ -21,19 +22,20 @@ import {
   reportListenerFailure,
   drainTerminalListenerFailures
 } from '../../core/transport-kit.js'
-import type { IRpcTransport, IRpcInboundMessage } from '../../core/transport.js'
+import type { IRpcTransport } from '../../core/index.js'
+import type { IRpcInboundMessage } from '../../core/transport.js'
 import {
   RpcPlatform,
   RpcTransportEncoding,
   RpcTransportOwnership,
   RpcTransportTopology
 } from '../../core/transport-constants.js'
-import { RpcProcessErrorCode } from '../../process/error-code.js'
+import { RpcProcessErrorCode } from '../../process/index.js'
 import { createProcessError } from '../../process/error.js'
-import { RemoteMethodName } from '../../remote/constants.js'
-import { RpcRemoteLayerErrorCode } from '../../remote/error-code.js'
+import { RemoteMethodName } from '../../remote/index.js'
+import { RpcRemoteLayerErrorCode } from '../../remote/index.js'
 import { JsonRpcProfile, JsonRpcErrorNumber } from './constants.js'
-import { readRpcBatchMembers } from '../../contract/batch-frame.js'
+import { readRpcBatchMembers } from '../../contract/framing/index.js'
 import { JsonRpcBridgeErrorCode } from './error-code.js'
 import { createJsonRpcBridgeError } from './error.js'
 import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from './framing.js'
@@ -614,7 +616,7 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
   /** Both public and private inputs share one whole physical write and one correlation owner. */
   const send = async (
     value: unknown,
-    sendOptions?: import('../../core/transport.js').IRpcSendOptions,
+    sendOptions?: import('../../core/index.js').IRpcSendOptions,
     objectInput = false
   ): Promise<void> => {
     if (closed) throw terminal

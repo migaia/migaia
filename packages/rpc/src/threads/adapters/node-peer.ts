@@ -2,13 +2,13 @@ import {
   readRuntimePreparationContext,
   withRuntimePreparationContext
 } from '../../remote/runtime-api/launch-context.js'
-import { RpcError, RpcCoreErrorCode } from '../../core/errors.js'
+import { RpcError, RpcCoreErrorCode } from '../../core/index.js'
 import { RuntimeApiErrorText } from '../../remote/runtime-api/constants.js'
 import { readRuntimeDefaultTimeout } from '../../remote/runtime-api/timeout.js'
 import { parentPort, workerData } from 'node:worker_threads'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { bindNativeReplayTransport } from '../../core/internal/native-replay.js'
-import { createRuntimePeer, type IRuntimePeerOptions } from '../../remote/runtime-api/peer.js'
+import { createRuntimePeer, type IRuntimePeerOptions } from '../../remote/index.js'
 import { createThreadSourcePeer, type IRuntimeThreadPeerOptions } from '../runtime-peer.js'
 import { readThreadRuntimeBootstrap, intersectThreadCapabilities } from '../bootstrap.js'
 import { createNodeThreadBootstrapHandoff } from '../receive-handoff.js'

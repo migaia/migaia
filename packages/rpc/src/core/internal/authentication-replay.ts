@@ -4,8 +4,8 @@ import { RpcMiddlewareErrorText } from '../middleware/error-text.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import { RpcEnvelopeKind, RpcRouteType, type IRpcEnvelope } from '../../contract/index.js'
 import { RpcAuthenticationRejectionReason } from '../error-code.js'
-import type { IRpcBinaryDigest } from '../../contract/runtime-api/binary.js'
-import type { IRpcRuntimeEnvelope } from '../../contract/runtime-api/types.js'
+import type { IRpcBinaryDigest } from '../../contract/v1/index.js'
+import type { IRpcRuntimeEnvelope } from '../../contract/index.js'
 
 /** Signed control discriminants are private authentication facts, outside RPC business routes. */
 export const RpcAuthenticationControl = {
@@ -146,7 +146,7 @@ export function authenticationChallengeRejection(
 /** Checks discovery semantics only after the original framer and codec have completed. */
 export function assertAuthenticationChallengeEnvelope(
   context: IRpcAuthenticationContext,
-  envelope: IRpcEnvelope | import('../../contract/runtime-api/types.js').IRpcRuntimeEnvelope
+  envelope: IRpcEnvelope | import('../../contract/index.js').IRpcRuntimeEnvelope
 ): void {
   /** Verified physical proof cannot be supplied by semantic payload fields. */
   const proof = verifiedContexts.get(context)

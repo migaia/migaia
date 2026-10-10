@@ -9,7 +9,7 @@ import type { IRpcEventListener, IRpcProvider } from '../typing.js'
 import type { IRpcFeature } from '../feature.js'
 import type { IEndpointCapabilitiesFeatureExpose } from './endpoint-capabilities-plugin.js'
 import { defineRpcFeature } from './define-rpc-feature.js'
-import { RpcRuntimeKind } from '../../contract/runtime-api/constants.js'
+import { RpcRuntimeKind } from '../../contract/framing/v1.js'
 import type {
   IOutboundCapability,
   IProviderCapability,

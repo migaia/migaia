@@ -153,7 +153,7 @@ export const RuntimeEventName = {
 export type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName]
 /** Original scheduler timestamps are monotonic milliseconds, not wall-clock epoch time. */
 export const RuntimeQueryClock = { scheduler: 'scheduler' } as const
-import { RpcCapability } from '../../contract/wire-constants.js'
+import { RpcCapability } from '../../contract/index.js'
 
 /** Existing custom roots can offer ordinary calls without promising a private Host admission scope. */
 export const RUNTIME_API_BASE_CAPABILITIES = Object.freeze([

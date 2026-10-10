@@ -1,6 +1,6 @@
 import { emitOutput, type ISerializeTextFormat } from '@migaia/serialize'
 import type { ISupervisorSnapshot } from '@migaia/supervision'
-import type { IRpcRuntimeGeneration } from '../../contract/runtime-api/types.js'
+import type { IRpcRuntimeGeneration } from '../../contract/index.js'
 import { readEndpointClientCounters } from '../../core/internal/endpoint-projection.js'
 import {
   runtimeIdentity,

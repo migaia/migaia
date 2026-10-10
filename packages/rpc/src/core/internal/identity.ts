@@ -1,7 +1,7 @@
 import { RpcCoreErrorText } from '../error-text.js'
 import { tupleKey } from './safe-value.js'
 import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
-import type { IRpcRuntimeGeneration } from '../../contract/runtime-api/types.js'
+import type { IRpcRuntimeGeneration } from '../../contract/index.js'
 
 /** Owns verified source bindings and issues unique, non-cryptographic identifiers. */
 export class VerifiedPeerRegistry {

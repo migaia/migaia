@@ -1,5 +1,5 @@
 import { selectedJsonObjectPort } from './json-object-port.js'
-import { invalidRpcStream } from '../../contract/stream-error.js'
+import { invalidRpcStream } from '../../contract/index.js'
 import { createOutboundEnvelope } from './outbound-envelope.js'
 import { readProviderPreflight } from './provider.js'
 import { hasFastEndpoint } from './fast-path.js'
@@ -25,7 +25,6 @@ import {
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import type { IInboundIdentityAdmission } from './inbound-identity.js'
 import { EndpointOwnerKey, type IEndpointKernelHost } from '../endpoint-kernel.js'
-
 import type {
   IRpcInboundIdentityPort,
   IRpcOutboundOperationsPort,
@@ -49,8 +48,8 @@ import { NativeDefaultIdText } from './native-default-id-text.js'
 import { tupleKey, runtimeTaskKey } from './safe-value.js'
 import { createRpcIdempotencyStore } from '../idempotency-store.js'
 import type { RpcOutboundAttachment } from './outbound-attachment.js'
-import type { IRpcRuntimeEnvelope } from '../../contract/runtime-api/types.js'
-import { RpcRuntimeKind, RpcRuntimeOperation } from '../../contract/runtime-api/constants.js'
+import type { IRpcRuntimeEnvelope } from '../../contract/index.js'
+import { RpcRuntimeKind, RpcRuntimeOperation } from '../../contract/framing/v1.js'
 import type { IRpcEarlyProviderIntent } from './variation-coordinator.js'
 import {
   readSelectedFramerChunks,

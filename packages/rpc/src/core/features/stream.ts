@@ -1,4 +1,4 @@
-import type { IRpcPortableValue } from '../../contract/types.js'
+import type { IRpcPortableValue } from '../../contract/index.js'
 import type { IRpcFeature } from '../feature.js'
 import type { IEndpointCapabilitiesFeatureExpose } from '../internal/endpoint-capabilities-plugin.js'
 import { defineRpcFeature } from '../internal/define-rpc-feature.js'

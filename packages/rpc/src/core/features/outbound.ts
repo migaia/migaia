@@ -1,5 +1,5 @@
 import { RpcOutboundAttachment } from '../internal/outbound-attachment.js'
-import { RpcRuntimeKind } from '../../contract/runtime-api/constants.js'
+import { RpcRuntimeKind } from '../../contract/framing/v1.js'
 import { RpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import { registerEndpointDebugSnapshot } from '../internal/test-observer.js'

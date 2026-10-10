@@ -1,5 +1,5 @@
-import { normalizePortable } from '../contract/normalize.js'
-import type { IRpcContext } from '../core/typing.js'
+import { normalizePortable } from '../contract/index.js'
+import type { IRpcContext } from '../core/index.js'
 import { RemoteMethodMode, type IRemoteContract } from './contract.js'
 import { RpcRemoteLayerErrorCode } from './error-code.js'
 import { createRemoteLayerError } from './error.js'

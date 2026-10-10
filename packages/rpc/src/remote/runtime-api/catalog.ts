@@ -1,7 +1,7 @@
-import { RPC_PORTABLE_MAX_DEPTH } from '../../contract/normalize.js'
-import { RpcWireLimit } from '../../contract/wire-constants.js'
-import { RpcError, RpcCoreErrorCode } from '../../core/errors.js'
-import type { IRpcContext } from '../../core/typing.js'
+import { RPC_PORTABLE_MAX_DEPTH } from '../../contract/index.js'
+import { RpcWireLimit } from '../../contract/index.js'
+import { RpcError, RpcCoreErrorCode } from '../../core/index.js'
+import type { IRpcContext } from '../../core/index.js'
 import { RemoteMethodName } from '../constants.js'
 import {
   RemoteCatalogLimit,
@@ -14,7 +14,7 @@ import {
 import { RuntimeApiErrorText, RuntimeApiMode } from './constants.js'
 import type { IRuntimePluginConnection } from './outlet.js'
 import { readRuntimePeerConnection } from './peer.js'
-import { RpcCapability } from '../../contract/wire-constants.js'
+import { RpcCapability } from '../../contract/index.js'
 import { assertProviderForwardRoute } from '../../core/internal/provider.js'
 
 /** A callable receives the portable application payload and the original core provider context. */

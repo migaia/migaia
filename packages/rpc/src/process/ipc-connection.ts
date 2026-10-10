@@ -1,13 +1,13 @@
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { deferred, hostRethrowReporter } from '@migaia/utils/promise'
-import type { IRpcFeature } from '../core/feature.js'
+import type { IRpcFeature } from '../core/index.js'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
 import { createIpcLogFeature } from '../core/plugins/log.js'
 import {
   createIpcSendQueueFeature,
   createIpcSendQueueTransport
 } from '../core/plugins/send-queue.js'
-import type { IRpcTransport } from '../core/transport.js'
+import type { IRpcTransport } from '../core/index.js'
 import type { IIpcGatedTransport } from '../core/plugins/flow-control.js'
 import { attachIpcStderr } from './stderr.js'
 import type { IProcessCommonOptions } from './types.js'

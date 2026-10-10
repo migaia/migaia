@@ -1,6 +1,6 @@
 import { identityCodecV1 } from '@migaia/serialize/codec'
-import { messageFramerV1 } from '../contract/framing/message-framer.js'
-import { RpcCapability } from '../contract/wire-constants.js'
+import { messageFramerV1 } from '../contract/framing/index.js'
+import { RpcCapability } from '../contract/index.js'
 
 /** Both ends share this static identity pipeline; no hello is sent on message channels. */
 export const THREAD_CHANNEL_PROFILE = Object.freeze({

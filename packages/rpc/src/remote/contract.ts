@@ -1,5 +1,5 @@
-import { normalizePortable } from '../contract/normalize.js'
-import type { IRpcPortableValue } from '../contract/types.js'
+import { normalizePortable } from '../contract/index.js'
+import type { IRpcPortableValue } from '../contract/index.js'
 import { RemoteMethodName } from './constants.js'
 import { RpcRemoteLayerErrorCode } from './error-code.js'
 import { createRemoteLayerError } from './error.js'
