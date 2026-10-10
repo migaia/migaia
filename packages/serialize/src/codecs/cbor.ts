@@ -1,13 +1,12 @@
+import { toCodecPortableValue } from '../portable.js'
 import { Decoder, Encoder } from 'cbor-x'
 import { SerializeErrorCode } from '../error-code.js'
 import {
   assertCodecVersion,
   asCodecValue,
-  assertPortableValue,
   CodecErrorText,
   createCodecError,
   normalizeCodecFailure,
-  toPortableValue,
   type ICodec,
   type ICodecValue
 } from '../codec.js'
@@ -73,8 +72,7 @@ export function defineCBORCodec<const TVersion extends number>(
     encodedType: 'uint8array' as const,
     encode: (value: ICodecValue): Uint8Array => {
       try {
-        const portable = toPortableValue(value)
-        assertPortableValue(portable)
+        const portable = toCodecPortableValue(value)
         return cborEncoder.encode(portable)
       } catch (error) {
         throw normalizeCodecFailure(
