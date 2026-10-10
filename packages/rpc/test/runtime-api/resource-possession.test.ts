@@ -12,6 +12,9 @@ import { abort } from '../../src/core/middleware/abort.js'
 import { RpcCapability } from '../../src/contract/wire-constants.js'
 import type { IRpcFactoryConfig } from '../../src/core/typing.js'
 import type { IRpcPortableValue } from '../../src/contract/types.js'
+import { defineFeature } from '../../src/core/feature.js'
+import { RpcError, RpcCoreErrorCode } from '../../src/core/errors.js'
+import { RpcCoreErrorText } from '../../src/core/error-text.js'
 
 /** New resource operations run through the existing composition and real memory carrier. */
 function pair(capabilities: readonly string[] = []) {
@@ -74,6 +77,54 @@ describe('C12 resource possession', () => {
     } finally {
       await fixture.close()
     }
+  })
+
+  it('[A44/BC13] leaves an unpulled cold stream on the original ready rejection', async () => {
+    /** This actual Feature failure rejects the original installation resource. */
+    const failure = new RpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.endpointModuleInvalid
+    )
+    /** Only the failing endpoint owns this pair side; rollback drains its installed resources. */
+    const transports = createMemoryTransportPair()
+    /** The failing Feature reaches the normal composition rollback path. */
+    const endpoint = createRuntimeApiEndpoint(
+      {
+        id: 'cold-failure',
+        transport: transports[0],
+        codec: identityCodecV1 as IRpcFactoryConfig['codec'],
+        framer: messageFramerV1,
+        middlewares: [connect({ transport: transports[0] }), abort()],
+        features: [
+          defineFeature(() => {
+            throw failure
+          })
+        ]
+      },
+      { transport: transports[0], peerId: 'other', agreement: { capabilities: [] } }
+    )
+    /** Opening retains the payload while leaving original stream activation lazy. */
+    const consumer = endpoint.stream.open('other', 'numbers', { value: 42 })
+    /** Handling ready must observe the only rejection until a caller actually pulls. */
+    const installationError = await endpoint.ready.then(
+      () => undefined,
+      (error) => error
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(installationError).toBeDefined()
+    expect(
+      await consumer.next().then(
+        () => undefined,
+        (error) => error
+      )
+    ).toBe(installationError)
+    expect(
+      await endpoint.dispose().then(
+        () => undefined,
+        (error) => error
+      )
+    ).toBe(installationError)
+    transports[0].close?.()
   })
 
   it('[A44/BC13] returns sync resource and snapshots a cold request before ready', async () => {
