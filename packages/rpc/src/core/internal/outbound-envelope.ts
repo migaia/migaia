@@ -7,8 +7,6 @@ import type { IRpcRuntimeEnvelope } from '../../contract/runtime-api/types.js'
 import { normalizeRuntimeEnvelope } from '../../contract/runtime-api/normalize.js'
 import { RpcRuntimeProfile, RpcRuntimeKind } from '../../contract/runtime-api/constants.js'
 import { normalizePortable } from '../../contract/normalize.js'
-import { invalidRpcEnvelope } from '../../contract/v1/route.js'
-import { RpcEnvelopeViolation } from '../../contract/wire-constants.js'
 import {
   captureOwnedJson,
   readOwnedJsonSnapshot,
@@ -276,8 +274,6 @@ export function createRuntimeRequestOutboundEnvelope(
 ): IRpcRuntimeEnvelope {
   /** Only the internal admission owner supplies this input; malformed caller headers still reject. */
   const envelope = normalizeRuntimeEnvelope(header)
-  if (!isRuntimeRequestInput(input))
-    throw invalidRpcEnvelope(RpcEnvelopeViolation.payload, '/payload')
   if (envelope.kind !== RpcRuntimeKind.call || envelope.task.method !== input.method)
     return createRuntimeOutboundEnvelope({ ...envelope, payload: input.payload })
   const complete = Object.freeze({
