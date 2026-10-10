@@ -1,8 +1,28 @@
 import { rpcApiGuides } from './rpc-api-guides.js'
 import { utilsApiGuides } from './utils-api-guides.js'
 import { completionApiGuides } from './completion-api-guides.js'
-import rpcReference from '../src/generated/manifests/libraries/rpc.json'
+import rpcCoreReference from '../src/generated/manifests/libraries/rpc-core.json'
+import rpcContractReference from '../src/generated/manifests/libraries/rpc-contract.json'
+import rpcProcessReference from '../src/generated/manifests/libraries/rpc-process.json'
+import rpcThreadsReference from '../src/generated/manifests/libraries/rpc-threads.json'
+import rpcBrowserReference from '../src/generated/manifests/libraries/rpc-browser.json'
+import rpcBridgeReference from '../src/generated/manifests/libraries/rpc-bridge-jsonrpc.json'
 import { isCallableApiSymbol, type IApiSymbol } from './content-contract.js'
+
+/** All six public owners use the canonical generated API projection schema. */
+type IRpcReference = Readonly<{
+  apis: readonly Readonly<{ module: string; symbols: readonly IApiSymbol[] }>[]
+}>
+
+/** Guides read each installed public owner directly after the umbrella package is retired. */
+const rpcReferences: Readonly<Record<string, IRpcReference>> = {
+  'rpc-core': rpcCoreReference as unknown as IRpcReference,
+  'rpc-contract': rpcContractReference as unknown as IRpcReference,
+  'rpc-process': rpcProcessReference as unknown as IRpcReference,
+  'rpc-threads': rpcThreadsReference as unknown as IRpcReference,
+  'rpc-browser': rpcBrowserReference as unknown as IRpcReference,
+  'rpc-bridge-jsonrpc': rpcBridgeReference as unknown as IRpcReference
+}
 
 export type IGuideLocale = 'en' | 'zh'
 
@@ -36,31 +56,31 @@ export type IApiGuide = {
 const optionTranslations: Readonly<
   Record<string, Readonly<Partial<Record<IGuideLocale, string>>>>
 > = {
-  'rpc:*:*:peerId': {
+  'rpc-core:*:*:peerId': {
     en: 'Expected authenticated peer identity used for source admission; a display name or operating-system PID is not a routing authority.',
     zh: 'source 准入使用的预期已认证 peer 身份；显示名称和操作系统 PID 不能作为路由授权。'
   },
-  'rpc:*:*:capabilities': {
+  'rpc-core:*:*:capabilities': {
     en: 'Actual static or negotiated capabilities of the paired native channel; declaring a local capability alone does not enable it on the remote peer.',
     zh: '配对原生通道的实际静态或协商能力；只在本端声明一项能力不会自动让远端支持它。'
   },
-  'rpc:*:*:origin': {
+  'rpc-core:*:*:origin': {
     en: 'Expected origin attached to incoming messages; combine it with source proof so an unrelated sender cannot impersonate the accepted peer.',
     zh: '入站消息预期 origin；与 source proof 配合，防止无关发送方冒充已采纳 peer。'
   },
-  'rpc:*:*:targetOrigin': {
+  'rpc-core:*:*:targetOrigin': {
     en: 'Exact trusted Window origin receiving outgoing messages; cross-origin targets must be configured explicitly rather than accepting every origin.',
     zh: '接收出站消息的明确可信 Window origin；跨源目标应显式配置，不能默认接纳所有 origin。'
   },
-  'rpc:*:*:allowUnsafeTargetOrigin': {
+  'rpc-core:*:*:allowUnsafeTargetOrigin': {
     en: 'Explicit opt-in for wildcard outgoing target origin; it does not disable incoming source validation and is unsuitable when a fixed origin is known.',
     zh: '对出站通配 origin 的显式授权，不会关闭入站 source 校验；已知固定 origin 时不应启用。'
   },
-  'rpc:*:*:ownership': {
+  'rpc-core:*:*:ownership': {
     en: 'Select owned only when this endpoint must close the physical port; borrowed removes local listeners without claiming the external resource lifetime.',
     zh: '只有 endpoint 必须关闭物理端口时才选择 owned；borrowed 只移除本地监听，不接管外部资源生命周期。'
   },
-  'rpc:*:*:timeoutMs': {
+  'rpc-core:*:*:timeoutMs': {
     en: 'Bounded request deadline in scheduler milliseconds; false explicitly disables it and zero expires immediately, while any launcher call cap still applies.',
     zh: '调度器毫秒请求期限；false 显式禁用、0 立即到期，同时仍受 launcher 的总调用预算限制。'
   },
@@ -68,11 +88,11 @@ const optionTranslations: Readonly<
     en: 'Receives a failure thrown by a diagnostic listener; report it to a terminal sink without re-entering the same diagnostic channel.',
     zh: '接收诊断监听器自身抛出的失败；写入独立终端日志，避免再次进入同一诊断通道。'
   },
-  'rpc:*:*:target': {
+  'rpc-core:*:*:target': {
     en: 'Concrete remote Window, Worker, Client or channel receiving outbound messages; choose the authenticated object rather than accepting arbitrary senders.',
     zh: '接收出站消息的具体 Window、Worker、Client 或通道对象；应固定已认证的目标，不能把任意消息发送方当作目标。'
   },
-  'rpc:*:*:receiver': {
+  'rpc-core:*:*:receiver': {
     en: 'Local message event owner; it can differ from the send target, such as navigator.serviceWorker receiving replies from a ServiceWorker.',
     zh: '本端消息事件的接收对象，可以不同于发送目标；例如页面通过 navigator.serviceWorker 接收 ServiceWorker 回复。'
   },
@@ -963,19 +983,19 @@ const optionTranslations: Readonly<
   'utils:string:format:nullish': {
     en: 'Behavior for null and undefined values: emit empty text or stringify the value.'
   },
-  'rpc:*:*:id': {
+  'rpc-core:*:*:id': {
     zh: '本地 endpoint 的稳定标识；每个需要路由的协议 envelope 都会携带它。'
   },
-  'rpc:*:*:targetIds': {
+  'rpc-core:*:*:targetIds': {
     zh: '可选的已知 peer 初始集合；自动发现仍可在需要时解析其他 target id。'
   },
-  'rpc:*:*:replay': {
+  'rpc-core:*:*:replay': {
     zh: '限制该 endpoint 为出站 request identifier 保留的重放窗口。'
   },
-  'rpc:*:*:replay.ttlMs': {
+  'rpc-core:*:*:replay.ttlMs': {
     zh: '出站 request identifier 的保留时长，默认 310 秒。'
   },
-  'rpc:*:*:replay.maxEntries': {
+  'rpc-core:*:*:replay.maxEntries': {
     en: 'Maximum number of outbound request identifiers retained for replay protection; increase only when measured traffic requires a larger bounded window.',
     zh: '为 replay protection 保留的出站 request identifier 最大数量；仅在有测量依据表明流量需要更大 bounded window 时调高。'
   },
@@ -987,97 +1007,97 @@ const optionTranslations: Readonly<
     en: 'Keeps the computed node active after observers detach; use it only when retained cache lifetime is intentional.',
     zh: 'observer 解除后保持 computed node active；仅在确实需要延长 cache lifetime 时使用。'
   },
-  'rpc:*:*:middlewares': {
+  'rpc-core:*:*:middlewares': {
     zh: 'endpoint 构造期间按 tuple 顺序原子安装的 middleware。'
   },
-  'rpc:*:*:construction': {
+  'rpc-core:*:*:construction': {
     en: 'Groups construction.signal and construction.timeoutMs so asynchronous endpoint construction can be cancelled or bounded while installed middleware is still rolled back safely.',
     zh: '组合 construction.signal 与 construction.timeoutMs；在下方分别配置中止信号和构造超时。'
   },
-  'rpc:core:authentication:encrypt': {
+  'rpc-core:index:authentication:encrypt': {
     en: 'Outbound encryption transform. It must be configured together with decrypt and runs before signing.',
     zh: '发送前执行的加密转换，必须与 decrypt 成对配置，并在签名前完成。'
   },
-  'rpc:core:authentication:decrypt': {
+  'rpc-core:index:authentication:decrypt': {
     en: 'Inbound decryption transform. It must be configured together with encrypt and runs after signature verification.',
     zh: '接收后的解密转换，必须与 encrypt 成对配置，并且只在验签通过后执行。'
   },
-  'rpc:core:authentication:sign': {
+  'rpc-core:index:authentication:sign': {
     en: 'Outbound signing transform. It must be configured together with verify and runs after encryption.',
     zh: '出站签名转换，必须与 verify 成对配置；签名覆盖已经加密的完整物理帧。'
   },
-  'rpc:core:authentication:verify': {
+  'rpc-core:index:authentication:verify': {
     en: 'Inbound signature-verification transform. It must be configured together with sign and runs before decryption.',
     zh: '入站验签转换，必须与 sign 成对配置；在解密和业务解析前拒绝伪造或不可信帧。'
   },
-  'rpc:core:authentication:encodedType': {
+  'rpc-core:index:authentication:encodedType': {
     en: 'Encoded representation required by the authentication transforms. It must agree with protocol output and transport requirements.',
     zh: '鉴权转换处理的编码值类型，必须与协议输出、framer 和 transport 要求一致。'
   },
-  'rpc:core:chunk:chunkSize': {
+  'rpc-core:index:chunk:chunkSize': {
     en: 'String payload size above which outbound messages are split. Omit for no splitting; Uint8Array payloads are never split.'
   },
-  'rpc:core:chunk:maxMessageBytes': {
+  'rpc-core:index:chunk:maxMessageBytes': {
     en: 'Maximum accepted logical message size. Omit for no message-size limit; other capacity limits remain active.'
   },
-  'rpc:core:chunk:maxConcurrentMessages': {
+  'rpc-core:index:chunk:maxConcurrentMessages': {
     en: 'Maximum number of message assemblies retained across all peers.'
   },
-  'rpc:core:chunk:maxConcurrentMessagesPerPeer': {
+  'rpc-core:index:chunk:maxConcurrentMessagesPerPeer': {
     en: 'Maximum number of message assemblies retained for one peer.'
   },
-  'rpc:core:chunk:maxBufferedBytes': {
+  'rpc-core:index:chunk:maxBufferedBytes': {
     en: 'Maximum total bytes retained by incomplete message assemblies.'
   },
-  'rpc:core:chunk:maxChunksPerMessage': {
+  'rpc-core:index:chunk:maxChunksPerMessage': {
     en: 'Maximum number of chunks accepted for one logical message.'
   },
-  'rpc:core:chunk:maxChunkBytes': {
+  'rpc-core:index:chunk:maxChunkBytes': {
     en: 'Maximum encoded byte size accepted for one chunk.'
   },
-  'rpc:core:chunk:assemblyTimeoutMs': {
+  'rpc-core:index:chunk:assemblyTimeoutMs': {
     en: 'Maximum time an incomplete message assembly may remain buffered before it is discarded.'
   },
-  'rpc:core:chunk:byteLength': {
+  'rpc-core:index:chunk:byteLength': {
     en: 'Custom byte-length calculator used to enforce chunk and message limits. Invalid results reject the chunk as CHUNK_INVALID.'
   },
-  'rpc:core:chunk:split': {
+  'rpc-core:index:chunk:split': {
     en: 'Custom string-splitting strategy. It must emit valid bounded chunk frames or the message is rejected as CHUNK_INVALID.'
   },
-  'rpc:core:contract:version': {
+  'rpc-core:index:contract:version': {
     en: 'Local protocol contract version advertised to peers.',
     zh: '本端业务 schema 的版本标识，用于生成请求路由并选择对应方法的输入与输出校验器。'
   },
-  'rpc:core:contract:acceptVersions': {
+  'rpc-core:index:contract:acceptVersions': {
     en: 'Peer protocol versions accepted by this endpoint. Defaults to the locally declared version.',
     zh: '允许接收的业务 schema 版本集合；与 v2 describe/batch 协议基线分开判断。'
   },
-  'rpc:core:contract:maxIdentifierLength': {
+  'rpc-core:index:contract:maxIdentifierLength': {
     en: 'Maximum length for sender, target, task, method, and receiver identifiers. Defaults to 128 even without contract middleware.',
     zh: 'method、sender 和 target 等业务标识的最长长度，用于在边界拒绝过长标识。'
   },
-  'rpc:core:contract:schemas': {
+  'rpc-core:index:contract:schemas': {
     en: 'Method-indexed parameter and result schemas. Methods without an exact entry are not schema-validated.',
     zh: '按方法和版本配置的参数与结果 schema 校验器，不会自动公开未注册的 provider。'
   },
-  'rpc:core:hooks:listeners': {
+  'rpc-core:index:hooks:listeners': {
     en: 'Initial ordered hook listeners installed with the middleware. Runtime subscriptions can be added through hooks.on().',
     zh: '接收 endpoint 生命周期、失败和鉴权事件的监听器；通过返回 disposer 解除自己的订阅。'
   },
-  'rpc:core:hooks:onHookError': {
+  'rpc-core:index:hooks:onHookError': {
     en: 'Contains hook-listener failures so a broken diagnostic listener cannot alter the RPC operation.',
     zh: 'hooks 监听器自身失败时的上报函数，不覆盖最初的业务错误或重新执行原调用。'
   },
-  'rpc:core:protocol:encode': {
+  'rpc-core:index:protocol:encode': {
     en: 'Encodes an outbound wire envelope. Failures are reported as PROTOCOL_INVALID.'
   },
-  'rpc:core:protocol:decode': {
+  'rpc-core:index:protocol:decode': {
     en: 'Decodes an inbound wire envelope. Failures are reported as PROTOCOL_INVALID.'
   },
-  'rpc:core:protocol:encodedType': {
+  'rpc-core:index:protocol:encodedType': {
     en: 'Declares the representation produced by encode and consumed by decode so transport compatibility is checked during construction.'
   },
-  'rpc:core:uuid:generate': {
+  'rpc-core:index:uuid:generate': {
     en: 'Custom identifier generator for task, message, and variation IDs. Defaults to the built-in secure random generator.',
     zh: '自定义语义请求 ID 生成器，必须避免当前 owner 内冲突；使用它会保留 legacy 重放账本速率边界。'
   },
@@ -3606,19 +3626,19 @@ const runtimeCompletionApiGuides = {
 
 /** RPC constants reuse the existing shape-aware reference guide without callable fallback prose. */
 const rpcConstantGuides = Object.fromEntries(
-  rpcReference.apis.flatMap((api) =>
+  Object.entries(rpcReferences).flatMap(([library, reference]) => reference.apis.flatMap((api) =>
     api.symbols
       .filter(
         (symbol) => symbol.kind === 'const' && !isCallableApiSymbol(symbol as unknown as IApiSymbol)
       )
       .map((symbol) => [
-        `rpc:${api.module.replaceAll('/', '-')}:${symbol.name}`,
+        `${library}:${api.module.replaceAll('/', '-')}:${symbol.name}`,
         {
-          en: createSupportingContractGuide('rpc', symbol as unknown as IApiSymbol, 'en'),
-          zh: createSupportingContractGuide('rpc', symbol as unknown as IApiSymbol, 'zh')
+          en: createSupportingContractGuide(library, symbol, 'en'),
+          zh: createSupportingContractGuide(library, symbol, 'zh')
         }
       ])
-  )
+  ))
 )
 
 const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, IApiGuide>>>>> = {
@@ -27111,8 +27131,8 @@ export function findApiGuide(
   /** Option translations belong to the same canonical guide, not a second rendered description. */
   /** Existing extracted RPC fields keep their exact names and gain only maintained localized prose. */
   const rpcFields =
-    library === 'rpc'
-      ? (rpcReference.apis
+    rpcReferences[library]
+      ? (rpcReferences[library].apis
           .find((api) => api.module === moduleName)
           ?.symbols.find((symbol) => symbol.name === symbolName)?.configuration ?? [])
       : []
@@ -27310,6 +27330,11 @@ export function findOptionTranslation(
     optionTranslations[`${library}:${moduleName}:${symbolName}:${fieldName}`]?.[locale] ??
     suffixes
       .map((suffix) => optionTranslations[`${library}:*:*:${suffix}`]?.[locale])
-      .find((description) => description !== undefined)
+      .find((description) => description !== undefined) ??
+    (library.startsWith('rpc-')
+      ? suffixes
+          .map((suffix) => optionTranslations[`rpc-core:*:*:${suffix}`]?.[locale])
+          .find((description) => description !== undefined)
+      : undefined)
   )
 }

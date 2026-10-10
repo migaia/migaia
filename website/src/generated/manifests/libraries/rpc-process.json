@@ -1,0 +1,1630 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "rpc-process",
+    "description": "RPC process owner.",
+    "version": "0.0.7",
+    "exports": [
+      ".",
+      "./adapters/bun-socket",
+      "./adapters/bun-spawn",
+      "./adapters/deno-command",
+      "./adapters/deno-socket",
+      "./adapters/electron-utility-process",
+      "./adapters/node-child-process",
+      "./adapters/node-socket",
+      "./adapters/windows-job"
+    ],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-rpc-process",
+            "heading": "@migaia/rpc-process",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "独立进程通信。从包根使用 `createProcessPeer`、`createProcessPlugin`。按平台导入 Node、Bun、Deno、Electron utility process 或 Windows job 的普通 adapter 子路径。"
+              },
+              {
+                "type": "paragraph",
+                "text": "RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不发布；仓内消费方直接导入各公开包。同一 realm 的第二份模块实例在取得资源前抛出 native Error，source 为 `@migaia/rpc/core`、code 为 `DUPLICATE_MODULE_INSTANCE`；修复依赖解析并重载 realm。不同 Worker realm 独立。既有六个语义 source、wire 与错误身份保持不变。"
+              },
+              {
+                "type": "paragraph",
+                "text": "完整使用边界见 USEGUIDE。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "migaia-rpc-process-使用指南",
+            "heading": "@migaia/rpc-process 使用指南",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "从包根使用 `createProcessPeer`、`createProcessPlugin`。按平台导入 Node、Bun、Deno、Electron utility process 或 Windows job 的普通 adapter 子路径。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createProcessPeer } from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'"
+              },
+              {
+                "type": "paragraph",
+                "text": "spawn 拥有执行单元；connect/listen 只持有自己的连接。Peer 的 request、notify、stream、group、outcome、取消、重试与 close 沿原实际资源生命周期执行。Core 持有 launch/bootstrap、provider 字节准入、listener 与 drain 机制；Native 包持有平台发现、stdio、socket 与 OS 资源。Electron、Koffi 仅是对应可选平台的 peer；使用进程不需要安装线程包。"
+              },
+              {
+                "type": "paragraph",
+                "text": "RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不发布；仓内消费方直接导入各公开包。同一 realm 的第二份模块实例在取得资源前抛出 native Error，source 为 `@migaia/rpc/core`、code 为 `DUPLICATE_MODULE_INSTANCE`；修复依赖解析并重载 realm。不同 Worker realm 独立。既有六个语义 source、wire 与错误身份保持不变。"
+              },
+              {
+                "type": "paragraph",
+                "text": "包内使用相对路径；跨包调用只使用公开 API。协议工具使用 `@migaia/rpc-contract`，Core/Remote/Testing 使用 `@migaia/rpc-core` 的普通入口。"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "rpc-process:index",
+      "library": "rpc-process",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-process/getting-started",
+      "architecturePath": "/en/architecture/rpc-process",
+      "symbols": [
+        {
+          "name": "createProcessPeer",
+          "kind": "function",
+          "signature": "export declare function createProcessPeer<TRemote = Record<never, never>>(options: IRuntimeProcessPeerOptions): Promise<IRuntimeTypedPeer<TRemote, IRuntimeFlatten<TRemote>, typeof RuntimePluginKey.process>>;",
+          "declarationLine": 5,
+          "source": "packages/rpc-process/dist/process/peer.d.ts",
+          "purpose": "Discover this platform's actual I/O while Core owns the peer and its preparation resources.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createProcessPeer.",
+          "advanced": "No additional advanced behavior is declared for createProcessPeer.",
+          "parameters": ["options: IRuntimeProcessPeerOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IRuntimeProcessPeerOptions",
+              "optional": false
+            }
+          ],
+          "returns": "Promise<IRuntimeTypedPeer<TRemote, IRuntimeFlatten<TRemote>, typeof RuntimePluginKey.process>>",
+          "errors": ["No documented errors are declared for createProcessPeer."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createProcessPeer.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "createProcessPeer",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createProcessPeer<TRemote = Record<never, never>>(options: IRuntimeProcessPeerOptions): Promise<IRuntimeTypedPeer<TRemote, IRuntimeFlatten<TRemote>, typeof RuntimePluginKey.process>>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IRuntimeProcessPeerOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "Promise<IRuntimeTypedPeer<TRemote, IRuntimeFlatten<TRemote>, typeof RuntimePluginKey.process>>"
+          ],
+          "whenToUse": "Use createProcessPeer when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createProcessPeer does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Discover this platform's actual I/O while Core owns the peer and its preparation resources."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createProcessPeer from @migaia/rpc-process, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createProcessPeer when its function contract and declared inputs match the result you need. Choose a different public symbol when createProcessPeer does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createProcessPeer."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createProcessPeer."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/peer.d.ts:createProcessPeer:export declare function createProcessPeer<TRemote = Record<never, never>>(options: IRuntimeProcessPeerOptions): Promise<IRuntimeTypedPeer<TRemote, IRuntimeFlatten<TRemote>, typeof RuntimePluginKey.process>>;",
+          "guidance": [],
+          "usageScore": 16,
+          "configuration": [],
+          "fragment": "rpc-process-index--createProcessPeer"
+        },
+        {
+          "name": "createProcessPlugin",
+          "kind": "function",
+          "signature": "export declare function createProcessPlugin<THandle extends IProcessHandle>(options: IProcessPluginOptions<THandle>): IProcessPlugin;\nexport declare function createProcessPlugin<TRemote = Record<never, never>, const TProvide extends import('@migaia/rpc-core/remote').IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeProcessPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'process'>;",
+          "declarationLine": 6,
+          "source": "packages/rpc-process/dist/process/plugin/client.d.ts",
+          "purpose": "The original advanced declaration is retained only for the serial C7 consumer migration. Adds one symmetric connection to the canonical process slot.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createProcessPlugin.",
+          "advanced": "No additional advanced behavior is declared for createProcessPlugin.",
+          "parameters": [
+            "options: IProcessPluginOptions<THandle>",
+            "'@migaia/rpc-core/remote': unknown"
+          ],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IProcessPluginOptions<THandle>",
+              "optional": false
+            },
+            {
+              "name": "'@migaia/rpc-core/remote'",
+              "type": "unknown",
+              "optional": false
+            }
+          ],
+          "returns": "IProcessPlugin | .IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeProcessPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'process'>",
+          "errors": ["No documented errors are declared for createProcessPlugin."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createProcessPlugin.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "createProcessPlugin",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createProcessPlugin<THandle extends IProcessHandle>(options: IProcessPluginOptions<THandle>): IProcessPlugin;",
+            "export declare function createProcessPlugin<TRemote = Record<never, never>, const TProvide extends import('@migaia/rpc-core/remote').IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeProcessPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'process'>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IProcessPluginOptions<THandle>",
+                "optional": false
+              }
+            ],
+            [
+              {
+                "name": "'@migaia/rpc-core/remote'",
+                "type": "unknown",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "IProcessPlugin",
+            ".IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeProcessPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'process'>"
+          ],
+          "whenToUse": "Use createProcessPlugin when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createProcessPlugin does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The original advanced declaration is retained only for the serial C7 consumer migration. Adds one symmetric connection to the canonical process slot."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createProcessPlugin from @migaia/rpc-process, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createProcessPlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when createProcessPlugin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createProcessPlugin."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createProcessPlugin."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/plugin/client.d.ts:createProcessPlugin:export declare function createProcessPlugin<THandle extends IProcessHandle>(options: IProcessPluginOptions<THandle>): IProcessPlugin;\nexport declare function createProcessPlugin<TRemote = Record<never, never>, const TProvide extends import('@migaia/rpc-core/remote').IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeProcessPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'process'>;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "rpc-process-index--createProcessPlugin"
+        },
+        {
+          "name": "createProcessTransport",
+          "kind": "function",
+          "signature": "export declare function createProcessTransport(channel: IProcessByteChannel, options: IProcessByteOptions): Promise<IRuntimePeerSourceResult>;\nexport declare function createProcessTransport(channel: IProcessMessageChannel, options: IProcessMessageOptions): Promise<IRemoteChannel>;",
+          "declarationLine": 4,
+          "source": "packages/rpc-process/dist/process/handshake.d.ts",
+          "purpose": "Construct a process byte channel through the Core owner, preserving its original Promise. Construct a static message channel without adding a wire handshake.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createProcessTransport.",
+          "advanced": "No additional advanced behavior is declared for createProcessTransport.",
+          "parameters": [
+            "channel: IProcessByteChannel",
+            "options: IProcessByteOptions",
+            "channel: IProcessMessageChannel",
+            "options: IProcessMessageOptions"
+          ],
+          "parameterDetails": [
+            {
+              "name": "channel",
+              "type": "IProcessByteChannel",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "IProcessByteOptions",
+              "optional": false
+            },
+            {
+              "name": "channel",
+              "type": "IProcessMessageChannel",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "IProcessMessageOptions",
+              "optional": false
+            }
+          ],
+          "returns": "Promise<IRuntimePeerSourceResult> | Promise<IRemoteChannel>",
+          "errors": ["No documented errors are declared for createProcessTransport."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createProcessTransport.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "createProcessTransport",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createProcessTransport(channel: IProcessByteChannel, options: IProcessByteOptions): Promise<IRuntimePeerSourceResult>;",
+            "export declare function createProcessTransport(channel: IProcessMessageChannel, options: IProcessMessageOptions): Promise<IRemoteChannel>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "channel",
+                "type": "IProcessByteChannel",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "IProcessByteOptions",
+                "optional": false
+              }
+            ],
+            [
+              {
+                "name": "channel",
+                "type": "IProcessMessageChannel",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "IProcessMessageOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["Promise<IRuntimePeerSourceResult>", "Promise<IRemoteChannel>"],
+          "whenToUse": "Use createProcessTransport when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createProcessTransport does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Construct a process byte channel through the Core owner, preserving its original Promise. Construct a static message channel without adding a wire handshake."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createProcessTransport from @migaia/rpc-process, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createProcessTransport when its function contract and declared inputs match the result you need. Choose a different public symbol when createProcessTransport does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createProcessTransport."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createProcessTransport."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/handshake.d.ts:createProcessTransport:export declare function createProcessTransport(channel: IProcessByteChannel, options: IProcessByteOptions): Promise<IRuntimePeerSourceResult>;\nexport declare function createProcessTransport(channel: IProcessMessageChannel, options: IProcessMessageOptions): Promise<IRemoteChannel>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-process-index--createProcessTransport"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-process:adapters/bun-socket",
+      "library": "rpc-process",
+      "module": "adapters/bun-socket",
+      "exportPath": "./adapters/bun-socket",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-process/getting-started",
+      "architecturePath": "/en/architecture/rpc-process",
+      "symbols": [],
+      "aliases": [
+        {
+          "identity": "packages/rpc-process/dist/process/adapters/node-socket.d.ts:dialProcessByteChannel:export declare function dialProcessByteChannel(options: Readonly<{ address: string; signal?: AbortSignal; }>): Promise<IProcessByteChannel>;",
+          "name": "dialProcessByteChannel",
+          "signature": "export declare function dialProcessByteChannel(options: Readonly<{ address: string; signal?: AbortSignal; }>): Promise<IProcessByteChannel>;",
+          "source": "packages/rpc-process/dist/process/adapters/node-socket.d.ts",
+          "exportPath": "./adapters/bun-socket",
+          "ownerExportPath": "./adapters/node-socket",
+          "ownerModule": "adapters/node-socket",
+          "ownerFragment": "rpc-process-adapters/node-socket--dialProcessByteChannel"
+        },
+        {
+          "identity": "packages/rpc-process/dist/process/adapters/node-socket.d.ts:listenProcessByteChannel:export declare const listenProcessByteChannel: IListenProcessByteChannel;",
+          "name": "listenProcessByteChannel",
+          "signature": "export declare const listenProcessByteChannel: IListenProcessByteChannel;",
+          "source": "packages/rpc-process/dist/process/adapters/node-socket.d.ts",
+          "exportPath": "./adapters/bun-socket",
+          "ownerExportPath": "./adapters/node-socket",
+          "ownerModule": "adapters/node-socket",
+          "ownerFragment": "rpc-process-adapters/node-socket--listenProcessByteChannel"
+        }
+      ]
+    },
+    {
+      "id": "rpc-process:adapters/bun-spawn",
+      "library": "rpc-process",
+      "module": "adapters/bun-spawn",
+      "exportPath": "./adapters/bun-spawn",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-process/getting-started",
+      "architecturePath": "/en/architecture/rpc-process",
+      "symbols": [
+        {
+          "name": "createBunProcessLauncher",
+          "kind": "function",
+          "signature": "export declare function createBunProcessLauncher(options?: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>): IProcessLauncher<INodeProcessHandle>;",
+          "declarationLine": 11,
+          "source": "packages/rpc-process/dist/process/adapters/node-child-process.d.ts",
+          "purpose": "Spawn without a shell and drain diagnostics before writing a secret bootstrap frame.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBunProcessLauncher.",
+          "advanced": "No additional advanced behavior is declared for createBunProcessLauncher.",
+          "parameters": [
+            "options: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }> (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>",
+              "optional": true
+            }
+          ],
+          "returns": "IProcessLauncher<INodeProcessHandle>",
+          "errors": ["No documented errors are declared for createBunProcessLauncher."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBunProcessLauncher.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "createNodeProcessLauncher",
+          "exportPath": "./adapters/bun-spawn",
+          "overloadSignatures": [
+            "export declare function createBunProcessLauncher(options?: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>): IProcessLauncher<INodeProcessHandle>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IProcessLauncher<INodeProcessHandle>"],
+          "whenToUse": "Use createBunProcessLauncher when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createBunProcessLauncher does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Spawn without a shell and drain diagnostics before writing a secret bootstrap frame."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createBunProcessLauncher from @migaia/rpc-process/adapters/bun-spawn, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createBunProcessLauncher when its function contract and declared inputs match the result you need. Choose a different public symbol when createBunProcessLauncher does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBunProcessLauncher."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createBunProcessLauncher."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/adapters/node-child-process.d.ts:createBunProcessLauncher:export declare function createBunProcessLauncher(options?: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>): IProcessLauncher<INodeProcessHandle>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-process-adapters/bun-spawn--createBunProcessLauncher"
+        },
+        {
+          "name": "IBunProcessHandle",
+          "kind": "type",
+          "signature": "export type IBunProcessHandle = IProcessHandle & Readonly<{ channel?: IProcessByteChannel; runtimeApiIdentity?: IRuntimePeerIdentity; }>;",
+          "declarationLine": 6,
+          "source": "packages/rpc-process/dist/process/adapters/node-child-process.d.ts",
+          "purpose": "A Node handle exposes stdout/stdin only when the specification chose byte channels.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IBunProcessHandle.",
+          "advanced": "No additional advanced behavior is declared for IBunProcessHandle.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IBunProcessHandle."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IBunProcessHandle.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "INodeProcessHandle",
+          "exportPath": "./adapters/bun-spawn",
+          "overloadSignatures": [
+            "export type IBunProcessHandle = IProcessHandle & Readonly<{ channel?: IProcessByteChannel; runtimeApiIdentity?: IRuntimePeerIdentity; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IBunProcessHandle when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IBunProcessHandle does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A Node handle exposes stdout/stdin only when the specification chose byte channels."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IBunProcessHandle from @migaia/rpc-process/adapters/bun-spawn, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IBunProcessHandle when its type contract and declared inputs match the result you need. Choose a different public symbol when IBunProcessHandle does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IBunProcessHandle."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IBunProcessHandle."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/adapters/node-child-process.d.ts:IBunProcessHandle:export type IBunProcessHandle = IProcessHandle & Readonly<{ channel?: IProcessByteChannel; runtimeApiIdentity?: IRuntimePeerIdentity; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-process-adapters/bun-spawn--IBunProcessHandle"
+        }
+      ],
+      "aliases": [
+        {
+          "identity": "packages/rpc-process/dist/process/adapters/node-child-process.d.ts:openProcessStdioChannel:export declare function openProcessStdioChannel(options: Readonly<{ bootstrap: 'stdin' | 'fd' | 'none'; fd?: number; bootstrapTimeoutMs?: number; }>): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array; }>>;",
+          "name": "openProcessStdioChannel",
+          "signature": "export declare function openProcessStdioChannel(options: Readonly<{ bootstrap: 'stdin' | 'fd' | 'none'; fd?: number; bootstrapTimeoutMs?: number; }>): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array; }>>;",
+          "source": "packages/rpc-process/dist/process/adapters/node-child-process.d.ts",
+          "exportPath": "./adapters/bun-spawn",
+          "ownerExportPath": "./adapters/node-child-process",
+          "ownerModule": "adapters/node-child-process",
+          "ownerFragment": "rpc-process-adapters/node-child-process--openProcessStdioChannel"
+        }
+      ]
+    },
+    {
+      "id": "rpc-process:adapters/deno-command",
+      "library": "rpc-process",
+      "module": "adapters/deno-command",
+      "exportPath": "./adapters/deno-command",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-process/getting-started",
+      "architecturePath": "/en/architecture/rpc-process",
+      "symbols": [
+        {
+          "name": "createDenoProcessLauncher",
+          "kind": "function",
+          "signature": "export declare function createDenoProcessLauncher(options?: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>): IProcessLauncher<IDenoProcessHandle>;",
+          "declarationLine": 11,
+          "source": "packages/rpc-process/dist/process/adapters/deno-command.d.ts",
+          "purpose": "Spawn a Deno.Command with an explicit environment allowlist and early stderr drain.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createDenoProcessLauncher.",
+          "advanced": "No additional advanced behavior is declared for createDenoProcessLauncher.",
+          "parameters": [
+            "options: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }> (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>",
+              "optional": true
+            }
+          ],
+          "returns": "IProcessLauncher<IDenoProcessHandle>",
+          "errors": ["No documented errors are declared for createDenoProcessLauncher."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createDenoProcessLauncher.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/deno-command",
+          "overloadSignatures": [
+            "export declare function createDenoProcessLauncher(options?: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>): IProcessLauncher<IDenoProcessHandle>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IProcessLauncher<IDenoProcessHandle>"],
+          "whenToUse": "Use createDenoProcessLauncher when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createDenoProcessLauncher does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Spawn a Deno.Command with an explicit environment allowlist and early stderr drain."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createDenoProcessLauncher from @migaia/rpc-process/adapters/deno-command, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createDenoProcessLauncher when its function contract and declared inputs match the result you need. Choose a different public symbol when createDenoProcessLauncher does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createDenoProcessLauncher."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createDenoProcessLauncher."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/adapters/deno-command.d.ts:createDenoProcessLauncher:export declare function createDenoProcessLauncher(options?: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>): IProcessLauncher<IDenoProcessHandle>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-process-adapters/deno-command--createDenoProcessLauncher"
+        },
+        {
+          "name": "IDenoProcessHandle",
+          "kind": "type",
+          "signature": "export type IDenoProcessHandle = IProcessHandle & Readonly<{ channel?: IProcessByteChannel; runtimeApiIdentity?: IRuntimePeerIdentity; }>;",
+          "declarationLine": 6,
+          "source": "packages/rpc-process/dist/process/adapters/deno-command.d.ts",
+          "purpose": "One Deno child exposes its byte port only when both directions were piped.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDenoProcessHandle.",
+          "advanced": "No additional advanced behavior is declared for IDenoProcessHandle.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IDenoProcessHandle."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDenoProcessHandle.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/deno-command",
+          "overloadSignatures": [
+            "export type IDenoProcessHandle = IProcessHandle & Readonly<{ channel?: IProcessByteChannel; runtimeApiIdentity?: IRuntimePeerIdentity; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IDenoProcessHandle when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IDenoProcessHandle does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "One Deno child exposes its byte port only when both directions were piped."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IDenoProcessHandle from @migaia/rpc-process/adapters/deno-command, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IDenoProcessHandle when its type contract and declared inputs match the result you need. Choose a different public symbol when IDenoProcessHandle does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDenoProcessHandle."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IDenoProcessHandle."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/adapters/deno-command.d.ts:IDenoProcessHandle:export type IDenoProcessHandle = IProcessHandle & Readonly<{ channel?: IProcessByteChannel; runtimeApiIdentity?: IRuntimePeerIdentity; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-process-adapters/deno-command--IDenoProcessHandle"
+        },
+        {
+          "name": "openProcessStdioChannel",
+          "kind": "function",
+          "signature": "export declare function openProcessStdioChannel(options: Readonly<{ bootstrap: 'stdin' | 'fd' | 'none'; fd?: number; bootstrapTimeoutMs?: number; }>): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array; }>>;",
+          "declarationLine": 15,
+          "source": "packages/rpc-process/dist/process/adapters/deno-command.d.ts",
+          "purpose": "Read the child's stdin bootstrap with the same decoder used for its hello.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for openProcessStdioChannel.",
+          "advanced": "No additional advanced behavior is declared for openProcessStdioChannel.",
+          "parameters": [
+            "options: Readonly<{ bootstrap: 'stdin' | 'fd' | 'none'; fd?: number; bootstrapTimeoutMs?: number; }>"
+          ],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "Readonly<{ bootstrap: 'stdin' | 'fd' | 'none'; fd?: number; bootstrapTimeoutMs?: number; }>",
+              "optional": false
+            }
+          ],
+          "returns": "Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array; }>>",
+          "errors": ["No documented errors are declared for openProcessStdioChannel."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for openProcessStdioChannel.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/deno-command",
+          "overloadSignatures": [
+            "export declare function openProcessStdioChannel(options: Readonly<{ bootstrap: 'stdin' | 'fd' | 'none'; fd?: number; bootstrapTimeoutMs?: number; }>): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array; }>>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "Readonly<{ bootstrap: 'stdin' | 'fd' | 'none'; fd?: number; bootstrapTimeoutMs?: number; }>",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array; }>>"
+          ],
+          "whenToUse": "Use openProcessStdioChannel when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when openProcessStdioChannel does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Read the child's stdin bootstrap with the same decoder used for its hello."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import openProcessStdioChannel from @migaia/rpc-process/adapters/deno-command, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use openProcessStdioChannel when its function contract and declared inputs match the result you need. Choose a different public symbol when openProcessStdioChannel does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for openProcessStdioChannel."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for openProcessStdioChannel."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/adapters/deno-command.d.ts:openProcessStdioChannel:export declare function openProcessStdioChannel(options: Readonly<{ bootstrap: 'stdin' | 'fd' | 'none'; fd?: number; bootstrapTimeoutMs?: number; }>): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array; }>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-process-adapters/deno-command--openProcessStdioChannel"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-process:adapters/deno-socket",
+      "library": "rpc-process",
+      "module": "adapters/deno-socket",
+      "exportPath": "./adapters/deno-socket",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-process/getting-started",
+      "architecturePath": "/en/architecture/rpc-process",
+      "symbols": [
+        {
+          "name": "dialProcessByteChannel",
+          "kind": "function",
+          "signature": "export declare function dialProcessByteChannel(options: Readonly<{ address: string; signal?: AbortSignal; }>): Promise<IProcessByteChannel>;",
+          "declarationLine": 3,
+          "source": "packages/rpc-process/dist/process/adapters/deno-socket.d.ts",
+          "purpose": "Deno's Node-compatible TCP/Unix streams reuse the one authenticated state machine.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for dialProcessByteChannel.",
+          "advanced": "No additional advanced behavior is declared for dialProcessByteChannel.",
+          "parameters": ["options: Readonly<{ address: string; signal?: AbortSignal; }>"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "Readonly<{ address: string; signal?: AbortSignal; }>",
+              "optional": false
+            }
+          ],
+          "returns": "Promise<IProcessByteChannel>",
+          "errors": ["No documented errors are declared for dialProcessByteChannel."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for dialProcessByteChannel.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/deno-socket",
+          "overloadSignatures": [
+            "export declare function dialProcessByteChannel(options: Readonly<{ address: string; signal?: AbortSignal; }>): Promise<IProcessByteChannel>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "Readonly<{ address: string; signal?: AbortSignal; }>",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["Promise<IProcessByteChannel>"],
+          "whenToUse": "Use dialProcessByteChannel when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when dialProcessByteChannel does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Deno's Node-compatible TCP/Unix streams reuse the one authenticated state machine."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import dialProcessByteChannel from @migaia/rpc-process/adapters/deno-socket, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use dialProcessByteChannel when its function contract and declared inputs match the result you need. Choose a different public symbol when dialProcessByteChannel does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for dialProcessByteChannel."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for dialProcessByteChannel."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/adapters/deno-socket.d.ts:dialProcessByteChannel:export declare function dialProcessByteChannel(options: Readonly<{ address: string; signal?: AbortSignal; }>): Promise<IProcessByteChannel>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-process-adapters/deno-socket--dialProcessByteChannel"
+        },
+        {
+          "name": "listenProcessByteChannel",
+          "kind": "const",
+          "signature": "export declare const listenProcessByteChannel: IListenProcessByteChannel;",
+          "declarationLine": 8,
+          "source": "packages/rpc-process/dist/process/adapters/deno-socket.d.ts",
+          "purpose": "Listener policy remains shared with Node, while named pipes stay unsupported.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for listenProcessByteChannel.",
+          "advanced": "No additional advanced behavior is declared for listenProcessByteChannel.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for listenProcessByteChannel."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for listenProcessByteChannel.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/deno-socket",
+          "overloadSignatures": [
+            "export declare const listenProcessByteChannel: IListenProcessByteChannel;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use listenProcessByteChannel when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when listenProcessByteChannel does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Listener policy remains shared with Node, while named pipes stay unsupported."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import listenProcessByteChannel from @migaia/rpc-process/adapters/deno-socket, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use listenProcessByteChannel when its const contract and declared inputs match the result you need. Choose a different public symbol when listenProcessByteChannel does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for listenProcessByteChannel."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for listenProcessByteChannel."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/adapters/deno-socket.d.ts:listenProcessByteChannel:export declare const listenProcessByteChannel: IListenProcessByteChannel;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-process-adapters/deno-socket--listenProcessByteChannel"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-process:adapters/electron-utility-process",
+      "library": "rpc-process",
+      "module": "adapters/electron-utility-process",
+      "exportPath": "./adapters/electron-utility-process",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-process/getting-started",
+      "architecturePath": "/en/architecture/rpc-process",
+      "symbols": [
+        {
+          "name": "createElectronUtilityProcessLauncher",
+          "kind": "function",
+          "signature": "export declare function createElectronUtilityProcessLauncher(): IProcessLauncher<IElectronProcessHandle>;",
+          "declarationLine": 8,
+          "source": "packages/rpc-process/dist/process/adapters/electron-utility-process.d.ts",
+          "purpose": "Construct a launcher whose unsupported capabilities are visible before any fork.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createElectronUtilityProcessLauncher.",
+          "advanced": "No additional advanced behavior is declared for createElectronUtilityProcessLauncher.",
+          "parameters": ["This function declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "IProcessLauncher<IElectronProcessHandle>",
+          "errors": ["No documented errors are declared for createElectronUtilityProcessLauncher."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createElectronUtilityProcessLauncher.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/electron-utility-process",
+          "overloadSignatures": [
+            "export declare function createElectronUtilityProcessLauncher(): IProcessLauncher<IElectronProcessHandle>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": ["IProcessLauncher<IElectronProcessHandle>"],
+          "whenToUse": "Use createElectronUtilityProcessLauncher when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createElectronUtilityProcessLauncher does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Construct a launcher whose unsupported capabilities are visible before any fork."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createElectronUtilityProcessLauncher from @migaia/rpc-process/adapters/electron-utility-process, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createElectronUtilityProcessLauncher when its function contract and declared inputs match the result you need. Choose a different public symbol when createElectronUtilityProcessLauncher does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createElectronUtilityProcessLauncher."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createElectronUtilityProcessLauncher."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/adapters/electron-utility-process.d.ts:createElectronUtilityProcessLauncher:export declare function createElectronUtilityProcessLauncher(): IProcessLauncher<IElectronProcessHandle>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-process-adapters/electron-utility-process--createElectronUtilityProcessLauncher"
+        },
+        {
+          "name": "IElectronProcessHandle",
+          "kind": "type",
+          "signature": "export type IElectronProcessHandle = IProcessHandle & Readonly<{ channel: IProcessMessageChannel; }>;",
+          "declarationLine": 4,
+          "source": "packages/rpc-process/dist/process/adapters/electron-utility-process.d.ts",
+          "purpose": "Electron's handle exposes a message carrier and keeps termination on the supervisor.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IElectronProcessHandle.",
+          "advanced": "No additional advanced behavior is declared for IElectronProcessHandle.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IElectronProcessHandle."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IElectronProcessHandle.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/electron-utility-process",
+          "overloadSignatures": [
+            "export type IElectronProcessHandle = IProcessHandle & Readonly<{ channel: IProcessMessageChannel; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IElectronProcessHandle when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IElectronProcessHandle does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Electron's handle exposes a message carrier and keeps termination on the supervisor."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IElectronProcessHandle from @migaia/rpc-process/adapters/electron-utility-process, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IElectronProcessHandle when its type contract and declared inputs match the result you need. Choose a different public symbol when IElectronProcessHandle does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IElectronProcessHandle."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IElectronProcessHandle."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/adapters/electron-utility-process.d.ts:IElectronProcessHandle:export type IElectronProcessHandle = IProcessHandle & Readonly<{ channel: IProcessMessageChannel; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-process-adapters/electron-utility-process--IElectronProcessHandle"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-process:adapters/node-child-process",
+      "library": "rpc-process",
+      "module": "adapters/node-child-process",
+      "exportPath": "./adapters/node-child-process",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-process/getting-started",
+      "architecturePath": "/en/architecture/rpc-process",
+      "symbols": [
+        {
+          "name": "createNodeProcessLauncher",
+          "kind": "function",
+          "signature": "export declare function createNodeProcessLauncher(options?: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>): IProcessLauncher<INodeProcessHandle>;",
+          "declarationLine": 11,
+          "source": "packages/rpc-process/dist/process/adapters/node-child-process.d.ts",
+          "purpose": "Spawn without a shell and drain diagnostics before writing a secret bootstrap frame.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createNodeProcessLauncher.",
+          "advanced": "No additional advanced behavior is declared for createNodeProcessLauncher.",
+          "parameters": [
+            "options: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }> (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>",
+              "optional": true
+            }
+          ],
+          "returns": "IProcessLauncher<INodeProcessHandle>",
+          "errors": ["No documented errors are declared for createNodeProcessLauncher."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeProcessLauncher.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/node-child-process",
+          "overloadSignatures": [
+            "export declare function createNodeProcessLauncher(options?: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>): IProcessLauncher<INodeProcessHandle>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IProcessLauncher<INodeProcessHandle>"],
+          "whenToUse": "Use createNodeProcessLauncher when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createNodeProcessLauncher does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Spawn without a shell and drain diagnostics before writing a secret bootstrap frame."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createNodeProcessLauncher from @migaia/rpc-process/adapters/node-child-process, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createNodeProcessLauncher when its function contract and declared inputs match the result you need. Choose a different public symbol when createNodeProcessLauncher does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createNodeProcessLauncher."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createNodeProcessLauncher."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/adapters/node-child-process.d.ts:createNodeProcessLauncher:export declare function createNodeProcessLauncher(options?: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>): IProcessLauncher<INodeProcessHandle>;",
+          "guidance": [],
+          "usageScore": 10,
+          "configuration": [],
+          "fragment": "rpc-process-adapters/node-child-process--createNodeProcessLauncher"
+        },
+        {
+          "name": "INodeProcessHandle",
+          "kind": "type",
+          "signature": "export type INodeProcessHandle = IProcessHandle & Readonly<{ channel?: IProcessByteChannel; runtimeApiIdentity?: IRuntimePeerIdentity; }>;",
+          "declarationLine": 6,
+          "source": "packages/rpc-process/dist/process/adapters/node-child-process.d.ts",
+          "purpose": "A Node handle exposes stdout/stdin only when the specification chose byte channels.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for INodeProcessHandle.",
+          "advanced": "No additional advanced behavior is declared for INodeProcessHandle.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for INodeProcessHandle."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for INodeProcessHandle.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/node-child-process",
+          "overloadSignatures": [
+            "export type INodeProcessHandle = IProcessHandle & Readonly<{ channel?: IProcessByteChannel; runtimeApiIdentity?: IRuntimePeerIdentity; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use INodeProcessHandle when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when INodeProcessHandle does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A Node handle exposes stdout/stdin only when the specification chose byte channels."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import INodeProcessHandle from @migaia/rpc-process/adapters/node-child-process, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use INodeProcessHandle when its type contract and declared inputs match the result you need. Choose a different public symbol when INodeProcessHandle does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for INodeProcessHandle."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for INodeProcessHandle."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/adapters/node-child-process.d.ts:INodeProcessHandle:export type INodeProcessHandle = IProcessHandle & Readonly<{ channel?: IProcessByteChannel; runtimeApiIdentity?: IRuntimePeerIdentity; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-process-adapters/node-child-process--INodeProcessHandle"
+        },
+        {
+          "name": "openProcessStdioChannel",
+          "kind": "function",
+          "signature": "export declare function openProcessStdioChannel(options: Readonly<{ bootstrap: 'stdin' | 'fd' | 'none'; fd?: number; bootstrapTimeoutMs?: number; }>): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array; }>>;",
+          "declarationLine": 15,
+          "source": "packages/rpc-process/dist/process/adapters/node-child-process.d.ts",
+          "purpose": "A child opens one stdio byte port and receives its bootstrap before handshake.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for openProcessStdioChannel.",
+          "advanced": "No additional advanced behavior is declared for openProcessStdioChannel.",
+          "parameters": [
+            "options: Readonly<{ bootstrap: 'stdin' | 'fd' | 'none'; fd?: number; bootstrapTimeoutMs?: number; }>"
+          ],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "Readonly<{ bootstrap: 'stdin' | 'fd' | 'none'; fd?: number; bootstrapTimeoutMs?: number; }>",
+              "optional": false
+            }
+          ],
+          "returns": "Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array; }>>",
+          "errors": ["No documented errors are declared for openProcessStdioChannel."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for openProcessStdioChannel.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/node-child-process",
+          "overloadSignatures": [
+            "export declare function openProcessStdioChannel(options: Readonly<{ bootstrap: 'stdin' | 'fd' | 'none'; fd?: number; bootstrapTimeoutMs?: number; }>): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array; }>>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "Readonly<{ bootstrap: 'stdin' | 'fd' | 'none'; fd?: number; bootstrapTimeoutMs?: number; }>",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array; }>>"
+          ],
+          "whenToUse": "Use openProcessStdioChannel when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when openProcessStdioChannel does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A child opens one stdio byte port and receives its bootstrap before handshake."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import openProcessStdioChannel from @migaia/rpc-process/adapters/node-child-process, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use openProcessStdioChannel when its function contract and declared inputs match the result you need. Choose a different public symbol when openProcessStdioChannel does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for openProcessStdioChannel."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for openProcessStdioChannel."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/adapters/node-child-process.d.ts:openProcessStdioChannel:export declare function openProcessStdioChannel(options: Readonly<{ bootstrap: 'stdin' | 'fd' | 'none'; fd?: number; bootstrapTimeoutMs?: number; }>): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array; }>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-process-adapters/node-child-process--openProcessStdioChannel"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-process:adapters/node-socket",
+      "library": "rpc-process",
+      "module": "adapters/node-socket",
+      "exportPath": "./adapters/node-socket",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-process/getting-started",
+      "architecturePath": "/en/architecture/rpc-process",
+      "symbols": [
+        {
+          "name": "dialProcessByteChannel",
+          "kind": "function",
+          "signature": "export declare function dialProcessByteChannel(options: Readonly<{ address: string; signal?: AbortSignal; }>): Promise<IProcessByteChannel>;",
+          "declarationLine": 3,
+          "source": "packages/rpc-process/dist/process/adapters/node-socket.d.ts",
+          "purpose": "Connect to an existing process without taking ownership of its process lifetime.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for dialProcessByteChannel.",
+          "advanced": "No additional advanced behavior is declared for dialProcessByteChannel.",
+          "parameters": ["options: Readonly<{ address: string; signal?: AbortSignal; }>"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "Readonly<{ address: string; signal?: AbortSignal; }>",
+              "optional": false
+            }
+          ],
+          "returns": "Promise<IProcessByteChannel>",
+          "errors": ["No documented errors are declared for dialProcessByteChannel."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for dialProcessByteChannel.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/node-socket",
+          "overloadSignatures": [
+            "export declare function dialProcessByteChannel(options: Readonly<{ address: string; signal?: AbortSignal; }>): Promise<IProcessByteChannel>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "Readonly<{ address: string; signal?: AbortSignal; }>",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["Promise<IProcessByteChannel>"],
+          "whenToUse": "Use dialProcessByteChannel when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when dialProcessByteChannel does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Connect to an existing process without taking ownership of its process lifetime."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import dialProcessByteChannel from @migaia/rpc-process/adapters/node-socket, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use dialProcessByteChannel when its function contract and declared inputs match the result you need. Choose a different public symbol when dialProcessByteChannel does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for dialProcessByteChannel."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for dialProcessByteChannel."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/adapters/node-socket.d.ts:dialProcessByteChannel:export declare function dialProcessByteChannel(options: Readonly<{ address: string; signal?: AbortSignal; }>): Promise<IProcessByteChannel>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-process-adapters/node-socket--dialProcessByteChannel"
+        },
+        {
+          "name": "listenProcessByteChannel",
+          "kind": "const",
+          "signature": "export declare const listenProcessByteChannel: IListenProcessByteChannel;",
+          "declarationLine": 8,
+          "source": "packages/rpc-process/dist/process/adapters/node-socket.d.ts",
+          "purpose": "Bind a local authenticated rendezvous point without exposing unverified bytes.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for listenProcessByteChannel.",
+          "advanced": "No additional advanced behavior is declared for listenProcessByteChannel.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for listenProcessByteChannel."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for listenProcessByteChannel.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/node-socket",
+          "overloadSignatures": [
+            "export declare const listenProcessByteChannel: IListenProcessByteChannel;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use listenProcessByteChannel when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when listenProcessByteChannel does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Bind a local authenticated rendezvous point without exposing unverified bytes."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import listenProcessByteChannel from @migaia/rpc-process/adapters/node-socket, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use listenProcessByteChannel when its const contract and declared inputs match the result you need. Choose a different public symbol when listenProcessByteChannel does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for listenProcessByteChannel."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for listenProcessByteChannel."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/adapters/node-socket.d.ts:listenProcessByteChannel:export declare const listenProcessByteChannel: IListenProcessByteChannel;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-process-adapters/node-socket--listenProcessByteChannel"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-process:adapters/windows-job",
+      "library": "rpc-process",
+      "module": "adapters/windows-job",
+      "exportPath": "./adapters/windows-job",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-process/getting-started",
+      "architecturePath": "/en/architecture/rpc-process",
+      "symbols": [
+        {
+          "name": "createWindowsJobProcessLauncher",
+          "kind": "function",
+          "signature": "export declare function createWindowsJobProcessLauncher(): IProcessLauncher;",
+          "declarationLine": 3,
+          "source": "packages/rpc-process/dist/process/adapters/windows-job.d.ts",
+          "purpose": "Reject direct launch as well as supervision admission until native handles are proven.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWindowsJobProcessLauncher.",
+          "advanced": "No additional advanced behavior is declared for createWindowsJobProcessLauncher.",
+          "parameters": ["This function declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "IProcessLauncher",
+          "errors": ["No documented errors are declared for createWindowsJobProcessLauncher."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWindowsJobProcessLauncher.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/windows-job",
+          "overloadSignatures": [
+            "export declare function createWindowsJobProcessLauncher(): IProcessLauncher;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": ["IProcessLauncher"],
+          "whenToUse": "Use createWindowsJobProcessLauncher when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createWindowsJobProcessLauncher does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Reject direct launch as well as supervision admission until native handles are proven."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createWindowsJobProcessLauncher from @migaia/rpc-process/adapters/windows-job, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createWindowsJobProcessLauncher when its function contract and declared inputs match the result you need. Choose a different public symbol when createWindowsJobProcessLauncher does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWindowsJobProcessLauncher."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createWindowsJobProcessLauncher."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/adapters/windows-job.d.ts:createWindowsJobProcessLauncher:export declare function createWindowsJobProcessLauncher(): IProcessLauncher;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-process-adapters/windows-job--createWindowsJobProcessLauncher"
+        }
+      ],
+      "aliases": []
+    }
+  ]
+}

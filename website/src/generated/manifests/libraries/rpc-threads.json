@@ -1,0 +1,1617 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "rpc-threads",
+    "description": "RPC threads owner.",
+    "version": "0.0.7",
+    "exports": [
+      ".",
+      "./adapters/browser",
+      "./adapters/bun",
+      "./adapters/deno",
+      "./adapters/electron-main",
+      "./adapters/electron-renderer",
+      "./adapters/node"
+    ],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-rpc-threads",
+            "heading": "@migaia/rpc-threads",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "独立线程通信。从包根使用 `createThreadPeer`、`createThreadPlugin`。按平台导入 `./adapters/node`、`bun`、`deno`、`browser`、`electron-main` 或 `electron-renderer`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不发布；仓内消费方直接导入各公开包。同一 realm 的第二份模块实例在取得资源前抛出 native Error，source 为 `@migaia/rpc/core`、code 为 `DUPLICATE_MODULE_INSTANCE`；修复依赖解析并重载 realm。不同 Worker realm 独立。既有六个语义 source、wire 与错误身份保持不变。"
+              },
+              {
+                "type": "paragraph",
+                "text": "完整使用边界见 USEGUIDE。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "migaia-rpc-threads-使用指南",
+            "heading": "@migaia/rpc-threads 使用指南",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "从包根使用 `createThreadPeer`、`createThreadPlugin`。按平台导入 `./adapters/node`、`bun`、`deno`、`browser`、`electron-main` 或 `electron-renderer`。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createThreadPeer } from '@migaia/rpc-threads'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'"
+              },
+              {
+                "type": "paragraph",
+                "text": "spawn 持有真实执行单元；connect/listen 借用连接，不取得终止其它执行单元的权限。只有实际 launcher 的 bootstrap 可以自动选择父端来源。Core 负责 ACK、replay、clone、codec 与 drain 状态；公开 handle 的操作只作用于它持有的资源。Electron 是对应平台的可选 peer；使用线程不需要安装进程包。"
+              },
+              {
+                "type": "paragraph",
+                "text": "RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不发布；仓内消费方直接导入各公开包。同一 realm 的第二份模块实例在取得资源前抛出 native Error，source 为 `@migaia/rpc/core`、code 为 `DUPLICATE_MODULE_INSTANCE`；修复依赖解析并重载 realm。不同 Worker realm 独立。既有六个语义 source、wire 与错误身份保持不变。"
+              },
+              {
+                "type": "paragraph",
+                "text": "包内使用相对路径；跨包调用只使用公开 API。协议工具使用 `@migaia/rpc-contract`，Core/Remote/Testing 使用 `@migaia/rpc-core` 的普通入口。"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "rpc-threads:index",
+      "library": "rpc-threads",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-threads/getting-started",
+      "architecturePath": "/en/architecture/rpc-threads",
+      "symbols": [
+        {
+          "name": "createNodeThreadChannel",
+          "kind": "function",
+          "signature": "export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult;",
+          "declarationLine": 4,
+          "source": "packages/rpc-threads/dist/threads/channel.d.ts",
+          "purpose": "Build the complete Node messaging channel over this actual held resource.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createNodeThreadChannel.",
+          "advanced": "No additional advanced behavior is declared for createNodeThreadChannel.",
+          "parameters": [
+            "port: INodeMessagePortLike",
+            "peerId: string",
+            "options: IThreadChannelOptions"
+          ],
+          "parameterDetails": [
+            {
+              "name": "port",
+              "type": "INodeMessagePortLike",
+              "optional": false
+            },
+            {
+              "name": "peerId",
+              "type": "string",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "IThreadChannelOptions",
+              "optional": false
+            }
+          ],
+          "returns": "import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult",
+          "errors": ["No documented errors are declared for createNodeThreadChannel."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeThreadChannel.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "createNodeThreadChannel",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "port",
+                "type": "INodeMessagePortLike",
+                "optional": false
+              },
+              {
+                "name": "peerId",
+                "type": "string",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "IThreadChannelOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult"],
+          "whenToUse": "Use createNodeThreadChannel when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createNodeThreadChannel does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Build the complete Node messaging channel over this actual held resource."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createNodeThreadChannel from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createNodeThreadChannel when its function contract and declared inputs match the result you need. Choose a different public symbol when createNodeThreadChannel does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createNodeThreadChannel."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createNodeThreadChannel."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/channel.d.ts:createNodeThreadChannel:export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--createNodeThreadChannel"
+        },
+        {
+          "name": "createThreadPeer",
+          "kind": "function",
+          "signature": "export declare function createThreadPeer<TRemote = Record<never, never>>(options: IRuntimeThreadPeerOptions): Promise<IRuntimeTypedPeer<TRemote>>;",
+          "declarationLine": 4,
+          "source": "packages/rpc-threads/dist/threads/peer.d.ts",
+          "purpose": "Select and construct this runtime's complete Thread peer without wrapping its Promise.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createThreadPeer.",
+          "advanced": "No additional advanced behavior is declared for createThreadPeer.",
+          "parameters": ["options: IRuntimeThreadPeerOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IRuntimeThreadPeerOptions",
+              "optional": false
+            }
+          ],
+          "returns": "Promise<IRuntimeTypedPeer<TRemote>>",
+          "errors": ["No documented errors are declared for createThreadPeer."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createThreadPeer.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "createThreadPeer",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createThreadPeer<TRemote = Record<never, never>>(options: IRuntimeThreadPeerOptions): Promise<IRuntimeTypedPeer<TRemote>>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IRuntimeThreadPeerOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["Promise<IRuntimeTypedPeer<TRemote>>"],
+          "whenToUse": "Use createThreadPeer when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createThreadPeer does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Select and construct this runtime's complete Thread peer without wrapping its Promise."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createThreadPeer from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createThreadPeer when its function contract and declared inputs match the result you need. Choose a different public symbol when createThreadPeer does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createThreadPeer."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createThreadPeer."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/peer.d.ts:createThreadPeer:export declare function createThreadPeer<TRemote = Record<never, never>>(options: IRuntimeThreadPeerOptions): Promise<IRuntimeTypedPeer<TRemote>>;",
+          "guidance": [],
+          "usageScore": 16,
+          "configuration": [],
+          "fragment": "rpc-threads-index--createThreadPeer"
+        },
+        {
+          "name": "createThreadPlugin",
+          "kind": "function",
+          "signature": "export declare function createThreadPlugin<THandle extends IThreadHandle>(options: IThreadPluginOptions<THandle>): IRemotePluginDefinition;\nexport declare function createThreadPlugin<TRemote = Record<never, never>, const TProvide extends import('@migaia/rpc-core/remote').IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>;",
+          "declarationLine": 10,
+          "source": "packages/rpc-threads/dist/threads/plugin.d.ts",
+          "purpose": "Combine one owned supervisor with remote's single Plugin assembly and retry owner. Install a symmetric connection into the original canonical thread slot.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createThreadPlugin.",
+          "advanced": "No additional advanced behavior is declared for createThreadPlugin.",
+          "parameters": [
+            "options: IThreadPluginOptions<THandle>",
+            "'@migaia/rpc-core/remote': unknown"
+          ],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IThreadPluginOptions<THandle>",
+              "optional": false
+            },
+            {
+              "name": "'@migaia/rpc-core/remote'",
+              "type": "unknown",
+              "optional": false
+            }
+          ],
+          "returns": "IRemotePluginDefinition | .IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>",
+          "errors": ["No documented errors are declared for createThreadPlugin."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createThreadPlugin.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "createThreadPlugin",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createThreadPlugin<THandle extends IThreadHandle>(options: IThreadPluginOptions<THandle>): IRemotePluginDefinition;",
+            "export declare function createThreadPlugin<TRemote = Record<never, never>, const TProvide extends import('@migaia/rpc-core/remote').IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IThreadPluginOptions<THandle>",
+                "optional": false
+              }
+            ],
+            [
+              {
+                "name": "'@migaia/rpc-core/remote'",
+                "type": "unknown",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "IRemotePluginDefinition",
+            ".IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>"
+          ],
+          "whenToUse": "Use createThreadPlugin when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createThreadPlugin does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Combine one owned supervisor with remote's single Plugin assembly and retry owner. Install a symmetric connection into the original canonical thread slot."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createThreadPlugin from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createThreadPlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when createThreadPlugin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createThreadPlugin."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createThreadPlugin."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/plugin.d.ts:createThreadPlugin:export declare function createThreadPlugin<THandle extends IThreadHandle>(options: IThreadPluginOptions<THandle>): IRemotePluginDefinition;\nexport declare function createThreadPlugin<TRemote = Record<never, never>, const TProvide extends import('@migaia/rpc-core/remote').IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "rpc-threads-index--createThreadPlugin"
+        },
+        {
+          "name": "createWebThreadChannel",
+          "kind": "function",
+          "signature": "export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult;",
+          "declarationLine": 6,
+          "source": "packages/rpc-threads/dist/threads/channel.d.ts",
+          "purpose": "Build the complete EventTarget messaging channel over this actual held resource.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWebThreadChannel.",
+          "advanced": "No additional advanced behavior is declared for createWebThreadChannel.",
+          "parameters": [
+            "port: IThreadWebPort",
+            "peerId: string",
+            "options: IThreadChannelOptions"
+          ],
+          "parameterDetails": [
+            {
+              "name": "port",
+              "type": "IThreadWebPort",
+              "optional": false
+            },
+            {
+              "name": "peerId",
+              "type": "string",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "IThreadChannelOptions",
+              "optional": false
+            }
+          ],
+          "returns": "import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult",
+          "errors": ["No documented errors are declared for createWebThreadChannel."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWebThreadChannel.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "createWebThreadChannel",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "port",
+                "type": "IThreadWebPort",
+                "optional": false
+              },
+              {
+                "name": "peerId",
+                "type": "string",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "IThreadChannelOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult"],
+          "whenToUse": "Use createWebThreadChannel when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createWebThreadChannel does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Build the complete EventTarget messaging channel over this actual held resource."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createWebThreadChannel from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createWebThreadChannel when its function contract and declared inputs match the result you need. Choose a different public symbol when createWebThreadChannel does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWebThreadChannel."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createWebThreadChannel."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/channel.d.ts:createWebThreadChannel:export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--createWebThreadChannel"
+        },
+        {
+          "name": "receiveThreadData",
+          "kind": "function",
+          "signature": "export declare function receiveThreadData(port: IThreadWebPort, prepare: (data: IRpcPortableValue | undefined, peerId: string) => PromiseLike<void> | void): Promise<IRpcPortableValue | undefined>;",
+          "declarationLine": 6,
+          "source": "packages/rpc-threads/dist/threads/bootstrap.d.ts",
+          "purpose": "Receive and prepare one real service bootstrap, retaining the original owned Promise.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for receiveThreadData.",
+          "advanced": "No additional advanced behavior is declared for receiveThreadData.",
+          "parameters": [
+            "port: IThreadWebPort",
+            "prepare: (data: IRpcPortableValue | undefined, peerId: string) => PromiseLike<void> | void"
+          ],
+          "parameterDetails": [
+            {
+              "name": "port",
+              "type": "IThreadWebPort",
+              "optional": false
+            },
+            {
+              "name": "prepare",
+              "type": "(data: IRpcPortableValue | undefined, peerId: string) => PromiseLike<void> | void",
+              "optional": false
+            }
+          ],
+          "returns": "Promise<IRpcPortableValue | undefined>",
+          "errors": ["No documented errors are declared for receiveThreadData."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for receiveThreadData.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "receiveThreadData",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function receiveThreadData(port: IThreadWebPort, prepare: (data: IRpcPortableValue | undefined, peerId: string) => PromiseLike<void> | void): Promise<IRpcPortableValue | undefined>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "port",
+                "type": "IThreadWebPort",
+                "optional": false
+              },
+              {
+                "name": "prepare",
+                "type": "(data: IRpcPortableValue | undefined, peerId: string) => PromiseLike<void> | void",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["Promise<IRpcPortableValue | undefined>"],
+          "whenToUse": "Use receiveThreadData when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when receiveThreadData does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Receive and prepare one real service bootstrap, retaining the original owned Promise."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import receiveThreadData from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use receiveThreadData when its function contract and declared inputs match the result you need. Choose a different public symbol when receiveThreadData does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for receiveThreadData."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for receiveThreadData."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/bootstrap.d.ts:receiveThreadData:export declare function receiveThreadData(port: IThreadWebPort, prepare: (data: IRpcPortableValue | undefined, peerId: string) => PromiseLike<void> | void): Promise<IRpcPortableValue | undefined>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--receiveThreadData"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-threads:adapters/browser",
+      "library": "rpc-threads",
+      "module": "adapters/browser",
+      "exportPath": "./adapters/browser",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-threads/getting-started",
+      "architecturePath": "/en/architecture/rpc-threads",
+      "symbols": [
+        {
+          "name": "createBrowserThreadChannelFactory",
+          "kind": "function",
+          "signature": "export declare function createBrowserThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
+          "declarationLine": 6,
+          "source": "packages/rpc-threads/dist/threads/adapters/browser.d.ts",
+          "purpose": "Reuse borrowed EventTarget messaging with the caller's exact scheduler.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBrowserThreadChannelFactory.",
+          "advanced": "No additional advanced behavior is declared for createBrowserThreadChannelFactory.",
+          "parameters": ["options: IThreadChannelOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IThreadChannelOptions",
+              "optional": false
+            }
+          ],
+          "returns": "Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>",
+          "errors": ["No documented errors are declared for createBrowserThreadChannelFactory."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBrowserThreadChannelFactory.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/browser",
+          "overloadSignatures": [
+            "export declare function createBrowserThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IThreadChannelOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>"
+          ],
+          "whenToUse": "Use createBrowserThreadChannelFactory when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createBrowserThreadChannelFactory does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Reuse borrowed EventTarget messaging with the caller's exact scheduler."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createBrowserThreadChannelFactory from @migaia/rpc-threads/adapters/browser, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createBrowserThreadChannelFactory when its function contract and declared inputs match the result you need. Choose a different public symbol when createBrowserThreadChannelFactory does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBrowserThreadChannelFactory."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createBrowserThreadChannelFactory."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/adapters/browser.d.ts:createBrowserThreadChannelFactory:export declare function createBrowserThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-adapters/browser--createBrowserThreadChannelFactory"
+        },
+        {
+          "name": "createBrowserThreadLauncher",
+          "kind": "function",
+          "signature": "export declare function createBrowserThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>;",
+          "declarationLine": 4,
+          "source": "packages/rpc-threads/dist/threads/adapters/browser.d.ts",
+          "purpose": "Browser has no proven final-exit receipt; lifecycle capabilities stay unsupported.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBrowserThreadLauncher.",
+          "advanced": "No additional advanced behavior is declared for createBrowserThreadLauncher.",
+          "parameters": ["options: IWebThreadLauncherOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IWebThreadLauncherOptions",
+              "optional": false
+            }
+          ],
+          "returns": "import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>",
+          "errors": ["No documented errors are declared for createBrowserThreadLauncher."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBrowserThreadLauncher.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/browser",
+          "overloadSignatures": [
+            "export declare function createBrowserThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IWebThreadLauncherOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>"
+          ],
+          "whenToUse": "Use createBrowserThreadLauncher when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createBrowserThreadLauncher does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Browser has no proven final-exit receipt; lifecycle capabilities stay unsupported."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createBrowserThreadLauncher from @migaia/rpc-threads/adapters/browser, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createBrowserThreadLauncher when its function contract and declared inputs match the result you need. Choose a different public symbol when createBrowserThreadLauncher does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBrowserThreadLauncher."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createBrowserThreadLauncher."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/adapters/browser.d.ts:createBrowserThreadLauncher:export declare function createBrowserThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-adapters/browser--createBrowserThreadLauncher"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-threads:adapters/bun",
+      "library": "rpc-threads",
+      "module": "adapters/bun",
+      "exportPath": "./adapters/bun",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-threads/getting-started",
+      "architecturePath": "/en/architecture/rpc-threads",
+      "symbols": [
+        {
+          "name": "createBunThreadChannelFactory",
+          "kind": "function",
+          "signature": "export declare function createBunThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
+          "declarationLine": 6,
+          "source": "packages/rpc-threads/dist/threads/adapters/bun.d.ts",
+          "purpose": "Reuse borrowed EventTarget messaging with the caller's exact scheduler.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBunThreadChannelFactory.",
+          "advanced": "No additional advanced behavior is declared for createBunThreadChannelFactory.",
+          "parameters": ["options: IThreadChannelOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IThreadChannelOptions",
+              "optional": false
+            }
+          ],
+          "returns": "Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>",
+          "errors": ["No documented errors are declared for createBunThreadChannelFactory."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBunThreadChannelFactory.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/bun",
+          "overloadSignatures": [
+            "export declare function createBunThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IThreadChannelOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>"
+          ],
+          "whenToUse": "Use createBunThreadChannelFactory when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createBunThreadChannelFactory does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Reuse borrowed EventTarget messaging with the caller's exact scheduler."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createBunThreadChannelFactory from @migaia/rpc-threads/adapters/bun, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createBunThreadChannelFactory when its function contract and declared inputs match the result you need. Choose a different public symbol when createBunThreadChannelFactory does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBunThreadChannelFactory."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createBunThreadChannelFactory."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/adapters/bun.d.ts:createBunThreadChannelFactory:export declare function createBunThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-adapters/bun--createBunThreadChannelFactory"
+        },
+        {
+          "name": "createBunThreadLauncher",
+          "kind": "function",
+          "signature": "export declare function createBunThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>;",
+          "declarationLine": 4,
+          "source": "packages/rpc-threads/dist/threads/adapters/bun.d.ts",
+          "purpose": "Bun has no proven final-exit receipt; lifecycle capabilities stay unsupported.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBunThreadLauncher.",
+          "advanced": "No additional advanced behavior is declared for createBunThreadLauncher.",
+          "parameters": ["options: IWebThreadLauncherOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IWebThreadLauncherOptions",
+              "optional": false
+            }
+          ],
+          "returns": "import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>",
+          "errors": ["No documented errors are declared for createBunThreadLauncher."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBunThreadLauncher.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/bun",
+          "overloadSignatures": [
+            "export declare function createBunThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IWebThreadLauncherOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>"
+          ],
+          "whenToUse": "Use createBunThreadLauncher when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createBunThreadLauncher does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Bun has no proven final-exit receipt; lifecycle capabilities stay unsupported."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createBunThreadLauncher from @migaia/rpc-threads/adapters/bun, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createBunThreadLauncher when its function contract and declared inputs match the result you need. Choose a different public symbol when createBunThreadLauncher does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBunThreadLauncher."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createBunThreadLauncher."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/adapters/bun.d.ts:createBunThreadLauncher:export declare function createBunThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-adapters/bun--createBunThreadLauncher"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-threads:adapters/deno",
+      "library": "rpc-threads",
+      "module": "adapters/deno",
+      "exportPath": "./adapters/deno",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-threads/getting-started",
+      "architecturePath": "/en/architecture/rpc-threads",
+      "symbols": [
+        {
+          "name": "createDenoThreadChannelFactory",
+          "kind": "function",
+          "signature": "export declare function createDenoThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
+          "declarationLine": 6,
+          "source": "packages/rpc-threads/dist/threads/adapters/deno.d.ts",
+          "purpose": "Reuse borrowed EventTarget messaging with the caller's exact scheduler.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createDenoThreadChannelFactory.",
+          "advanced": "No additional advanced behavior is declared for createDenoThreadChannelFactory.",
+          "parameters": ["options: IThreadChannelOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IThreadChannelOptions",
+              "optional": false
+            }
+          ],
+          "returns": "Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>",
+          "errors": ["No documented errors are declared for createDenoThreadChannelFactory."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createDenoThreadChannelFactory.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/deno",
+          "overloadSignatures": [
+            "export declare function createDenoThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IThreadChannelOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>"
+          ],
+          "whenToUse": "Use createDenoThreadChannelFactory when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createDenoThreadChannelFactory does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Reuse borrowed EventTarget messaging with the caller's exact scheduler."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createDenoThreadChannelFactory from @migaia/rpc-threads/adapters/deno, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createDenoThreadChannelFactory when its function contract and declared inputs match the result you need. Choose a different public symbol when createDenoThreadChannelFactory does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createDenoThreadChannelFactory."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createDenoThreadChannelFactory."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/adapters/deno.d.ts:createDenoThreadChannelFactory:export declare function createDenoThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-adapters/deno--createDenoThreadChannelFactory"
+        },
+        {
+          "name": "createDenoThreadLauncher",
+          "kind": "function",
+          "signature": "export declare function createDenoThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>;",
+          "declarationLine": 4,
+          "source": "packages/rpc-threads/dist/threads/adapters/deno.d.ts",
+          "purpose": "Deno has no proven final-exit receipt; lifecycle capabilities stay unsupported.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createDenoThreadLauncher.",
+          "advanced": "No additional advanced behavior is declared for createDenoThreadLauncher.",
+          "parameters": ["options: IWebThreadLauncherOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IWebThreadLauncherOptions",
+              "optional": false
+            }
+          ],
+          "returns": "import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>",
+          "errors": ["No documented errors are declared for createDenoThreadLauncher."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createDenoThreadLauncher.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/deno",
+          "overloadSignatures": [
+            "export declare function createDenoThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IWebThreadLauncherOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>"
+          ],
+          "whenToUse": "Use createDenoThreadLauncher when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createDenoThreadLauncher does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Deno has no proven final-exit receipt; lifecycle capabilities stay unsupported."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createDenoThreadLauncher from @migaia/rpc-threads/adapters/deno, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createDenoThreadLauncher when its function contract and declared inputs match the result you need. Choose a different public symbol when createDenoThreadLauncher does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createDenoThreadLauncher."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createDenoThreadLauncher."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/adapters/deno.d.ts:createDenoThreadLauncher:export declare function createDenoThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-adapters/deno--createDenoThreadLauncher"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-threads:adapters/electron-main",
+      "library": "rpc-threads",
+      "module": "adapters/electron-main",
+      "exportPath": "./adapters/electron-main",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-threads/getting-started",
+      "architecturePath": "/en/architecture/rpc-threads",
+      "symbols": [
+        {
+          "name": "createElectronMainThreadChannelFactory",
+          "kind": "function",
+          "signature": "export declare function createElectronMainThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").INodeThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
+          "declarationLine": 12,
+          "source": "packages/rpc-threads/dist/threads/adapters/electron-main.d.ts",
+          "purpose": "Electron main uses worker_threads, never electron.utilityProcess.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createElectronMainThreadChannelFactory.",
+          "advanced": "No additional advanced behavior is declared for createElectronMainThreadChannelFactory.",
+          "parameters": ["options: IThreadChannelOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IThreadChannelOptions",
+              "optional": false
+            }
+          ],
+          "returns": "Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").INodeThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>",
+          "errors": [
+            "No documented errors are declared for createElectronMainThreadChannelFactory."
+          ],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createElectronMainThreadChannelFactory.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/electron-main",
+          "overloadSignatures": [
+            "export declare function createElectronMainThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").INodeThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IThreadChannelOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").INodeThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>"
+          ],
+          "whenToUse": "Use createElectronMainThreadChannelFactory when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createElectronMainThreadChannelFactory does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Electron main uses worker_threads, never electron.utilityProcess."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createElectronMainThreadChannelFactory from @migaia/rpc-threads/adapters/electron-main, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createElectronMainThreadChannelFactory when its function contract and declared inputs match the result you need. Choose a different public symbol when createElectronMainThreadChannelFactory does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createElectronMainThreadChannelFactory."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createElectronMainThreadChannelFactory."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/adapters/electron-main.d.ts:createElectronMainThreadChannelFactory:export declare function createElectronMainThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").INodeThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-adapters/electron-main--createElectronMainThreadChannelFactory"
+        },
+        {
+          "name": "createElectronMainThreadLauncher",
+          "kind": "function",
+          "signature": "export declare function createElectronMainThreadLauncher(): { capabilities: { readonly termination: \"unsupported\"; readonly 'exit-observation': \"unsupported\"; readonly 'heap-limit': \"unsupported\"; }; launch(spec: import(\"@migaia/supervision/threads\").IThreadSpec, context: import(\"@migaia/supervision\").ILaunchContext): Promise<import(\"@migaia/rpc-core/adapter/threads\").IAdapterNodeThreadHandle>; };",
+          "declarationLine": 3,
+          "source": "packages/rpc-threads/dist/threads/adapters/electron-main.d.ts",
+          "purpose": "Reuse Node mechanics without treating Node evidence as an Electron actual-exit proof.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createElectronMainThreadLauncher.",
+          "advanced": "No additional advanced behavior is declared for createElectronMainThreadLauncher.",
+          "parameters": ["This function declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "{ capabilities: { readonly termination: \"unsupported\"; readonly 'exit-observation': \"unsupported\"; readonly 'heap-limit': \"unsupported\"; }; launch(spec: import(\"@migaia/supervision/threads\").IThreadSpec, context: import(\"@migaia/supervision\").ILaunchContext): Promise<import(\"@migaia/rpc-core/adapter/threads\").IAdapterNodeThreadHandle>; }",
+          "errors": ["No documented errors are declared for createElectronMainThreadLauncher."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createElectronMainThreadLauncher.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/electron-main",
+          "overloadSignatures": [
+            "export declare function createElectronMainThreadLauncher(): { capabilities: { readonly termination: \"unsupported\"; readonly 'exit-observation': \"unsupported\"; readonly 'heap-limit': \"unsupported\"; }; launch(spec: import(\"@migaia/supervision/threads\").IThreadSpec, context: import(\"@migaia/supervision\").ILaunchContext): Promise<import(\"@migaia/rpc-core/adapter/threads\").IAdapterNodeThreadHandle>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [
+            "{ capabilities: { readonly termination: \"unsupported\"; readonly 'exit-observation': \"unsupported\"; readonly 'heap-limit': \"unsupported\"; }; launch(spec: import(\"@migaia/supervision/threads\").IThreadSpec, context: import(\"@migaia/supervision\").ILaunchContext): Promise<import(\"@migaia/rpc-core/adapter/threads\").IAdapterNodeThreadHandle>; }"
+          ],
+          "whenToUse": "Use createElectronMainThreadLauncher when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createElectronMainThreadLauncher does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Reuse Node mechanics without treating Node evidence as an Electron actual-exit proof."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createElectronMainThreadLauncher from @migaia/rpc-threads/adapters/electron-main, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createElectronMainThreadLauncher when its function contract and declared inputs match the result you need. Choose a different public symbol when createElectronMainThreadLauncher does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createElectronMainThreadLauncher."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createElectronMainThreadLauncher."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/adapters/electron-main.d.ts:createElectronMainThreadLauncher:export declare function createElectronMainThreadLauncher(): { capabilities: { readonly termination: \"unsupported\"; readonly 'exit-observation': \"unsupported\"; readonly 'heap-limit': \"unsupported\"; }; launch(spec: import(\"@migaia/supervision/threads\").IThreadSpec, context: import(\"@migaia/supervision\").ILaunchContext): Promise<import(\"@migaia/rpc-core/adapter/threads\").IAdapterNodeThreadHandle>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-adapters/electron-main--createElectronMainThreadLauncher"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-threads:adapters/electron-renderer",
+      "library": "rpc-threads",
+      "module": "adapters/electron-renderer",
+      "exportPath": "./adapters/electron-renderer",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-threads/getting-started",
+      "architecturePath": "/en/architecture/rpc-threads",
+      "symbols": [
+        {
+          "name": "createElectronRendererThreadChannelFactory",
+          "kind": "function",
+          "signature": "export declare function createElectronRendererThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
+          "declarationLine": 6,
+          "source": "packages/rpc-threads/dist/threads/adapters/electron-renderer.d.ts",
+          "purpose": "Reuse borrowed EventTarget messaging with the caller's exact scheduler.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createElectronRendererThreadChannelFactory.",
+          "advanced": "No additional advanced behavior is declared for createElectronRendererThreadChannelFactory.",
+          "parameters": ["options: IThreadChannelOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IThreadChannelOptions",
+              "optional": false
+            }
+          ],
+          "returns": "Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>",
+          "errors": [
+            "No documented errors are declared for createElectronRendererThreadChannelFactory."
+          ],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createElectronRendererThreadChannelFactory.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/electron-renderer",
+          "overloadSignatures": [
+            "export declare function createElectronRendererThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IThreadChannelOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>"
+          ],
+          "whenToUse": "Use createElectronRendererThreadChannelFactory when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createElectronRendererThreadChannelFactory does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Reuse borrowed EventTarget messaging with the caller's exact scheduler."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createElectronRendererThreadChannelFactory from @migaia/rpc-threads/adapters/electron-renderer, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createElectronRendererThreadChannelFactory when its function contract and declared inputs match the result you need. Choose a different public symbol when createElectronRendererThreadChannelFactory does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createElectronRendererThreadChannelFactory."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createElectronRendererThreadChannelFactory."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/adapters/electron-renderer.d.ts:createElectronRendererThreadChannelFactory:export declare function createElectronRendererThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").IWebThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-adapters/electron-renderer--createElectronRendererThreadChannelFactory"
+        },
+        {
+          "name": "createElectronRendererThreadLauncher",
+          "kind": "function",
+          "signature": "export declare function createElectronRendererThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>;",
+          "declarationLine": 4,
+          "source": "packages/rpc-threads/dist/threads/adapters/electron-renderer.d.ts",
+          "purpose": "ElectronRenderer has no proven final-exit receipt; lifecycle capabilities stay unsupported.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createElectronRendererThreadLauncher.",
+          "advanced": "No additional advanced behavior is declared for createElectronRendererThreadLauncher.",
+          "parameters": ["options: IWebThreadLauncherOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IWebThreadLauncherOptions",
+              "optional": false
+            }
+          ],
+          "returns": "import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>",
+          "errors": ["No documented errors are declared for createElectronRendererThreadLauncher."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createElectronRendererThreadLauncher.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/electron-renderer",
+          "overloadSignatures": [
+            "export declare function createElectronRendererThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IWebThreadLauncherOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>"
+          ],
+          "whenToUse": "Use createElectronRendererThreadLauncher when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createElectronRendererThreadLauncher does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "ElectronRenderer has no proven final-exit receipt; lifecycle capabilities stay unsupported."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createElectronRendererThreadLauncher from @migaia/rpc-threads/adapters/electron-renderer, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createElectronRendererThreadLauncher when its function contract and declared inputs match the result you need. Choose a different public symbol when createElectronRendererThreadLauncher does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createElectronRendererThreadLauncher."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createElectronRendererThreadLauncher."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/adapters/electron-renderer.d.ts:createElectronRendererThreadLauncher:export declare function createElectronRendererThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterWebThreadHandle>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-threads:adapters/node",
+      "library": "rpc-threads",
+      "module": "adapters/node",
+      "exportPath": "./adapters/node",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-threads/getting-started",
+      "architecturePath": "/en/architecture/rpc-threads",
+      "symbols": [
+        {
+          "name": "createNodeThreadChannelFactory",
+          "kind": "function",
+          "signature": "export declare function createNodeThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").INodeThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
+          "declarationLine": 9,
+          "source": "packages/rpc-threads/dist/threads/adapters/node.d.ts",
+          "purpose": "Construct the factory over Core-owned handles or the existing strict custom raw-port shape.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createNodeThreadChannelFactory.",
+          "advanced": "No additional advanced behavior is declared for createNodeThreadChannelFactory.",
+          "parameters": ["options: IThreadChannelOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IThreadChannelOptions",
+              "optional": false
+            }
+          ],
+          "returns": "Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").INodeThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>",
+          "errors": ["No documented errors are declared for createNodeThreadChannelFactory."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeThreadChannelFactory.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/node",
+          "overloadSignatures": [
+            "export declare function createNodeThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").INodeThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IThreadChannelOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").INodeThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>"
+          ],
+          "whenToUse": "Use createNodeThreadChannelFactory when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createNodeThreadChannelFactory does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Construct the factory over Core-owned handles or the existing strict custom raw-port shape."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createNodeThreadChannelFactory from @migaia/rpc-threads/adapters/node, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createNodeThreadChannelFactory when its function contract and declared inputs match the result you need. Choose a different public symbol when createNodeThreadChannelFactory does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createNodeThreadChannelFactory."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createNodeThreadChannelFactory."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/adapters/node.d.ts:createNodeThreadChannelFactory:export declare function createNodeThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").INodeThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
+          "guidance": [],
+          "usageScore": 10,
+          "configuration": [],
+          "fragment": "rpc-threads-adapters/node--createNodeThreadChannelFactory"
+        },
+        {
+          "name": "createNodeThreadLauncher",
+          "kind": "function",
+          "signature": "export declare function createNodeThreadLauncher(options?: Readonly<{ runtimeApi?: IRuntimePeerSourceContext; }>): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterNodeThreadHandle>;",
+          "declarationLine": 5,
+          "source": "packages/rpc-threads/dist/threads/adapters/node.d.ts",
+          "purpose": "Launch this runtime's actual Worker through the complete Core-owned execution operation.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createNodeThreadLauncher.",
+          "advanced": "No additional advanced behavior is declared for createNodeThreadLauncher.",
+          "parameters": [
+            "options: Readonly<{ runtimeApi?: IRuntimePeerSourceContext; }> (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "Readonly<{ runtimeApi?: IRuntimePeerSourceContext; }>",
+              "optional": true
+            }
+          ],
+          "returns": "import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterNodeThreadHandle>",
+          "errors": ["No documented errors are declared for createNodeThreadLauncher."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeThreadLauncher.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/node",
+          "overloadSignatures": [
+            "export declare function createNodeThreadLauncher(options?: Readonly<{ runtimeApi?: IRuntimePeerSourceContext; }>): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterNodeThreadHandle>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "Readonly<{ runtimeApi?: IRuntimePeerSourceContext; }>",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterNodeThreadHandle>"
+          ],
+          "whenToUse": "Use createNodeThreadLauncher when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createNodeThreadLauncher does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Launch this runtime's actual Worker through the complete Core-owned execution operation."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createNodeThreadLauncher from @migaia/rpc-threads/adapters/node, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createNodeThreadLauncher when its function contract and declared inputs match the result you need. Choose a different public symbol when createNodeThreadLauncher does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createNodeThreadLauncher."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createNodeThreadLauncher."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-threads/dist/threads/adapters/node.d.ts:createNodeThreadLauncher:export declare function createNodeThreadLauncher(options?: Readonly<{ runtimeApi?: IRuntimePeerSourceContext; }>): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterNodeThreadHandle>;",
+          "guidance": [],
+          "usageScore": 10,
+          "configuration": [],
+          "fragment": "rpc-threads-adapters/node--createNodeThreadLauncher"
+        }
+      ],
+      "aliases": []
+    }
+  ]
+}

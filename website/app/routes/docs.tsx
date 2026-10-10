@@ -283,7 +283,7 @@ const GUIDE_STARTERS = [
     bodyZh: '选择后端、记录、事务、编解码与 live query。'
   },
   {
-    library: 'rpc',
+    library: 'rpc-core',
     titleEn: 'Connect browser runtimes',
     titleZh: '连接浏览器运行时',
     bodyEn: 'Create endpoints across windows, workers, channels, and transports.',
@@ -348,7 +348,7 @@ const ARCHITECTURE_FAMILIES = [
     titleZh: 'Browser 与平台',
     bodyEn: 'Browser storage, cross-runtime communication, and WebAssembly boundaries.',
     bodyZh: '浏览器存储、跨运行时通信以及 WebAssembly 边界。',
-    libraries: ['storage-contract', 'storage-web', 'rpc', 'wasm']
+    libraries: ['storage-contract', 'storage-web', 'rpc-core', 'wasm']
   },
   {
     titleEn: 'Other foundations',
@@ -721,21 +721,27 @@ function LibraryModuleLinks({
   ])
   /** Complete middleware-plugin links are separated from general root APIs for reader clarity. */
   const middlewarePluginLinks =
-    librarySlug === 'rpc'
-      ? apiLinks.filter((link) => link.module === 'core' && webRpcMiddlewareNames.has(link.name))
+    librarySlug === 'rpc-core'
+      ? apiLinks.filter((link) => link.module === 'index' && webRpcMiddlewareNames.has(link.name))
       : []
   /** Primary RPC entry points must not be buried under generated module names. */
   const primaryEntries =
-    librarySlug === 'rpc'
+    librarySlug === 'rpc-core'
       ? ([
-          ['createProcessPeer', 'process', 'createProcessPeer'],
-          ['createProcessPlugin', 'process', 'createProcessPlugin'],
-          ['createThreadPeer', 'threads', 'createThreadPeer'],
-          ['createThreadPlugin', 'threads', 'createThreadPlugin'],
-          ['createEndpoint', 'core', 'createEndpoint'],
-          ['createComposedEndpoint', 'core/composed', 'createComposedEndpoint']
+          ['createEndpoint', 'index', 'createEndpoint'],
+          ['createComposedEndpoint', 'composed', 'createComposedEndpoint']
         ] as const)
-      : []
+      : librarySlug === 'rpc-process'
+        ? ([
+            ['createProcessPeer', 'index', 'createProcessPeer'],
+            ['createProcessPlugin', 'index', 'createProcessPlugin']
+          ] as const)
+        : librarySlug === 'rpc-threads'
+          ? ([
+              ['createThreadPeer', 'index', 'createThreadPeer'],
+              ['createThreadPlugin', 'index', 'createThreadPlugin']
+            ] as const)
+          : []
   /** Navigation links are the complete lightweight inventory for every public runtime entry. */
   const rootApis = libraryApis.filter(
     (candidate) =>
@@ -815,10 +821,10 @@ function LibraryModuleLinks({
               </Link>
             ))}
           </div>
-          <Link to={`/${locale}/guides/rpc/endpoint-composition`}>
+          <Link to={`/${locale}/guides/rpc-core/endpoint-composition`}>
             {locale === 'zh' ? '如何选择 Endpoint →' : 'How to choose an Endpoint →'}
           </Link>
-          <Link to={`/${locale}/guides/rpc/transports-and-security`}>
+          <Link to={`/${locale}/guides/rpc-core/transports-and-security`}>
             {locale === 'zh' ? 'Transport 选择与完整案例' : 'Transport selection and examples'}
           </Link>
         </div>
@@ -1317,7 +1323,7 @@ function ParameterGuide({
   readonly fieldName: string
   readonly locale: ILocale
 }) {
-  if (api.library !== 'rpc' || fieldName !== 'transport') return null
+  if (api.library !== 'rpc-core' || fieldName !== 'transport') return null
   return (
     <div className="parameter-guide" data-parameter-guide="rpc-transport">
       <h4>{locale === 'zh' ? '如何选择 transport' : 'Choosing a transport'}</h4>
@@ -2531,7 +2537,7 @@ const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
   tray: '组合条目定义、适配器与 Host 安装流程。',
   utils: '提供取消、并发、错误、集合、字符串等通用基础工具。',
   wasm: '管理 WebAssembly 初始化、内存所有权、值转换与清理。',
-  rpc: '用四个 Peer/Plugin 工厂连接进程和线程，以显式 provide/expose 共享方法；core/browser 提供自定义连接、编解码和安全边界。'
+  'rpc-core': '用四个 Peer/Plugin 工厂连接进程和线程，以显式 provide/expose 共享方法；core/browser 提供自定义连接、编解码和安全边界。'
 } as const satisfies Readonly<Record<string, string>>
 
 /** Architecture-page summaries explain the pain, core capability, and governing design up front. */
@@ -2587,7 +2593,7 @@ const LIBRARY_ARCHITECTURE_LEDES_ZH = {
   utils:
     '用于多个包共同需要、且不应绑定 Store、DOM 或具体运行时的基础能力，包括取消、并发、错误、集合、对象路径、字节与字符串处理。每个子路径拥有独立契约和错误语义，调用方应按能力导入；它不是无边界的杂物箱。',
   wasm: '用于统一 WebAssembly 模块初始化、实例复用、线性内存分配、JS/WASM 值转换和确定性释放。它把平台加载与内存所有权封装在明确边界内，避免每个消费者重复处理指针、视图失效和清理；没有 WASM 模块时无需使用。',
-  rpc: '用于进程、Worker、Window 或 MessagePort 两端进行类型安全的双向调用。四个 Peer/Plugin 工厂根据真实 provide/expose 自动生成 v2 目录，复用原连接、鉴权、重放窗口、deadline 与 drain owner；业务不用复制手写消息协议。spawn 拥有执行单元，connect/listen 只借用连接，批量帧接收是握手基线，未支持的可选能力显式拒绝。事务与业务回滚仍由调用方负责。'
+  'rpc-core': '用于进程、Worker、Window 或 MessagePort 两端进行类型安全的双向调用。四个 Peer/Plugin 工厂根据真实 provide/expose 自动生成 v2 目录，复用原连接、鉴权、重放窗口、deadline 与 drain owner；业务不用复制手写消息协议。spawn 拥有执行单元，connect/listen 只借用连接，批量帧接收是握手基线，未支持的可选能力显式拒绝。事务与业务回滚仍由调用方负责。'
 } as const satisfies Readonly<Record<string, string>>
 
 /** Missing English package descriptions are explicit instead of slogan fallbacks. */
@@ -2608,7 +2614,7 @@ const LIBRARY_REFERENCE_ALIASES = {
   'Storage Host': 'storage-web',
   Tray: 'tray',
   WASM: 'wasm',
-  RPC: 'rpc'
+  RPC: 'rpc-core'
 } as const satisfies Readonly<Record<string, string>>
 
 /** Resolves an explicit package reference only when it points outside the current library. */
@@ -2718,7 +2724,7 @@ function groupGuideApiLinks(
   library: string,
   locale: ILocale
 ): readonly IGuideApiGroup[] {
-  if (library === 'rpc') return groupWebRpcGuideApiLinks(apiLinks, locale)
+  if (library === 'rpc-core') return groupWebRpcGuideApiLinks(apiLinks, locale)
   if (library === 'storage-web') return groupStorageWebApiLinks(apiLinks, locale)
   /** Ordered module buckets keep generated public export order stable in navigation. */
   const groups = new Map<string, IGuideApiLink[]>()

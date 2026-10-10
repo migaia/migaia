@@ -16,7 +16,12 @@ const PACKAGES = [
   'storage-contract',
   'plugin-host',
   'resource',
-  'rpc',
+  'rpc-contract',
+  'rpc-core',
+  'rpc-process',
+  'rpc-threads',
+  'rpc-bridge-jsonrpc',
+  'rpc-browser',
   'logger',
   'storage-web'
 ]
@@ -364,7 +369,7 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
     'flush-and-shutdown',
     'runtime-and-forwarding'
   ],
-  rpc: [
+  'rpc-core': [
     'endpoint-composition',
     'extension-authoring',
     'calls-and-cancellation',
@@ -1572,7 +1577,10 @@ function buildLibraryEntries() {
   const packagesRoot = resolve('..', 'packages')
   return readdirSync(packagesRoot, { withFileTypes: true })
     .filter(
-      (entry) => entry.isDirectory() && existsSync(join(packagesRoot, entry.name, 'package.json'))
+      (entry) =>
+        entry.isDirectory() &&
+        entry.name !== 'rpc-integration' &&
+        existsSync(join(packagesRoot, entry.name, 'package.json'))
     )
     .sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0))
     .map((entry) => {
@@ -1975,7 +1983,10 @@ async function generateManifests() {
             const wildcardPath = api.exportPath.includes('*')
               ? `./${source.replace(`packages/${library.slug}/dist/`, '').replace(/\.d\.ts$/u, '')}`
               : api.exportPath
-            const importPath = `${packageName}/${wildcardPath.replace(/^\.\//u, '')}`
+            const importPath =
+              wildcardPath === '.'
+                ? packageName
+                : `${packageName}/${wildcardPath.replace(/^\.\//u, '')}`
             const paths = candidates.get(symbolName) ?? []
             paths.push(importPath)
             candidates.set(symbolName, paths)

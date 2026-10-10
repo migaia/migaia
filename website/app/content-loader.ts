@@ -53,7 +53,7 @@ function isGuideNavigationSymbol(api: IApi, symbol: IApiSymbol): boolean {
 function isGuideApiLinkSymbol(slug: string, api: IApi, symbol: IApiSymbol): boolean {
   if (!isGuideNavigationSymbol(api, symbol)) return false
   if (isCallableApiSymbol(symbol)) return true
-  return slug === 'rpc' && api.module === 'core/transport-constants' && symbol.kind === 'const'
+  return slug === 'rpc-core' && api.module === 'transport-constants' && symbol.kind === 'const'
 }
 
 /** Projects complete lightweight API navigation without serializing documentation bodies. */
