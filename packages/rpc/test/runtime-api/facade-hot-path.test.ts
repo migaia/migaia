@@ -36,8 +36,14 @@ for (const carrier of ['stdio-framed', 'worker'] as const) {
       requests: number
       payloadValue: number
       requestClosure: number
+      runtimeInput: number
     }
     assert.equal(observed.requests, 20, '[A37] the genuine public Peer completed every request')
+    assert.equal(
+      observed.runtimeInput,
+      20,
+      '[BC11] Core captures each logical request exactly once'
+    )
     assert.equal(
       observed.payloadValue,
       0,
@@ -62,6 +68,7 @@ for (const carrier of ['stdio-framed', 'worker'] as const) {
       payloadValue: number
       requestClosure: number
       runtimeEnvelope: number
+      runtimeInput: number
       binaryPrepare: number
       materialize: number
       loaded: {
@@ -75,6 +82,11 @@ for (const carrier of ['stdio-framed', 'worker'] as const) {
     assert.equal(observed.payloadValue, 0, '[D19] Deno does not add facade payload walks')
     assert.equal(observed.requestClosure, 0, '[R15] Deno uses the original cold dispatcher')
     assert.equal(
+      observed.runtimeInput,
+      20,
+      '[BC11] Core captures each logical request exactly once'
+    )
+    assert.equal(
       observed.runtimeEnvelope,
       40,
       '[D19] only outgoing and untrusted incoming admission'
@@ -86,7 +98,6 @@ for (const carrier of ['stdio-framed', 'worker'] as const) {
       '[K273] scalar runtime calls do not materialize JSON again'
     )
     for (const suffix of [
-      '/remote/runtime-api/peer.js',
       '/contract/runtime-api/normalize-envelope.js',
       '/contract/runtime-api/binary-capture.js',
       '/core/internal/outbound-envelope.js'
@@ -99,6 +110,12 @@ for (const carrier of ['stdio-framed', 'worker'] as const) {
     assert.ok(
       observed.loaded.some((row) => row.url.endsWith('/remote/runtime-api/managed-peer.js'))
     )
+    for (const suffix of ['/remote/runtime-api/peer.js', '/core/internal/runtime-call.js']) {
+      const witness = observed.loaded.find((row) => row.url.endsWith(suffix))
+      assert.ok(witness, `[BC11] actual moved owner or raw facade must load for ${suffix}`)
+      assert.equal(witness.diagnosticOverlay, false)
+      assert.equal(witness.loadedSHA256, witness.diskSHA256)
+    }
     assert.equal(
       observed.loaded.some((row) => row.url.endsWith('/contract/runtime-api/binary.js')),
       false,

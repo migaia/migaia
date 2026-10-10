@@ -12,8 +12,6 @@ export const RuntimeReportKind = {
 
 /** Automatic provide descriptor errors are stable, non-reflecting configuration diagnostics. */
 export const RuntimeApiErrorText = {
-  /** Every own process transfer field is invalid, including empty or undefined values. */
-  processTransferInvalid: 'Runtime process calls do not accept transfer',
   /** Factory admission rejects this value before bootstrap or physical resource acquisition. */
   defaultTimeoutInvalid: 'Runtime defaultTimeoutMs must be a positive finite number',
   /** A foreign origin without a negotiated node cannot safely begin a native forwarding route. */

@@ -64,15 +64,16 @@ it('[K284/A45] only an exact canonical receiver payload is reusable through held
 it('[K284/A45] a custom normalizer is read once, retains its receiver and cannot mint canonical membership', () => {
   /** The custom getter deliberately changes on a second read. */
   let reads = 0
-  let receiver: unknown
+  /** Retain the actual receiver without aliasing the method's `this` binding. */
+  const observation: { receiver?: unknown } = {}
   const protocol: IRpcProtocol<IRpcEnvelope, string, number> = {
     id: 'k284-custom',
     version: 1,
     get normalize() {
       reads++
       return reads === 1
-        ? function (value: unknown) {
-            receiver = this
+        ? function (this: IRpcProtocol<IRpcEnvelope, string, number>, value: unknown) {
+            observation.receiver = this
             return normalizeRpcEnvelope(value)
           }
         : normalizeRpcEnvelope
@@ -82,7 +83,7 @@ it('[K284/A45] a custom normalizer is read once, retains its receiver and cannot
   if (envelope.kind !== 'request') assert.fail('request must remain a request')
   const payload = envelope.data.payload as object
   assert.equal(reads, 1)
-  assert.equal(receiver, protocol)
+  assert.equal(observation.receiver, protocol)
   assert.equal(isInboundNormalizedPayload(payload), false)
   assert.equal(
     isForwardedPayload(createForwardOptions({ data: payload } as IRpcContext), payload),

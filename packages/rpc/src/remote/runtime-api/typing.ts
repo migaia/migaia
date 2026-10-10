@@ -1,12 +1,11 @@
 import type { IFeatureOutput, IFeatureRecord, IPluginConstraint } from '@migaia/plugin-host'
-import type { IRemoteCallOptions } from '../types.js'
 import type { IRpcRuntimeSendOptions } from '../../core/internal/outbound-attachment.js'
 import type { IRpcRuntimeStepOutcome } from '../../contract/runtime-api/types.js'
 import type { IRuntimePeer as IRuntimePeerHandle } from './peer.js'
 
 /** Runtime calls retain the original core false override without widening legacy remote options. */
-export type IRuntimeCallOptions = Omit<IRemoteCallOptions, 'timeoutMs'> &
-  Readonly<{ timeoutMs?: number | false; transfer?: readonly ArrayBuffer[] }>
+export type IRuntimeCallOptions =
+  import('../../core/internal/runtime-call.js').ICoreRuntimeCallOptions
 
 /** Process calls reject own transfer presence; thread calls accept only genuine backing types. */
 type IRuntimeFamilyCallOptions<K> =

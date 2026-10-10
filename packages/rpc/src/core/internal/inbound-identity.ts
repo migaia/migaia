@@ -261,6 +261,12 @@ export class InboundIdentityCoordinator {
     return token !== undefined && this.bindGeneration(token, generation)
   }
 
+  /** Resolve only the generation already bound to this exact authenticated response source. */
+  readResponseGeneration(binding: string): IRpcRuntimeGeneration | undefined {
+    const token = this.#established.get(binding)
+    return token === undefined ? undefined : this.readGeneration(token)
+  }
+
   /** Runtime fences read only previously accepted describe identity on this original peer owner. */
   readGeneration(token: string): IRpcRuntimeGeneration | undefined {
     return this.#closed ? undefined : this.#peers.readGeneration(token)

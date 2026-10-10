@@ -101,11 +101,14 @@ class OutboundSnapshot extends class {
 } {
   /** The exact original admission kind stays on its snapshot and cannot be copied or reflected. */
   #kind: symbol
+  /** Logical input grammar depth is private and cannot be copied from reflected properties. */
+  #depth: 0 | 2 | undefined
 
   /** Stamp a newly admitted record once, including records already frozen by the contract owner. */
-  constructor(value: object, kind: symbol) {
+  constructor(value: object, kind: symbol, depth?: 0 | 2) {
     super(value)
     this.#kind = kind
+    this.#depth = depth
   }
 
   /** Caller freezing, field copies and inbound records cannot mint this private admission kind. */
@@ -116,6 +119,10 @@ class OutboundSnapshot extends class {
       ? value.#kind
       : undefined
   }
+  /** Read only the exact input owner's original grammar association. */
+  static depth(value: object): 0 | 2 | undefined {
+    return #depth in value ? value.#depth : undefined
+  }
 }
 /** Distinct private proof kinds cannot be forged by copying fields or freezing caller data. */
 const legacySnapshot = Symbol('rpc-legacy-outbound-snapshot')
@@ -123,10 +130,24 @@ const legacySnapshot = Symbol('rpc-legacy-outbound-snapshot')
 const runtimeSnapshot = Symbol('rpc-runtime-outbound-snapshot')
 /** One logical caller admission survives its original retry owner without another portable walk. */
 const runtimeInputSnapshot = Symbol('rpc-runtime-input-snapshot')
-/** Existing options carry only a package-owned exact input reference, never a public skip flag. */
-const runtimeInput = Symbol('rpc-runtime-input')
-/** Logical input admission retains the original grammar depth when reused by a legacy frame. */
-const runtimeInputDepth = Symbol('rpc-runtime-input-depth')
+/** Core-to-Core options retain an exact input without a reflected marker or public skip flag. */
+class RuntimeInputOptions extends class {
+  /** Stamp the existing options record without changing its prototype or public property shape. */
+  constructor(value: object) {
+    return value
+  }
+} {
+  /** Only the original Core operation can retain the input owned by its capture/retry path. */
+  #input: IRuntimeRequestInput
+  constructor(value: object, input: IRuntimeRequestInput) {
+    super(value)
+    this.#input = input
+  }
+  /** A spread or foreign options object cannot carry this private association. */
+  static read(value: object): IRuntimeRequestInput | undefined {
+    return #input in value ? value.#input : undefined
+  }
+}
 
 /** A logical input belongs to the same proof owner as the final immutable outbound envelope. */
 export type IRuntimeRequestInput = Readonly<{
@@ -152,9 +173,8 @@ export function createRuntimeRequestInput(
         ? (payload as IRpcPortableValue)
         : normalizePortable(payload, portableDepth, new Set<object>(), binary)
   const input = { method, ...(portable === undefined ? {} : { payload: portable }) }
-  Object.defineProperty(input, runtimeInputDepth, { value: portableDepth })
   Object.freeze(input)
-  new OutboundSnapshot(input, runtimeInputSnapshot)
+  new OutboundSnapshot(input, runtimeInputSnapshot, portableDepth)
   return input
 }
 
@@ -163,7 +183,7 @@ export function retainRuntimeRequestInput<T extends object>(
   options: T,
   input: IRuntimeRequestInput
 ): T {
-  Object.defineProperty(options, runtimeInput, { value: input, enumerable: true })
+  new RuntimeInputOptions(options, input)
   return options
 }
 
@@ -175,10 +195,10 @@ export function readRuntimeRequestInput(
   portableDepth: 0 | 2 = 0
 ): IRuntimeRequestInput | undefined {
   if (typeof options !== 'object' || options === null) return undefined
-  const input = Reflect.get(options, runtimeInput) as IRuntimeRequestInput | undefined
+  const input = RuntimeInputOptions.read(options)
   return input &&
     isRuntimeRequestInput(input) &&
-    Reflect.get(input, runtimeInputDepth) === portableDepth &&
+    OutboundSnapshot.depth(input) === portableDepth &&
     input.method === method &&
     input.payload === payload
     ? input
