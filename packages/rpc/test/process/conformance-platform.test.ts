@@ -155,6 +155,7 @@ describe('conformance toolchain and platform evidence boundaries', () => {
     expect(defaultConfig.test.exclude).toEqual([
       ...configDefaults.exclude,
       'test/process/conformance*.test.ts',
+      'test/bridge/conformance-faults.test.ts',
       'test/merge/suite-parity.test.ts'
     ])
     /** All package dependency sets remain identical to the frozen pre-I20 preparation commit. */
