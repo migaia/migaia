@@ -869,6 +869,35 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
               endpointId: this.id,
               platform: this.kernel.platform
             }
+            /** Verify native bytes before admission or replay. */
+            const validate =
+              nativeBinary &&
+              (async (encoded: unknown): Promise<IRpcRuntimeEnvelope> => {
+                try {
+                  const accepted = this.#runtimeComponents.framer.accept(encoded, {
+                    source: physical.sourceToken,
+                    messageId: 'whole'
+                  })
+                  if (accepted.status !== 'complete')
+                    throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
+                  const manifest = this.#runtimeComponents.codec.decode(accepted.value)
+                  restoredBinary = await restoreInboundRuntimeBinary(
+                    manifest,
+                    RpcBinaryStorage.native,
+                    nativeBinary.sidecars,
+                    this.#physicalLimit,
+                    readAuthenticationBinaryDigest(this.#authentication)!
+                  )
+                  return restoredBinary
+                } catch (cause) {
+                  throw this.#authentication && isRpcBinaryIntegrityFailure(cause)
+                    ? new RpcAuthenticationError(
+                        RpcMiddlewareErrorText.inboundFrameAuthenticationFailed,
+                        cause
+                      )
+                    : new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid, cause)
+                }
+              })
             if (this.#authentication) {
               /** Native or absent (undefined/null) sources use the endpoint partition. */
               let session =
@@ -911,39 +940,10 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                       }
                     : undefined
                 )
-              if (nativeBinary) {
-                const digest = readAuthenticationBinaryDigest(this.#authentication)!
-                bindAuthenticationBinaryValidation(authenticationContext, async (encoded) => {
-                  try {
-                    /** Original codec/framer run exactly once, inside final native acceptance. */
-                    const accepted = this.#runtimeComponents.framer.accept(encoded, {
-                      source: physical.sourceToken,
-                      messageId: 'whole'
-                    })
-                    if (accepted.status !== 'complete')
-                      throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
-                    const manifest = this.#runtimeComponents.codec.decode(accepted.value)
-                    restoredBinary = await restoreInboundRuntimeBinary(
-                      manifest,
-                      RpcBinaryStorage.native,
-                      nativeBinary.sidecars,
-                      this.#physicalLimit,
-                      digest
-                    )
-                    return restoredBinary
-                  } catch (cause) {
-                    if (isRpcBinaryIntegrityFailure(cause))
-                      throw new RpcAuthenticationError(
-                        RpcMiddlewareErrorText.inboundFrameAuthenticationFailed,
-                        cause
-                      )
-                    throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid, cause)
-                  }
-                })
-              }
+              if (validate) bindAuthenticationBinaryValidation(authenticationContext, validate)
               frame = await this.#authentication.unprotect(frame, authenticationContext)
               if (frame === consumedAuthenticationFrame) return
-            }
+            } else if (validate) await validate(frame)
             this.#native?.observeOwner()
             this.kernel.assertActive(generation)
             if (this.#native && !this.#native.active) return

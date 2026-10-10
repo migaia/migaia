@@ -13,6 +13,7 @@ import { createRuntimePeer, type IRuntimePeerOptions } from '../remote/index.js'
 import {
   readThreadRuntimeBootstrap,
   intersectThreadCapabilities,
+  createThreadRuntimeCapabilityOffer,
   type IThreadRuntimeBootstrap
 } from './bootstrap.js'
 import { createWebThreadBootstrapHandoff } from './receive-handoff.js'
@@ -79,11 +80,13 @@ export async function createAutomaticWebThreadPeer(
             options.self.instanceId !== bootstrap.self.instanceId)
         )
           throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
+        /** This native child derives only its own compiled offer before the bilateral agreement. */
+        const capabilities = createThreadRuntimeCapabilityOffer(context.capabilities)
         native.postMessage(
           {
             kind: ThreadBootstrap.runtimeAcknowledged,
             version: THREAD_RUNTIME_API_VERSION,
-            capabilities: context.capabilities
+            capabilities
           },
           undefined
         )
@@ -92,7 +95,7 @@ export async function createAutomaticWebThreadPeer(
           bootstrap.parent.instanceId,
           {
             scheduler: systemScheduler,
-            capabilities: intersectThreadCapabilities(context.capabilities, bootstrap.capabilities)
+            capabilities: intersectThreadCapabilities(capabilities, bootstrap.capabilities)
           },
           handoff
         )

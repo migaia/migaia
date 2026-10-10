@@ -238,11 +238,11 @@ export function registerAuthenticationBinaryDigest(
   counterSetters.get(capability)!.binaryDigest = digest
 }
 
-/** Opaque external capabilities have no native mapping authority, even with a matching label. */
+/** Unauthenticated traffic hashes bytes; installed auth must admit its digest. */
 export function readAuthenticationBinaryDigest(
   capability: IRpcAuthenticationCapability | undefined
 ): IRpcBinaryDigest | undefined {
-  return capability ? counterSetters.get(capability)?.binaryDigest : undefined
+  return capability ? counterSetters.get(capability)?.binaryDigest : createRpcBackingDigest()
 }
 
 /** Select actual stateless core hashing; this function grants no auth, replay or carrier authority. */

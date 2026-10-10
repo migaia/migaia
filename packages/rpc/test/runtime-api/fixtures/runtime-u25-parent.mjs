@@ -186,7 +186,7 @@ try {
   assert.equal(final.state, 'done')
   assert.equal(final.outcome.completion.ok, true)
   assert.deepEqual({ ...final.outcome.completion.result }, { final: 99, aborted: false })
-  /** The actual default assembly copies portable bytes and never silently grants ownership transfer. */
+  /** Default Worker clone and process inline both leave the caller's original backing usable. */
   const backing = new Uint8Array([9, 1, 2, 8]).buffer
   const copied = await peer.request('echo', {
     backing,
@@ -196,14 +196,22 @@ try {
   assert.equal(backing.byteLength, 4)
   assert.ok(copied.backing instanceof ArrayBuffer)
   assert.ok(copied.first instanceof Uint8Array)
-  /** Inline portable views preserve offsets and visible bytes while masking unrelated backing bytes. */
-  assert.notEqual(copied.first.buffer, copied.second.buffer)
+  if (mode === 'thread') {
+    /** Negotiated native clone retains aliases and the complete original backing across the Worker. */
+    assert.equal(copied.first.buffer, copied.second.buffer)
+    assert.equal(copied.first.buffer, copied.backing)
+    assert.deepEqual([...new Uint8Array(copied.first.buffer)], [9, 1, 2, 8])
+  } else {
+    /** Process inline views retain independent backings and mask bytes outside each visible view. */
+    assert.notEqual(copied.first.buffer, copied.second.buffer)
+    assert.equal(new Uint8Array(copied.first.buffer)[0], 0)
+    assert.equal(new Uint8Array(copied.second.buffer)[0], 0)
+  }
   assert.deepEqual([...copied.first], [1, 2])
   assert.deepEqual([...copied.second], [2])
-  assert.equal(new Uint8Array(copied.first.buffer)[0], 0)
-  assert.equal(new Uint8Array(copied.second.buffer)[0], 0)
   assert.equal(copied.first.byteOffset, 1)
   assert.deepEqual([...new Uint8Array(copied.backing)], [9, 1, 2, 8])
+  assert.deepEqual([...new Uint8Array(backing)], [9, 1, 2, 8])
   const beforeTransfer = await peer.request('binaryCount')
   await assert.rejects(
     async () => peer.request('echo', backing, { transfer: [backing] }),

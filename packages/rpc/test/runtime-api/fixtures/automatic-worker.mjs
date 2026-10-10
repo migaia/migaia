@@ -17,6 +17,10 @@ if (typeof threads.createThreadPeer === 'function') {
       probe: async (value) => {
         const peer = await initialized
         return { value, self: peer.self, parent: await peer.request('parentEcho') }
+      },
+      /** Echo binary stream items through the default public Worker owner without transfer. */
+      values: async function* (value) {
+        yield value
       }
     },
     report: (error) => process.stderr.write(`${error?.code ?? 'fixture-error'}\n`)

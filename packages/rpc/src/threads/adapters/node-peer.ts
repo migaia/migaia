@@ -10,7 +10,11 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import { bindNativeReplayTransport } from '../../core/internal/native-replay.js'
 import { createRuntimePeer, type IRuntimePeerOptions } from '../../remote/index.js'
 import { createThreadSourcePeer, type IRuntimeThreadPeerOptions } from '../runtime-peer.js'
-import { readThreadRuntimeBootstrap, intersectThreadCapabilities } from '../bootstrap.js'
+import {
+  readThreadRuntimeBootstrap,
+  intersectThreadCapabilities,
+  createThreadRuntimeCapabilityOffer
+} from '../bootstrap.js'
 import { createNodeThreadBootstrapHandoff } from '../receive-handoff.js'
 import { createNodeThreadChannel } from '../channel.js'
 import { ThreadBootstrap, THREAD_RUNTIME_API_VERSION } from '../constants.js'
@@ -50,11 +54,13 @@ export function createThreadPeer(options: IRuntimeThreadPeerOptions) {
       const handoff = createNodeThreadBootstrapHandoff(native)
       resources.bootstrap = handoff
       try {
+        /** This native child derives only its own compiled offer before the bilateral agreement. */
+        const capabilities = createThreadRuntimeCapabilityOffer(context.capabilities)
         /** The child offers only its own actual roots, independently of the parent metadata. */
         native.postMessage({
           kind: ThreadBootstrap.runtimeAcknowledged,
           version: THREAD_RUNTIME_API_VERSION,
-          capabilities: context.capabilities
+          capabilities
         })
         /** The wrapper transfers subscriptions while provenance stays on the exact native port. */
         const channel = createNodeThreadChannel(
@@ -62,7 +68,7 @@ export function createThreadPeer(options: IRuntimeThreadPeerOptions) {
           bootstrap.parent.instanceId,
           {
             scheduler: systemScheduler,
-            capabilities: intersectThreadCapabilities(context.capabilities, bootstrap.capabilities)
+            capabilities: intersectThreadCapabilities(capabilities, bootstrap.capabilities)
           },
           handoff
         )
