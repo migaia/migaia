@@ -9,6 +9,7 @@ import {
   PROCESS_STDERR_INTERVAL_MS
 } from './constants.js'
 import type { IProcessCommonOptions } from './types.js'
+import type { IRuntimeByteConnection } from '@migaia/rpc-core/adapter'
 
 /** Project the existing reader into a bounded session log without retaining or delaying bytes. */
 export function attachIpcStderr(
@@ -97,5 +98,33 @@ export function attachIpcStderr(
     closed = true
     flush(scheduler.now())
     unsubscribe()
+  }
+}
+
+/** Attach this actual stderr owner to one constructed Core connection, with original rollback. */
+export function attachProcessChannelStderr<T extends IRuntimeByteConnection>(
+  channel: T,
+  options: IProcessCommonOptions
+): T {
+  try {
+    /** The exact selected log installation shares the existing queue/close resource lifetime. */
+    const unsubscribe = attachIpcStderr(channel.log, options.ipc, options.report, channel.scheduler)
+    channel.ownClose({ close: unsubscribe })
+    return channel
+  } catch (primary) {
+    /** Secondary cleanup/report failures never replace the original construction failure. */
+    const report = (error: unknown): void => {
+      try {
+        options.report(error)
+      } catch (failure) {
+        hostRethrowReporter(failure, IpcReporterContext)
+      }
+    }
+    try {
+      void channel.close().catch(report)
+    } catch (cleanup) {
+      report(cleanup)
+    }
+    throw primary
   }
 }

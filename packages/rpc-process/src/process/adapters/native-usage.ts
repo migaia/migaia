@@ -1,4 +1,4 @@
-import { RPC_PROCESS_ERROR_SOURCE } from '@migaia/rpc-core/adapter/diagnostics'
+import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'

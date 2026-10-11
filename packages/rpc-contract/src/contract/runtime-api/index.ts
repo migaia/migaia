@@ -14,3 +14,6 @@ export {
   rpcMessageCapabilityControl,
   type IRpcMessageCapabilityControl
 } from './message-control.js'
+
+/** The standard byte launch grammar does not grant decoded metadata any resource authority. */
+export { rpcByteRuntimeBootstrap, type IRpcByteRuntimeBootstrap } from './byte-bootstrap.js'

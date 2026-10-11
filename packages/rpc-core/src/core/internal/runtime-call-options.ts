@@ -19,8 +19,8 @@ export function retainRuntimeTransferOptions<T extends object>(source: object, c
   return copied
 }
 
-/** The held Process factory rejects transfer before any transfer getter or caller payload is read. */
-export function assertRuntimeProcessTransfer(options: object | undefined): void {
+/** A narrowed runtime resource rejects transfer before any transfer getter or caller payload read. */
+export function assertRuntimeTransferDisabled(options: object | undefined): void {
   if (options && Object.hasOwn(options, transferField))
     throw createRpcError(
       RpcCoreErrorCode.invalidConfig,

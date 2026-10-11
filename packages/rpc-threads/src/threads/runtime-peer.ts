@@ -1,6 +1,5 @@
-import { createAdapterConfigurationError } from '@migaia/rpc-core/adapter'
 import type { IThreadHandle } from '@migaia/supervision/threads'
-import { prepareAdapterPeer, AdapterPeerErrorText } from '@migaia/rpc-core/adapter'
+import { prepareAdapterPeer, createAdapterSourceConfigurationError } from '@migaia/rpc-core/adapter'
 import {
   RuntimePluginKey,
   type IRuntimePeerOptions,
@@ -33,7 +32,7 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
   /** The opaque Core operation performs the original early timeout admission exactly once. */
   const preparation = prepareAdapterPeer(options, RuntimePluginKey.thread)
   if (!options.spawn || typeof options.spawn !== 'object' || options.connect || options.listen)
-    throw createAdapterConfigurationError(AdapterPeerErrorText.sourceInvalid)
+    throw createAdapterSourceConfigurationError()
   /** The caller's source object is snapshotted before the original binding can start. */
   const source = options.spawn
   /** Local address is output from Core's original preparation rather than a peer claim. */

@@ -203,6 +203,23 @@ describe('C3 public adapter resource boundaries', () => {
     async (writer) => {
       expectPrivateWriter(writer)
       await withHeldChannel(async (channel) => {
+        /** Copying a genuine channel's agreement cannot qualify the new resource governor. */
+        const copiedChannel = { ...channel, transport: foreignTransport(channel.transport) }
+        expect(() =>
+          adapter.createRuntimeProviderGovernor(
+            copiedChannel,
+            {
+              maxCallsPerMinute: 10,
+              maxPayloadBytes: 1024,
+              maxConsecutiveTimeouts: 3,
+              idleTimeoutMs: 1000,
+              violationLimit: 3,
+              overflow: { source: 'fixture', code: 'OVERFLOW', message: 'fixture overflow' }
+            },
+            async () => undefined,
+            () => undefined
+          )
+        ).toThrowError(expect.objectContaining({ code: core.RpcCoreErrorCode.invalidConfig }))
         /** Metadata and a same-description global symbol cannot reproduce a private policy symbol. */
         const policy = vi.fn(() => undefined)
         /** This business callback was never constructed by a native admission owner. */

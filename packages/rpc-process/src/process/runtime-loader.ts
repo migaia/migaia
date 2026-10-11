@@ -1,7 +1,4 @@
-import type {
-  IAdapterProcessRuntimeLoader,
-  IAdapterProcessRuntimeModule
-} from '@migaia/rpc-core/adapter/process'
+import type { IAdapterProcessRuntimeLoader, IAdapterProcessRuntimeModule } from './peer.js'
 
 /** This runtime resource retains the original native module selection and bare import Promise. */
 export class NativeProcessRuntimeLoader implements IAdapterProcessRuntimeLoader {

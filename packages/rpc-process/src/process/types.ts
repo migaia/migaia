@@ -50,7 +50,10 @@ export type IProcessByteOptions = IProcessCommonOptions &
         auth:
           | Readonly<{
               mode: 'required'
-              verify(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): void | Promise<void>
+              verify(
+                auth: IRpcPortableValue | undefined,
+                peer: IRpcPeerInfo
+              ): string | void | Promise<string | void>
             }>
           | Readonly<{ mode: 'none' }>
       }>

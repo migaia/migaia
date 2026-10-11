@@ -1,26 +1,6 @@
-/**
- * A runtime/carrier adapter gives Core the ordered raw I/O it actually holds. Core constructs the
- * channel, negotiates its protocol and owns its exact trust facts; no registrar is public.
- */
-export { createAdapterChannel } from './adapter-owned/process/handshake.js'
-export type {
-  IProcessMessageChannel,
-  IProcessByteChannel,
-  IProcessCommonOptions,
-  IProcessByteOptions,
-  IProcessMessageOptions,
-  IProcessByteListener,
-  IAuthenticatedProcessChannel,
-  IProcessPendingByteConnection,
-  IListenProcessByteChannel
-} from './adapter-owned/process/types.js'
-
-/** Receive framed bootstrap on held byte I/O and transfer the same decoder into this channel. */
-export { receiveAdapterBootstrap } from './adapter-owned/process/bootstrap.js'
-
 /** Adapter admission and presentation retain canonical owners without exposing trust writers. */
 export {
-  AdapterPeerErrorText,
+  createAdapterSourceConfigurationError,
   IpcReporterContext,
   createAdapterId,
   readAdapterAbortReason,
@@ -45,7 +25,26 @@ export {
   createAdapterPlugin,
   holdAdapterRegistration
 } from './runtime-adapter/binding.js'
-export type { IAdapterRegistration } from './runtime-adapter/binding.js'
+export type {
+  IAdapterRegistration,
+  IAdapterBindingDrain,
+  IAdapterPluginLifecycleResource
+} from './runtime-adapter/binding.js'
+/**
+ * Listener resources retain genuine endpoint/session preparation without accepting context or
+ * claims.
+ */
+export type {
+  IAdapterListenerPreparation,
+  IAdapterListenerSession,
+  IAdapterListenerOwner,
+  IAdapterListenerService
+} from './runtime-adapter/listener.js'
+/**
+ * Byte Peer configuration is local presentation data, never decoded bootstrap or accepted
+ * agreement.
+ */
+export type { IAdapterBytePeerOptions } from './runtime-adapter/byte/peer.js'
 /** Object negotiation creates its own final transport and retains its own private agreement. */
 export { holdAdapterObjectChannel, materializeAdapterJson } from './runtime-adapter/object/index.js'
 export type {
@@ -95,3 +94,10 @@ export type {
   IRuntimeEventByteWriter,
   IRuntimeBytePhysicalResource
 } from './runtime-adapter/byte/event-byte-io.js'
+/** Held whole-message I/O expands its fixed V1 profile only through actual bounded ACK reception. */
+export { createRuntimeMessageConnection } from './runtime-adapter/message/connection.js'
+export type {
+  IRuntimeMessageConnectionOptions,
+  IRuntimeMessageDiagnostics
+} from './runtime-adapter/message/connection.js'
+export type { IRuntimeMessageIO } from './runtime-adapter/byte/types.js'

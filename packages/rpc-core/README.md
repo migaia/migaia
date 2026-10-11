@@ -118,20 +118,20 @@ JSON-RPC bridge 完成原 hello 后允许同连接的 invoke、describe、无 id
 
 ## Runtime/carrier adapter resources
 
-`@migaia/rpc-core/adapter` constructs a complete channel from ordered raw I/O held by a runtime or carrier adapter. It owns the handshake, physical frame queue, IPC gate, codec/framer composition and exact private batch/replay facts. It never accepts an existing RPC transport to mark, an agreed/trusted/owned flag, or a registration callback. The historical `staticAgreement` option contains two local/peer protocol proposals; the constructor validates their equality and creates its own static agreement for its own new transport. It is not a receipt for another transport.
+`@migaia/rpc-core/adapter` constructs a complete channel from ordered raw I/O held by a runtime or carrier adapter. It owns the handshake, physical frame queue, IPC gate, codec/framer composition and exact private batch/replay facts. It never accepts an existing RPC transport to mark, an agreed/trusted/owned flag, or a registration callback. Process validates its historical staticAgreement locally; Core accepts only the local proposal and derives expanded capabilities from actual ACKs.
 
-Node adapter authors can give `@migaia/rpc-core/adapter/node` their actual child pipes, process stdio or duplex socket. `createAdapterChildStdio(child)` and `createAdapterProcessStdio(io)` retain the original physical lifetime/exclusive reader observation; `createAdapterSocketByteIO(socket)` preserves the ordinary socket profile without claiming launch replay ownership. `@migaia/rpc-core/adapter/web-streams` constructs the original reader/writer scope from held Web Streams. These ordinary subentries are separate from the neutral Core root.
+Node adapter authors can give `@migaia/rpc-process/adapters/node-child-process` their actual child pipes, process stdio or duplex socket. `createAdapterChildStdio(child)` and `createAdapterProcessStdio(io)` retain the original physical lifetime/exclusive reader observation; `createAdapterSocketByteIO(socket)` preserves the ordinary socket profile without claiming launch replay ownership. `@migaia/rpc-process` constructs the original reader/writer scope from held Web Streams. Native resource glue belongs to the Process package.
 
 A third-party custom IPC adapter needs only the ordinary constructors and the standalone Contract toolkit:
 
 ```ts
-import { createAdapterChannel } from '@migaia/rpc-core/adapter'
-import { createAdapterSocketByteIO } from '@migaia/rpc-core/adapter/node'
+import { createProcessTransport } from '@migaia/rpc-process'
+import { createAdapterSocketByteIO } from '@migaia/rpc-process/adapters/node-socket'
 import { RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'
 
 // socket is the actual duplex resource acquired by this adapter.
 const raw = createAdapterSocketByteIO(socket)
-const channel = await createAdapterChannel(raw, {
+const channel = await createProcessTransport(raw, {
   peerId: 'service',
   role: 'initiator',
   offer: {
@@ -148,14 +148,14 @@ const channel = await createAdapterChannel(raw, {
 await channel.close()
 ```
 
-Adapters propagate the original owner errors. `RPC_PROCESS_ERROR_SOURCE` and `RpcProcessErrorCode` remain ordinary diagnostic data at `@migaia/rpc-core/adapter/diagnostics`; their semantic source stays `@migaia/rpc/process`. Process text and stderr diagnostic tables are private. Trust writers, owned snapshots and physical receipt readers remain private. Adapter authors attach their own source/code through `@migaia/utils/error`; they do not ask Core to mint arbitrary operation errors.
+Adapters propagate the original owner errors. `RPC_PROCESS_ERROR_SOURCE` and `RpcProcessErrorCode` remain ordinary diagnostic data at `@migaia/rpc-process`; their semantic source stays `@migaia/rpc/process`. Process text and stderr diagnostic tables are private. Trust writers, owned snapshots and physical receipt readers remain private. Adapter authors attach their own source/code through `@migaia/utils/error`; they do not ask Core to mint arbitrary operation errors.
 
 
 ### Thread execution and foreign-language byte adapters
 
-A third-party runtime adapter can give Core its native module acquisition resource. Core performs
-Worker construction, observes real exit/error events, receives the private ACK and constructs the
-channel over that exact Worker. The import still happens at the original launch boundary. The
+The Thread owner acquires native modules and constructs Workers at the original launch boundary.
+Core holds their actual message ports and exit/terminate resources, reads the private ACK, and
+constructs the channel over that held resource. The import still happens at the original launch boundary. The
 returned handle exposes `identity`, `port`, `exited`, `terminate`, `sampleUsage` and a complete
 `open` operation; preparation and receive-handoff callbacks remain private.
 

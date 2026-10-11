@@ -6,14 +6,17 @@ import {
   materializeOutboundJson
 } from '../../dist/core/internal/outbound-envelope.js'
 import {
-  remoteProcessJsonCodec,
-  messageProcessPipeline
-} from '../../dist/adapter-owned/process/pipeline.js'
+  createRuntimeBytePipeline,
+  runtimeMessagePipeline as messageProcessPipeline
+} from '../../dist/runtime-adapter/byte/pipeline.js'
 import {
   wrapAuthenticationEnvelope,
   readAuthenticationEnvelope,
   RpcAuthenticationEnvelope
 } from '../../dist/core/middleware/authentication-envelope.js'
+
+/** Preserve byte-for-byte vectors through the same canonical generic codec. */
+const remoteProcessJsonCodec = createRuntimeBytePipeline('json-wire-fixture').codec
 
 it('[R14-A22] two portable inputs preserve null prototypes, frozen own snapshots and shared getter order', () => {
   /** Both inputs independently reuse one nested caller object; admission snapshots each occurrence. */

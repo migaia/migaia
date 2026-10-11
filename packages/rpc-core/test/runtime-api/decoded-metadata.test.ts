@@ -5,9 +5,12 @@ import { messageFramerV1, remoteProcessStringFramer } from '@migaia/rpc-contract
 import { createClientEndpoint } from '../../dist/core/client.js'
 import { connect } from '../../dist/core/index.js'
 import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { remoteProcessJsonCodec } from '../../dist/adapter-owned/process/pipeline.js'
+import { createRuntimeBytePipeline } from '../../dist/runtime-adapter/byte/pipeline.js'
 import { normalizeInboundRuntimeEnvelope } from '../../dist/core/internal/inbound-normalization.js'
 import * as fast from '../../dist/core/internal/fast-path.js'
+
+/** Observe the same canonical JSON codec under its runtime-neutral owner. */
+const remoteProcessJsonCodec = createRuntimeBytePipeline('json-codec-fixture').codec
 
 it.each(['json', 'json-custom-framer', 'live', 'copied-json'] as const)(
   '[H1-D5] the receive owner derives %s metadata admission from original decoder identity',

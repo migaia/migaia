@@ -1,4 +1,4 @@
-import { createRpcError, createRpcTransportError, tagRpcError } from '../core/errors.js'
+import { RpcError, RpcTransportError, tagRpcError } from '../core/errors.js'
 import { RpcCoreErrorCode } from '../core/error-code.js'
 import { defaultRpcId } from '../core/internal/id.js'
 import { resolveAbortReason } from '../core/internal/async-control.js'
@@ -9,8 +9,10 @@ import { contractRequiresStream } from '../remote/serve-methods.js'
 import { RuntimeApiErrorText } from '../remote/runtime-api/constants.js'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
 
-/** Stable Peer admission messages let adapters preserve the existing public diagnostic text. */
-export const AdapterPeerErrorText = RuntimeApiErrorText
+/** Construct the original source-conflict diagnostic without exporting the private text catalog. */
+export function createAdapterSourceConfigurationError() {
+  return new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
+}
 
 /** Fixed fallback reporter context belongs to the original IPC listener/report owner. */
 export { IpcReporterContext }
@@ -47,9 +49,9 @@ export function adapterContractRequiresStream(...args: Parameters<typeof contrac
   return contractRequiresStream(...args)
 }
 
-/** Construct only the established invalid-config diagnostic, never an arbitrary local error code. */
+/** Construct the established native diagnostic without minting live control identity. */
 export function createAdapterConfigurationError(message: string) {
-  return createRpcError(RpcCoreErrorCode.invalidConfig, message)
+  return new RpcError(RpcCoreErrorCode.invalidConfig, message)
 }
 
 /**
@@ -60,7 +62,9 @@ export function createAdapterConfigurationTypeError(message: string, cause?: unk
   return tagRpcError(new TypeError(message, { cause }), RpcCoreErrorCode.invalidConfig)
 }
 
-/** Present actual carrier failures through the existing transport error and original cause chain. */
-export function createAdapterTransportError(...args: Parameters<typeof createRpcTransportError>) {
-  return createRpcTransportError(...args)
+/** Preserve the native transport diagnostic/cause without granting private live control identity. */
+export function createAdapterTransportError(
+  ...args: ConstructorParameters<typeof RpcTransportError>
+) {
+  return new RpcTransportError(...args)
 }

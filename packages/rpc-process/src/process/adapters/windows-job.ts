@@ -1,4 +1,4 @@
-import { RPC_PROCESS_ERROR_SOURCE } from '@migaia/rpc-core/adapter/diagnostics'
+import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
 import { RpcProcessErrorText } from '../error-text.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { CapabilityLevel, StandardCapability } from '@migaia/supervision'

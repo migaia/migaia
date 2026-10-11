@@ -2,7 +2,7 @@ import { createManualScheduler } from '@migaia/utils/scheduler'
 import type { IPluginDependencyPlan, IPluginRemoval } from '@migaia/plugin-host'
 import { describe, expect, it, vi } from 'vitest'
 import { createProcessResilience } from '@migaia/rpc-process'
-import type { IProcessDependencyHostPort } from '@migaia/rpc-core/adapter/process'
+import type { IProcessDependencyHostPort } from '@migaia/rpc-process'
 import type { IProcessRegistrationBinding } from '@migaia/rpc-process'
 
 /** One fake terminal source preserves supervision's own zero-minute report. */

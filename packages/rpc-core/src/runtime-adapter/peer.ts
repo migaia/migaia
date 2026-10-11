@@ -22,8 +22,13 @@ import { createRpcError, RpcCoreErrorCode } from '../core/errors.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
 import { RuntimeApiErrorText } from '../remote/runtime-api/constants.js'
+import { assertRuntimeTransferDisabled } from '../core/internal/runtime-call-options.js'
 import type { IRemoteBinding, IRemoteChannel, IRemoteServeEndpoint } from '../remote/types.js'
 import type { ISupervisor } from '@migaia/supervision'
+import type { IRpcHandshakeOffer } from '@migaia/rpc-contract'
+import { createAdapterListenerPreparation, type IAdapterListenerPreparation } from './listener.js'
+import { createAdapterBytePeer, type IAdapterBytePeerOptions } from './byte/peer.js'
+import type { IRuntimeByteIO } from './byte/types.js'
 
 /** Adapter deployment objects are ordinary configuration; resource factories remain adapter-owned. */
 export type IAdapterPeerOptions = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> &
@@ -54,6 +59,8 @@ class AdapterPeerPreparation {
   readonly #selectedSelf: IRuntimePeerIdentity | undefined
   /** Every launch under this preparation shares one Core-generated local provider namespace. */
   #providerId: string | undefined
+  /** A fixed narrowing view shares this preparation's identity/namespace without another validation. */
+  #withoutTransfer: IAdapterPeerPreparation | undefined
 
   /** Validate the default before any native acquisition and retain only Core's original context. */
   constructor(
@@ -162,11 +169,21 @@ class AdapterPeerPreparation {
     binding: IAdapterManagedBinding<TUnit, TSpec>,
     execution?: ISupervisor<unknown, unknown>
   ) {
+    return this.#managed(options, binding, execution, this.#preparation)
+  }
+
+  /** Only Core's opaque views select a genuine context for the same held managed resources. */
+  #managed<TUnit, TSpec>(
+    options: Parameters<typeof createManagedRuntimePeer<TUnit, TSpec>>[0],
+    binding: IAdapterManagedBinding<TUnit, TSpec>,
+    execution: ISupervisor<unknown, unknown> | undefined,
+    preparation: IRuntimePreparationContext | undefined
+  ) {
     return createManagedRuntimePeer(
       options,
       binding,
       binding.bindEndpoint,
-      this.#preparation,
+      preparation,
       binding.drainCurrent ? () => binding.drainCurrent!() : undefined,
       execution
     )
@@ -177,15 +194,73 @@ class AdapterPeerPreparation {
    * options.
    */
   peer(options: IRuntimePeerOptions, resource?: IAdapterMessageResource) {
+    return this.#peer(options, resource, this.#preparation)
+  }
+
+  /** Validate an ordinary local proposal against this preparation's actual compiled local roots. */
+  validateOffer(offer: IRpcHandshakeOffer): void {
+    /** This comparison preserves the original local identity/subset admission and error identity. */
+    const context = this.context
+    if (
+      offer.peer.id !== context.self.instanceId ||
+      offer.capabilities.some((value) => !context.capabilities.includes(value))
+    )
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
+  }
+
+  /**
+   * Prepare the original listener directory and sessions while Core retains its genuine Host
+   * context.
+   */
+  listener(localOffer: readonly string[]): IAdapterListenerPreparation {
+    return this.#listener(localOffer, this.#preparation)
+  }
+
+  /** Only Core's narrowing views may select a genuine listener context for the original options. */
+  #listener(
+    localOffer: readonly string[],
+    preparation: IRuntimePreparationContext | undefined
+  ): IAdapterListenerPreparation {
+    /**
+     * Keep the original listener option subset; retry/key/execution policies remain with their
+     * owner.
+     */
+    const options: IRuntimePeerOptions = {
+      self: this.context.self,
+      provide: this.#options.provide,
+      providerLimits: this.#options.providerLimits,
+      defaultTimeoutMs: this.#options.defaultTimeoutMs,
+      contract: this.#options.contract,
+      endpointFactory: this.#options.endpointFactory,
+      report: this.#options.report
+    }
+    return createAdapterListenerPreparation(options, localOffer, preparation)
+  }
+
+  /** Consume Core's original first-frame snapshot on the actual held byte input. */
+  bytePeer(options: IRuntimePeerOptions, io: IRuntimeByteIO, local: IAdapterBytePeerOptions) {
+    return createAdapterBytePeer(options, io, local, this.#preparation)
+  }
+
+  /** A narrowing view preserves context across copied options without exposing a context input. */
+  #peer(
+    options: IRuntimePeerOptions,
+    resource: IAdapterMessageResource | undefined,
+    preparation: IRuntimePreparationContext | undefined
+  ) {
     if (!resource)
-      return withRuntimePreparationContext(options, this.#preparation ?? {}, () =>
+      return withRuntimePreparationContext(options, preparation ?? {}, () =>
         createRuntimePeer(options)
       )
-    return this.#resourcePeer(options, resource)
+    return this.#resourcePeer(options, resource, preparation)
   }
 
   /** Native automatic preparation reads only this Core resource's actual initial message. */
-  async #resourcePeer(options: IRuntimePeerOptions, resource: IAdapterMessageResource) {
+  async #resourcePeer(
+    options: IRuntimePeerOptions,
+    resource: IAdapterMessageResource,
+    context: IRuntimePreparationContext | undefined
+  ) {
     /** Only the exact Core resource can transfer cold capture and actual launch metadata. */
     const preparation = readAdapterMessagePreparation(resource)
     if (!preparation)
@@ -245,7 +320,7 @@ class AdapterPeerPreparation {
           })
         }
       }
-      return await withRuntimePreparationContext(peerOptions, this.#preparation ?? {}, () =>
+      return await withRuntimePreparationContext(peerOptions, context ?? {}, () =>
         createRuntimePeer(peerOptions, {
           bootstrap: preparation,
           generation: preparation.generation
@@ -264,10 +339,69 @@ class AdapterPeerPreparation {
       throw primary
     }
   }
+
+  /**
+   * Disable only transfer on this preparation's real operations, before caller getter/payload
+   * capture.
+   */
+  withoutTransfer(): IAdapterPeerPreparation {
+    if (this.#withoutTransfer) return this.#withoutTransfer
+    /** This context is copied only from Core's genuine original Host preparation, never caller DTOs. */
+    const context: IRuntimePreparationContext = {
+      ...this.#preparation,
+      restrictTransfer: assertRuntimeTransferDisabled
+    }
+    /** Fixed view operations close over the genuine context and reuse the original lazy namespace. */
+    const view = Object.freeze(
+      Object.defineProperties(
+        {
+          readProvide: (fallback: IRuntimePeerOptions['provide']) =>
+            context.readProvide?.() ?? fallback,
+          own: (resource: Readonly<{ close(): Promise<void> }>) =>
+            context.own?.(() => resource.close()),
+          launch: <TSpec, TRequest extends Readonly<{ executionGeneration?: number }>, THandle>(
+            launcher: Readonly<{ launch(spec: TSpec, request: TRequest): Promise<THandle> }>,
+            spec: TSpec,
+            request: TRequest,
+            childName?: string
+          ) => this.launch(launcher, spec, request, childName),
+          launcher: <
+            TLauncher extends Readonly<{ launch(spec: never, request: never): Promise<unknown> }>
+          >(
+            launcher: TLauncher,
+            childName?: string
+          ) => this.launcher(launcher, childName),
+          managed: <TUnit, TSpec>(
+            options: Parameters<typeof createManagedRuntimePeer<TUnit, TSpec>>[0],
+            binding: IAdapterManagedBinding<TUnit, TSpec>,
+            execution?: ISupervisor<unknown, unknown>
+          ) => this.#managed(options, binding, execution, context),
+          peer: (options: IRuntimePeerOptions, resource?: IAdapterMessageResource) =>
+            this.#peer(options, resource, context),
+          validateOffer: (offer: IRpcHandshakeOffer) => this.validateOffer(offer),
+          listener: (offer: readonly string[]) => this.#listener(offer, context),
+          bytePeer: (
+            options: IRuntimePeerOptions,
+            io: IRuntimeByteIO,
+            local: IAdapterBytePeerOptions
+          ) => createAdapterBytePeer(options, io, local, context),
+          withoutTransfer: () => view
+        },
+        {
+          context: { get: () => this.context, enumerable: true },
+          initialSignal: { get: () => context.initialSignal, enumerable: true },
+          lifecycleSignal: { get: () => context.lifecycleSignal, enumerable: true }
+        }
+      )
+    ) as IAdapterPeerPreparation
+    return (this.#withoutTransfer = view)
+  }
 }
 
 /** Opaque preparation exposes resource operations and local proposal data, not context writers. */
-export type IAdapterPeerPreparation = AdapterPeerPreparation
+export type IAdapterPeerPreparation = Readonly<
+  Pick<AdapterPeerPreparation, keyof AdapterPeerPreparation>
+>
 
 /** Prepare a source from ordinary options; the Core-owned object is the only context carrier. */
 export function prepareAdapterPeer(

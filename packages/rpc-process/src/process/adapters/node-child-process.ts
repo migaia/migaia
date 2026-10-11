@@ -1,4 +1,5 @@
-import { RPC_PROCESS_ERROR_SOURCE, IpcReporterContext } from '@migaia/rpc-core/adapter/diagnostics'
+import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
+import { IpcReporterContext } from '@migaia/rpc-core/adapter'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -11,16 +12,16 @@ import {
   type IProcessHandle,
   type IProcessLauncher
 } from '@migaia/supervision/process'
-import { receiveAdapterBootstrap } from '@migaia/rpc-core/adapter'
+import { receiveAdapterBootstrap } from '../bootstrap.js'
 import { RpcProcessErrorCode } from '../error-code.js'
 
 import { RpcProcessErrorText } from '../error-text.js'
 import type { IProcessByteChannel } from '../types.js'
 import type { IRuntimePeerIdentity } from '@migaia/rpc-core/remote'
-import { createAdapterNodeProcessLaunch } from '@migaia/rpc-core/adapter/process/node'
-import type { IProcessRuntimeBootstrapOptions } from '@migaia/rpc-core/adapter/process'
+import { createAdapterNodeProcessLaunch } from '../node-launch.js'
+import type { IProcessRuntimeBootstrapOptions } from '../runtime-bootstrap.js'
 import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION } from '../constants.js'
-import { createAdapterProcessStdio, type IAdapterChildStdio } from '@migaia/rpc-core/adapter/node'
+import { createAdapterProcessStdio, type IAdapterChildStdio } from '../node-io.js'
 import { sampleNativeProcess } from './native-usage.js'
 
 /** A Node handle exposes stdout/stdin only when the specification chose byte channels. */
@@ -218,3 +219,8 @@ export async function openProcessStdioChannel(
   const channel = createAdapterProcessStdio(process)
   return receiveAdapterBootstrap(channel, options.bootstrap, options)
 }
+
+/** Moved former Core Node operations remain available through this owning native public entry. */
+export { createAdapterNodeProcessLaunch } from '../node-launch.js'
+export { createAdapterChildStdio, createAdapterProcessStdio } from '../node-io.js'
+export type { IAdapterChildStdio, IAdapterProcessStdio } from '../node-io.js'

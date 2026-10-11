@@ -1,4 +1,5 @@
-import { RPC_PROCESS_ERROR_SOURCE, IpcReporterContext } from '@migaia/rpc-core/adapter/diagnostics'
+import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
+import { IpcReporterContext } from '@migaia/rpc-core/adapter'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { CapabilityLevel, StandardCapability, type TerminationMode } from '@migaia/supervision'
@@ -10,15 +11,15 @@ import {
 } from '@migaia/supervision/process'
 import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
 import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-core'
-import { receiveAdapterBootstrap } from '@migaia/rpc-core/adapter'
+import { receiveAdapterBootstrap } from '../bootstrap.js'
 import { RpcProcessErrorCode } from '../error-code.js'
 
 import { RpcProcessErrorText } from '../error-text.js'
 import type { IProcessByteChannel } from '../types.js'
 import type { IRuntimePeerIdentity } from '@migaia/rpc-core/remote'
-import { createAdapterProcessLaunch } from '@migaia/rpc-core/adapter/process'
-import { createAdapterWebByteIO } from '@migaia/rpc-core/adapter/web-streams'
-import type { IProcessRuntimeBootstrapOptions } from '@migaia/rpc-core/adapter/process'
+import { createAdapterProcessLaunch } from '../launch.js'
+import { createAdapterWebByteIO } from '../web-byte-stream.js'
+import type { IProcessRuntimeBootstrapOptions } from '../runtime-bootstrap.js'
 import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION } from '../constants.js'
 
 /** Only the Deno APIs used by this deep adapter are typed here. */

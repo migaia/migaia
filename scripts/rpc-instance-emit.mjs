@@ -33,6 +33,9 @@ export const RPC_RESOURCE_POINTS = {
     'runtime-adapter/byte/event-byte-io.ts': ['createRuntimeEventByteIO'],
     'runtime-adapter/byte/handshake.ts': ['createRuntimeByteConnection'],
     'runtime-adapter/byte/bootstrap.ts': ['readRuntimeByteBootstrap'],
+    'runtime-adapter/byte/peer.ts': ['createAdapterBytePeer'],
+    'runtime-adapter/message/connection.ts': ['createRuntimeMessageConnection'],
+    'runtime-adapter/listener.ts': ['createAdapterListenerPreparation'],
     'runtime-adapter/byte/ipc-connection.ts': ['attachIpcConnection'],
     'runtime-adapter/object/connection.ts': ['holdAdapterObjectChannel'],
     'runtime-adapter/provider/governor.ts': ['createRuntimeProviderGovernor'],
@@ -47,15 +50,6 @@ export const RPC_RESOURCE_POINTS = {
       'createAdapterPlugin',
       'holdAdapterRegistration'
     ],
-    'adapter-node.ts': [
-      'createAdapterChildStdio',
-      'createAdapterProcessStdio',
-      'createAdapterSocketByteIO'
-    ],
-    'adapter-web-streams.ts': ['createAdapterWebByteIO'],
-    'adapter-owned/process/launch.ts': ['AdapterProcessLaunch', 'createAdapterProcessLaunch'],
-    'adapter-process-node.ts': ['createAdapterNodeProcessLaunch'],
-
     'core/composed.ts': ['createComposedEndpointRuntime'],
     'core/runtime-api-endpoint.ts': ['createRuntimeApiEndpoint'],
     'core/client.ts': ['createClientEndpointRuntime'],
@@ -92,40 +86,41 @@ export const RPC_RESOURCE_POINTS = {
     'remote/runtime-api/managed-peer.ts': ['createManagedRuntimePeer'],
     'remote/runtime-api/outlet.ts': ['createRuntimeOutlet'],
     'remote/runtime-api/events.ts': ['createRuntimeEventPublisher'],
-    'testing/index.ts': ['createPeerPair'],
-    'adapter-owned/process/handshake.ts': ['createAdapterChannel'],
-    'adapter-owned/process/channel.ts': ['bindProcessByteWire', 'bindProcessMessageTransport'],
-    'adapter-owned/process/ipc-connection.ts': ['attachIpcConnection'],
-    'adapter-owned/process/stderr.ts': ['attachIpcStderr'],
-    'adapter-owned/process/node-byte-stream.ts': ['nodeByteStream'],
-    'adapter-owned/process/web-byte-stream.ts': ['webByteStream'],
-    'adapter-owned/process/bootstrap.ts': ['receiveAdapterBootstrap'],
-    'adapter-owned/process/peer.ts': ['createAdapterProcessPeer'],
-    'adapter-owned/process/runtime-peer.ts': ['createProcessSourcePeer'],
-    'adapter-owned/process/runtime-listener.ts': ['createProcessListenerPeer'],
-    'adapter-owned/process/automatic-peer.ts': ['createAutomaticProcessPeer'],
-    'adapter-owned/process/plugin/client.ts': ['createAdapterProcessPlugin'],
-    'adapter-owned/process/plugin/binding.ts': [
+    'testing/index.ts': ['createPeerPair']
+  },
+  '@migaia/rpc-process': {
+    'process/node-io.ts': [
+      'createAdapterChildStdio',
+      'createAdapterProcessStdio',
+      'createAdapterSocketByteIO'
+    ],
+    'process/node-launch.ts': ['createAdapterNodeProcessLaunch'],
+    'process/launch.ts': ['AdapterProcessLaunch', 'createAdapterProcessLaunch'],
+    'process/web-byte-stream.ts': ['webByteStream', 'createAdapterWebByteIO'],
+    'process/node-byte-stream.ts': ['nodeByteStream'],
+    'process/bootstrap.ts': ['receiveAdapterBootstrap'],
+    'process/peer.ts': ['createAdapterProcessPeer', 'createProcessPeer'],
+    'process/runtime-peer.ts': ['createProcessSourcePeer'],
+    'process/runtime-listener.ts': ['createProcessListenerPeer'],
+    'process/automatic-peer.ts': ['createAutomaticProcessPeer'],
+    'process/plugin/operation.ts': ['createAdapterProcessPlugin'],
+    'process/plugin/binding.ts': [
       'createSpawnProcessBinding',
       'createProcessConnectionSupervisor',
       'createConnectProcessBinding'
     ],
-    'adapter-owned/process/plugin/serve.ts': [
-      'serveProcessSessions',
-      'createProcessSessionService'
-    ],
-    'adapter-owned/process/host/adopted-binding.ts': ['createAdoptedProcessBinding'],
-    'adapter-owned/process/host/registration.ts': ['adoptHostRegistration'],
-    'adapter-owned/process/resilience/index.ts': ['createProcessResilience'],
-    'adapter-owned/process/resilience/session.ts': ['createProcessSessionManager'],
-    'adapter-owned/process/resilience/provider-admission.ts': ['createProcessProviderAdmission'],
-    'adapter-owned/process/resilience/rendezvous.ts': ['listenProcessRegistrations'],
-    'adapter-owned/process/resilience/fallback.ts': ['createProcessInstanceFallback'],
-    'adapter-owned/process/resilience/terminal.ts': ['createProcessTerminalRegistration']
-  },
-  '@migaia/rpc-process': {
+    'process/plugin/serve.ts': ['serveProcessSessions', 'createProcessSessionService'],
+    'process/host/adopted-binding.ts': ['createAdoptedProcessBinding'],
+    'process/host/registration.ts': ['adoptHostRegistration'],
+    'process/resilience/index.ts': ['createProcessResilience'],
+    'process/resilience/session.ts': ['createProcessSessionManager'],
+    'process/resilience/provider-admission.ts': ['createProcessProviderAdmission'],
+    'process/resilience/rendezvous.ts': ['listenProcessRegistrations'],
+    'process/resilience/fallback.ts': ['createProcessInstanceFallback'],
+    'process/resilience/terminal.ts': ['createProcessTerminalRegistration'],
+    'process/stderr.ts': ['attachIpcStderr'],
+    'process/object-channel.ts': ['openProcessObjectChannel'],
     'process/handshake.ts': ['createProcessTransport'],
-    'process/peer.ts': ['createProcessPeer'],
     'process/plugin/client.ts': ['createProcessPlugin'],
     'process/adapters/node-child-process.ts': [
       'createNodeProcessLauncher',
