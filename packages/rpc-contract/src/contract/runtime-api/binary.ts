@@ -157,8 +157,10 @@ export function restoreRpcBinary(
 }
 
 /**
- * A receive owner selects this entry only for its actual canonical JSON/native clone decoder
- * output.
+ * Restore only canonical codec output selected by its receive owner from actual provenance. Reading
+ * own enumerable properties executes getters; this entry does not accept or validate
+ * caller-constructed objects. Use `restoreRpcBinary` for strict object validation. Binary digest,
+ * error identity and Promise scheduling remain with the canonical restore owner.
  */
 export function restoreRpcBinaryDecoded(
   value: unknown,

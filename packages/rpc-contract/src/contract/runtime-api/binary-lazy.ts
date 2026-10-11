@@ -92,7 +92,12 @@ export function restoreRpcBinaryLazy(
   )
 }
 
-/** Preserve the same cold/warm Promise schedule for actual codec-decoded metadata. */
+/**
+ * Restore only canonical codec output while preserving the existing cold/warm Promise schedule.
+ * Reading own enumerable properties executes getters; this entry does not accept or validate
+ * caller-constructed objects. Use this subpath's `restoreRpcBinary` strict entry instead. The
+ * receive owner must select this entry from the actual canonical decoder's provenance.
+ */
 export function restoreRpcBinaryDecodedLazy(
   value: unknown,
   storage: RpcBinaryStorage,

@@ -86,11 +86,11 @@ for (const carrier of ['stdio-framed', 'worker'] as const) {
       20,
       '[BC11] Core captures each logical request exactly once'
     )
-    assert.equal(
-      observed.runtimeEnvelope,
-      40,
-      '[D19] only outgoing and untrusted incoming admission'
-    )
+    /**
+     * H1 removes owned outbound re-normalization, reducing union admissions per request from 2 to
+     * 1.
+     */
+    assert.equal(observed.runtimeEnvelope, 20, '[D19] only untrusted incoming union admission')
     assert.equal(observed.binaryPrepare, 0, '[K272] scalar calls do not prepare binary manifests')
     assert.equal(
       observed.materialize,
@@ -139,10 +139,11 @@ it('[A37][D19] canonical runtime sender does not normalize its owned envelope ag
   })
   const observed = JSON.parse(result.stdout) as { requests: number; runtimeEnvelope: number }
   assert.equal(observed.requests, 20)
+  /** H1 removes owned outbound re-normalization, reducing union admissions per request from 2 to 1. */
   assert.equal(
     observed.runtimeEnvelope,
-    40,
-    '[D19] each request has one outbound snapshot and one untrusted inbound admission'
+    20,
+    '[D19] each request has one untrusted inbound admission after owned header construction'
   )
 })
 

@@ -2599,6 +2599,45 @@ const rpcProtocolToolkitGuides = {
     quickStart:
       "import { restoreRpcBinary, RpcBinaryStorage, type IRpcBinaryDigest } from '@migaia/rpc-contract/binary'\n\n/** Restore the actual inline metadata after its carrier admits and authenticates the frame. */\nexport async function restoreInline(manifest: unknown) {\n  return await restoreRpcBinary(manifest, RpcBinaryStorage.inline, [])\n}\n\n/** The carrier supplies the real native sidecars and its actual whole-backing SHA-256 digest. */\nexport async function restoreNative(\n  manifest: unknown, sidecars: readonly ArrayBuffer[], digest: IRpcBinaryDigest\n) {\n  return await restoreRpcBinary(manifest, RpcBinaryStorage.native, sidecars, undefined, digest)\n}\n// Retain the actual backing references; restoration does not create transfer or execution rights."
   }),
+  'rpc-contract:binary:restoreRpcBinaryDecoded': guide({
+    purposeEn:
+      'Restores binary metadata only from canonical codec output, preserving the existing digest and Promise boundary. Reading own enumerable metadata properties executes getters. This entry does not accept or validate caller-constructed objects; use restoreRpcBinary from the same subpath for strict object validation.',
+    purposeZh:
+      '仅恢复 canonical codec 输出中的 binary metadata，保留既有摘要与 Promise 边界。读取自有可枚举 metadata 属性会执行 getter。此入口不接受、不校验调用方构造的对象；严格对象校验使用同一子路径的 restoreRpcBinary。',
+    quickStart: `import { restoreRpcBinaryDecoded, restoreRpcBinary, RpcBinaryStorage } from '@migaia/rpc-contract/binary'
+import { defineJsonCodec } from '@migaia/serialize/codecs/json'
+
+/** Retain the canonical JSON decoder at the actual receive boundary. */
+const codec = defineJsonCodec({ version: 1 })
+
+/** Decode actual received inline metadata before selecting decoded admission. */
+export async function restoreReceivedText(text: string) {
+  return await restoreRpcBinaryDecoded(codec.decode(text), RpcBinaryStorage.inline, [])
+}
+
+/** Caller-constructed manifests require strict object admission. */
+export async function restoreCallerManifest(manifest: unknown) {
+  return await restoreRpcBinary(manifest, RpcBinaryStorage.inline, [])
+}
+// Native storage also requires the actual sidecars and the owner's whole-backing digest.
+// Codec provenance does not authenticate a carrier or authorize transfer.`,
+    useEn: [
+      'The actual receive owner holds output produced by its canonical JSON or native structured-clone decoder.',
+      'The receiver retains its existing binary budget, sidecars and native whole-backing integrity stage.'
+    ],
+    useZh: [
+      '实际接收 owner 持有 canonical JSON 或原生结构化克隆 decoder 产生的输出。',
+      '接收端需要保留既有 binary 预算、sidecar 与 native 完整 backing 校验阶段。'
+    ],
+    avoidEn: [
+      'Caller-constructed objects or custom codec output require restoreRpcBinary from @migaia/rpc-contract/binary.',
+      'Do not treat metadata admission as authentication, replay admission or transfer permission.'
+    ],
+    avoidZh: [
+      '调用方构造的对象或自定义 codec 输出应使用 @migaia/rpc-contract/binary 的 restoreRpcBinary。',
+      '不能把 metadata 准入当作鉴权、replay 准入或 transfer 权限。'
+    ]
+  }),
   'rpc-contract:binary-inspect:assertRpcNativeBinaryFrameSize': guide({
     ...rpcProtocolGuideContexts.nativeInspection,
     purposeEn:
@@ -2661,6 +2700,45 @@ const rpcProtocolToolkitGuides = {
       'Restores an actual received binary manifest through the canonical decoder after cold loading. It preserves the original asynchronous integrity stage and transferred backing identities; the carrier still owns authentication, admission and closure.',
     purposeZh:
       '冷加载后通过规范 decoder 恢复实际收到的 binary manifest，保留原异步完整性阶段与传来的 backing 身份。载体继续拥有鉴权、准入和关闭；数据恢复不授予运行时权限。'
+  }),
+  'rpc-contract:binary-lazy:restoreRpcBinaryDecoded': guide({
+    purposeEn:
+      'Restores binary metadata only from canonical codec output while allowing cold codec loading. Reading own enumerable metadata properties executes getters. This entry does not accept or validate caller-constructed objects; use restoreRpcBinary from the same lazy subpath for strict object validation.',
+    purposeZh:
+      '仅恢复 canonical codec 输出中的 binary metadata，并允许冷加载 codec。读取自有可枚举 metadata 属性会执行 getter。此入口不接受、不校验调用方构造的对象；严格对象校验使用同一 lazy 子路径的 restoreRpcBinary。',
+    quickStart: `import { restoreRpcBinaryDecoded, restoreRpcBinary, RpcBinaryStorage } from '@migaia/rpc-contract/binary/lazy'
+import { defineJsonCodec } from '@migaia/serialize/codecs/json'
+
+/** Keep the canonical JSON decoder owned by this receive boundary. */
+const codec = defineJsonCodec({ version: 1 })
+
+/** Continue at the receiver's existing asynchronous binary restoration stage. */
+export async function restoreReceivedText(text: string) {
+  return await restoreRpcBinaryDecoded(codec.decode(text), RpcBinaryStorage.inline, [])
+}
+
+/** Caller-constructed manifests still use the strict lazy entry. */
+export async function restoreCallerManifest(manifest: unknown) {
+  return await restoreRpcBinary(manifest, RpcBinaryStorage.inline, [])
+}
+// Native storage also requires the actual sidecars and the owner's whole-backing digest.
+// Loading the codec does not create authentication or transfer permission.`,
+    useEn: [
+      'The receive owner has actual canonical decoder output and needs the existing cold binary codec path.',
+      'The receiver retains the original asynchronous restoration and full-backing digest stage.'
+    ],
+    useZh: [
+      '接收 owner 持有真实 canonical decoder 输出，并需要既有冷加载 binary codec 路径。',
+      '接收端需要保留原异步恢复与完整 backing 摘要阶段。'
+    ],
+    avoidEn: [
+      'Caller-constructed objects or custom codec output require restoreRpcBinary from @migaia/rpc-contract/binary/lazy.',
+      'Cold loading and successful data restoration do not authorize authentication, replay or transfer.'
+    ],
+    avoidZh: [
+      '调用方构造的对象或自定义 codec 输出应使用 @migaia/rpc-contract/binary/lazy 的 restoreRpcBinary。',
+      '冷加载与数据恢复成功不能授予鉴权、replay 或 transfer 权限。'
+    ]
   }),
   'rpc-contract:errors:deserializeRpcError': guide({
     ...rpcProtocolGuideContexts.errors,
@@ -2818,6 +2896,44 @@ const rpcProtocolToolkitGuides = {
     purposeZh:
       '在原 parser 边界同步验证完整 runtime envelope union，并快照业务 slot。返回规范 runtime envelope 或原生编码错误；在 dispatch 接触应用状态前完成，不替调用方改变控制权。'
   }),
+  'rpc-contract:runtime:normalizeRuntimeEnvelopeDecoded': guide({
+    purposeEn:
+      'Synchronously normalizes the runtime union only from canonical codec output. Reading own enumerable metadata properties executes getters. This entry does not accept or validate caller-constructed objects; use normalizeRuntimeEnvelope from the same subpath for strict object validation.',
+    purposeZh:
+      '仅从 canonical codec 输出同步归一化 runtime union。读取自有可枚举 metadata 属性会执行 getter。此入口不接受、不校验调用方构造的对象；严格对象校验使用同一子路径的 normalizeRuntimeEnvelope。',
+    quickStart: `import { normalizeRuntimeEnvelopeDecoded, normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime'
+import { defineJsonCodec } from '@migaia/serialize/codecs/json'
+
+/** The receive owner retains the actual canonical JSON decoder. */
+const codec = defineJsonCodec({ version: 1 })
+
+/** Select decoded admission only for the decoder's actual output. */
+export function receiveRuntimeText(text: string) {
+  return normalizeRuntimeEnvelopeDecoded(codec.decode(text))
+}
+
+/** Validate caller-constructed objects through the strict entry. */
+export function admitCallerObject(value: unknown) {
+  return normalizeRuntimeEnvelope(value)
+}
+// Canonical decoding proves data provenance, not authentication or execution permission.`,
+    useEn: [
+      'The actual receive owner has output from its canonical JSON or native structured-clone decoder.',
+      'The receiver needs the shared runtime union and native error boundary without a new asynchronous stage.'
+    ],
+    useZh: [
+      '实际接收 owner 持有 canonical JSON 或原生结构化克隆 decoder 的输出。',
+      '接收端需要共享 runtime union 与原生错误边界，且不增加异步阶段。'
+    ],
+    avoidEn: [
+      'Caller-constructed objects or custom codec output require normalizeRuntimeEnvelope from @migaia/rpc-contract/runtime.',
+      'Do not use normalization to claim authenticated identity, replay admission or provider execution.'
+    ],
+    avoidZh: [
+      '调用方构造的对象或自定义 codec 输出应使用 @migaia/rpc-contract/runtime 的 normalizeRuntimeEnvelope。',
+      '不能用归一化声称已鉴权身份、replay 准入或 provider 执行权限。'
+    ]
+  }),
   'rpc-contract:runtime:normalizeRuntimeGeneration': guide({
     ...rpcProtocolGuideContexts.runtimeData,
     purposeEn:
@@ -2853,12 +2969,87 @@ const rpcProtocolToolkitGuides = {
     purposeZh:
       '在保留原 protection output 值类别的同时附加固定 parser selector，返回供既有接收端使用的 carrier 数据。不会创建 batch、replay、codec 或执行授信事实。'
   }),
+  'rpc-contract:runtime-metadata:createRuntimeCallEnvelope': guide({
+    purposeEn:
+      "Constructs one outgoing call from the actual owner's typed route, task, id and options. It reuses canonical field validation in the existing order, admits the payload last and freezes new snapshots without freezing caller inputs. It does not grant transport, generation or execution authority.",
+    purposeZh:
+      '用实际 owner 提供的 typed route、task、id 与 options 构造一个出站 call。按既有顺序复用规范字段校验，最后接纳 payload，并冻结新快照而不冻结调用方输入。此操作不授予 transport、generation 或执行权限。',
+    quickStart: `import { createRuntimeCallEnvelope, type IRpcRuntimeCallHeader } from '@migaia/rpc-contract/runtime/metadata'
+import { normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime'
+import type { IRpcPortableValue } from '@migaia/rpc-contract'
+
+/** The route and generation owners supply their real held header fields. */
+export function createOutgoingCall(header: IRpcRuntimeCallHeader, payload?: IRpcPortableValue) {
+  return createRuntimeCallEnvelope(header, payload)
+}
+
+/** Received or arbitrary object input requires the complete strict union parser. */
+export function admitReceivedEnvelope(value: unknown) {
+  return normalizeRuntimeEnvelope(value)
+}
+// Construction does not allocate a provider, authenticate a peer or authorize a send.`,
+    useEn: [
+      'An outgoing protocol owner already holds the typed call header and its actual route and generation facts.',
+      'The owner needs canonical call field validation and one payload snapshot before its existing send stage.'
+    ],
+    useZh: [
+      '出站协议 owner 已持有 typed call header 及真实 route 与 generation 事实。',
+      'owner 需要在既有发送阶段前进行规范 call 字段校验，并只快照一次 payload。'
+    ],
+    avoidEn: [
+      'Received or arbitrary objects require normalizeRuntimeEnvelope from @migaia/rpc-contract/runtime.',
+      'Do not construct group, control or outcome variants with this call-only operation.'
+    ],
+    avoidZh: [
+      '收到的或任意对象应使用 @migaia/rpc-contract/runtime 的 normalizeRuntimeEnvelope。',
+      '此操作仅构造 call，不能用于构造 group、control 或 outcome variant。'
+    ]
+  }),
   'rpc-contract:runtime-lazy:normalizeRuntimeEnvelope': guide({
     ...rpcProtocolGuideContexts.lazyParsing,
     purposeEn:
       'Normalizes the same complete runtime-envelope union while letting only its actual stream branch cold-load the canonical parser. It returns the existing synchronous value or a Promise at that cold boundary; rejection retains the original cause.',
     purposeZh:
       '归一化同一完整 runtime envelope union，仅让实际 stream 分支冷加载规范 parser。返回既有同步值，或在该冷边界返回 Promise；拒绝保留原 cause，不为普通 scalar 分支制造异步加载。'
+  }),
+  'rpc-contract:runtime-lazy:normalizeRuntimeEnvelopeDecoded': guide({
+    purposeEn:
+      'Normalizes the runtime union only from canonical codec output; an actual cold stream branch may return a Promise. Reading own enumerable metadata properties executes getters. This entry does not accept or validate caller-constructed objects; use normalizeRuntimeEnvelope from the same lazy subpath for strict object validation.',
+    purposeZh:
+      '仅从 canonical codec 输出归一化 runtime union；实际冷 stream 分支可能返回 Promise。读取自有可枚举 metadata 属性会执行 getter。此入口不接受、不校验调用方构造的对象；严格对象校验使用同一 lazy 子路径的 normalizeRuntimeEnvelope。',
+    quickStart: `import { normalizeRuntimeEnvelopeDecoded, normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime/lazy'
+import { defineJsonCodec } from '@migaia/serialize/codecs/json'
+
+/** The canonical decoder remains owned by the actual receive boundary. */
+const codec = defineJsonCodec({ version: 1 })
+
+/** Await at the receiver's existing continuation when a cold stream parser is needed. */
+export async function receiveRuntimeText(text: string) {
+  return await normalizeRuntimeEnvelopeDecoded(codec.decode(text))
+}
+
+/** Caller-constructed objects use the strict lazy parser. */
+export async function admitCallerObject(value: unknown) {
+  return await normalizeRuntimeEnvelope(value)
+}
+// Scalar branches stay synchronous inside the parser; only a cold stream branch may yield.
+// Successful normalization does not grant authentication or stream lifecycle authority.`,
+    useEn: [
+      'The receive owner holds actual canonical decoder output at an existing asynchronous continuation.',
+      'An actual stream branch needs cold parser loading while scalar normalization keeps its synchronous result.'
+    ],
+    useZh: [
+      '接收 owner 在既有异步 continuation 持有真实 canonical decoder 输出。',
+      '实际 stream 分支需要冷加载 parser，同时 scalar 归一化保留同步结果。'
+    ],
+    avoidEn: [
+      'Caller-constructed objects or custom codec output require normalizeRuntimeEnvelope from @migaia/rpc-contract/runtime/lazy.',
+      'Do not use lazy normalization as sequence, credit, cancellation or iterator cleanup authority.'
+    ],
+    avoidZh: [
+      '调用方构造的对象或自定义 codec 输出应使用 @migaia/rpc-contract/runtime/lazy 的 normalizeRuntimeEnvelope。',
+      '不能把 lazy 归一化当作序列、credit、取消或 iterator cleanup 的控制权。'
+    ]
   }),
   'rpc-contract:runtime-lazy:normalizeStreamPayload': guide({
     ...rpcProtocolGuideContexts.lazyParsing,
