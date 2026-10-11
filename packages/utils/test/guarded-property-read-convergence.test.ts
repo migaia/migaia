@@ -61,7 +61,7 @@ describe('guarded property read convergence', () => {
     const targets = [
       'packages/utils/src/function.ts',
       'packages/rpc-core/src/core/internal/safe-value.ts',
-      'packages/rpc-contract/src/contract/error.ts',
+      'packages/utils/src/error-chain.ts',
       'packages/reactive/src/runtime/runtime.class.ts',
       'packages/reactive/src/runtime/scheduler.class.ts',
       'packages/resource/src/resource.class.ts'

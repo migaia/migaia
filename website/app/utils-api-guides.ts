@@ -1,4 +1,4 @@
-import type { IApiGuide, IGuideLocale } from './api-guides.js'
+import type { IApiGuide, IApiOptionGuide, IGuideLocale } from './api-guides.js'
 
 type IUtilsGuideInput = {
   readonly purposeEn: string
@@ -264,9 +264,418 @@ const safeValueUtilsApiGuides = {
   })
 }
 
+/** One caller-owned policy controls admission, privacy, limits, and native restoration. */
+const errorChainStrategyOption: Readonly<Record<IGuideLocale, IApiOptionGuide>> = {
+  en: {
+    name: 'strategy',
+    type: 'IErrorChainStrategy',
+    optional: true,
+    defaultValue: '{}',
+    description:
+      'The default fields are source, code, name, message, stack, cause, errors, data, and truncated. Keep the first five fields in that order in a custom whitelist; excluded optional fields are not read. limits defaults to maxNesting 32, maxNodes 128, maxBytes 65536, maxStringBytes 4096, and maxObjects 10000. Bytes count UTF-8 text units, including data keys and text, rather than the complete JSON encoding. sanitizeText owns redaction and returns value, bytes, and changed; the default only repairs lone surrogates and bounds text. presentation selects public code/message by the exact local object and hides descendants unless preserveSerializedError is true. fallback supplies unknown/UNKNOWN/Error and non-error value thrown. normalizeData, dataTextLeaf, and extensions own portable data and extension admission. createError selects native restoration; attachIdentity attaches diagnostic source/code; createViolation owns validation errors. These trusted callbacks never turn received identity into local control authority.',
+    whenToUse:
+      'Set only the policy needed by your boundary. RPC callers use rpc-contract public functions and its existing strategy.'
+  },
+  zh: {
+    name: 'strategy',
+    type: 'IErrorChainStrategy',
+    optional: true,
+    defaultValue: '{}',
+    description:
+      '默认字段为 source、code、name、message、stack、cause、errors、data、truncated。自定义白名单须按此顺序保留前五个必填字段；排除的可选字段不会被读取。limits 默认 maxNesting 32、maxNodes 128、maxBytes 65536、maxStringBytes 4096、maxObjects 10000。字节计数覆盖 UTF-8 文本单元及 data 的键与文本，并非完整 JSON 编码长度。sanitizeText 负责脱敏并返回 value、bytes、changed；默认只修复孤立 surrogate 并限制文本长度。presentation 按确切本地对象选择公开 code/message，除非 preserveSerializedError 为 true，否则隐藏其后代。fallback 提供 unknown/UNKNOWN/Error 与 non-error value thrown。normalizeData、dataTextLeaf、extensions 负责可移植数据和扩展准入。createError 选择原生类还原；attachIdentity 附加诊断 source/code；createViolation 定义校验错误。这些可信回调不能把收到的身份变成本地控制权限。',
+    whenToUse: '只配置边界确实需要的策略。RPC 调用方使用 rpc-contract 公开函数及其既有策略。'
+  }
+}
+
+/** Send and reachability failures preserve the exact caught value through reporting or cause. */
+const errorChainSendOption: Readonly<Record<IGuideLocale, IApiOptionGuide>> = {
+  en: {
+    name: 'options',
+    type: 'ISerializeErrorChainOptions',
+    optional: true,
+    defaultValue: '{}',
+    description:
+      'report receives { pointer, field, error } for caught getter or portable-data failures and retains the exact thrown value. Serialization marks the affected output truncated and continues when a reporter handles it. Traversal reports failed reads and continues along available edges. Without report, the default throws a TypeError with source @migaia/utils, code ERROR_CHAIN_INVALID, pointer, violation, and the original value on cause. A reporter failure propagates to the caller.',
+    whenToUse:
+      'Provide a real diagnostic sink when a partial result is useful; otherwise let the violation propagate.'
+  },
+  zh: {
+    name: 'options',
+    type: 'ISerializeErrorChainOptions',
+    optional: true,
+    defaultValue: '{}',
+    description:
+      'report 接收 getter 或可移植数据读取失败的 { pointer, field, error }，其中 error 保留确切抛出值。报告后序列化把受影响输出标为 truncated 并继续；遍历在报告读取失败后沿可用边继续。未配置 report 时，默认抛出带 source @migaia/utils、code ERROR_CHAIN_INVALID、pointer、violation 的 TypeError，原值保留在 cause。report 自身失败会向调用方传播。',
+    whenToUse: '部分结果仍有用途时接入实际诊断出口；否则让校验错误向调用方传播。'
+  }
+}
+
+/** Receive policy rejects unknown fields unless a boundary explicitly admits a migration drop. */
+const errorChainReceiveOption: Readonly<Record<IGuideLocale, IApiOptionGuide>> = {
+  en: {
+    name: 'options',
+    type: 'INormalizeErrorChainOptions',
+    optional: true,
+    defaultValue: '{ unknownFields: "reject" }',
+    description:
+      'unknownFields defaults to reject. Select ignore only when the boundary intentionally drops unlisted own fields; onUnknownField(pointer, field) observes each dropped field. Required fields, non-empty source/code/name/stack, scalar-safe text, finite plain data, non-empty errors arrays, cycles, and tree/text budgets are still validated. Cause adds one nesting level; errors adds the array and entry levels. The first invalid field raises the strategy violation; by default it is ERROR_CHAIN_INVALID with the received value or failed getter on cause.',
+    whenToUse:
+      'Keep strict validation for ordinary receive paths; use ignore with an observation callback for a documented compatibility boundary.'
+  },
+  zh: {
+    name: 'options',
+    type: 'INormalizeErrorChainOptions',
+    optional: true,
+    defaultValue: '{ unknownFields: "reject" }',
+    description:
+      'unknownFields 默认为 reject。只有边界明确丢弃白名单外的自有字段时才选择 ignore；onUnknownField(pointer, field) 观察每个被丢弃的字段。必填字段、非空 source/code/name/stack、合法 Unicode 文本、有限纯数据、非空 errors 数组、循环及树和文本预算仍会校验。cause 增加一层深度；errors 增加数组与元素两层。首个无效字段触发策略定义的错误；默认是 ERROR_CHAIN_INVALID，收到的值或读取失败的确切抛出值保留在 cause。',
+    whenToUse: '普通接收路径保持严格校验；只有已说明的兼容边界才使用 ignore 并接入观察回调。'
+  }
+}
+
+/** Five generic error capabilities have independent bilingual guides and executable examples. */
+const errorChainGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> = {
+  serializeErrorChain: {
+    en: {
+      purpose:
+        'Projects an unknown thrown value into a fresh frozen error tree. It preserves available source/code/name/message/stack and bounded cause/errors reachability without mutating the original graph; cleanupErrors entries join the serialized errors array. maxNodes counts tree occurrences, including repeated shared children. Cycles and exceeded child budgets produce truncated output; a root whose own text exceeds maxBytes throws. No receiver stack is generated here, and privacy requires an explicit strategy.',
+      quickStart: `import { attachErrorIdentity, sanitizeErrorText, serializeErrorChain } from '@migaia/utils/error'
+
+/** Keep the local error for local handling; only this snapshot crosses the boundary. */
+const failure = attachErrorIdentity(new TypeError('request failed token=private'), {
+  source: '@example/orders', code: 'INVALID_ORDER'
+})
+const snapshot = serializeErrorChain(failure, {
+  limits: { maxStringBytes: 256 },
+  /** Redact every text unit, including stack and data keys, before counting bytes. */
+  sanitizeText(value, truncate) {
+    const redacted = value.replace(/token=[^\\s]+/g, 'token=<redacted>')
+    const text = sanitizeErrorText(redacted, 256, truncate)
+    return { ...text, changed: text.changed || redacted !== value }
+  }
+}, { report: event => console.error('error snapshot failed', event.pointer, event.field, event.error) })
+console.log(snapshot.message, snapshot.truncated) // request failed token=<redacted>, true
+console.log(JSON.stringify(snapshot)) // Consume the frozen snapshot in a text-only sink.
+console.log(failure.message) // request failed token=private: local input stays unchanged.`,
+      scenarios: [
+        'A worker, storage, or diagnostic boundary needs one bounded immutable snapshot of an error graph.',
+        'The boundary owns a text redaction policy and reports failed getters while retaining useful partial evidence.'
+      ],
+      avoidWhen: [
+        'The caller needs original object identity; use reachErrorChain on the local graph instead of serializing it.',
+        'RPC wire fields, jsonrpc mapping, or contract control identities are required; use serializeRpcError from rpc-contract.'
+      ],
+      options: [errorChainStrategyOption.en, errorChainSendOption.en]
+    },
+    zh: {
+      purpose:
+        '把任意抛出值投影为新的冻结错误树。保留可用的 source/code/name/message/stack 与预算内的 cause/errors 可达关系，不修改原图；cleanupErrors 条目合入序列化 errors 数组。maxNodes 按树中出现次数计数，共享子节点重复出现也占预算。循环或子节点超限会产生 truncated 输出；根节点自身文本超过 maxBytes 则抛出错误。此处不会生成接收端 stack；隐私规则须由策略明确指定。',
+      quickStart: `import { attachErrorIdentity, sanitizeErrorText, serializeErrorChain } from '@migaia/utils/error'
+
+/** 本地处理仍使用原 error；只有快照跨越边界。 */
+const failure = attachErrorIdentity(new TypeError('request failed token=private'), {
+  source: '@example/orders', code: 'INVALID_ORDER'
+})
+const snapshot = serializeErrorChain(failure, {
+  limits: { maxStringBytes: 256 },
+  /** 每个文本单元先脱敏，再计数；stack 与 data 键也经过同一规则。 */
+  sanitizeText(value, truncate) {
+    const redacted = value.replace(/token=[^\\s]+/g, 'token=<redacted>')
+    const text = sanitizeErrorText(redacted, 256, truncate)
+    return { ...text, changed: text.changed || redacted !== value }
+  }
+}, { report: event => console.error('快照读取失败', event.pointer, event.field, event.error) })
+console.log(snapshot.message, snapshot.truncated) // request failed token=<redacted>, true
+console.log(JSON.stringify(snapshot)) // 冻结快照交给只接收文本的出口。
+console.log(failure.message) // request failed token=private：本地输入未改变。`,
+      scenarios: [
+        'Worker、存储或诊断边界需要错误图的一份有界不可变快照。',
+        '边界拥有明确文本脱敏规则，并报告 getter 失败，同时保留可用的部分证据。'
+      ],
+      avoidWhen: [
+        '需要原对象身份时，在本地图上使用 reachErrorChain，不把快照当作原 error。',
+        '需要 RPC wire 字段、jsonrpc 映射或 contract 控制身份时，使用 rpc-contract 的 serializeRpcError。'
+      ],
+      options: [errorChainStrategyOption.zh, errorChainSendOption.zh]
+    }
+  },
+  deserializeErrorChain: {
+    en: {
+      purpose:
+        'Validates the whole received tree before restoring native errors. The default preserves TypeError, RangeError, SyntaxError, ReferenceError, URIError, EvalError, AggregateError, and AbortError as DOMException when the host supplies it; other names use Error with the received name. It replaces the constructor stack with the exact received stack. Source/code remain remote diagnostic identity, never local control authority.',
+      quickStart: `import { deserializeErrorChain, reachErrorChain } from '@migaia/utils/error'
+
+/** Received presentation is diagnostic data; it does not authorize local retry or cancellation. */
+const received: unknown = {
+  source: '@example/orders', code: 'INVALID_ORDER', name: 'TypeError',
+  message: 'quantity is invalid', stack: 'TypeError: quantity is invalid\\n    at remote/orders:8',
+  cause: {
+    source: '@example/input', code: 'OUT_OF_RANGE', name: 'RangeError',
+    message: 'quantity must be positive', stack: 'RangeError: quantity must be positive\\n    at remote/input:3'
+  }
+}
+const failure = deserializeErrorChain(received)
+console.log(failure instanceof TypeError) // true
+console.log(failure.cause instanceof RangeError) // true
+console.log(failure.stack) // Received remote/orders trace; no local constructor trace.
+console.log(Reflect.get(failure, 'source'), Reflect.get(failure, 'code')) // @example/orders INVALID_ORDER
+for (const entry of reachErrorChain(failure)) console.error(entry) // Consume both restored failures.`,
+      scenarios: [
+        'A received diagnostic snapshot must regain native instanceof checks and reachable cause/errors entries.',
+        'A receiver reports the remote stack and identity without using them to select privileged local control behavior.'
+      ],
+      avoidWhen: [
+        'The caller needs the exact original object; cross-boundary restoration creates new objects.',
+        'The payload is an RPC envelope or needs contract-local identity handling; use deserializeRpcError from rpc-contract.'
+      ],
+      options: [errorChainStrategyOption.en, errorChainReceiveOption.en]
+    },
+    zh: {
+      purpose:
+        '先校验完整接收树，再还原原生错误。默认保留 TypeError、RangeError、SyntaxError、ReferenceError、URIError、EvalError、AggregateError；宿主提供 DOMException 时，以它还原 AbortError。其他名称使用 Error 并保留收到的 name。构造时产生的 stack 会被收到的确切 stack 替换。source/code 始终是远端诊断身份，不能取得本地控制权限。',
+      quickStart: `import { deserializeErrorChain, reachErrorChain } from '@migaia/utils/error'
+
+/** 收到的展示字段仅供诊断，不能授权本地重试或取消。 */
+const received: unknown = {
+  source: '@example/orders', code: 'INVALID_ORDER', name: 'TypeError',
+  message: 'quantity is invalid', stack: 'TypeError: quantity is invalid\\n    at remote/orders:8',
+  cause: {
+    source: '@example/input', code: 'OUT_OF_RANGE', name: 'RangeError',
+    message: 'quantity must be positive', stack: 'RangeError: quantity must be positive\\n    at remote/input:3'
+  }
+}
+const failure = deserializeErrorChain(received)
+console.log(failure instanceof TypeError) // true
+console.log(failure.cause instanceof RangeError) // true
+console.log(failure.stack) // 收到的 remote/orders 堆栈，没有本地构造堆栈。
+console.log(Reflect.get(failure, 'source'), Reflect.get(failure, 'code')) // @example/orders INVALID_ORDER
+for (const entry of reachErrorChain(failure)) console.error(entry) // 消费两个还原后的失败。`,
+      scenarios: [
+        '接收的诊断快照需要恢复原生 instanceof 判断和 cause/errors 可达关系。',
+        '接收方报告远端 stack 与身份，同时避免用它们选择具有权限的本地控制行为。'
+      ],
+      avoidWhen: [
+        '需要确切原对象时不能使用跨边界还原；还原会创建新对象。',
+        '输入是 RPC envelope 或需要 contract 的本地身份处理时，使用 rpc-contract 的 deserializeRpcError。'
+      ],
+      options: [errorChainStrategyOption.zh, errorChainReceiveOption.zh]
+    }
+  },
+  normalizeSerializedErrorChain: {
+    en: {
+      purpose:
+        'Validates unknown input and returns a fresh frozen serialized tree without constructing native errors. It rejects malformed fields, lone surrogates, cyclic trees, unsupported data, and exceeded limits rather than silently repairing received evidence. Source/code and stack are retained as presentation data. Unknown fields are rejected by default; an explicit ignore policy drops them observably.',
+      quickStart: `import { normalizeSerializedErrorChain } from '@migaia/utils/error'
+
+/** This migration boundary intentionally drops the old diagnostic field. */
+const received: unknown = {
+  source: '@example/orders', code: 'INVALID_ORDER', name: 'TypeError',
+  message: 'quantity is invalid', stack: 'TypeError: quantity is invalid\\n    at remote/orders:8',
+  legacyDetail: 'obsolete'
+}
+const snapshot = normalizeSerializedErrorChain(received, {}, {
+  unknownFields: 'ignore',
+  onUnknownField: (pointer, field) => console.warn('dropped diagnostic field', pointer, field)
+})
+console.log(snapshot.message, Object.isFrozen(snapshot)) // quantity is invalid, true
+console.log(Object.hasOwn(snapshot, 'legacyDetail')) // false
+console.log(JSON.stringify(snapshot)) // Forward only the admitted frozen tree.`,
+      scenarios: [
+        'A diagnostic relay needs a validated immutable tree but does not need native error allocation.',
+        'A documented migration accepts extra fields, reports each drop, and forwards only admitted diagnostic data.'
+      ],
+      avoidWhen: [
+        'The input is a local thrown value requiring projection and redaction; use serializeErrorChain.',
+        'The receiver needs native errors for instanceof or cause handling; use deserializeErrorChain, which already validates.'
+      ],
+      options: [errorChainStrategyOption.en, errorChainReceiveOption.en]
+    },
+    zh: {
+      purpose:
+        '校验 unknown 输入并返回新的冻结序列化树，不创建原生 Error。对无效字段、孤立 surrogate、循环树、不支持的数据与超限输入直接报错，不静默修复收到的证据。source/code 与 stack 保留为展示数据。默认拒绝未知字段；显式 ignore 策略才会以可观察方式丢弃它们。',
+      quickStart: `import { normalizeSerializedErrorChain } from '@migaia/utils/error'
+
+/** 此迁移边界明确丢弃旧诊断字段。 */
+const received: unknown = {
+  source: '@example/orders', code: 'INVALID_ORDER', name: 'TypeError',
+  message: 'quantity is invalid', stack: 'TypeError: quantity is invalid\\n    at remote/orders:8',
+  legacyDetail: 'obsolete'
+}
+const snapshot = normalizeSerializedErrorChain(received, {}, {
+  unknownFields: 'ignore',
+  onUnknownField: (pointer, field) => console.warn('丢弃诊断字段', pointer, field)
+})
+console.log(snapshot.message, Object.isFrozen(snapshot)) // quantity is invalid, true
+console.log(Object.hasOwn(snapshot, 'legacyDetail')) // false
+console.log(JSON.stringify(snapshot)) // 只转发已准入的冻结树。`,
+      scenarios: [
+        '诊断中继需要经过校验的不可变树，但不需要分配原生 Error。',
+        '已说明的迁移路径允许额外字段，逐项报告丢弃，并只转发已准入诊断数据。'
+      ],
+      avoidWhen: [
+        '输入是需要投影与脱敏的本地抛出值时，使用 serializeErrorChain。',
+        '接收方需要原生 instanceof 或 cause 处理时，使用已内置完整校验的 deserializeErrorChain。'
+      ],
+      options: [errorChainStrategyOption.zh, errorChainReceiveOption.zh]
+    }
+  },
+  reachErrorChain: {
+    en: {
+      purpose:
+        'Lazily walks the original cause, errors, and cleanupErrors graph in cause-first order. It yields each object identity once, retains primitive occurrences, and never replaces errors or their stacks. The default identity cap is maxObjects 10000; reaching the cap ends iteration without a completeness claim. This walk does not apply the serialized maxNesting/maxNodes/text budgets.',
+      quickStart: `import { reachErrorChain } from '@migaia/utils/error'
+
+/** Primary is reachable through both cause and errors; its identity appears only once. */
+const primary = new TypeError('invalid order')
+const cleanup = new Error('cleanup failed')
+const failure = new AggregateError([primary, cleanup], 'batch failed', { cause: primary })
+const entries = [...reachErrorChain(failure, { limits: { maxObjects: 10 } }, {
+  report: event => console.error('error graph read failed', event.pointer, event.field, event.error)
+})]
+console.log(entries.length) // 3: AggregateError, primary, cleanup
+console.log(entries.some(entry => entry === primary)) // true: exact original reference
+for (const entry of entries) console.error(entry) // Report every reachable failure.`,
+      scenarios: [
+        'Local classification or reporting must find an exact original error through cause and aggregate edges.',
+        'A cyclic or shared error graph needs a finite walk with object identity deduplication and observable read failures.'
+      ],
+      avoidWhen: [
+        'The caller needs a frozen transport snapshot or privacy transform; use serializeErrorChain.',
+        'The caller needs proof that an unbounded graph is complete after the maxObjects cap has stopped iteration.'
+      ],
+      options: [errorChainStrategyOption.en, errorChainSendOption.en]
+    },
+    zh: {
+      purpose:
+        '惰性遍历原 cause、errors、cleanupErrors 图，保持 cause 优先顺序。每个对象身份只返回一次，原始值按出现次数保留，不替换 error 或 stack。对象身份上限默认 maxObjects 10000；达到上限即结束，不能据此宣称遍历完整。此遍历不应用序列化的 maxNesting、maxNodes 或文本预算。',
+      quickStart: `import { reachErrorChain } from '@migaia/utils/error'
+
+/** primary 经 cause 与 errors 双重可达，但同一对象只出现一次。 */
+const primary = new TypeError('invalid order')
+const cleanup = new Error('cleanup failed')
+const failure = new AggregateError([primary, cleanup], 'batch failed', { cause: primary })
+const entries = [...reachErrorChain(failure, { limits: { maxObjects: 10 } }, {
+  report: event => console.error('错误图读取失败', event.pointer, event.field, event.error)
+})]
+console.log(entries.length) // 3：AggregateError、primary、cleanup
+console.log(entries.some(entry => entry === primary)) // true：确切原对象引用
+for (const entry of entries) console.error(entry) // 报告每个可达失败。`,
+      scenarios: [
+        '本地分类或报告需要经 cause 与聚合边找到确切原 error。',
+        '循环或共享错误图需要有限遍历、对象身份去重与可观察的读取失败。'
+      ],
+      avoidWhen: [
+        '需要冻结的传输快照或隐私变换时，使用 serializeErrorChain。',
+        'maxObjects 已截断遍历时，不能用结果证明一个无界图已完整检查。'
+      ],
+      options: [errorChainStrategyOption.zh, errorChainSendOption.zh]
+    }
+  },
+  sanitizeErrorText: {
+    en: {
+      purpose:
+        'Returns { value, bytes, changed } after replacing lone UTF-16 surrogates and retaining the longest whole-scalar UTF-8 prefix within maxBytes. maxBytes defaults to 4096 and truncate defaults to true. With truncate false, it still repairs surrogates and counts the entire text while ignoring the byte ceiling. It does not remove secrets; use it inside the boundary-owned sanitizeText policy after redaction.',
+      quickStart: `import { sanitizeErrorText } from '@migaia/utils/error'
+
+/** Ten bytes fit two Chinese scalars and one emoji without cutting their encoding. */
+const bounded = sanitizeErrorText('你好🙂tail', 10)
+console.log(bounded.value, bounded.bytes, bounded.changed) // 你好🙂, 10, true
+const repaired = sanitizeErrorText('x\\uD800')
+console.log(repaired.value, repaired.bytes, repaired.changed) // x�, 4, true
+const counted = sanitizeErrorText('你好🙂', 2, false)
+console.log(counted.value, counted.bytes, counted.changed) // 你好🙂, 10, false
+console.log(JSON.stringify({ display: bounded.value, incomplete: bounded.changed })) // Consume the result flag.`,
+      scenarios: [
+        'A diagnostic text field has a UTF-8 byte budget and must never end with half a Unicode scalar.',
+        'A caller-owned redaction strategy needs scalar repair and accurate byte accounting after replacing secrets.'
+      ],
+      avoidWhen: [
+        'The caller expects token or personal-data redaction from this function; implement that policy before calling it.',
+        'Received evidence must be rejected rather than repaired; use normalizeSerializedErrorChain for strict receive validation.'
+      ],
+      options: [
+        {
+          name: 'maxBytes',
+          type: 'number',
+          optional: true,
+          defaultValue: '4096',
+          description:
+            'UTF-8 byte ceiling for the complete scalar prefix when truncate is true; it does not count UTF-16 code units.',
+          whenToUse: 'Set the accepted diagnostic field budget in bytes.'
+        },
+        {
+          name: 'truncate',
+          type: 'boolean',
+          optional: true,
+          defaultValue: 'true',
+          description:
+            'True bounds the prefix; false repairs and counts the entire text without applying maxBytes. changed still reports surrogate replacement.',
+          whenToUse: 'Use false only when another owner checks the full text budget.'
+        }
+      ]
+    },
+    zh: {
+      purpose:
+        '替换孤立 UTF-16 surrogate，并保留 maxBytes 内最长的完整 Unicode scalar UTF-8 前缀，返回 { value, bytes, changed }。maxBytes 默认 4096，truncate 默认 true。truncate 为 false 时仍修复 surrogate 并计算全文字节，但不应用字节上限。函数不会移除秘密；应在边界拥有的 sanitizeText 策略中先脱敏，再调用它。',
+      quickStart: `import { sanitizeErrorText } from '@migaia/utils/error'
+
+/** 十个字节容纳两个中文 scalar 与一个 emoji，不截断编码。 */
+const bounded = sanitizeErrorText('你好🙂tail', 10)
+console.log(bounded.value, bounded.bytes, bounded.changed) // 你好🙂, 10, true
+const repaired = sanitizeErrorText('x\\uD800')
+console.log(repaired.value, repaired.bytes, repaired.changed) // x�, 4, true
+const counted = sanitizeErrorText('你好🙂', 2, false)
+console.log(counted.value, counted.bytes, counted.changed) // 你好🙂, 10, false
+console.log(JSON.stringify({ display: bounded.value, incomplete: bounded.changed })) // 消费结果及变更标志。`,
+      scenarios: [
+        '诊断文本字段按 UTF-8 字节限制长度，并且不能在 Unicode scalar 中间结束。',
+        '调用方拥有的脱敏策略需要在替换秘密后修复 Unicode 并精确计算字节。'
+      ],
+      avoidWhen: [
+        '不能依靠此函数移除 token 或个人信息；必须先实现边界自己的脱敏规则。',
+        '收到的证据必须拒绝而不能修复时，使用 normalizeSerializedErrorChain 严格校验。'
+      ],
+      options: [
+        {
+          name: 'maxBytes',
+          type: 'number',
+          optional: true,
+          defaultValue: '4096',
+          description:
+            'truncate 为 true 时完整 scalar 前缀的 UTF-8 字节上限，不按 UTF-16 code unit 计数。',
+          whenToUse: '按字节设置诊断字段允许的预算。'
+        },
+        {
+          name: 'truncate',
+          type: 'boolean',
+          optional: true,
+          defaultValue: 'true',
+          description:
+            'true 限制前缀；false 修复并计算全文，不应用 maxBytes。surrogate 替换仍会使 changed 为 true。',
+          whenToUse: '只有其他 owner 检查全文预算时才使用 false。'
+        }
+      ]
+    }
+  }
+}
+
+/**
+ * Root re-exports and the error subpath resolve to the same maintained guide without locale
+ * fallback.
+ */
+const errorChainUtilsApiGuides: Readonly<
+  Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>
+> = Object.fromEntries(
+  Object.entries(errorChainGuides).flatMap(([name, guide]) => [
+    [`utils:error:${name}`, guide],
+    [`utils:index:${name}`, guide]
+  ])
+)
+
 export const utilsApiGuides = {
   ...foundationalUtilsApiGuides,
   ...dataUtilsApiGuides,
   ...controlUtilsApiGuides,
-  ...safeValueUtilsApiGuides
+  ...safeValueUtilsApiGuides,
+  ...errorChainUtilsApiGuides
 } as const

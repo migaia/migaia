@@ -44,6 +44,12 @@ export const UtilsErrorCode = {
    */
   errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT',
   /**
+   * An incoming serialized error tree or its plain data violates the configured field, scalar,
+   * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract (K289 and
+   * error-codes §3.4); callers correct the input or supply their boundary's owning strategy.
+   */
+  errorChainInvalid: 'ERROR_CHAIN_INVALID',
+  /**
    * An immutable snapshot could not be produced because the host's structured clone rejected the
    * value (functions, symbols, host objects). The caller must pass cloneable data.
    */

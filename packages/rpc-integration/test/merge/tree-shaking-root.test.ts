@@ -8,15 +8,16 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-core')
 
 /**
- * C5 final re-pins the fresh six-package root: 200 modules, 985824 raw bytes and 240805 gzip bytes.
- * The C4 root was 198/977832/239477; K290 retains Utils string/object and C5 owner-only error
- * identity accounts for the measured byte change. Exact source, module and byte attribution lives
- * in docs/rpc/scratch/package-split/c5-tree-final-attribution.json. These measured caps contain no
- * headroom; the immutable legacy comparison remains unchanged.
+ * K289 re-pins the fresh root to exactly 200 modules, 982595 raw bytes and 241062 gzip bytes.
+ * Main's C5 predecessor was 200/985824/240805. The error-chain move accounts for -3229 rendered
+ * bytes, zero framing delta and +257 whole-bundle gzip bytes; verified shared Utils imports and
+ * private binding substitutions account for derived changes. The complete 200-module evidence is in
+ * docs/rpc/scratch/k289/repin/comparison.json. Neither byte cap contains headroom; the immutable
+ * legacy comparison stays unchanged.
  */
 const allowedIncrease = {
-  rawBytes: 393970 / legacyRoot.rawBytes,
-  gzipBytes: 97893 / legacyRoot.gzipBytes
+  rawBytes: 390741 / legacyRoot.rawBytes,
+  gzipBytes: 98150 / legacyRoot.gzipBytes
 } as const
 
 /** Exact C5 delta from the immutable 157-module legacy root, including canonical Utils owners. */
