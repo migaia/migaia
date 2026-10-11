@@ -190,6 +190,7 @@ async function openWebThreadHandle(
   /** Only this actual launcher retains Core's original raw control resource. */
   const preparation = webPreparations.get(handle)
   try {
+    if (signal.aborted) throw readAdapterAbortReason(signal)
     /** Expanded legacy children need the parent's ACK before they can publish service readiness. */
     if (
       !preparation &&
@@ -197,7 +198,6 @@ async function openWebThreadHandle(
         (value) => !rpcMessageCapabilityControl.staticCapabilities.includes(value)
       )
     ) {
-      if (signal.aborted) throw readAdapterAbortReason(signal)
       /** The actual port owns ACK capture while the independent legacy ready fence remains active. */
       const resource = createEventTargetMessageResource(handle.port)
       try {

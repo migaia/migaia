@@ -8,6 +8,50 @@ import { nativeFixture, workerEntry } from './fixture.js'
 
 /** Ordinary lifecycle regressions from archived audit receipts do not restart the interrupted audit. */
 describe('thread preparation and retry settlement', () => {
+  it('preserves pre-aborted open priority before reading the local capability proposal', async () => {
+    /** A cancelled opening must retain its original caller reason before configuration effects. */
+    const controller = new AbortController()
+    /** Exact identity distinguishes cancellation from any later getter or startup failure. */
+    const reason = new Error('cancelled before thread opening')
+    controller.abort(reason)
+    /** The proposal getter must not run on an opening already rejected by its signal. */
+    let reads = 0
+    /** No physical event operation is needed when the original opening is already cancelled. */
+    const target = new EventEmitter()
+    /** The supported raw port shape would expose any premature Core reader installation. */
+    const port: IThreadWebPort = {
+      postMessage: () => undefined,
+      addEventListener: (type, listener) => {
+        target.on(type, listener)
+      },
+      removeEventListener: (type, listener) => {
+        target.off(type, listener)
+      }
+    }
+    /** Both readiness and native completion remain pending independently of caller cancellation. */
+    const pending = new Promise<never>(() => undefined)
+    await expect(
+      createWebThreadChannelFactory({
+        scheduler: systemScheduler,
+        /** Reading configuration here would replace the original cancellation with a getter failure. */
+        get capabilities(): readonly string[] {
+          reads++
+          throw new Error('capability getter must not run after cancellation')
+        }
+      }).open(
+        {
+          identity: { fingerprint: 'cancelled-peer' },
+          port,
+          prepared: pending,
+          exited: pending,
+          terminate: () => undefined
+        },
+        controller.signal
+      )
+    ).rejects.toBe(reason)
+    expect(reads).toBe(0)
+    expect(target.listenerCount('message')).toBe(0)
+  })
   it('[A9] withholds transport until private bootstrap preparation acknowledges', async () => {
     /** Event subscriptions prove the factory has not installed transport before readiness. */
     const target = new EventEmitter()
