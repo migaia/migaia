@@ -1,5 +1,5 @@
 /** CI package scheduling; one preparation build feeds read-only release checks and custody. */
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import {
   existsSync,
   mkdirSync,
@@ -9,7 +9,7 @@ import {
   appendFileSync
 } from 'node:fs'
 import { availableParallelism, constants, tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   CAPTURE_EXIT_CODE_FILE,
@@ -26,6 +26,8 @@ import { assertAllFresh, DistStampErrorCode } from './dist-stamp.mjs'
 /** @typedef {{ name: string; gates: IGateResult[]; started: number; finished: number }} IPackageResult */
 /** @typedef {{ jobs: number; workers: number; reportRoot: string; env: NodeJS.ProcessEnv }} ICiRuntime */
 /** @typedef {{ cwd?: string; env?: NodeJS.ProcessEnv; log?: string }} ICommandOptions */
+/** @typedef {{ rpc: boolean; website: boolean }} ICiScope */
+/** @typedef {{ name: string; path: string }} IWorkspaceProject */
 
 /** All commands resolve relative to the checkout containing this scheduler. */
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -69,6 +71,17 @@ const familyOnlyTestFile =
   /\/test\/(?:process\/conformance[^/]*\.test\.ts|bridge\/conformance-faults\.test\.ts|merge\/suite-parity\.test\.ts)$/
 /** The measured plugin-host acceptance suite must never compete with another package check. */
 const exclusivePackages = Object.freeze(['plugin-host'])
+/** Shared inputs invalidate every package gate; pnpm still owns all package dependency selection. */
+const sharedInputPaths = new Set([
+  'package.json',
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  'tsconfig.base.json',
+  'Makefile'
+])
+/** Only root tool configurations and scripts trigger the explicitly requested full fallback. */
+const rootToolConfig =
+  /^(?:\.?ox(?:fmt|lint)(?:rc|\.config)?|vitest\.config|eslint\.config|\.eslintrc)(?:\.|$)/
 /** Package-only packed scripts may omit precisely these known preparation builds. */
 const packedCommands = Object.freeze({
   'event-subscriber': [
@@ -114,7 +127,14 @@ const text = Object.freeze({
   jobs: (jobs, workers) => `==> CI_JOBS=${jobs}; nested workers=${workers}`,
   invalidJobs: 'CI_JOBS must be a positive integer',
   invalidArguments:
-    'usage: node scripts/ci-run.mjs ci --release "packages" --store "packages" | packages --packages "packages"',
+    'usage: node scripts/ci-run.mjs ci|affected --release "packages" --store "packages" | packages --packages "packages"',
+  invalidBase: 'CI_BASE must name an existing Git commit',
+  affected: (base) => '==> affected scope; CI_BASE=' + base,
+  selection: (names) => '==> selected packages: ' + (names.join(' ') || '(none)'),
+  fallback: (paths) => '==> full fallback: shared inputs changed: ' + paths.join(', '),
+  selectionReason: '==> selection: pnpm Git dependents filter, including untracked package inputs',
+  emptyDiff: '==> affected scope: empty diff; no gates run',
+  plan: (names) => '==> planned gates: ' + (names.join(' ') || '(none)'),
   missingPackage: (name) => `unknown CI package: ${name}`,
   packedChanged: (name) => `CI packed preparation no longer matches the declared ${name} script`,
   missingTools: (tools) => `rpc/test:conformance (missing: ${tools.join(' ')})`,
@@ -144,7 +164,10 @@ export const runCommand = (command, args, options = {}) =>
       env: options.env ?? process.env,
       stdio: ['inherit', 'pipe', 'pipe']
     })
-    /** Forward each chunk to its original channel and the capture log, without buffering test output. */
+    /**
+     * Forward each chunk to its original channel and the capture log, without buffering test
+     * output.
+     */
     const forward = (channel, chunk) => {
       channel.write(chunk)
       if (options.log) appendFileSync(options.log, chunk)
@@ -527,9 +550,15 @@ const groupSummary = (name, names, packages) => {
  * @param {string[]} releasePackages Existing foundation release plan.
  * @param {string[]} storePackages Existing store release plan.
  * @param {ICiRuntime} runtime Invocation context.
+ * @param {ICiScope} [scope] Affected mode selects RPC and website gates; full CI retains both.
  * @returns {Promise<number>} Existing finish_ci blocking status.
  */
-export const runCi = async (releasePackages, storePackages, runtime) => {
+export const runCi = async (
+  releasePackages,
+  storePackages,
+  runtime,
+  scope = { rpc: true, website: true }
+) => {
   /** Root rows stay in their old order even though both package groups now share one pool. */
   const results = []
   results.push(
@@ -541,10 +570,8 @@ export const runCi = async (releasePackages, storePackages, runtime) => {
     )
   /** All readers begin only after the one topological workspace build has finished. */
   const packages = await runPackages([...releasePackages, ...storePackages], runtime)
-  results.push(
-    groupSummary(GateName.ship, releasePackages, packages),
-    groupSummary(GateName.store, storePackages, packages)
-  )
+  if (releasePackages.length) results.push(groupSummary(GateName.ship, releasePackages, packages))
+  if (storePackages.length) results.push(groupSummary(GateName.store, storePackages, packages))
   for (const name of [GateName.registry, GateName.consumers])
     results.push(await runGate(name, 'required', 'pnpm', ['run', name], { env: runtime.env }))
   results.push(
@@ -559,63 +586,208 @@ export const runCi = async (releasePackages, storePackages, runtime) => {
       env: runtime.env
     })
   )
-  /** Missing toolchains retain the original explicit blocking/warning skip policy. */
-  const missing = []
-  for (const tool of conformanceTools)
-    if (
-      (await runCommand('/bin/sh', [
-        '-c',
-        'command -v "$1" >/dev/null 2>&1',
-        'ci-tool-check',
-        tool
-      ])) !== 0
-    )
-      missing.push(tool)
-  if (missing.length)
-    results.push({
-      name: text.missingTools(missing),
-      code: process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1' ? 0 : 1,
-      state:
-        process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1'
-          ? GateState.skipWarning
-          : GateState.skipBlocking,
-      seconds: 0
-    })
-  else
+  if (scope.rpc) {
+    /** Missing toolchains retain the original explicit blocking/warning skip policy. */
+    const missing = []
+    for (const tool of conformanceTools)
+      if (
+        (await runCommand('/bin/sh', [
+          '-c',
+          'command -v "$1" >/dev/null 2>&1',
+          'ci-tool-check',
+          tool
+        ])) !== 0
+      )
+        missing.push(tool)
+    if (missing.length)
+      results.push({
+        name: text.missingTools(missing),
+        code: process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1' ? 0 : 1,
+        state:
+          process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1'
+            ? GateState.skipWarning
+            : GateState.skipBlocking,
+        seconds: 0
+      })
+    else
+      results.push(
+        await runGate(
+          GateName.conformance,
+          'required',
+          'pnpm',
+          ['--filter', './packages/rpc-integration', 'run', 'test:conformance'],
+          { env: runtime.env }
+        )
+      )
     results.push(
       await runGate(
-        GateName.conformance,
+        GateName.parity,
         'required',
         'pnpm',
-        ['--filter', './packages/rpc-integration', 'run', 'test:conformance'],
+        ['--filter', './packages/rpc-integration', 'run', 'test:suite-parity'],
         { env: runtime.env }
       )
     )
-  results.push(
-    await runGate(
-      GateName.parity,
-      'required',
-      'pnpm',
-      ['--filter', './packages/rpc-integration', 'run', 'test:suite-parity'],
-      { env: runtime.env }
-    )
-  )
-  for (const gate of ['fmt', 'lint', 'typecheck'])
+  }
+  if (scope.website) {
+    for (const gate of ['fmt', 'lint', 'typecheck'])
+      results.push(
+        await runGate(
+          `website/${gate}`,
+          'required',
+          'make',
+          ['--no-print-directory', 'ci-website-check', `GATE=${gate}`],
+          { env: runtime.env }
+        )
+      )
     results.push(
       await runGate(
-        `website/${gate}`,
-        'required',
+        'website/test',
+        'warning',
         'make',
-        ['--no-print-directory', 'ci-website-check', `GATE=${gate}`],
-        { env: runtime.env }
+        ['--no-print-directory', 'ci-website-test'],
+        {
+          env: runtime.env
+        }
       )
     )
-  results.push(
-    await runGate('website/test', 'warning', 'make', ['--no-print-directory', 'ci-website-test'], {
-      env: runtime.env
-    })
-  )
+  }
   return printSummary(results)
+}
+
+/**
+ * Read installed pnpm workspace metadata without creating a second dependency graph.
+ *
+ * @param {string[]} filters Pnpm selectors whose union determines the current project list.
+ * @returns {IWorkspaceProject[]} Workspace names and absolute paths.
+ */
+const listProjects = (filters = []) =>
+  JSON.parse(
+    execFileSync(
+      'pnpm',
+      [
+        ...(filters.length ? filters.flatMap((filter) => ['--filter', filter]) : ['-r']),
+        'list',
+        '--depth',
+        '-1',
+        '--json'
+      ],
+      { cwd: repositoryRoot, encoding: 'utf8' }
+    )
+  )
+
+/**
+ * Use pnpm's Git dependent selector, adding selectors only for untracked project inputs.
+ *
+ * @param {string[]} release Foundation release inventory owned by Makefile.
+ * @param {string[]} store Store release inventory owned by Makefile.
+ * @returns {{ release: string[]; store: string[]; scope: ICiScope; empty: boolean }} Selected
+ *   gates.
+ * @throws {Error} CI_BASE is empty or cannot resolve to a Git commit.
+ */
+const selectAffected = (release, store) => {
+  /** The default remains explicit; an empty configured base is not silently replaced. */
+  const base = process.env.CI_BASE ?? 'origin/main'
+  if (!base) throw new Error(text.invalidBase)
+  execFileSync('git', ['rev-parse', '--verify', '--end-of-options', base + '^{commit}'], {
+    cwd: repositoryRoot,
+    stdio: 'pipe'
+  })
+  /** Git and pnpm compare the same ref; NUL separation preserves filenames with whitespace. */
+  const tracked = execFileSync(
+    'git',
+    ['diff', '--name-only', '--no-renames', '-z', '--end-of-options', base, '--'],
+    { cwd: repositoryRoot, encoding: 'utf8' }
+  )
+    .split('\0')
+    .filter(Boolean)
+  /** Pnpm's ref selector omits these files, so their owning projects need extra selectors. */
+  const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8'
+  })
+    .split('\0')
+    .filter(Boolean)
+  /** Shared-input changes widen this invocation, never the underlying release inventory. */
+  const changed = [...new Set([...tracked, ...untracked])]
+  console.log(text.affected(base))
+  if (!changed.length) {
+    console.log(text.emptyDiff)
+    return { release: [], store: [], scope: { rpc: false, website: false }, empty: true }
+  }
+  /** The short fallback list is a CI policy; package consumers remain pnpm's responsibility. */
+  const shared = changed.filter(
+    (path) =>
+      sharedInputPaths.has(path) ||
+      path.startsWith('scripts/') ||
+      (!path.includes('/') && rootToolConfig.test(path))
+  )
+  if (shared.length) {
+    console.log(text.fallback(shared))
+    console.log(text.selection([...release, ...store]))
+    return { release, store, scope: { rpc: true, website: true }, empty: false }
+  }
+  /** Longest paths distinguish nested projects without treating the repository root as an owner. */
+  const inventory = listProjects()
+    .filter((project) => resolve(project.path) !== repositoryRoot)
+    .sort((left, right) => right.path.length - left.path.length)
+  /** Extra selectors use declared project names, leaving reverse closure traversal to pnpm. */
+  const extra = new Set()
+  for (const path of untracked) {
+    /** An ignored file cannot enter this list; only the current workspace owner is added. */
+    const absolute = resolve(repositoryRoot, path)
+    /** Projects are provided by pnpm, including the website and any current app workspace. */
+    const owner = inventory.find((project) => absolute.startsWith(resolve(project.path) + sep))
+    if (owner) extra.add('...' + owner.name)
+  }
+  /** Multiple pnpm filters form a union, including each changed package and its dependents. */
+  const selected = listProjects(['...[' + base + ']', ...extra])
+  /** Directory names bind selection to the existing Makefile release lists. */
+  const names = new Set(
+    selected
+      .map((project) => relative(repositoryRoot, project.path).split(sep).join('/'))
+      .filter((path) => /^packages\/[^/]+$/.test(path))
+      .map((path) => path.slice('packages/'.length))
+  )
+  /** The website generator documents every current library, excluding the integration-only owner. */
+  const website =
+    selected.some((project) => resolve(project.path) === join(repositoryRoot, 'website')) ||
+    [...names].some((name) => name !== RPC_COVERAGE_FAMILY.runner)
+  console.log(text.selection([...names]))
+  console.log(text.selectionReason)
+  return {
+    release: release.filter((name) => names.has(name)),
+    store: store.filter((name) => names.has(name)),
+    scope: { rpc: [...names].some((name) => name.startsWith('rpc-')), website },
+    empty: false
+  }
+}
+
+/**
+ * List the actual root gate plan before any build, test or capture directory is created.
+ *
+ * @param {string[]} release Selected foundation packages.
+ * @param {string[]} store Selected Store packages.
+ * @param {ICiScope} scope RPC and website consumers enabled by this selection.
+ * @returns {void}
+ */
+const printPlan = (release, store, scope) => {
+  /** Registry and custody remain full checks even when release checks select only affected owners. */
+  const gates = [
+    GateName.build,
+    GateName.dependencies,
+    GateName.release,
+    ...(release.length ? [GateName.ship] : []),
+    ...(store.length ? [GateName.store] : []),
+    GateName.registry,
+    GateName.consumers,
+    GateName.docs,
+    ...rootTestGates,
+    GateName.custody,
+    ...(scope.rpc ? [GateName.conformance, GateName.parity] : []),
+    ...(scope.website ? ['website/fmt', 'website/lint', 'website/typecheck', 'website/test'] : [])
+  ]
+  console.log(text.plan(gates))
 }
 
 /**
@@ -647,7 +819,8 @@ const preparePackages = async (runtime) => {
 const parseArguments = (argv) => {
   /** Make passes each package list as one argument, avoiding shell splitting inside this module. */
   const [mode, ...args] = argv
-  if (mode !== 'ci' && mode !== 'packages') throw new Error(text.invalidArguments)
+  if (mode !== 'ci' && mode !== 'packages' && mode !== 'affected')
+    throw new Error(text.invalidArguments)
   /** The three accepted lists are explicit inputs rather than a second release inventory. */
   const options = { release: [], store: [], packages: [] }
   for (let index = 0; index < args.length; index += 2) {
@@ -673,9 +846,29 @@ const parseArguments = (argv) => {
 export const main = async (argv) => {
   /** Parse before creating reports so invalid invocations have no filesystem effect. */
   const options = parseArguments(argv)
+  /** Selection and dry-run are read-only and must precede raw report allocation. */
+  const selection =
+    options.mode === 'affected'
+      ? selectAffected(options.release, options.store)
+      : {
+          release: options.release,
+          store: options.store,
+          scope: { rpc: true, website: true },
+          empty: false
+        }
+  if (selection.empty) return 0
+  if (process.env.CI_DRY_RUN === '1') {
+    if (options.mode === 'packages') console.log(text.selection(options.packages))
+    else console.log(text.selection([...selection.release, ...selection.store]))
+    if (options.mode === 'packages')
+      console.log(text.plan(options.packages.map((name) => name + '/release-check')))
+    else printPlan(selection.release, selection.store, selection.scope)
+    return 0
+  }
   /** One runtime owns the entire invocation's reports and nested worker budget. */
   const runtime = createRuntime()
-  if (options.mode === 'ci') return runCi(options.release, options.store, runtime)
+  if (options.mode !== 'packages')
+    return runCi(selection.release, selection.store, runtime, selection.scope)
   /** Standalone ship/store begins with fresh output, then never rebuilds inside package jobs. */
   const prepared = await preparePackages(runtime)
   if (prepared !== 0) return prepared
