@@ -13322,7 +13322,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       ]
     }
   },
-  'rpc:index': {
+  'rpc-core:index': {
     zh: {
       title: 'RPC 学习路径',
       lede: '先选择最窄 endpoint 表面与真实 transport，再逐步加入 provider、契约、发现、控制、分片和生命周期策略。',
@@ -13476,7 +13476,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       ]
     }
   },
-  'rpc:getting-started': {
+  'rpc-core:getting-started': {
     zh: {
       title: '五分钟建立可释放的 RPC 调用链',
       lede: '用一对 Memory transport、最窄 client/provider preset 和同一组基础 middleware 完成请求、响应与释放闭环。',
@@ -13565,7 +13565,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       next: [
         { label: '五分钟建立首条调用链', path: 'getting-started' },
         { label: 'Provider 与契约', path: 'providers-and-contracts' },
-        { label: 'createClientEndpoint API', path: 'docs/rpc/core/client/createClientEndpoint' }
+        { label: 'createClientEndpoint API', path: 'docs/rpc-core/client/createClientEndpoint' }
       ]
     },
     en: {
@@ -13684,11 +13684,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       next: [
         { label: 'Build the first call path in five minutes', path: 'getting-started' },
         { label: 'Providers and contracts', path: 'providers-and-contracts' },
-        { label: 'createClientEndpoint API', path: 'docs/rpc/core/client/createClientEndpoint' }
+        { label: 'createClientEndpoint API', path: 'docs/rpc-core/client/createClientEndpoint' }
       ]
     }
   },
-  'rpc:endpoint-composition': {
+  'rpc-core:endpoint-composition': {
     zh: {
       title: '四个 Peer/Plugin 工厂：来源、类型与所有权',
       lede: '先区分进程或 Worker，再决定独立 Peer 或 PluginHost 所有。provide/expose 决定真正公开的方法，目录由库生成。',
@@ -13759,11 +13759,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       next: [
         {
           label: '独立进程 Peer',
-          path: 'docs/rpc/process/createProcessPeer'
+          path: 'docs/rpc-process/createProcessPeer'
         },
         {
           label: '独立 Worker Peer',
-          path: 'docs/rpc/threads/createThreadPeer'
+          path: 'docs/rpc-threads/createThreadPeer'
         },
         {
           label: '载体与安全边界',
@@ -13841,11 +13841,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       next: [
         {
           label: 'process Peer',
-          path: 'docs/rpc/process/createProcessPeer'
+          path: 'docs/rpc-process/createProcessPeer'
         },
         {
           label: 'Worker Peer',
-          path: 'docs/rpc/threads/createThreadPeer'
+          path: 'docs/rpc-threads/createThreadPeer'
         },
         {
           label: 'Transport and security',
@@ -13854,7 +13854,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       ]
     }
   },
-  'rpc:extension-authoring': {
+  'rpc-core:extension-authoring': {
     zh: {
       title: '扩展 RPC：Feature 边界与自定义 Middleware',
       lede: 'Feature 改变 Endpoint 的根能力，middleware 改变运行策略。当前公开扩展点允许编写 middleware，但 Feature token 仍由 RPC 包拥有。',
@@ -13946,7 +13946,9 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '返回 Endpoint 选择指南', path: 'endpoint-composition' },
-        { label: 'Hooks 与生命周期 API', path: 'docs/rpc/core/hooks' }
+        { label: 'Hooks 与生命周期 API', path: 'docs/rpc-core/hooks' },
+        { label: 'Contract framing 规范', path: 'docs/rpc-contract/framing' },
+        { label: 'Contract handshake 规范', path: 'docs/rpc-contract/handshake' }
       ]
     },
     en: {
@@ -14040,11 +14042,13 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Back to Endpoint selection', path: 'endpoint-composition' },
-        { label: 'Hooks and lifecycle API', path: 'docs/rpc/core/hooks' }
+        { label: 'Hooks and lifecycle API', path: 'docs/rpc-core/hooks' },
+        { label: 'Contract framing specification', path: 'docs/rpc-contract/framing' },
+        { label: 'Contract handshake specification', path: 'docs/rpc-contract/handshake' }
       ]
     }
   },
-  'rpc:calls-and-cancellation': {
+  'rpc-core:calls-and-cancellation': {
     zh: {
       title: '正确选择调用、广播、通知与取消语义',
       lede: 'send 系列等待结构化响应，dispatch 系列只确认发送结算；先选择业务语义，再配置 timeout、signal 与 transfer。',
@@ -14104,7 +14108,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Provider 与契约', path: 'providers-and-contracts' },
-        { label: 'createClientEndpoint API', path: 'docs/rpc/core/client/createClientEndpoint' }
+        { label: 'createClientEndpoint API', path: 'docs/rpc-core/client/createClientEndpoint' }
       ]
     },
     en: {
@@ -14174,11 +14178,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Providers and contracts', path: 'providers-and-contracts' },
-        { label: 'createClientEndpoint API', path: 'docs/rpc/core/client/createClientEndpoint' }
+        { label: 'createClientEndpoint API', path: 'docs/rpc-core/client/createClientEndpoint' }
       ]
     }
   },
-  'rpc:providers-and-contracts': {
+  'rpc-core:providers-and-contracts': {
     zh: {
       title: '用 Provider 与 Contract 固定网络边界',
       lede: 'Provider 只接收结构化 context；contract 在参数进入业务代码前、结果离开业务代码前执行 schema 校验。',
@@ -14233,7 +14237,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Transport 与安全', path: 'transports-and-security' },
-        { label: 'contract API', path: 'docs/rpc/contract' }
+        { label: 'contract API', path: 'docs/rpc-core/contract' }
       ]
     },
     en: {
@@ -14290,7 +14294,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Transports and security', path: 'transports-and-security' },
-        { label: 'contract API', path: 'docs/rpc/contract' }
+        { label: 'contract API', path: 'docs/rpc-core/contract' }
       ]
     }
   },
@@ -14429,7 +14433,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       ]
     }
   },
-  'rpc:transports-and-security': {
+  'rpc-core:transports-and-security': {
     zh: {
       title: '按拓扑选择 Transport，并建立真实安全边界',
       lede: 'Transport 只负责收发消息；topology、ownership、sourceProof 与 authentication 共同决定 endpoint 可以信任什么。',
@@ -14477,7 +14481,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '发现与控制', path: 'discovery-and-control' },
-        { label: 'authentication API', path: 'docs/rpc/core/authentication' }
+        { label: 'authentication API', path: 'docs/rpc-core/authentication' }
       ]
     },
     en: {
@@ -14531,11 +14535,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Discovery and control', path: 'discovery-and-control' },
-        { label: 'authentication API', path: 'docs/rpc/core/authentication' }
+        { label: 'authentication API', path: 'docs/rpc-core/authentication' }
       ]
     }
   },
-  'rpc:discovery-and-control': {
+  'rpc-core:discovery-and-control': {
     zh: {
       title: '发现远端能力，并显式启用控制面',
       lede: 'discovery 维护远端快照，control 处理控制帧；两者都不会替代 transport 身份验证或自动公开 outbound。',
@@ -14585,7 +14589,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '分片与背压', path: 'chunking-and-backpressure' },
-        { label: 'ping API', path: 'docs/rpc/core/ping' }
+        { label: 'ping API', path: 'docs/rpc-core/ping' }
       ]
     },
     en: {
@@ -14637,11 +14641,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Chunking and backpressure', path: 'chunking-and-backpressure' },
-        { label: 'ping API', path: 'docs/rpc/core/ping' }
+        { label: 'ping API', path: 'docs/rpc-core/ping' }
       ]
     }
   },
-  'rpc:chunking-and-backpressure': {
+  'rpc-core:chunking-and-backpressure': {
     zh: {
       title: '在明确容量预算下启用分片',
       lede: '分片解决单帧尺寸限制，不是可靠传输或无限缓冲；所有消息、分片、并发和等待都必须有界。',
@@ -14697,7 +14701,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '重放、重试与生命周期', path: 'replay-retry-and-lifecycle' },
-        { label: 'chunk API', path: 'docs/rpc/contract/framing/createStringFramer' }
+        { label: 'chunk API', path: 'docs/rpc-contract/framing/createStringFramer' }
       ]
     },
     en: {
@@ -14767,11 +14771,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Replay, retry, and lifecycle', path: 'replay-retry-and-lifecycle' },
-        { label: 'chunk API', path: 'docs/rpc/contract/framing/createStringFramer' }
+        { label: 'chunk API', path: 'docs/rpc-contract/framing/createStringFramer' }
       ]
     }
   },
-  'rpc:replay-retry-and-lifecycle': {
+  'rpc-core:replay-retry-and-lifecycle': {
     zh: {
       title: '区分重放保护、业务重试与 Endpoint 终态',
       lede: 'replay 窗口防止旧消息 id 被重新接受；它不替业务重试、幂等设计或可靠队列，dispose 之后 endpoint 永久终止。',
@@ -14829,7 +14833,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '返回 RPC 学习路径', path: 'index' },
-        { label: 'dispose API', path: 'docs/rpc/core/composed/createComposedEndpoint' }
+        { label: 'dispose API', path: 'docs/rpc-core/composed/createComposedEndpoint' }
       ]
     },
     en: {
@@ -14889,7 +14893,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Return to RPC learning paths', path: 'index' },
-        { label: 'dispose ownership API', path: 'docs/rpc/core/composed/createComposedEndpoint' }
+        { label: 'dispose ownership API', path: 'docs/rpc-core/composed/createComposedEndpoint' }
       ]
     }
   },

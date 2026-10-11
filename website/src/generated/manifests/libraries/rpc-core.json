@@ -1102,8 +1102,8 @@
             ]
           },
           {
-            "id": "runtime-carrier-adapter-resources",
-            "heading": "Runtime/carrier adapter resources",
+            "id": "advanced-usage-runtime-carrier-adapter-resources",
+            "heading": "Advanced usage: Runtime/carrier adapter resources",
             "blocks": [
               {
                 "type": "paragraph",
@@ -1141,8 +1141,8 @@
             ]
           },
           {
-            "id": "thread-execution-and-foreign-language-byte-adapters",
-            "heading": "Thread execution and foreign-language byte adapters",
+            "id": "advanced-usage-runtime-carrier-adapter-resources-thread-execution-and-foreign-language-byte-adapters",
+            "heading": "Advanced usage: Runtime/carrier adapter resources · Thread execution and foreign-language byte adapters",
             "blocks": [
               {
                 "type": "paragraph",
@@ -1176,11 +1176,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "The variables above belong to the existing deployment and authentication issuer. JSON-RPC frame operations and diagnostic catalogs come from `@migaia/rpc-contract/framing/jsonrpc`. Neither this operation nor the Thread operations accept an existing target transport to qualify. Spreading a returned transport, adding capability labels or copying a codec never recreates its private registration."
+                "text": "The variables above belong to the existing deployment and authentication issuer. JSON-RPC frame operations and diagnostic catalogs come from `@migaia/rpc-contract/framing/jsonrpc`."
               },
               {
                 "type": "paragraph",
-                "text": "The neutral Core entry does not import native runtime modules or these adapter entries."
+                "text": "Neither this operation nor the Thread operations accept an existing target transport to qualify. Spreading a returned transport, adding capability labels or copying a codec never recreates its private registration. The neutral Core entry does not import native runtime modules or these adapter entries."
               },
               {
                 "type": "paragraph",

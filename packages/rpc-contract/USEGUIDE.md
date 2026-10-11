@@ -46,7 +46,7 @@ For a capture point that precedes later preparation, call `captureRpcBinaryData`
 
 A custom metadata codec can supply an actual `IRpcBinaryDataCodec` resource as the final prepare argument. `encode` produces its actual metadata representation. Optional `captureJsonData` receives canonical encoded roots and returns its actual JSON-ready value without walking those business roots again, and owns that codec representation's quota policy; `encodeInline` is its actual byte encoder. The prepare limit bounds binary backing allocation; a whole capture resource enforces its actual metadata representation quota. Encode-only resources retain exact metadata measurement. These data operations are responsible for accurate output, just as the supplied digest is responsible for actual SHA-256. They never establish Core transport trust, replay receipt or execution authority. Raw capture sinks and prehash/finish callbacks are internal.
 
-## Caller-held error metadata
+## Advanced usage: Caller-held error metadata
 
 ```ts
 import {

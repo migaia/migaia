@@ -115,7 +115,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  createJsonRpcFrameDecoder,\n  encodeJsonRpcFrame\n} from '@migaia/rpc-contract/framing/jsonrpc'\n\n/** The application supplies actual byte writes and consumes decoded protocol messages. */\nexport function createCarrierProtocol(\n  write: (frame: Uint8Array) => Promise<void>,\n  receive: (message: unknown) => void\n) {\n  const decoder = createJsonRpcFrameDecoder()\n  return {\n    send: (message: unknown) => write(encodeJsonRpcFrame(message)),\n    push: (chunk: Uint8Array) => {\n      for (const message of decoder.push(chunk)) receive(message)\n    },\n    finish: () => decoder.finish(),\n    close: () => decoder.close()\n  }\n}"
+                "code": "import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'\n\n/** The application supplies actual byte writes and consumes decoded protocol messages. */\nexport function createCarrierProtocol(\n  write: (frame: Uint8Array) => Promise<void>,\n  receive: (message: unknown) => void\n) {\n  const decoder = createJsonRpcFrameDecoder()\n  return {\n    send: (message: unknown) => write(encodeJsonRpcFrame(message)),\n    push: (chunk: Uint8Array) => {\n      for (const message of decoder.push(chunk)) receive(message)\n    },\n    finish: () => decoder.finish(),\n    close: () => decoder.close()\n  }\n}"
               },
               {
                 "type": "paragraph",
@@ -194,13 +194,13 @@
             ]
           },
           {
-            "id": "caller-held-error-metadata",
-            "heading": "Caller-held error metadata",
+            "id": "advanced-usage-caller-held-error-metadata",
+            "heading": "Advanced usage: Caller-held error metadata",
             "blocks": [
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) }, {\n    summaries,\n    routes\n  })\n  return deserializeRpcError(wire, undefined, routes)\n}"
+                "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(\n    error,\n    { report: ({ error: failure }) => report(failure) },\n    {\n      summaries,\n      routes\n    }\n  )\n  return deserializeRpcError(wire, undefined, routes)\n}"
               },
               {
                 "type": "paragraph",
@@ -3571,7 +3571,7 @@
           "errors": ["No documented errors are declared for deserializeRpcError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for deserializeRpcError.",
           "examples": [
-            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) }, {\n    summaries,\n    routes\n  })\n  return deserializeRpcError(wire, undefined, routes)\n}"
+            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(\n    error,\n    { report: ({ error: failure }) => report(failure) },\n    {\n      summaries,\n      routes\n    }\n  )\n  return deserializeRpcError(wire, undefined, routes)\n}"
           ],
           "members": [],
           "aliasOf": "deserializeRpcError",
@@ -3637,13 +3637,13 @@
           "identity": "packages/rpc-contract/dist/contract/error.d.ts:deserializeRpcError:export declare function deserializeRpcError(value: unknown, options?: IRpcWireErrorOptions, routes?: IRpcErrorWireRouteStore): Error;",
           "guidance": [
             {
-              "id": "caller-held-error-metadata",
-              "heading": "Caller-held error metadata",
+              "id": "advanced-usage-caller-held-error-metadata",
+              "heading": "Advanced usage: Caller-held error metadata",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) }, {\n    summaries,\n    routes\n  })\n  return deserializeRpcError(wire, undefined, routes)\n}"
+                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(\n    error,\n    { report: ({ error: failure }) => report(failure) },\n    {\n      summaries,\n      routes\n    }\n  )\n  return deserializeRpcError(wire, undefined, routes)\n}"
                 },
                 {
                   "type": "paragraph",
@@ -4013,7 +4013,7 @@
           "errors": ["No documented errors are declared for IRpcErrorWireSummary."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcErrorWireSummary.",
           "examples": [
-            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) }, {\n    summaries,\n    routes\n  })\n  return deserializeRpcError(wire, undefined, routes)\n}"
+            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(\n    error,\n    { report: ({ error: failure }) => report(failure) },\n    {\n      summaries,\n      routes\n    }\n  )\n  return deserializeRpcError(wire, undefined, routes)\n}"
           ],
           "members": [],
           "aliasOf": "IRpcErrorWireSummary",
@@ -4061,13 +4061,13 @@
           "identity": "packages/rpc-contract/dist/contract/types.d.ts:IRpcErrorWireSummary:export type IRpcErrorWireSummary = Readonly<{ code: string; message: string; /** Keep this node's existing serialized descendants instead of selecting the five-field summary. */ preserveSerializedError?: true; }>;",
           "guidance": [
             {
-              "id": "caller-held-error-metadata",
-              "heading": "Caller-held error metadata",
+              "id": "advanced-usage-caller-held-error-metadata",
+              "heading": "Advanced usage: Caller-held error metadata",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) }, {\n    summaries,\n    routes\n  })\n  return deserializeRpcError(wire, undefined, routes)\n}"
+                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(\n    error,\n    { report: ({ error: failure }) => report(failure) },\n    {\n      summaries,\n      routes\n    }\n  )\n  return deserializeRpcError(wire, undefined, routes)\n}"
                 },
                 {
                   "type": "paragraph",
@@ -4773,13 +4773,13 @@
           "identity": "packages/rpc-contract/dist/contract/error-text.d.ts:RpcContractErrorDiagnostic:export declare const RpcContractErrorDiagnostic: Readonly<{ /** Whole physical-frame quotas retain the canonical semantic source, code and stable message. */ frameLimitExceeded: Readonly<{ source: \"@migaia/rpc/contract\"; code: \"FRAME_LIMIT_EXCEEDED\"; message: \"rpc frame limit exceeded\"; }>; }>;",
           "guidance": [
             {
-              "id": "caller-held-error-metadata",
-              "heading": "Caller-held error metadata",
+              "id": "advanced-usage-caller-held-error-metadata",
+              "heading": "Advanced usage: Caller-held error metadata",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) }, {\n    summaries,\n    routes\n  })\n  return deserializeRpcError(wire, undefined, routes)\n}"
+                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(\n    error,\n    { report: ({ error: failure }) => report(failure) },\n    {\n      summaries,\n      routes\n    }\n  )\n  return deserializeRpcError(wire, undefined, routes)\n}"
                 },
                 {
                   "type": "paragraph",
@@ -5342,7 +5342,7 @@
           "errors": ["No documented errors are declared for serializeRpcError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for serializeRpcError.",
           "examples": [
-            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) }, {\n    summaries,\n    routes\n  })\n  return deserializeRpcError(wire, undefined, routes)\n}"
+            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(\n    error,\n    { report: ({ error: failure }) => report(failure) },\n    {\n      summaries,\n      routes\n    }\n  )\n  return deserializeRpcError(wire, undefined, routes)\n}"
           ],
           "members": [],
           "aliasOf": "serializeRpcError",
@@ -5408,13 +5408,13 @@
           "identity": "packages/rpc-contract/dist/contract/error.d.ts:serializeRpcError:export declare function serializeRpcError(value: unknown, options: IRpcSerializeErrorOptions, metadata?: IRpcErrorWireMetadata): IRpcSerializedError;",
           "guidance": [
             {
-              "id": "caller-held-error-metadata",
-              "heading": "Caller-held error metadata",
+              "id": "advanced-usage-caller-held-error-metadata",
+              "heading": "Advanced usage: Caller-held error metadata",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) }, {\n    summaries,\n    routes\n  })\n  return deserializeRpcError(wire, undefined, routes)\n}"
+                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(\n    error,\n    { report: ({ error: failure }) => report(failure) },\n    {\n      summaries,\n      routes\n    }\n  )\n  return deserializeRpcError(wire, undefined, routes)\n}"
                 },
                 {
                   "type": "paragraph",
@@ -6892,7 +6892,7 @@
           "errors": ["No documented errors are declared for createJsonRpcFrameDecoder."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createJsonRpcFrameDecoder.",
           "examples": [
-            "import {\n  createJsonRpcFrameDecoder,\n  encodeJsonRpcFrame\n} from '@migaia/rpc-contract/framing/jsonrpc'\n\n/** The application supplies actual byte writes and consumes decoded protocol messages. */\nexport function createCarrierProtocol(\n  write: (frame: Uint8Array) => Promise<void>,\n  receive: (message: unknown) => void\n) {\n  const decoder = createJsonRpcFrameDecoder()\n  return {\n    send: (message: unknown) => write(encodeJsonRpcFrame(message)),\n    push: (chunk: Uint8Array) => {\n      for (const message of decoder.push(chunk)) receive(message)\n    },\n    finish: () => decoder.finish(),\n    close: () => decoder.close()\n  }\n}"
+            "import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'\n\n/** The application supplies actual byte writes and consumes decoded protocol messages. */\nexport function createCarrierProtocol(\n  write: (frame: Uint8Array) => Promise<void>,\n  receive: (message: unknown) => void\n) {\n  const decoder = createJsonRpcFrameDecoder()\n  return {\n    send: (message: unknown) => write(encodeJsonRpcFrame(message)),\n    push: (chunk: Uint8Array) => {\n      for (const message of decoder.push(chunk)) receive(message)\n    },\n    finish: () => decoder.finish(),\n    close: () => decoder.close()\n  }\n}"
           ],
           "members": [],
           "exportPath": "./framing/jsonrpc",
@@ -6963,7 +6963,7 @@
           "errors": ["No documented errors are declared for encodeJsonRpcFrame."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for encodeJsonRpcFrame.",
           "examples": [
-            "import {\n  createJsonRpcFrameDecoder,\n  encodeJsonRpcFrame\n} from '@migaia/rpc-contract/framing/jsonrpc'\n\n/** The application supplies actual byte writes and consumes decoded protocol messages. */\nexport function createCarrierProtocol(\n  write: (frame: Uint8Array) => Promise<void>,\n  receive: (message: unknown) => void\n) {\n  const decoder = createJsonRpcFrameDecoder()\n  return {\n    send: (message: unknown) => write(encodeJsonRpcFrame(message)),\n    push: (chunk: Uint8Array) => {\n      for (const message of decoder.push(chunk)) receive(message)\n    },\n    finish: () => decoder.finish(),\n    close: () => decoder.close()\n  }\n}"
+            "import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'\n\n/** The application supplies actual byte writes and consumes decoded protocol messages. */\nexport function createCarrierProtocol(\n  write: (frame: Uint8Array) => Promise<void>,\n  receive: (message: unknown) => void\n) {\n  const decoder = createJsonRpcFrameDecoder()\n  return {\n    send: (message: unknown) => write(encodeJsonRpcFrame(message)),\n    push: (chunk: Uint8Array) => {\n      for (const message of decoder.push(chunk)) receive(message)\n    },\n    finish: () => decoder.finish(),\n    close: () => decoder.close()\n  }\n}"
           ],
           "members": [],
           "exportPath": "./framing/jsonrpc",

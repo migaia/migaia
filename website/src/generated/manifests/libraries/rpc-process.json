@@ -66,6 +66,46 @@
                 "text": "包内使用相对路径；跨包调用只使用公开 API。协议工具使用 `@migaia/rpc-contract`，Core/Remote/Testing 使用 `@migaia/rpc-core` 的普通入口。"
               }
             ]
+          },
+          {
+            "id": "advanced-usage-拥有子进程并调用远端服务",
+            "heading": "Advanced usage：拥有子进程并调用远端服务",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "下面沿已存在的 Node stdio source 启动一个服务，在父端调用 `math.double`，并在 `finally` 关闭 Peer。两个 TypeScript 文件使用 ESM，先编译到同目录的 `.js`；`service.js` 必须是本应用实际部署的子端入口。"
+              }
+            ]
+          },
+          {
+            "id": "advanced-usage-拥有子进程并调用远端服务-进程子端-service-ts",
+            "heading": "Advanced usage：拥有子进程并调用远端服务 · 进程子端 service.ts",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: { math: { double: (value: number) => value * 2 } },\n  report: (error) => console.error(error)\n})"
+              }
+            ]
+          },
+          {
+            "id": "advanced-usage-拥有子进程并调用远端服务-createprocesspeer-父端-main-ts",
+            "heading": "Advanced usage：拥有子进程并调用远端服务 · createProcessPeer 父端 main.ts",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport {\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessByteChannel\n} from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IChildApi = { math: { double: (value: number) => number } }\ntype IOptions = Parameters<typeof createProcessPeer<IChildApi>>[0]\ntype ISpawn = Exclude<NonNullable<IOptions['spawn']>, Function>\n/** 收集原 source/code/cause 错误，不把失败当成重执许可。 */\nconst report = (error: unknown) => console.error(error)\n/** 此 launcher 创建并持有本次原生进程。 */\nconst launcher = createNodeProcessLauncher()\n/** 新会话凭据通过实际 bootstrap 交给该子进程，不写入日志。 */\nconst token = randomBytes(32).toString('base64url')\n/** 保留 launcher 返回的实际 handle，建立连接时复用其字节资源与身份。 */\nlet handle: Awaited<ReturnType<typeof launcher.launch>>\n/** 一个 source 组合监督预算、bootstrap 与同一次 launch 的真实通道。 */\nconst spawn: ISpawn = {\n  kind: 'spawn',\n  channelKind: 'byte',\n  wire: 'native',\n  token,\n  supervision: {\n    id: 'math-process',\n    isolation: 'best-effort',\n    report,\n    launcher: {\n      ...launcher,\n      launch: async (spec, request) => {\n        handle = await launcher.launch(spec, request)\n        return handle\n      }\n    },\n    budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n    spec: {\n      command: process.execPath,\n      args: [fileURLToPath(new URL('./service.js', import.meta.url))],\n      env: { inherit: ['PATH'], set: {} },\n      stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n      bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n    }\n  },\n  rawChannel: async () => handle.channel!,\n  establish: (raw, prepared) =>\n    createProcessTransport(raw as IProcessByteChannel, {\n      role: 'initiator',\n      offer: prepared.offer!,\n      peerId: handle.runtimeApiIdentity!.instanceId,\n      scheduler: prepared.scheduler,\n      ipc: { ...prepared.session, log: () => undefined },\n      report\n    })\n}\n/** 工厂完成协商后，Peer 持有本次连接与执行单元的生命周期。 */\nconst typedRemote = await createProcessPeer<IChildApi>({ spawn, report })\ntry {\n  console.log(await typedRemote.request('math.double', 21))\n} finally {\n  await typedRemote.close()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`launcher.launch` 返回实际 handle 后，`rawChannel` 才读取它的字节通道；`establish` 用该次 handle 的真实 instanceId 和原 prepared offer 创建通道。这里没有声明任意 transport 为 owned，也没有把复制的身份或 capabilities 当授信。`budget` 限定本应用的进程数，不能用它声称操作系统隔离或已测量资源用量。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`request` 的 Promise 给出业务结果，发送成功本身不代表服务已执行。`close()` 由原监督与 drain owner 结束这个 spawn 的连接和执行单元；使用 connect/listen 借用外部服务时，只关闭本端连接，外部进程仍由其原 owner 终止。遇到断线或未知结果，先按既有 source/code 策略对账，不自动重放副作用。"
+              }
+            ]
           }
         ]
       }
@@ -108,7 +148,10 @@
           "returns": "Promise<IRuntimeTypedPeer<TRemote, IRuntimeFlatten<TRemote>, typeof RuntimePluginKey.process>>",
           "errors": ["No documented errors are declared for createProcessPeer."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createProcessPeer.",
-          "examples": [],
+          "examples": [
+            "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: { math: { double: (value: number) => value * 2 } },\n  report: (error) => console.error(error)\n})",
+            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport {\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessByteChannel\n} from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IChildApi = { math: { double: (value: number) => number } }\ntype IOptions = Parameters<typeof createProcessPeer<IChildApi>>[0]\ntype ISpawn = Exclude<NonNullable<IOptions['spawn']>, Function>\n/** 收集原 source/code/cause 错误，不把失败当成重执许可。 */\nconst report = (error: unknown) => console.error(error)\n/** 此 launcher 创建并持有本次原生进程。 */\nconst launcher = createNodeProcessLauncher()\n/** 新会话凭据通过实际 bootstrap 交给该子进程，不写入日志。 */\nconst token = randomBytes(32).toString('base64url')\n/** 保留 launcher 返回的实际 handle，建立连接时复用其字节资源与身份。 */\nlet handle: Awaited<ReturnType<typeof launcher.launch>>\n/** 一个 source 组合监督预算、bootstrap 与同一次 launch 的真实通道。 */\nconst spawn: ISpawn = {\n  kind: 'spawn',\n  channelKind: 'byte',\n  wire: 'native',\n  token,\n  supervision: {\n    id: 'math-process',\n    isolation: 'best-effort',\n    report,\n    launcher: {\n      ...launcher,\n      launch: async (spec, request) => {\n        handle = await launcher.launch(spec, request)\n        return handle\n      }\n    },\n    budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n    spec: {\n      command: process.execPath,\n      args: [fileURLToPath(new URL('./service.js', import.meta.url))],\n      env: { inherit: ['PATH'], set: {} },\n      stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n      bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n    }\n  },\n  rawChannel: async () => handle.channel!,\n  establish: (raw, prepared) =>\n    createProcessTransport(raw as IProcessByteChannel, {\n      role: 'initiator',\n      offer: prepared.offer!,\n      peerId: handle.runtimeApiIdentity!.instanceId,\n      scheduler: prepared.scheduler,\n      ipc: { ...prepared.session, log: () => undefined },\n      report\n    })\n}\n/** 工厂完成协商后，Peer 持有本次连接与执行单元的生命周期。 */\nconst typedRemote = await createProcessPeer<IChildApi>({ spawn, report })\ntry {\n  console.log(await typedRemote.request('math.double', 21))\n} finally {\n  await typedRemote.close()\n}"
+          ],
           "members": [],
           "aliasOf": "createProcessPeer",
           "exportPath": ".",
@@ -164,7 +207,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-process/dist/process/peer.d.ts:createProcessPeer:export declare function createProcessPeer<TRemote = Record<never, never>>(options: IRuntimeProcessPeerOptions): Promise<IRuntimeTypedPeer<TRemote, IRuntimeFlatten<TRemote>, typeof RuntimePluginKey.process>>;",
           "guidance": [],
-          "usageScore": 16,
+          "usageScore": 60,
           "configuration": [],
           "fragment": "rpc-process-index--createProcessPeer"
         },
@@ -305,7 +348,9 @@
           "returns": "Promise<IRuntimePeerSourceResult> | Promise<IRemoteChannel>",
           "errors": ["No documented errors are declared for createProcessTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createProcessTransport.",
-          "examples": [],
+          "examples": [
+            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport {\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessByteChannel\n} from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IChildApi = { math: { double: (value: number) => number } }\ntype IOptions = Parameters<typeof createProcessPeer<IChildApi>>[0]\ntype ISpawn = Exclude<NonNullable<IOptions['spawn']>, Function>\n/** 收集原 source/code/cause 错误，不把失败当成重执许可。 */\nconst report = (error: unknown) => console.error(error)\n/** 此 launcher 创建并持有本次原生进程。 */\nconst launcher = createNodeProcessLauncher()\n/** 新会话凭据通过实际 bootstrap 交给该子进程，不写入日志。 */\nconst token = randomBytes(32).toString('base64url')\n/** 保留 launcher 返回的实际 handle，建立连接时复用其字节资源与身份。 */\nlet handle: Awaited<ReturnType<typeof launcher.launch>>\n/** 一个 source 组合监督预算、bootstrap 与同一次 launch 的真实通道。 */\nconst spawn: ISpawn = {\n  kind: 'spawn',\n  channelKind: 'byte',\n  wire: 'native',\n  token,\n  supervision: {\n    id: 'math-process',\n    isolation: 'best-effort',\n    report,\n    launcher: {\n      ...launcher,\n      launch: async (spec, request) => {\n        handle = await launcher.launch(spec, request)\n        return handle\n      }\n    },\n    budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n    spec: {\n      command: process.execPath,\n      args: [fileURLToPath(new URL('./service.js', import.meta.url))],\n      env: { inherit: ['PATH'], set: {} },\n      stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n      bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n    }\n  },\n  rawChannel: async () => handle.channel!,\n  establish: (raw, prepared) =>\n    createProcessTransport(raw as IProcessByteChannel, {\n      role: 'initiator',\n      offer: prepared.offer!,\n      peerId: handle.runtimeApiIdentity!.instanceId,\n      scheduler: prepared.scheduler,\n      ipc: { ...prepared.session, log: () => undefined },\n      report\n    })\n}\n/** 工厂完成协商后，Peer 持有本次连接与执行单元的生命周期。 */\nconst typedRemote = await createProcessPeer<IChildApi>({ spawn, report })\ntry {\n  console.log(await typedRemote.request('math.double', 21))\n} finally {\n  await typedRemote.close()\n}"
+          ],
           "members": [],
           "aliasOf": "createProcessTransport",
           "exportPath": ".",
@@ -377,7 +422,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-process/dist/process/handshake.d.ts:createProcessTransport:export declare function createProcessTransport(channel: IProcessByteChannel, options: IProcessByteOptions): Promise<IRuntimePeerSourceResult>;\nexport declare function createProcessTransport(channel: IProcessMessageChannel, options: IProcessMessageOptions): Promise<IRemoteChannel>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "rpc-process-index--createProcessTransport"
         }
@@ -1181,7 +1226,9 @@
           "returns": "IProcessLauncher<INodeProcessHandle>",
           "errors": ["No documented errors are declared for createNodeProcessLauncher."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeProcessLauncher.",
-          "examples": [],
+          "examples": [
+            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport {\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessByteChannel\n} from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IChildApi = { math: { double: (value: number) => number } }\ntype IOptions = Parameters<typeof createProcessPeer<IChildApi>>[0]\ntype ISpawn = Exclude<NonNullable<IOptions['spawn']>, Function>\n/** 收集原 source/code/cause 错误，不把失败当成重执许可。 */\nconst report = (error: unknown) => console.error(error)\n/** 此 launcher 创建并持有本次原生进程。 */\nconst launcher = createNodeProcessLauncher()\n/** 新会话凭据通过实际 bootstrap 交给该子进程，不写入日志。 */\nconst token = randomBytes(32).toString('base64url')\n/** 保留 launcher 返回的实际 handle，建立连接时复用其字节资源与身份。 */\nlet handle: Awaited<ReturnType<typeof launcher.launch>>\n/** 一个 source 组合监督预算、bootstrap 与同一次 launch 的真实通道。 */\nconst spawn: ISpawn = {\n  kind: 'spawn',\n  channelKind: 'byte',\n  wire: 'native',\n  token,\n  supervision: {\n    id: 'math-process',\n    isolation: 'best-effort',\n    report,\n    launcher: {\n      ...launcher,\n      launch: async (spec, request) => {\n        handle = await launcher.launch(spec, request)\n        return handle\n      }\n    },\n    budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n    spec: {\n      command: process.execPath,\n      args: [fileURLToPath(new URL('./service.js', import.meta.url))],\n      env: { inherit: ['PATH'], set: {} },\n      stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n      bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n    }\n  },\n  rawChannel: async () => handle.channel!,\n  establish: (raw, prepared) =>\n    createProcessTransport(raw as IProcessByteChannel, {\n      role: 'initiator',\n      offer: prepared.offer!,\n      peerId: handle.runtimeApiIdentity!.instanceId,\n      scheduler: prepared.scheduler,\n      ipc: { ...prepared.session, log: () => undefined },\n      report\n    })\n}\n/** 工厂完成协商后，Peer 持有本次连接与执行单元的生命周期。 */\nconst typedRemote = await createProcessPeer<IChildApi>({ spawn, report })\ntry {\n  console.log(await typedRemote.request('math.double', 21))\n} finally {\n  await typedRemote.close()\n}"
+          ],
           "members": [],
           "exportPath": "./adapters/node-child-process",
           "overloadSignatures": [
@@ -1234,7 +1281,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-process/dist/process/adapters/node-child-process.d.ts:createNodeProcessLauncher:export declare function createNodeProcessLauncher(options?: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>): IProcessLauncher<INodeProcessHandle>;",
           "guidance": [],
-          "usageScore": 10,
+          "usageScore": 24,
           "configuration": [],
           "fragment": "rpc-process-adapters/node-child-process--createNodeProcessLauncher"
         },

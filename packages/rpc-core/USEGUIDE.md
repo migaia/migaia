@@ -482,7 +482,7 @@ The process connection emits at most 32 normal `ipc.stderr` records per 1000 ms 
 
 当 `createRuntimeApiEndpoint` 实际连接的 native runtime directory 已就绪时，`group(steps, options)` 接收原 request-only wire steps，提交一个 task 并返回每一步的结果。第一步失败后余项 not-executed，已经发生的副作用不回滚。`outcome(idempotencyKey)` 查询原逻辑调用的 pending/unknown/done 与 store/result，不重新执行 provider；unknown 不证明未执行。Remote 工厂继续拥有目录/选项验证、重试、恢复与关闭。
 
-## Runtime/carrier adapter resources
+## Advanced usage: Runtime/carrier adapter resources
 
 `@migaia/rpc-core/adapter` constructs a complete channel from ordered raw I/O held by a runtime or carrier adapter. It owns the handshake, physical frame queue, IPC gate, codec/framer composition and exact private batch/replay facts. It never accepts an existing RPC transport to mark, an agreed/trusted/owned flag, or a registration callback. The historical `staticAgreement` option contains two local/peer protocol proposals; the constructor validates their equality and creates its own static agreement for its own new transport. It is not a receipt for another transport.
 
@@ -566,8 +566,9 @@ const channel = await createJsonRpcAdapterChannel({
 ```
 
 The variables above belong to the existing deployment and authentication issuer. JSON-RPC frame
-operations and diagnostic catalogs come from `@migaia/rpc-contract/framing/jsonrpc`. Neither this
-operation nor the Thread operations accept an existing target transport to qualify. Spreading a
+operations and diagnostic catalogs come from `@migaia/rpc-contract/framing/jsonrpc`.
+
+Neither this operation nor the Thread operations accept an existing target transport to qualify. Spreading a
 returned transport, adding capability labels or copying a codec never recreates its private
 registration. The neutral Core entry does not import native runtime modules or these adapter
 entries.

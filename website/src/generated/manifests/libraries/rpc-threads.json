@@ -49,7 +49,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createThreadPeer } from '@migaia/rpc-threads'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'"
+                "code": "import { createThreadPeer } from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'"
               },
               {
                 "type": "paragraph",
@@ -62,6 +62,46 @@
               {
                 "type": "paragraph",
                 "text": "包内使用相对路径；跨包调用只使用公开 API。协议工具使用 `@migaia/rpc-contract`，Core/Remote/Testing 使用 `@migaia/rpc-core` 的普通入口。"
+              }
+            ]
+          },
+          {
+            "id": "advanced-usage-拥有-worker-并保证关闭",
+            "heading": "Advanced usage：拥有 Worker 并保证关闭",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "以下父端用 Node launcher 创建实际 Worker，复用同一个 scheduler 与单执行单元预算，调用子端后关闭 Peer。两个文件使用 ESM，先编译到同目录的 `.js`；每次启动使用新的 source，不复用已经关闭的 Worker。"
+              }
+            ]
+          },
+          {
+            "id": "advanced-usage-拥有-worker-并保证关闭-worker-子端-worker-ts",
+            "heading": "Advanced usage：拥有 Worker 并保证关闭 · Worker 子端 worker.ts",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: { math: { double: (value: number) => value * 2 } },\n  report: (error) => console.error(error)\n})"
+              }
+            ]
+          },
+          {
+            "id": "advanced-usage-拥有-worker-并保证关闭-createthreadpeer-父端-main-ts",
+            "heading": "Advanced usage：拥有 Worker 并保证关闭 · createThreadPeer 父端 main.ts",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IChildApi = { math: { double: (value: number) => number } }\n/** 原错误进入本应用的报告策略，保留其身份与 cause。 */\nconst report = (error: unknown) => console.error(error)\n/** 该 source 用实际 Node Worker launcher 与 channel factory 持有执行单元。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** Peer 在真实 bootstrap、ACK 与协商完成后提供类型化调用。 */\nconst typedRemote = await createThreadPeer<IChildApi>({ spawn, report })\ntry {\n  console.log(await typedRemote.request('math.double', 21))\n} finally {\n  await typedRemote.close()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`createNodeThreadLauncher` 持有创建的 Worker；`createNodeThreadChannelFactory` 沿实际 raw port 与原 private ACK 建立通道。子端只能因真实 launcher bootstrap 自动发现父端；Worker 名称、PID、普通 MessagePort 或复制的 handle 不提供 stop/restart/replace 权限。预算只约束本应用的 Worker 数，没有实际采样时不能宣称资源用量已经验证。"
+              },
+              {
+                "type": "paragraph",
+                "text": "正常返回与调用抛错都进入 `finally`，由 Peer 的原 close/drain owner 清理连接并结束它拥有的 Worker。connect/listen 或借用 port 的 Peer 只关闭自己的连接，不终止外部执行单元。需要 transfer 时，按真实协商能力与 backing 所有权处理；detach 后的失败不能恢复 buffer，也不能以自动重试重放它。"
               }
             ]
           }
@@ -208,7 +248,10 @@
           "returns": "Promise<IRuntimeTypedPeer<TRemote>>",
           "errors": ["No documented errors are declared for createThreadPeer."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createThreadPeer.",
-          "examples": [],
+          "examples": [
+            "import { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: { math: { double: (value: number) => value * 2 } },\n  report: (error) => console.error(error)\n})",
+            "import { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IChildApi = { math: { double: (value: number) => number } }\n/** 原错误进入本应用的报告策略，保留其身份与 cause。 */\nconst report = (error: unknown) => console.error(error)\n/** 该 source 用实际 Node Worker launcher 与 channel factory 持有执行单元。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** Peer 在真实 bootstrap、ACK 与协商完成后提供类型化调用。 */\nconst typedRemote = await createThreadPeer<IChildApi>({ spawn, report })\ntry {\n  console.log(await typedRemote.request('math.double', 21))\n} finally {\n  await typedRemote.close()\n}"
+          ],
           "members": [],
           "aliasOf": "createThreadPeer",
           "exportPath": ".",
@@ -262,7 +305,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-threads/dist/threads/peer.d.ts:createThreadPeer:export declare function createThreadPeer<TRemote = Record<never, never>>(options: IRuntimeThreadPeerOptions): Promise<IRuntimeTypedPeer<TRemote>>;",
           "guidance": [],
-          "usageScore": 16,
+          "usageScore": 56,
           "configuration": [],
           "fragment": "rpc-threads-index--createThreadPeer"
         },
@@ -1470,7 +1513,9 @@
           "returns": "Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").INodeThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>",
           "errors": ["No documented errors are declared for createNodeThreadChannelFactory."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeThreadChannelFactory.",
-          "examples": [],
+          "examples": [
+            "import { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IChildApi = { math: { double: (value: number) => number } }\n/** 原错误进入本应用的报告策略，保留其身份与 cause。 */\nconst report = (error: unknown) => console.error(error)\n/** 该 source 用实际 Node Worker launcher 与 channel factory 持有执行单元。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** Peer 在真实 bootstrap、ACK 与协商完成后提供类型化调用。 */\nconst typedRemote = await createThreadPeer<IChildApi>({ spawn, report })\ntry {\n  console.log(await typedRemote.request('math.double', 21))\n} finally {\n  await typedRemote.close()\n}"
+          ],
           "members": [],
           "exportPath": "./adapters/node",
           "overloadSignatures": [
@@ -1525,7 +1570,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-threads/dist/threads/adapters/node.d.ts:createNodeThreadChannelFactory:export declare function createNodeThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").INodeThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
           "guidance": [],
-          "usageScore": 10,
+          "usageScore": 28,
           "configuration": [],
           "fragment": "rpc-threads-adapters/node--createNodeThreadChannelFactory"
         },
@@ -1551,7 +1596,9 @@
           "returns": "import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterNodeThreadHandle>",
           "errors": ["No documented errors are declared for createNodeThreadLauncher."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeThreadLauncher.",
-          "examples": [],
+          "examples": [
+            "import { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IChildApi = { math: { double: (value: number) => number } }\n/** 原错误进入本应用的报告策略，保留其身份与 cause。 */\nconst report = (error: unknown) => console.error(error)\n/** 该 source 用实际 Node Worker launcher 与 channel factory 持有执行单元。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** Peer 在真实 bootstrap、ACK 与协商完成后提供类型化调用。 */\nconst typedRemote = await createThreadPeer<IChildApi>({ spawn, report })\ntry {\n  console.log(await typedRemote.request('math.double', 21))\n} finally {\n  await typedRemote.close()\n}"
+          ],
           "members": [],
           "exportPath": "./adapters/node",
           "overloadSignatures": [
@@ -1606,7 +1653,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-threads/dist/threads/adapters/node.d.ts:createNodeThreadLauncher:export declare function createNodeThreadLauncher(options?: Readonly<{ runtimeApi?: IRuntimePeerSourceContext; }>): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterNodeThreadHandle>;",
           "guidance": [],
-          "usageScore": 10,
+          "usageScore": 28,
           "configuration": [],
           "fragment": "rpc-threads-adapters/node--createNodeThreadLauncher"
         }
