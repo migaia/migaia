@@ -22,8 +22,14 @@ export function registerLazyNativeReplayOwner(
   if (!owners.has(resource) && !initializers.has(resource)) initializers.set(resource, initialize)
 }
 
-/** A second wrapper permanently downgrades the first consumer instead of creating parallel L. */
-export function bindNativeReplayTransport(resource: object, transport: IRpcTransport): void {
+/** Bind a physical owner once; constructed carrier composition retains that original receipt. */
+export function bindNativeReplayTransport(resource: object, transport: object): void {
+  /** A Core-created raw carrier already retains its physical owner's once-per-lifetime receipt. */
+  const associated = transports.get(resource)
+  if (associated) {
+    transports.set(transport, associated)
+    return
+  }
   /** Only a deep adapter's registered initializer may produce physical provenance. */
   const initialize = initializers.get(resource)
   if (!owners.has(resource) && initialize) {
@@ -34,6 +40,7 @@ export function bindNativeReplayTransport(resource: object, transport: IRpcTrans
   const registration = owners.get(resource)
   if (!registration) return
   if (registration.receipt) {
+    /** A second physical wrapper permanently downgrades the first rather than minting fresh L. */
     registration.receipt.downgrade()
     return
   }

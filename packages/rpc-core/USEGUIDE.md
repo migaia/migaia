@@ -649,6 +649,99 @@ import {
 export function transferError(error: unknown, report: (failure: unknown) => void) {
   const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) })
   const received: unknown = JSON.parse(JSON.stringify(wire))
+
+
+## 运行时 adapter API：持有资源，Core 生成能力事实
+
+本节是 adapter extraction 的实施契约，当前迁移尚未完成。生产 adapter 与第三方 adapter 均使用唯一的 `@migaia/rpc-core/adapter` 入口。运行时发现、启动、线程 bootstrap 包装、JSON-RPC 映射及进程策略属于 adapter；Core 只实现通用载体、协议控制、provider 资源与 remote 生命周期。adapter 可直接使用已有基础库的公开入口；RPC 包依赖向内指向 `rpc-contract`、`rpc-core`，JSON-RPC bridge 另外可依赖 `rpc-process`。基础库不反向依赖 RPC 包。
+
+调用方交给 Core 自己持有的原始消息端口、字节 I/O、启动句柄及 `rpc-contract` 的标准协议组件。Core 构造新的 channel，在自己的收发路径观察 peer offer/ACK，再生成该 channel 的精确能力与资源事实。接口不接收已有 transport 作为登记目标，也不接收 agreed/trusted/owned 声明、alive/exclusive 回调声明、私有 provider reservation DTO 或 JSON snapshot。
+
+### 消息端口
+
+`createEventEmitterMessageResource(port, launch?)` 与 `createEventTargetMessageResource(port, launch?)` 持有原始端口；可选 launch 是实际执行句柄的退出通知和终止操作。Core 观察真实 close/completion 与消息 reader 数量。`resource.openStatic({ peerId, scheduler, enabled? })` 同步构造固定 identity/message profile；默认 `stream@1`、`batch@1`，`enabled` 仅能缩小该 profile，且不发 hello。
+
+`resource.open({ peerId, scheduler, offer, control, signal?, timeoutMs?, bootstrap? })` 等待能力准备后返回 channel。`offer` 是本地提案；`control` 选择 `rpc-contract/runtime` 的标准 `rpcMessageCapabilityControl`。Core 读取实际 ACK，并复用现有 ACK grammar 与能力求交算法。自动启动的初始消息由 Core 读取实际持有的 launch input，不能传入 adapter 已解析的协商结果。没有 ACK，或 ACK 未列出的扩展能力不启用；未知或额外 ACK 字段按原失败和错误码语义拒绝。
+
+2026-10-11 的有意变更仅涉及同版本 lockstep 的 thread 私有启动消息：旧 legacy 扩展路径直接采用两端配置；新路径交换同一种 capability ACK，再使用实际交集。业务 binary/runtime/transfer 能力保留。默认固定 static profile 保持零 hello。显式扩展 channel 的准备可能需要 await；原 channel factory 的异步 open 边界继续承担该等待。process message 扩展能力另按下述授权处理；JSON-RPC wire 保持不变。
+
+第三方自定义事件消息端口可使用同一资源操作：
+
+```ts
+import { RpcCapability } from '@migaia/rpc-contract'
+import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
+import { createEventEmitterMessageResource } from '@migaia/rpc-core/adapter'
+import { createRuntimePeer } from '@migaia/rpc-core/remote'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+/** myRuntime 已持有真实端口；其 on/off/postMessage 地址同一个原始资源。 */
+const resource = createEventEmitterMessageResource(myRuntime.parentPort)
+
+/** 两端各自提出本地已实现的能力；Core 从收到的 ACK 计算交集。 */
+const peer = await createRuntimePeer({
+  self: { name: 'custom-runtime', instanceId: 'custom-runtime-1' },
+  provide: { echo: (value: unknown) => value },
+  connect: () => resource.open({
+    peerId: 'custom-runtime-parent',
+    scheduler: systemScheduler,
+    offer: [RpcCapability.runtimeApi, RpcCapability.batch, RpcCapability.stream],
+    control: rpcMessageCapabilityControl
+  }),
+  report: (error: unknown) => myRuntime.report(error)
+})
+
+await peer.close()
+```
+
+这里的端口来自调用方实际资源。公开属性或复制 transport、codec/framer 对象不会复制 Core 的私有事实。标准 control descriptor 仅描述报文 grammar；能力来自 Core 自己读到的报文。
+
+### 字节连接与通用 provider 资源
+
+`createRuntimeByteConnection(io, options, diagnostics)` 在原始有序 byte I/O 上执行 Contract hello/accept、认证、最终载体构造与私有 batch/replay 绑定。`options` 包含本地 offer、role、认证 verifier、地址和队列/log 配置，不包含已协商结果。verifier 的返回身份只有在 Core 实际调用 verifier 后才能用于该连接的 session scope。`readRuntimeByteBootstrap(io, diagnostics, options?)` 读取一个有界 framed 初始消息，再将同一 decoder/接收队列移交给连接。
+
+`createRuntimeProviderGovernor(channel, policy, closeSession, report)` 持有原连接和原关闭操作，内部构造 rate/payload reservation、scalar/stream wrapper 与 preflight/bulk 事实。它提供 `limits`、`endpoint`、`close` 操作；不公开 reserve/check/invoke/enter registrar。`createRuntimeProviderScope(store?)` 的 `session(channel, limits)` 只使用 Core 在实际认证连接上保留的身份。进程阈值、诊断及会话关闭策略留在 rpc-process。
+
+诊断参数是原有 source/code/message 数据，不能选择 trust writer。Node byte-stream glue 和 Buffer/runtime 专属处理留在 rpc-process。stderr 的策略属于 process；通用 Core IPC gate/log 安装继续使用同一个原资源与清理顺序。
+
+### 通用对象连接
+
+`holdAdapterObjectChannel(io)` 持有原始 text/object I/O。其 `prepare(localOffer)` 在安装原生 reader/timer 之前生成 hello，并保留原提案；`negotiate()` 自己调用该资源的 exchange，读取实际 reply，再调用 Contract completion。`open(commonOptions)` 使用自己保存的结果构造最终 IPC transport 和标准 object/text pipeline，内部生成 batch/object-port 事实；`close(reason?)` 关闭同一资源。
+
+`io.activate(capabilities)` 是 Core 向实际资源输出协商结果，不是输入声明。JSON-RPC envelope、correlation、method extension 检查和 full wire error 映射留在 bridge。hello 编码、完成检查、timer 清理和最终 IPC adoption 的顺序保持原实现。通用 JSON materialization 留 Core，adapter 不获取私有 snapshot owner。
+
+### Peer、启动与 binding 的准备
+
+`prepareAdapterPeer(options)` 验证原 Peer 配置并持有原 Host preparation context，返回不透明准备对象。本地 identity、compiled offer、timeout 和启动 metadata 从该对象输出；它的 Peer/managed-Peer/launch 操作保留原 Core lifecycle owner。调用方不能读取或设置 Host context、provider scope、session membership 或 generation 注册表。
+
+adapter 的 launch 操作交给该准备对象实际 launcher、spec 与原 launch request。Core 使用自己生成的本地提案和 namespace 填写启动 metadata，再调用该 held launcher。binding/drain 操作复用现有 remote owner；native supervisor 继续由原 supervision 公共工厂构造。普通配置校验、目录规范化、失败 presentation 和 abort reason 使用明确的 adapter 数据操作，不公开任意 Core error identity 或 provider trust 的写入能力。
+
+
+公开 adapter 数据操作的用途：`createAdapterId` 生成普通本地资源地址；`readAdapterAbortReason` 保留原 signal reason；`validateAdapterPeerTimeout`、`validateAdapterPeerMethods` 在 native I/O 前校验本地配置；`normalizeAdapterDescription`、`adapterContractRequiresStream` 对收到的目录和本地声明进行数据检查。`AdapterPeerErrorText` 与 `IpcReporterContext` 保留稳定失败文本和 reporter 归属。
+
+`createAdapterConfigurationError` 只生成原 INVALID_CONFIG 诊断，`createAdapterConfigurationTypeError` 在 Core 内构造原生 TypeError 并保留 cause，不接外部 error 作为登记目标，`createAdapterTransportError` 表达真实载体失败；这些接口不能生成任意 deadline/owned/trusted 身份。`holdAdapterLaunch(request).proposal` 只输出 Core 曾附在同一原 launch request 上的本地 metadata，不能写入 context。
+
+`createAdapterBindingDrain(scheduler, report)` 持有原 endpoint drain；`createAdapterPlugin(options, metadata?)` 完成原 Plugin assembly；`holdAdapterRegistration(options).prepare(signal, rollback?)`、`.plugin(metadata?, onReleased?)`、`.release()` 在预验证和安装之间保留同一个真实 registration。调用方不能提供 prepared holder。`prepareAdapterPeer(options, defaultName, selectedSelf?)` 返回本地 `context` 和 `launch`、`managed`、`peer`、`own` 操作；Host context 不进入公开输入。
+
+通用 object/byte 连接的 `log` 是同一个原 IPC log installation；`ownClose({ close })` 接实际清理资源，在 gated physical close 前清理。`expectedStringText` 仅选择原非字符串输入的诊断文本，不能改变 codec 快路证明。`materializeAdapterJson(value)` 是普通 JSON 数据输出操作，不返回或登记私有 owned snapshot。
+
+
+`createRuntimeEventByteIO(reader, writer, physical, closedDiagnostic)` 接受实际持有的事件字节流和物理 close 资源。Core 直接安装原 reader、观察 destroyed/close 与 listenerCount，构造自己的 raw byte channel；不接收 owned/native 标签或 alive/exclusive 回调。独立读写流保留 stdio 的原资格；同一个 duplex 作为 reader/writer 时维持原 socket 路径，不凭借形状升级 replay。标准字节编码由 Core 的通用 codec owner 实现，Node byte glue 留在 process。
+
+
+`resource.receiveInitial(rawInitialResource?)` 同步安装原 bounded cold receiver，并返回实际初始报文的 Promise；仅自动发现路径调用该读取操作。普通 `openStatic` 保持原 lazy listener 行为。初始报文使用原 closed bootstrap grammar、identity/地址一致性、portable data 和 generation 校验。Event byte 构造的 `closedDiagnostic` 是原 CHANNEL_CLOSED 的 source/code/message presentation，不能提供 replay 资格。
+
+
+`resource.prepareControl(localOffer, rawInitialResource?)` 在实际创建 Worker 的同步段捕获 ACK，并输出原 handle.prepared 所需的准备 Promise；Core 内部保留 offer/ACK/交集。随后 `open` 只接本地配置，使用 factory 的原 scheduler 构造最终 channel，不能把准备结果重新传入作为信任声明。`preparation.launcher(actualLauncher, childName?)` 在 binding admission 前保留同一个原 launcher 和 Core namespace；`preparation.peer(options, messageResource)` 只从同一个 Core 资源读取实际 initial message 与 generation，不接 adapter 解码后的 bootstrap DTO。
+
+
+Node 子端的 rawInitialResource 是实际 native launch input 的 read 操作；Core 自己读取原 workerData 形状、完整校验并缓存 metadata，再向 Peer owner 移交。它不包含已求交的 capabilities，也不是 adapter 的解码结果。自动 Web 路径从原消息事件捕获初始报文。两类资源共用同一个 canonical initial/ACK grammar。
+
+
+### Process 诊断与对象资源接入
+
+`@migaia/rpc-process` 的 `createProcessChannelClosedError(cause?)` 创建原生 Process CHANNEL_CLOSED 错误，保留原 source、code、message 和 cause。`openProcessObjectChannel(connection, commonOptions)` 操作 Core 已构造的对象连接，使用 Process 的规范 expected-string 诊断、platform 及 stderr 安装/释放策略；它不登记能力或接受外部 agreement。JSON-RPC bridge 通过这两个公开操作复用原 Process 诊断与生命周期归属。
+
+process message 的有意变更仅涉及扩展 runtime/binary 能力：旧 staticAgreement 可直接启用其声明；新路径仅直接启用固定基础 profile，扩展项由 Core 从实际 capability ACK 求交。沿用相同 ACK reader/intersection 以及 handshakeTimeoutMs/default；没有 ACK 或超时则返回固定 profile，agreement.capabilities 反映实际启用项，格式错误或伪造 ACK 使用原错误码拒绝。固定 legacy ping profile 保持零握手。
   const restored = deserializeRpcError(received)
   const timeout: RpcTimeoutError | undefined = isRpcTimeoutError(restored) ? restored : undefined
   return { restored, timeout, stackPreserved: restored.stack === wire.stack }
