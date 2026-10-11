@@ -8513,6 +8513,12 @@
       "library": "serialize"
     },
     {
+      "path": "/en/docs/serialize/codec/IPortableBinaryResult",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
       "path": "/en/docs/serialize/codec/IPortableWalkerStrategy",
       "locale": "en",
       "domain": "docs",
@@ -24234,6 +24240,12 @@
     },
     {
       "path": "/zh/docs/serialize/codec/ICodecValue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codec/IPortableBinaryResult",
       "locale": "zh",
       "domain": "docs",
       "library": "serialize"

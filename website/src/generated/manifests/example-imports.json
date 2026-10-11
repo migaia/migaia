@@ -807,6 +807,7 @@
       "IJsonCodecOptions": "@migaia/serialize/codecs/json",
       "IJsonPluginOptions": "@migaia/serialize/plugins",
       "IMessagePackCodecOptions": "@migaia/serialize/codecs/message-pack",
+      "IPortableBinaryResult": "@migaia/serialize/codec",
       "IPortableWalkerStrategy": "@migaia/serialize/codec",
       "IProtobufCodecOptions": "@migaia/serialize/codecs/protobuf",
       "IProtobufSchema": "@migaia/serialize/codecs/protobuf",
