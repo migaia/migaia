@@ -1,5 +1,13 @@
-import type { IAdapterPeerPreparation, IAdapterListenerService } from '@migaia/rpc-core/adapter'
-import type { IRuntimePeer, IRuntimePeerOptions } from '@migaia/rpc-core/remote'
+import {
+  prepareAdapterPeer,
+  type IAdapterPeerPreparation,
+  type IAdapterListenerService
+} from '@migaia/rpc-core/adapter'
+import {
+  RuntimePluginKey,
+  type IRuntimePeer,
+  type IRuntimePeerOptions
+} from '@migaia/rpc-core/remote'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { ProcessPluginChannelKind } from './plugin/constants.js'
 import { serveProcessSessions, type IProcessSessionsHandle } from './plugin/serve.js'
@@ -19,10 +27,13 @@ export type IRuntimeProcessListen = IProcessServeListenerIngress &
 export async function createProcessListenerPeer(
   options: IRuntimePeerOptions,
   ingress: IRuntimeProcessListen,
-  preparation: IAdapterPeerPreparation
+  preparation?: IAdapterPeerPreparation
 ): Promise<IRuntimePeer> {
+  /** Direct native listeners obtain the same opaque Core owner as the deployed source path. */
+  const prepared =
+    preparation ?? prepareAdapterPeer(options, RuntimePluginKey.process).withoutTransfer()
   /** The canonical local directory is compiled before native bind or quota construction. */
-  const listener = preparation.listener(ingress.offer.capabilities)
+  const listener = prepared.listener(ingress.offer.capabilities)
   /** Only this construction closes a default governor it created. */
   const resilience =
     ingress.resilience ??
@@ -46,12 +57,12 @@ export async function createProcessListenerPeer(
       undefined,
       ingress.scheduler ?? systemScheduler,
       {
-        signal: preparation.lifecycleSignal,
-        initialSignal: preparation.initialSignal,
+        signal: prepared.lifecycleSignal,
+        initialSignal: prepared.initialSignal,
         providerLimits: options.providerLimits,
         own: (dispose) => {
           closeSessions = dispose
-          preparation.own({ close })
+          prepared.own({ close })
         },
         publish: (service) => listener.publish(service as IAdapterListenerService),
         ...(!ingress.resilience ? { release: () => resilience.close() } : {})
