@@ -101,7 +101,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "Public source/code tables and wire-error operations support protocol implementers and adapter authors. Human-readable diagnostic tables are private; `normalizeRuntimePortable` and `hasRpcPortableBinary` remain internal pending Serialize phase B. `classifyRpcContractError` queries an actual local violation's disclosure policy without reading error getters; copied or foreign errors have no classification."
+                "text": "Portable normalization uses Serialize's canonical `createPortableWalker` with Contract-owned wire and native strategies captured once at module scope. Contract retains its tag grammar, 64-level depth limit, snapshot and native-binary proof policy, and stable error identities. The public `normalizePortable`, `RPC_PORTABLE_MAX_DEPTH` and `./portable` entry stay unchanged."
+              },
+              {
+                "type": "paragraph",
+                "text": "Public source/code tables and wire-error operations support protocol implementers and adapter authors. Human-readable diagnostic tables are private; `normalizeRuntimePortable` and `hasRpcPortableBinary` remain internal. `classifyRpcContractError` queries an actual local violation's disclosure policy without reading error getters; copied or foreign errors have no classification."
               },
               {
                 "type": "paragraph",
@@ -176,6 +180,14 @@
             "id": "binary-protocol-data",
             "heading": "Binary protocol data",
             "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`normalizePortable` from `@migaia/rpc-contract/portable` snapshots the existing wire domain: ordinary records become frozen null-prototype copies, parent getters run once before child traversal, arrays retain their wire map semantics, and byte views become canonical unpadded base64url tags. `RPC_PORTABLE_MAX_DEPTH` stays 64."
+              },
+              {
+                "type": "paragraph",
+                "text": "Contract's module-level wire and native strategies use Serialize's single canonical traversal; callers keep the existing API and error handling. Negotiated native handling and exact-reference binary proofs remain internal Contract responsibilities."
+              },
               {
                 "type": "paragraph",
                 "text": "Use `prepareRpcBinary` from `@migaia/rpc-contract/binary`, or the same canonical name from `@migaia/rpc-contract/binary/lazy`, with a runtime envelope, selected storage, byte limit and actual whole-backing digest. Both return the canonical manifest, original native sidecars and backing byte total."
@@ -1437,10 +1449,10 @@
           "ownerFragment": "rpc-contract-errors--RPC_CONTRACT_SOURCE"
         },
         {
-          "identity": "packages/rpc-contract/dist/contract/normalize.d.ts:RPC_PORTABLE_MAX_DEPTH:export declare const RPC_PORTABLE_MAX_DEPTH = 64;",
+          "identity": "packages/rpc-contract/dist/contract/portable-strategy.d.ts:RPC_PORTABLE_MAX_DEPTH:export declare const RPC_PORTABLE_MAX_DEPTH = 64;",
           "name": "RPC_PORTABLE_MAX_DEPTH",
           "signature": "export declare const RPC_PORTABLE_MAX_DEPTH = 64;",
-          "source": "packages/rpc-contract/dist/contract/normalize.d.ts",
+          "source": "packages/rpc-contract/dist/contract/portable-strategy.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./portable",
           "ownerModule": "portable",
@@ -12157,7 +12169,7 @@
           "name": "normalizePortable",
           "kind": "function",
           "signature": "export declare function normalizePortable(value: unknown, depth?: number, active?: Set<object>): IRpcWirePortableValue;\nexport declare function normalizePortable(value: unknown, depth: number, active: Set<object>, nativeBinary: boolean | (() => never)): IRpcPortableValue;",
-          "declarationLine": 15,
+          "declarationLine": 7,
           "source": "packages/rpc-contract/dist/contract/normalize.d.ts",
           "purpose": "Validate and snapshot a portable value, reading each ordinary object field once. Only the negotiated runtime branch may preserve a native value in the semantic snapshot.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizePortable.",
@@ -12292,7 +12304,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-contract/dist/contract/normalize.d.ts:normalizePortable:export declare function normalizePortable(value: unknown, depth?: number, active?: Set<object>): IRpcWirePortableValue;\nexport declare function normalizePortable(value: unknown, depth: number, active: Set<object>, nativeBinary: boolean | (() => never)): IRpcPortableValue;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "rpc-contract-portable--normalizePortable"
         },
@@ -12301,7 +12313,7 @@
           "kind": "const",
           "signature": "export declare const RPC_PORTABLE_MAX_DEPTH = 64;",
           "declarationLine": 3,
-          "source": "packages/rpc-contract/dist/contract/normalize.d.ts",
+          "source": "packages/rpc-contract/dist/contract/portable-strategy.d.ts",
           "purpose": "Existing portable recursion budget is also reused by cold Runtime API method compilation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RPC_PORTABLE_MAX_DEPTH.",
           "advanced": "No additional advanced behavior is declared for RPC_PORTABLE_MAX_DEPTH.",
@@ -12352,9 +12364,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-contract/dist/contract/normalize.d.ts:RPC_PORTABLE_MAX_DEPTH:export declare const RPC_PORTABLE_MAX_DEPTH = 64;",
+          "identity": "packages/rpc-contract/dist/contract/portable-strategy.d.ts:RPC_PORTABLE_MAX_DEPTH:export declare const RPC_PORTABLE_MAX_DEPTH = 64;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "rpc-contract-portable--RPC_PORTABLE_MAX_DEPTH"
         }

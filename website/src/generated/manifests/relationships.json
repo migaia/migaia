@@ -14422,6 +14422,16 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/docs/serialize/codec/IPortableBinaryResult",
+      "to": "/en/guides/serialize",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/serialize",
+      "to": "/en/docs/serialize/codec/IPortableBinaryResult",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/docs/serialize/codec/IPortableWalkerStrategy",
       "to": "/en/guides/serialize",
       "type": "domain-peer"
@@ -40339,6 +40349,16 @@
     {
       "from": "/zh/guides/serialize",
       "to": "/zh/docs/serialize/codec/ICodecValue",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/serialize/codec/IPortableBinaryResult",
+      "to": "/zh/guides/serialize",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/serialize",
+      "to": "/zh/docs/serialize/codec/IPortableBinaryResult",
       "type": "domain-peer"
     },
     {
@@ -138172,6 +138192,16 @@
       "type": "alias-symbol"
     },
     {
+      "from": "/en/docs/serialize#IPortableBinaryResult",
+      "to": "/en/docs/serialize/codec#serialize-codec--IPortableBinaryResult",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/serialize/codec#serialize-codec--IPortableBinaryResult",
+      "to": "/en/docs/serialize#IPortableBinaryResult",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/en/docs/serialize#IPortableWalkerStrategy",
       "to": "/en/docs/serialize/codec#serialize-codec--IPortableWalkerStrategy",
       "type": "symbol-alias"
@@ -139112,6 +139142,16 @@
       "type": "alias-symbol"
     },
     {
+      "from": "/zh/docs/serialize#IPortableBinaryResult",
+      "to": "/zh/docs/serialize/codec#serialize-codec--IPortableBinaryResult",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/serialize/codec#serialize-codec--IPortableBinaryResult",
+      "to": "/zh/docs/serialize#IPortableBinaryResult",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/zh/docs/serialize#IPortableWalkerStrategy",
       "to": "/zh/docs/serialize/codec#serialize-codec--IPortableWalkerStrategy",
       "type": "symbol-alias"
@@ -139653,6 +139693,36 @@
     },
     {
       "from": "/en/docs/serialize/codec",
+      "to": "/en/docs/serialize/codec#serialize-codec--IPortableBinaryResult",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/serialize/codec#serialize-codec--IPortableBinaryResult",
+      "to": "/en/docs/serialize/codec",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/serialize/codec#serialize-codec--IPortableBinaryResult",
+      "to": "/en/guides/serialize/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/serialize/getting-started",
+      "to": "/en/docs/serialize/codec#serialize-codec--IPortableBinaryResult",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/serialize/codec#serialize-codec--IPortableBinaryResult",
+      "to": "/en/architecture/serialize",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/serialize",
+      "to": "/en/docs/serialize/codec#serialize-codec--IPortableBinaryResult",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/serialize/codec",
       "to": "/en/docs/serialize/codec#serialize-codec--IPortableWalkerStrategy",
       "type": "api-symbol"
     },
@@ -140009,6 +140079,36 @@
     {
       "from": "/zh/architecture/serialize",
       "to": "/zh/docs/serialize/codec#serialize-codec--ICodecValue",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/serialize/codec",
+      "to": "/zh/docs/serialize/codec#serialize-codec--IPortableBinaryResult",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/serialize/codec#serialize-codec--IPortableBinaryResult",
+      "to": "/zh/docs/serialize/codec",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/serialize/codec#serialize-codec--IPortableBinaryResult",
+      "to": "/zh/guides/serialize/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/serialize/getting-started",
+      "to": "/zh/docs/serialize/codec#serialize-codec--IPortableBinaryResult",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/serialize/codec#serialize-codec--IPortableBinaryResult",
+      "to": "/zh/architecture/serialize",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/serialize",
+      "to": "/zh/docs/serialize/codec#serialize-codec--IPortableBinaryResult",
       "type": "architecture-symbol"
     },
     {

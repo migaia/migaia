@@ -58171,10 +58171,10 @@
           "ownerFragment": "rpc-contract-errors--RPC_CONTRACT_SOURCE"
         },
         {
-          "identity": "packages/rpc-contract/dist/contract/normalize.d.ts:RPC_PORTABLE_MAX_DEPTH:export declare const RPC_PORTABLE_MAX_DEPTH = 64;",
+          "identity": "packages/rpc-contract/dist/contract/portable-strategy.d.ts:RPC_PORTABLE_MAX_DEPTH:export declare const RPC_PORTABLE_MAX_DEPTH = 64;",
           "name": "RPC_PORTABLE_MAX_DEPTH",
           "signature": "export declare const RPC_PORTABLE_MAX_DEPTH = 64;",
-          "source": "packages/rpc-contract/dist/contract/normalize.d.ts",
+          "source": "packages/rpc-contract/dist/contract/portable-strategy.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./portable",
           "ownerModule": "portable",
@@ -68891,7 +68891,7 @@
           "name": "normalizePortable",
           "kind": "function",
           "signature": "export declare function normalizePortable(\n  value: unknown,\n  depth?: number,\n  active?: Set<object>,\n): IRpcWirePortableValue;\nexport declare function normalizePortable(\n  value: unknown,\n  depth: number,\n  active: Set<object>,\n  nativeBinary: boolean | (() => never),\n): IRpcPortableValue;",
-          "declarationLine": 15,
+          "declarationLine": 7,
           "source": "packages/rpc-contract/dist/contract/normalize.d.ts",
           "purpose": "Validate and snapshot a portable value, reading each ordinary object field once. Only the negotiated runtime branch may preserve a native value in the semantic snapshot.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizePortable.",
@@ -69026,7 +69026,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-contract/dist/contract/normalize.d.ts:normalizePortable:export declare function normalizePortable(value: unknown, depth?: number, active?: Set<object>): IRpcWirePortableValue;\nexport declare function normalizePortable(value: unknown, depth: number, active: Set<object>, nativeBinary: boolean | (() => never)): IRpcPortableValue;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "rpc-contract-portable--normalizePortable"
         },
@@ -69035,7 +69035,7 @@
           "kind": "const",
           "signature": "export declare const RPC_PORTABLE_MAX_DEPTH = 64;",
           "declarationLine": 3,
-          "source": "packages/rpc-contract/dist/contract/normalize.d.ts",
+          "source": "packages/rpc-contract/dist/contract/portable-strategy.d.ts",
           "purpose": "Existing portable recursion budget is also reused by cold Runtime API method compilation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RPC_PORTABLE_MAX_DEPTH.",
           "advanced": "No additional advanced behavior is declared for RPC_PORTABLE_MAX_DEPTH.",
@@ -69086,9 +69086,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-contract/dist/contract/normalize.d.ts:RPC_PORTABLE_MAX_DEPTH:export declare const RPC_PORTABLE_MAX_DEPTH = 64;",
+          "identity": "packages/rpc-contract/dist/contract/portable-strategy.d.ts:RPC_PORTABLE_MAX_DEPTH:export declare const RPC_PORTABLE_MAX_DEPTH = 64;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "rpc-contract-portable--RPC_PORTABLE_MAX_DEPTH"
         }
@@ -114837,9 +114837,9 @@
           "ownerFragment": "serialize-core--collectStream"
         },
         {
-          "identity": "packages/serialize/dist/portable.d.ts:createPortableWalker:export declare function createPortableWalker(strategy: IPortableWalkerStrategy): (value: unknown, active?: Set<object>) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean; }>;",
+          "identity": "packages/serialize/dist/portable.d.ts:createPortableWalker:export declare function createPortableWalker(strategy: IPortableWalkerStrategy): IPortableWalker;",
           "name": "createPortableWalker",
-          "signature": "export declare function createPortableWalker(strategy: IPortableWalkerStrategy): (value: unknown, active?: Set<object>) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean; }>;",
+          "signature": "export declare function createPortableWalker(strategy: IPortableWalkerStrategy): IPortableWalker;",
           "source": "packages/serialize/dist/portable.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./codec",
@@ -114967,9 +114967,19 @@
           "ownerFragment": "serialize-plugins--IJsonPluginOptions"
         },
         {
-          "identity": "packages/serialize/dist/portable.d.ts:IPortableWalkerStrategy:export type IPortableWalkerStrategy = Readonly<{ maxDepth?: number; scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar; binary: (value: object, context: IPortableWalkerContext) => string | undefined; record: (value: object, context: IPortableWalkerContext) => IPortableRecord | undefined; array?: (value: unknown[], visit: (child: unknown) => unknown, context: IPortableWalkerContext) => Readonly<{ value: unknown[]; length?: number; violation?: string; }>; key?: (key: string, context: IPortableWalkerContext) => void; finish?: (value: unknown) => unknown; violation: (reason: string, cause?: unknown) => never; }>;",
+          "identity": "packages/serialize/dist/portable.d.ts:IPortableBinaryResult:export type IPortableBinaryResult = string | Uint8Array | ArrayBuffer;",
+          "name": "IPortableBinaryResult",
+          "signature": "export type IPortableBinaryResult = string | Uint8Array | ArrayBuffer;",
+          "source": "packages/serialize/dist/portable.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./codec",
+          "ownerModule": "codec",
+          "ownerFragment": "serialize-codec--IPortableBinaryResult"
+        },
+        {
+          "identity": "packages/serialize/dist/portable.d.ts:IPortableWalkerStrategy:export type IPortableWalkerStrategy = Readonly<{ maxDepth?: number; scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar | IPortablePrimitive; record: (value: object, context: IPortableWalkerContext) => IPortableRecord | undefined; key?: (key: string, context: IPortableWalkerContext) => void; /** Output writes belong to the strategy's selected prototype and property semantics. */ write?: (output: Record<string, unknown>, key: string, child: unknown) => void; /** Native presence differs from inline bytes tags and never requires another child scan. */ finish?: (value: unknown, hasNativeBinary: boolean) => unknown; violation: (reason: string, cause?: unknown) => never; }> & (Readonly<{ array?: (value: unknown[], visit: (child: unknown) => unknown, context: IPortableWalkerContext) => unknown[] | Readonly<{ value: unknown[]; length?: number; violation?: string; }>; arrayValue?: never; }> | Readonly<{ array?: never; /** Raw snapshots avoid an admission box when the caller binds its own lexical callback. */ arrayValue: (value: unknown[], visit: IPortableOwnedVisit, childDepth: number, ancestors: Set<object>, guard: (() => never) | undefined, bounds: boolean, context: IPortableWalkerContext) => unknown; }>) & (Readonly<{ binary: (value: object, context: IPortableWalkerContext) => string | undefined; nativeByteLength?: never; }> | Readonly<{ binary: (value: object, context: IPortableWalkerContext) => IPortableBinaryResult | undefined; /** Read the admitted native object's length through its owner's intrinsic slot accessor. */ nativeByteLength: (value: Uint8Array | ArrayBuffer) => number; }>);",
           "name": "IPortableWalkerStrategy",
-          "signature": "export type IPortableWalkerStrategy = Readonly<{ maxDepth?: number; scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar; binary: (value: object, context: IPortableWalkerContext) => string | undefined; record: (value: object, context: IPortableWalkerContext) => IPortableRecord | undefined; array?: (value: unknown[], visit: (child: unknown) => unknown, context: IPortableWalkerContext) => Readonly<{ value: unknown[]; length?: number; violation?: string; }>; key?: (key: string, context: IPortableWalkerContext) => void; finish?: (value: unknown) => unknown; violation: (reason: string, cause?: unknown) => never; }>;",
+          "signature": "export type IPortableWalkerStrategy = Readonly<{ maxDepth?: number; scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar | IPortablePrimitive; record: (value: object, context: IPortableWalkerContext) => IPortableRecord | undefined; key?: (key: string, context: IPortableWalkerContext) => void; /** Output writes belong to the strategy's selected prototype and property semantics. */ write?: (output: Record<string, unknown>, key: string, child: unknown) => void; /** Native presence differs from inline bytes tags and never requires another child scan. */ finish?: (value: unknown, hasNativeBinary: boolean) => unknown; violation: (reason: string, cause?: unknown) => never; }> & (Readonly<{ array?: (value: unknown[], visit: (child: unknown) => unknown, context: IPortableWalkerContext) => unknown[] | Readonly<{ value: unknown[]; length?: number; violation?: string; }>; arrayValue?: never; }> | Readonly<{ array?: never; /** Raw snapshots avoid an admission box when the caller binds its own lexical callback. */ arrayValue: (value: unknown[], visit: IPortableOwnedVisit, childDepth: number, ancestors: Set<object>, guard: (() => never) | undefined, bounds: boolean, context: IPortableWalkerContext) => unknown; }>) & (Readonly<{ binary: (value: object, context: IPortableWalkerContext) => string | undefined; nativeByteLength?: never; }> | Readonly<{ binary: (value: object, context: IPortableWalkerContext) => IPortableBinaryResult | undefined; /** Read the admitted native object's length through its owner's intrinsic slot accessor. */ nativeByteLength: (value: Uint8Array | ArrayBuffer) => number; }>);",
           "source": "packages/serialize/dist/portable.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./codec",
@@ -115268,7 +115278,7 @@
           "name": "asCodecValue",
           "kind": "function",
           "signature": "export declare function asCodecValue(value: unknown): ICodecValue;",
-          "declarationLine": 58,
+          "declarationLine": 89,
           "source": "packages/serialize/dist/portable.d.ts",
           "purpose": "Validate and narrow a decoded format value while preserving its original identity.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for asCodecValue.",
@@ -115423,7 +115433,7 @@
           "name": "assertPortableValue",
           "kind": "function",
           "signature": "export declare function assertPortableValue(value: unknown, active?: Set<object>): void;",
-          "declarationLine": 56,
+          "declarationLine": 87,
           "source": "packages/serialize/dist/portable.d.ts",
           "purpose": "Assert the legacy decoded portable profile without replacing or freezing caller data.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertPortableValue.",
@@ -115675,10 +115685,10 @@
         {
           "name": "createPortableWalker",
           "kind": "function",
-          "signature": "export declare function createPortableWalker(\n  strategy: IPortableWalkerStrategy,\n): (\n  value: unknown,\n  active?: Set<object>,\n) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean }>;",
-          "declarationLine": 50,
+          "signature": "export declare function createPortableWalker(\n  strategy: IPortableWalkerStrategy,\n): IPortableWalker;",
+          "declarationLine": 85,
           "source": "packages/serialize/dist/portable.d.ts",
-          "purpose": "Create one specialized portable walker. Strategy callbacks and depth are captured once; callers create this function at module/owner scope. One traversal returns value, JSON UTF-8 byte upper bound and binary presence. No native-binary negotiation, side tables or consumer profiles exist.",
+          "purpose": "Create one specialized synchronous walker. Policy callbacks and context are bound once. Node accounting stays in primitive invocation slots instead of allocating a result/context per node. Nested calls save/restore the slots in finally; no caller graph survives a completed invocation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createPortableWalker.",
           "advanced": "No additional advanced behavior is declared for createPortableWalker.",
           "parameters": ["strategy: IPortableWalkerStrategy"],
@@ -115689,7 +115699,7 @@
               "optional": false
             }
           ],
-          "returns": "(value: unknown, active?: Set<object>) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean; }>",
+          "returns": "IPortableWalker",
           "errors": ["No documented errors are declared for createPortableWalker."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createPortableWalker.",
           "examples": [
@@ -115699,7 +115709,7 @@
           "aliasOf": "createPortableWalker",
           "exportPath": "./codec",
           "overloadSignatures": [
-            "export declare function createPortableWalker(strategy: IPortableWalkerStrategy): (value: unknown, active?: Set<object>) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean; }>;"
+            "export declare function createPortableWalker(strategy: IPortableWalkerStrategy): IPortableWalker;"
           ],
           "overloadParameterDetails": [
             [
@@ -115710,16 +115720,14 @@
               }
             ]
           ],
-          "overloadReturns": [
-            "(value: unknown, active?: Set<object>) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean; }>"
-          ],
+          "overloadReturns": ["IPortableWalker"],
           "whenToUse": "Use createPortableWalker when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createPortableWalker does not match the required inputs or return contract.",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Create one specialized portable walker. Strategy callbacks and depth are captured once; callers create this function at module/owner scope. One traversal returns value, JSON UTF-8 byte upper bound and binary presence. No native-binary negotiation, side tables or consumer profiles exist."
+              "content": "Create one specialized synchronous walker. Policy callbacks and context are bound once. Node accounting stays in primitive invocation slots instead of allocating a result/context per node. Nested calls save/restore the slots in finally; no caller graph survives a completed invocation."
             },
             {
               "id": "getting-started",
@@ -115748,7 +115756,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/portable.d.ts:createPortableWalker:export declare function createPortableWalker(strategy: IPortableWalkerStrategy): (value: unknown, active?: Set<object>) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean; }>;",
+          "identity": "packages/serialize/dist/portable.d.ts:createPortableWalker:export declare function createPortableWalker(strategy: IPortableWalkerStrategy): IPortableWalker;",
           "guidance": [],
           "usageScore": 20,
           "configuration": [],
@@ -115881,10 +115889,74 @@
           "fragment": "serialize-codec--ICodecValue"
         },
         {
+          "name": "IPortableBinaryResult",
+          "kind": "type",
+          "signature": "export type IPortableBinaryResult = string | Uint8Array | ArrayBuffer;",
+          "declarationLine": 18,
+          "source": "packages/serialize/dist/portable.d.ts",
+          "purpose": "Binary outcomes are unboxed: inline text or borrowed native storage, with no descriptor allocation.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPortableBinaryResult.",
+          "advanced": "No additional advanced behavior is declared for IPortableBinaryResult.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IPortableBinaryResult."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPortableBinaryResult.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IPortableBinaryResult",
+          "exportPath": "./codec",
+          "overloadSignatures": [
+            "export type IPortableBinaryResult = string | Uint8Array | ArrayBuffer;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IPortableBinaryResult when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IPortableBinaryResult does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Binary outcomes are unboxed: inline text or borrowed native storage, with no descriptor allocation."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPortableBinaryResult from @migaia/serialize/codec, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPortableBinaryResult when its type contract and declared inputs match the result you need. Choose a different public symbol when IPortableBinaryResult does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPortableBinaryResult."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IPortableBinaryResult."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/portable.d.ts:IPortableBinaryResult:export type IPortableBinaryResult = string | Uint8Array | ArrayBuffer;",
+          "guidance": [],
+          "usageScore": 10,
+          "configuration": [],
+          "fragment": "serialize-codec--IPortableBinaryResult"
+        },
+        {
           "name": "IPortableWalkerStrategy",
           "kind": "type",
-          "signature": "export type IPortableWalkerStrategy = Readonly<{\n  maxDepth?: number;\n  scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar;\n  binary: (value: object, context: IPortableWalkerContext) => string | undefined;\n  record: (\n    value: object,\n    context: IPortableWalkerContext,\n  ) => IPortableRecord | undefined;\n  array?: (\n    value: unknown[],\n    visit: (child: unknown) => unknown,\n    context: IPortableWalkerContext,\n  ) => Readonly<{ value: unknown[]; length?: number; violation?: string }>;\n  key?: (key: string, context: IPortableWalkerContext) => void;\n  finish?: (value: unknown) => unknown;\n  violation: (reason: string, cause?: unknown) => never;\n}>;",
-          "declarationLine": 31,
+          "signature": "export type IPortableWalkerStrategy = Readonly<{\n  maxDepth?: number;\n  scalar: (\n    value: unknown,\n    context: IPortableWalkerContext,\n  ) => IPortableScalar | IPortablePrimitive;\n  record: (\n    value: object,\n    context: IPortableWalkerContext,\n  ) => IPortableRecord | undefined;\n  key?: (key: string, context: IPortableWalkerContext) => void;\n  /** Output writes belong to the strategy's selected prototype and property semantics. */ write?: (\n    output: Record<string, unknown>,\n    key: string,\n    child: unknown,\n  ) => void;\n  /** Native presence differs from inline bytes tags and never requires another child scan. */ finish?: (\n    value: unknown,\n    hasNativeBinary: boolean,\n  ) => unknown;\n  violation: (reason: string, cause?: unknown) => never;\n}> &\n  (\n    | Readonly<{\n        array?: (\n          value: unknown[],\n          visit: (child: unknown) => unknown,\n          context: IPortableWalkerContext,\n        ) =>\n          | unknown[]\n          | Readonly<{ value: unknown[]; length?: number; violation?: string }>;\n        arrayValue?: never;\n      }>\n    | Readonly<{\n        array?: never;\n        /** Raw snapshots avoid an admission box when the caller binds its own lexical callback. */ arrayValue: (\n          value: unknown[],\n          visit: IPortableOwnedVisit,\n          childDepth: number,\n          ancestors: Set<object>,\n          guard: (() => never) | undefined,\n          bounds: boolean,\n          context: IPortableWalkerContext,\n        ) => unknown;\n      }>\n  ) &\n  (\n    | Readonly<{\n        binary: (value: object, context: IPortableWalkerContext) => string | undefined;\n        nativeByteLength?: never;\n      }>\n    | Readonly<{\n        binary: (\n          value: object,\n          context: IPortableWalkerContext,\n        ) => IPortableBinaryResult | undefined;\n        /** Read the admitted native object's length through its owner's intrinsic slot accessor. */ nativeByteLength: (\n          value: Uint8Array | ArrayBuffer,\n        ) => number;\n      }>\n  );",
+          "declarationLine": 42,
           "source": "packages/serialize/dist/portable.d.ts",
           "purpose": "Policy owned by the caller, resolved once at factory creation. Hooks never recurse themselves. Scalar/array/record validation may return a deferred violation to preserve projection failure priority; immediate violations call context.reject. The violation hook throws the caller's own coded native error and retains the supplied original failure on cause.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPortableWalkerStrategy.",
@@ -115901,7 +115973,7 @@
           "aliasOf": "IPortableWalkerStrategy",
           "exportPath": "./codec",
           "overloadSignatures": [
-            "export type IPortableWalkerStrategy = Readonly<{ maxDepth?: number; scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar; binary: (value: object, context: IPortableWalkerContext) => string | undefined; record: (value: object, context: IPortableWalkerContext) => IPortableRecord | undefined; array?: (value: unknown[], visit: (child: unknown) => unknown, context: IPortableWalkerContext) => Readonly<{ value: unknown[]; length?: number; violation?: string; }>; key?: (key: string, context: IPortableWalkerContext) => void; finish?: (value: unknown) => unknown; violation: (reason: string, cause?: unknown) => never; }>;"
+            "export type IPortableWalkerStrategy = Readonly<{ maxDepth?: number; scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar | IPortablePrimitive; record: (value: object, context: IPortableWalkerContext) => IPortableRecord | undefined; key?: (key: string, context: IPortableWalkerContext) => void; /** Output writes belong to the strategy's selected prototype and property semantics. */ write?: (output: Record<string, unknown>, key: string, child: unknown) => void; /** Native presence differs from inline bytes tags and never requires another child scan. */ finish?: (value: unknown, hasNativeBinary: boolean) => unknown; violation: (reason: string, cause?: unknown) => never; }> & (Readonly<{ array?: (value: unknown[], visit: (child: unknown) => unknown, context: IPortableWalkerContext) => unknown[] | Readonly<{ value: unknown[]; length?: number; violation?: string; }>; arrayValue?: never; }> | Readonly<{ array?: never; /** Raw snapshots avoid an admission box when the caller binds its own lexical callback. */ arrayValue: (value: unknown[], visit: IPortableOwnedVisit, childDepth: number, ancestors: Set<object>, guard: (() => never) | undefined, bounds: boolean, context: IPortableWalkerContext) => unknown; }>) & (Readonly<{ binary: (value: object, context: IPortableWalkerContext) => string | undefined; nativeByteLength?: never; }> | Readonly<{ binary: (value: object, context: IPortableWalkerContext) => IPortableBinaryResult | undefined; /** Read the admitted native object's length through its owner's intrinsic slot accessor. */ nativeByteLength: (value: Uint8Array | ArrayBuffer) => number; }>);"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -115940,7 +116012,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/portable.d.ts:IPortableWalkerStrategy:export type IPortableWalkerStrategy = Readonly<{ maxDepth?: number; scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar; binary: (value: object, context: IPortableWalkerContext) => string | undefined; record: (value: object, context: IPortableWalkerContext) => IPortableRecord | undefined; array?: (value: unknown[], visit: (child: unknown) => unknown, context: IPortableWalkerContext) => Readonly<{ value: unknown[]; length?: number; violation?: string; }>; key?: (key: string, context: IPortableWalkerContext) => void; finish?: (value: unknown) => unknown; violation: (reason: string, cause?: unknown) => never; }>;",
+          "identity": "packages/serialize/dist/portable.d.ts:IPortableWalkerStrategy:export type IPortableWalkerStrategy = Readonly<{ maxDepth?: number; scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar | IPortablePrimitive; record: (value: object, context: IPortableWalkerContext) => IPortableRecord | undefined; key?: (key: string, context: IPortableWalkerContext) => void; /** Output writes belong to the strategy's selected prototype and property semantics. */ write?: (output: Record<string, unknown>, key: string, child: unknown) => void; /** Native presence differs from inline bytes tags and never requires another child scan. */ finish?: (value: unknown, hasNativeBinary: boolean) => unknown; violation: (reason: string, cause?: unknown) => never; }> & (Readonly<{ array?: (value: unknown[], visit: (child: unknown) => unknown, context: IPortableWalkerContext) => unknown[] | Readonly<{ value: unknown[]; length?: number; violation?: string; }>; arrayValue?: never; }> | Readonly<{ array?: never; /** Raw snapshots avoid an admission box when the caller binds its own lexical callback. */ arrayValue: (value: unknown[], visit: IPortableOwnedVisit, childDepth: number, ancestors: Set<object>, guard: (() => never) | undefined, bounds: boolean, context: IPortableWalkerContext) => unknown; }>) & (Readonly<{ binary: (value: object, context: IPortableWalkerContext) => string | undefined; nativeByteLength?: never; }> | Readonly<{ binary: (value: object, context: IPortableWalkerContext) => IPortableBinaryResult | undefined; /** Read the admitted native object's length through its owner's intrinsic slot accessor. */ nativeByteLength: (value: Uint8Array | ArrayBuffer) => number; }>);",
           "guidance": [],
           "usageScore": 20,
           "configuration": [],
@@ -116051,7 +116123,7 @@
           "name": "toPortableValue",
           "kind": "function",
           "signature": "export declare function toPortableValue(value: unknown, active?: Set<object>): unknown;",
-          "declarationLine": 60,
+          "declarationLine": 91,
           "source": "packages/serialize/dist/portable.d.ts",
           "purpose": "Preserve the legacy intermediate projection with a thin default walker instance.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for toPortableValue.",
