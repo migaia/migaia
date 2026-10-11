@@ -427,3 +427,5 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 `createPortableWalker(strategy)`（主入口或 `/codec`）在模块或 owner 作用域创建一次，返回单次融合遍历函数。每次调用返回 `{ value, byteUpperBound, hasBinary }`；字节数是 JSON UTF-8 的保守上界，不是精确长度。
 
 策略类型 `IPortableWalkerStrategy` 决定字段读取/排序、复制或仅校验、原型与冻结、二进制准入及表示、深度和违规错误。serialize 不提供消费方 profile。现有 `toPortableValue`/`assertPortableValue` 是包内默认策略的薄实例；JSON、MessagePack、CBOR 编码使用同一融合遍历，保留原来的排序、字节输出和错误边界。详见 [USEGUIDE 的 Portable walker](./USEGUIDE.md#portable-walker)。
+
+Portable strategies may return an inline base64url string or a borrowed `Uint8Array`/`ArrayBuffer` through the typed `IPortableBinaryResult` union. Native strategies supply `nativeByteLength` using their intrinsic length accessor; native values keep their identity and are not frozen. The value-only `walker.value()` uses the same fused traversal without allocating an unused metadata box. Starting depth and a per-call binary guard are optional invocation arguments; create the walker once at module/owner scope.

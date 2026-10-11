@@ -60,7 +60,7 @@ export {
   assertPortableValue,
   asCodecValue
 } from './portable.js'
-export type { IPortableWalkerStrategy } from './portable.js'
+export type { IPortableWalkerStrategy, IPortableBinaryResult } from './portable.js'
 
 /** Validate format version and retain its literal type for factory callers. */
 export function assertCodecVersion<const TVersion extends number>(version: TVersion): TVersion {
