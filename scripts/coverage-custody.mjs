@@ -78,6 +78,20 @@ export const RPC_COVERAGE_FAMILY = Object.freeze({
   ])
 })
 
+/** Shared with the CI runner so custody and signing consume this invocation's raw reports. */
+export const CI_COVERAGE_REPORT_ENV = 'MIGAIA_CI_COVERAGE_REPORT_DIR'
+
+/** The CI runner records the actual capture exit code before custody may reuse V8 output. */
+export const CAPTURE_EXIT_CODE_FILE = 'capture-exit-code'
+
+/**
+ * Preserve the existing capture-failure message for both new captures and reused CI reports.
+ *
+ * @param {string} packageName Actual package or declared RPC family coverage unit.
+ * @returns {string} Stable capture-failure message.
+ */
+const captureFailureMessage = (packageName) => `coverage capture failed for ${packageName}`
+
 /** Read one package manifest without allowing package code to become an owner. */
 export const readPackageManifest = (packageName) => {
   const manifestPath = join(repositoryRoot, 'packages', packageName, 'package.json')
@@ -448,18 +462,18 @@ export const readCoverageReport = (packageName, packageReport) => {
 }
 
 /**
- * Capture one coverage unit against output already built and asserted fresh by `main`.
+ * Return the existing V8 capture command for custody and the CI release-check runner.
  *
  * @param {string} packageName Actual package or the declared RPC family unit.
  * @param {string} reportRoot Absolute raw capture root.
- * @returns {ReturnType<typeof readCoverageReport>} Original V8 totals and file records.
- * @throws {Error} The existing test command or its coverage thresholds fail.
+ * @returns {string[]} Pnpm arguments preserving the unit's reporters, source scope and config.
  */
-export const capturePackage = (packageName, reportRoot) => {
+export const coverageArguments = (packageName, reportRoot) => {
+  /** Each unit owns its original pair of V8 JSON reports below the invocation's capture root. */
   const packageReport = join(reportRoot, packageName)
   /** The family uses its single existing config; all other package commands remain unchanged. */
   const family = packageName === RPC_COVERAGE_FAMILY.unit
-  const args = family
+  return family
     ? [
         '--dir',
         `packages/${RPC_COVERAGE_FAMILY.runner}`,
@@ -486,8 +500,21 @@ export const capturePackage = (packageName, reportRoot) => {
         `--coverage.reportsDirectory=${packageReport}`,
         '--coverage.include=src/**/*.{ts,tsx}'
       ]
+}
+
+/**
+ * Capture one coverage unit against output already built and asserted fresh by `main`.
+ *
+ * @param {string} packageName Actual package or the declared RPC family unit.
+ * @param {string} reportRoot Absolute raw capture root.
+ * @returns {ReturnType<typeof readCoverageReport>} Original V8 totals and file records.
+ * @throws {Error} The existing test command or its coverage thresholds fail.
+ */
+export const capturePackage = (packageName, reportRoot) => {
+  /** Capture output remains in the same per-unit directory used by the report reader. */
+  const packageReport = join(reportRoot, packageName)
   try {
-    const output = run('pnpm', args)
+    const output = run('pnpm', coverageArguments(packageName, reportRoot))
     writeFileSync(join(reportRoot, `${packageName}-capture.log`), output)
   } catch (error) {
     /** Preserve native stderr/stdout so a threshold failure cannot be called baseline drift. */
@@ -495,7 +522,7 @@ export const capturePackage = (packageName, reportRoot) => {
       join(reportRoot, `${packageName}-capture.log`),
       `${error.stdout ?? ''}${error.stderr ?? ''}`
     )
-    throw new Error(`coverage capture failed for ${packageName}`, { cause: error })
+    throw new Error(captureFailureMessage(packageName), { cause: error })
   }
   return readCoverageReport(packageName, packageReport)
 }
@@ -555,6 +582,8 @@ export const main = () => {
     assertExclusions(existing.exclusions)
   }
   const reportRoot = mkdtempSync(join(tmpdir(), 'migai-coverage-custody-'))
+  /** Only the current CI invocation supplies reusable reports; standalone custody still captures. */
+  const ciReportRoot = process.env[CI_COVERAGE_REPORT_ENV]
   /** Failed comparison retains all raw captures; no partial result can replace the signed baseline. */
   let verified = false
   try {
@@ -567,7 +596,31 @@ export const main = () => {
       ...coveragePackages.filter((packageName) => packageName !== RPC_COVERAGE_FAMILY.unit)
     ]
     for (const packageName of captureOrder) {
-      const report = capturePackage(packageName, reportRoot)
+      /** A failed Vitest command can still emit JSON, so its exit marker is checked first. */
+      const ciPackageReport = ciReportRoot ? join(ciReportRoot, packageName) : null
+      /** Missing markers identify output that has no successful CI capture evidence. */
+      const captureExitCodePath = ciPackageReport
+        ? join(ciPackageReport, CAPTURE_EXIT_CODE_FILE)
+        : null
+      /** The runner writes a numeric exit code; nonzero output must never trigger a retry. */
+      const captureExitCode =
+        captureExitCodePath && existsSync(captureExitCodePath)
+          ? readFileSync(captureExitCodePath, 'utf8').trim()
+          : null
+      if (captureExitCode !== null && captureExitCode !== '0') {
+        throw new Error(captureFailureMessage(packageName), {
+          cause: { status: Number(captureExitCode) }
+        })
+      }
+      /** Reuse only a successful, complete report; missing output retains standalone capture. */
+      const reuseReport =
+        captureExitCode === '0' &&
+        existsSync(join(ciPackageReport, 'coverage-summary.json')) &&
+        existsSync(join(ciPackageReport, 'coverage-final.json'))
+      /** Both paths use the existing report reader and all unchanged custody assertions below. */
+      const report = reuseReport
+        ? readCoverageReport(packageName, ciPackageReport)
+        : capturePackage(packageName, reportRoot)
       packages[packageName] = report.metrics
       assertCompleteMetrics(report.metrics, packageName)
       for (const [sourcePath, entry] of Object.entries(report.files)) {
