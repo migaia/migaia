@@ -134,14 +134,23 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'RpcRuntimeStoreKind',
       'RpcRuntimeStreamPrefix',
       'normalizeRuntimeEnvelope',
+      'normalizeRuntimeEnvelopeDecoded',
       'normalizeRuntimeGeneration',
       'normalizeRuntimeSteps',
       'readRuntimeCarrier',
       'runtimeOperationCapabilities',
       'wrapRuntimeCarrier'
     ],
-    './runtime/metadata': ['normalizeRuntimeGeneration', 'normalizeRuntimeSteps'],
-    './runtime/lazy': ['normalizeRuntimeEnvelope', 'normalizeStreamPayload'],
+    './runtime/metadata': [
+      'createRuntimeCallEnvelope',
+      'normalizeRuntimeGeneration',
+      'normalizeRuntimeSteps'
+    ],
+    './runtime/lazy': [
+      'normalizeRuntimeEnvelope',
+      'normalizeRuntimeEnvelopeDecoded',
+      'normalizeStreamPayload'
+    ],
     './binary/inspect': [
       'RpcBinaryProfile',
       'RpcBinaryStorage',
@@ -167,14 +176,16 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'RpcNativeBinaryKind',
       'captureRpcBinaryData',
       'prepareRpcBinary',
-      'restoreRpcBinary'
+      'restoreRpcBinary',
+      'restoreRpcBinaryDecoded'
     ],
     './binary/lazy': [
       'RpcBinaryProfile',
       'RpcBinaryStorage',
       'RpcNativeBinaryKind',
       'prepareRpcBinary',
-      'restoreRpcBinary'
+      'restoreRpcBinary',
+      'restoreRpcBinaryDecoded'
     ],
     './binary/capture': ['RpcBinaryStorage', 'captureRpcBinaryData'],
     './stream': [

@@ -52,9 +52,9 @@ registerHooks({
           'managed request must load the original cold dispatcher'
         )
     if (url.endsWith('/rpc-contract/dist/contract/runtime-api/normalize-envelope.js')) {
-      /** Both synchronous outbound and lazy inbound use this one full union admission owner. */
+      /** Strict and decoded inbound admission share this canonical union owner after H1. */
       const pattern =
-        /export function normalizeRuntimeEnvelope\(value, portable, normalizeStreamPayload\) \{/
+        /export function normalizeRuntimeEnvelope\(value, portable, normalizeStreamPayload, readRecord = readStrictRecord\) \{/
       assert.ok(pattern.test(source), 'shared runtime normalization declaration required')
       source = source.replace(pattern, '$& globalThis.__rpcFacadeCounters.runtimeEnvelope++;')
     }

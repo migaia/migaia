@@ -16,8 +16,10 @@ export function normalizeRuntimeEnvelope(
 }
 
 /**
- * Validate a trusted canonical codec result with the shared union parser. The decoding owner must
- * select this operation from its actual resource provenance; calling it grants no RPC authority.
+ * Validate only canonical codec output selected by its decoding owner from actual provenance.
+ * Reading own enumerable properties executes getters; this entry does not accept or validate
+ * caller-constructed objects. Use `normalizeRuntimeEnvelope` for strict object validation. The
+ * shared union parser still checks wire fields; calling this entry grants no RPC authority.
  */
 export function normalizeRuntimeEnvelopeDecoded(
   value: unknown,

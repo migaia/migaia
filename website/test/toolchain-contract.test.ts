@@ -452,8 +452,8 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
         .map((symbol) => ({ api, symbol }))
     )
 
-  /** C5's ordinary error surface retains exactly the current six-package runtime inventory. */
-  assert.equal(runtimeSymbols.length, 313)
+  /** H1 adds five public codec/owned entries to C5's exact six-package runtime inventory. */
+  assert.equal(runtimeSymbols.length, 318)
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)

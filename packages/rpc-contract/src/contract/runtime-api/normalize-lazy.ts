@@ -14,8 +14,11 @@ export function normalizeRuntimeEnvelopeLazy(
 }
 
 /**
- * Validate a trusted canonical codec result selected by its decoding owner, without granting RPC
- * authority. The shared union yields only when an actual stream branch loads its parser.
+ * Validate only canonical codec output selected by its decoding owner from actual provenance.
+ * Reading own enumerable properties executes getters; this entry does not accept or validate
+ * caller-constructed objects. Use this subpath's `normalizeRuntimeEnvelope` strict entry instead.
+ * The shared union yields only when an actual stream branch loads its parser; no authority is
+ * granted by calling this entry.
  */
 export function normalizeRuntimeEnvelopeDecodedLazy(
   value: unknown,
