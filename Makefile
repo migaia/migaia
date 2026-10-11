@@ -107,32 +107,8 @@ ship-dry-run:
 # validation reads package outputs. Repository gates retain their own exit codes;
 # no release mutation or registry authentication runs.
 ci:
-	@$(CI_REPORT) \
-	run_gate required workspace/build pnpm -r run build; \
-	run_gate required dependencies-check $(CI_MAKE) dependencies-check; \
-	run_gate required release-plan-check $(CI_MAKE) release-plan-check; \
-	run_gate required ship-ci $(CI_MAKE) ship-ci; \
-	run_gate required store-ship-ci $(CI_MAKE) store-ship-ci; \
-	run_gate required registry:check pnpm run registry:check; \
-	run_gate required typecheck:consumers pnpm run typecheck:consumers; \
-	run_gate required check-docs-independence node scripts/check-docs-independence.mjs; \
-	for gate in test:coverage-custody test:dist-stamp test:tree-shaking; do \
-		run_gate required "$$gate" pnpm run "$$gate"; \
-	done; \
-	run_gate required coverage-custody-report $(CI_MAKE) coverage-custody-report; \
-	$(FIND_MISSING_TOOLCHAINS) \
-	if [ -n "$$missing_tools" ]; then \
-		printf '\n==> rpc/test:conformance 跳过：缺少工具链%s\n' "$$missing_tools"; \
-		if [ "$(CI_ALLOW_MISSING_TOOLCHAINS)" = 1 ]; then \
-			record_gate SKIP-WARN "rpc/test:conformance (missing:$$missing_tools)" 0 0; \
-		else record_gate SKIP-BLOCKING "rpc/test:conformance (missing:$$missing_tools)" 1 0; fi; \
-	else run_gate required rpc/test:conformance $(CI_MAKE) ci-conformance; fi; \
-	run_gate required rpc/test:suite-parity pnpm --filter ./packages/rpc-integration run test:suite-parity; \
-	for gate in fmt lint typecheck; do \
-		run_gate required "website/$$gate" $(CI_MAKE) ci-website-check GATE="$$gate"; \
-	done; \
-	run_gate warning website/test $(CI_MAKE) ci-website-test; \
-	finish_ci
+	@CI_ALLOW_MISSING_TOOLCHAINS=$(CI_ALLOW_MISSING_TOOLCHAINS) node scripts/ci-run.mjs ci \
+		--release "$(RELEASE_PACKAGES)" --store "$(STORE_RELEASE_PACKAGES)"
 
 # Daily checks run format before lint and types, without tests or builds.
 # wasm has no typecheck:test script; its native tests stay in full CI.
@@ -224,11 +200,7 @@ coverage-custody-report:
 	@node scripts/coverage-custody.mjs
 
 ship-ci:
-	@$(CI_REPORT) \
-	for package in $(RELEASE_PACKAGES); do \
-		run_gate required "$$package/release-check" $(CI_MAKE) "$$package-check"; \
-	done; \
-	finish_ci
+	@node scripts/ci-run.mjs packages --packages "$(RELEASE_PACKAGES)"
 
 # Backward-compatible name for callers that used the pre-phase terminology.
 ship-check:
@@ -283,11 +255,7 @@ store-ship-preflight:
 	@$(MAKE) auth-check
 
 store-ship-ci:
-	@$(CI_REPORT) \
-	for package in $(STORE_RELEASE_PACKAGES); do \
-		run_gate required "$$package/release-check" $(CI_MAKE) "$$package-check"; \
-	done; \
-	finish_ci
+	@node scripts/ci-run.mjs packages --packages "$(STORE_RELEASE_PACKAGES)"
 
 store-ship-pack-check:
 	@set -eu; \
