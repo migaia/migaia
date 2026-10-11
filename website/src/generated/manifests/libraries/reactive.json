@@ -3,7 +3,7 @@
   "library": {
     "slug": "reactive",
     "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "exports": [
       ".",
       "./copy-check",
@@ -1948,7 +1948,7 @@
         {
           "identity": "packages/reactive/dist/runtime/runtime.class.d.ts:Runtime:export declare class Runtime implements IRuntime { #private; readonly [RUNTIME_BRAND]: true; constructor(options?: IRuntimeOptions); signal<T>(value: T, options?: IReactiveNodeOptions): Signal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): Computed<T>; effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; batch<T>(fn: () => T): T; untracked<T>(fn: () => T): T; flush(): IFlushResult; setSchedulerStrategy(strategy: ISchedulerStrategy): void; currentVersion(): number; runTracedAction<T>(name: string, fn: () => T): T; reportError(error: unknown, context: IRuntimeErrorReportContext): void; subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer; }",
           "name": "Runtime",
-          "signature": "export declare class Runtime implements IRuntime { #private; readonly [RUNTIME_BRAND]: true; constructor(options?: IRuntimeOptions); signal<T>(value: T, options?: IReactiveNodeOptions): Signal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): Computed<T>; effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; batch<T>(fn: () => T): T; untracked<T>(fn: () => T): T; flush(): IFlushResult; setSchedulerStrategy(strategy: ISchedulerStrategy): void; currentVersion(): number; runTracedAction<T>(name: string, fn: () => T): T; reportError(error: unknown, context: IRuntimeErrorReportContext): void; subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer; }",
+          "signature": "export type { Runtime } from './runtime/index.js';",
           "source": "packages/reactive/dist/runtime/runtime.class.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./runtime",

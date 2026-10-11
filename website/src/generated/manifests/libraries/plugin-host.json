@@ -3,7 +3,7 @@
   "library": {
     "slug": "plugin-host",
     "description": "Runtime-neutral plugin lifecycle, extension and pipeline host for Node.js, Bun, browsers and workers.",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "exports": [".", "./composition"],
     "documentation": {
       "readme": {
