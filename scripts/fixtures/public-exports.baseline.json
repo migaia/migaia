@@ -706,6 +706,7 @@
         "chunkToBytes",
         "chunkToText",
         "collectStream",
+        "createPortableWalker",
         "createSerializeError",
         "createSerializeRangeError",
         "createSerializeRegistry",
@@ -754,6 +755,7 @@
         "assertCodecVersion",
         "assertPortableValue",
         "createCodecError",
+        "createPortableWalker",
         "identityCodecV1",
         "normalizeCodecFailure",
         "toPortableValue"
