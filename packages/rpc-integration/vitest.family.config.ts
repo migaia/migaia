@@ -14,8 +14,13 @@ const testOwners = [
 ]
 /** Runtime coverage belongs to exactly the six final Source owners; integration has no runtime API. */
 const runtimeOwners = testOwners.filter((owner) => owner !== 'rpc-integration')
-/** Family accounting includes conformance and parity; only Vitest's system exclusions remain. */
-const excluded = configDefaults.exclude
+/** Timing-sensitive conformance and parity suites belong to their exclusive standalone gates. */
+const excluded = [
+  ...configDefaults.exclude,
+  'test/process/conformance*.test.ts',
+  '../rpc-bridge-jsonrpc/test/bridge/conformance-faults.test.ts',
+  'test/merge/suite-parity.test.ts'
+]
 
 /** A single family gate makes moving a test between owners neutral to Source coverage. */
 export default defineConfig(
