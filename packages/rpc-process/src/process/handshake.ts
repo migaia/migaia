@@ -37,7 +37,10 @@ export function createProcessTransport(
         throw createAdapterConfigurationTypeError(RpcProcessErrorText.optionsInvalid)
       /** Existing public declaration equality is validated before Core acquires any physical reader. */
       const local = options.staticAgreement?.local
-      /** Peer declaration remains caller validation only; it can never grant Core expansion authority. */
+      /**
+       * Peer declaration remains caller validation only; it can never grant Core expansion
+       * authority.
+       */
       const peer = options.staticAgreement?.peer
       if (
         !local ||
