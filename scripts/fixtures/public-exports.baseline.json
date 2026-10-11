@@ -533,6 +533,7 @@
         "RpcRuntimeStoreKind",
         "RpcRuntimeStreamPrefix",
         "normalizeRuntimeEnvelope",
+        "normalizeRuntimeEnvelopeDecoded",
         "normalizeRuntimeGeneration",
         "normalizeRuntimeSteps",
         "readRuntimeCarrier",
@@ -540,11 +541,13 @@
         "wrapRuntimeCarrier"
       ],
       "./runtime/metadata": [
+        "createRuntimeCallEnvelope",
         "normalizeRuntimeGeneration",
         "normalizeRuntimeSteps"
       ],
       "./runtime/lazy": [
         "normalizeRuntimeEnvelope",
+        "normalizeRuntimeEnvelopeDecoded",
         "normalizeStreamPayload"
       ],
       "./binary/inspect": [
@@ -572,14 +575,16 @@
         "RpcNativeBinaryKind",
         "captureRpcBinaryData",
         "prepareRpcBinary",
-        "restoreRpcBinary"
+        "restoreRpcBinary",
+        "restoreRpcBinaryDecoded"
       ],
       "./binary/lazy": [
         "RpcBinaryProfile",
         "RpcBinaryStorage",
         "RpcNativeBinaryKind",
         "prepareRpcBinary",
-        "restoreRpcBinary"
+        "restoreRpcBinary",
+        "restoreRpcBinaryDecoded"
       ],
       "./binary/capture": [
         "RpcBinaryStorage",
