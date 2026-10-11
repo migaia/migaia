@@ -25,6 +25,28 @@ export const RPC_RESOURCE_POINTS = {
     'contract/framing/jsonrpc.ts': ['encodeJsonRpcFrame', 'createJsonRpcFrameDecoder']
   },
   '@migaia/rpc-core': {
+    'runtime-adapter/message/resource.ts': [
+      'AdapterMessageResource',
+      'createEventEmitterMessageResource',
+      'createEventTargetMessageResource'
+    ],
+    'runtime-adapter/byte/event-byte-io.ts': ['createRuntimeEventByteIO'],
+    'runtime-adapter/byte/handshake.ts': ['createRuntimeByteConnection'],
+    'runtime-adapter/byte/bootstrap.ts': ['readRuntimeByteBootstrap'],
+    'runtime-adapter/byte/ipc-connection.ts': ['attachIpcConnection'],
+    'runtime-adapter/object/connection.ts': ['holdAdapterObjectChannel'],
+    'runtime-adapter/provider/governor.ts': ['createRuntimeProviderGovernor'],
+    'runtime-adapter/provider/scope.ts': ['createRuntimeProviderScope'],
+    'runtime-adapter/peer.ts': [
+      'AdapterPeerPreparation',
+      'prepareAdapterPeer',
+      'holdAdapterLaunch'
+    ],
+    'runtime-adapter/binding.ts': [
+      'createAdapterBindingDrain',
+      'createAdapterPlugin',
+      'holdAdapterRegistration'
+    ],
     'adapter-node.ts': [
       'createAdapterChildStdio',
       'createAdapterProcessStdio',

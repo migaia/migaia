@@ -1,0 +1,38 @@
+import type { IRpcHandshakeOffer } from '@migaia/rpc-contract'
+import type { IRpcInboundMessage, IRpcSendOptions } from '../../core/transport.js'
+import type { IRuntimePeerSourceResult } from '../../remote/index.js'
+import type { IRuntimeByteConnection, IRuntimeConnectionOptions } from '../byte/types.js'
+
+/**
+ * Held object I/O retains its physical exchange, text/object views and one terminal lifetime. Core
+ * reads the actual handshake reply through exchange; activate receives Core's result.
+ */
+export type IRuntimeObjectIO = Readonly<{
+  exchange(hello: string): Promise<string>
+  activate(capabilities: readonly string[]): void
+  writeText(value: unknown, options?: IRpcSendOptions): void | Promise<void>
+  writeObject(value: unknown, options?: IRpcSendOptions): void | Promise<void>
+  subscribeText(listener: (message: IRpcInboundMessage) => void): () => void
+  subscribeObject(listener: (message: IRpcInboundMessage) => void): () => void
+  onTransportError(listener: (error: unknown) => void): () => void
+  /** Closing observers run before terminal subscribers, preserving private-port revocation. */
+  onClosing(listener: () => void): () => void
+  close(reason?: unknown): Promise<void>
+  assertOpen(): void
+  readonly closed: boolean
+}>
+
+/** The constructed channel exposes its actual log and cleanup operations, never trust writers. */
+export type IRuntimeObjectChannel = IRuntimePeerSourceResult &
+  Pick<IRuntimeByteConnection, 'log' | 'ownClose'>
+
+/**
+ * Cold preparation preserves local offer reads before I/O; negotiation reads the actual reply. Open
+ * constructs the final transport from the internally retained agreement exactly once.
+ */
+export type IRuntimeObjectConnection = Readonly<{
+  prepare(offer: IRpcHandshakeOffer): void
+  negotiate(): Promise<void>
+  open(options: IRuntimeConnectionOptions): IRuntimeObjectChannel
+  close(reason?: unknown): Promise<void>
+}>
