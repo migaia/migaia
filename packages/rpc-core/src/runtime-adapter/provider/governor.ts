@@ -11,7 +11,10 @@ import { portableBytes } from '../../core/idempotency-store.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
 import type { IRpcProviderRejection } from '../../core/index.js'
 import { RpcProviderRejectionReason } from '../../core/index.js'
-import { localRpcErrorCode, RpcCoreErrorCode } from '../../core/errors.js'
+import { localRpcErrorCode, RpcCoreErrorCode, tagRpcError } from '../../core/errors.js'
+import { runtimeConnectionPrincipal } from '../byte/connection-identity.js'
+import { RuntimeAdapterErrorText } from '../byte/error-text.js'
+import { readAdapterMessagePreparation } from '../message/resource.js'
 import type {
   IRpcContext,
   IRpcEndpoint,
@@ -43,6 +46,17 @@ export type IRuntimeProviderGovernor = Readonly<{
   close(): void
 }>
 
+/** The exact governor retains its original channel; copied methods do not create policy authority. */
+const governors = new WeakMap<
+  object,
+  Readonly<{ channel: IRemoteChannel; governor: IRuntimeProviderGovernor }>
+>()
+
+/** Listener attachment reads only the actual governor created over its original connection. */
+export function readRuntimeProviderGovernor(governor: IRuntimeProviderGovernor) {
+  return governors.get(governor)
+}
+
 /** Enforce per-connection rate, payload, and idle limits at the provider boundary. */
 export function createRuntimeProviderGovernor(
   channel: IRemoteChannel,
@@ -50,6 +64,14 @@ export function createRuntimeProviderGovernor(
   closeSession: () => Promise<void>,
   report: (error: unknown) => void
 ): IRuntimeProviderGovernor {
+  if (
+    runtimeConnectionPrincipal(channel) === undefined &&
+    readAdapterMessagePreparation(channel) === undefined
+  )
+    throw tagRpcError(
+      new TypeError(RuntimeAdapterErrorText.connectionRequired),
+      RpcCoreErrorCode.invalidConfig
+    )
   /** The constructed connection retains its original monotonic clock. */
   const scheduler = channel.scheduler
   /** A window starts with its first admitted request, not at connection startup. */
@@ -224,7 +246,8 @@ export function createRuntimeProviderGovernor(
     )
   }
 
-  return Object.freeze({
+  /** This one factory result is the canonical policy owner consumed by Core listener sessions. */
+  const governor: IRuntimeProviderGovernor = Object.freeze({
     /** Preserve the caller's limits and observer while linking canonical concurrency refusals. */
     limits(limits, configured) {
       /** Keep valid caller limits within the original governor; invalid values reach core unchanged. */
@@ -333,4 +356,6 @@ export function createRuntimeProviderGovernor(
       unsubscribe()
     }
   })
+  governors.set(governor, Object.freeze({ channel, governor }))
+  return governor
 }

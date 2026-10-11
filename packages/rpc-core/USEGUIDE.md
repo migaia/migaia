@@ -484,20 +484,20 @@ The process connection emits at most 32 normal `ipc.stderr` records per 1000 ms 
 
 ## Advanced usage: Runtime/carrier adapter resources
 
-`@migaia/rpc-core/adapter` constructs a complete channel from ordered raw I/O held by a runtime or carrier adapter. It owns the handshake, physical frame queue, IPC gate, codec/framer composition and exact private batch/replay facts. It never accepts an existing RPC transport to mark, an agreed/trusted/owned flag, or a registration callback. The historical `staticAgreement` option contains two local/peer protocol proposals; the constructor validates their equality and creates its own static agreement for its own new transport. It is not a receipt for another transport.
+`@migaia/rpc-core/adapter` constructs a complete channel from ordered raw I/O held by a runtime or carrier adapter. It owns the handshake, physical frame queue, IPC gate, codec/framer composition and exact private batch/replay facts. It never accepts an existing RPC transport to mark, an agreed/trusted/owned flag, or a registration callback. Process validates its historical staticAgreement locally; Core accepts only the local proposal and derives expanded capabilities from actual ACKs.
 
-Node adapter authors can give `@migaia/rpc-core/adapter/node` their actual child pipes, process stdio or duplex socket. `createAdapterChildStdio(child)` and `createAdapterProcessStdio(io)` retain the original physical lifetime/exclusive reader observation; `createAdapterSocketByteIO(socket)` preserves the ordinary socket profile without claiming launch replay ownership. `@migaia/rpc-core/adapter/web-streams` constructs the original reader/writer scope from held Web Streams. These ordinary subentries are separate from the neutral Core root.
+Node adapter authors can give `@migaia/rpc-process/adapters/node-child-process` their actual child pipes, process stdio or duplex socket. `createAdapterChildStdio(child)` and `createAdapterProcessStdio(io)` retain the original physical lifetime/exclusive reader observation; `createAdapterSocketByteIO(socket)` preserves the ordinary socket profile without claiming launch replay ownership. `@migaia/rpc-process` constructs the original reader/writer scope from held Web Streams. Native resource glue belongs to the Process package.
 
 A third-party custom IPC adapter needs only the ordinary constructors and the standalone Contract toolkit:
 
 ```ts
-import { createAdapterChannel } from '@migaia/rpc-core/adapter'
-import { createAdapterSocketByteIO } from '@migaia/rpc-core/adapter/node'
+import { createProcessTransport } from '@migaia/rpc-process'
+import { createAdapterSocketByteIO } from '@migaia/rpc-process/adapters/node-socket'
 import { RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'
 
 // socket is the actual duplex resource acquired by this adapter.
 const raw = createAdapterSocketByteIO(socket)
-const channel = await createAdapterChannel(raw, {
+const channel = await createProcessTransport(raw, {
   peerId: 'service',
   role: 'initiator',
   offer: {
@@ -514,13 +514,13 @@ const channel = await createAdapterChannel(raw, {
 await channel.close()
 ```
 
-Adapters propagate the original owner errors. `RPC_PROCESS_ERROR_SOURCE` and `RpcProcessErrorCode` remain ordinary diagnostic data at `@migaia/rpc-core/adapter/diagnostics`; their semantic source stays `@migaia/rpc/process`. Process text and stderr diagnostic tables are private. Trust writers, owned snapshots and physical receipt readers remain private. Adapter authors attach their own source/code through `@migaia/utils/error`; they do not ask Core to mint arbitrary operation errors.
+Adapters propagate the original owner errors. `RPC_PROCESS_ERROR_SOURCE` and `RpcProcessErrorCode` remain ordinary diagnostic data at `@migaia/rpc-process`; their semantic source stays `@migaia/rpc/process`. Process text and stderr diagnostic tables are private. Trust writers, owned snapshots and physical receipt readers remain private. Adapter authors attach their own source/code through `@migaia/utils/error`; they do not ask Core to mint arbitrary operation errors.
 
 ### Thread execution and foreign-language byte adapters
 
-A third-party runtime adapter can give Core its native module acquisition resource. Core performs
-Worker construction, observes real exit/error events, receives the private ACK and constructs the
-channel over that exact Worker. The import still happens at the original launch boundary. The
+The Thread owner acquires native modules and constructs Workers at the original launch boundary.
+Core holds their actual message ports and exit/terminate resources, reads the private ACK, and
+constructs the channel over that held resource. The import still happens at the original launch boundary. The
 returned handle exposes `identity`, `port`, `exited`, `terminate`, `sampleUsage` and a complete
 `open` operation; preparation and receive-handoff callbacks remain private.
 
@@ -585,11 +585,11 @@ Core-private initializer; there is no public lifetime registrar or target transp
 | `@migaia/rpc-contract` / `@migaia/rpc-contract/errors` | `RPC_CONTRACT_SOURCE` = `@migaia/rpc/contract` | `RpcContractErrorCode` | 识别非法 envelope、frame、handshake 与错误树，修复对应协议输入。 |
 | `@migaia/rpc-core` | `RPC_CORE_ERROR_SOURCE` = `@migaia/rpc/core` | `RpcCoreErrorCode` | 分类 Endpoint 的配置、取消、deadline、transport 与 provider 诊断。 |
 | `@migaia/rpc-core/remote` | `RPC_REMOTE_ERROR_SOURCE` = `@migaia/rpc/remote` | `RpcRemoteLayerErrorCode` | 解释 generation 关闭、启动失败及未知结果，按原 outcome/对账路径恢复。 |
-| `@migaia/rpc-process`；Core 适配器还可用 `@migaia/rpc-core/adapter/diagnostics` | `RPC_PROCESS_ERROR_SOURCE` = `@migaia/rpc/process` | `RpcProcessErrorCode` | 分类实际 launch、dial、listen、bootstrap 与资源采样失败。 |
+| `@migaia/rpc-process` | `RPC_PROCESS_ERROR_SOURCE` = `@migaia/rpc/process` | `RpcProcessErrorCode` | 分类实际 launch、dial、listen、bootstrap 与资源采样失败。 |
 | `@migaia/rpc-threads` | `RPC_THREAD_ERROR_SOURCE` = `@migaia/rpc/threads` | `RpcThreadErrorCode` | 报告真实 Worker 采样失败，保留原 cause 并展示 unavailable。 |
 | `@migaia/rpc-bridge-jsonrpc` / `@migaia/rpc-contract/framing/jsonrpc` | `JSONRPC_BRIDGE_ERROR_SOURCE` = `@migaia/rpc/bridge/jsonrpc` | `JsonRpcBridgeErrorCode` | 识别 framing、hello/profile 与扩展协商失败，处理实际连接。 |
 
-`RpcCoreErrorText`、`RpcContractErrorText`、`RpcContractErrorDiagnostic`、`RpcProcessErrorText`、`RpcRemoteLayerErrorText`、`JsonRpcBridgeErrorText` 与 Thread 文本表均为私有展示。删除这些已更名包的公开表属于破坏性导出变更；message 字面量不是恢复、重试、终止或关闭契约。Process bootstrap 的环境名、版本、frame 限额和发现超时仍由 `@migaia/rpc-core/adapter/process-data` 普通导出；stderr 文本/配额常量不公开。
+`RpcCoreErrorText`、`RpcContractErrorText`、`RpcContractErrorDiagnostic`、`RpcProcessErrorText`、`RpcRemoteLayerErrorText`、`JsonRpcBridgeErrorText` 与 Thread 文本表均为私有展示。删除这些已更名包的公开表属于破坏性导出变更；message 字面量不是恢复、重试、终止或关闭契约。Process bootstrap 的环境名、版本、frame 限额和发现超时仍由 `@migaia/rpc-process` 普通导出；stderr 文本/配额常量不公开。
 
 ### 跨 realm / 模块副本的诊断分类
 
@@ -716,7 +716,7 @@ await peer.close()
 adapter 的 launch 操作交给该准备对象实际 launcher、spec 与原 launch request。Core 使用自己生成的本地提案和 namespace 填写启动 metadata，再调用该 held launcher。binding/drain 操作复用现有 remote owner；native supervisor 继续由原 supervision 公共工厂构造。普通配置校验、目录规范化、失败 presentation 和 abort reason 使用明确的 adapter 数据操作，不公开任意 Core error identity 或 provider trust 的写入能力。
 
 
-公开 adapter 数据操作的用途：`createAdapterId` 生成普通本地资源地址；`readAdapterAbortReason` 保留原 signal reason；`validateAdapterPeerTimeout`、`validateAdapterPeerMethods` 在 native I/O 前校验本地配置；`normalizeAdapterDescription`、`adapterContractRequiresStream` 对收到的目录和本地声明进行数据检查。`AdapterPeerErrorText` 与 `IpcReporterContext` 保留稳定失败文本和 reporter 归属。
+公开 adapter 数据操作的用途：`createAdapterId` 生成普通本地资源地址；`readAdapterAbortReason` 保留原 signal reason；`validateAdapterPeerTimeout`、`validateAdapterPeerMethods` 在 native I/O 前校验本地配置；`normalizeAdapterDescription`、`adapterContractRequiresStream` 对收到的目录和本地声明进行数据检查。`createAdapterSourceConfigurationError()` 构造原 source-conflict 配置失败，规范文本仍由 Core 私有 owner 维护；`IpcReporterContext` 保留 reporter 归属。
 
 `createAdapterConfigurationError` 只生成原 INVALID_CONFIG 诊断，`createAdapterConfigurationTypeError` 在 Core 内构造原生 TypeError 并保留 cause，不接外部 error 作为登记目标，`createAdapterTransportError` 表达真实载体失败；这些接口不能生成任意 deadline/owned/trusted 身份。`holdAdapterLaunch(request).proposal` 只输出 Core 曾附在同一原 launch request 上的本地 metadata，不能写入 context。
 
@@ -742,3 +742,33 @@ Node 子端的 rawInitialResource 是实际 native launch input 的 read 操作�
 `@migaia/rpc-process` 的 `createProcessChannelClosedError(cause?)` 创建原生 Process CHANNEL_CLOSED 错误，保留原 source、code、message 和 cause。`openProcessObjectChannel(connection, commonOptions)` 操作 Core 已构造的对象连接，使用 Process 的规范 expected-string 诊断、platform 及 stderr 安装/释放策略；它不登记能力或接受外部 agreement。JSON-RPC bridge 通过这两个公开操作复用原 Process 诊断与生命周期归属。
 
 process message 的有意变更仅涉及扩展 runtime/binary 能力：旧 staticAgreement 可直接启用其声明；新路径仅直接启用固定基础 profile，扩展项由 Core 从实际 capability ACK 求交。沿用相同 ACK reader/intersection 以及 handshakeTimeoutMs/default；没有 ACK 或超时则返回固定 profile，agreement.capabilities 反映实际启用项，格式错误或伪造 ACK 使用原错误码拒绝。固定 legacy ping profile 保持零握手。
+
+
+`createRuntimeMessageConnection(io, options, diagnostics)` 持有完整消息 I/O（send/onMessage/onClose/close），options 只含本地 offer 与普通连接配置。Core 内置固定 V1 基础集合 abort/ping/close/deadline/idempotency/trace/stream/batch；其本地子集保留顺序和零握手。扩展集合使用同一个 Contract ACK reader/intersection，握手等待沿用 handshakeTimeoutMs/default，超时仅保留本地固定基础子集。Core 从实际 ACK 决定扩展能力，再构造 transport/pipeline；任意完整消息 I/O 不因形状获得 clone/native replay 资格。Process 在此调用之前保持原 staticAgreement codec/顺序一致性校验。
+
+`preparation.listener(localOffer)` 保留原 Peer 配置、Host preparation 与本地目录，返回 Core listener assembly。其 `session(channel, signal, actualScope, numericLimits, customIdempotency?)` 操作实际 Core 连接和 Core provider scope；返回的 session 自行 `prepare()` 构造原 endpoint。adapter 可先对输出做原服务形状检查，再调用 `attach(actualDrain, actualGovernor)`；Core 按原 drain→governor 顺序保存最终 endpoint，`peer()` 只消费其内部保存的 endpoint/Host 状态。任何已准备 endpoint 或 Host context 均不接受回传。
+
+`listener.open(actualSessionOwner)` 读取原 session owner 的 current/services/closed/close 操作，构造 facade 与 session 查询；它不创建第二套 membership 集合。`listener.publish(ownSessionService)` 只发布同一 assembly 创建的 service。scope、drain、governor 和 session 使用 Core 工厂原对象的私有身份；复制字段不能供给能力事实。Process 继续拥有认证 ingress、原 session Set、清理与复原策略。
+
+
+自定义 structural governor 的 `customIdempotency` 是既有普通 IRpcIdempotencyConfig：store/scope 回调的业务输出按原契约使用，不因此生成已认证 principal、Host 或 provider admission 身份。内置 governor 的实际会话 scope 从 Core 认证连接生成；公开 sessionOptions 的字符串/回调输出仍是普通配置，不提供私有 signer。
+
+
+`preparation.withoutTransfer()` 返回使用原准备上下文的收紧视图：它只拒绝调用选项中的 own transfer 字段，并在读取 transfer getter 或 payload 前执行原拒绝操作。它不能启用 transfer 或授予任何载体、Host、provider、generation 事实。Process 使用该视图保留所有 source 形式的既有不支持 transfer 契约。
+
+
+`preparation.validateOffer(localOffer)` 检查本地 peer 地址与已编译 roots：地址必须匹配，offer capabilities 必须是实际 roots 的子集；失败使用原 identityInvalid 配置诊断。listener owner 的 `carrier` 仅用于原空会话查询的载体标签，不提供资格。
+
+Contract 的 `rpcByteRuntimeBootstrap` 描述原封闭 byte launch metadata grammar（kind/version/frame cap 与 self/parent/token/generation），不签发信任。`readRuntimeByteBootstrap` 在实际读取第一帧时保留私有原始快照；`preparation.bytePeer(options, actualIO, { runtime, platform, diagnostics, expectedStringText, bootstrapInvalidText })` 只读取同一 IO 的 Core 快照，使用该标准 grammar、实际 token/parent 验证和普通 byte handshake 构造 Peer，内部生成 generation 事实。adapter 不能提供已解析 bootstrap、generation 或 Host context。
+
+
+公开 adapter 配置/载体失败构造操作仅保留原生错误类型、source/code/message/cause 诊断；不写入 Core 的私有 live-control error identity。实际取消、关闭或重试仍由 Core 观察到的操作状态决定。
+
+
+`createAdapterPlugin(options, metadata?, lifecycleResource?)` 可持有既有 registration 的生命周期资源，其 `installed()` 接收真实安装完成事件，`close()` 释放该 registration。Core 在原 assembly 的安装/释放点调用这些实际资源操作，保持原 Promise 和顺序；返回值不供给已安装、已协商、prepared holder 或其他信任事实。`holdAdapterRegistration` 继续在 Core 内部创建并保留自己的 generation holder。
+
+
+从实际 inbound launch input 收到并验证的 parent 地址，随 Core 创建的消息 channel 保留为稳定的私有会话 principal。公开元数据或复制 channel 无法提供该事实；使用 `createRuntimeProviderScope(store).session(channel, limits)` 可保持同一 parent 在实际 Worker 替换后的 journal scope。没有实际 inbound metadata 的普通消息 channel 不因本地 peerId 获得 principal。
+
+
+`providerScope.namespace` 是 Core 在创建 scope 时生成的普通地址输出。Process 的公开 sessionOptions 用它格式化既有普通 scope callback，实际会话由同一 Core scope 使用内部保存的 namespace 与实际连接 principal 构造；不读取调用方回传的 namespace 或 principal 声明。公开 callback 与实际会话保留同一 namespace/store，且只分配一次。

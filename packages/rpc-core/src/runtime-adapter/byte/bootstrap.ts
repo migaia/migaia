@@ -13,6 +13,14 @@ import { tagRpcError } from '../../core/errors.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 
+/** Actual first-frame snapshots remain private and cannot be replaced by returned mutable bytes. */
+const bootstraps = new WeakMap<object, Uint8Array>()
+
+/** Only Core's automatic Peer operation reads the exact held resource's observed first frame. */
+export function readRuntimeByteBootstrapSnapshot(channel: IRuntimeByteIO): Uint8Array | undefined {
+  return bootstraps.get(channel)
+}
+
 /** Consume one framed bootstrap and transfer the same decoder to handshake. */
 export async function readRuntimeByteBootstrap(
   channel: IRuntimeByteIO,
@@ -39,6 +47,8 @@ export async function readRuntimeByteBootstrap(
   const decoder = createRpcStreamFrameDecoderWithLimit(
     {
       onFrame(frame) {
+        /** Copy actual first-frame bytes before the physical reader returns to its caller. */
+        if (!receiver.receivedBootstrap) bootstraps.set(channel, frame.slice())
         /** Owner violations are data here: the original decoder continues the current chunk. */
         const violation = receiver.accept(frame)
         if (violation) void close()

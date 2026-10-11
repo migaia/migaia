@@ -1,4 +1,4 @@
-import type { IAdapterProcessRuntimeIO } from '@migaia/rpc-core/adapter/process'
+import type { IAdapterProcessRuntimeIO } from '../peer.js'
 import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS } from '../constants.js'
 import { openProcessStdioChannel } from './deno-command.js'
 

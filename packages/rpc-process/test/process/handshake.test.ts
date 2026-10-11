@@ -8,6 +8,7 @@ import {
 } from '@migaia/rpc-contract/framing/stream'
 import { acceptRpcHandshake } from '@migaia/rpc-contract'
 import { RpcCapability, RpcCodecId, RpcProtocol } from '@migaia/rpc-contract'
+import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { createProcessTransport } from '@migaia/rpc-process'
 import { createNativeProcessOffer } from '../../src/process/offer.js'
 import type { IProcessByteChannel, IProcessMessageChannel } from '@migaia/rpc-process'
@@ -55,6 +56,32 @@ function createBytePair(): readonly [
 /** Shared per-connection IPC identity has no diagnostic sink in handshake-only tests. */
 function ipc(name: string) {
   return { connectionId: name, sessionId: name, log: () => undefined }
+}
+
+/** Dedicated ACK cases drive actual whole-message delivery rather than a supplied agreement. */
+function createMessageControlFixture(reply?: unknown, holdSend = false) {
+  /** One native callback is transferred from startup capture to the existing business receiver. */
+  let receiver: ((value: unknown) => void) | undefined
+  /** Physical sends distinguish the fixed zero-handshake path from authorized expansion. */
+  const sent: unknown[] = []
+  /** This fixture models the held physical writer, including an unending drain. */
+  const channel: IProcessMessageChannel = {
+    kind: 'message',
+    send(value) {
+      sent.push(value)
+      if (reply !== undefined) queueMicrotask(() => receiver?.(reply))
+      if (holdSend) return new Promise<void>(() => undefined)
+    },
+    onMessage(listener) {
+      receiver = listener
+      return () => {
+        if (receiver === listener) receiver = undefined
+      }
+    },
+    onClose: () => () => undefined,
+    close: () => undefined
+  }
+  return { channel, sent }
 }
 
 describe('native process handshake', () => {
@@ -457,5 +484,105 @@ describe('native process handshake', () => {
         }
       )
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+  })
+
+  it('[APS7] expands process messages only from the actual ACK while retaining fixed capabilities', async () => {
+    const offer = [RpcCapability.ping, RpcCapability.runtimeApi, RpcCapability.batch]
+    const fixture = createMessageControlFixture(
+      rpcMessageCapabilityControl.acknowledgement([RpcCapability.runtimeApi])
+    )
+    const remote = await createProcessTransport(fixture.channel, {
+      peerId: 'message-ack',
+      report: () => undefined,
+      ipc: ipc('message-ack'),
+      staticAgreement: {
+        local: { codec: 'identity', capabilities: offer },
+        peer: { codec: 'identity', capabilities: offer }
+      }
+    })
+    expect(fixture.sent).toEqual([rpcMessageCapabilityControl.acknowledgement(offer)])
+    expect(remote.agreement.capabilities).toEqual(offer)
+    expect(remote.features).toEqual([])
+    await remote.close()
+  })
+
+  it('[APS7] falls back to the fixed process profile when ACK and physical drain stay absent', async () => {
+    const scheduler = createManualScheduler()
+    const offer = [RpcCapability.ping, RpcCapability.runtimeApi, RpcCapability.batch]
+    const fixture = createMessageControlFixture(undefined, true)
+    const pending = createProcessTransport(fixture.channel, {
+      peerId: 'message-timeout',
+      scheduler,
+      handshakeTimeoutMs: 10,
+      report: () => undefined,
+      ipc: ipc('message-timeout'),
+      staticAgreement: {
+        local: { codec: 'identity', capabilities: offer },
+        peer: { codec: 'identity', capabilities: offer }
+      }
+    })
+    scheduler.advance(9)
+    expect(scheduler.pendingCount).toBe(1)
+    scheduler.advance(1)
+    const remote = await pending
+    expect(remote.agreement.capabilities).toEqual([RpcCapability.ping, RpcCapability.batch])
+    expect(fixture.sent).toEqual([rpcMessageCapabilityControl.acknowledgement(offer)])
+    expect(scheduler.pendingCount).toBe(0)
+    await remote.close()
+  })
+
+  it('[APS7] rejects a forged process ACK carrying a claimed ownership field', async () => {
+    const offer = [RpcCapability.ping, RpcCapability.runtimeApi]
+    const fixture = createMessageControlFixture({
+      ...rpcMessageCapabilityControl.acknowledgement(offer),
+      owned: true
+    })
+    const pending = createProcessTransport(fixture.channel, {
+      peerId: 'message-forged',
+      report: () => undefined,
+      ipc: ipc('message-forged'),
+      staticAgreement: {
+        local: { codec: 'identity', capabilities: offer },
+        peer: { codec: 'identity', capabilities: offer }
+      }
+    })
+    await expect(pending).rejects.toBeInstanceOf(TypeError)
+    await expect(pending).rejects.toMatchObject({
+      source: '@migaia/rpc/core',
+      code: 'INVALID_CONFIG'
+    })
+  })
+
+  it('[APS7] equal expanded declarations and public trust claims cannot bypass raw ACK reception', async () => {
+    const scheduler = createManualScheduler()
+    const offer = [RpcCapability.ping, RpcCapability.runtimeApi]
+    const fixture = createMessageControlFixture()
+    let claimReads = 0
+    const options = {
+      peerId: 'message-claimed',
+      scheduler,
+      handshakeTimeoutMs: 1,
+      report: () => undefined,
+      ipc: ipc('message-claimed'),
+      staticAgreement: {
+        local: { codec: 'identity' as const, capabilities: offer },
+        peer: { codec: 'identity' as const, capabilities: offer }
+      },
+      get agreed() {
+        claimReads += 1
+        return true
+      },
+      get trusted() {
+        claimReads += 1
+        return true
+      }
+    }
+    const pending = createProcessTransport(fixture.channel, options)
+    scheduler.advance(1)
+    const remote = await pending
+    expect(remote.agreement.capabilities).toEqual([RpcCapability.ping])
+    expect(claimReads).toBe(0)
+    expect(fixture.sent).toEqual([rpcMessageCapabilityControl.acknowledgement(offer)])
+    await remote.close()
   })
 })

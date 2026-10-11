@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
 import { describe, it, vi } from 'vitest'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
-import { remoteProcessJsonCodec } from '../../dist/adapter-owned/process/pipeline.js'
+import { createRuntimeBytePipeline } from '../../dist/runtime-adapter/byte/pipeline.js'
 import { outboundFactory, request } from '../core/fixtures/a10-u9-candidate.js'
+
+/** Observe the same canonical JSON codec under its runtime-neutral owner. */
+const remoteProcessJsonCodec = createRuntimeBytePipeline('json-codec-fixture').codec
 
 describe('U9 package-created outbound proof', () => {
   it('[A17] canonical JSON string codec skips repeated admission only after actual construction', async () => {

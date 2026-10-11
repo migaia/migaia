@@ -1,8 +1,7 @@
 import {
   createEventTargetMessageResource,
   prepareAdapterPeer,
-  createAdapterConfigurationError,
-  AdapterPeerErrorText,
+  createAdapterSourceConfigurationError,
   validateAdapterPeerMethods
 } from '@migaia/rpc-core/adapter'
 import {
@@ -20,7 +19,7 @@ export function createAutomaticWebThreadPeer(
   /** Core performs the original early timeout check without repeating the adapter's getter reads. */
   const preparation = prepareAdapterPeer(options, RuntimePluginKey.thread)
   if (options.spawn !== undefined || options.connect !== undefined || options.listen !== undefined)
-    throw createAdapterConfigurationError(AdapterPeerErrorText.sourceInvalid)
+    throw createAdapterSourceConfigurationError()
   validateAdapterPeerMethods(options.provide, options.contract)
   /** Core receives the actual raw resource and retains bootstrap, capability and generation facts. */
   const resource = createEventTargetMessageResource(native)

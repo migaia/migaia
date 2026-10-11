@@ -1,10 +1,13 @@
 export { createProcessPlugin } from './client.js'
-export { parseProcessPluginDescriptor, ProcessPluginWire } from '@migaia/rpc-core/adapter/process'
+export { createAdapterProcessPlugin } from './operation.js'
+export type { IRuntimeProcessPluginOptions } from './operation.js'
+export { parseProcessPluginDescriptor } from './descriptor.js'
+export { ProcessPluginWire } from './constants.js'
 export type {
   IProcessPluginOptions,
   IProcessPlugin,
   IProcessPluginReplaceResult,
   IProcessServeChildIngress,
-  IProcessServeListenerIngress,
-  IProcessPluginDescriptor
-} from '@migaia/rpc-core/adapter/process'
+  IProcessServeListenerIngress
+} from './types.js'
+export type { IProcessPluginDescriptor } from './descriptor.js'

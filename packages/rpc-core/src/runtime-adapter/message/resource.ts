@@ -1,3 +1,4 @@
+import { retainRuntimeConnectionIdentity } from '../byte/connection-identity.js'
 import { identityCodecV1 } from '@migaia/serialize/codec'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
@@ -324,6 +325,8 @@ class AdapterMessageResource implements IAdapterMessageResource {
           return transport.close?.()
         }))
     })
+    /** A real inbound launch binds this channel to the actual observed parent's stable address. */
+    if (this.#initial) retainRuntimeConnectionIdentity(channel, this.#initial.parent.instanceId)
     this.#channel = channel
     preparations.set(channel, preparations.get(this)!)
     return channel

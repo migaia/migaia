@@ -105,30 +105,6 @@
     "./adapter": {
       "types": "./dist/adapter.d.ts",
       "default": "./dist/adapter.js"
-    },
-    "./adapter/node": {
-      "types": "./dist/adapter-node.d.ts",
-      "default": "./dist/adapter-node.js"
-    },
-    "./adapter/diagnostics": {
-      "types": "./dist/adapter-diagnostics.d.ts",
-      "default": "./dist/adapter-diagnostics.js"
-    },
-    "./adapter/process-data": {
-      "types": "./dist/adapter-process-data.d.ts",
-      "default": "./dist/adapter-process-data.js"
-    },
-    "./adapter/web-streams": {
-      "types": "./dist/adapter-web-streams.d.ts",
-      "default": "./dist/adapter-web-streams.js"
-    },
-    "./adapter/process": {
-      "types": "./dist/adapter-process.d.ts",
-      "default": "./dist/adapter-process.js"
-    },
-    "./adapter/process/node": {
-      "types": "./dist/adapter-process-node.d.ts",
-      "default": "./dist/adapter-process-node.js"
     }
   },
   "publishConfig": {

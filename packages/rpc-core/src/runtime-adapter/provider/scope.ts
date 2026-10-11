@@ -17,6 +17,8 @@ import { RuntimeAdapterErrorText } from '../byte/error-text.js'
 
 /** One constructed scope owns its existing shared store and generic provider admission resource. */
 export type IRuntimeProviderScope = Readonly<{
+  /** Ordinary generated address output; signing never reads caller-provided namespace data. */
+  namespace: string
   admission: IProviderAdmissionScope
   session(
     channel: IRemoteChannel,
@@ -28,6 +30,14 @@ export type IRuntimeProviderScope = Readonly<{
   close(): void
 }>
 
+/** Only the exact factory result exposes the held scope to Core's listener/session constructor. */
+const scopes = new WeakMap<object, IRuntimeProviderScope>()
+
+/** Internal session construction never trusts a copied public scope or caller callback table. */
+export function readRuntimeProviderScope(scope: IRuntimeProviderScope) {
+  return scopes.get(scope)
+}
+
 /** Derive stable principal keys only from Core-constructed, authenticated connection identities. */
 export function createRuntimeProviderScope(
   inputStore?: IRpcIdempotencyStore
@@ -38,7 +48,9 @@ export function createRuntimeProviderScope(
   const scopePrefix = defaultRpcId()
   /** All actual sessions share this canonical admission owner instead of parallel per-socket queues. */
   const admission = createProviderAdmissionScope()
-  return Object.freeze({
+  /** Core retains its genuine operation identity independently of public structural shape. */
+  const scope: IRuntimeProviderScope = Object.freeze({
+    namespace: scopePrefix,
     admission,
     session(channel, limits) {
       /** No field on public channel/identity metadata can replace exact constructor membership. */
@@ -60,4 +72,6 @@ export function createRuntimeProviderScope(
       admission.clear()
     }
   })
+  scopes.set(scope, scope)
+  return scope
 }

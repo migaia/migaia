@@ -83,7 +83,10 @@ export type IRuntimeByteWire = Readonly<{
 }>
 
 /** Reject duplicate ownership before subscribing to a physical channel. */
-function claim(channel: object, diagnostics: IRuntimeByteDiagnostics): void {
+function claim(
+  channel: object,
+  diagnostics: Pick<IRuntimeByteDiagnostics, 'duplicateBinding'>
+): void {
   if (boundChannels.has(channel))
     throw tagRpcError(new TypeError(diagnostics.duplicateBinding), RpcCoreErrorCode.invalidConfig)
   boundChannels.add(channel)
@@ -434,7 +437,11 @@ export function bindRuntimeMessageTransport(
     IRuntimeConnectionOptions,
     'platform' | 'expectedStringText' | 'peerId' | 'report' | 'signal'
   >,
-  diagnostics: IRuntimeByteDiagnostics
+  diagnostics: Pick<IRuntimeByteDiagnostics, 'closed' | 'duplicateBinding'>,
+  receive?: Readonly<{
+    subscribe(listener: (value: unknown) => void): void
+    unsubscribe(listener: (value: unknown) => void): void
+  }>
 ): IRpcTransport {
   claim(channel, diagnostics)
   /** Message listeners are scoped to this single physical channel. */
@@ -462,7 +469,7 @@ export function bindRuntimeMessageTransport(
     return closing
   }
   /** This adapter owns exactly one physical whole-message subscription. */
-  const removeMessage = channel.onMessage((data) => {
+  const onMessage = (data: unknown): void => {
     if (closed) return
     for (const listener of listeners) {
       try {
@@ -471,7 +478,12 @@ export function bindRuntimeMessageTransport(
         options.report(error)
       }
     }
-  })
+  }
+  /** Expanded startup transfers the existing cold reader; fixed construction stays direct. */
+  const removeMessage = receive
+    ? () => receive.unsubscribe(onMessage)
+    : channel.onMessage(onMessage)
+  receive?.subscribe(onMessage)
   /** Observe physical terminal once, independently of business listener registration. */
   const removeClose = channel.onClose((reason) => {
     void close(

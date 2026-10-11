@@ -1,9 +1,6 @@
-import { createAdapterProcessPlugin } from '@migaia/rpc-core/adapter/process'
-import type {
-  IProcessPlugin,
-  IProcessPluginOptions,
-  IRuntimeProcessPluginOptions
-} from '@migaia/rpc-core/adapter/process'
+import type { IRuntimeProcessPluginOptions } from './operation.js'
+import { createAdapterProcessPlugin } from './operation.js'
+import type { IProcessPlugin, IProcessPluginOptions } from './types.js'
 import type {
   IRuntimePluginTyping,
   IRuntimeExpose,
@@ -46,3 +43,7 @@ export function createProcessPlugin<THandle extends IProcessHandle>(
 ): IProcessPlugin | ReturnType<typeof createRuntimePlugin> {
   return createAdapterProcessPlugin(options, new NativeProcessRuntimeLoader())
 }
+
+/** The moved custom-runtime factory retains the same canonical Process operation. */
+export { createAdapterProcessPlugin } from './operation.js'
+export type { IRuntimeProcessPluginOptions } from './operation.js'

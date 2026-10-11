@@ -1,0 +1,303 @@
+import type {
+  IRuntimePluginTyping,
+  IRuntimeExpose,
+  IRuntimeRegistry
+} from '@migaia/rpc-core/remote'
+import { createProcessResilience } from '../resilience/index.js'
+import type { IProcessRegistration } from '../resilience/types.js'
+import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
+import type { IPluginBeforeReleaseContext } from '@migaia/plugin-host'
+import { ReplaceStrategy } from '@migaia/supervision'
+import { SUPERVISION_SOURCE, SupervisionErrorCode, SupervisionErrorText } from '@migaia/supervision'
+import { attachErrorIdentity } from '@migaia/utils/error'
+import { normalizeRemoteContract } from '@migaia/rpc-core/remote'
+import { createAdapterPlugin as assembleRemotePluginDefinition } from '@migaia/rpc-core/adapter'
+import type { IRemoteEndpointFactory } from '@migaia/rpc-core/remote'
+import {
+  createConnectProcessBinding,
+  createSpawnProcessBinding,
+  invalidOption,
+  reportSafely,
+  type IProcessPluginBinding,
+  validateSpawnProcessPluginDeployment
+} from './binding.js'
+import type {
+  IProcessConnectionHandle,
+  IProcessPlugin,
+  IProcessPluginOptions,
+  IProcessPluginReplaceResult
+} from './types.js'
+import { createRuntimePlugin, type IRuntimePluginOptions } from '@migaia/rpc-core/remote'
+import { RuntimePluginKey } from '@migaia/rpc-core/remote'
+import { createAdapterProcessPeer } from '../peer.js'
+import type { IAdapterProcessRuntimeLoader } from '../peer.js'
+import type { IRuntimeProcessPeerOptions } from '../runtime-peer.js'
+
+/** This physical owner alone retains the stable family token for its actual Host slot operation. */
+const processRuntimeSlotFamily = Object.freeze({})
+
+/** Capture the canonical namespace once; descriptive resource fields cannot retarget this operation. */
+const processRuntimeSlotKey = RuntimePluginKey.process
+
+/** Symmetric Plugin options reuse the process Peer source boundary and canonical Feature exposure. */
+export type IRuntimeProcessPluginOptions = IRuntimePluginOptions<
+  IRuntimeProcessPeerOptions['spawn'],
+  IRuntimeProcessPeerOptions['connect'],
+  IRuntimeProcessPeerOptions['listen']
+>
+
+/** Keep failed endpoint admission inside the generation's rollback boundary. */
+function processEndpointFactory<TUnit extends object, TSpec>(
+  binding: IProcessPluginBinding<TUnit, TSpec>,
+  factory: IRemoteEndpointFactory,
+  report: (error: unknown) => void
+): IRemoteEndpointFactory {
+  return async (channel, signal) => {
+    const endpoint = await factory(channel, signal)
+    try {
+      return binding.bindEndpoint(channel, endpoint)
+    } catch (error) {
+      try {
+        await endpoint.endpoint.dispose()
+      } catch (cleanupError) {
+        reportSafely(report, cleanupError)
+      }
+      throw error
+    }
+  }
+}
+
+/** A retired definition has the same terminal identity as its disposed supervisor. */
+function staleDefinition(): never {
+  throw attachErrorIdentity(new Error(SupervisionErrorText.scopeTerminal), {
+    source: SUPERVISION_SOURCE,
+    code: SupervisionErrorCode.scopeTerminal
+  })
+}
+
+/** The original advanced declaration is retained only for the serial C7 consumer migration. */
+export function createAdapterProcessPlugin<THandle extends IProcessHandle>(
+  options: IProcessPluginOptions<THandle>,
+  runtime: IAdapterProcessRuntimeLoader
+): IProcessPlugin
+/** Adds one symmetric connection to the canonical process slot. */
+export function createAdapterProcessPlugin<
+  TRemote = Record<never, never>,
+  const TProvide extends import('@migaia/rpc-core/remote').IRuntimePeerProvide = Record<
+    never,
+    never
+  >,
+  const TName extends string = string,
+  const TExpose extends readonly string[] = readonly [],
+  THost = unknown
+>(
+  options: Omit<IRuntimeProcessPluginOptions, 'name' | 'provide' | 'expose'> &
+    Readonly<{
+      name: TName
+      provide?: TProvide
+      expose?: TExpose &
+        (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[])
+    }>,
+  runtime: IAdapterProcessRuntimeLoader
+): ReturnType<typeof createRuntimePlugin> &
+  IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'process'>
+/** Native factories can retain the same advanced/symmetric union while supplying actual runtime I/O. */
+export function createAdapterProcessPlugin<THandle extends IProcessHandle>(
+  options: IProcessPluginOptions<THandle> | IRuntimeProcessPluginOptions,
+  runtime: IAdapterProcessRuntimeLoader
+): IProcessPlugin | ReturnType<typeof createRuntimePlugin>
+/** Route the four-factory migration through one symmetric builder without copying platform owners. */
+export function createAdapterProcessPlugin<THandle extends IProcessHandle>(
+  options: IProcessPluginOptions<THandle> | IRuntimeProcessPluginOptions,
+  runtime: IAdapterProcessRuntimeLoader
+): IProcessPlugin | ReturnType<typeof createRuntimePlugin> {
+  if (!('deployment' in options))
+    return createRuntimePlugin(
+      options,
+      {
+        key: processRuntimeSlotKey,
+        acquire: (integration, create) =>
+          integration.acquireSharedSlot(processRuntimeSlotKey, processRuntimeSlotFamily, create)
+      },
+      (peerOptions) => createAdapterProcessPeer(peerOptions, runtime)
+    )
+  return assembleProcessPlugin(options)
+}
+
+/** A prepared candidate transfers borrowed governance only at its canonical installation boundary. */
+function assembleProcessPlugin<THandle extends IProcessHandle>(
+  options: IProcessPluginOptions<THandle>,
+  retirePreviousRegistration?: () => Promise<void> | undefined
+): IProcessPlugin {
+  const contract = normalizeRemoteContract(options.contract)
+  if (options.name !== contract.plugin) invalidOption('name')
+  if (
+    options.registrationOwner?.name !== options.name ||
+    typeof options.registrationOwner.host?.unUse !== 'function'
+  )
+    invalidOption('registrationOwner')
+  /** One governor lives across supervisor generations, rather than per endpoint. */
+  const binding: IProcessPluginBinding<
+    IProcessHandle | IProcessConnectionHandle,
+    IProcessSpec | string
+  > = (
+    options.deployment.kind === 'spawn'
+      ? createSpawnProcessBinding(options.deployment, options.report)
+      : createConnectProcessBinding(options.deployment, options.report)
+  ) as IProcessPluginBinding<IProcessHandle | IProcessConnectionHandle, IProcessSpec | string>
+  /** Borrowed governance is never closed by this definition. */
+  const resilience =
+    options.resilience ??
+    createProcessResilience({
+      scheduler: binding.scheduler,
+      report: options.report
+    })
+  /** Liquidation releases the Plugin through its real local Host, retaining the tombstone. */
+  let liquidating = false
+  /** Candidate preparation has no installed registration; installation owns terminal diagnostics. */
+  let registration: IProcessRegistration | undefined
+  const attachRegistration = (): void => {
+    registration = resilience.attachRegistration(
+      options.name,
+      {
+        ownership: options.deployment.kind === 'spawn' ? 'spawn-owned' : 'connection-borrowed',
+        health: binding.health,
+        supervisor: binding.registrationSupervisor
+      },
+      {
+        kind: 'proxy-plugin',
+        name: options.name,
+        host: {
+          unUse: (async (
+            name: string,
+            removal: { policy: 'suspend' | 'cascade'; dryRun?: boolean }
+          ) => {
+            if (removal.dryRun)
+              return options.registrationOwner.host.unUse(name, { ...removal, dryRun: true })
+            liquidating = true
+            try {
+              return await options.registrationOwner.host.unUse(name, { ...removal, dryRun: false })
+            } finally {
+              liquidating = false
+            }
+          }) as typeof options.registrationOwner.host.unUse
+        }
+      }
+    )
+  }
+  /** Normal release awaits diagnostics cleanup; committed liquidation retains its tombstone. */
+  const releaseRegistration = async (): Promise<void> => {
+    if (liquidating) return
+    await registration?.close()
+    if (!options.resilience) await resilience.close()
+  }
+  if (options.deployment.kind === 'spawn') {
+    const deployment = options.deployment
+
+    /** Only Host installation makes this exact definition eligible for replacement. */
+    let installed = false
+    /** Admission stays synchronous; the selected owner performs the actual replacement. */
+    const replace: IProcessPlugin['replace'] = (
+      replacement = {}
+    ): Promise<IProcessPluginReplaceResult> => {
+      if (!installed) staleDefinition()
+      const strategy = replacement.strategy ?? ReplaceStrategy.stopThenStart
+      if (
+        strategy !== ReplaceStrategy.stopThenStart &&
+        strategy !== ReplaceStrategy.startThenSwitch
+      )
+        invalidOption('strategy')
+      if (replacement.spec)
+        validateSpawnProcessPluginDeployment(
+          { ...deployment, supervision: { ...deployment.supervision, spec: replacement.spec } },
+          'spec'
+        )
+      if (strategy === ReplaceStrategy.stopThenStart)
+        return binding.supervisor
+          .replace({ strategy, spec: replacement.spec })
+          .then((outcome) => ({ strategy, outcome }))
+      if (typeof options.host.replace !== 'function') invalidOption('host.replace')
+      /**
+       * Candidate construction reuses supervision spec validation before touching the caller's
+       * pool.
+       */
+      const candidate = assembleProcessPlugin(
+        {
+          ...options,
+          deployment: {
+            ...deployment,
+            supervision: {
+              ...deployment.supervision,
+              spec: replacement.spec ?? deployment.supervision.spec,
+              prewarm: undefined
+            }
+          }
+        },
+        options.resilience ? () => registration?.close() : undefined
+      )
+      deployment.supervision.prewarm?.invalidate()
+      return options.host
+        .replace(options.name, candidate)
+        .then(() => ({ strategy, plugin: candidate }))
+    }
+    return assembleRemotePluginDefinition(
+      {
+        name: options.name,
+        contract,
+        host: options.host,
+        binding,
+        endpointFactory: processEndpointFactory(binding, options.endpointFactory, options.report),
+        report: options.report,
+        callDeadlineCapMs: deployment.supervision.spec.limits?.callWallTimeMs,
+        keyFactory: options.keyFactory,
+        retryPort: options.retryPort,
+        callGuard: resilience.callGuard(options.name)
+      },
+      {
+        replace,
+        beforeRelease: (context: IPluginBeforeReleaseContext) =>
+          binding.drainCurrent({ hostRemainingMs: context.remainingMs() })
+      },
+      {
+        installed: () => {
+          /** Default installation remains synchronous; only a shared-name transfer joins cleanup. */
+          const retiring = retirePreviousRegistration?.()
+          if (retiring)
+            return retiring.then(() => {
+              attachRegistration()
+              installed = true
+            })
+          attachRegistration()
+          installed = true
+        },
+        close: () => {
+          installed = false
+          return releaseRegistration()
+        }
+      }
+    )
+  }
+
+  /** A borrowed external process has no whole-process replacement command. */
+  const replace: IProcessPlugin['replace'] = (): Promise<IProcessPluginReplaceResult> =>
+    invalidOption('deployment.kind')
+  return assembleRemotePluginDefinition(
+    {
+      name: options.name,
+      contract,
+      host: options.host,
+      binding,
+      endpointFactory: processEndpointFactory(binding, options.endpointFactory, options.report),
+      report: options.report,
+      keyFactory: options.keyFactory,
+      retryPort: options.retryPort,
+      callGuard: resilience.callGuard(options.name)
+    },
+    {
+      replace,
+      beforeRelease: (context: IPluginBeforeReleaseContext) =>
+        binding.drainCurrent({ hostRemainingMs: context.remainingMs() })
+    },
+    { installed: attachRegistration, close: releaseRegistration }
+  )
+}

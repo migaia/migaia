@@ -1,10 +1,10 @@
-import { RPC_PROCESS_ERROR_SOURCE } from '@migaia/rpc-core/adapter/diagnostics'
+import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
 import { attachErrorIdentity, tryReadProperty } from '@migaia/utils/error'
 import { lstat } from 'node:fs/promises'
 import { createConnection, createServer, type Server, type Socket } from 'node:net'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-core'
-import { IpcReporterContext } from '@migaia/rpc-core/adapter/diagnostics'
+import { IpcReporterContext } from '@migaia/rpc-core/adapter'
 import { RpcProcessErrorCode } from '../error-code.js'
 
 import { RpcProcessErrorText } from '../error-text.js'
@@ -15,7 +15,7 @@ import type {
   IProcessByteListener,
   IProcessPendingByteConnection
 } from '../types.js'
-import { createAdapterSocketByteIO } from '@migaia/rpc-core/adapter/node'
+import { createAdapterSocketByteIO } from '../node-io.js'
 import {
   prepareUnixSocketPath,
   recordUnixSocketOwner,
@@ -250,6 +250,7 @@ export const listenProcessByteChannel: IListenProcessByteChannel = async (
                       code: RpcProcessErrorCode.authRejected
                     })
                   principalId = verified
+                  return verified
                 }
               }
             }),
@@ -471,3 +472,6 @@ export const listenProcessByteChannel: IListenProcessByteChannel = async (
   if (options.signal?.aborted) await close()
   return Object.freeze({ address: boundAddress, close })
 }
+
+/** The moved socket resource operation keeps native dependencies in this owning public entry. */
+export { createAdapterSocketByteIO } from '../node-io.js'

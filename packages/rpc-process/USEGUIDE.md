@@ -13,7 +13,7 @@ RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不�
 
 包内使用相对路径；跨包调用只使用公开 API。协议工具使用 `@migaia/rpc-contract`，Core/Remote/Testing 使用 `@migaia/rpc-core` 的普通入口。
 
-从包根导入 `RPC_PROCESS_ERROR_SOURCE` 和 `RpcProcessErrorCode`，按 `(source, code)` 处理 launch、dial、listen 与资源采样失败。source 固定为 `@migaia/rpc/process`；原生 cause 与错误类型沿原路径保留。`RpcProcessErrorText` 已从公开面删除，这是更名后包的破坏性导出变更；消息只用于展示，不作为重试或终止依据。自定义 child bootstrap 继续使用 `@migaia/rpc-core/adapter/process-data` 的环境名、版本、frame 限额与发现超时常量；stderr 文本与配额常量属于私有诊断策略。
+从包根导入 `RPC_PROCESS_ERROR_SOURCE` 和 `RpcProcessErrorCode`，按 `(source, code)` 处理 launch、dial、listen 与资源采样失败。source 固定为 `@migaia/rpc/process`；原生 cause 与错误类型沿原路径保留。`RpcProcessErrorText` 已从公开面删除，这是更名后包的破坏性导出变更；消息只用于展示，不作为重试或终止依据。自定义 child bootstrap 继续使用 `@migaia/rpc-process` 的环境名、版本、frame 限额与发现超时常量；stderr 文本与配额常量属于私有诊断策略。
 
 ## Advanced usage：拥有子进程并调用远端服务
 
@@ -103,3 +103,8 @@ try {
 `launcher.launch` 返回实际 handle 后，`rawChannel` 才读取它的字节通道；`establish` 用该次 handle 的真实 instanceId 和原 prepared offer 创建通道。这里没有声明任意 transport 为 owned，也没有把复制的身份或 capabilities 当授信。`budget` 限定本应用的进程数，不能用它声称操作系统隔离或已测量资源用量。
 
 `request` 的 Promise 给出业务结果，发送成功本身不代表服务已执行。`close()` 由原监督与 drain owner 结束这个 spawn 的连接和执行单元；使用 connect/listen 借用外部服务时，只关闭本端连接，外部进程仍由其原 owner 终止。遇到断线或未知结果，先按既有 source/code 策略对账，不自动重放副作用。
+
+
+运行时外迁后，Process 包拥有 native I/O、launch/bootstrap、host registration、listener/session、resilience 与 stderr 策略；通用 framing、实际 handshake/ACK、provider 资源与私有事实由 `@migaia/rpc-core/adapter` 的持有资源操作构造。原 Core Process 用户操作与配置类型移到本包公开入口；Node pipe/socket 操作留在对应 native 子入口。
+
+message 通道的固定 V1 profile 保持零握手。扩展 runtime/binary 能力由 Core 收到的 capability ACK 求交，沿用 handshakeTimeoutMs/default；缺少 ACK 或超时只启用固定 profile，格式错误/伪造 ACK 使用原错误码拒绝。staticAgreement 的相等声明不能绕过 ACK，agreement.capabilities 反映实际能力。此项有意变更仅涉及 process message 扩展能力。

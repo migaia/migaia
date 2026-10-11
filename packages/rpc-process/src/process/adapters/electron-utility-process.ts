@@ -1,4 +1,4 @@
-import { RPC_PROCESS_ERROR_SOURCE } from '@migaia/rpc-core/adapter/diagnostics'
+import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
 import { randomUUID } from 'node:crypto'
 import type { Readable } from 'node:stream'
 import { attachErrorIdentity } from '@migaia/utils/error'
@@ -10,7 +10,7 @@ import {
   type IProcessLauncher
 } from '@migaia/supervision/process'
 import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-core'
-import { IpcReporterContext } from '@migaia/rpc-core/adapter/diagnostics'
+import { IpcReporterContext } from '@migaia/rpc-core/adapter'
 import { ERROR_SOURCE, RpcProcessErrorCode } from '../error-code.js'
 
 import { RpcProcessErrorText } from '../error-text.js'
