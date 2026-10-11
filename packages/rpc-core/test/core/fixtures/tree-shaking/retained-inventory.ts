@@ -6,16 +6,15 @@ const reviewed = (...modules: readonly string[]): readonly string[] =>
   Object.freeze([...modules].sort())
 
 /**
- * K289 exact five-consumer sets retain C5's 130/188/195/200/199 module counts with no slack. Only
- * the Utils error-core chunk identity changes; all other retained owner paths remain exact. Fresh
- * predecessor/current inventories, source/map/artifact hashes, emitted regions and derived binding
- * changes are recorded in docs/rpc/scratch/k289/repin/comparison.json. C5's preceding custody stays
- * in docs/rpc/scratch/package-split/c5-tree-final-attribution.json.
+ * Portable convergence adds the same seven explicit Contract/serialize owners to each K289 set.
+ * Fresh counts are 137/195/202/207/206; main1437c404 retains 130/188/195/200/199. No module slack.
+ * Root bytes, module/source/map custody and exact derived-region proofs are preserved in
+ * docs/serialize/portable-converge/phase-b/rebase-1437c404/reviewed-repin-comparison.json.
  */
 export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, readonly string[]>> =
   Object.freeze({
     core: reviewed(
-      '\0rolldown/runtime.js',
+      '\u0000rolldown/runtime.js',
       'dist/core/composed.js',
       'dist/core/endpoint-kernel.js',
       'dist/core/error-code.js',
@@ -129,6 +128,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/rpc-contract/dist/contract/framing/message-framer.js',
       'workspace:packages/rpc-contract/dist/contract/framing/reassembler.js',
       'workspace:packages/rpc-contract/dist/contract/normalize.js',
+      'workspace:packages/rpc-contract/dist/contract/portable-binary.js',
+      'workspace:packages/rpc-contract/dist/contract/portable-strategy.js',
       'workspace:packages/rpc-contract/dist/contract/protocol.js',
       'workspace:packages/rpc-contract/dist/contract/runtime-api/constants.js',
       'workspace:packages/rpc-contract/dist/contract/v1/normalize.js',
@@ -137,18 +138,23 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/rpc-contract/dist/contract/wire-constants.js',
       'workspace:packages/rpc-contract/dist/contract/wire-error-constants.js',
       'workspace:packages/rpc-contract/dist/internal/module-instance.js',
+      'workspace:packages/serialize/dist/base64.js',
+      'workspace:packages/serialize/dist/codec-text.js',
       'workspace:packages/serialize/dist/codecs/identity.js',
+      'workspace:packages/serialize/dist/error-code.js',
+      'workspace:packages/serialize/dist/errors.js',
+      'workspace:packages/serialize/dist/portable.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
       'workspace:packages/utils/dist/error-tLXBvoy2.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
-      'workspace:packages/utils/dist/string.js',
-      'workspace:packages/utils/dist/scheduler.js'
+      'workspace:packages/utils/dist/scheduler.js',
+      'workspace:packages/utils/dist/string.js'
     ),
     client: reviewed(
-      '\0rolldown/runtime.js',
-      '\0vite/preload-helper.js',
+      '\u0000rolldown/runtime.js',
+      '\u0000vite/preload-helper.js',
       'dist/core/client.js',
       'dist/core/composed.js',
       'dist/core/endpoint-kernel.js',
@@ -299,6 +305,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/rpc-contract/dist/contract/framing/message-framer.js',
       'workspace:packages/rpc-contract/dist/contract/framing/reassembler.js',
       'workspace:packages/rpc-contract/dist/contract/normalize.js',
+      'workspace:packages/rpc-contract/dist/contract/portable-binary.js',
+      'workspace:packages/rpc-contract/dist/contract/portable-strategy.js',
       'workspace:packages/rpc-contract/dist/contract/protocol.js',
       'workspace:packages/rpc-contract/dist/contract/runtime-api/binary-capture.js',
       'workspace:packages/rpc-contract/dist/contract/runtime-api/binary-constants.js',
@@ -325,7 +333,12 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/rpc-contract/dist/contract/wire-constants.js',
       'workspace:packages/rpc-contract/dist/contract/wire-error-constants.js',
       'workspace:packages/rpc-contract/dist/internal/module-instance.js',
+      'workspace:packages/serialize/dist/base64.js',
+      'workspace:packages/serialize/dist/codec-text.js',
       'workspace:packages/serialize/dist/codecs/identity.js',
+      'workspace:packages/serialize/dist/error-code.js',
+      'workspace:packages/serialize/dist/errors.js',
+      'workspace:packages/serialize/dist/portable.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
       'workspace:packages/utils/dist/error-tLXBvoy2.js',
@@ -333,12 +346,12 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/object.js',
       'workspace:packages/utils/dist/promise.js',
-      'workspace:packages/utils/dist/string.js',
-      'workspace:packages/utils/dist/scheduler.js'
+      'workspace:packages/utils/dist/scheduler.js',
+      'workspace:packages/utils/dist/string.js'
     ),
     provider: reviewed(
-      '\0rolldown/runtime.js',
-      '\0vite/preload-helper.js',
+      '\u0000rolldown/runtime.js',
+      '\u0000vite/preload-helper.js',
       'dist/core/composed.js',
       'dist/core/endpoint-kernel.js',
       'dist/core/error-code.js',
@@ -495,6 +508,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/rpc-contract/dist/contract/framing/message-framer.js',
       'workspace:packages/rpc-contract/dist/contract/framing/reassembler.js',
       'workspace:packages/rpc-contract/dist/contract/normalize.js',
+      'workspace:packages/rpc-contract/dist/contract/portable-binary.js',
+      'workspace:packages/rpc-contract/dist/contract/portable-strategy.js',
       'workspace:packages/rpc-contract/dist/contract/protocol.js',
       'workspace:packages/rpc-contract/dist/contract/runtime-api/binary-capture.js',
       'workspace:packages/rpc-contract/dist/contract/runtime-api/binary-constants.js',
@@ -522,7 +537,12 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/rpc-contract/dist/contract/wire-constants.js',
       'workspace:packages/rpc-contract/dist/contract/wire-error-constants.js',
       'workspace:packages/rpc-contract/dist/internal/module-instance.js',
+      'workspace:packages/serialize/dist/base64.js',
+      'workspace:packages/serialize/dist/codec-text.js',
       'workspace:packages/serialize/dist/codecs/identity.js',
+      'workspace:packages/serialize/dist/error-code.js',
+      'workspace:packages/serialize/dist/errors.js',
+      'workspace:packages/serialize/dist/portable.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
       'workspace:packages/utils/dist/error-tLXBvoy2.js',
@@ -530,12 +550,12 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/object.js',
       'workspace:packages/utils/dist/promise.js',
-      'workspace:packages/utils/dist/string.js',
-      'workspace:packages/utils/dist/scheduler.js'
+      'workspace:packages/utils/dist/scheduler.js',
+      'workspace:packages/utils/dist/string.js'
     ),
     full: reviewed(
-      '\0rolldown/runtime.js',
-      '\0vite/preload-helper.js',
+      '\u0000rolldown/runtime.js',
+      '\u0000vite/preload-helper.js',
       'dist/core/composed.js',
       'dist/core/endpoint-kernel.js',
       'dist/core/error-code.js',
@@ -697,6 +717,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/rpc-contract/dist/contract/framing/message-framer.js',
       'workspace:packages/rpc-contract/dist/contract/framing/reassembler.js',
       'workspace:packages/rpc-contract/dist/contract/normalize.js',
+      'workspace:packages/rpc-contract/dist/contract/portable-binary.js',
+      'workspace:packages/rpc-contract/dist/contract/portable-strategy.js',
       'workspace:packages/rpc-contract/dist/contract/protocol.js',
       'workspace:packages/rpc-contract/dist/contract/runtime-api/binary-capture.js',
       'workspace:packages/rpc-contract/dist/contract/runtime-api/binary-constants.js',
@@ -724,7 +746,12 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/rpc-contract/dist/contract/wire-constants.js',
       'workspace:packages/rpc-contract/dist/contract/wire-error-constants.js',
       'workspace:packages/rpc-contract/dist/internal/module-instance.js',
+      'workspace:packages/serialize/dist/base64.js',
+      'workspace:packages/serialize/dist/codec-text.js',
       'workspace:packages/serialize/dist/codecs/identity.js',
+      'workspace:packages/serialize/dist/error-code.js',
+      'workspace:packages/serialize/dist/errors.js',
+      'workspace:packages/serialize/dist/portable.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
       'workspace:packages/utils/dist/error-tLXBvoy2.js',
@@ -732,12 +759,12 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/object.js',
       'workspace:packages/utils/dist/promise.js',
-      'workspace:packages/utils/dist/string.js',
-      'workspace:packages/utils/dist/scheduler.js'
+      'workspace:packages/utils/dist/scheduler.js',
+      'workspace:packages/utils/dist/string.js'
     ),
     custom: reviewed(
-      '\0rolldown/runtime.js',
-      '\0vite/preload-helper.js',
+      '\u0000rolldown/runtime.js',
+      '\u0000vite/preload-helper.js',
       'dist/core/composed.js',
       'dist/core/endpoint-kernel.js',
       'dist/core/error-code.js',
@@ -898,6 +925,8 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/rpc-contract/dist/contract/framing/message-framer.js',
       'workspace:packages/rpc-contract/dist/contract/framing/reassembler.js',
       'workspace:packages/rpc-contract/dist/contract/normalize.js',
+      'workspace:packages/rpc-contract/dist/contract/portable-binary.js',
+      'workspace:packages/rpc-contract/dist/contract/portable-strategy.js',
       'workspace:packages/rpc-contract/dist/contract/protocol.js',
       'workspace:packages/rpc-contract/dist/contract/runtime-api/binary-capture.js',
       'workspace:packages/rpc-contract/dist/contract/runtime-api/binary-constants.js',
@@ -925,7 +954,12 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/rpc-contract/dist/contract/wire-constants.js',
       'workspace:packages/rpc-contract/dist/contract/wire-error-constants.js',
       'workspace:packages/rpc-contract/dist/internal/module-instance.js',
+      'workspace:packages/serialize/dist/base64.js',
+      'workspace:packages/serialize/dist/codec-text.js',
       'workspace:packages/serialize/dist/codecs/identity.js',
+      'workspace:packages/serialize/dist/error-code.js',
+      'workspace:packages/serialize/dist/errors.js',
+      'workspace:packages/serialize/dist/portable.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
       'workspace:packages/utils/dist/error-tLXBvoy2.js',
@@ -933,7 +967,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/object.js',
       'workspace:packages/utils/dist/promise.js',
-      'workspace:packages/utils/dist/string.js',
-      'workspace:packages/utils/dist/scheduler.js'
+      'workspace:packages/utils/dist/scheduler.js',
+      'workspace:packages/utils/dist/string.js'
     )
   })

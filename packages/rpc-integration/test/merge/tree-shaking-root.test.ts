@@ -8,20 +8,21 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-core')
 
 /**
- * K289 re-pins the fresh root to exactly 200 modules, 982595 raw bytes and 241062 gzip bytes.
- * Main's C5 predecessor was 200/985824/240805. The error-chain move accounts for -3229 rendered
- * bytes, zero framing delta and +257 whole-bundle gzip bytes; verified shared Utils imports and
- * private binding substitutions account for derived changes. The complete 200-module evidence is in
- * docs/rpc/scratch/k289/repin/comparison.json. Neither byte cap contains headroom; the immutable
- * legacy comparison stays unchanged.
+ * Portable convergence re-pins the root to 207 modules, 1006331 raw bytes and 248781 gzip bytes.
+ * Main1437c404 retains 200/982595/241062. Seven portable owners account for the module increase;
+ * exact emitted regions add 23730 bytes and framing adds six newlines. The unchanged identity
+ * declaration moves between regions, and only observed chunk filenames change in shared code.
+ * Whole-bundle gzip increases by 7719 bytes. Full module/source/map and exact substitution evidence
+ * is in docs/serialize/portable-converge/phase-b/rebase-1437c404/reviewed-repin-comparison.json.
+ * Neither byte cap contains headroom; the immutable legacy comparison stays unchanged.
  */
 const allowedIncrease = {
-  rawBytes: 390741 / legacyRoot.rawBytes,
-  gzipBytes: 98150 / legacyRoot.gzipBytes
+  rawBytes: 414477 / legacyRoot.rawBytes,
+  gzipBytes: 105869 / legacyRoot.gzipBytes
 } as const
 
-/** Exact C5 delta from the immutable 157-module legacy root, including canonical Utils owners. */
-const expectedModuleIncrease = 43
+/** Exact portable delta from the immutable 157-module legacy root, including canonical owners. */
+const expectedModuleIncrease = 50
 
 describe('A9 root tree-shaking cost', () => {
   it('keeps module count exact and both byte costs within reviewed caps', () => {
