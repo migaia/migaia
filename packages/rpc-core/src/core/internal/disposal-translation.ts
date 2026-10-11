@@ -1,0 +1,116 @@
+import { createRpcLifecycleError, type IRpcCleanupError, RpcLifecycleError } from '../errors.js'
+import { PluginHostDisposalNodeKind, readPluginHostDisposalProvenance } from '@migaia/plugin-host'
+
+import { RpcCoreErrorText } from '../error-text.js'
+
+/** Stable PluginHost cleanup-group label retained in the endpoint diagnostic contract. */
+const HOST_RESOURCE_DISPOSER_LABEL = 'resource disposer'
+
+/** Reads an explicit resource record without treating arbitrary error causes as containers. */
+const isCleanupRecord = (
+  value: unknown
+): value is { readonly resource: string; readonly error: unknown } =>
+  Boolean(
+    value &&
+    typeof value === 'object' &&
+    'resource' in value &&
+    'error' in value &&
+    typeof (value as { readonly resource?: unknown }).resource === 'string'
+  )
+
+/** Recognizes only a wrapper carrying PluginHost's package-owned provenance symbol. */
+const isPluginHostResourceWrapper = (
+  value: unknown
+): value is Error & { readonly cause: unknown } =>
+  value instanceof Error &&
+  readPluginHostDisposalProvenance(value)?.kind === PluginHostDisposalNodeKind.disposerWrapper
+
+/** Recognizes a Host-generated single-error aggregate container without inspecting its cause shape. */
+const isPluginHostAggregateContainer = (
+  value: unknown
+): value is Error & { readonly cause: unknown } =>
+  value instanceof Error &&
+  readPluginHostDisposalProvenance(value)?.kind === PluginHostDisposalNodeKind.aggregate
+
+/**
+ * Reuses the native lifecycle diagnostic after cleanup has failed. This only presents the original
+ * error; the host's independent finally block owns terminal state and grants no control identity.
+ */
+const findLifecycleError = (
+  value: unknown,
+  seen: Set<object> = new Set()
+): RpcLifecycleError | undefined => {
+  if (value instanceof RpcLifecycleError) return value
+  if (!value || (typeof value !== 'object' && typeof value !== 'function')) return undefined
+  if (seen.has(value)) return undefined
+  seen.add(value)
+  if (isCleanupRecord(value)) return findLifecycleError(value.error, seen)
+  if (value instanceof AggregateError)
+    for (const child of value.errors) {
+      const lifecycleError = findLifecycleError(child, seen)
+      if (lifecycleError) return lifecycleError
+    }
+  if (isPluginHostAggregateContainer(value)) return findLifecycleError(value.cause, seen)
+  if (isPluginHostResourceWrapper(value)) return findLifecycleError(value.cause, seen)
+  return undefined
+}
+
+/**
+ * Flattens PluginHost's structural cleanup containers while retaining every raw leaf in release
+ * order. PluginHost uses nested AggregateError causes for one resource disposer; no diagnostic text
+ * is inspected, so arbitrary user error messages remain opaque and untouched.
+ */
+const flattenHostCleanupErrors = (
+  value: unknown,
+  seen: Set<object> = new Set()
+): readonly IRpcCleanupError[] => {
+  if (!value || (typeof value !== 'object' && typeof value !== 'function'))
+    return [{ resource: HOST_RESOURCE_DISPOSER_LABEL, error: value }]
+  if (seen.has(value)) return []
+  seen.add(value)
+  if (isCleanupRecord(value)) {
+    const resource = value.resource
+    return flattenHostCleanupErrors(value.error, seen).map(({ error }) => ({
+      resource,
+      error
+    }))
+  }
+  if (value instanceof AggregateError) {
+    return value.errors.flatMap((child) => flattenHostCleanupErrors(child, seen))
+  }
+  if (isPluginHostAggregateContainer(value)) return flattenHostCleanupErrors(value.cause, seen)
+  if (isPluginHostResourceWrapper(value)) return flattenHostCleanupErrors(value.cause, seen)
+  return [{ resource: HOST_RESOURCE_DISPOSER_LABEL, error: value }]
+}
+
+/** Translates a PluginHost rejection before it crosses the composed endpoint boundary. */
+export const translateEndpointDisposalError = (
+  error: unknown,
+  cleanupErrors: readonly IRpcCleanupError[] = []
+): RpcLifecycleError => {
+  const nestedLifecycleError = findLifecycleError(error)
+  if (nestedLifecycleError) return nestedLifecycleError
+  const hostCleanupErrors = flattenHostCleanupErrors(error)
+  const labeledByIdentity = new Map(
+    cleanupErrors.map((cleanupError) => [cleanupError.error, cleanupError] as const)
+  )
+  const translatedCleanupErrors: IRpcCleanupError[] = []
+  const seenLeaves = new Set<unknown>()
+  for (const cleanupError of hostCleanupErrors) {
+    if (seenLeaves.has(cleanupError.error)) continue
+    seenLeaves.add(cleanupError.error)
+    translatedCleanupErrors.push(labeledByIdentity.get(cleanupError.error) ?? cleanupError)
+  }
+  for (const cleanupError of cleanupErrors) {
+    if (seenLeaves.has(cleanupError.error)) continue
+    seenLeaves.add(cleanupError.error)
+    translatedCleanupErrors.push(cleanupError)
+  }
+  if (translatedCleanupErrors.length > 0)
+    return createRpcLifecycleError(
+      RpcCoreErrorText.endpointDisposalCleanupFailed,
+      translatedCleanupErrors[0]?.error,
+      translatedCleanupErrors
+    )
+  return createRpcLifecycleError(RpcCoreErrorText.endpointDisposalCleanupFailed, error)
+}

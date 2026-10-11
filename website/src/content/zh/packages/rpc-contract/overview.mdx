@@ -1,0 +1,12 @@
+---
+title: rpc-contract
+description: RPC 协议工具
+---
+
+# rpc-contract
+
+独立协议实现使用此包的 wire、握手、framing、binary 与错误工具。普通子路径按协议能力组织；内部编解码实现由包自身维护。
+
+协议接收方可用 `normalizeRpcEnvelope` 校验实际输入，再用 `classifyRpcContractError` 读取该次校验错误的受控 code/text。分类只识别本实例实际产生的错误，不读取 cause 或错误 getter；无分类时保留原错误处理。
+
+RPC 六个公开包采用锁步版本和精确 peer，直接安装需要的包。完整 API 与资源生命周期见本包生成参考、README 和 USEGUIDE。

@@ -1,6 +1,6 @@
 # `@migaia/store-worker`
 
-把 Store 的响应式计算和序列化编解码搬到 Worker 里跑：主线程用几乎和调本地异步函数一样的写法把耗时工作丢给 Worker，同时保留 `@migaia/resource` 的 `Resource` 的取消、去重、缓存能力。本包**不实现**任何消息协议——协议、超时、取消、来源校验全部来自 `@migaia/rpc/core`，这里只负责把这些通用能力接到 Store 生态的两个具体场景上：通用计算卸载(`WorkerAdapter`/`workerComputed`)与序列化编解码卸载(`workerPlugin`)。
+把 Store 的响应式计算和序列化编解码搬到 Worker 里跑：主线程用几乎和调本地异步函数一样的写法把耗时工作丢给 Worker，同时保留 `@migaia/resource` 的 `Resource` 的取消、去重、缓存能力。本包**不实现**任何消息协议——协议、超时、取消、来源校验全部来自 `@migaia/rpc-core`，这里只负责把这些通用能力接到 Store 生态的两个具体场景上：通用计算卸载(`WorkerAdapter`/`workerComputed`)与序列化编解码卸载(`workerPlugin`)。
 
 ## 适用与不适用场景
 

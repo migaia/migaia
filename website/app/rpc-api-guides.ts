@@ -66,8 +66,8 @@ function endpointGuide(input: {
     purposeEn: `Creates an endpoint that can ${input.surfaceEn}. Setup is all-or-nothing: if one installation step fails, RPC removes the listeners and resources installed by earlier steps.`,
     purposeZh: `创建可${input.surfaceZh}的端点。初始化会整体成功或整体失败；如果中途出错，RPC 会清理此前已经安装的监听器和资源。`,
     quickStart: `import { ${input.name} } from '${input.importPath}'
-import { connect, createEndpoint as createServiceEndpoint } from '@migaia/rpc/core'
-import { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'
+import { connect, createEndpoint as createServiceEndpoint } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
 
 const [transport, serviceTransport] = createMemoryTransportPair()
 const service = await createServiceEndpoint({
@@ -132,8 +132,8 @@ function middlewareTransportExamples(
       id: 'iframe-transport',
       title: locale === 'zh' ? '父页面调用 iframe' : 'Parent page to iframe',
       description: descriptions.iframe,
-      code: `import { ${imports} } from '@migaia/rpc/core'
-import { createWindowMessageTransport } from '@migaia/rpc/browser/adapters/window'
+      code: `import { ${imports} } from '@migaia/rpc-core'
+import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
 
 const frame = document.querySelector<HTMLIFrameElement>('#embedded-app')!
 const transport = createWindowMessageTransport({
@@ -148,8 +148,8 @@ const endpoint = await createEndpoint({
       id: 'worker-transport',
       title: locale === 'zh' ? '页面调用 Dedicated Worker' : 'Page to Dedicated Worker',
       description: descriptions.worker,
-      code: `import { ${imports} } from '@migaia/rpc/core'
-import { createWebWorkerTransport } from '@migaia/rpc/browser/adapters/web-worker'
+      code: `import { ${imports} } from '@migaia/rpc-core'
+import { createWebWorkerTransport } from '@migaia/rpc-core/adapters/web-worker'
 
 const worker = new Worker(new URL('./task.worker.ts', import.meta.url), { type: 'module' })
 const transport = createWebWorkerTransport(worker, { peerId: 'task-worker' })
@@ -165,8 +165,8 @@ const endpoint = await createEndpoint({
           ? '同源 Tab 通过 BroadcastChannel 通信'
           : 'Same-origin tabs through BroadcastChannel',
       description: descriptions.tabs,
-      code: `import { ${imports} } from '@migaia/rpc/core'
-import { createBroadcastChannelTransport } from '@migaia/rpc/browser/adapters/broadcast-channel'
+      code: `import { ${imports} } from '@migaia/rpc-core'
+import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'
 
 const channel = new BroadcastChannel('application-rpc-v1')
 const transport = createBroadcastChannelTransport(channel)
@@ -179,8 +179,8 @@ const endpoint = await createEndpoint({
       id: 'service-worker-transport',
       title: locale === 'zh' ? '页面调用 Service Worker' : 'Page to Service Worker',
       description: descriptions.serviceWorker,
-      code: `import { ${imports} } from '@migaia/rpc/core'
-import { createServiceWorkerTransport } from '@migaia/rpc/browser/adapters/service-worker'
+      code: `import { ${imports} } from '@migaia/rpc-core'
+import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'
 
 await navigator.serviceWorker.ready
 const controller = navigator.serviceWorker.controller
@@ -247,7 +247,7 @@ function pingUsageExamples(locale: IGuideLocale): readonly IApiGuideExample[] {
       id: 'preflight-liveness',
       title: copy.preflight[0],
       description: copy.preflight[1],
-      code: `import type { IRpcEndpoint } from '@migaia/rpc/core'
+      code: `import type { IRpcEndpoint } from '@migaia/rpc-core'
 
 type IPreviewDocument = { pages: number }
 
@@ -291,7 +291,7 @@ export async function refreshPeerStatus(
       id: 'cancel-liveness',
       title: copy.cancel[0],
       description: copy.cancel[1],
-      code: `import type { IRpcEndpoint } from '@migaia/rpc/core'
+      code: `import type { IRpcEndpoint } from '@migaia/rpc-core'
 
 export async function checkWorkerBeforePageExit(client: IRpcEndpoint) {
   const controller = new AbortController()
@@ -314,7 +314,7 @@ export async function checkWorkerBeforePageExit(client: IRpcEndpoint) {
       id: 'periodic-liveness',
       title: copy.heartbeat[0],
       description: copy.heartbeat[1],
-      code: `import type { IRpcEndpoint } from '@migaia/rpc/core'
+      code: `import type { IRpcEndpoint } from '@migaia/rpc-core'
 
 type IConnectionState = 'online' | 'reconnecting'
 
@@ -366,8 +366,8 @@ function middlewareGuide(input: {
     purposeZh: `${input.purposeZh} 安装到 Host 后，这项策略会参与每一次匹配的 endpoint 操作。send()、provide()、ping() 等可调用能力由 endpoint 的 Feature 提供；middleware 负责改变这些操作的连接、校验、保护、观测或边界规则，并不会凭空增加一套无关的业务 API。`,
     examplesEn: input.examplesEn ?? middlewareTransportExamples(input.name, input.code, 'en'),
     examplesZh: input.examplesZh ?? middlewareTransportExamples(input.name, input.code, 'zh'),
-    quickStart: `import { ${imports} } from '@migaia/rpc/core'
-import { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'
+    quickStart: `import { ${imports} } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
 
 ${input.setup ? `${input.setup}\n\n` : ''}// 用内存通道模拟真实的客户端与服务宿主；浏览器中可替换成 Worker、MessagePort 等 adapter。
 const [clientTransport, serviceTransport] = createMemoryTransportPair()
@@ -429,7 +429,7 @@ function transportGuide(input: {
   return guide({
     purposeEn: `Wraps ${input.boundaryEn} as the send/receive connection expected by a RPC endpoint. The adapter also records how the two sides are connected, how messages are encoded, and which side must close the host resource.`,
     purposeZh: `把${input.boundaryZh}包装成 RPC endpoint 所需的消息收发连接。适配器还会记录两端如何连接、消息如何编码，以及由哪一端负责关闭宿主资源。`,
-    quickStart: `import { ${input.name} } from '${input.importPath}'\nimport { connect, createEndpoint } from '@migaia/rpc/core'\n\nconst transport = ${input.expression}\nconst endpoint = await createEndpoint({\n  id: 'local',\n  transport,\n  middlewares: [connect({ transport })]\n})\nendpoint.provide('health', ({ success }) => success({ ok: true }))\ntry {\n  console.log('health provider ready:', typeof endpoint.provide)\n} finally {\n  await endpoint.dispose()\n}`,
+    quickStart: `import { ${input.name} } from '${input.importPath}'\nimport { connect, createEndpoint } from '@migaia/rpc-core'\n\nconst transport = ${input.expression}\nconst endpoint = await createEndpoint({\n  id: 'local',\n  transport,\n  middlewares: [connect({ transport })]\n})\nendpoint.provide('health', ({ success }) => success({ ok: true }))\ntry {\n  console.log('health provider ready:', typeof endpoint.provide)\n} finally {\n  await endpoint.dispose()\n}`,
     useEn: [
       `The two endpoints communicate through ${input.boundaryEn}.`,
       'Use the adapter when RPC should register the message listener and remove it when the endpoint is disposed.'
@@ -446,7 +446,7 @@ function transportGuide(input: {
   })
 }
 
-/** Creates a reading guide for one public failure class. */
+/** Describes a public diagnostic type without exposing its owner-only runtime constructor. */
 function errorGuide(input: {
   readonly name: string
   readonly conditionEn: string
@@ -455,21 +455,21 @@ function errorGuide(input: {
   readonly distinctionZh: string
 }): Readonly<Record<IGuideLocale, IApiGuide>> {
   return guide({
-    purposeEn: `${input.name} represents ${input.conditionEn}. Its stable source and code let callers handle the failure without parsing message text, while cause and cleanup fields retain the original error.`,
-    purposeZh: `${input.name} 表示${input.conditionZh}。调用方可以读取稳定的 source 与 code 处理失败，无需解析 message；原始错误仍保留在 cause 或清理结果字段中。`,
-    quickStart: `import type { IRpcEndpoint } from '@migaia/rpc/core'\nimport { ${input.name} } from '@migaia/rpc/core'\n\n// endpoint 已由应用按 transport、connect 和服务端 handler 完成组装。\nexport async function callWorker(endpoint: IRpcEndpoint) {\n  try {\n    await endpoint.send('worker', 'load', [])\n  } catch (error) {\n    if (error instanceof ${input.name}) {\n      console.error(error.code, error.cause)\n    }\n    throw error\n  }\n}\n\n// 服务端返回失败时，错误会沿 endpoint 边界传回这里；上层可在页面或重试层调用 callWorker(endpoint)。`,
+    purposeEn: `${input.name} describes ${input.conditionEn}. Import it as a type to read an actual owner's failure. Source/code and cause are diagnostics; they do not prove execution, authorize retry or change Core operation state.`,
+    purposeZh: `${input.name} 描述${input.conditionZh}。只作 type 导入，读取实际 owner 已产生的失败。source/code 与 cause 属于诊断，不能证明执行结果、授予重试或改变 Core 操作状态。`,
+    quickStart: `import type { ${input.name} } from '@migaia/rpc-core'\n\n/** Read a failure already raised by its owner; no constructor is imported. */\nexport function reportFailure(error: ${input.name}) {\n  console.error(error.source, error.code, error.cause)\n}\n// For unknown values use the public Core family guards before reading diagnostics.\n// Their result is not proof that Core minted the error or that the call may be repeated.`,
     useEn: [
       input.distinctionEn,
-      'Catch it only where the caller can recover, translate, report, or apply a bounded retry policy.'
+      'Read cause and cleanup evidence at the original error boundary without replacing the error.'
     ],
-    useZh: [input.distinctionZh, '只在调用方能够恢复、转换、报告或执行有上限重试的边界捕获。'],
+    useZh: [input.distinctionZh, '在原错误边界读取 cause 与 cleanup 证据，不替换原错误。'],
     avoidEn: [
-      'Branching on message text instead of source, code, name, or native error identity.',
-      'Constructing it to represent a normal endpoint state.'
+      'Importing this type as a value for construction or instanceof checks.',
+      'Using public diagnostic fields to authorize retry, cancellation, terminal or close decisions.'
     ],
     avoidZh: [
-      '不要根据 message 文本分支；应读取 source、code、name 或原生错误类型。',
-      '不要用它表示正常 endpoint 状态。'
+      '把此 type 作为 value 导入进行构造或 instanceof 判断。',
+      '用公开诊断字段授予重试、取消、终止或关闭决定。'
     ]
   })
 }
@@ -485,7 +485,7 @@ function constantGuide(input: {
   return guide({
     purposeEn: `Provides the canonical ${input.roleEn}. Use its members instead of repeating wire-visible or cross-module string literals.`,
     purposeZh: `提供规范的${input.roleZh}。应引用其 member，不要重复书写 wire-visible 或 cross-module string literal。`,
-    quickStart: `import { ${input.name} } from '@migaia/rpc/core'\n\nconst value = ${input.name}.${input.member}\nif (value === ${input.name}.${input.member}) {\n  console.log(value) // ${input.value}\n}\n// Business code reads the same canonical member instead of copying the wire-visible string.`,
+    quickStart: `import { ${input.name} } from '@migaia/rpc-core'\n\nconst value = ${input.name}.${input.member}\nif (value === ${input.name}.${input.member}) {\n  console.log(value) // ${input.value}\n}\n// Business code reads the same canonical member instead of copying the wire-visible string.`,
     useEn: [
       'Code must produce, compare, log, or test the corresponding stable discriminant.',
       'A custom adapter or diagnostic consumer interoperates with RPC metadata.'
@@ -507,8 +507,8 @@ function constantGuide(input: {
 
 /** Copyable chunk examples for the preset/composed distinction and browser host boundaries. */
 const chunkScenarioCode = {
-  preset: `import { chunk, connect, createEndpoint } from '@migaia/rpc/core'
-import { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'
+  preset: `import { chunk, connect, createEndpoint } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
 
 const [clientTransport, serviceTransport] = createMemoryTransportPair()
 const policy = { chunkSize: 64 * 1024, maxMessageBytes: 8 * 1024 * 1024 }
@@ -535,8 +535,8 @@ try {
   await Promise.all([client.dispose(), service.dispose()])
 }`,
   iframe: `// parent.ts：父页面创建调用端，targetOrigin 必须固定为 iframe 的真实 origin。
-import { chunk, connect, createEndpoint } from '@migaia/rpc/core'
-import { createWindowMessageTransport } from '@migaia/rpc/browser/adapters/window'
+import { chunk, connect, createEndpoint } from '@migaia/rpc-core'
+import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
 
 const frame = document.querySelector<HTMLIFrameElement>('#report-frame')
 if (!frame?.contentWindow) throw new Error('report iframe is unavailable')
@@ -571,8 +571,8 @@ const render = (value: unknown) => '<main>' + String(value) + '</main>'
 iframeEndpoint.provide('renderReport', ({ data, success }) => success(render(data)))
 window.addEventListener('pagehide', () => void iframeEndpoint.dispose(), { once: true })`,
   tabs: `// 两个同源 Tab 运行同一入口；URL 中的 role 决定当前 Tab 是服务端还是调用端。
-import { chunk, connect, createEndpoint } from '@migaia/rpc/core'
-import { createBroadcastChannelTransport } from '@migaia/rpc/browser/adapters/broadcast-channel'
+import { chunk, connect, createEndpoint } from '@migaia/rpc-core'
+import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'
 
 const role = new URL(location.href).searchParams.get('role')
 const endpointId = role === 'service' ? 'document-owner' : 'document-viewer'
@@ -599,8 +599,8 @@ if (role === 'service') {
 
 window.addEventListener('pagehide', () => void endpoint.dispose(), { once: true })`,
   worker: `// main.ts：页面端持有 Worker，并把大任务交给 Worker endpoint。
-import { chunk, connect, createEndpoint } from '@migaia/rpc/core'
-import { createWebWorkerTransport } from '@migaia/rpc/browser/adapters/web-worker'
+import { chunk, connect, createEndpoint } from '@migaia/rpc-core'
+import { createWebWorkerTransport } from '@migaia/rpc-core/adapters/web-worker'
 
 const worker = new Worker(new URL('./image-worker.ts', import.meta.url), { type: 'module' })
 const pageTransport = createWebWorkerTransport(worker, { peerId: 'image-worker' })
@@ -633,8 +633,8 @@ workerEndpoint.provide('buildPreview', async ({ data, success }) => {
 /** Contract examples prove that the same middleware policy works across real host boundaries. */
 const contractTransportCode = {
   iframe: `// parent.ts：父页面通过 Window transport 调用 iframe。
-import { connect, contract, createEndpoint } from '@migaia/rpc/core'
-import { createWindowMessageTransport } from '@migaia/rpc/browser/adapters/window'
+import { connect, contract, createEndpoint } from '@migaia/rpc-core'
+import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
 
 const frame = document.querySelector<HTMLIFrameElement>('#billing')!
 const transport = createWindowMessageTransport({
@@ -655,8 +655,8 @@ const billing = await createEndpoint({
 })
 const total = await billing.send<number>('billing-frame', 'calculateTotal', { prices: [12, 30] })`,
   worker: `// main.ts：页面通过 Dedicated Worker transport 调用后台计算宿主。
-import { connect, contract, createEndpoint, timeout } from '@migaia/rpc/core'
-import { createWebWorkerTransport } from '@migaia/rpc/browser/adapters/web-worker'
+import { connect, contract, createEndpoint, timeout } from '@migaia/rpc-core'
+import { createWebWorkerTransport } from '@migaia/rpc-core/adapters/web-worker'
 
 const worker = new Worker(new URL('./image.worker.ts', import.meta.url), { type: 'module' })
 const transport = createWebWorkerTransport(worker, { peerId: 'image-worker' })
@@ -674,8 +674,8 @@ const images = await createEndpoint({
 })
 const thumbnail = await images.send<Blob>('image-worker', 'resize', { file: new Blob(['demo']), width: 320 })`,
   tabs: `// client-tab.ts：同源 Tab 通过 BroadcastChannel 调用服务 Tab。
-import { connect, contract, createEndpoint, timeout } from '@migaia/rpc/core'
-import { createBroadcastChannelTransport } from '@migaia/rpc/browser/adapters/broadcast-channel'
+import { connect, contract, createEndpoint, timeout } from '@migaia/rpc-core'
+import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'
 
 const channel = new BroadcastChannel('settings-v1')
 const transport = createBroadcastChannelTransport(channel)
@@ -693,8 +693,8 @@ const settings = await createEndpoint({
 })
 const theme = await settings.send<string>('settings-service', 'readTheme', undefined)`,
   serviceWorker: `// page.ts：受控页面通过 ServiceWorker transport 调用离线缓存宿主。
-import { connect, contract, createEndpoint } from '@migaia/rpc/core'
-import { createServiceWorkerTransport } from '@migaia/rpc/browser/adapters/service-worker'
+import { connect, contract, createEndpoint } from '@migaia/rpc-core'
+import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'
 
 await navigator.serviceWorker.ready
 const controller = navigator.serviceWorker.controller
@@ -720,13 +720,13 @@ const cached = await cache.send<boolean>('service-worker', 'hasCache', '/catalog
 
 /** Human-maintained RPC guides keyed by stable public route identity. */
 const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> = {
-  'rpc:core-features-discovery:createDiscoveryFeature': guide({
+  'rpc-core:features-discovery:createDiscoveryFeature': guide({
     purposeEn:
       'Adds the peer discovery and verified bindings to a composed endpoint through the original Feature dependency graph. It creates no socket by itself: the construction scope owns installation, shared dependencies, provider visibility and reverse cleanup after failure.',
     purposeZh:
       '为组合式 endpoint 增加目标发现与已验证绑定，通过原 Feature 依赖图进行装配。工厂本身不创建 socket，也不越过 transport/source 鉴权；construction scope 持有原依赖、原子安装、provider 可见性和失败时的逆序清理。业务仍通过实际 provide/send 能力调用，不能把 Feature 定义当作已安装的服务实例。',
     quickStart:
-      "import { connect } from '@migaia/rpc/core'\nimport { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'\nimport { createOutboundFeature } from '@migaia/rpc/core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc/core/features/provider'\nimport { createDiscoveryFeature } from '@migaia/rpc/core/features/discovery'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  const discovery = createDiscoveryFeature(outbound)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider, 'first-party-discovery': discovery }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
+      "import { connect } from '@migaia/rpc-core'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc-core/features/provider'\nimport { createDiscoveryFeature } from '@migaia/rpc-core/features/discovery'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  const discovery = createDiscoveryFeature(outbound)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider, 'first-party-discovery': discovery }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
     useEn: [
       'A custom endpoint needs this explicit capability together with its declared outbound/provider dependencies.',
       'The application must retain one shared identity, pending registry and cleanup scope while selecting its precise runtime surface.'
@@ -753,13 +753,13 @@ const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale,
       }
     ]
   }),
-  'rpc:core-stream:createCanonicalChunkFeature': guide({
+  'rpc-core:stream:createCanonicalChunkFeature': guide({
     purposeEn:
       'Adds the canonical physical reassembly dependency to a composed endpoint through the original Feature dependency graph. It creates no socket by itself: the construction scope owns installation, shared dependencies, provider visibility and reverse cleanup after failure.',
     purposeZh:
       '为组合式 endpoint 增加规范物理分片重组依赖，通过原 Feature 依赖图进行装配。工厂本身不创建 socket，也不越过 transport/source 鉴权；construction scope 持有原依赖、原子安装、provider 可见性和失败时的逆序清理。业务仍通过实际 provide/send 能力调用，不能把 Feature 定义当作已安装的服务实例。',
     quickStart:
-      "import { connect } from '@migaia/rpc/core'\nimport { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'\nimport { createOutboundFeature } from '@migaia/rpc/core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc/core/features/provider'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
+      "import { connect } from '@migaia/rpc-core'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc-core/features/provider'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
     useEn: [
       'A custom endpoint needs this explicit capability together with its declared outbound/provider dependencies.',
       'The application must retain one shared identity, pending registry and cleanup scope while selecting its precise runtime surface.'
@@ -777,46 +777,46 @@ const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale,
       '不要在选定 Feature 图旁另造接收器、重放账本或 provider 队列。'
     ]
   }),
-  'rpc:core:createEndpoint': endpointGuide({
+  'rpc-core:index:createEndpoint': endpointGuide({
     name: 'createEndpoint',
-    importPath: '@migaia/rpc/core',
+    importPath: '@migaia/rpc-core',
     surfaceEn:
       'call remote methods, provide local methods, discover peers, send control messages, and transfer chunked payloads',
     surfaceZh: '调用远端方法、提供本地方法、发现对端、发送控制消息，并传输需要分片的大数据',
     useEn: 'Use the root preset only when one endpoint needs all five operations listed above.',
     useZh: '只有同一个 endpoint 确实需要上面五类操作时，才使用根入口的完整预设。'
   }),
-  'rpc:core-full:createFullEndpoint': endpointGuide({
+  'rpc-core:full:createFullEndpoint': endpointGuide({
     name: 'createFullEndpoint',
-    importPath: '@migaia/rpc/core/full',
+    importPath: '@migaia/rpc-core/full',
     surfaceEn: 'the explicit full outbound, provider, discovery, control, and chunk surface',
     surfaceZh: '显式完整的 outbound、provider、discovery、control 与 chunk surface',
     useEn: 'The full preset is intentional and the import should make that choice visible.',
     useZh: '明确选择 full preset，并希望 import 直接表达该意图。'
   }),
-  'rpc:core-client:createClientEndpoint': endpointGuide({
+  'rpc-core:client:createClientEndpoint': endpointGuide({
     name: 'createClientEndpoint',
-    importPath: '@migaia/rpc/core/client',
+    importPath: '@migaia/rpc-core/client',
     surfaceEn: 'kernel and outbound call capabilities only',
     surfaceZh: '仅 kernel 与 outbound call capability',
     useEn: 'This endpoint only calls or dispatches to remote providers.',
     useZh: '该 endpoint 只调用远端 provider 或发送单向 dispatch。'
   }),
-  'rpc:core-provider:createProviderEndpoint': endpointGuide({
+  'rpc-core:provider:createProviderEndpoint': endpointGuide({
     name: 'createProviderEndpoint',
-    importPath: '@migaia/rpc/core/provider',
+    importPath: '@migaia/rpc-core/provider',
     surfaceEn: 'outbound calls plus provider registration',
     surfaceZh: 'outbound call 与 provider registration',
     useEn: 'This endpoint exposes methods and may also call its peer.',
     useZh: '该 endpoint 需要暴露 method，并且也可能回调 peer。'
   }),
-  'rpc:core-composed:createComposedEndpoint': guide({
+  'rpc-core:composed:createComposedEndpoint': guide({
     purposeEn:
       'Builds the smallest endpoint from an explicit Feature root record. Private Feature dependencies are installed and deduplicated without silently widening the public root surface.',
     purposeZh:
       '从显式、原生 Feature root record 构造最小 endpoint。私有 Feature dependency 会被安装并去重，但不会静默扩大 public root surface。',
     quickStart:
-      "import { connect } from '@migaia/rpc/core'\nimport { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createOutboundFeature } from '@migaia/rpc/core/features/outbound'\nimport { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'\n\nconst [transport] = createMemoryTransportPair()\nconst chunks = createCanonicalChunkFeature()\nconst outbound = createOutboundFeature(chunks)\nconst endpoint = await createComposedEndpoint(\n  { id: 'client', transport, middlewares: [connect({ transport })] },\n  { 'first-party-outbound': outbound }\n)\n\ntry {\n  console.log('outbound capability installed:', typeof endpoint.send)\n} finally {\n  await endpoint.dispose()\n}",
+      "import { connect } from '@migaia/rpc-core'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\n\nconst [transport] = createMemoryTransportPair()\nconst chunks = createCanonicalChunkFeature()\nconst outbound = createOutboundFeature(chunks)\nconst endpoint = await createComposedEndpoint(\n  { id: 'client', transport, middlewares: [connect({ transport })] },\n  { 'first-party-outbound': outbound }\n)\n\ntry {\n  console.log('outbound capability installed:', typeof endpoint.send)\n} finally {\n  await endpoint.dispose()\n}",
     useEn: [
       'Bundle custody or least-authority design requires an exact capability surface.',
       'A custom endpoint combines only selected first-party Features.'
@@ -831,13 +831,13 @@ const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale,
     ],
     avoidZh: ['确实需要 complete preset。', '传入旧 iterable roots 或重复 Feature owner。']
   }),
-  'rpc:core:defineFeature': guide({
+  'rpc-core:index:defineFeature': guide({
     purposeEn:
       'Defines a reusable RPC Feature that contributes capabilities to an endpoint without installing an uncontrolled parallel host.',
     purposeZh:
       '定义可复用的 RPC Feature，为 endpoint 增加明确的 capability surface，同时不建立失控的平行 host。Feature factory 在 endpoint 安装时才执行，返回的对象就是调用方随后能够使用的能力面；数据通常从 transport 进入，由已有 Feature 处理后，再通过这个 surface 暴露给业务代码。Feature 也可以通过 dependencies 声明必须先安装的前置能力。',
     quickStart:
-      "import { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { connect, defineFeature } from '@migaia/rpc/core'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\n\nconst audit = defineFeature(() => {\n  let received = 0\n  return {\n    recordMessage: (message: string) => {\n      received += 1\n      console.log('received:', message)\n    },\n    receivedCount: () => received\n  }\n})\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint(\n  { id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] },\n  { audit }\n)\ntry {\n  const message = 'order-created'\n  service.recordMessage(message) // 输入数据进入业务能力；Feature 内部累计处理次数。\n  console.log(service.receivedCount()) // 1：返回值就是 endpoint 安装 audit 后获得的能力面。\n} finally {\n  await service.dispose()\n}",
+      "import { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { connect, defineFeature } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst audit = defineFeature(() => {\n  let received = 0\n  return {\n    recordMessage: (message: string) => {\n      received += 1\n      console.log('received:', message)\n    },\n    receivedCount: () => received\n  }\n})\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint(\n  { id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] },\n  { audit }\n)\ntry {\n  const message = 'order-created'\n  service.recordMessage(message) // 输入数据进入业务能力；Feature 内部累计处理次数。\n  console.log(service.receivedCount()) // 1：返回值就是 endpoint 安装 audit 后获得的能力面。\n} finally {\n  await service.dispose()\n}",
     useEn: [
       'A feature is reused across several explicitly composed endpoints.',
       'Business data needs a narrow, typed surface after transport or protocol processing.',
@@ -851,37 +851,37 @@ const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale,
     avoidEn: ['Using a feature to hide endpoint-wide transport or lifecycle ownership.'],
     avoidZh: ['用 feature 隐藏 endpoint-wide transport 或 lifecycle ownership。']
   }),
-  'rpc:core:defineMiddleware': guide({
+  'rpc-core:index:defineMiddleware': guide({
     purposeEn:
       'Defines a reusable middleware descriptor whose installation and ordering remain owned by the endpoint composition.',
     purposeZh:
       '定义可复用 middleware descriptor，同时让 installation 与 ordering 继续由 endpoint composition 拥有。',
     quickStart:
-      "import { connect, createEndpoint, defineMiddleware } from '@migaia/rpc/core'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\n\nconst audit = defineMiddleware('audit', (core) => ({\n  install: () => {\n    console.log('installing audit for', core.id)\n    return {}\n  }\n}))\nconst [transport] = createMemoryTransportPair()\nconst endpoint = await createEndpoint({\n  id: 'audited-client', transport,\n  middlewares: [audit, connect({ transport })] as const\n})\ntry {\n  console.log('audit middleware installed')\n} finally {\n  await endpoint.dispose()\n}",
+      "import { connect, createEndpoint, defineMiddleware } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst audit = defineMiddleware('audit', (core) => ({\n  install: () => {\n    console.log('installing audit for', core.id)\n    return {}\n  }\n}))\nconst [transport] = createMemoryTransportPair()\nconst endpoint = await createEndpoint({\n  id: 'audited-client', transport,\n  middlewares: [audit, connect({ transport })] as const\n})\ntry {\n  console.log('audit middleware installed')\n} finally {\n  await endpoint.dispose()\n}",
     useEn: ['A cross-cutting concern must be installed consistently on selected endpoints.'],
     useZh: ['cross-cutting concern 需要在选定 endpoint 上一致安装。'],
     avoidEn: ['Mutating endpoint state outside the declared middleware lifecycle.'],
     avoidZh: ['在声明的 middleware lifecycle 之外修改 endpoint state。']
   }),
-  'rpc:core:framer': guide({
+  'rpc-core:index:framer': guide({
     purposeEn:
       'Defines the frame boundary used to encode and decode transport messages, keeping chunking and message ownership explicit.',
     purposeZh:
       '定义 transport message 使用的 frame boundary，让分片与 message ownership 保持显式。',
     quickStart:
-      "import { framer, codec, connect, createEndpoint } from '@migaia/rpc/core'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createStringFramer } from '@migaia/rpc/contract/framing'\nimport { defineJsonCodec } from '@migaia/serialize/codecs/json'\n\nconst [transport] = createMemoryTransportPair()\nconst framePlugin = framer(createStringFramer({ chunkBytes: 64, maxMessageBytes: 16 * 1024 }))\nconst endpoint = await createEndpoint({\n  id: 'client', transport,\n  middlewares: [codec(defineJsonCodec({ version: 1 })), framePlugin, connect({ transport })] as const\n})\ntry {\n  console.log('bounded string framing ready')\n} finally {\n  await endpoint.dispose()\n}",
+      "import { framer, codec, connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createStringFramer } from '@migaia/rpc-contract/framing'\nimport { defineJsonCodec } from '@migaia/serialize/codecs/json'\n\nconst [transport] = createMemoryTransportPair()\nconst framePlugin = framer(createStringFramer({ chunkBytes: 64, maxMessageBytes: 16 * 1024 }))\nconst endpoint = await createEndpoint({\n  id: 'client', transport,\n  middlewares: [codec(defineJsonCodec({ version: 1 })), framePlugin, connect({ transport })] as const\n})\ntry {\n  console.log('bounded string framing ready')\n} finally {\n  await endpoint.dispose()\n}",
     useEn: ['A transport needs an explicit framing policy for bounded messages.'],
     useZh: ['transport 需要为 bounded message 指定显式 framing policy。'],
     avoidEn: ['Treating framing as an unbounded or implicitly shared transport detail.'],
     avoidZh: ['把 framing 当作无界或隐式共享的 transport detail。']
   }),
-  'rpc:core-features-control:createControlFeature': guide({
+  'rpc-core:features-control:createControlFeature': guide({
     purposeEn:
       'Adds the bounded ping, cancellation and close control to a composed endpoint through the original Feature dependency graph. It creates no socket by itself: the construction scope owns installation, shared dependencies, provider visibility and reverse cleanup after failure.',
     purposeZh:
       '为组合式 endpoint 增加受限探活、取消和关闭控制，通过原 Feature 依赖图进行装配。工厂本身不创建 socket，也不越过 transport/source 鉴权；construction scope 持有原依赖、原子安装、provider 可见性和失败时的逆序清理。业务仍通过实际 provide/send 能力调用，不能把 Feature 定义当作已安装的服务实例。',
     quickStart:
-      "import { connect } from '@migaia/rpc/core'\nimport { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'\nimport { createOutboundFeature } from '@migaia/rpc/core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc/core/features/provider'\nimport { createDiscoveryFeature } from '@migaia/rpc/core/features/discovery'\nimport { createControlFeature } from '@migaia/rpc/core/features/control'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  const discovery = createDiscoveryFeature(outbound)\n  const selected = createControlFeature(outbound, discovery)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider, 'first-party-discovery': discovery, 'first-party-control': selected }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
+      "import { connect } from '@migaia/rpc-core'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc-core/features/provider'\nimport { createDiscoveryFeature } from '@migaia/rpc-core/features/discovery'\nimport { createControlFeature } from '@migaia/rpc-core/features/control'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  const discovery = createDiscoveryFeature(outbound)\n  const selected = createControlFeature(outbound, discovery)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider, 'first-party-discovery': discovery, 'first-party-control': selected }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
     useEn: [
       'A custom endpoint needs this explicit capability together with its declared outbound/provider dependencies.',
       'The application must retain one shared identity, pending registry and cleanup scope while selecting its precise runtime surface.'
@@ -915,7 +915,7 @@ const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale,
       }
     ]
   }),
-  'rpc:core:connect': middlewareGuide({
+  'rpc-core:index:connect': middlewareGuide({
     name: 'connect',
     purposeEn:
       'Installs the single transport authority, subscribes inbound frames, and owns transport cleanup according to declared custody.',
@@ -928,13 +928,13 @@ const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale,
       'Installing more than one connect middleware or providing conflicting transport objects.',
     avoidZh: '安装多个 connect middleware，或提供互相冲突的 transport object。'
   }),
-  'rpc:core:contract': middlewareGuide({
+  'rpc-core:index:contract': middlewareGuide({
     name: 'contract',
     purposeEn:
       'Negotiates an accepted protocol version and validates method parameters and results through small parse-compatible schemas at the network boundary.',
     purposeZh:
       '协商可接受的 protocol version，并通过 parse-compatible schema 在 network boundary 校验 method parameter 与 result。',
-    code: "import { connect, contract, createEndpoint } from '@migaia/rpc/core'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\n\nconst [clientTransport, serverTransport] = createMemoryTransportPair()\nconst productContract = contract({\n  version: '1',\n  schemas: {\n    findProduct: {\n      params: { parse: (value: unknown) => String(value) },\n      result: { parse: (value: unknown) => value }\n    }\n  }\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  transport: clientTransport,\n  middlewares: [productContract, connect({ transport: clientTransport })]\n})\nconst server = await createEndpoint({\n  id: 'server',\n  transport: serverTransport,\n  middlewares: [productContract, connect({ transport: serverTransport })]\n})\n\n// 两端共享同一个 contract；请求参数和返回值都会在 wire boundary 校验。\nconsole.log('contract ready:', client.id, server.id)\n\ntry {\n  console.log('业务调用应把 client 接到 outbound、server 接到 provider，双方都会经过上面的参数和返回值校验。')\n} finally {\n  await Promise.all([client.dispose(), server.dispose()])\n}",
+    code: "import { connect, contract, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [clientTransport, serverTransport] = createMemoryTransportPair()\nconst productContract = contract({\n  version: '1',\n  schemas: {\n    findProduct: {\n      params: { parse: (value: unknown) => String(value) },\n      result: { parse: (value: unknown) => value }\n    }\n  }\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  transport: clientTransport,\n  middlewares: [productContract, connect({ transport: clientTransport })]\n})\nconst server = await createEndpoint({\n  id: 'server',\n  transport: serverTransport,\n  middlewares: [productContract, connect({ transport: serverTransport })]\n})\n\n// 两端共享同一个 contract；请求参数和返回值都会在 wire boundary 校验。\nconsole.log('contract ready:', client.id, server.id)\n\ntry {\n  console.log('业务调用应把 client 接到 outbound、server 接到 provider，双方都会经过上面的参数和返回值校验。')\n} finally {\n  await Promise.all([client.dispose(), server.dispose()])\n}",
     examplesEn: [
       {
         id: 'iframe-transport',
@@ -1000,20 +1000,20 @@ const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale,
     avoidEn: 'Treating a version string as peer authentication.',
     avoidZh: '把 version string 当作 peer authentication。'
   }),
-  'rpc:core:protocol': middlewareGuide({
+  'rpc-core:index:protocol': middlewareGuide({
     name: 'protocol',
     purposeEn:
       'Defines the outbound encoder and inbound decoder for wire envelopes and declares the encoded representation expected by the transport.',
     purposeZh:
       '定义 wire envelope 的 outbound encoder 与 inbound decoder，并声明 transport 期望的 encoded representation。',
-    code: "import { protocol } from '@migaia/rpc/core'\n\n// protocol only encodes and decodes the wire envelope; endpoint code supplies business data.\nconst jsonProtocol = protocol({ encodedType: 'string', encode: JSON.stringify, decode: JSON.parse })\nconsole.log(jsonProtocol)",
+    code: "import { protocol } from '@migaia/rpc-core'\n\n// protocol only encodes and decodes the wire envelope; endpoint code supplies business data.\nconst jsonProtocol = protocol({ encodedType: 'string', encode: JSON.stringify, decode: JSON.parse })\nconsole.log(jsonProtocol)",
     useEn:
       'The transport cannot carry structured objects directly or a stable wire codec is required.',
     useZh: 'transport 不能直接承载 structured object，或需要稳定 wire codec。',
     avoidEn: 'Encoding business payloads independently outside the envelope codec.',
     avoidZh: '在 envelope codec 外独立编码 business payload。'
   }),
-  'rpc:core:authentication': middlewareGuide({
+  'rpc-core:index:authentication': middlewareGuide({
     name: 'authentication',
     purposeEn:
       'Protects every outbound and inbound frame, including control and chunk frames, by applying paired encryption/decryption and signing/verification transforms in the defined order.',
@@ -1054,7 +1054,7 @@ const decrypt = async (value: unknown) => {
       'Configuring only one half of an encryption or signature pair, or requiring transferable zero-copy buffers.',
     avoidZh: '只配置 encryption/signature pair 的一半，或仍要求 transferable zero-copy buffer。'
   }),
-  'rpc:core:chunk': middlewareGuide({
+  'rpc-core:index:chunk': middlewareGuide({
     name: 'chunk',
     purposeEn:
       'Configures bounded splitting and reassembly for large string envelopes, with limits for message size, peers, buffered bytes, chunk count, and assembly lifetime.',
@@ -1066,7 +1066,7 @@ const decrypt = async (value: unknown) => {
     avoidEn: 'Splitting Uint8Array payloads or disabling bounds on an untrusted channel.',
     avoidZh: '拆分 Uint8Array payload，或在 untrusted channel 上关闭边界。'
   }),
-  'rpc:core:timeout': middlewareGuide({
+  'rpc-core:index:timeout': middlewareGuide({
     name: 'timeout',
     purposeEn:
       'Applies a bounded deadline to outbound request/response work and rejects timed-out calls with a stable RpcTimeoutError contract.',
@@ -1078,7 +1078,7 @@ const decrypt = async (value: unknown) => {
     avoidEn: 'Using a large timeout to conceal an overloaded or unreachable provider.',
     avoidZh: '用很大的 timeout 掩盖 overloaded 或 unreachable provider。'
   }),
-  'rpc:core:ping': middlewareGuide({
+  'rpc-core:index:ping': middlewareGuide({
     name: 'ping',
     purposeEn:
       'Adds control-frame liveness probes and exposes ping or pingAll only when the selected endpoint surface also owns control capability.',
@@ -1098,7 +1098,7 @@ const decrypt = async (value: unknown) => {
     avoidEn: 'Treating a successful ping as authentication or business-service readiness.',
     avoidZh: '把 ping 成功当作 authentication 或 business-service readiness。'
   }),
-  'rpc:core:abort': middlewareGuide({
+  'rpc-core:index:abort': middlewareGuide({
     name: 'abort',
     purposeEn:
       'Enables propagation of caller cancellation to in-flight remote provider work while preserving the original abort reason at the local boundary.',
@@ -1110,7 +1110,7 @@ const decrypt = async (value: unknown) => {
     avoidEn: 'Assuming cancellation can undo remote side effects that already committed.',
     avoidZh: '假设 cancellation 能撤销远端已经 commit 的 side effect。'
   }),
-  'rpc:core:hooks': middlewareGuide({
+  'rpc-core:index:hooks': middlewareGuide({
     name: 'hooks',
     purposeEn:
       'Installs ordered observability listeners for endpoint lifecycle and operation events while containing listener failures away from RPC results.',
@@ -1123,7 +1123,7 @@ const decrypt = async (value: unknown) => {
       'Implementing business control flow or mutating RPC results from a diagnostic listener.',
     avoidZh: '在 diagnostic listener 中实现 business control flow 或修改 RPC result。'
   }),
-  'rpc:core:uuid': middlewareGuide({
+  'rpc-core:index:uuid': middlewareGuide({
     name: 'uuid',
     purposeEn:
       'Supplies the identifier generator used for tasks, messages, and variations while retaining collision and replay checks.',
@@ -1135,13 +1135,13 @@ const decrypt = async (value: unknown) => {
     avoidEn: 'Using sequential or low-entropy identifiers on an untrusted channel.',
     avoidZh: '在 untrusted channel 上使用 sequential 或 low-entropy identifier。'
   }),
-  'rpc:core:codec': guide({
+  'rpc-core:index:codec': guide({
     purposeEn:
       'Declares the wire representation used by an endpoint so encoding and decoding remain symmetric across the transport boundary.',
     purposeZh:
       '声明 endpoint 使用的 wire representation，确保 transport boundary 两侧的 encode 与 decode 保持对称。',
-    quickStart: `import { codec, connect, createEndpoint } from '@migaia/rpc/core'
-import { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'
+    quickStart: `import { codec, connect, createEndpoint } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
 
 const [transport] = createMemoryTransportPair()
 const endpointCodec = codec({
@@ -1166,13 +1166,13 @@ try {
     avoidEn: ['Changing codec identity after peers adopt the contract.'],
     avoidZh: ['peer 采用 contract 后再改变 codec identity。']
   }),
-  'rpc:core-features-outbound:createOutboundFeature': guide({
+  'rpc-core:features-outbound:createOutboundFeature': guide({
     purposeEn:
       'Adds the outbound calls and response correlation to a composed endpoint through the original Feature dependency graph. It creates no socket by itself: the construction scope owns installation, shared dependencies, provider visibility and reverse cleanup after failure.',
     purposeZh:
       '为组合式 endpoint 增加出站请求与响应关联，通过原 Feature 依赖图进行装配。工厂本身不创建 socket，也不越过 transport/source 鉴权；construction scope 持有原依赖、原子安装、provider 可见性和失败时的逆序清理。业务仍通过实际 provide/send 能力调用，不能把 Feature 定义当作已安装的服务实例。',
     quickStart:
-      "import { connect } from '@migaia/rpc/core'\nimport { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'\nimport { createOutboundFeature } from '@migaia/rpc/core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc/core/features/provider'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
+      "import { connect } from '@migaia/rpc-core'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc-core/features/provider'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
     useEn: [
       'A custom endpoint needs this explicit capability together with its declared outbound/provider dependencies.',
       'The application must retain one shared identity, pending registry and cleanup scope while selecting its precise runtime surface.'
@@ -1199,13 +1199,13 @@ try {
       }
     ]
   }),
-  'rpc:core-features-provider:createProviderFeature': guide({
+  'rpc-core:features-provider:createProviderFeature': guide({
     purposeEn:
       'Adds the explicit method registration and provider admission to a composed endpoint through the original Feature dependency graph. It creates no socket by itself: the construction scope owns installation, shared dependencies, provider visibility and reverse cleanup after failure.',
     purposeZh:
       '为组合式 endpoint 增加显式方法注册与 provider 准入，通过原 Feature 依赖图进行装配。工厂本身不创建 socket，也不越过 transport/source 鉴权；construction scope 持有原依赖、原子安装、provider 可见性和失败时的逆序清理。业务仍通过实际 provide/send 能力调用，不能把 Feature 定义当作已安装的服务实例。',
     quickStart:
-      "import { connect } from '@migaia/rpc/core'\nimport { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'\nimport { createOutboundFeature } from '@migaia/rpc/core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc/core/features/provider'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
+      "import { connect } from '@migaia/rpc-core'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createProviderFeature } from '@migaia/rpc-core/features/provider'\n\nfunction selectedFeatures() {\n  const chunks = createCanonicalChunkFeature()\n  const outbound = createOutboundFeature(chunks)\n  const provider = createProviderFeature(outbound)\n  return { 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider }\n}\n\nconst [clientTransport, serviceTransport] = createMemoryTransportPair()\nconst service = await createComposedEndpoint({ id: 'service', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport })] }, selectedFeatures())\nconst client = await createComposedEndpoint({ id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] }, selectedFeatures())\nservice.provide('measure', (context) => context.success(String(context.data).length))\ntry {\n  console.log(await client.send<number>('service', 'measure', 'hello'))\n} finally {\n  await Promise.all([client.dispose(), service.dispose()])\n}",
     useEn: [
       'A custom endpoint needs this explicit capability together with its declared outbound/provider dependencies.',
       'The application must retain one shared identity, pending registry and cleanup scope while selecting its precise runtime surface.'
@@ -1237,12 +1237,12 @@ try {
       'Lets a composed endpoint receive, validate, and reassemble chunk frames. The feature token selects that runtime owner; the root chunk({...}) middleware separately defines how outgoing strings are split and how much incomplete data may be buffered. Real two-way use normally installs both on every peer.',
     purposeZh:
       '让组合式 endpoint 能接收、校验并重组分片消息。Feature token 负责安装分片帧处理器；根入口的 chunk({...}) middleware 负责配置发送端如何拆分字符串，以及接收端最多允许缓存多少未完成数据。真实双向通信通常要求两端都同时选择 Feature 并安装 middleware。',
-    quickStart: `import { chunk as configureChunk, connect } from '@migaia/rpc/core'
-import { createComposedEndpoint } from '@migaia/rpc/core/composed'
-import { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'
-import { chunk as selectChunkFrames } from '@migaia/rpc/core/features/chunk'
-import { outbound } from '@migaia/rpc/core/features/outbound'
-import { provider } from '@migaia/rpc/core/features/provider'
+    quickStart: `import { chunk as configureChunk, connect } from '@migaia/rpc-core'
+import { createComposedEndpoint } from '@migaia/rpc-core/composed'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+import { chunk as selectChunkFrames } from '@migaia/rpc-core/features/chunk'
+import { outbound } from '@migaia/rpc-core/features/outbound'
+import { provider } from '@migaia/rpc-core/features/provider'
 
 const [clientTransport, serviceTransport] = createMemoryTransportPair()
 const chunkPolicy = {
@@ -1418,18 +1418,18 @@ try {
       }
     ]
   }),
-  'rpc:core-adapters-memory:createMemoryTransportPair': transportGuide({
+  'rpc-core:adapters-memory:createMemoryTransportPair': transportGuide({
     name: 'createMemoryTransportPair',
-    importPath: '@migaia/rpc/core/adapters/memory',
+    importPath: '@migaia/rpc-core/adapters/memory',
     expression: 'createMemoryTransportPair()',
     boundaryEn: 'an isolated in-process paired channel',
     boundaryZh: '隔离的 in-process paired channel',
     cautionEn: 'Production peers live in different processes or browsing contexts.',
     cautionZh: '生产 peer 位于不同 process 或 browsing context。'
   }),
-  'rpc:browser-adapters-broadcast-channel:createBroadcastChannelTransport': transportGuide({
+  'rpc-browser:adapters-broadcast-channel:createBroadcastChannelTransport': transportGuide({
     name: 'createBroadcastChannelTransport',
-    importPath: '@migaia/rpc/browser/adapters/broadcast-channel',
+    importPath: '@migaia/rpc-browser/adapters/broadcast-channel',
     expression: "createBroadcastChannelTransport(new BroadcastChannel('migaia'))",
     boundaryEn: 'a BroadcastChannel shared by same-origin contexts',
     boundaryZh: '由 same-origin context 共享的 BroadcastChannel',
@@ -1438,45 +1438,45 @@ try {
     cautionZh:
       '需要把 channel 当作 authentication boundary；BroadcastChannel 只提供 honest-node routing。'
   }),
-  'rpc:core-adapters-message-port:createBrowserMessagePortTransport': transportGuide({
+  'rpc-core:adapters-message-port:createBrowserMessagePortTransport': transportGuide({
     name: 'createBrowserMessagePortTransport',
-    importPath: '@migaia/rpc/core/adapters/message-port',
+    importPath: '@migaia/rpc-core/adapters/message-port',
     expression: "createBrowserMessagePortTransport(port, { ownership: 'owned' })",
     boundaryEn: 'a browser MessagePort',
     boundaryZh: 'browser MessagePort',
     cautionEn: 'The port lifecycle is owned elsewhere; use borrowed custody instead of closing it.',
     cautionZh: 'port lifecycle 由外部拥有；应使用 borrowed custody，不能关闭它。'
   }),
-  'rpc:core-adapters-message-port:createNodeMessagePortTransport': transportGuide({
+  'rpc-core:adapters-message-port:createNodeMessagePortTransport': transportGuide({
     name: 'createNodeMessagePortTransport',
-    importPath: '@migaia/rpc/core/adapters/message-port',
+    importPath: '@migaia/rpc-core/adapters/message-port',
     expression: 'createNodeMessagePortTransport(port)',
     boundaryEn: 'a Node-compatible MessagePort',
     boundaryZh: 'Node-compatible MessagePort',
     cautionEn: 'The value does not implement the Node message, postMessage, and close contract.',
     cautionZh: '该值不实现 Node message、postMessage 与 close contract。'
   }),
-  'rpc:browser-adapters-web-worker:createWebWorkerTransport': transportGuide({
+  'rpc-core:adapters-web-worker:createWebWorkerTransport': transportGuide({
     name: 'createWebWorkerTransport',
-    importPath: '@migaia/rpc/browser/adapters/web-worker',
+    importPath: '@migaia/rpc-core/adapters/web-worker',
     expression: 'createWebWorkerTransport(worker)',
     boundaryEn: 'a dedicated Worker or WorkerGlobalScope-like port',
     boundaryZh: 'dedicated Worker 或 WorkerGlobalScope-like port',
     cautionEn: 'Multiple logical peers share the same receiver; use a multiplexed adapter instead.',
     cautionZh: '多个 logical peer 共享同一个 receiver；应使用 multiplexed adapter。'
   }),
-  'rpc:browser-adapters-shared-worker:createSharedWorkerTransport': transportGuide({
+  'rpc-browser:adapters-shared-worker:createSharedWorkerTransport': transportGuide({
     name: 'createSharedWorkerTransport',
-    importPath: '@migaia/rpc/browser/adapters/shared-worker',
+    importPath: '@migaia/rpc-browser/adapters/shared-worker',
     expression: 'createSharedWorkerTransport(worker.port)',
     boundaryEn: 'a SharedWorker MessagePort with multiplexed peer assumptions',
     boundaryZh: '具有 multiplexed peer assumption 的 SharedWorker MessagePort',
     cautionEn: 'Peer identity cannot be established for the shared topology.',
     cautionZh: '无法为 shared topology 建立 peer identity。'
   }),
-  'rpc:browser-adapters-service-worker:createServiceWorkerTransport': transportGuide({
+  'rpc-browser:adapters-service-worker:createServiceWorkerTransport': transportGuide({
     name: 'createServiceWorkerTransport',
-    importPath: '@migaia/rpc/browser/adapters/service-worker',
+    importPath: '@migaia/rpc-browser/adapters/service-worker',
     expression:
       'createServiceWorkerTransport({ target: controller, receiver: navigator.serviceWorker })',
     boundaryEn: 'a ServiceWorker target and its separate message receiver',
@@ -1484,9 +1484,9 @@ try {
     cautionEn: 'The controlling worker is absent or may change without an owner-managed reconnect.',
     cautionZh: 'controlling worker 不存在，或可能改变但没有 owner-managed reconnect。'
   }),
-  'rpc:browser-adapters-window:createWindowMessageTransport': transportGuide({
+  'rpc-browser:adapters-window:createWindowMessageTransport': transportGuide({
     name: 'createWindowMessageTransport',
-    importPath: '@migaia/rpc/browser/adapters/window',
+    importPath: '@migaia/rpc-browser/adapters/window',
     expression:
       "createWindowMessageTransport({ target: frame.contentWindow!, receiver: window, targetOrigin: 'https://trusted.example' })",
     boundaryEn: 'window.postMessage between a window and an iframe or opener',
@@ -1494,9 +1494,9 @@ try {
     cautionEn: 'targetOrigin or source proof cannot be pinned to the intended peer.',
     cautionZh: '无法把 targetOrigin 或 source proof 固定到预期 peer。'
   }),
-  'rpc:browser-adapters-rtc-data-channel:createRtcDataChannelTransport': transportGuide({
+  'rpc-browser:adapters-rtc-data-channel:createRtcDataChannelTransport': transportGuide({
     name: 'createRtcDataChannelTransport',
-    importPath: '@migaia/rpc/browser/adapters/rtc-data-channel',
+    importPath: '@migaia/rpc-browser/adapters/rtc-data-channel',
     expression: 'createRtcDataChannelTransport(dataChannel)',
     boundaryEn: 'an open RTCDataChannel',
     boundaryZh: '已打开的 RTCDataChannel',
@@ -1504,9 +1504,9 @@ try {
       'Signaling, reconnect, or channel negotiation still needs to be performed; this adapter does not own it.',
     cautionZh: 'signaling、reconnect 或 channel negotiation 尚未完成；adapter 不拥有这些流程。'
   }),
-  'rpc:browser-adapters-web-transport:createWebTransportDatagramTransport': transportGuide({
+  'rpc-browser:adapters-web-transport:createWebTransportDatagramTransport': transportGuide({
     name: 'createWebTransportDatagramTransport',
-    importPath: '@migaia/rpc/browser/adapters/web-transport',
+    importPath: '@migaia/rpc-browser/adapters/web-transport',
     expression: 'createWebTransportDatagramTransport(session.datagrams)',
     boundaryEn: 'WebTransport unreliable datagrams',
     boundaryZh: 'WebTransport unreliable datagram',
@@ -1517,13 +1517,13 @@ try {
 
 /** RPC Contract guide entries introduced by rpc-contract exports used by RPC runtime setup. */
 const rpcContractGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> = {
-  'rpc:contract:createDescriptor': guide({
+  'rpc-contract:index:createDescriptor': guide({
     purposeEn:
       'Creates a typed contract descriptor for versioned RPC operations and keeps the resulting identity stable across endpoint creation and test coverage.',
     purposeZh:
       '创建可用于版本化 RPC 的类型化契约 descriptor。它只记录“这个 RPC 契约叫什么、当前是第几版”，不会自动发送请求；业务协议可以把它登记起来，在接收请求前按 ID 和版本找到同一份契约。',
     quickStart:
-      "import { createDescriptor } from '@migaia/rpc/contract'\n\nconst readOrders = createDescriptor('read-orders', 1)\n// 注册表让 endpoint 或协议处理器按稳定 ID 找到契约。\nconst contracts = new Map([[readOrders.id, readOrders]])\nconst selected = contracts.get('read-orders')\nconsole.log(selected?.id, selected?.version) // read-orders 1",
+      "import { createDescriptor } from '@migaia/rpc-contract'\n\nconst readOrders = createDescriptor('read-orders', 1)\n// 注册表让 endpoint 或协议处理器按稳定 ID 找到契约。\nconst contracts = new Map([[readOrders.id, readOrders]])\nconst selected = contracts.get('read-orders')\nconsole.log(selected?.id, selected?.version) // read-orders 1",
     useEn: [
       'A public endpoint method or custom protocol needs a stable descriptor before any request is accepted.'
     ],
@@ -1551,13 +1551,92 @@ const webRpcCoreGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IA
 
 /** Cross-realm error utilities and stable failure contracts. */
 const webRpcErrorGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> = {
-  'rpc:contract:serializeRpcError': guide({
+  'rpc-contract:errors:classifyRpcContractError': guide({
+    purposeEn:
+      'Queries disclosure code and display message for the exact local Contract error without reading its properties. The immutable summary is presentation policy; message wording is not a public recovery contract.',
+    purposeZh:
+      '不读取错误属性地查询当前 Contract 实例实际产生错误的披露 code 与展示 message。不可变 summary 是展示策略；message 文本不是公开恢复契约。',
+    quickStart: `import { classifyRpcContractError, normalizeRpcEnvelope } from '@migaia/rpc-contract'
+
+try {
+  normalizeRpcEnvelope({})
+} catch (error) {
+  const diagnostic = classifyRpcContractError(error)
+  if (!diagnostic) throw error
+  console.error(diagnostic.code, diagnostic.message)
+}`,
+    useEn: [
+      'A protocol receiver needs controlled diagnostics for an envelope rejected by the actual normalizer.',
+      'A diagnostic UI must display a protocol violation without inspecting the error cause or invoking its getters.'
+    ],
+    useZh: [
+      '协议接收方需要展示实际 normalizer 拒绝 envelope 后产生的受控诊断。',
+      '诊断界面需要显示协议违例，同时避免访问错误 cause 或调用其 getter。'
+    ],
+    avoidEn: [
+      'A foreign or copied error needs classification; this operation returns undefined for those values.',
+      'Core or Remote errors need their own wire presentation; use the Core error operations instead.'
+    ],
+    avoidZh: [
+      '要分类外部或复制得到的错误；此操作对这些值返回 undefined。',
+      '要编码 Core 或 Remote 错误的线上诊断；应使用 Core 自己的错误操作。'
+    ]
+  }),
+  'rpc-core:index:serializeRpcError': guide({
+    purposeEn:
+      'Encodes a held Core or Remote error as bounded protocol data using its existing presentation and forwarding-route policy. Custom carriers retain the local error and cause while sending the same controlled diagnostic fields as the built-in transport.',
+    purposeZh:
+      '按原诊断与 forwarding-route 策略，把持有的 Core 或 Remote 错误编码为有界协议数据。自定义载体保留本地错误及 cause，线上使用与内置 transport 相同的受控诊断字段。',
+    quickStart:
+      "import { attachErrorIdentity } from '@migaia/utils/error'\nimport { serializeRpcError, deserializeRpcError } from '@migaia/rpc-core'\n\n/** This adapter owns its semantic identity and display wording. */\nconst ADAPTER_SOURCE = '@example/custom-ipc'\n/** A native write failure never claims a Core timeout or cancellation. */\nconst AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const\n/** Keep private native details on cause rather than quoting payload bytes. */\nconst AdapterErrorText = { writeFailed: 'adapter write failed' } as const\n\n/** Project an actual native write failure using this adapter's own identity. */\nexport function projectWriteFailure(cause: unknown) {\n  const original = attachErrorIdentity(new Error(AdapterErrorText.writeFailed, { cause }), {\n    source: ADAPTER_SOURCE, code: AdapterErrorCode.writeFailed\n  })\n  const wire = serializeRpcError(original, { report: ({ error }) => console.error(error) })\n  return { original, wire }\n}\n\n/** Reconstruct received error data without minting Core's private operation identity. */\nexport function receiveFailure(received: unknown) {\n  return deserializeRpcError(received)\n}\n// The serializer keeps Core/Remote disclosure and forwarding routes for actual held errors.\n// A wire source/code/name and a restored error never authorize retry, cancellation or close.",
+    useEn: [
+      'A custom carrier needs to transmit an actual Core or Remote failure with its existing redaction policy.',
+      'A relay must preserve admitted forwarding routes when it re-encodes a received failure.'
+    ],
+    useZh: [
+      '自定义载体需要传输实际 Core 或 Remote 错误，并沿用其原脱敏策略。',
+      '中继重新编码收到的错误时，需要保留已接纳的 forwarding route。'
+    ],
+    avoidEn: [
+      'Only independent protocol data is handled; use the Contract serializer for that implementation.',
+      'The application wants to send arbitrary objects or raw private causes without the error owner policy.'
+    ],
+    avoidZh: [
+      '只处理独立协议实现的数据；该实现应使用 Contract 的错误编码操作。',
+      '要发送任意对象或绕过错误 owner 策略暴露原私有 cause。'
+    ]
+  }),
+  'rpc-core:index:deserializeRpcError': guide({
+    purposeEn:
+      'Validates received error protocol data and restores its native error graph without replacing the transmitted stack. Core retains the admitted route for subsequent forwarding or re-encoding by a custom carrier.',
+    purposeZh:
+      '校验接收到的错误协议数据并恢复原生错误图，不替换传来的 stack。Core 持有已接纳的 route，供自定义载体随后转发或重新编码同一个错误。',
+    quickStart:
+      "import { attachErrorIdentity } from '@migaia/utils/error'\nimport { serializeRpcError, deserializeRpcError } from '@migaia/rpc-core'\n\n/** This adapter owns its semantic identity and display wording. */\nconst ADAPTER_SOURCE = '@example/custom-ipc'\n/** A native write failure never claims a Core timeout or cancellation. */\nconst AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const\n/** Keep private native details on cause rather than quoting payload bytes. */\nconst AdapterErrorText = { writeFailed: 'adapter write failed' } as const\n\n/** Project an actual native write failure using this adapter's own identity. */\nexport function projectWriteFailure(cause: unknown) {\n  const original = attachErrorIdentity(new Error(AdapterErrorText.writeFailed, { cause }), {\n    source: ADAPTER_SOURCE, code: AdapterErrorCode.writeFailed\n  })\n  const wire = serializeRpcError(original, { report: ({ error }) => console.error(error) })\n  return { original, wire }\n}\n\n/** Reconstruct received error data without minting Core's private operation identity. */\nexport function receiveFailure(received: unknown) {\n  return deserializeRpcError(received)\n}\n// The serializer keeps Core/Remote disclosure and forwarding routes for actual held errors.\n// A wire source/code/name and a restored error never authorize retry, cancellation or close.",
+    useEn: [
+      'A custom carrier receives error data that must be validated before it becomes a local throwable value.',
+      'A relay needs the same restored error and route when it forwards or serializes a failure again.'
+    ],
+    useZh: [
+      '自定义载体收到错误数据，需要先校验再恢复为可在本地抛出的值。',
+      '中继转发或再次编码失败时，需要保留恢复后的同一个错误及 route。'
+    ],
+    avoidEn: [
+      'A local Error already exists; retain that object instead of reconstructing it.',
+      'Received stack or data is treated as executable input rather than diagnostic content.'
+    ],
+    avoidZh: [
+      '本地已经持有 Error；应保留原对象，而不是再次恢复。',
+      '要把收到的 stack 或 data 当作可执行输入，而不是诊断内容。'
+    ]
+  }),
+  'rpc-contract:index:serializeRpcError': guide({
     purposeEn:
       'Serializes an Error and its bounded cause or AggregateError graph into a cross-realm record containing name, message, stack, source, code, data, and nested failures.',
     purposeZh:
       '把 Error 及其有界 cause/AggregateError graph 序列化成跨 realm record，保留 name、message、stack、source、code、data 与 nested failure。',
     quickStart:
-      "import { serializeRpcError } from '@migaia/rpc/contract'\n\nconst error = new Error('remote failure')\nconst payload = serializeRpcError(error, { report: console.error })\nconsole.log(payload)",
+      "import { serializeRpcError } from '@migaia/rpc-contract'\n\nconst error = new Error('remote failure')\nconst payload = serializeRpcError(error, { report: console.error })\nconsole.log(payload)",
     useEn: [
       'An error must cross a Worker, window, or transport boundary without losing diagnostic identity.'
     ],
@@ -1570,13 +1649,13 @@ const webRpcErrorGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, I
     ],
     avoidZh: ['序列化任意 application data。', '用 receiver-side stack 替换原始 stack。']
   }),
-  'rpc:contract:deserializeRpcError': guide({
+  'rpc-contract:index:deserializeRpcError': guide({
     purposeEn:
       'Reconstructs a received serialized failure into the closest supported Error class while retaining the transmitted stack, source/code identity, data, and cause graph.',
     purposeZh:
       '把收到的 serialized failure 重建为最接近的受支持 Error class，同时保留 transmitted stack、source/code identity、data 与 cause graph。',
     quickStart:
-      "import { deserializeRpcError, serializeRpcError } from '@migaia/rpc/contract'\n\nconst message = { error: serializeRpcError(new Error('remote failure'), { report: console.error }) }\nconst remoteError = deserializeRpcError(message.error)\nconsole.error(remoteError)",
+      "import { deserializeRpcError, serializeRpcError } from '@migaia/rpc-contract'\n\nconst message = { error: serializeRpcError(new Error('remote failure'), { report: console.error }) }\nconst remoteError = deserializeRpcError(message.error)\nconsole.error(remoteError)",
     useEn: [
       'A serialized remote failure must become a throwable local value with inspectable provenance.'
     ],
@@ -1590,13 +1669,13 @@ const webRpcErrorGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, I
       '重新生成 local error 并丢弃 transmitted identity。'
     ]
   }),
-  'rpc:contract:reachRpcError': guide({
+  'rpc-contract:index:reachRpcError': guide({
     purposeEn:
       'Traverses an error, its cause chain, and AggregateError.errors in bounded identity order so reporting and contract checks can find every reachable original failure.',
     purposeZh:
       '按有界 identity order 遍历 error、cause chain 与 AggregateError.errors，让 reporting 与 contract check 能找到每个可达的原始 failure。',
     quickStart:
-      "import { reachRpcError } from '@migaia/rpc/contract'\n\nconst originalError = new Error('database unavailable')\nconst error = new Error('request failed', { cause: originalError })\nfor (const cause of reachRpcError(error, { report: console.error })) {\n  if (cause === originalError) console.log('original reached')\n}",
+      "import { reachRpcError } from '@migaia/rpc-contract'\n\nconst originalError = new Error('database unavailable')\nconst error = new Error('request failed', { cause: originalError })\nfor (const cause of reachRpcError(error, { report: console.error })) {\n  if (cause === originalError) console.log('original reached')\n}",
     useEn: ['Diagnostics or tests must prove that wrapping preserved original error identity.'],
     useZh: ['diagnostics 或 test 必须证明 wrapping 保留了 original error identity。'],
     avoidEn: [
@@ -1605,61 +1684,76 @@ const webRpcErrorGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, I
     ],
     avoidZh: ['遍历期间修改 error。', '假设每个 yielded value 都是 Error instance。']
   }),
-  'rpc:core:isRpcError': guide({
+  'rpc-core:index:isRpcError': guide({
     purposeEn:
-      'Detects the public RPC error shape without same-realm instanceof, making it useful after cross-realm reconstruction.',
+      'Recognizes only an object with a string code. This loose diagnostic shape check does not establish a Core source, error family, private owner identity or execution outcome.',
     purposeZh:
-      '不依赖 same-realm instanceof，按 public RPC error shape 做窄化，因此适用于 cross-realm reconstruction 之后。',
+      '只识别带 string code 的 object。这是宽松诊断 shape 判断，不能确认 Core source、错误族、owner 私有身份或执行结果。',
     quickStart:
-      "import { isRpcError } from '@migaia/rpc/core'\n\nconst error: unknown = { source: '@migaia/rpc/core', code: 'DEADLINE_EXCEEDED' }\nif (isRpcError(error) && error.code === 'DEADLINE_EXCEEDED') {\n  console.log('retrying after remote deadline')\n}",
-    useEn: ['A catch boundary needs machine-readable source/code handling across realms.'],
-    useZh: ['catch boundary 需要跨 realm 的 machine-readable source/code handling。'],
+      "import { isRpcError, serializeRpcError } from '@migaia/rpc-core'\n\n/** Report the caught value without turning its public code into a control decision. */\nexport function reportCodedFailure(error: unknown) {\n  if (isRpcError(error)) {\n    const wire = serializeRpcError(error, { report: ({ error }) => console.error(error) })\n    console.error(wire)\n  }\n}\n// Use isRpcErrorInstance/isRpcRemoteError/isRpcTimeoutError for Core family diagnostics.\n// Reconcile actual execution/outcome before deciding whether a call may be repeated.",
+    useEn: [
+      'A reporting boundary identifies a machine-readable code before selecting its diagnostic sink.',
+      'A received coded value must be distinguished from an uncoded primitive without instanceof.'
+    ],
+    useZh: [
+      '报告边界先识别 machine-readable code，再选择诊断 sink。',
+      '需要不依赖 instanceof 地区分编码值与无 code 的抛出 primitive。'
+    ],
     avoidEn: [
-      'Using it as proof that an untrusted object is safe.',
-      'Replacing AbortError or TimeoutError name checks where those semantics matter.'
+      'Using this result or a public code to authorize retry, cancellation, terminal or close.',
+      'Treating this as a Core family guard or proof that Core minted an untrusted object.'
     ],
     avoidZh: [
-      '把它当作 untrusted object 安全可信的证明。',
-      '在需要 AbortError/TimeoutError semantics 时替代 name check。'
+      '凭此结果或公开 code 授予重试、取消、终止或关闭。',
+      '把此判断当作 Core 错误族守卫，或证明不可信 object 由 Core 产生。'
     ]
   }),
-  'rpc:core:WEBRPC_SOURCE': guide({
+  'rpc-core:index:RPC_CORE_ERROR_SOURCE': guide({
     purposeEn:
-      'Exposes the stable source discriminator stamped onto locally produced RPC failures so catch boundaries can distinguish ownership without parsing messages.',
+      'Provides the stable @migaia/rpc/core diagnostic source. Compare it with the public code table on validated received error data; it is not a credential or proof of local Core construction.',
     purposeZh:
-      '公开写入本地 RPC failure 的稳定 source discriminator，让 catch boundary 无需解析 message 即可区分 ownership。',
+      '提供稳定的 @migaia/rpc/core 诊断 source。在已校验的接收错误数据上与公开 code 表一起比较；它不是凭据，也不证明本地 Core 构造身份。',
     quickStart:
-      "import { isRpcError, WEBRPC_SOURCE } from '@migaia/rpc/core'\n\nconst error: unknown = { source: WEBRPC_SOURCE, code: 'REMOTE_FAILURE' }\nif (isRpcError(error) && error.source === WEBRPC_SOURCE) {\n  console.error('RPC failure:', error)\n}",
-    useEn: ['A shared error boundary handles failures from several libraries.'],
-    useZh: ['shared error boundary 需要处理来自多个 library 的 failure。'],
-    avoidEn: [
-      'Treating source as a security credential.',
-      'Hard-coding the same string in several consumers.'
+      "import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-core'\nimport { normalizeRpcSerializedError } from '@migaia/rpc-contract/errors'\n\n/** Classify a received diagnostic tree after the wire grammar accepts it. */\nexport function reportCoreDeadline(received: unknown) {\n  const wire = normalizeRpcSerializedError(received)\n  if (wire.source === RPC_CORE_ERROR_SOURCE && wire.code === RpcCoreErrorCode.deadlineExceeded) {\n    console.error(wire)\n  }\n  return wire\n}\n// The pair reports the failure; actual execution/outcome controls any retry decision.",
+    useEn: [
+      'A shared report sink distinguishes Core diagnostics from application and adapter sources.',
+      'A protocol implementer preserves the historical semantic source across the physical package split.'
     ],
-    avoidZh: ['把 source 当作 security credential。', '在多个 consumer 中硬编码同一个 string。']
+    useZh: [
+      '共享报告 sink 需要区分 Core 与应用、适配器的诊断来源。',
+      '协议实现者在物理分包后继续保留原语义 source。'
+    ],
+    avoidEn: [
+      'Using source/code as a Core private owner identity or execution receipt.',
+      'Automatically retrying a business call from a received deadline code.'
+    ],
+    avoidZh: [
+      '把 source/code 当作 Core 私有 owner 身份或执行回执。',
+      '凭收到的 deadline code 自动重试业务调用。'
+    ]
   }),
-  'rpc:core:RpcError': errorGuide({
+  'rpc-core:index:RpcError': errorGuide({
     name: 'RpcError',
     conditionEn: 'a coded local RPC failure without a more specific public subclass',
     conditionZh: '没有更具体 public subclass 的 coded local RPC failure',
     distinctionEn: 'Handle a stable RPC code not represented by a narrower class.',
     distinctionZh: '处理没有 narrower class 表达的稳定 RPC code。'
   }),
-  'rpc:core:RpcSchemaValidationError': errorGuide({
+  'rpc-core:index:RpcSchemaValidationError': errorGuide({
     name: 'RpcSchemaValidationError',
     conditionEn: 'schema rejection of method parameters or results and retains rejected data',
     conditionZh: 'method parameter 或 result 被 schema 拒绝，并保留 rejected data',
     distinctionEn: 'Reject malformed data at the network contract boundary.',
     distinctionZh: '在 network contract boundary 拒绝 malformed data。'
   }),
-  'rpc:core:RpcConfigurationError': errorGuide({
+  'rpc-core:index:RpcConfigurationError': errorGuide({
     name: 'RpcConfigurationError',
     conditionEn: 'invalid or conflicting endpoint configuration before operation begins',
     conditionZh: 'operation 开始前的 invalid 或 conflicting endpoint configuration',
     distinctionEn: 'Fix setup; retrying unchanged configuration cannot succeed.',
     distinctionZh: '应修正 setup；原样重试不会成功。'
   }),
-  'rpc:core:RpcConstructionError': errorGuide({
+  'rpc-core:index:RpcConstructionError': errorGuide({
     name: 'RpcConstructionError',
     conditionEn:
       'atomic endpoint construction failure with cleanup results from rolled-back resources',
@@ -1669,78 +1763,406 @@ const webRpcErrorGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, I
     distinctionZh:
       '以 cause 为 primary failure，以 cleanupErrors 或 cleanupPromise 为 secondary rollback evidence。'
   }),
-  'rpc:core:RpcLifecycleError': errorGuide({
-    name: 'RpcLifecycleError',
-    conditionEn: 'use after endpoint disposal or a terminal lifecycle transition',
-    conditionZh: 'endpoint dispose 后继续使用，或发生 terminal lifecycle transition',
-    distinctionEn: 'Create a new endpoint instead of reviving a terminal one.',
-    distinctionZh: '应创建新 endpoint，不能 revive terminal endpoint。'
+  'rpc-core:index:RpcLifecycleError': guide({
+    purposeEn:
+      "Represents failure after disposal of the caller's own resource. StoreWorker uses this public constructor after its real disposePromise starts and retains cleanup failures through cause/cleanupErrors. Construction supplies diagnostics, never Core private operation identity.",
+    purposeZh:
+      '表示调用方自己的资源开始 disposal 后发生的失败。StoreWorker 在真实 disposePromise 开始后使用这个公开构造器，并通过 cause/cleanupErrors 保留清理失败。构造只提供诊断，不产生 Core 操作私有身份。',
+    quickStart:
+      "import { RpcLifecycleError } from '@migaia/rpc-core'\n\n/** The resource owner supplies its actual disposal promise and owned display text. */\nexport function rejectAfterDisposal(disposePromise: Promise<void> | undefined, message: string) {\n  if (disposePromise !== undefined) throw new RpcLifecycleError(message)\n}\n// StoreWorker's workerParser uses this pattern before request/stream dispatch.\n// Construction cannot retire another Core generation or authorize a close.",
+    useEn: [
+      'A real resource owner rejects new work after its own disposal begins, as StoreWorker does.',
+      'That owner preserves the primary cleanup error and resource-specific cleanup entries.'
+    ],
+    useZh: [
+      '真实资源 owner 像 StoreWorker 一样，在自己的 disposal 开始后拒绝新工作。',
+      '该 owner 需要保留原 cleanup 主错误与资源对应的 cleanup entries。'
+    ],
+    avoidEn: [
+      'Constructing an error to claim that Core cancelled, retired or closed an operation.',
+      'Using public fields as evidence that Core minted private lifecycle identity.'
+    ],
+    avoidZh: [
+      '构造错误以声称 Core 已取消、retire 或关闭某个操作。',
+      '用公开字段证明 Core 已产生操作私有生命周期身份。'
+    ]
   }),
-  'rpc:core:RpcSerializationError': errorGuide({
+  'rpc-core:index:RpcSerializationError': errorGuide({
     name: 'RpcSerializationError',
     conditionEn: 'payload or error serialization that cannot preserve the wire contract',
     conditionZh: 'payload 或 error serialization 无法保留 wire contract',
     distinctionEn: 'Correct the payload shape or codec before resending.',
     distinctionZh: '重新发送前修正 payload shape 或 codec。'
   }),
-  'rpc:core:RpcProtocolError': errorGuide({
+  'rpc-core:index:RpcProtocolError': errorGuide({
     name: 'RpcProtocolError',
     conditionEn: 'a malformed, undecodable, or semantically invalid wire envelope',
     conditionZh: 'malformed、无法 decode 或语义无效的 wire envelope',
     distinctionEn: 'Treat the peer or codec as incompatible until the mismatch is resolved.',
     distinctionZh: '在 mismatch 解决前，把 peer 或 codec 视为 incompatible。'
   }),
-  'rpc:core:RpcContractError': errorGuide({
+  'rpc-core:index:RpcContractError': errorGuide({
     name: 'RpcContractError',
     conditionEn: 'protocol-version or declared contract incompatibility between peers',
     conditionZh: 'peer 之间的 protocol-version 或 declared contract incompatibility',
     distinctionEn: 'Negotiate a supported version or deploy matching contracts.',
     distinctionZh: '协商 supported version，或部署匹配 contract。'
   }),
-  'rpc:core:RpcTransportError': errorGuide({
+  'rpc-core:index:RpcTransportError': errorGuide({
     name: 'RpcTransportError',
     conditionEn: 'send, subscription, listener, or channel failure owned by the transport boundary',
     conditionZh: '由 transport boundary 拥有的 send、subscription、listener 或 channel failure',
     distinctionEn: 'Reconnect or replace the transport only when owner policy permits it.',
     distinctionZh: '仅在 owner policy 允许时 reconnect 或 replace transport。'
   }),
-  'rpc:core:RpcAuthenticationError': errorGuide({
+  'rpc-core:index:RpcAuthenticationError': errorGuide({
     name: 'RpcAuthenticationError',
     conditionEn: 'failed frame verification, signing, encryption, or decryption',
     conditionZh: 'frame verification、signing、encryption 或 decryption 失败',
     distinctionEn: 'Reject the frame and inspect keys, peer identity, or transform ordering.',
     distinctionZh: '拒绝 frame，并检查 key、peer identity 或 transform order。'
   }),
-  'rpc:core:RpcChunkError': errorGuide({
+  'rpc-core:index:RpcChunkError': errorGuide({
     name: 'RpcChunkError',
     conditionEn: 'invalid chunk structure or an exceeded reassembly capacity bound',
     conditionZh: 'chunk structure 无效，或超过 reassembly capacity bound',
     distinctionEn: 'Reject the assembly instead of retaining unbounded peer-controlled memory.',
     distinctionZh: '拒绝 assembly，不能保留无界 peer-controlled memory。'
   }),
-  'rpc:core:RpcRemoteError': errorGuide({
+  'rpc-core:index:RpcRemoteError': errorGuide({
     name: 'RpcRemoteError',
     conditionEn: 'a provider-declared remote business failure reconstructed on the caller',
     conditionZh: 'provider 声明的 remote business failure 在 caller 侧重建',
     distinctionEn: 'Handle provider code and optional data as a remote application contract.',
     distinctionZh: '把 provider code 与 optional data 作为 remote application contract 处理。'
   }),
-  'rpc:core:RpcAbortError': errorGuide({
+  'rpc-core:index:RpcAbortError': errorGuide({
     name: 'RpcAbortError',
     conditionEn: 'caller or owner cancellation with the standard AbortError name',
     conditionZh: 'caller 或 owner cancellation，并公开标准 AbortError name',
     distinctionEn:
-      'Stop dependent work and preserve the reason; do not report expected cancellation as a fault.',
-    distinctionZh: '停止 dependent work 并保留 reason；不要把预期 cancellation 报告成 fault。'
+      'Read the cancellation reason retained by the actual owner; a diagnostic label cannot cancel another operation.',
+    distinctionZh: '读取实际 owner 保留的取消原因；诊断标签不能取消其它操作。'
   }),
-  'rpc:core:RpcTimeoutError': errorGuide({
+  'rpc-core:index:RpcTimeoutError': errorGuide({
     name: 'RpcTimeoutError',
     conditionEn: 'an exceeded call deadline with the standard TimeoutError name',
     conditionZh: 'call deadline 超限，并公开标准 TimeoutError name',
     distinctionEn:
-      'Retry only when the method is repeat-safe and the caller owns a bounded retry policy.',
-    distinctionZh: '只有 method 可安全重复且 caller 拥有 bounded retry policy 时才能重试。'
+      'Report the deadline and reconcile actual execution/outcome before any independent retry policy runs.',
+    distinctionZh: '报告 deadline，并在独立重试策略运行前核对真实 execution/outcome。'
   })
+}
+
+/** Documents actual source/code catalogs for protocol diagnostics without granting operation rights. */
+function errorIdentityGuide(input: {
+  readonly source: string
+  readonly codeTable: string
+  readonly importPath: string
+  readonly member: string
+  readonly purposeEn: string
+  readonly purposeZh: string
+  readonly useEn: readonly string[]
+  readonly useZh: readonly string[]
+}): Readonly<Record<IGuideLocale, IApiGuide>> {
+  return guide({
+    purposeEn: input.purposeEn,
+    purposeZh: input.purposeZh,
+    quickStart: `import { ${input.source}, ${input.codeTable} } from '${input.importPath}'
+import { normalizeRpcSerializedError } from '@migaia/rpc-contract/errors'
+
+/** Report the actual received error tree after accepting the closed wire grammar. */
+export function reportReceivedFailure(received: unknown) {
+  const wire = normalizeRpcSerializedError(received)
+  if (wire.source === ${input.source} && wire.code === ${input.codeTable}.${input.member}) {
+    console.error(wire)
+  }
+  return wire
+}
+// The pair classifies diagnostics; actual execution/outcome and owned resources decide controls.
+// After admission the same fields may preserve wire/terminal report wording; they do not change control.
+// Third-party adapters attach their own source/code through @migaia/utils/error.`,
+    useEn: input.useEn,
+    useZh: input.useZh,
+    avoidEn: [
+      'Parsing display text instead of the documented semantic source/code pair.',
+      'Treating copied source/code fields as a retry, cancellation, terminal or close permission.'
+    ],
+    avoidZh: [
+      '解析展示文本，而不是读取已定义的语义 source/code。',
+      '把复制的 source/code 字段当作重试、取消、终止或关闭权限。'
+    ]
+  })
+}
+
+/** Explains one B6 family predicate as cross-realm diagnosis rather than local owner identity. */
+function errorFamilyGuide(input: {
+  readonly name: string
+  readonly purposeEn: string
+  readonly purposeZh: string
+  readonly useEn: readonly string[]
+  readonly useZh: readonly string[]
+}): Readonly<Record<IGuideLocale, IApiGuide>> {
+  return guide({
+    purposeEn: input.purposeEn,
+    purposeZh: input.purposeZh,
+    quickStart: `import { ${input.name}, serializeRpcError } from '@migaia/rpc-core'
+
+/** The reporting boundary classifies a caught value without changing an operation. */
+export function reportFamilyFailure(error: unknown) {
+  if (!${input.name}(error)) return false
+  const wire = serializeRpcError(error, { report: ({ error }) => console.error(error) })
+  console.error(wire)
+  return true
+}
+// This public predicate works across realms and module copies without instanceof.
+// Public fields may be copied; a match does not prove Core minted private control identity.
+// An admitted reason may retain source/code for wire or terminal presentation without gaining control.
+// Reconcile actual execution/outcome before any independent retry decision.`,
+    useEn: input.useEn,
+    useZh: input.useZh,
+    avoidEn: [
+      'Using family classification to cancel, terminate, close or retire an owned generation.',
+      'Equating a received cached cancellation label with Core private live-operation identity.'
+    ],
+    avoidZh: [
+      '用错误族分类取消、终止、关闭或 retire 持有的 generation。',
+      '把收到的缓存取消标签等同于 Core 操作私有身份。'
+    ]
+  })
+}
+
+/** Ordinary public error catalogs have concrete protocol-implementer and adapter-author uses. */
+/** Each semantic source/code pair shares one maintained diagnostic use case. */
+const rpcErrorCatalogGuides = {
+  contract: errorIdentityGuide({
+    importPath: '@migaia/rpc-contract/errors',
+    source: 'RPC_CONTRACT_SOURCE',
+    codeTable: 'RpcContractErrorCode',
+    member: 'frameLimitExceeded',
+    purposeEn:
+      'Identifies Contract protocol violations with the unchanged @migaia/rpc/contract source and public code table. A frame quota diagnostic does not itself alter the carrier or replay state.',
+    purposeZh:
+      '用不变的 @migaia/rpc/contract source 与公开 code 表识别 Contract 协议违例。frame 配额诊断本身不改变载体或 replay 状态。',
+    useEn: [
+      'An independent protocol receiver reports an invalid envelope, frame, handshake or error tree.',
+      'A foreign runtime preserves the same semantic code while implementing the shipped wire-error schema.'
+    ],
+    useZh: [
+      '独立协议接收端需要报告无效 envelope、frame、handshake 或错误树。',
+      '外部 runtime 实现随包交付的 wire-error schema，并保留相同语义 code。'
+    ]
+  }),
+  core: errorIdentityGuide({
+    importPath: '@migaia/rpc-core',
+    source: 'RPC_CORE_ERROR_SOURCE',
+    codeTable: 'RpcCoreErrorCode',
+    member: 'deadlineExceeded',
+    purposeEn:
+      'Lists the semantic Core failures that custom adapters may report. A deadline code describes a failure; only the actual logical call outcome can establish whether execution occurred.',
+    purposeZh:
+      '列出自定义适配器可报告的 Core 语义失败。deadline code 描述失败；只有实际逻辑调用的 outcome 能确定是否发生执行。',
+    useEn: [
+      'An adapter author classifies a Core failure for reporting without constructing Core private identity.',
+      'A caller retains source/code and cause while independently reconciling a lost result.'
+    ],
+    useZh: [
+      '适配器作者需要分类 Core 失败以报告，不构造 Core 私有身份。',
+      '调用方独立核对丢失结果时，保留 source/code 与 cause。'
+    ]
+  }),
+  remote: errorIdentityGuide({
+    importPath: '@migaia/rpc-core/remote',
+    source: 'RPC_REMOTE_ERROR_SOURCE',
+    codeTable: 'RpcRemoteLayerErrorCode',
+    member: 'resultUnknown',
+    purposeEn:
+      'Identifies Remote layer failures with the stable @migaia/rpc/remote source. REMOTE_RESULT_UNKNOWN reports a lost result rather than proof that a non-idempotent method did not execute.',
+    purposeZh:
+      '用稳定的 @migaia/rpc/remote source 识别 Remote 层失败。REMOTE_RESULT_UNKNOWN 表示结果丢失，不证明非幂等方法没有执行。',
+    useEn: [
+      'A Runtime caller reports an unavailable generation or an unknown result before reconciliation.',
+      'A custom diagnostic sink distinguishes Remote contract failures from Core and native transport failures.'
+    ],
+    useZh: [
+      'Runtime 调用方在对账前报告 generation 不可用或结果未知。',
+      '自定义诊断 sink 需要区分 Remote contract、Core 与原生 transport 失败。'
+    ]
+  }),
+  process: errorIdentityGuide({
+    importPath: '@migaia/rpc-process',
+    source: 'RPC_PROCESS_ERROR_SOURCE',
+    codeTable: 'RpcProcessErrorCode',
+    member: 'usageSampleFailed',
+    purposeEn:
+      'Identifies actual Process launch, connection, lifecycle and sampling failures with the stable @migaia/rpc/process source. Native details remain reachable through the original cause.',
+    purposeZh:
+      '用稳定的 @migaia/rpc/process source 识别实际 Process 启动、连接、生命周期与采样失败。原生详情沿原 cause 保持可达。',
+    useEn: [
+      'A process adapter reports native launch or socket errors without depending on private display text.',
+      'A resource view reports sampling unavailable without fabricating CPU or RSS values.'
+    ],
+    useZh: [
+      '进程适配器不依赖私有展示文本地报告原生启动或 socket 错误。',
+      '资源视图报告采样 unavailable，不伪造 CPU 或 RSS 数值。'
+    ]
+  }),
+  threads: errorIdentityGuide({
+    importPath: '@migaia/rpc-threads',
+    source: 'RPC_THREAD_ERROR_SOURCE',
+    codeTable: 'RpcThreadErrorCode',
+    member: 'usageSampleFailed',
+    purposeEn:
+      'Identifies the native Worker sampling failure with the stable @migaia/rpc/threads source and THREAD_USAGE_SAMPLE_FAILED code. This diagnostic grants no Worker stop or replacement authority.',
+    purposeZh:
+      '用稳定的 @migaia/rpc/threads source 与 THREAD_USAGE_SAMPLE_FAILED code 识别原生 Worker 采样失败。此诊断不授予 Worker stop 或 replacement 权限。',
+    useEn: [
+      'A thread adapter reports an unsupported or failed real Worker resource sample.',
+      'An application retains the original sampling cause while showing the measurement unavailable.'
+    ],
+    useZh: [
+      '线程适配器需要报告不支持或失败的真实 Worker 资源采样。',
+      '应用保留原采样 cause，同时显示测量 unavailable。'
+    ]
+  }),
+  jsonrpc: errorIdentityGuide({
+    importPath: '@migaia/rpc-bridge-jsonrpc',
+    source: 'JSONRPC_BRIDGE_ERROR_SOURCE',
+    codeTable: 'JsonRpcBridgeErrorCode',
+    member: 'frameInvalid',
+    purposeEn:
+      'Identifies framing, profile, extension and hello-deadline failures with the stable @migaia/rpc/bridge/jsonrpc source. The JSON-RPC integer code policy remains with the foreign peer profile.',
+    purposeZh:
+      '用稳定的 @migaia/rpc/bridge/jsonrpc source 识别 framing、profile、扩展与 hello deadline 失败。JSON-RPC 整数 code 策略仍归外部 peer profile。',
+    useEn: [
+      'A foreign-language carrier reports Content-Length or UTF-8 rejection without parsing messages.',
+      'A peer maps its actual wire error tree through toJsonRpcError/fromJsonRpcError while preserving semantic identity.'
+    ],
+    useZh: [
+      '外部语言载体不解析 message 文本地报告 Content-Length 或 UTF-8 拒绝。',
+      'peer 用 toJsonRpcError/fromJsonRpcError 映射实际 wire 错误树，保留语义身份。'
+    ]
+  }),
+  processAdapter: errorIdentityGuide({
+    importPath: '@migaia/rpc-core/adapter/diagnostics',
+    source: 'RPC_PROCESS_ERROR_SOURCE',
+    codeTable: 'RpcProcessErrorCode',
+    member: 'usageSampleFailed',
+    purposeEn:
+      'Identifies actual Process launch, connection, lifecycle and sampling failures with the stable @migaia/rpc/process source. Native details remain reachable through the original cause.',
+    purposeZh:
+      '用稳定的 @migaia/rpc/process source 识别实际 Process 启动、连接、生命周期与采样失败。原生详情沿原 cause 保持可达。',
+    useEn: [
+      'A process adapter reports native launch or socket errors without depending on private display text.',
+      'A resource view reports sampling unavailable without fabricating CPU or RSS values.'
+    ],
+    useZh: [
+      '进程适配器不依赖私有展示文本地报告原生启动或 socket 错误。',
+      '资源视图报告采样 unavailable，不伪造 CPU 或 RSS 数值。'
+    ]
+  }),
+  threadsAdapter: errorIdentityGuide({
+    importPath: '@migaia/rpc-core/adapter/threads',
+    source: 'RPC_THREAD_ERROR_SOURCE',
+    codeTable: 'RpcThreadErrorCode',
+    member: 'usageSampleFailed',
+    purposeEn:
+      'Identifies the native Worker sampling failure with the stable @migaia/rpc/threads source and THREAD_USAGE_SAMPLE_FAILED code. This diagnostic grants no Worker stop or replacement authority.',
+    purposeZh:
+      '用稳定的 @migaia/rpc/threads source 与 THREAD_USAGE_SAMPLE_FAILED code 识别原生 Worker 采样失败。此诊断不授予 Worker stop 或 replacement 权限。',
+    useEn: [
+      'A thread adapter reports an unsupported or failed real Worker resource sample.',
+      'An application retains the original sampling cause while showing the measurement unavailable.'
+    ],
+    useZh: [
+      '线程适配器需要报告不支持或失败的真实 Worker 资源采样。',
+      '应用保留原采样 cause，同时显示测量 unavailable。'
+    ]
+  }),
+  jsonrpcAdapter: errorIdentityGuide({
+    importPath: '@migaia/rpc-contract/framing/jsonrpc',
+    source: 'JSONRPC_BRIDGE_ERROR_SOURCE',
+    codeTable: 'JsonRpcBridgeErrorCode',
+    member: 'frameInvalid',
+    purposeEn:
+      'Identifies framing, profile, extension and hello-deadline failures with the stable @migaia/rpc/bridge/jsonrpc source. The JSON-RPC integer code policy remains with the foreign peer profile.',
+    purposeZh:
+      '用稳定的 @migaia/rpc/bridge/jsonrpc source 识别 framing、profile、扩展与 hello deadline 失败。JSON-RPC 整数 code 策略仍归外部 peer profile。',
+    useEn: [
+      'A foreign-language carrier reports Content-Length or UTF-8 rejection without parsing messages.',
+      'A peer maps its actual wire error tree through toJsonRpcError/fromJsonRpcError while preserving semantic identity.'
+    ],
+    useZh: [
+      '外部语言载体不解析 message 文本地报告 Content-Length 或 UTF-8 拒绝。',
+      'peer 用 toJsonRpcError/fromJsonRpcError 映射实际 wire 错误树，保留语义身份。'
+    ]
+  })
+}
+
+/** Concrete source/code and family guides for the ordinary third-party error surface. */
+const rpcPublicErrorGuides = {
+  'rpc-contract:errors:RPC_CONTRACT_SOURCE': rpcErrorCatalogGuides.contract,
+  'rpc-contract:errors:RpcContractErrorCode': rpcErrorCatalogGuides.contract,
+  'rpc-core:index:RpcCoreErrorCode': rpcErrorCatalogGuides.core,
+  'rpc-core:remote:RPC_REMOTE_ERROR_SOURCE': rpcErrorCatalogGuides.remote,
+  'rpc-core:remote:RpcRemoteLayerErrorCode': rpcErrorCatalogGuides.remote,
+  'rpc-process:index:RPC_PROCESS_ERROR_SOURCE': rpcErrorCatalogGuides.process,
+  'rpc-process:index:RpcProcessErrorCode': rpcErrorCatalogGuides.process,
+  'rpc-threads:index:RPC_THREAD_ERROR_SOURCE': rpcErrorCatalogGuides.threads,
+  'rpc-threads:index:RpcThreadErrorCode': rpcErrorCatalogGuides.threads,
+  'rpc-bridge-jsonrpc:index:JSONRPC_BRIDGE_ERROR_SOURCE': rpcErrorCatalogGuides.jsonrpc,
+  'rpc-bridge-jsonrpc:index:JsonRpcBridgeErrorCode': rpcErrorCatalogGuides.jsonrpc,
+  'rpc-core:index:isRpcErrorInstance': errorFamilyGuide({
+    name: 'isRpcErrorInstance',
+    purposeEn:
+      'Recognizes a Core diagnostic error family by its stable source, known code and family name across realms or module copies. Unlike isRpcError, it checks the family; it still cannot attest private local construction.',
+    purposeZh:
+      '跨 realm 或模块副本，用稳定 source、已知 code 与族 name 识别 Core 诊断错误族。比 isRpcError 多检查错误族，但仍不能证明本地私有构造身份。',
+    useEn: [
+      'An adapter classifies a received or cross-realm Core failure for a diagnostic sink.',
+      'A consumer reads the public RpcError type without importing a runtime constructor.'
+    ],
+    useZh: [
+      '适配器需要为诊断 sink 分类接收或跨 realm 的 Core 失败。',
+      '消费方需要读取公开 RpcError type，不导入运行时构造器。'
+    ]
+  }),
+  'rpc-core:index:isRpcRemoteError': errorFamilyGuide({
+    name: 'isRpcRemoteError',
+    purposeEn:
+      'Recognizes the RpcRemoteError diagnostic family across realms using Core source, its family name and the remote string code domain. The remote business code is preserved; a match does not prove delivery or execution state.',
+    purposeZh:
+      '跨 realm 用 Core source、RpcRemoteError 族 name 与远端 string code 域识别诊断族。保留远端业务 code；匹配不证明送达或执行状态。',
+    useEn: [
+      'A caller reports the provider business code and cause after receiving a remote failure.',
+      'A relay distinguishes the remote error family while preserving its unrestricted business code.'
+    ],
+    useZh: [
+      '调用方收到远端失败后需要报告 provider 业务 code 与 cause。',
+      'relay 需要区分远端错误族，同时保留其不受限业务 code。'
+    ]
+  }),
+  'rpc-core:index:isRpcTimeoutError': errorFamilyGuide({
+    name: 'isRpcTimeoutError',
+    purposeEn:
+      'Recognizes the coded TimeoutError diagnostic family across realms or copies. A timeout description does not prove that the provider failed to execute, and cannot mint a local timer or cancellation identity.',
+    purposeZh:
+      '跨 realm 或副本识别编码 TimeoutError 诊断族。超时描述不证明 provider 未执行，也不能产生本地 timer 或取消身份。',
+    useEn: [
+      'A reporting boundary records a deadline failure without relying on same-realm instanceof.',
+      'A caller diagnoses a timeout while separately consulting actual execution/outcome facts.'
+    ],
+    useZh: [
+      '报告边界不依赖同 realm instanceof 地记录 deadline 失败。',
+      '调用方诊断超时时，独立查询真实 execution/outcome 事实。'
+    ]
+  }),
+  'rpc-core:adapter-diagnostics:RPC_PROCESS_ERROR_SOURCE': rpcErrorCatalogGuides.processAdapter,
+  'rpc-core:adapter-diagnostics:RpcProcessErrorCode': rpcErrorCatalogGuides.processAdapter,
+  'rpc-core:adapter-threads:RPC_THREAD_ERROR_SOURCE': rpcErrorCatalogGuides.threadsAdapter,
+  'rpc-core:adapter-threads:RpcThreadErrorCode': rpcErrorCatalogGuides.threadsAdapter,
+  'rpc-contract:framing-jsonrpc:JSONRPC_BRIDGE_ERROR_SOURCE': rpcErrorCatalogGuides.jsonrpcAdapter,
+  'rpc-contract:framing-jsonrpc:JsonRpcBridgeErrorCode': rpcErrorCatalogGuides.jsonrpcAdapter
 }
 
 /** Stable protocol discriminants used by adapters, diagnostics, and tests. */
@@ -1759,42 +2181,42 @@ const webRpcConstantGuides: Readonly<Record<string, Readonly<Record<IGuideLocale
     member: 'abort',
     value: 'abort control frame'
   }),
-  'rpc:protocol-constants:RpcPlatform': constantGuide({
+  'rpc-core:transport-constants:RpcPlatform': constantGuide({
     name: 'RpcPlatform',
     roleEn: 'transport platform labels',
     roleZh: 'transport platform label',
     member: 'worker',
     value: 'Worker transport'
   }),
-  'rpc:protocol-constants:RpcTransportOwnership': constantGuide({
+  'rpc-core:transport-constants:RpcTransportOwnership': constantGuide({
     name: 'RpcTransportOwnership',
     roleEn: 'transport custody modes',
     roleZh: 'transport custody mode',
     member: 'borrowed',
     value: 'remove listeners without closing the host resource'
   }),
-  'rpc:protocol-constants:RpcTransportEncoding': constantGuide({
+  'rpc-core:transport-constants:RpcTransportEncoding': constantGuide({
     name: 'RpcTransportEncoding',
     roleEn: 'transport encoding capabilities',
     roleZh: 'transport encoding capability',
     member: 'uint8Array',
     value: 'binary encoded frames'
   }),
-  'rpc:protocol-constants:RpcTransportTopology': constantGuide({
+  'rpc-core:transport-constants:RpcTransportTopology': constantGuide({
     name: 'RpcTransportTopology',
     roleEn: 'peer fan-out and trust topology labels',
     roleZh: 'peer fan-out 与 trust topology label',
     member: 'multiplexed',
     value: 'several logical peers share a channel'
   }),
-  'rpc:protocol-constants:RpcEndpointStatus': constantGuide({
+  'rpc-core:transport-constants:RpcEndpointStatus': constantGuide({
     name: 'RpcEndpointStatus',
     roleEn: 'discovery-visible endpoint states',
     roleZh: 'discovery-visible endpoint state',
     member: 'active',
     value: 'endpoint accepts work'
   }),
-  'rpc:protocol-constants:RpcOperation': constantGuide({
+  'rpc-core:transport-constants:RpcOperation': constantGuide({
     name: 'RpcOperation',
     roleEn: 'single-target operation labels',
     roleZh: 'single-target operation label',
@@ -1808,7 +2230,7 @@ const webRpcConstantGuides: Readonly<Record<string, Readonly<Record<IGuideLocale
     member: 'request',
     value: 'provider request work'
   }),
-  'rpc:protocol-constants:RpcCandidateStatus': constantGuide({
+  'rpc-core:transport-constants:RpcCandidateStatus': constantGuide({
     name: 'RpcCandidateStatus',
     roleEn: 'discovery candidate states',
     roleZh: 'discovery candidate state',
@@ -1838,9 +2260,690 @@ const webRpcConstantGuides: Readonly<Record<string, Readonly<Record<IGuideLocale
   })
 }
 
+/**
+ * Canonical examples and decision boundaries are shared only by the protocol operations they
+ * actually invoke.
+ */
+const rpcProtocolGuideContexts = {
+  binary: {
+    quickStart:
+      "import { captureRpcBinaryData, prepareRpcBinary, RpcBinaryStorage } from '@migaia/rpc-contract/binary'\nimport { prepareRpcBinary as prepareColdRpcBinary, restoreRpcBinary } from '@migaia/rpc-contract/binary/lazy'\nimport type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract/runtime'\n\n/** Capture at the application's chosen point, then finish that same snapshot later. */\nexport async function captureOutgoing(envelope: IRpcRuntimeEnvelope) {\n  const captured = captureRpcBinaryData(envelope, RpcBinaryStorage.inline, 1_048_576)\n  return await captured.prepare()\n}\n\n/** The eager entry prepares this actual outgoing envelope. */\nexport async function prepareOutgoing(envelope: IRpcRuntimeEnvelope) {\n  return await prepareRpcBinary(envelope, RpcBinaryStorage.inline, 1_048_576)\n}\n\n/** A carrier that chooses the light entry uses the same canonical operation name. */\nexport async function prepareColdOutgoing(envelope: IRpcRuntimeEnvelope) {\n  return await prepareColdRpcBinary(envelope, RpcBinaryStorage.inline, 1_048_576)\n}\n/** Restore an actual received inline manifest at the receiver's existing asynchronous stage. */\nexport async function restoreIncoming(manifest: unknown) {\n  return await restoreRpcBinary(manifest, RpcBinaryStorage.inline, [])\n}\n// The carrier sends manifest and sidecars from the returned preparation result.\n// Native storage additionally needs the authentication owner's whole-backing digest.",
+    useEn: [
+      'An independent carrier needs the canonical manifest and actual binary backing accounting.',
+      'The application must preserve the existing capture point before cold loading or asynchronous preparation.'
+    ],
+    useZh: [
+      '独立载体需要规范 manifest 与真实二进制 backing 计量。',
+      '应用需要在冷加载或异步准备前保留既有捕获点。'
+    ],
+    avoidEn: [
+      'Use Core/Remote when the requirement is an authenticated endpoint rather than protocol data.',
+      'A copied codec or prepared payload cannot qualify a channel or grant transfer ownership.'
+    ],
+    avoidZh: [
+      '需要已鉴权 endpoint 时应使用 Core/Remote，协议数据操作不能替代连接构造。',
+      '复制 codec 或 prepared payload 不能授予通道资格或转移所有权。'
+    ]
+  },
+  nativeInspection: {
+    quickStart:
+      "import {\n  assertRpcNativeBinaryFrameSize, hasRpcBinaryEnvelope,\n  isRpcBinaryIntegrityFailure, measureRpcNativeBinaryFrame, readRpcNativeBinary,\n  rpcBinaryBackingLength, rpcBinaryView\n} from '@migaia/rpc-contract/binary/inspect'\nimport type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract/runtime'\n\n/** Admit the received wrapper's actual backing size before expensive integrity work. */\nexport function inspectReceived(value: unknown, limit: number) {\n  const packet = readRpcNativeBinary(value, limit)\n  if (!packet) return undefined\n  const bytes = measureRpcNativeBinaryFrame(\n    packet.protectedMetadata, packet.sidecars.length, packet.backingBytes\n  )\n  assertRpcNativeBinaryFrameSize(\n    packet.protectedMetadata, packet.sidecars.length, packet.backingBytes, limit\n  )\n  const backings = packet.sidecars.map((backing) => ({\n    byteLength: rpcBinaryBackingLength(backing),\n    view: rpcBinaryView(new Uint8Array(backing))\n  }))\n  return { packet, bytes, backings }\n}\n\n/** Branch on the proof retained by the canonical envelope normalizer. */\nexport function containsBinary(envelope: IRpcRuntimeEnvelope) {\n  return hasRpcBinaryEnvelope(envelope)\n}\n\n/** An actual restoration failure is classified without changing its native cause. */\nexport async function receiveRestored(\n  restore: () => Promise<IRpcRuntimeEnvelope>, report: (error: unknown) => void\n) {\n  try { return await restore() }\n  catch (error) {\n    if (isRpcBinaryIntegrityFailure(error)) report(error)\n    throw error\n  }\n}",
+    useEn: [
+      'A native carrier must admit its actual received wrapper before digest work.',
+      'A protocol implementation needs real backing/view measurements or local integrity diagnostics.'
+    ],
+    useZh: [
+      'native 载体需要在摘要工作前接纳实际收到的 wrapper。',
+      '协议实现需要真实 backing/view 计量或本地完整性诊断。'
+    ],
+    avoidEn: [
+      'Do not treat a passed outer-wrapper check as completed authentication or SHA verification.',
+      'Only supported non-shared ArrayBuffer and Uint8Array resources belong to this native profile.'
+    ],
+    avoidZh: [
+      '不能把外层 wrapper 检查通过当作已完成鉴权或 SHA 验证。',
+      '该 native profile 只接受支持的非共享 ArrayBuffer 与 Uint8Array 资源。'
+    ]
+  },
+  errors: {
+    quickStart:
+      "import {\n  deserializeRpcError, fromJsonRpcError, normalizeRpcSerializedError,\n  reachRpcError, serializeRpcError, toJsonRpcError,\n  RpcJsonRpcWireError, RpcWireErrorField, RpcWireErrorLimit\n} from '@migaia/rpc-contract/errors'\nimport wireErrorSchema from '@migaia/rpc-contract/schema/wire-error' with { type: 'json' }\n\n/** Foreign protocol implementations reuse the same shipped grammar and error extension. */\nexport const errorProtocol = {\n  schema: wireErrorSchema, fieldOrder: RpcWireErrorField,\n  limits: RpcWireErrorLimit, jsonRpcDataKey: RpcJsonRpcWireError.dataKey\n}\n\n/** Encode the caller's real failure; its reporting policy owns serialization diagnostics. */\nexport function encodeFailure(error: unknown, report: (error: unknown) => void, jsonRpcCode: number) {\n  const options = { report: ({ error: failure }: { error: unknown }) => report(failure) }\n  const reachable = [...reachRpcError(error, options)]\n  const wire = serializeRpcError(error, options)\n  const jsonRpc = toJsonRpcError(wire, jsonRpcCode)\n  return { reachable, wire, jsonRpc }\n}\n\n/** Validate an untrusted response before reconstructing its native error graph. */\nexport function receiveFailure(jsonRpc: unknown) {\n  const wire = normalizeRpcSerializedError(fromJsonRpcError(jsonRpc))\n  return deserializeRpcError(wire)\n}\n// The JSON-RPC adapter owns jsonRpcCode; Contract does not invent an integer code policy.\n// Core/Remote errors use the corresponding Core error operations for their private metadata.",
+    useEn: [
+      'A custom protocol implementation must carry the actual bounded error chain across a language boundary.',
+      'A diagnostic consumer needs the original local failure identities or validated remote reconstruction.'
+    ],
+    useZh: [
+      '自定义协议实现需要把实际有界错误链带过语言边界。',
+      '诊断消费方需要原本地失败身份或已验证远端错误恢复。'
+    ],
+    avoidEn: [
+      'Use Core error operations for Core/Remote private redaction and forwarding metadata.',
+      'The bridge owns integer JSON-RPC codes; these data conversions do not mint package errors.'
+    ],
+    avoidZh: [
+      'Core/Remote 私有脱敏与 forwarding metadata 应使用 Core 的错误操作。',
+      'bridge 拥有 JSON-RPC 整数 code；这些数据转换不会铸造任意包错误。'
+    ]
+  },
+  physicalFrames: {
+    quickStart:
+      "import {\n  assertRpcPhysicalFrameSize, inspectRpcPhysicalFrame,\n  measureRpcPhysicalFrame, readRpcBatchMembers\n} from '@migaia/rpc-contract/framing'\n\n/** Admit one complete encoded representation, rather than only one semantic batch member. */\nexport function admitPhysicalFrame(frame: unknown, limit: number) {\n  assertRpcPhysicalFrameSize(frame, limit)\n  return readRpcBatchMembers(frame)\n}\n\n/** A custom encoder reuses one inspection while partitioning its actual queued members. */\nexport function partitionFrame<T>(frame: unknown, members: T[], limit: number) {\n  const inspection = inspectRpcPhysicalFrame(frame, limit)\n  return { bytes: inspection.bytes, groups: inspection.splitBatch(members) }\n}\n\n/** Read a physical byte count when no partitioning or admission operation is needed. */\nexport function frameBytes(frame: unknown) { return measureRpcPhysicalFrame(frame) }",
+    useEn: [
+      'A custom encoder must enforce the existing complete physical-message byte limit.',
+      'An actual queued batch needs partitioning from one owned measurement.'
+    ],
+    useZh: [
+      '自定义 encoder 需要执行既有完整物理消息字节上限。',
+      '实际排队 batch 需要复用一次持有的计量结果进行划分。'
+    ],
+    avoidEn: [
+      'A batch wrapper does not validate its members or establish negotiated batch agreement.',
+      "Use the carrier's own sending and queue lifetime; these functions do not schedule work."
+    ],
+    avoidZh: [
+      'batch wrapper 不会验证每个成员，也不能建立已协商 batch agreement。',
+      '发送与队列寿命使用载体自己的 owner；这些函数不负责调度。'
+    ]
+  },
+  jsonRpcFrames: {
+    quickStart:
+      "import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'\n\n/** The carrier owns actual byte writes, message handling, and closure. */\nexport function createCarrierProtocol(\n  write: (frame: Uint8Array) => Promise<void>, receive: (message: unknown) => void\n) {\n  const decoder = createJsonRpcFrameDecoder()\n  return {\n    send: (message: unknown) => write(encodeJsonRpcFrame(message)),\n    push: (chunk: Uint8Array) => {\n      for (const message of decoder.push(chunk)) receive(message)\n    },\n    finish: () => decoder.finish(),\n    close: () => decoder.close()\n  }\n}",
+    useEn: [
+      'A custom ordered-byte carrier implements Content-Length framing for foreign peers.',
+      "The same decoder must retain a partial frame across the carrier's actual read chunks."
+    ],
+    useZh: [
+      '自定义有序字节载体为外部 peer 实现 Content-Length framing。',
+      '同一 decoder 需要跨载体实际 read chunk 保留未完成帧。'
+    ],
+    avoidEn: [
+      'The framer is not a completed authenticated hello or a correlated RPC endpoint.',
+      "A malformed terminal frame must propagate to the carrier's existing error/close owner."
+    ],
+    avoidZh: [
+      'framer 不能代替已鉴权 hello 或具有调用关联的 RPC endpoint。',
+      '末尾非法帧应传递给载体既有的错误与关闭 owner。'
+    ]
+  },
+  bootstrapHandoff: {
+    quickStart:
+      "import { createRpcBootstrapFrameReceiver } from '@migaia/rpc-contract/framing/stream'\n\n/** Hand off an actual bootstrap frame to the carrier's business-frame consumer. */\nexport async function acceptBootstrap(\n  frame: Uint8Array, onFrame: (frame: Uint8Array) => void, onError: (error: Error) => void\n) {\n  const receiver = createRpcBootstrapFrameReceiver()\n  const error = receiver.accept(frame)\n  if (error) receiver.fail(error)\n  const bootstrap = await receiver.bootstrap\n  const detach = receiver.attach(onFrame, onError)\n  receiver.activate()\n  return { bootstrap, receiver, detach }\n}\n// Feed later complete frames through receiver.accept; detach when the carrier closes.\n// Carrier failures call receiver.fail with their original Error.",
+    useEn: [
+      'A custom framed carrier owns its real bootstrap-to-handshake handoff.',
+      'The carrier must retain the first bootstrap and activate its existing business consumer later.'
+    ],
+    useZh: [
+      '自定义完整帧载体拥有实际 bootstrap 到 handshake 交接。',
+      '载体需要保留首个 bootstrap，并稍后激活既有业务消费者。'
+    ],
+    avoidEn: [
+      'The receiver does not acquire native I/O or execution lifetime ownership.',
+      'Pass the actual original failure to fail; copied permission records cannot replace held resources.'
+    ],
+    avoidZh: [
+      'receiver 不会取得 native I/O 或执行资源的寿命所有权。',
+      'fail 使用实际原错误；复制权限记录不能代替持有的资源。'
+    ]
+  },
+  handshakeFrames: {
+    quickStart:
+      "import { createRpcHandshakeFrameReceiver, RpcHandshakeRole } from '@migaia/rpc-contract/framing/stream'\n\n/** A responder receives one complete handshake frame before activating business traffic. */\nexport async function receiveHello(frame: Uint8Array) {\n  const receiver = createRpcHandshakeFrameReceiver({ role: RpcHandshakeRole.responder })\n  const error = receiver.accept(frame)\n  if (error instanceof Error) { receiver.close(error); throw error }\n  const helloText = await receiver.readHandshakeFrame()\n  return { helloText, receiver }\n}\n// After the real handshake owner accepts the offer, call beginAccept and activate.\n// Close with the carrier's actual failure or cancellation reason.",
+    useEn: [
+      'A carrier receives complete frames but needs the retained initiator/responder grammar.',
+      'Its actual handshake owner decides when retained business frames can be activated.'
+    ],
+    useZh: [
+      '载体接收完整帧但需要保留 initiator/responder 的协议语法。',
+      '实际 handshake owner 需要决定何时激活保留的业务帧。'
+    ],
+    avoidEn: [
+      'Use the existing channel constructor when no custom receive handoff is needed.',
+      'Role and frame data are protocol inputs, not proof of native resource ownership.'
+    ],
+    avoidZh: [
+      '不需要自定义接收交接时应使用既有完整 channel constructor。',
+      'role 与 frame 数据是协议输入，不是 native 资源所有权证明。'
+    ]
+  },
+  streamFrames: {
+    quickStart:
+      "import { createRpcStreamFrameDecoderWithLimit, encodeRpcStreamTextFrame } from '@migaia/rpc-contract/framing/stream'\n\n/** The carrier changes its own phase limit and supplies complete-payload/error consumers. */\nexport function framedTextCarrier(\n  onFrame: (frame: Uint8Array) => void, onError: (error: Error) => void,\n  currentLimit: () => number, write: (frame: Uint8Array) => Promise<void>\n) {\n  const decoder = createRpcStreamFrameDecoderWithLimit({ onFrame, onError }, currentLimit)\n  const encoder = new TextEncoder()\n  return {\n    send: (text: string) => write(encodeRpcStreamTextFrame(text, encoder)),\n    push: (chunk: Uint8Array) => decoder.push(chunk),\n    finish: () => decoder.finish(),\n    close: () => decoder.close()\n  }\n}",
+    useEn: [
+      'A custom process-like carrier receives arbitrary native byte chunks.',
+      'The actual connection phase supplies its live payload limit before allocation.'
+    ],
+    useZh: [
+      '自定义进程类载体接收任意 native 字节 chunk。',
+      '实际连接阶段需要在分配前提供当前 payload 上限。'
+    ],
+    avoidEn: [
+      'Already complete string messages use the Contract string framer instead.',
+      "Do not create a second receiver queue or change the carrier's first-error policy."
+    ],
+    avoidZh: [
+      '已保证完整字符串消息的载体应使用 Contract string framer。',
+      '不能新增第二条 receiver 队列或改变载体原 first-error 策略。'
+    ]
+  },
+  handshakeData: {
+    quickStart:
+      "import { RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\nimport { acceptRpcHandshake, completeRpcHandshake, createRpcHello, normalizeRpcHandshake } from '@migaia/rpc-contract/handshake'\n\nconst client = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json], capabilities: []\n}\nconst service = { ...client, peer: { id: 'service', runtime: RpcPeerRuntime.node } }\nconst hello = createRpcHello(client)\nconst received = normalizeRpcHandshake(hello)\nconst acceptance = acceptRpcHandshake(service, hello)\nif (!acceptance.ok) throw acceptance.error\nconst agreement = completeRpcHandshake(client, acceptance.reply)\nconsole.log(received.step, agreement.codec)\n// These are protocol proposals and negotiated data. The real carrier still owns authentication.",
+    useEn: [
+      'An independent protocol carrier exchanges the actual hello and accept/reject messages.',
+      'An initiator or responder needs the exact common version/codec/capability result.'
+    ],
+    useZh: [
+      '独立协议载体需要交换实际 hello 与 accept/reject 消息。',
+      'initiator 或 responder 需要精确的共同版本、codec 与 capability 结果。'
+    ],
+    avoidEn: [
+      'The real channel still owns token verification, resource identity and lifetime.',
+      'Do not replace bounded redacted failures with an error that embeds the received token or input.'
+    ],
+    avoidZh: [
+      '真实 channel 仍拥有 token 验证、资源身份与生命周期。',
+      '不能把有界脱敏失败替换成嵌入收到的 token 或输入的错误。'
+    ]
+  },
+  portableValues: {
+    quickStart:
+      "import { normalizePortable } from '@migaia/rpc-contract/portable'\nimport { normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime'\nimport { hasRpcBinaryEnvelope } from '@migaia/rpc-contract/binary/inspect'\n\n/** Admit one business value for the legacy portable wire grammar. */\nexport function snapshotBusinessValue(value: unknown) {\n  return normalizePortable(value)\n}\n\n/** A runtime protocol receiver validates its actual envelope before selecting a binary profile. */\nexport function inspectRuntimeEnvelope(decoded: unknown) {\n  const envelope = normalizeRuntimeEnvelope(decoded)\n  return { envelope, hasBinary: hasRpcBinaryEnvelope(envelope) }\n}\n// Retain the canonical snapshot; a copied record cannot substitute for its binary proof.\n// This data operation does not authorize transfer or negotiate channel capabilities.",
+    useEn: [
+      'An independent protocol implementation admits an actual business value at its supported profile boundary.',
+      'The caller needs the canonical snapshot and its already retained binary proof.'
+    ],
+    useZh: [
+      '独立协议实现需要在支持的 profile 边界接纳实际业务值。',
+      '调用者需要规范 snapshot 及其已保留的二进制证明。'
+    ],
+    avoidEn: [
+      'Use the negotiated native profile only when that actual connection supports it.',
+      'Do not reimplement the portable walker or use normalization as transfer authorization.'
+    ],
+    avoidZh: [
+      '只有实际连接已支持时才能使用协商后的 native profile。',
+      '不能重写 portable walker，也不能把归一化当作转移授权。'
+    ]
+  },
+  runtimeData: {
+    quickStart:
+      "import {\n  normalizeRuntimeEnvelope, normalizeRuntimeGeneration, normalizeRuntimeSteps,\n  readRuntimeCarrier, runtimeOperationCapabilities, wrapRuntimeCarrier,\n  type IRpcRuntimeOptions, RpcRuntimeMode\n} from '@migaia/rpc-contract/runtime'\n\n/** A protocol implementation admits the real decoded data before dispatching it. */\nexport function admitRuntimeData(envelope: unknown, steps: unknown, generation: unknown) {\n  return {\n    envelope: normalizeRuntimeEnvelope(envelope),\n    steps: normalizeRuntimeSteps(steps),\n    generation: normalizeRuntimeGeneration(generation)\n  }\n}\n\n/** Only the authentication owner interprets the selected protected output. */\nexport function selectProtectedOutput(frame: unknown) {\n  return readRuntimeCarrier(wrapRuntimeCarrier(frame))?.frame\n}\n\n/** These are AND dependencies of the selected operation, not an inferred offer closure. */\nexport function requiredCapabilities(mode: RpcRuntimeMode, options?: IRpcRuntimeOptions) {\n  return runtimeOperationCapabilities(mode, options)\n}",
+    useEn: [
+      'A protocol implementer validates the received closed runtime union before dispatch.',
+      'A custom carrier needs the fixed selector or exact dependencies of an opted-in operation.'
+    ],
+    useZh: [
+      '协议实现者需要在 dispatch 前验证收到的封闭 runtime union。',
+      '自定义载体需要固定 selector 或显式 operation 的精确依赖。'
+    ],
+    avoidEn: [
+      'These projections cannot mint launch, replay, batch or codec trust for a transport.',
+      'Core/Remote still owns provider execution, logical retry and held execution controls.'
+    ],
+    avoidZh: [
+      '这些数据投影不能为 transport 铸造 launch、replay、batch 或 codec 信任。',
+      'Core/Remote 仍拥有 provider 执行、逻辑重试与持有的执行控制权。'
+    ]
+  },
+  lazyParsing: {
+    quickStart:
+      "import { normalizeRuntimeEnvelope, normalizeStreamPayload } from '@migaia/rpc-contract/runtime/lazy'\n\n/** Await only at a receiver's existing asynchronous continuation. */\nexport async function receiveRuntimeEnvelope(decoded: unknown) {\n  return await normalizeRuntimeEnvelope(decoded)\n}\n\n/** An independent stream receiver shares the same canonical cold parser. */\nexport async function receiveStreamPayload(decoded: unknown) {\n  return await normalizeStreamPayload(decoded)\n}\n// Scalar envelope branches retain synchronous results; a cold stream branch may return a Promise.\n// The caller propagates the original parser failure and retains its actual stream state.",
+    useEn: [
+      'An existing asynchronous receiver wants the canonical parser without loading every stream branch eagerly.',
+      'The carrier preserves its original decode continuation and error cause when cold loading is required.'
+    ],
+    useZh: [
+      '既有异步 receiver 需要规范 parser，但无需提前加载所有 stream 分支。',
+      '冷加载必要时，载体需要保留原 decode continuation 与错误 cause。'
+    ],
+    avoidEn: [
+      'Do not force ordinary synchronous scalar parsing into a new asynchronous boundary.',
+      'Lazy parsing does not own sequence, credit, cancellation or iterator cleanup.'
+    ],
+    avoidZh: [
+      '不能为普通同步 scalar 解析制造新的异步边界。',
+      'lazy parser 不拥有序列、credit、取消或 iterator cleanup。'
+    ]
+  },
+  streamFinish: {
+    quickStart:
+      "import { checkRpcRuntimeStreamFinish, checkRpcRuntimeStreamIntent, checkRpcRuntimeStreamTransition } from '@migaia/rpc-contract/stream'\nimport type { IRpcRuntimeOptions, IRpcRuntimeStream } from '@migaia/rpc-contract/runtime'\n\n/** Validate a real received finish against the options retained by the stream owner. */\nexport function receiveFinish(\n  control: Pick<IRpcRuntimeStream, 'event'>, options: Pick<IRpcRuntimeOptions, 'cancel'>\n) {\n  const error = checkRpcRuntimeStreamTransition(control, options)\n  if (error) throw error\n}\n\n/** An early control is checked at its own existing held-intent boundary. */\nexport function earlyFinish(finish: boolean, options: Pick<IRpcRuntimeOptions, 'cancel'>) {\n  const error = checkRpcRuntimeStreamIntent({ finish }, options)\n  if (error) throw error\n}\n\n/** Use after the protocol owner has already observed an actual finish discriminator. */\nexport function admittedFinish(options: Pick<IRpcRuntimeOptions, 'cancel'>) {\n  const error = checkRpcRuntimeStreamFinish(options)\n  if (error) throw error\n}",
+    useEn: [
+      'A runtime stream implementation has received an actual finish control or retained early intent.',
+      'The owner checks that control against the original admitted cancellation options.'
+    ],
+    useZh: [
+      'runtime stream 实现已经收到实际 finish control 或保留 early intent。',
+      'owner 需要按原已接纳取消 options 检查该 control。'
+    ],
+    avoidEn: [
+      'Only the actual owner decides terminal transitions, cancellation and iterator cleanup.',
+      'A validation result cannot create a stream exchange or acknowledge a missing call.'
+    ],
+    avoidZh: [
+      '只有实际 owner 决定终态转换、取消与 iterator cleanup。',
+      '校验结果不能创建 stream exchange，也不能确认缺失的调用。'
+    ]
+  },
+  streamCredit: {
+    quickStart:
+      "import {\n  checkRpcStreamInitialSequence, checkRpcStreamSequence, checkRpcStreamProgress,\n  checkRpcStreamConsumerCredit, checkRpcStreamProducerCredit,\n  measurePortableStreamValue, normalizeStreamPayload, RpcStreamEvent,\n  type IRpcStreamSequence, type IRpcStreamConsumerCredit, type IRpcStreamProducerCredit\n} from '@migaia/rpc-contract/stream'\n\n/** Validate a received event before the implementation touches its held stream state. */\nexport function admitStreamPayload(value: unknown, expected: IRpcStreamSequence | undefined) {\n  const payload = normalizeStreamPayload(value)\n  const error = payload.event === RpcStreamEvent.open\n    ? checkRpcStreamInitialSequence(payload)\n    : checkRpcStreamSequence(payload, expected)\n  if (error) throw error\n  return { payload, bytes: payload.value === undefined ? 0 : measurePortableStreamValue(payload.value) }\n}\n\n/** Consumer and producer checks use different actual held resources. */\nexport function consumerCredit(payload: IRpcStreamSequence, state: IRpcStreamConsumerCredit) {\n  const error = checkRpcStreamConsumerCredit(payload, state)\n  if (error) throw error\n}\nexport function producerCredit(payload: IRpcStreamSequence, state: IRpcStreamProducerCredit) {\n  const error = checkRpcStreamProducerCredit(payload, state)\n  if (error) throw error\n}\nexport function terminalProgress(payload: IRpcStreamSequence, state: IRpcStreamSequence) {\n  const error = checkRpcStreamProgress(payload, state)\n  if (error) throw error\n}\n// The implementation still owns credit updates, cancellation and iterator cleanup.",
+    useEn: [
+      'An independent stream protocol validates actual received payloads and held exchange state.',
+      'The existing consumer/producer owner needs exact sequence, credit or item-byte admission.'
+    ],
+    useZh: [
+      '独立 stream 协议需要验证实际收到的 payload 与持有的 exchange 状态。',
+      '既有 consumer/producer owner 需要精确序列、credit 或 item 字节准入。'
+    ],
+    avoidEn: [
+      'Direction and resource cleanup remain with the existing stream owner.',
+      'Use actual held pending/busy state; received labels cannot prove protocol credit.'
+    ],
+    avoidZh: [
+      '方向与资源 cleanup 仍由既有 stream owner 管理。',
+      '使用实际持有的 pending/busy 状态，收到的标签不能证明协议 credit。'
+    ]
+  }
+}
+
+/**
+ * The frozen standalone toolkit keys each bind a concrete operation to its maintained bilingual use
+ * case.
+ */
+const rpcProtocolToolkitGuides = {
+  'rpc-contract:v1:normalizeRpcEnvelope': guide({
+    purposeEn:
+      'Validates an actual received protocol-1 envelope and returns its canonical snapshot. The receiver still owns authentication, routing and execution; Contract failures retain their native type, source/code and original cause.',
+    purposeZh:
+      '验证实际收到的 protocol-1 envelope，返回规范快照。鉴权、路由与执行仍归接收端；Contract 失败保留原生类型、source/code 与原 cause。',
+    quickStart:
+      "import { normalizeRpcEnvelope } from '@migaia/rpc-contract/v1'\nimport { classifyRpcContractError } from '@migaia/rpc-contract/errors'\n\n/** Admit real decoded protocol input before the receiver dispatches it. */\nexport function admitEnvelope(decoded: unknown) {\n  try {\n    return normalizeRpcEnvelope(decoded)\n  } catch (error) {\n    const summary = classifyRpcContractError(error)\n    if (summary) console.error(summary.code, summary.message)\n    throw error\n  }\n}\n// Diagnostic projection preserves the original failure and grants no channel or execution rights.",
+    useEn: [
+      'An independent protocol-1 receiver validates the closed envelope grammar before dispatch.',
+      'A custom carrier needs the canonical snapshot and the original coded validation failure.'
+    ],
+    useZh: [
+      '独立 protocol-1 接收方需要在 dispatch 前验证封闭 envelope grammar。',
+      '自定义载体需要规范快照与原编码校验失败。'
+    ],
+    avoidEn: [
+      'Using normalization to claim authentication, replay admission or provider execution.',
+      'Passing an unsupported runtime-envelope union through the protocol-1 validator.'
+    ],
+    avoidZh: [
+      '用归一化声称已鉴权、接纳 replay 或执行 provider。',
+      '把不受支持的 runtime-envelope union 交给 protocol-1 validator。'
+    ]
+  }),
+  'rpc-contract:binary:captureRpcBinaryData': guide({
+    ...rpcProtocolGuideContexts.binary,
+    purposeEn:
+      'Captures one actual runtime envelope synchronously and returns an opaque resource whose prepare() finishes that same snapshot later. Inline bytes are copied at capture; native backings retain their original identities.',
+    purposeZh:
+      '同步捕获一个实际 runtime envelope，返回只能通过 prepare() 完成同一快照的不透明资源。inline 字节在捕获时复制，native backing 保留原身份；不开放可变 scratch 或传输授信。'
+  }),
+  'rpc-contract:binary:prepareRpcBinary': guide({
+    ...rpcProtocolGuideContexts.binary,
+    purposeEn:
+      'Prepares a runtime envelope with the selected storage profile and actual codec, returning its canonical manifest, ordered native sidecars and complete backing-byte count. The caller supplies a whole-backing digest for native storage.',
+    purposeZh:
+      '按实际 storage profile 与持有的 codec 准备 runtime envelope，返回规范 manifest、按序 native sidecar 和完整 backing 字节数。native storage 的完整 backing 摘要由原鉴权 owner 提供。'
+  }),
+  'rpc-contract:binary:restoreRpcBinary': guide({
+    ...rpcProtocolGuideContexts.binary,
+    purposeEn:
+      'Restores a received canonical binary manifest using the already loaded codec. Native storage verifies the actual whole-backing digest and preserves backing identities; this protocol data operation does not authenticate or authorize a transport.',
+    purposeZh:
+      '用已加载的规范 codec 恢复收到的 binary manifest。native storage 校验实际完整 backing 摘要并保留 backing 身份；此协议数据操作不负责鉴权或授予 transport 权限。',
+    quickStart:
+      "import { restoreRpcBinary, RpcBinaryStorage, type IRpcBinaryDigest } from '@migaia/rpc-contract/binary'\n\n/** Restore the actual inline metadata after its carrier admits and authenticates the frame. */\nexport async function restoreInline(manifest: unknown) {\n  return await restoreRpcBinary(manifest, RpcBinaryStorage.inline, [])\n}\n\n/** The carrier supplies the real native sidecars and its actual whole-backing SHA-256 digest. */\nexport async function restoreNative(\n  manifest: unknown, sidecars: readonly ArrayBuffer[], digest: IRpcBinaryDigest\n) {\n  return await restoreRpcBinary(manifest, RpcBinaryStorage.native, sidecars, undefined, digest)\n}\n// Retain the actual backing references; restoration does not create transfer or execution rights."
+  }),
+  'rpc-contract:binary-inspect:assertRpcNativeBinaryFrameSize': guide({
+    ...rpcProtocolGuideContexts.nativeInspection,
+    purposeEn:
+      "Enforces the complete native frame limit from protected metadata, actual sidecar count and full backing bytes. It returns nothing on admission and preserves the Contract owner's native coded failure when the physical representation exceeds the limit.",
+    purposeZh:
+      '用 protected metadata、实际 sidecar 数量与完整 backing 字节数检查 native 物理帧上限。通过时无返回值；超限保留 Contract owner 的原生编码错误，不只按可见 view 长度计量。'
+  }),
+  'rpc-contract:binary-inspect:hasRpcBinaryEnvelope': guide({
+    ...rpcProtocolGuideContexts.nativeInspection,
+    purposeEn:
+      'Reads the binary-bearing proof retained by the canonical envelope normalization. It returns a boolean without recursively inspecting business payloads again; it does not negotiate storage or qualify a channel.',
+    purposeZh:
+      '读取规范 envelope 归一化时保留的二进制证明，返回布尔值而不再次递归扫描业务 payload。它不负责协商 storage，也不授予通道资格；调用者应保留原快照。'
+  }),
+  'rpc-contract:binary-inspect:isRpcBinaryIntegrityFailure': guide({
+    ...rpcProtocolGuideContexts.nativeInspection,
+    purposeEn:
+      'Classifies a real binary restoration failure caused by complete-backing length or SHA mismatch. It distinguishes local integrity evidence from structural grammar failures without replacing the error or its cause.',
+    purposeZh:
+      '分类完整 backing 长度或 SHA 不一致导致的真实二进制恢复失败，区分本地完整性事实与结构语法错误。接收实际错误，返回布尔结果，不替换错误对象或 cause。'
+  }),
+  'rpc-contract:binary-inspect:measureRpcNativeBinaryFrame': guide({
+    ...rpcProtocolGuideContexts.nativeInspection,
+    purposeEn:
+      'Counts the exact native selector, protected-metadata representation and complete backing bytes using actual sidecar count. It returns the physical byte charge without serializing caller-owned sidecars.',
+    purposeZh:
+      '按实际 sidecar 数量计算 native selector、protected metadata 表示与完整 backing 的物理字节费用，返回数字；不会序列化调用者持有的 sidecar，也不只计可见片段。'
+  }),
+  'rpc-contract:binary-inspect:readRpcNativeBinary': guide({
+    ...rpcProtocolGuideContexts.nativeInspection,
+    purposeEn:
+      'Admits a received native wrapper against the outer grammar and backing-count/size limit before expensive hashing. It returns the actual protected metadata, ordered sidecars and backing-byte total, or undefined for a non-native representation.',
+    purposeZh:
+      '在昂贵摘要前按外层语法、backing 数量与大小上限接纳收到的 native wrapper。返回真实 protected metadata、按序 sidecar 与 backing 总字节数；不是该表示时返回 undefined。'
+  }),
+  'rpc-contract:binary-inspect:rpcBinaryBackingLength': guide({
+    ...rpcProtocolGuideContexts.nativeInspection,
+    purposeEn:
+      'Reads the complete byte length from a genuine ArrayBuffer internal slot. It returns the whole backing length, including bytes outside a view, for a carrier that must account for actual transferred memory.',
+    purposeZh:
+      '从真正 ArrayBuffer 的内部 slot 读取完整字节长度，包含 view 外的 backing 字节。返回数字，供载体计量实际转移内存；不是读取调用者可覆盖的同名属性。'
+  }),
+  'rpc-contract:binary-inspect:rpcBinaryView': guide({
+    ...rpcProtocolGuideContexts.nativeInspection,
+    purposeEn:
+      'Reads a supported Uint8Array backed by a non-shared ArrayBuffer and returns its genuine backing, offset and visible length. This is a data-inspection operation and grants no ownership-transfer permission.',
+    purposeZh:
+      '读取受支持的、由非共享 ArrayBuffer 支持的 Uint8Array，返回真实 backing、offset 与可见长度。这是数据检查操作，不授予内存所有权转移权限，也不支持其它 view 域。'
+  }),
+  'rpc-contract:binary-lazy:prepareRpcBinary': guide({
+    ...rpcProtocolGuideContexts.binary,
+    purposeEn:
+      'Prepares the same canonical binary representation while allowing cold codec loading. It retains the synchronous capture point and the first native digest boundary before asynchronous completion.',
+    purposeZh:
+      '在允许冷加载 codec 的同时准备同一规范二进制表示；异步完成前保留原同步捕获点与第一次 native digest 边界。返回真实 manifest、sidecar 与 backing 计量，不重走业务图。'
+  }),
+  'rpc-contract:binary-lazy:restoreRpcBinary': guide({
+    ...rpcProtocolGuideContexts.binary,
+    purposeEn:
+      'Restores an actual received binary manifest through the canonical decoder after cold loading. It preserves the original asynchronous integrity stage and transferred backing identities; the carrier still owns authentication, admission and closure.',
+    purposeZh:
+      '冷加载后通过规范 decoder 恢复实际收到的 binary manifest，保留原异步完整性阶段与传来的 backing 身份。载体继续拥有鉴权、准入和关闭；数据恢复不授予运行时权限。'
+  }),
+  'rpc-contract:errors:deserializeRpcError': guide({
+    ...rpcProtocolGuideContexts.errors,
+    purposeEn:
+      "Validates the entire untrusted serialized error tree before reconstructing its native Error graph. It retains the accepted stack/cause/errors chain and can write validated forwarding routes to the caller's actual route map.",
+    purposeZh:
+      '在重建原生 Error 图前验证完整不可信序列化错误树，保留已接纳的 stack、cause 与 errors 链。可把验证后的 forwarding route 写入调用者实际持有的 route map，不提供注册器。'
+  }),
+  'rpc-contract:errors:fromJsonRpcError': guide({
+    ...rpcProtocolGuideContexts.errors,
+    purposeEn:
+      "Recovers the canonical RPC error extension from a JSON-RPC response, or synthesizes one bounded wire node for a foreign peer. It returns protocol error data rather than selecting the adapter's integer error code policy.",
+    purposeZh:
+      '从 JSON-RPC response 恢复规范 RPC error extension；外部 peer 没有 extension 时合成一个有界 wire node。返回协议错误数据，不替适配器选择整数错误码策略。'
+  }),
+  'rpc-contract:errors:normalizeRpcSerializedError': guide({
+    ...rpcProtocolGuideContexts.errors,
+    purposeEn:
+      'Validates and freezes a fresh wire error tree before a receiver consumes its fields. Malformed depth, shape, text or budget keeps the original Contract failure boundary; successful output is a canonical serialized error.',
+    purposeZh:
+      '在接收端使用字段前验证并冻结一份新的 wire error tree，检查深度、形状、文本与预算。成功返回规范序列化错误；非法输入保留原 Contract 失败边界与原因。'
+  }),
+  'rpc-contract:errors:reachRpcError': guide({
+    ...rpcProtocolGuideContexts.errors,
+    purposeEn:
+      "Walks the same cause and AggregateError edges used by error projection without the wire-depth limit, deduplicating object identities. The returned generator is useful for the caller's own diagnostic classification of an actual local failure.",
+    purposeZh:
+      '沿错误投影相同的 cause 与 AggregateError 边遍历真实本地失败，按对象身份去重，但不施加 wire 深度上限。返回 generator，供调用者自己的诊断分类；它不生成线上错误树。'
+  }),
+  'rpc-contract:errors:serializeRpcError': guide({
+    ...rpcProtocolGuideContexts.errors,
+    purposeEn:
+      'Projects an actual thrown value into a bounded, frozen, language-neutral error tree. The caller supplies its reporting policy and optional maps for exact held error references; transport trust and arbitrary error minting are outside this operation.',
+    purposeZh:
+      '把实际抛出值投影为有界、冻结、语言无关的错误树。调用者提供报告策略与可选的真实错误引用 maps；该操作不授予 transport trust，也不提供任意包错误铸造能力。'
+  }),
+  'rpc-contract:errors:toJsonRpcError': guide({
+    ...rpcProtocolGuideContexts.errors,
+    purposeEn:
+      'Maps a validated serialized RPC error into JSON-RPC using the integer code supplied by the bridge owner. It preserves the canonical extension instead of inventing a second error-chain or integer-code registry.',
+    purposeZh:
+      '使用 bridge owner 提供的整数 code，把已验证序列化 RPC 错误映射到 JSON-RPC，并保留规范 extension。不会建立第二份错误链或整数错误码注册表。'
+  }),
+  'rpc-contract:framing:assertRpcPhysicalFrameSize': guide({
+    ...rpcProtocolGuideContexts.physicalFrames,
+    purposeEn:
+      'Checks the whole physical encoded frame against its byte limit. It returns nothing for an admitted frame and preserves the native Contract error when one semantic envelope or batch representation exceeds the limit.',
+    purposeZh:
+      '按字节上限检查完整物理编码帧。通过时无返回值；单 envelope 或 batch 表示超限时保留 Contract 原生错误。语义成员大小不能代替完整帧计量。'
+  }),
+  'rpc-contract:framing:inspectRpcPhysicalFrame': guide({
+    ...rpcProtocolGuideContexts.physicalFrames,
+    purposeEn:
+      "Measures one complete encoded frame and returns its byte charge plus splitBatch for the caller's actual queued members. Recursive partitioning reuses that inspection; an oversize singleton retains the original native RangeError.",
+    purposeZh:
+      '计量一个完整编码帧，返回字节费用与对调用者实际排队成员使用的 splitBatch。递归划分复用同一次检查；无法继续划分的超大 singleton 保留原生 RangeError。'
+  }),
+  'rpc-contract:framing:measureRpcPhysicalFrame': guide({
+    ...rpcProtocolGuideContexts.physicalFrames,
+    purposeEn:
+      'Returns the bytes of a complete physical representation. Encoded byte carriers reuse actual bytes, while object frames measure their complete encoded form; the caller retains its original codec and queue ownership.',
+    purposeZh:
+      '返回完整物理表示的字节数。已编码字节载体复用实际 bytes，object frame 按完整编码形式计量；调用者继续持有原 codec 与队列，函数不执行发送或分片。'
+  }),
+  'rpc-contract:framing:readRpcBatchMembers': guide({
+    ...rpcProtocolGuideContexts.physicalFrames,
+    purposeEn:
+      'Reads a codec-decoded physical batch wrapper and returns its actual semantic members, or undefined when the value is not a batch. Each returned member remains independently untrusted until its own envelope normalization.',
+    purposeZh:
+      '读取 codec 解出的物理 batch wrapper，返回实际语义成员；不是 batch 时返回 undefined。每个成员仍需独立 envelope 归一化，读取 wrapper 本身不会赋予语义信任。'
+  }),
+  'rpc-contract:framing-jsonrpc:createJsonRpcFrameDecoder': guide({
+    ...rpcProtocolGuideContexts.jsonRpcFrames,
+    purposeEn:
+      'Creates a bounded incremental Content-Length decoder for an actual byte carrier. push returns complete decoded messages, finish checks a truncated terminal frame, and close releases the retained framing state.',
+    purposeZh:
+      '为实际字节载体创建有界增量 Content-Length decoder。push 返回完整解码消息，finish 检查末尾截断帧，close 释放保留的 framing 状态；载体仍拥有 I/O 与关闭动作。'
+  }),
+  'rpc-contract:framing-jsonrpc:encodeJsonRpcFrame': guide({
+    ...rpcProtocolGuideContexts.jsonRpcFrames,
+    purposeEn:
+      'Encodes one JSON-RPC value into a normalized ASCII Content-Length header and UTF-8 body in one physical write chunk. The returned Uint8Array can be written by the actual carrier without splitting the protocol representation.',
+    purposeZh:
+      '把一个 JSON-RPC 值编码为规范 ASCII Content-Length header 与 UTF-8 body，返回可由实际载体一次写出的 Uint8Array。它不拥有 socket，也不建立 hello 或调用关联状态。'
+  }),
+  'rpc-contract:framing-stream:createRpcBootstrapFrameReceiver': guide({
+    ...rpcProtocolGuideContexts.bootstrapHandoff,
+    purposeEn:
+      'Creates the bootstrap-to-handshake receive handoff for a custom complete-frame carrier. It retains the bootstrap Promise and at most one following handshake frame; attach/activate hand off to the real consumer, while fail preserves the original carrier error.',
+    purposeZh:
+      '为自定义完整帧载体创建 bootstrap 到 handshake 的接收交接，保留 bootstrap Promise 与至多一个后续 handshake frame。attach/activate 交给实际消费者；fail 使用原载体错误。'
+  }),
+  'rpc-contract:framing-stream:createRpcHandshakeFrameReceiver': guide({
+    ...rpcProtocolGuideContexts.handshakeFrames,
+    purposeEn:
+      'Creates a protocol receiver with the actual retained role options. It reads the handshake text, retains pre-activation traffic and hands it off only after the carrier activates; close retains the actual cancellation or failure reason.',
+    purposeZh:
+      '使用实际保留的 role options 创建协议 receiver，读取 handshake 文本并保留激活前流量；仅在载体 activate 后交接。close 使用实际取消或失败原因，不拥有 native 执行资源。'
+  }),
+  'rpc-contract:framing-stream:createRpcStreamFrameDecoderWithLimit': guide({
+    ...rpcProtocolGuideContexts.streamFrames,
+    purposeEn:
+      "Creates a length-prefixed incremental decoder whose live phase limit is read before payload allocation. Complete frames and the first malformed-frame error go to the carrier's existing callbacks; finish and close preserve its framing lifecycle.",
+    purposeZh:
+      '创建长度前缀增量 decoder，在分配 payload 前读取载体当前阶段上限。完整 frame 与第一个非法帧错误交原回调；finish 与 close 保留 framing 生命周期，不引入新的接收策略。'
+  }),
+  'rpc-contract:framing-stream:encodeRpcStreamTextFrame': guide({
+    ...rpcProtocolGuideContexts.streamFrames,
+    purposeEn:
+      "Uses the caller's actual text encoder to emit the final length-prefixed process frame, optionally reusing provided storage. The returned bytes retain the connection's existing backing ownership and physical-message boundary.",
+    purposeZh:
+      '使用调用者实际 text encoder 生成最终长度前缀进程帧，可复用提供的 storage。返回字节保持连接原 backing 所有权与物理消息边界；函数本身不发送或关闭连接。'
+  }),
+  'rpc-contract:handshake:acceptRpcHandshake': guide({
+    ...rpcProtocolGuideContexts.handshakeData,
+    purposeEn:
+      "Negotiates common protocol version, codec and capabilities from the responder's actual offer and received hello. It returns an acceptance reply/agreement or a rejection reply/original error without retaining the received input in diagnostics.",
+    purposeZh:
+      '按 responder 的实际 offer 与收到的 hello 协商共同协议版本、codec 和 capabilities，返回 acceptance reply/agreement 或 rejection reply/原错误。诊断不保留收到的输入；仍需实际载体鉴权。'
+  }),
+  'rpc-contract:handshake:completeRpcHandshake': guide({
+    ...rpcProtocolGuideContexts.handshakeData,
+    purposeEn:
+      "Verifies a responder's actual reply against the initiator's retained local offer and returns the negotiated agreement. Unsupported choices reject at the canonical Contract boundary without creating channel or execution authority.",
+    purposeZh:
+      '按 initiator 保留的本地 offer 验证 responder 实际 reply，返回协商 agreement。无法接受的选择在规范 Contract 边界拒绝，不因此创建通道或执行权限。'
+  }),
+  'rpc-contract:handshake:createRpcHello': guide({
+    ...rpcProtocolGuideContexts.handshakeData,
+    purposeEn:
+      "Encodes the initiator's local protocol offer into the first-channel UTF-8 JSON hello text. Invalid offers preserve the bounded redacted failure policy instead of retaining the caller's original token or data subtree.",
+    purposeZh:
+      '把 initiator 本地协议 offer 编码为首通道 UTF-8 JSON hello 文本。非法 offer 保留有界脱敏失败策略，不保留调用者原 token 或数据子树；返回文本供实际载体发送。'
+  }),
+  'rpc-contract:handshake:normalizeRpcHandshake': guide({
+    ...rpcProtocolGuideContexts.handshakeData,
+    purposeEn:
+      'Validates received first-channel handshake text or bytes into the closed hello/accept/reject union. Invalid syntax or fields retain only the bounded diagnostic summary; normalization itself grants no authenticated peer identity.',
+    purposeZh:
+      '把收到的首通道 handshake 文本或 bytes 验证为封闭 hello/accept/reject union。非法语法或字段只保留有界诊断摘要；归一化本身不赋予已鉴权 peer 身份。'
+  }),
+
+  'rpc-contract:portable:normalizePortable': guide({
+    ...rpcProtocolGuideContexts.portableValues,
+    purposeEn:
+      'Validates and snapshots a portable value using the existing wire profile, recursion bound and ordinary-field read points. It returns canonical wire-compatible data and keeps the original native failure for unsupported values or cycles.',
+    purposeZh:
+      '按既有 wire profile、递归上限与普通字段读取点验证并快照 portable value，返回规范 wire-compatible 数据。不可支持的值或循环保持原生失败；不是为载体增加新 codec。'
+  }),
+
+  'rpc-contract:runtime:normalizeRuntimeEnvelope': guide({
+    ...rpcProtocolGuideContexts.runtimeData,
+    purposeEn:
+      'Synchronously validates the complete runtime-envelope union and snapshots its business slots at the original parser boundary. It returns a canonical runtime envelope or the original native coded error before dispatch touches application state.',
+    purposeZh:
+      '在原 parser 边界同步验证完整 runtime envelope union，并快照业务 slot。返回规范 runtime envelope 或原生编码错误；在 dispatch 接触应用状态前完成，不替调用方改变控制权。'
+  }),
+  'rpc-contract:runtime:normalizeRuntimeGeneration': guide({
+    ...rpcProtocolGuideContexts.runtimeData,
+    purposeEn:
+      'Snapshots the closed generation fields as nonnegative safe integers issued by their real owners. The returned protocol data can be compared by an implementation, but copying it never grants launch, replay or replacement authority.',
+    purposeZh:
+      '把封闭 generation 字段快照为真实 owner 发出的非负安全整数，返回供协议实现比较的数据。复制 generation 不会取得 launch、replay 或 replacement 权限。'
+  }),
+  'rpc-contract:runtime:normalizeRuntimeSteps': guide({
+    ...rpcProtocolGuideContexts.runtimeData,
+    purposeEn:
+      'Validates the actual closed request-only group steps and snapshots each portable business input once. It returns the canonical ordered step list without running providers, retrying a call or rolling back previously executed effects.',
+    purposeZh:
+      '验证实际封闭 request-only group steps，并把每个 portable 业务输入快照一次，返回规范有序步骤列表。不会运行 provider、重试调用，也不会回滚已发生的副作用。'
+  }),
+  'rpc-contract:runtime:readRuntimeCarrier': guide({
+    ...rpcProtocolGuideContexts.runtimeData,
+    purposeEn:
+      'Reads only the fixed runtime selector from a received carrier representation. A selected object has two own data fields, and the returned frame remains opaque protection output until the canonical authentication owner consumes it.',
+    purposeZh:
+      '只读取收到的 carrier 表示中的固定 runtime selector。选中对象具有两个自有 data fields，返回 frame 在规范鉴权 owner 消费前仍是 opaque protection output，不携带权限授信。'
+  }),
+  'rpc-contract:runtime:runtimeOperationCapabilities': guide({
+    ...rpcProtocolGuideContexts.runtimeData,
+    purposeEn:
+      'Returns the exact AND capability dependencies of the explicitly selected runtime operation and options. It does not infer an offer closure, mutate negotiation or authorize an operation merely because a label is present.',
+    purposeZh:
+      '返回显式选择 runtime operation 与 options 的精确 AND capability 依赖列表。不会推导 offer closure、修改协商，也不会因标签存在就授予操作权；实际 channel 仍负责验证。'
+  }),
+  'rpc-contract:runtime:wrapRuntimeCarrier': guide({
+    ...rpcProtocolGuideContexts.runtimeData,
+    purposeEn:
+      "Adds the fixed parser selector while preserving the original protection output's value category. It returns carrier data for the existing receiver and creates no batch, replay, codec or execution trust facts.",
+    purposeZh:
+      '在保留原 protection output 值类别的同时附加固定 parser selector，返回供既有接收端使用的 carrier 数据。不会创建 batch、replay、codec 或执行授信事实。'
+  }),
+  'rpc-contract:runtime-lazy:normalizeRuntimeEnvelope': guide({
+    ...rpcProtocolGuideContexts.lazyParsing,
+    purposeEn:
+      'Normalizes the same complete runtime-envelope union while letting only its actual stream branch cold-load the canonical parser. It returns the existing synchronous value or a Promise at that cold boundary; rejection retains the original cause.',
+    purposeZh:
+      '归一化同一完整 runtime envelope union，仅让实际 stream 分支冷加载规范 parser。返回既有同步值，或在该冷边界返回 Promise；拒绝保留原 cause，不为普通 scalar 分支制造异步加载。'
+  }),
+  'rpc-contract:runtime-lazy:normalizeStreamPayload': guide({
+    ...rpcProtocolGuideContexts.lazyParsing,
+    purposeEn:
+      "Shares the canonical stream payload parser through the receiver's existing asynchronous continuation. It returns the canonical payload or a cold-load Promise and keeps the original parsing error and actual stream-owner state separate.",
+    purposeZh:
+      '通过 receiver 既有异步 continuation 复用规范 stream payload parser，返回规范 payload 或冷加载 Promise。保留原解析错误；解析数据与实际 stream owner 状态仍分开。'
+  }),
+  'rpc-contract:stream:checkRpcRuntimeStreamFinish': guide({
+    ...rpcProtocolGuideContexts.streamFinish,
+    purposeEn:
+      'Checks the actual admitted call options after the protocol owner has observed a finish control. It returns the original coded protocol Error or undefined, leaving cancellation, terminal state and cleanup to that owner.',
+    purposeZh:
+      '在协议 owner 已观察到 finish control 后检查实际已接纳调用 options，返回原编码协议 Error 或 undefined。取消、终态和 cleanup 继续由该 owner 管理，不以数据检查代替状态转换。'
+  }),
+  'rpc-contract:stream:checkRpcRuntimeStreamIntent': guide({
+    ...rpcProtocolGuideContexts.streamFinish,
+    purposeEn:
+      'Checks an actual retained early-control finish intent against its call options. It returns the existing protocol Error or undefined while retaining the original discriminator and short-circuit behavior.',
+    purposeZh:
+      '按实际调用 options 检查保留的 early-control finish intent，返回既有协议 Error 或 undefined，并保留原 discriminator 与短路读取行为；不会替 owner 创建早期控制状态。'
+  }),
+  'rpc-contract:stream:checkRpcRuntimeStreamTransition': guide({
+    ...rpcProtocolGuideContexts.streamFinish,
+    purposeEn:
+      "Checks a real runtime stream finish event against its start options; other controls do not consume this rule. It returns the original protocol Error or undefined without moving the owner's stream state or releasing its resources.",
+    purposeZh:
+      '按 start options 检查真实 runtime stream finish event，其它 control 不使用该规则。返回原协议 Error 或 undefined，不移动 owner 的 stream 状态，也不释放资源。'
+  }),
+  'rpc-contract:stream:checkRpcStreamConsumerCredit': guide({
+    ...rpcProtocolGuideContexts.streamCredit,
+    purposeEn:
+      "Checks one received consumer response against the stream owner's actual pending credit and sequence. It returns the original protocol Error or undefined and reads pending credit only after the sequence matches.",
+    purposeZh:
+      '按 stream owner 实际 pending credit 与序列检查一次收到的 consumer response。返回原协议 Error 或 undefined；仅在序列匹配后读取 credit，状态更新与 iterator cleanup 仍由原 owner 执行。'
+  }),
+  'rpc-contract:stream:checkRpcStreamInitialSequence': guide({
+    ...rpcProtocolGuideContexts.streamCredit,
+    purposeEn:
+      "Checks an actual received open frame against the protocol's initial sequence. It returns the original coded stream Error or undefined before the implementation installs or advances its stream exchange.",
+    purposeZh:
+      '按协议初始序列检查实际收到的 open frame，在实现安装或推进 stream exchange 前返回原编码 stream Error 或 undefined；不会替调用者登记 exchange。'
+  }),
+  'rpc-contract:stream:checkRpcStreamProducerCredit': guide({
+    ...rpcProtocolGuideContexts.streamCredit,
+    purposeEn:
+      "Checks one producer pull against the owner's actual sequence and in-flight busy state. It returns the original protocol Error or undefined, preserving sequence-before-busy reads without starting another producer operation.",
+    purposeZh:
+      '按 owner 的实际序列与 in-flight busy 状态检查一次 producer pull，返回原协议 Error 或 undefined，保留先序列后 busy 的读取顺序，不启动另一个 producer operation。'
+  }),
+  'rpc-contract:stream:checkRpcStreamProgress': guide({
+    ...rpcProtocolGuideContexts.streamCredit,
+    purposeEn:
+      "Checks terminal stream progress against the owner's actual sequence. A runtime terminal notification can advance past discarded items but cannot go backwards; the result is the original Error or undefined, not a state mutation.",
+    purposeZh:
+      '按 owner 实际序列检查 stream terminal progress。runtime terminal notification 可推进到被丢弃 item 之后但不能倒退；返回原 Error 或 undefined，不改变状态。'
+  }),
+  'rpc-contract:stream:checkRpcStreamSequence': guide({
+    ...rpcProtocolGuideContexts.streamCredit,
+    purposeEn:
+      'Checks one actual frame against a held stream exchange sequence. An absent exchange cannot acknowledge cancellation; the function returns the original coded Error or undefined while leaving exchange lifetime to the implementation.',
+    purposeZh:
+      '按持有的 stream exchange 序列检查一次实际 frame。缺失 exchange 不能确认取消；返回原编码 Error 或 undefined，exchange 的寿命仍由原协议实现维护。'
+  }),
+  'rpc-contract:stream:measurePortableStreamValue': guide({
+    ...rpcProtocolGuideContexts.streamCredit,
+    purposeEn:
+      'Returns the JSON-compatible byte charge of a normalized portable stream item. It is independent of the selected codec, route header and key order, so the stream owner can apply its existing per-item budget consistently.',
+    purposeZh:
+      '返回已归一化 portable stream item 的 JSON-compatible 字节费用，与所选 codec、route header 和 key 顺序无关。stream owner 据此应用原逐项预算，不用完整帧大小替代 item 计量。'
+  }),
+  'rpc-contract:stream:normalizeStreamPayload': guide({
+    ...rpcProtocolGuideContexts.streamCredit,
+    purposeEn:
+      "Validates a received stream event shape and portable-value budget before the stream owner touches held sequence or credit. It returns a canonical payload; direction, cancellation and lifecycle remain the existing stream owner's responsibility.",
+    purposeZh:
+      '在 stream owner 接触持有的序列或 credit 前验证收到的 event 形状与 portable value 预算，返回规范 payload。方向、取消和生命周期仍由既有 stream owner 负责。'
+  })
+}
+
 export const rpcApiGuides = {
+  ...rpcProtocolToolkitGuides,
   ...rpcContractGuides,
   ...webRpcCoreGuides,
   ...webRpcErrorGuides,
+  ...rpcPublicErrorGuides,
   ...webRpcConstantGuides
 } as const

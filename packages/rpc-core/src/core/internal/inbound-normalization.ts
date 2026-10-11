@@ -1,0 +1,88 @@
+import { createRpcProtocolError } from '../errors.js'
+import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
+import { normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime/lazy'
+import { normalizePortable } from '@migaia/rpc-contract/portable'
+import { restoreRpcBinary } from '@migaia/rpc-contract/binary/lazy'
+import type { IRpcEnvelopeOptions, IRpcProtocol } from '@migaia/rpc-contract'
+import type { IRpcEnvelope } from '@migaia/rpc-contract'
+import type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract/runtime'
+import { RpcEnvelopeKind } from '@migaia/rpc-contract/wire'
+import { RpcRuntimeKind } from '@migaia/rpc-contract/wire'
+
+import { RpcCoreErrorText } from '../error-text.js'
+
+/** Complete receiver validation proves only exact immutable data, never endpoint authority. */
+const inboundPayloads = new WeakMap<object, IRpcEnvelope | IRpcRuntimeEnvelope>()
+
+/** Retain actual provider payload roots only after the whole canonical operation succeeded. */
+function rememberPayload<T extends IRpcEnvelope | IRpcRuntimeEnvelope>(envelope: T): T {
+  /** Opaque legacy variation deliberately has no portable payload proof. */
+  const payload =
+    'data' in envelope
+      ? envelope.kind === RpcEnvelopeKind.variation
+        ? undefined
+        : envelope.data.payload
+      : envelope.kind === RpcRuntimeKind.group
+        ? envelope.steps
+        : 'payload' in envelope
+          ? envelope.payload
+          : undefined
+  if (payload !== null && typeof payload === 'object') inboundPayloads.set(payload, envelope)
+  if (envelope.kind === RpcRuntimeKind.group)
+    for (const step of envelope.steps)
+      if (step.payload !== null && typeof step.payload === 'object')
+        inboundPayloads.set(step.payload, envelope)
+  return envelope
+}
+
+/** Capture a custom method once and preserve its receiver; only the canonical function records. */
+export function normalizeInboundRpcEnvelope(
+  value: unknown,
+  protocol: IRpcProtocol<IRpcEnvelope, string, number>,
+  options?: IRpcEnvelopeOptions
+): IRpcEnvelope {
+  /** The same one-read function decides both execution and canonical ownership. */
+  const normalize = protocol.normalize
+  /** Reflect.apply retains the original protocol receiver without a second getter read. */
+  const envelope = Reflect.apply(normalize, protocol, [value, options]) as IRpcEnvelope
+  return normalize === normalizeRpcEnvelope ? rememberPayload(envelope) : envelope
+}
+
+/** Preserve the canonical lazy stream branch while recording only its successful final result. */
+function retainRuntimeEnvelope(
+  envelope: IRpcRuntimeEnvelope | Promise<IRpcRuntimeEnvelope>
+): IRpcRuntimeEnvelope | Promise<IRpcRuntimeEnvelope> {
+  return envelope instanceof Promise ? envelope.then(rememberPayload) : rememberPayload(envelope)
+}
+
+/** Text receive retains its original portable grammar and unsupported-binary failure. */
+export function normalizeInboundRuntimeEnvelope(
+  value: unknown
+): IRpcRuntimeEnvelope | Promise<IRpcRuntimeEnvelope> {
+  return retainRuntimeEnvelope(
+    normalizeRuntimeEnvelope(value, (payload) =>
+      normalizePortable(payload, 0, new Set<object>(), () => {
+        throw createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
+      })
+    )
+  )
+}
+
+/** Inline restoration keeps the original subsequent portable validation and records that output. */
+export function normalizeInboundRuntimeBinaryEnvelope(
+  value: unknown
+): IRpcRuntimeEnvelope | Promise<IRpcRuntimeEnvelope> {
+  return retainRuntimeEnvelope(normalizeRuntimeEnvelope(value))
+}
+
+/** The canonical lazy parser validates all bytes and digests before its exact output is reusable. */
+export async function restoreInboundRuntimeBinary(
+  ...input: Parameters<typeof restoreRpcBinary>
+): Promise<IRpcRuntimeEnvelope> {
+  return rememberPayload(await restoreRpcBinary(...input))
+}
+
+/** Queries receiver data identity without granting insertion or any transport/provider authority. */
+export function isInboundNormalizedPayload(value: object): boolean {
+  return inboundPayloads.has(value)
+}

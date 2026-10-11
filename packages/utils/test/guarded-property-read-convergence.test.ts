@@ -60,8 +60,8 @@ describe('guarded property read convergence', () => {
 
     const targets = [
       'packages/utils/src/function.ts',
-      'packages/rpc/src/core/internal/safe-value.ts',
-      'packages/rpc/src/contract/error.ts',
+      'packages/rpc-core/src/core/internal/safe-value.ts',
+      'packages/rpc-contract/src/contract/error.ts',
       'packages/reactive/src/runtime/runtime.class.ts',
       'packages/reactive/src/runtime/scheduler.class.ts',
       'packages/resource/src/resource.class.ts'
@@ -77,7 +77,7 @@ describe('guarded property read convergence', () => {
         expect(source).toContain('tryReadProperty(')
         expect(source).not.toContain('function inspectThenable')
       } else expect(source).toContain('tryReadProperty(')
-      if (path.startsWith('packages/rpc/')) expect(source).toContain("from '@migaia/utils/error'")
+      if (path.startsWith('packages/rpc-')) expect(source).toContain("from '@migaia/utils/error'")
       if (path === 'packages/utils/src/function.ts') expect(source).toContain("from './error.js'")
     }
 

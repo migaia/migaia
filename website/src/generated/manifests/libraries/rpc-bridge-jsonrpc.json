@@ -1,0 +1,521 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "rpc-bridge-jsonrpc",
+    "description": "RPC bridge-jsonrpc owner.",
+    "version": "0.0.7",
+    "exports": ["."],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-rpc-bridge-jsonrpc",
+            "heading": "@migaia/rpc-bridge-jsonrpc",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "外部语言 JSON-RPC。使用 `createJsonRpcRemoteChannel` 绑定 `@migaia/rpc-process` 提供的实际有序字节通道；普通 framing 工具来自 `@migaia/rpc-contract/framing/jsonrpc`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不发布；仓内消费方直接导入各公开包。同一 realm 的第二份模块实例在取得资源前抛出 native Error，source 为 `@migaia/rpc/core`、code 为 `DUPLICATE_MODULE_INSTANCE`；修复依赖解析并重载 realm。不同 Worker realm 独立。既有六个语义 source、wire 与错误身份保持不变。"
+              },
+              {
+                "type": "paragraph",
+                "text": "完整使用边界见 USEGUIDE。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "migaia-rpc-bridge-jsonrpc-使用指南",
+            "heading": "@migaia/rpc-bridge-jsonrpc 使用指南",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "使用 `createJsonRpcRemoteChannel` 绑定 `@migaia/rpc-process` 提供的实际有序字节通道；普通 framing 工具来自 `@migaia/rpc-contract/framing/jsonrpc`。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\nimport { encodeJsonRpcFrame, createJsonRpcFrameDecoder } from '@migaia/rpc-contract/framing/jsonrpc'"
+              },
+              {
+                "type": "paragraph",
+                "text": "此包仅用于外部语言 peer。握手、相关 ID、已协商 batch、invoke/cancel 与错误链沿原 JSON-RPC profile 执行；不为不支持的 stream 或 transfer 模式增加 fallback。非法 frame、UTF-8 或 JSON 仍终止连接，cancel 不新增 ACK。Core 的完整通道操作保留实际 transport、object port 与 batch 状态。"
+              },
+              {
+                "type": "paragraph",
+                "text": "RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不发布；仓内消费方直接导入各公开包。同一 realm 的第二份模块实例在取得资源前抛出 native Error，source 为 `@migaia/rpc/core`、code 为 `DUPLICATE_MODULE_INSTANCE`；修复依赖解析并重载 realm。不同 Worker realm 独立。既有六个语义 source、wire 与错误身份保持不变。"
+              },
+              {
+                "type": "paragraph",
+                "text": "包内使用相对路径；跨包调用只使用公开 API。协议工具使用 `@migaia/rpc-contract`，Core/Remote/Testing 使用 `@migaia/rpc-core` 的普通入口。"
+              },
+              {
+                "type": "paragraph",
+                "text": "从包根导入 `JSONRPC_BRIDGE_ERROR_SOURCE` 和 `JsonRpcBridgeErrorCode`，用原 `@migaia/rpc/bridge/jsonrpc` source 与 code 识别 frame/profile/扩展/握手失败。`JsonRpcBridgeErrorText` 已从公开面删除，这是更名后包的破坏性导出变更。外部语言 peer 通过 `@migaia/rpc-contract/errors` 的 `toJsonRpcError`、`fromJsonRpcError` 和 `RpcJsonRpcWireError.dataKey` 保留完整 wire 错误树；JSON-RPC 整数 code 仍由 peer profile 决定。消息与 wire source/code 均不授予 Core 运行时权限。"
+              }
+            ]
+          },
+          {
+            "id": "advanced-usage-把真实字节连接接入-runtime-peer",
+            "heading": "Advanced usage：把真实字节连接接入 Runtime Peer",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "外部语言服务先在自己的连接上实现 `migaia.hello`、`migaia.describe`、`migaia.invoke` 与 `migaia.cancel`，并在实际 v2 目录公开 `echo`。应用取得真实有序 `heldByteIO`，由自己的认证 issuer 提供 `issuedToken`；`remoteContract` 是该服务现有的本地声明，`localOffer` 是受支持 JSON-RPC profile 的真实本端提案。它们是协议输入，不能给其它 transport 授 owned 或 native 控制权限。"
+              },
+              {
+                "type": "paragraph",
+                "text": "下面从已存在的完整 bridge channel 操作接入普通 Runtime Peer："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\nimport { createRuntimePeer } from '@migaia/rpc-core/remote'\n\n/** 类型对应外部服务实际公开的 echo，不代替其握手目录或鉴权。 */\ntype IForeignApi = { echo: (payload: readonly string[]) => readonly string[] }\n\n/** Peer 只拥有这条已取得字节连接；本端身份与实际 offer 相同。 */\nconst peer = await createRuntimePeer<IForeignApi>({\n  self: { name: 'foreign-client', instanceId: localOffer.peer.id },\n  connect: () =>\n    createJsonRpcRemoteChannel({\n      byte: heldByteIO,\n      peerId,\n      target: { kind: 'plugin', contract: remoteContract },\n      offer: localOffer,\n      token: issuedToken,\n      scheduler,\n      wallClock,\n      ipc,\n      report\n    }),\n  report\n})\ntry {\n  console.log(await peer.request('echo', ['hello']))\n} finally {\n  await peer.close()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`heldByteIO` 是 Process 包产生的实际 `IProcessByteChannel`，有序 write 的完成必须反映真实物理写入；不能把日志或复制 DTO 当通道。`peerId` 指向这条连接的实际对端，`scheduler`、`wallClock`、`ipc` 和 `report` 来自应用现有生命周期与报告策略。`localOffer` 只包含支持的 bridge capabilities，库在自己的握手边界加入 JSON codec 和必需扩展；不宣称原生进程控制、stream 或 transfer。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`connect` 创建并完成原认证 hello 后才向 Runtime Peer 交出该 channel。Core 继续拥有 framing、相关 ID、已协商 batch、错误链与 gated transport；业务只调用真实目录允许的 request/notify。非法 frame、UTF-8、JSON 或不支持的 mode 沿既有代码拒绝，`report` 保留原错误链，不能将失败消息解释成安全重执许可。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`peer.close()` 关闭本端通道并清理原监听/drain 资源；这个 connect source 不拥有外部进程的执行权限。若应用另外用 launcher 创建了服务，服务的 terminate/exited 仍交该 launcher owner 收尾，不因 bridge 成功或对端名称就转移控制权。"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "rpc-bridge-jsonrpc:index",
+      "library": "rpc-bridge-jsonrpc",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-bridge-jsonrpc/getting-started",
+      "architecturePath": "/en/architecture/rpc-bridge-jsonrpc",
+      "symbols": [
+        {
+          "name": "createJsonRpcRemoteChannel",
+          "kind": "function",
+          "signature": "export declare function createJsonRpcRemoteChannel(options: IJsonRpcBridgeOptions): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>;",
+          "declarationLine": 7,
+          "source": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/index.d.ts",
+          "purpose": "Construct the foreign-language channel and retain the Core owner's exact Promise.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createJsonRpcRemoteChannel.",
+          "advanced": "No additional advanced behavior is declared for createJsonRpcRemoteChannel.",
+          "parameters": ["options: IJsonRpcBridgeOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IJsonRpcBridgeOptions",
+              "optional": false
+            }
+          ],
+          "returns": "Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>",
+          "errors": ["No documented errors are declared for createJsonRpcRemoteChannel."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createJsonRpcRemoteChannel.",
+          "examples": [
+            "import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\nimport { createRuntimePeer } from '@migaia/rpc-core/remote'\n\n/** 类型对应外部服务实际公开的 echo，不代替其握手目录或鉴权。 */\ntype IForeignApi = { echo: (payload: readonly string[]) => readonly string[] }\n\n/** Peer 只拥有这条已取得字节连接；本端身份与实际 offer 相同。 */\nconst peer = await createRuntimePeer<IForeignApi>({\n  self: { name: 'foreign-client', instanceId: localOffer.peer.id },\n  connect: () =>\n    createJsonRpcRemoteChannel({\n      byte: heldByteIO,\n      peerId,\n      target: { kind: 'plugin', contract: remoteContract },\n      offer: localOffer,\n      token: issuedToken,\n      scheduler,\n      wallClock,\n      ipc,\n      report\n    }),\n  report\n})\ntry {\n  console.log(await peer.request('echo', ['hello']))\n} finally {\n  await peer.close()\n}"
+          ],
+          "members": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createJsonRpcRemoteChannel(options: IJsonRpcBridgeOptions): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IJsonRpcBridgeOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>"
+          ],
+          "whenToUse": "Use createJsonRpcRemoteChannel when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createJsonRpcRemoteChannel does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Construct the foreign-language channel and retain the Core owner's exact Promise."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createJsonRpcRemoteChannel from @migaia/rpc-bridge-jsonrpc, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createJsonRpcRemoteChannel when its function contract and declared inputs match the result you need. Choose a different public symbol when createJsonRpcRemoteChannel does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createJsonRpcRemoteChannel."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createJsonRpcRemoteChannel."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/index.d.ts:createJsonRpcRemoteChannel:export declare function createJsonRpcRemoteChannel(options: IJsonRpcBridgeOptions): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>;",
+          "guidance": [],
+          "usageScore": 30,
+          "configuration": [],
+          "fragment": "rpc-bridge-jsonrpc-index--createJsonRpcRemoteChannel"
+        },
+        {
+          "name": "IJsonRpcBridgeErrorCode",
+          "kind": "type",
+          "signature": "export type IJsonRpcBridgeErrorCode = (typeof JsonRpcBridgeErrorCode)[keyof typeof JsonRpcBridgeErrorCode];",
+          "declarationLine": 16,
+          "source": "packages/rpc-contract/dist/contract/framing/jsonrpc-error-code.d.ts",
+          "purpose": "IJsonRpcBridgeErrorCode is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IJsonRpcBridgeErrorCode.",
+          "advanced": "No additional advanced behavior is declared for IJsonRpcBridgeErrorCode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IJsonRpcBridgeErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IJsonRpcBridgeErrorCode.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IJsonRpcBridgeErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IJsonRpcBridgeErrorCode = (typeof JsonRpcBridgeErrorCode)[keyof typeof JsonRpcBridgeErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IJsonRpcBridgeErrorCode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IJsonRpcBridgeErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IJsonRpcBridgeErrorCode is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IJsonRpcBridgeErrorCode from @migaia/rpc-bridge-jsonrpc, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IJsonRpcBridgeErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IJsonRpcBridgeErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IJsonRpcBridgeErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IJsonRpcBridgeErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-bridge-jsonrpc:packages/rpc-contract/dist/contract/framing/jsonrpc-error-code.d.ts:IJsonRpcBridgeErrorCode:export type IJsonRpcBridgeErrorCode = (typeof JsonRpcBridgeErrorCode)[keyof typeof JsonRpcBridgeErrorCode];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-bridge-jsonrpc-index--IJsonRpcBridgeErrorCode"
+        },
+        {
+          "name": "IJsonRpcBridgeOptions",
+          "kind": "type",
+          "signature": "export type IJsonRpcBridgeOptions = Readonly<{ byte: IProcessByteChannel; peerId: string; target: Readonly<{ kind: 'plugin'; contract: IRemoteContract; }> | Readonly<{ kind: 'host'; catalog: IRemoteHostCatalog; }>; offer: Omit<IRpcHandshakeOffer, 'auth' | 'codecs'>; token: string; scheduler: IScheduler; wallClock: IWallClock; ipc: IProcessCommonOptions['ipc']; signal?: AbortSignal; handshakeTimeoutMs?: number; report(error: unknown): void; }>;",
+          "declarationLine": 6,
+          "source": "packages/rpc-core/dist/adapter-owned/jsonrpc/handshake.d.ts",
+          "purpose": "Caller owns launch, authentication issuance, clocks and the physical byte connection.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IJsonRpcBridgeOptions.",
+          "advanced": "No additional advanced behavior is declared for IJsonRpcBridgeOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IJsonRpcBridgeOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IJsonRpcBridgeOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IJsonRpcBridgeOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IJsonRpcBridgeOptions = Readonly<{ byte: IProcessByteChannel; peerId: string; target: Readonly<{ kind: 'plugin'; contract: IRemoteContract; }> | Readonly<{ kind: 'host'; catalog: IRemoteHostCatalog; }>; offer: Omit<IRpcHandshakeOffer, 'auth' | 'codecs'>; token: string; scheduler: IScheduler; wallClock: IWallClock; ipc: IProcessCommonOptions['ipc']; signal?: AbortSignal; handshakeTimeoutMs?: number; report(error: unknown): void; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IJsonRpcBridgeOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IJsonRpcBridgeOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Caller owns launch, authentication issuance, clocks and the physical byte connection."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IJsonRpcBridgeOptions from @migaia/rpc-bridge-jsonrpc, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IJsonRpcBridgeOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IJsonRpcBridgeOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IJsonRpcBridgeOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IJsonRpcBridgeOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-bridge-jsonrpc:packages/rpc-core/dist/adapter-owned/jsonrpc/handshake.d.ts:IJsonRpcBridgeOptions:export type IJsonRpcBridgeOptions = Readonly<{ byte: IProcessByteChannel; peerId: string; target: Readonly<{ kind: 'plugin'; contract: IRemoteContract; }> | Readonly<{ kind: 'host'; catalog: IRemoteHostCatalog; }>; offer: Omit<IRpcHandshakeOffer, 'auth' | 'codecs'>; token: string; scheduler: IScheduler; wallClock: IWallClock; ipc: IProcessCommonOptions['ipc']; signal?: AbortSignal; handshakeTimeoutMs?: number; report(error: unknown): void; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-bridge-jsonrpc-index--IJsonRpcBridgeOptions"
+        },
+        {
+          "name": "IProcessByteChannel",
+          "kind": "type",
+          "signature": "export type IProcessByteChannel = Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "declarationLine": 15,
+          "source": "packages/rpc-core/dist/adapter-owned/process/types.d.ts",
+          "purpose": "Byte channels expose one ordered, backpressured physical stream.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessByteChannel.",
+          "advanced": "No additional advanced behavior is declared for IProcessByteChannel.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IProcessByteChannel."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IProcessByteChannel.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IProcessByteChannel",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IProcessByteChannel = Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IProcessByteChannel when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IProcessByteChannel does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Byte channels expose one ordered, backpressured physical stream."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IProcessByteChannel from @migaia/rpc-bridge-jsonrpc, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IProcessByteChannel when its type contract and declared inputs match the result you need. Choose a different public symbol when IProcessByteChannel does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessByteChannel."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IProcessByteChannel."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-bridge-jsonrpc:packages/rpc-core/dist/adapter-owned/process/types.d.ts:IProcessByteChannel:export type IProcessByteChannel = Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-bridge-jsonrpc-index--IProcessByteChannel"
+        },
+        {
+          "name": "JSONRPC_BRIDGE_ERROR_SOURCE",
+          "kind": "const",
+          "signature": "export declare const JSONRPC_BRIDGE_ERROR_SOURCE = \"@migaia/rpc/bridge/jsonrpc\";",
+          "declarationLine": 2,
+          "source": "packages/rpc-contract/dist/contract/framing/jsonrpc-error-code.d.ts",
+          "purpose": "Dedicated public source separates bridge protocol failures from core and process failures.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for JSONRPC_BRIDGE_ERROR_SOURCE.",
+          "advanced": "No additional advanced behavior is declared for JSONRPC_BRIDGE_ERROR_SOURCE.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for JSONRPC_BRIDGE_ERROR_SOURCE."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for JSONRPC_BRIDGE_ERROR_SOURCE.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "JSONRPC_BRIDGE_ERROR_SOURCE",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const JSONRPC_BRIDGE_ERROR_SOURCE = \"@migaia/rpc/bridge/jsonrpc\";"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use JSONRPC_BRIDGE_ERROR_SOURCE when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when JSONRPC_BRIDGE_ERROR_SOURCE does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Dedicated public source separates bridge protocol failures from core and process failures."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import JSONRPC_BRIDGE_ERROR_SOURCE from @migaia/rpc-bridge-jsonrpc, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use JSONRPC_BRIDGE_ERROR_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when JSONRPC_BRIDGE_ERROR_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for JSONRPC_BRIDGE_ERROR_SOURCE."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for JSONRPC_BRIDGE_ERROR_SOURCE."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-bridge-jsonrpc:packages/rpc-contract/dist/contract/framing/jsonrpc-error-code.d.ts:JSONRPC_BRIDGE_ERROR_SOURCE:export declare const JSONRPC_BRIDGE_ERROR_SOURCE = \"@migaia/rpc/bridge/jsonrpc\";",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-bridge-jsonrpc-index--JSONRPC_BRIDGE_ERROR_SOURCE"
+        },
+        {
+          "name": "JsonRpcBridgeErrorCode",
+          "kind": "const",
+          "signature": "export declare const JsonRpcBridgeErrorCode: { /** Invalid headers, body encoding, JSON or truncated EOF closes this byte connection. */ readonly frameInvalid: \"JSONRPC_FRAME_INVALID\"; /** A required method, capability or business wire-error extension is absent. */ readonly extensionMissing: \"JSONRPC_EXTENSION_MISSING\"; /** A profile message or caller option cannot be translated; choose a supported profile. */ readonly profileInvalid: \"JSONRPC_PROFILE_INVALID\"; /** A contract includes generators; use a native channel for streaming methods. */ readonly unsupportedMode: \"JSONRPC_UNSUPPORTED_MODE\"; /** The hello deadline expires; the caller may establish a new connection. */ readonly handshakeTimeout: \"JSONRPC_HANDSHAKE_TIMEOUT\"; };",
+          "declarationLine": 4,
+          "source": "packages/rpc-contract/dist/contract/framing/jsonrpc-error-code.d.ts",
+          "purpose": "Public bridge codes describe one profile failure each; native error types stay intact.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for JsonRpcBridgeErrorCode.",
+          "advanced": "No additional advanced behavior is declared for JsonRpcBridgeErrorCode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for JsonRpcBridgeErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for JsonRpcBridgeErrorCode.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "JsonRpcBridgeErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const JsonRpcBridgeErrorCode: { /** Invalid headers, body encoding, JSON or truncated EOF closes this byte connection. */ readonly frameInvalid: \"JSONRPC_FRAME_INVALID\"; /** A required method, capability or business wire-error extension is absent. */ readonly extensionMissing: \"JSONRPC_EXTENSION_MISSING\"; /** A profile message or caller option cannot be translated; choose a supported profile. */ readonly profileInvalid: \"JSONRPC_PROFILE_INVALID\"; /** A contract includes generators; use a native channel for streaming methods. */ readonly unsupportedMode: \"JSONRPC_UNSUPPORTED_MODE\"; /** The hello deadline expires; the caller may establish a new connection. */ readonly handshakeTimeout: \"JSONRPC_HANDSHAKE_TIMEOUT\"; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use JsonRpcBridgeErrorCode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when JsonRpcBridgeErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Public bridge codes describe one profile failure each; native error types stay intact."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import JsonRpcBridgeErrorCode from @migaia/rpc-bridge-jsonrpc, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use JsonRpcBridgeErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when JsonRpcBridgeErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for JsonRpcBridgeErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for JsonRpcBridgeErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-bridge-jsonrpc:packages/rpc-contract/dist/contract/framing/jsonrpc-error-code.d.ts:JsonRpcBridgeErrorCode:export declare const JsonRpcBridgeErrorCode: { /** Invalid headers, body encoding, JSON or truncated EOF closes this byte connection. */ readonly frameInvalid: \"JSONRPC_FRAME_INVALID\"; /** A required method, capability or business wire-error extension is absent. */ readonly extensionMissing: \"JSONRPC_EXTENSION_MISSING\"; /** A profile message or caller option cannot be translated; choose a supported profile. */ readonly profileInvalid: \"JSONRPC_PROFILE_INVALID\"; /** A contract includes generators; use a native channel for streaming methods. */ readonly unsupportedMode: \"JSONRPC_UNSUPPORTED_MODE\"; /** The hello deadline expires; the caller may establish a new connection. */ readonly handshakeTimeout: \"JSONRPC_HANDSHAKE_TIMEOUT\"; };",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-bridge-jsonrpc-index--JsonRpcBridgeErrorCode"
+        }
+      ],
+      "aliases": []
+    }
+  ]
+}

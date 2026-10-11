@@ -4,6 +4,11 @@ import { attachErrorIdentity } from './error.js'
 
 export * from './object-path.js'
 
+/** Creates a new null-prototype dictionary whose untrusted keys cannot invoke prototype setters. */
+export function createSafeRecord<T>(): Partial<Record<string, T>> {
+  return Object.create(null) as Partial<Record<string, T>>
+}
+
 export type IProbePropertyResult<T> =
   | { readonly kind: 'missing' }
   | { readonly kind: 'value'; readonly value: T }

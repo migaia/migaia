@@ -23,7 +23,7 @@ function filesUnder(directory) {
     const relativePath = relative(root, path).replaceAll('\\', '/')
     if (entry.isDirectory()) {
       if (['node_modules', 'dist'].includes(entry.name)) return []
-      if (relativePath === 'packages/rpc/test/merge') return []
+      if (relativePath === 'packages/rpc-integration/test/merge') return []
       if (relativePath === 'website') return []
       return filesUnder(path)
     }

@@ -2,6 +2,23 @@ import { UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { attachErrorIdentity } from './error.js'
 
+/** Outcome of one conversion; failures retain the exact value thrown by user coercion. */
+export type IStringConversion =
+  | { readonly threw: false; readonly value: string }
+  | { readonly threw: true; readonly error: unknown }
+
+/**
+ * Converts a value once with native String semantics, keeping strings unchanged. A hostile
+ * conversion returns its original thrown value; the caller owns fallback, reporting, and rethrow.
+ */
+export function tryString(value: unknown): IStringConversion {
+  try {
+    return { threw: false, value: typeof value === 'string' ? value : String(value) }
+  } catch (error) {
+    return { threw: true, error }
+  }
+}
+
 /** Placeholder delimiters used by the linear template scanner. */
 export type IFormatPlaceholder = {
   readonly open: string

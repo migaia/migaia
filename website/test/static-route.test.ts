@@ -315,19 +315,22 @@ test('SITE-T-NESTED-MODULES preserves export hierarchy in routes and navigation'
 
   /** Current RPC features come from package exports rather than a hard-coded plugin inventory. */
   const webRpcFeatures = nestedApis.filter(
-    (api) => api.library === 'rpc' && api.module.startsWith('core/features/')
+    (api) => api.library === 'rpc-core' && api.module.startsWith('features/')
   )
   assert.ok(webRpcFeatures.length > 0, 'expected RPC feature modules')
   const webRpcFeatureHtml = readFileSync(
-    join(buildRoot, artifactPath(publicModulePath('zh', 'rpc', webRpcFeatures[0].module))),
+    join(buildRoot, artifactPath(publicModulePath('zh', 'rpc-core', webRpcFeatures[0].module))),
     'utf8'
   )
   const featureRail = stableLeftRail(webRpcFeatureHtml)
   assert.match(featureRail, />功能插件</)
   assert.doesNotMatch(featureRail, />features</)
   for (const feature of webRpcFeatures)
-    assert.match(featureRail, new RegExp(`href="${publicModulePath('zh', 'rpc', feature.module)}"`))
-  assert.doesNotMatch(featureRail, /rpc\/features-[^/"]+/)
+    assert.match(
+      featureRail,
+      new RegExp(`href="${publicModulePath('zh', 'rpc-core', feature.module)}"`)
+    )
+  assert.doesNotMatch(featureRail, /rpc-core\/features-[^/"]+/)
 })
 
 test('SITE-T-LEFT-RAIL-INVARIANT keeps every module tree stable across all API routes', () => {
@@ -915,7 +918,14 @@ test('SITE-T-A05/A10 closes every generated route and API body artifact', () => 
       const output = join(buildRoot, artifactPath(modulePath))
       const html = readFileSync(output, 'utf8')
       if (api.symbols.length === 0) {
-        assert.match(html, locale === 'zh' ? /重新导出的符号/ : /Re-exported symbols/)
+        if (api.library === 'rpc-contract' && api.module === 'schema/wire-error') {
+          assert.match(html, /JSON Schema/)
+          assert.ok(
+            renderedText(html).includes(
+              "import wireErrorSchema from '@migaia/rpc-contract/schema/wire-error' with { type: 'json' }"
+            )
+          )
+        } else assert.match(html, locale === 'zh' ? /重新导出的符号/ : /Re-exported symbols/)
         continue
       }
       for (const symbol of api.symbols) {
@@ -2249,95 +2259,95 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
       'Interpolate display text safely and localize numeric output consistently',
       'Choose missing-value and nullish policy explicitly'
     ],
-    ['/zh/guides/rpc', 'RPC 学习路径', '先决定端点需要公开什么'],
-    ['/en/guides/rpc', 'RPC learning paths', 'First decide what the endpoint must expose'],
+    ['/zh/guides/rpc-core', 'RPC 学习路径', '先决定端点需要公开什么'],
+    ['/en/guides/rpc-core', 'RPC learning paths', 'First decide what the endpoint must expose'],
     [
-      '/zh/guides/rpc/getting-started',
+      '/zh/guides/rpc-core/getting-started',
       '五分钟建立可释放的 RPC 调用链',
       '先建立 transport，再分别创建两端'
     ],
     [
-      '/en/guides/rpc/getting-started',
+      '/en/guides/rpc-core/getting-started',
       'Build a disposable RPC call path in five minutes',
       'Create the transport first, then construct both endpoints'
     ],
     [
-      '/zh/guides/rpc/endpoint-composition',
+      '/zh/guides/rpc-core/endpoint-composition',
       '四个 Peer/Plugin 工厂：来源、类型与所有权',
       '按所有权选择四个工厂'
     ],
     [
-      '/en/guides/rpc/endpoint-composition',
+      '/en/guides/rpc-core/endpoint-composition',
       'Four Peer/Plugin factories: sources, types and ownership',
       'Choose the four factories by ownership'
     ],
     [
-      '/zh/guides/rpc/calls-and-cancellation',
+      '/zh/guides/rpc-core/calls-and-cancellation',
       '正确选择调用、广播、通知与取消语义',
       '不要用一个方法模拟另一种语义'
     ],
     [
-      '/en/guides/rpc/calls-and-cancellation',
+      '/en/guides/rpc-core/calls-and-cancellation',
       'Choose call, fan-out, notification, and cancellation semantics correctly',
       'Do not use one operation to imitate another'
     ],
     [
-      '/zh/guides/rpc/providers-and-contracts',
+      '/zh/guides/rpc-core/providers-and-contracts',
       '用 Provider 与 Contract 固定网络边界',
       '为每个公开方法声明参数与结果'
     ],
     [
-      '/en/guides/rpc/providers-and-contracts',
+      '/en/guides/rpc-core/providers-and-contracts',
       'Fix the network boundary with providers and contracts',
       'Declare parameters and results for every public method'
     ],
     [
-      '/zh/guides/rpc/transports-and-security',
+      '/zh/guides/rpc-core/transports-and-security',
       '按拓扑选择 Transport，并建立真实安全边界',
       '先声明真实拓扑'
     ],
     [
-      '/en/guides/rpc/transports-and-security',
+      '/en/guides/rpc-core/transports-and-security',
       'Choose a transport by topology and establish a real security boundary',
       'Declare the real topology first'
     ],
     [
-      '/zh/guides/rpc/extension-authoring',
+      '/zh/guides/rpc-core/extension-authoring',
       '扩展 RPC：Feature 边界与自定义 Middleware',
       '编写一个可释放的自定义 Middleware'
     ],
     [
-      '/en/guides/rpc/extension-authoring',
+      '/en/guides/rpc-core/extension-authoring',
       'Extend RPC: Feature boundaries and custom middleware',
       'Author disposable custom middleware'
     ],
     [
-      '/zh/guides/rpc/discovery-and-control',
+      '/zh/guides/rpc-core/discovery-and-control',
       '发现远端能力，并显式启用控制面',
       '把自动发现与手动发现当成不同策略'
     ],
     [
-      '/en/guides/rpc/discovery-and-control',
+      '/en/guides/rpc-core/discovery-and-control',
       'Discover remote capabilities and enable the control plane explicitly',
       'Treat automatic and manual discovery as different policies'
     ],
     [
-      '/zh/guides/rpc/chunking-and-backpressure',
+      '/zh/guides/rpc-core/chunking-and-backpressure',
       '在明确容量预算下启用分片',
       '同时选择 chunk Feature 与策略 middleware'
     ],
     [
-      '/en/guides/rpc/chunking-and-backpressure',
+      '/en/guides/rpc-core/chunking-and-backpressure',
       'Enable chunking under explicit capacity budgets',
       'Select both the chunk Feature and policy middleware'
     ],
     [
-      '/zh/guides/rpc/replay-retry-and-lifecycle',
+      '/zh/guides/rpc-core/replay-retry-and-lifecycle',
       '区分重放保护、业务重试与 Endpoint 终态',
       '按双向请求吞吐配置重放窗口'
     ],
     [
-      '/en/guides/rpc/replay-retry-and-lifecycle',
+      '/en/guides/rpc-core/replay-retry-and-lifecycle',
       'Separate replay protection, business retry, and endpoint terminal state',
       'Size the replay window from bidirectional request throughput'
     ],
@@ -2967,7 +2977,7 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   assert.match(guideSource, /plugins: \[indexedDbReactive\(\{[\s\S]*?id: 'primary'/)
 
   const webRpcStart = readFileSync(
-    join(buildRoot, artifactPath('/en/guides/rpc/getting-started')),
+    join(buildRoot, artifactPath('/en/guides/rpc-core/getting-started')),
     'utf8'
   )
   const webRpcStartText = renderedText(webRpcStart)
@@ -3135,7 +3145,7 @@ test('SITE-T-WEBRPC-LINKS keeps every maintained RPC continuation resolvable', (
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/rpc${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/guides/rpc-core${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3164,7 +3174,7 @@ test('SITE-T-WEBRPC-TRANSPORTS renders every adapter tutorial in both locales', 
     'createWebTransportDatagramTransport'
   ]
   for (const locale of ['en', 'zh']) {
-    const path = `/${locale}/guides/rpc/transports-and-security`
+    const path = `/${locale}/guides/rpc-core/transports-and-security`
     const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
     for (const factory of factories) assert.ok(page.includes(factory), `${path} misses ${factory}`)
     assert.ok(!page.includes('createMessagePortTransport'))
@@ -3173,21 +3183,23 @@ test('SITE-T-WEBRPC-TRANSPORTS renders every adapter tutorial in both locales', 
 
 test('SITE-T-WEBRPC-NAV exposes primary endpoints and every guide from the left rail', () => {
   for (const locale of ['en', 'zh']) {
-    const docsPath = `/${locale}/docs/rpc`
-    const docsPage = readFileSync(join(buildRoot, artifactPath(docsPath)), 'utf8')
-    for (const endpoint of [
-      'createEndpoint',
-      'createProcessPeer',
-      'createProcessPlugin',
-      'createThreadPeer',
-      'createThreadPlugin',
-      'createComposedEndpoint'
-    ])
-      assert.ok(docsPage.includes(`>${endpoint}</a>`), `${docsPath} hides ${endpoint}`)
-    assert.ok(docsPage.includes(`/${locale}/guides/rpc/transports-and-security`))
-    assert.ok(docsPage.includes(`/${locale}/guides/rpc/endpoint-composition`))
+    /** Each factory remains navigable from the actual package that owns its public API. */
+    const factoryOwners = [
+      ['rpc-core', ['createEndpoint', 'createComposedEndpoint']],
+      ['rpc-process', ['createProcessPeer', 'createProcessPlugin']],
+      ['rpc-threads', ['createThreadPeer', 'createThreadPlugin']]
+    ] as const
+    for (const [owner, endpoints] of factoryOwners) {
+      const docsPath = `/${locale}/docs/${owner}`
+      const docsPage = readFileSync(join(buildRoot, artifactPath(docsPath)), 'utf8')
+      for (const endpoint of endpoints)
+        assert.ok(docsPage.includes(`>${endpoint}</a>`), `${docsPath} hides ${endpoint}`)
+    }
+    const corePage = readFileSync(join(buildRoot, artifactPath(`/${locale}/docs/rpc-core`)), 'utf8')
+    assert.ok(corePage.includes(`/${locale}/guides/rpc-core/transports-and-security`))
+    assert.ok(corePage.includes(`/${locale}/guides/rpc-core/endpoint-composition`))
 
-    const guidePath = `/${locale}/guides/rpc/transports-and-security`
+    const guidePath = `/${locale}/guides/rpc-core/transports-and-security`
     const guidePage = readFileSync(join(buildRoot, artifactPath(guidePath)), 'utf8')
     for (const anchor of [
       'window-transport',
@@ -3209,7 +3221,7 @@ test('SITE-T-WEBRPC-NAV exposes primary endpoints and every guide from the left 
       'chunking-and-backpressure',
       'replay-retry-and-lifecycle'
     ])
-      assert.ok(guidePage.includes(`/${locale}/guides/rpc/${topic}`))
+      assert.ok(guidePage.includes(`/${locale}/guides/rpc-core/${topic}`))
     assert.ok(guidePage.includes('href="#memory-transport"'))
     assert.ok(guidePage.includes('href="#web-transport-datagram-transport"'))
   }
@@ -3217,7 +3229,7 @@ test('SITE-T-WEBRPC-NAV exposes primary endpoints and every guide from the left 
 
 test('SITE-T-WEBRPC-ENDPOINT-SELECTION explains four factories and source ownership', () => {
   for (const locale of ['en', 'zh']) {
-    const path = `/${locale}/guides/rpc/endpoint-composition`
+    const path = `/${locale}/guides/rpc-core/endpoint-composition`
     const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
     for (const factory of [
       'createProcessPeer',
@@ -3231,13 +3243,13 @@ test('SITE-T-WEBRPC-ENDPOINT-SELECTION explains four factories and source owners
     assert.match(page, locale === 'zh' ? /所有权/ : /ownership/)
     assert.match(page, /createPeerPair/)
     assert.match(page, /createComposedEndpoint/)
-    assert.ok(page.includes(`/${locale}/guides/rpc/extension-authoring`))
+    assert.ok(page.includes(`/${locale}/guides/rpc-core/extension-authoring`))
   }
 })
 
 test('SITE-T-WEBRPC-EXTENSIONS documents the public Feature boundary and custom middleware', () => {
   for (const locale of ['en', 'zh']) {
-    const path = `/${locale}/guides/rpc/extension-authoring`
+    const path = `/${locale}/guides/rpc-core/extension-authoring`
     const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
     for (const contract of [
       'IRpcPlugin',
@@ -3247,7 +3259,7 @@ test('SITE-T-WEBRPC-EXTENSIONS documents the public Feature boundary and custom 
       'defineEndpointModule'
     ])
       assert.ok(page.includes(contract), `${path} misses ${contract}`)
-    assert.ok(page.includes(`/${locale}/guides/rpc/endpoint-composition`))
+    assert.ok(page.includes(`/${locale}/guides/rpc-core/endpoint-composition`))
   }
 })
 
@@ -3257,7 +3269,7 @@ test('SITE-T-WEBRPC-GUIDE-NAV separates APIs, plugins, specifications, adapters,
     zh: ['API', '插件', '规范', '宿主适配器', '错误与诊断']
   } as const
   for (const locale of ['en', 'zh'] as const) {
-    const path = `/${locale}/guides/rpc/extension-authoring`
+    const path = `/${locale}/guides/rpc-core/extension-authoring`
     const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
     for (const heading of expectations[locale])
       assert.ok(page.includes(`<h3>${heading}</h3>`), `${path} misses ${heading}`)

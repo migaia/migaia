@@ -31,7 +31,7 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "import { connect, contract, createEndpoint, protocol } from '@migaia/rpc/core'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\n\n// 1. 创建一对已经互联的 transport。\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\n// 2. Provider 拥有服务 id，并注册可调用的方法。\nconst calculator = await createEndpoint({\n  id: 'calculator',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ]\n})\ncalculator.provide('add', (context) => {\n  const { left, right } = context.data as { left: number; right: number }\n  return context.success(left + right)\n})\n\n// 3. Client 声明允许调用的目标，然后像调用异步函数一样发送请求。\nconst app = await createEndpoint({\n  id: 'test-app',\n  targetIds: ['calculator'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport })\n  ]\n})\nconst result = await app.send<number>('calculator', 'add', { left: 20, right: 22 })\nconsole.assert(result === 42)\n\n// 4. 测试结束时释放两端，避免监听器泄漏到下一个用例。\nawait Promise.all([app.dispose(), calculator.dispose()])"
+          code: "import { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\n// 1. 创建一对已经互联的 transport。\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\n// 2. Provider 拥有服务 id，并注册可调用的方法。\nconst calculator = await createEndpoint({\n  id: 'calculator',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ]\n})\ncalculator.provide('add', (context) => {\n  const { left, right } = context.data as { left: number; right: number }\n  return context.success(left + right)\n})\n\n// 3. Client 声明允许调用的目标，然后像调用异步函数一样发送请求。\nconst app = await createEndpoint({\n  id: 'test-app',\n  targetIds: ['calculator'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport })\n  ]\n})\nconst result = await app.send<number>('calculator', 'add', { left: 20, right: 22 })\nconsole.assert(result === 42)\n\n// 4. 测试结束时释放两端，避免监听器泄漏到下一个用例。\nawait Promise.all([app.dispose(), calculator.dispose()])"
         },
         {
           type: 'list',
@@ -54,12 +54,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// parent.ts：父页面调用 iframe\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc/core'\n\nimport { createWindowMessageTransport } from '@migaia/rpc/browser/adapters/window'\n\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nawait new Promise<void>((resolve) => iframe.addEventListener('load', () => resolve(), { once: true }))\nconst childOrigin = new URL(iframe.src).origin\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: childOrigin\n})\nconst billing = await createEndpoint({\n  id: 'checkout-page',\n  targetIds: ['billing-frame'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst total = await billing.send<number>('billing-frame', 'calculateTotal', {\n  prices: [12, 30],\n  taxRate: 0.08\n})\nconsole.log(total) // 45.36\n\nawait billing.dispose()"
+          code: "// parent.ts：父页面调用 iframe\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\n\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nawait new Promise<void>((resolve) => iframe.addEventListener('load', () => resolve(), { once: true }))\nconst childOrigin = new URL(iframe.src).origin\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: childOrigin\n})\nconst billing = await createEndpoint({\n  id: 'checkout-page',\n  targetIds: ['billing-frame'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst total = await billing.send<number>('billing-frame', 'calculateTotal', {\n  prices: [12, 30],\n  taxRate: 0.08\n})\nconsole.log(total) // 45.36\n\nawait billing.dispose()"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// billing-frame.ts：iframe 提供方法给父页面\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc/core'\n\nimport { createWindowMessageTransport } from '@migaia/rpc/browser/adapters/window'\n\nif (!window.parent) throw new Error('This page must run inside the billing iframe')\nconst parentOrigin = 'https://shop.example'\nconst transport = createWindowMessageTransport({\n  target: window.parent,\n  receiver: window,\n  targetOrigin: parentOrigin\n})\nconst billing = await createEndpoint({\n  id: 'billing-frame',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nbilling.provide('calculateTotal', (context) => {\n  const input = context.data as { prices: number[]; taxRate: number }\n  const subtotal = input.prices.reduce((sum, price) => sum + price, 0)\n  return context.success(subtotal * (1 + input.taxRate))\n})\n\nwindow.addEventListener('pagehide', () => void billing.dispose(), { once: true })"
+          code: "// billing-frame.ts：iframe 提供方法给父页面\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\n\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nif (!window.parent) throw new Error('This page must run inside the billing iframe')\nconst parentOrigin = 'https://shop.example'\nconst transport = createWindowMessageTransport({\n  target: window.parent,\n  receiver: window,\n  targetOrigin: parentOrigin\n})\nconst billing = await createEndpoint({\n  id: 'billing-frame',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nbilling.provide('calculateTotal', (context) => {\n  const input = context.data as { prices: number[]; taxRate: number }\n  const subtotal = input.prices.reduce((sum, price) => sum + price, 0)\n  return context.success(subtotal * (1 + input.taxRate))\n})\n\nwindow.addEventListener('pagehide', () => void billing.dispose(), { once: true })"
         },
         {
           type: 'list',
@@ -103,12 +103,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// main.ts：创建专用端口，把另一端转移给 Worker\nimport { connect, createEndpoint } from '@migaia/rpc/core'\nimport { createBrowserMessagePortTransport } from '@migaia/rpc/core/adapters/message-port'\n\nconst worker = new Worker(new URL('./search.worker.ts', import.meta.url), { type: 'module' })\nconst { port1, port2 } = new MessageChannel()\nworker.postMessage({ type: 'rpc-port', port: port2 }, [port2])\n\nconst transport = createBrowserMessagePortTransport(port1, { ownership: 'owned' })\nconst search = await createEndpoint({\n  id: 'search-page',\n  targetIds: ['search-worker'],\n  transport,\n  middlewares: [connect({ transport })]\n})\nconst matches = await search.send<string[]>('search-worker', 'find', { query: 'migaia' })\n\nawait search.dispose() // ownership: owned 会同时关闭 port1\nworker.terminate()"
+          code: "// main.ts：创建专用端口，把另一端转移给 Worker\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createBrowserMessagePortTransport } from '@migaia/rpc-core/adapters/message-port'\n\nconst worker = new Worker(new URL('./search.worker.ts', import.meta.url), { type: 'module' })\nconst { port1, port2 } = new MessageChannel()\nworker.postMessage({ type: 'rpc-port', port: port2 }, [port2])\n\nconst transport = createBrowserMessagePortTransport(port1, { ownership: 'owned' })\nconst search = await createEndpoint({\n  id: 'search-page',\n  targetIds: ['search-worker'],\n  transport,\n  middlewares: [connect({ transport })]\n})\nconst matches = await search.send<string[]>('search-worker', 'find', { query: 'migaia' })\n\nawait search.dispose() // ownership: owned 会同时关闭 port1\nworker.terminate()"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// search.worker.ts：接收被转移的 port2，并在同一专用链路提供方法\nimport { connect, createEndpoint } from '@migaia/rpc/core'\nimport { createBrowserMessagePortTransport } from '@migaia/rpc/core/adapters/message-port'\n\nself.addEventListener('message', (event: MessageEvent) => {\n  if (event.data?.type !== 'rpc-port') return\n  const port = event.data.port as MessagePort\nconst index = ['migaia', 'storage', 'rpc']\n  const transport = createBrowserMessagePortTransport(port, { ownership: 'owned' })\n  void createEndpoint({\n    id: 'search-worker',\n    transport,\n    middlewares: [connect({ transport })]\n  }).then((search) => {\n    search.provide('find', (context) => {\n      const { query } = context.data as { query: string }\n      return context.success(index.filter((item) => item.includes(query)))\n    })\n  })\n})"
+          code: "// search.worker.ts：接收被转移的 port2，并在同一专用链路提供方法\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createBrowserMessagePortTransport } from '@migaia/rpc-core/adapters/message-port'\n\nself.addEventListener('message', (event: MessageEvent) => {\n  if (event.data?.type !== 'rpc-port') return\n  const port = event.data.port as MessagePort\nconst index = ['migaia', 'storage', 'rpc']\n  const transport = createBrowserMessagePortTransport(port, { ownership: 'owned' })\n  void createEndpoint({\n    id: 'search-worker',\n    transport,\n    middlewares: [connect({ transport })]\n  }).then((search) => {\n    search.provide('find', (context) => {\n      const { query } = context.data as { query: string }\n      return context.success(index.filter((item) => item.includes(query)))\n    })\n  })\n})"
         },
         {
           type: 'list',
@@ -156,12 +156,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// main.ts：Node 主线程\nimport { MessageChannel, Worker } from 'node:worker_threads'\nimport { connect, createEndpoint } from '@migaia/rpc/core'\nimport { createNodeMessagePortTransport } from '@migaia/rpc/core/adapters/message-port'\n\nconst worker = new Worker(new URL('./hash.worker.js', import.meta.url))\nconst { port1, port2 } = new MessageChannel()\nworker.postMessage({ type: 'rpc-port', port: port2 }, [port2])\nconst transport = createNodeMessagePortTransport(port1)\nconst hashing = await createEndpoint({\n  id: 'node-main', targetIds: ['hash-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst digest = await hashing.send<string>('hash-worker', 'sha256', 'hello')\nawait hashing.dispose()\nawait worker.terminate()"
+          code: "// main.ts：Node 主线程\nimport { MessageChannel, Worker } from 'node:worker_threads'\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createNodeMessagePortTransport } from '@migaia/rpc-core/adapters/message-port'\n\nconst worker = new Worker(new URL('./hash.worker.js', import.meta.url))\nconst { port1, port2 } = new MessageChannel()\nworker.postMessage({ type: 'rpc-port', port: port2 }, [port2])\nconst transport = createNodeMessagePortTransport(port1)\nconst hashing = await createEndpoint({\n  id: 'node-main', targetIds: ['hash-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst digest = await hashing.send<string>('hash-worker', 'sha256', 'hello')\nawait hashing.dispose()\nawait worker.terminate()"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// hash.worker.ts：worker_threads Worker\nimport { parentPort, type MessagePort } from 'node:worker_threads'\nimport { createHash } from 'node:crypto'\nimport { connect, createEndpoint } from '@migaia/rpc/core'\nimport { createNodeMessagePortTransport } from '@migaia/rpc/core/adapters/message-port'\n\nparentPort?.once('message', (message: { type: string; port: MessagePort }) => {\n  if (message.type !== 'rpc-port') return\n  const transport = createNodeMessagePortTransport(message.port)\n  void createEndpoint({\n    id: 'hash-worker', transport, middlewares: [connect({ transport })]\n  }).then((hashing) => {\n    hashing.provide('sha256', (context) =>\n      context.success(createHash('sha256').update(String(context.data)).digest('hex'))\n    )\n  })\n})"
+          code: "// hash.worker.ts：worker_threads Worker\nimport { parentPort, type MessagePort } from 'node:worker_threads'\nimport { createHash } from 'node:crypto'\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createNodeMessagePortTransport } from '@migaia/rpc-core/adapters/message-port'\n\nparentPort?.once('message', (message: { type: string; port: MessagePort }) => {\n  if (message.type !== 'rpc-port') return\n  const transport = createNodeMessagePortTransport(message.port)\n  void createEndpoint({\n    id: 'hash-worker', transport, middlewares: [connect({ transport })]\n  }).then((hashing) => {\n    hashing.provide('sha256', (context) =>\n      context.success(createHash('sha256').update(String(context.data)).digest('hex'))\n    )\n  })\n})"
         },
         {
           type: 'list',
@@ -187,12 +187,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// main.ts：主线程调用 Worker\nimport { connect, contract, createEndpoint, protocol, timeout } from '@migaia/rpc/core'\n\nimport { createWebWorkerTransport } from '@migaia/rpc/browser/adapters/web-worker'\n\nconst worker = new Worker(new URL('./image.worker.ts', import.meta.url), { type: 'module' })\nconst transport = createWebWorkerTransport(worker, { peerId: 'image-worker' })\nconst images = await createEndpoint({\n  id: 'editor-page',\n  targetIds: ['image-worker'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport }), timeout({ timeoutMs: 30_000 })]\n})\n\nconst thumbnail = await images.send<Blob>('image-worker', 'resize', { file: new Blob(['demo']), width: 320 })\n\nawait images.dispose()\nworker.terminate()"
+          code: "// main.ts：主线程调用 Worker\nimport { connect, contract, createEndpoint, protocol, timeout } from '@migaia/rpc-core'\n\nimport { createWebWorkerTransport } from '@migaia/rpc-core/adapters/web-worker'\n\nconst worker = new Worker(new URL('./image.worker.ts', import.meta.url), { type: 'module' })\nconst transport = createWebWorkerTransport(worker, { peerId: 'image-worker' })\nconst images = await createEndpoint({\n  id: 'editor-page',\n  targetIds: ['image-worker'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport }), timeout({ timeoutMs: 30_000 })]\n})\n\nconst thumbnail = await images.send<Blob>('image-worker', 'resize', { file: new Blob(['demo']), width: 320 })\n\nawait images.dispose()\nworker.terminate()"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// image.worker.ts：Worker 接收调用并返回结果\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc/core'\n\nimport { createWebWorkerTransport } from '@migaia/rpc/browser/adapters/web-worker'\n\nconst scope = globalThis as unknown as DedicatedWorkerGlobalScope\nconst transport = createWebWorkerTransport(scope)\nconst images = await createEndpoint({\n  id: 'image-worker',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst resizeImage = async (file: Blob, width: number): Promise<Blob> => {\n  const bitmap = await createImageBitmap(file)\n  const canvas = new OffscreenCanvas(width, Math.round(bitmap.height * width / bitmap.width))\n  const context = canvas.getContext('2d')\n  if (!context) throw new Error('2D canvas is unavailable')\n  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)\n  bitmap.close()\n  return canvas.convertToBlob({ type: 'image/webp' })\n}\n\nimages.provide('resize', async (context) => {\n  const { file, width } = context.data as { file: Blob; width: number }\n  const result = await resizeImage(file, width)\n  return context.success(result)\n})"
+          code: "// image.worker.ts：Worker 接收调用并返回结果\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\n\nimport { createWebWorkerTransport } from '@migaia/rpc-core/adapters/web-worker'\n\nconst scope = globalThis as unknown as DedicatedWorkerGlobalScope\nconst transport = createWebWorkerTransport(scope)\nconst images = await createEndpoint({\n  id: 'image-worker',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst resizeImage = async (file: Blob, width: number): Promise<Blob> => {\n  const bitmap = await createImageBitmap(file)\n  const canvas = new OffscreenCanvas(width, Math.round(bitmap.height * width / bitmap.width))\n  const context = canvas.getContext('2d')\n  if (!context) throw new Error('2D canvas is unavailable')\n  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)\n  bitmap.close()\n  return canvas.convertToBlob({ type: 'image/webp' })\n}\n\nimages.provide('resize', async (context) => {\n  const { file, width } = context.data as { file: Blob; width: number }\n  const result = await resizeImage(file, width)\n  return context.success(result)\n})"
         },
         {
           type: 'list',
@@ -237,12 +237,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// page.ts：每个标签页创建自己的 endpoint\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc/core'\n\nimport { createSharedWorkerTransport } from '@migaia/rpc/browser/adapters/shared-worker'\n\nconst worker = new SharedWorker(new URL('./counter.worker.ts', import.meta.url), { type: 'module' })\nworker.port.start()\nconst transport = createSharedWorkerTransport(worker.port)\nconst counter = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['shared-counter'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst value = await counter.send<number>('shared-counter', 'increment', undefined)\nconsole.log(`shared counter value: ${value}`) // 响应来自 SharedWorker 中所有页面共享的计数状态。\nwindow.addEventListener('pagehide', () => void counter.dispose(), { once: true })"
+          code: "// page.ts：每个标签页创建自己的 endpoint\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\n\nimport { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'\n\nconst worker = new SharedWorker(new URL('./counter.worker.ts', import.meta.url), { type: 'module' })\nworker.port.start()\nconst transport = createSharedWorkerTransport(worker.port)\nconst counter = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['shared-counter'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst value = await counter.send<number>('shared-counter', 'increment', undefined)\nconsole.log(`shared counter value: ${value}`) // 响应来自 SharedWorker 中所有页面共享的计数状态。\nwindow.addEventListener('pagehide', () => void counter.dispose(), { once: true })"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// counter.worker.ts：每个 connect 事件带来一条独立端口\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc/core'\n\nimport { createSharedWorkerTransport } from '@migaia/rpc/browser/adapters/shared-worker'\n\nlet value = 0\nself.addEventListener('connect', (event: MessageEvent) => {\n  const port = event.ports[0]\n  port.start()\n  const transport = createSharedWorkerTransport(port)\n  void createEndpoint({\n    id: 'shared-counter',\n    transport,\n    middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n  }).then((counter) => {\n    counter.provide('increment', (context) => context.success(++value))\n  })\n})"
+          code: "// counter.worker.ts：每个 connect 事件带来一条独立端口\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\n\nimport { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'\n\nlet value = 0\nself.addEventListener('connect', (event: MessageEvent) => {\n  const port = event.ports[0]\n  port.start()\n  const transport = createSharedWorkerTransport(port)\n  void createEndpoint({\n    id: 'shared-counter',\n    transport,\n    middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n  }).then((counter) => {\n    counter.provide('increment', (context) => context.success(++value))\n  })\n})"
         },
         {
           type: 'list',
@@ -289,12 +289,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// page.ts：受控页面先把自己的 client id 告诉 ServiceWorker\nimport { connect, createEndpoint } from '@migaia/rpc/core'\nimport { createServiceWorkerTransport } from '@migaia/rpc/browser/adapters/service-worker'\n\nawait navigator.serviceWorker.ready\nconst controller = navigator.serviceWorker.controller\nif (!controller) throw new Error('Reload once so the ServiceWorker controls this page')\nconst clientId = crypto.randomUUID()\ncontroller.postMessage({ type: 'rpc-connect', clientId })\n\nconst transport = createServiceWorkerTransport({\n  target: controller, receiver: navigator.serviceWorker, peerId: 'service-worker'\n})\nconst cache = await createEndpoint({\n  id: clientId, targetIds: ['service-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst cached = await cache.send<boolean>('service-worker', 'hasCache', '/catalog.json')\nconsole.log(cached ? 'offline catalog is available' : 'offline catalog is missing') // provider 在 ServiceWorker 端查询 CacheStorage 后返回结果。\nwindow.addEventListener('pagehide', () => void cache.dispose(), { once: true })"
+          code: "// page.ts：受控页面先把自己的 client id 告诉 ServiceWorker\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\nawait navigator.serviceWorker.ready\nconst controller = navigator.serviceWorker.controller\nif (!controller) throw new Error('Reload once so the ServiceWorker controls this page')\nconst clientId = crypto.randomUUID()\ncontroller.postMessage({ type: 'rpc-connect', clientId })\n\nconst transport = createServiceWorkerTransport({\n  target: controller, receiver: navigator.serviceWorker, peerId: 'service-worker'\n})\nconst cache = await createEndpoint({\n  id: clientId, targetIds: ['service-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst cached = await cache.send<boolean>('service-worker', 'hasCache', '/catalog.json')\nconsole.log(cached ? 'offline catalog is available' : 'offline catalog is missing') // provider 在 ServiceWorker 端查询 CacheStorage 后返回结果。\nwindow.addEventListener('pagehide', () => void cache.dispose(), { once: true })"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// service-worker.ts：为发起握手的具体 Client 建立返回链路\nimport { connect, createEndpoint } from '@migaia/rpc/core'\nimport { createServiceWorkerTransport } from '@migaia/rpc/browser/adapters/service-worker'\n\nself.addEventListener('message', (event: ExtendableMessageEvent) => {\n  if (event.data?.type !== 'rpc-connect' || !event.source) return\n  const client = event.source as Client\n  const transport = createServiceWorkerTransport({\n    target: client, receiver: self, peerId: event.data.clientId\n  })\n  event.waitUntil(\n    createEndpoint({\n      id: 'service-worker', transport, middlewares: [connect({ transport })]\n    }).then((cache) => {\n      cache.provide('hasCache', async (context) =>\n        context.success(Boolean(await caches.match(String(context.data))))\n      )\n    })\n  )\n})"
+          code: "// service-worker.ts：为发起握手的具体 Client 建立返回链路\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\nself.addEventListener('message', (event: ExtendableMessageEvent) => {\n  if (event.data?.type !== 'rpc-connect' || !event.source) return\n  const client = event.source as Client\n  const transport = createServiceWorkerTransport({\n    target: client, receiver: self, peerId: event.data.clientId\n  })\n  event.waitUntil(\n    createEndpoint({\n      id: 'service-worker', transport, middlewares: [connect({ transport })]\n    }).then((cache) => {\n      cache.provide('hasCache', async (context) =>\n        context.success(Boolean(await caches.match(String(context.data))))\n      )\n    })\n  )\n})"
         },
         {
           type: 'list',
@@ -343,12 +343,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// service-tab.ts：任意一个标签页可提供同步服务\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc/core'\n\nimport { createBroadcastChannelTransport } from '@migaia/rpc/browser/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('migaia-settings-v1')\nconst transport = createBroadcastChannelTransport(channel)\nconst settings = await createEndpoint({\n  id: 'settings-service',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nsettings.provide('readTheme', (context) => context.success(localStorage.getItem('theme') ?? 'system'))"
+          code: "// service-tab.ts：任意一个标签页可提供同步服务\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\n\nimport { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('migaia-settings-v1')\nconst transport = createBroadcastChannelTransport(channel)\nconst settings = await createEndpoint({\n  id: 'settings-service',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nsettings.provide('readTheme', (context) => context.success(localStorage.getItem('theme') ?? 'system'))"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// client-tab.ts：另一个同源标签页调用服务\nimport { connect, contract, createEndpoint, protocol, timeout } from '@migaia/rpc/core'\n\nimport { createBroadcastChannelTransport } from '@migaia/rpc/browser/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('migaia-settings-v1')\nconst transport = createBroadcastChannelTransport(channel)\nconst settings = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['settings-service'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport }), timeout({ timeoutMs: 2_000 })]\n})\n\nconst theme = await settings.send<string>('settings-service', 'readTheme', undefined)\n\nawait settings.dispose()\nchannel.close()"
+          code: "// client-tab.ts：另一个同源标签页调用服务\nimport { connect, contract, createEndpoint, protocol, timeout } from '@migaia/rpc-core'\n\nimport { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('migaia-settings-v1')\nconst transport = createBroadcastChannelTransport(channel)\nconst settings = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['settings-service'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport }), timeout({ timeoutMs: 2_000 })]\n})\n\nconst theme = await settings.send<string>('settings-service', 'readTheme', undefined)\n\nawait settings.dispose()\nchannel.close()"
         },
         {
           type: 'list',
@@ -401,12 +401,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// caller.ts：信令完成后，调用方创建可靠有序 DataChannel\nimport { connect, createEndpoint } from '@migaia/rpc/core'\nimport { createRtcDataChannelTransport } from '@migaia/rpc/browser/adapters/rtc-data-channel'\n\nimport { waitForOpen } from './rtc-channel.js'\n\nconst channel = peerConnection.createDataChannel('migaia-rpc', { ordered: true })\nawait waitForOpen(channel)\nconst transport = createRtcDataChannelTransport(channel)\nconst peer = await createEndpoint({\n  id: 'browser-a', targetIds: ['browser-b'], transport,\n  middlewares: [connect({ transport })]\n})\nconst profile = await peer.send('browser-b', 'readProfile', { userId: '42' })\nawait peer.dispose()\nchannel.close()"
+          code: "// caller.ts：信令完成后，调用方创建可靠有序 DataChannel\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'\n\nimport { waitForOpen } from './rtc-channel.js'\n\nconst channel = peerConnection.createDataChannel('migaia-rpc', { ordered: true })\nawait waitForOpen(channel)\nconst transport = createRtcDataChannelTransport(channel)\nconst peer = await createEndpoint({\n  id: 'browser-a', targetIds: ['browser-b'], transport,\n  middlewares: [connect({ transport })]\n})\nconst profile = await peer.send('browser-b', 'readProfile', { userId: '42' })\nawait peer.dispose()\nchannel.close()"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// receiver.ts：另一端从 datachannel 事件取得同一条逻辑链路\nimport { connect, createEndpoint } from '@migaia/rpc/core'\nimport { createRtcDataChannelTransport } from '@migaia/rpc/browser/adapters/rtc-data-channel'\n\nimport { waitForOpen } from './rtc-channel.js'\n\nconst loadProfile = async (userId: string) => ({ userId, displayName: 'Ada' })\n\npeerConnection.addEventListener('datachannel', (event) => {\n  const channel = event.channel\n  if (channel.label !== 'migaia-rpc') return\n  void waitForOpen(channel).then(async () => {\n    const transport = createRtcDataChannelTransport(channel)\n    const peer = await createEndpoint({\n      id: 'browser-b', transport, middlewares: [connect({ transport })]\n    })\n    peer.provide('readProfile', async (context) =>\n      context.success(await loadProfile((context.data as { userId: string }).userId))\n    )\n  })\n})"
+          code: "// receiver.ts：另一端从 datachannel 事件取得同一条逻辑链路\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'\n\nimport { waitForOpen } from './rtc-channel.js'\n\nconst loadProfile = async (userId: string) => ({ userId, displayName: 'Ada' })\n\npeerConnection.addEventListener('datachannel', (event) => {\n  const channel = event.channel\n  if (channel.label !== 'migaia-rpc') return\n  void waitForOpen(channel).then(async () => {\n    const transport = createRtcDataChannelTransport(channel)\n    const peer = await createEndpoint({\n      id: 'browser-b', transport, middlewares: [connect({ transport })]\n    })\n    peer.provide('readProfile', async (context) =>\n      context.success(await loadProfile((context.data as { userId: string }).userId))\n    )\n  })\n})"
         },
         {
           type: 'list',
@@ -454,12 +454,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// browser.ts：调用 HTTP/3 服务端公开的指标方法\nimport { connect, createEndpoint, protocol, timeout } from '@migaia/rpc/core'\nimport { createWebTransportDatagramTransport } from '@migaia/rpc/browser/adapters/web-transport'\n\nconst session = new WebTransport('https://api.example/rpc')\nawait session.ready\nconst transport = createWebTransportDatagramTransport(session.datagrams)\nconst codec = protocol({\n  encodedType: 'uint8array',\n  encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n  decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n})\nconst metrics = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['metrics-service'],\n  transport,\n  middlewares: [codec, connect({ transport }), timeout({ timeoutMs: 1_000 })]\n})\n\nconst snapshot = await metrics.send<{ cpu: number; at: number }>(\n  'metrics-service',\n  'latest',\n  undefined\n)\nconsole.log('metrics snapshot:', snapshot)\n\nawait metrics.dispose()\nsession.close()"
+          code: "// browser.ts：调用 HTTP/3 服务端公开的指标方法\nimport { connect, createEndpoint, protocol, timeout } from '@migaia/rpc-core'\nimport { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'\n\nconst session = new WebTransport('https://api.example/rpc')\nawait session.ready\nconst transport = createWebTransportDatagramTransport(session.datagrams)\nconst codec = protocol({\n  encodedType: 'uint8array',\n  encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n  decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n})\nconst metrics = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['metrics-service'],\n  transport,\n  middlewares: [codec, connect({ transport }), timeout({ timeoutMs: 1_000 })]\n})\n\nconst snapshot = await metrics.send<{ cpu: number; at: number }>(\n  'metrics-service',\n  'latest',\n  undefined\n)\nconsole.log('metrics snapshot:', snapshot)\n\nawait metrics.dispose()\nsession.close()"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// metrics-session.ts：由 HTTP/3 框架在认证并接受 session 后调用\nimport { connect, createEndpoint, protocol } from '@migaia/rpc/core'\nimport { createWebTransportDatagramTransport } from '@migaia/rpc/browser/adapters/web-transport'\n\ntype IAcceptedSession = {\n  datagrams: {\n    readable: ReadableStream<Uint8Array>\n    writable: WritableStream<Uint8Array>\n  }\n  closed: Promise<void>\n}\n\nexport async function serveMetrics(session: IAcceptedSession): Promise<void> {\n  const transport = createWebTransportDatagramTransport(session.datagrams)\n  const codec = protocol({\n    encodedType: 'uint8array',\n    encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n    decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n  })\n  const metrics = await createEndpoint({\n    id: 'metrics-service',\n    transport,\n    middlewares: [codec, connect({ transport })]\n  })\n\n  metrics.provide('latest', (context) =>\n    context.success({ cpu: 0.42, at: Date.now() })\n  )\n\n  await session.closed.finally(() => metrics.dispose())\n}"
+          code: "// metrics-session.ts：由 HTTP/3 框架在认证并接受 session 后调用\nimport { connect, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'\n\ntype IAcceptedSession = {\n  datagrams: {\n    readable: ReadableStream<Uint8Array>\n    writable: WritableStream<Uint8Array>\n  }\n  closed: Promise<void>\n}\n\nexport async function serveMetrics(session: IAcceptedSession): Promise<void> {\n  const transport = createWebTransportDatagramTransport(session.datagrams)\n  const codec = protocol({\n    encodedType: 'uint8array',\n    encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n    decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n  })\n  const metrics = await createEndpoint({\n    id: 'metrics-service',\n    transport,\n    middlewares: [codec, connect({ transport })]\n  })\n\n  metrics.provide('latest', (context) =>\n    context.success({ cpu: 0.42, at: Date.now() })\n  )\n\n  await session.closed.finally(() => metrics.dispose())\n}"
         },
         {
           type: 'list',
@@ -497,7 +497,7 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "import { connect, contract, createEndpoint, protocol } from '@migaia/rpc/core'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst calculator = await createEndpoint({\n  id: 'calculator',\n  transport: providerTransport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport: providerTransport })]\n})\ncalculator.provide('add', (context) => {\n  const { left, right } = context.data as { left: number; right: number }\n  return context.success(left + right)\n})\n\nconst app = await createEndpoint({\n  id: 'test-app',\n  targetIds: ['calculator'],\n  transport: clientTransport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport: clientTransport })]\n})\nconst result = await app.send<number>('calculator', 'add', { left: 20, right: 22 })\nconsole.assert(result === 42)\n\nawait Promise.all([app.dispose(), calculator.dispose()])"
+          code: "import { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst calculator = await createEndpoint({\n  id: 'calculator',\n  transport: providerTransport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport: providerTransport })]\n})\ncalculator.provide('add', (context) => {\n  const { left, right } = context.data as { left: number; right: number }\n  return context.success(left + right)\n})\n\nconst app = await createEndpoint({\n  id: 'test-app',\n  targetIds: ['calculator'],\n  transport: clientTransport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport: clientTransport })]\n})\nconst result = await app.send<number>('calculator', 'add', { left: 20, right: 22 })\nconsole.assert(result === 42)\n\nawait Promise.all([app.dispose(), calculator.dispose()])"
         },
         {
           type: 'list',
@@ -520,12 +520,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// parent.ts: call the iframe\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc/core'\n\nimport { createWindowMessageTransport } from '@migaia/rpc/browser/adapters/window'\n\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nawait new Promise<void>((resolve) => iframe.addEventListener('load', () => resolve(), { once: true }))\nconst childOrigin = new URL(iframe.src).origin\nconst transport = createWindowMessageTransport({ target: iframe.contentWindow!, receiver: window, targetOrigin: childOrigin })\nconst billing = await createEndpoint({\n  id: 'checkout-page', targetIds: ['billing-frame'], transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nconst total = await billing.send<number>('billing-frame', 'calculateTotal', { prices: [12, 30], taxRate: 0.08 })\nawait billing.dispose()"
+          code: "// parent.ts: call the iframe\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\n\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nawait new Promise<void>((resolve) => iframe.addEventListener('load', () => resolve(), { once: true }))\nconst childOrigin = new URL(iframe.src).origin\nconst transport = createWindowMessageTransport({ target: iframe.contentWindow!, receiver: window, targetOrigin: childOrigin })\nconst billing = await createEndpoint({\n  id: 'checkout-page', targetIds: ['billing-frame'], transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nconst total = await billing.send<number>('billing-frame', 'calculateTotal', { prices: [12, 30], taxRate: 0.08 })\nawait billing.dispose()"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// billing-frame.ts: expose a method to the parent\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc/core'\n\nimport { createWindowMessageTransport } from '@migaia/rpc/browser/adapters/window'\n\nconst transport = createWindowMessageTransport({ target: window.parent, receiver: window, targetOrigin: 'https://shop.example' })\nconst billing = await createEndpoint({\n  id: 'billing-frame', transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nbilling.provide('calculateTotal', (context) => {\n  const input = context.data as { prices: number[]; taxRate: number }\n  return context.success(input.prices.reduce((sum, price) => sum + price, 0) * (1 + input.taxRate))\n})"
+          code: "// billing-frame.ts: expose a method to the parent\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\n\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst transport = createWindowMessageTransport({ target: window.parent, receiver: window, targetOrigin: 'https://shop.example' })\nconst billing = await createEndpoint({\n  id: 'billing-frame', transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nbilling.provide('calculateTotal', (context) => {\n  const input = context.data as { prices: number[]; taxRate: number }\n  return context.success(input.prices.reduce((sum, price) => sum + price, 0) * (1 + input.taxRate))\n})"
         },
         {
           type: 'list',
@@ -573,12 +573,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// main.ts: transfer one dedicated port to the Worker\nimport { connect, createEndpoint } from '@migaia/rpc/core'\nimport { createBrowserMessagePortTransport } from '@migaia/rpc/core/adapters/message-port'\n\nconst worker = new Worker(new URL('./search.worker.ts', import.meta.url), { type: 'module' })\nconst { port1, port2 } = new MessageChannel()\nworker.postMessage({ type: 'rpc-port', port: port2 }, [port2])\nconst transport = createBrowserMessagePortTransport(port1, { ownership: 'owned' })\nconst search = await createEndpoint({\n  id: 'search-page', targetIds: ['search-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst matches = await search.send<string[]>('search-worker', 'find', { query: 'migaia' })\nawait search.dispose()\nworker.terminate()"
+          code: "// main.ts: transfer one dedicated port to the Worker\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createBrowserMessagePortTransport } from '@migaia/rpc-core/adapters/message-port'\n\nconst worker = new Worker(new URL('./search.worker.ts', import.meta.url), { type: 'module' })\nconst { port1, port2 } = new MessageChannel()\nworker.postMessage({ type: 'rpc-port', port: port2 }, [port2])\nconst transport = createBrowserMessagePortTransport(port1, { ownership: 'owned' })\nconst search = await createEndpoint({\n  id: 'search-page', targetIds: ['search-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst matches = await search.send<string[]>('search-worker', 'find', { query: 'migaia' })\nawait search.dispose()\nworker.terminate()"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// search.worker.ts: receive port2 and expose a method on that link\nimport { connect, createEndpoint } from '@migaia/rpc/core'\nimport { createBrowserMessagePortTransport } from '@migaia/rpc/core/adapters/message-port'\n\nself.addEventListener('message', (event: MessageEvent) => {\n  if (event.data?.type !== 'rpc-port') return\n  const port = event.data.port as MessagePort\nconst index = ['migaia', 'storage', 'rpc']\n  const transport = createBrowserMessagePortTransport(port, { ownership: 'owned' })\n  void createEndpoint({\n    id: 'search-worker', transport, middlewares: [connect({ transport })]\n  }).then((search) => {\n    search.provide('find', (context) => {\n      const { query } = context.data as { query: string }\n      return context.success(index.filter((item) => item.includes(query)))\n    })\n  })\n})"
+          code: "// search.worker.ts: receive port2 and expose a method on that link\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createBrowserMessagePortTransport } from '@migaia/rpc-core/adapters/message-port'\n\nself.addEventListener('message', (event: MessageEvent) => {\n  if (event.data?.type !== 'rpc-port') return\n  const port = event.data.port as MessagePort\nconst index = ['migaia', 'storage', 'rpc']\n  const transport = createBrowserMessagePortTransport(port, { ownership: 'owned' })\n  void createEndpoint({\n    id: 'search-worker', transport, middlewares: [connect({ transport })]\n  }).then((search) => {\n    search.provide('find', (context) => {\n      const { query } = context.data as { query: string }\n      return context.success(index.filter((item) => item.includes(query)))\n    })\n  })\n})"
         },
         {
           type: 'list',
@@ -630,12 +630,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// main.ts\nimport { MessageChannel, Worker } from 'node:worker_threads'\nimport { connect, createEndpoint } from '@migaia/rpc/core'\nimport { createNodeMessagePortTransport } from '@migaia/rpc/core/adapters/message-port'\n\nconst worker = new Worker(new URL('./hash.worker.js', import.meta.url))\nconst { port1, port2 } = new MessageChannel()\nworker.postMessage({ type: 'rpc-port', port: port2 }, [port2])\nconst transport = createNodeMessagePortTransport(port1)\nconst hashing = await createEndpoint({\n  id: 'node-main', targetIds: ['hash-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst digest = await hashing.send<string>('hash-worker', 'sha256', 'hello')\nawait hashing.dispose()\nawait worker.terminate()"
+          code: "// main.ts\nimport { MessageChannel, Worker } from 'node:worker_threads'\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createNodeMessagePortTransport } from '@migaia/rpc-core/adapters/message-port'\n\nconst worker = new Worker(new URL('./hash.worker.js', import.meta.url))\nconst { port1, port2 } = new MessageChannel()\nworker.postMessage({ type: 'rpc-port', port: port2 }, [port2])\nconst transport = createNodeMessagePortTransport(port1)\nconst hashing = await createEndpoint({\n  id: 'node-main', targetIds: ['hash-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst digest = await hashing.send<string>('hash-worker', 'sha256', 'hello')\nawait hashing.dispose()\nawait worker.terminate()"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// hash.worker.ts\nimport { parentPort, type MessagePort } from 'node:worker_threads'\nimport { createHash } from 'node:crypto'\nimport { connect, createEndpoint } from '@migaia/rpc/core'\nimport { createNodeMessagePortTransport } from '@migaia/rpc/core/adapters/message-port'\n\nparentPort?.once('message', (message: { type: string; port: MessagePort }) => {\n  if (message.type !== 'rpc-port') return\n  const transport = createNodeMessagePortTransport(message.port)\n  void createEndpoint({\n    id: 'hash-worker', transport, middlewares: [connect({ transport })]\n  }).then((hashing) => {\n    hashing.provide('sha256', (context) =>\n      context.success(createHash('sha256').update(String(context.data)).digest('hex'))\n    )\n  })\n})"
+          code: "// hash.worker.ts\nimport { parentPort, type MessagePort } from 'node:worker_threads'\nimport { createHash } from 'node:crypto'\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createNodeMessagePortTransport } from '@migaia/rpc-core/adapters/message-port'\n\nparentPort?.once('message', (message: { type: string; port: MessagePort }) => {\n  if (message.type !== 'rpc-port') return\n  const transport = createNodeMessagePortTransport(message.port)\n  void createEndpoint({\n    id: 'hash-worker', transport, middlewares: [connect({ transport })]\n  }).then((hashing) => {\n    hashing.provide('sha256', (context) =>\n      context.success(createHash('sha256').update(String(context.data)).digest('hex'))\n    )\n  })\n})"
         },
         {
           type: 'list',
@@ -661,12 +661,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// main.ts: call the Worker\nimport { connect, contract, createEndpoint, protocol, timeout } from '@migaia/rpc/core'\n\nimport { createWebWorkerTransport } from '@migaia/rpc/browser/adapters/web-worker'\n\nconst worker = new Worker(new URL('./image.worker.ts', import.meta.url), { type: 'module' })\nconst transport = createWebWorkerTransport(worker, { peerId: 'image-worker' })\nconst images = await createEndpoint({\n  id: 'editor-page', targetIds: ['image-worker'], transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport }), timeout({ timeoutMs: 30_000 })]\n})\nconst thumbnail = await images.send<Blob>('image-worker', 'resize', { file: new Blob(['demo']), width: 320 })\nawait images.dispose()\nworker.terminate()"
+          code: "// main.ts: call the Worker\nimport { connect, contract, createEndpoint, protocol, timeout } from '@migaia/rpc-core'\n\nimport { createWebWorkerTransport } from '@migaia/rpc-core/adapters/web-worker'\n\nconst worker = new Worker(new URL('./image.worker.ts', import.meta.url), { type: 'module' })\nconst transport = createWebWorkerTransport(worker, { peerId: 'image-worker' })\nconst images = await createEndpoint({\n  id: 'editor-page', targetIds: ['image-worker'], transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport }), timeout({ timeoutMs: 30_000 })]\n})\nconst thumbnail = await images.send<Blob>('image-worker', 'resize', { file: new Blob(['demo']), width: 320 })\nawait images.dispose()\nworker.terminate()"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// image.worker.ts: handle the call and return a result\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc/core'\n\nimport { createWebWorkerTransport } from '@migaia/rpc/browser/adapters/web-worker'\n\nconst scope = globalThis as unknown as DedicatedWorkerGlobalScope\nconst transport = createWebWorkerTransport(scope)\nconst images = await createEndpoint({\n  id: 'image-worker', transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst resizeImage = async (file: Blob, width: number): Promise<Blob> => {\n  const bitmap = await createImageBitmap(file)\n  const canvas = new OffscreenCanvas(width, Math.round(bitmap.height * width / bitmap.width))\n  const context = canvas.getContext('2d')\n  if (!context) throw new Error('2D canvas is unavailable')\n  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)\n  bitmap.close()\n  return canvas.convertToBlob({ type: 'image/webp' })\n}\nimages.provide('resize', async (context) => {\n  const { file, width } = context.data as { file: Blob; width: number }\n  return context.success(await resizeImage(file, width))\n})"
+          code: "// image.worker.ts: handle the call and return a result\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\n\nimport { createWebWorkerTransport } from '@migaia/rpc-core/adapters/web-worker'\n\nconst scope = globalThis as unknown as DedicatedWorkerGlobalScope\nconst transport = createWebWorkerTransport(scope)\nconst images = await createEndpoint({\n  id: 'image-worker', transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst resizeImage = async (file: Blob, width: number): Promise<Blob> => {\n  const bitmap = await createImageBitmap(file)\n  const canvas = new OffscreenCanvas(width, Math.round(bitmap.height * width / bitmap.width))\n  const context = canvas.getContext('2d')\n  if (!context) throw new Error('2D canvas is unavailable')\n  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)\n  bitmap.close()\n  return canvas.convertToBlob({ type: 'image/webp' })\n}\nimages.provide('resize', async (context) => {\n  const { file, width } = context.data as { file: Blob; width: number }\n  return context.success(await resizeImage(file, width))\n})"
         },
         {
           type: 'list',
@@ -723,12 +723,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// page.ts: each tab creates its own endpoint\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc/core'\n\nimport { createSharedWorkerTransport } from '@migaia/rpc/browser/adapters/shared-worker'\n\nconst worker = new SharedWorker(new URL('./counter.worker.ts', import.meta.url), { type: 'module' })\nworker.port.start()\nconst transport = createSharedWorkerTransport(worker.port)\nconst counter = await createEndpoint({\n  id: crypto.randomUUID(), targetIds: ['shared-counter'], transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nconst value = await counter.send<number>('shared-counter', 'increment', undefined)"
+          code: "// page.ts: each tab creates its own endpoint\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\n\nimport { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'\n\nconst worker = new SharedWorker(new URL('./counter.worker.ts', import.meta.url), { type: 'module' })\nworker.port.start()\nconst transport = createSharedWorkerTransport(worker.port)\nconst counter = await createEndpoint({\n  id: crypto.randomUUID(), targetIds: ['shared-counter'], transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nconst value = await counter.send<number>('shared-counter', 'increment', undefined)"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// counter.worker.ts: attach every connection port\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc/core'\n\nimport { createSharedWorkerTransport } from '@migaia/rpc/browser/adapters/shared-worker'\n\nlet value = 0\nself.addEventListener('connect', (event: MessageEvent) => {\n  const port = event.ports[0]\n  port.start()\n  const transport = createSharedWorkerTransport(port)\n  void createEndpoint({\n    id: 'shared-counter', transport,\n    middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n  }).then((counter) => counter.provide('increment', (context) => context.success(++value)))\n})"
+          code: "// counter.worker.ts: attach every connection port\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\n\nimport { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'\n\nlet value = 0\nself.addEventListener('connect', (event: MessageEvent) => {\n  const port = event.ports[0]\n  port.start()\n  const transport = createSharedWorkerTransport(port)\n  void createEndpoint({\n    id: 'shared-counter', transport,\n    middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n  }).then((counter) => counter.provide('increment', (context) => context.success(++value)))\n})"
         },
         {
           type: 'list',
@@ -785,12 +785,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// page.ts\nimport { connect, createEndpoint } from '@migaia/rpc/core'\nimport { createServiceWorkerTransport } from '@migaia/rpc/browser/adapters/service-worker'\n\nawait navigator.serviceWorker.ready\nconst controller = navigator.serviceWorker.controller\nif (!controller) throw new Error('Reload once so the ServiceWorker controls this page')\nconst clientId = crypto.randomUUID()\ncontroller.postMessage({ type: 'rpc-connect', clientId })\nconst transport = createServiceWorkerTransport({\n  target: controller, receiver: navigator.serviceWorker, peerId: 'service-worker'\n})\nconst cache = await createEndpoint({\n  id: clientId, targetIds: ['service-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst cached = await cache.send<boolean>('service-worker', 'hasCache', '/catalog.json')"
+          code: "// page.ts\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\nawait navigator.serviceWorker.ready\nconst controller = navigator.serviceWorker.controller\nif (!controller) throw new Error('Reload once so the ServiceWorker controls this page')\nconst clientId = crypto.randomUUID()\ncontroller.postMessage({ type: 'rpc-connect', clientId })\nconst transport = createServiceWorkerTransport({\n  target: controller, receiver: navigator.serviceWorker, peerId: 'service-worker'\n})\nconst cache = await createEndpoint({\n  id: clientId, targetIds: ['service-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst cached = await cache.send<boolean>('service-worker', 'hasCache', '/catalog.json')"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// service-worker.ts\nimport { connect, createEndpoint } from '@migaia/rpc/core'\nimport { createServiceWorkerTransport } from '@migaia/rpc/browser/adapters/service-worker'\n\nself.addEventListener('message', (event: ExtendableMessageEvent) => {\n  if (event.data?.type !== 'rpc-connect' || !event.source) return\n  const client = event.source as Client\n  const transport = createServiceWorkerTransport({\n    target: client, receiver: self, peerId: event.data.clientId\n  })\n  event.waitUntil(\n    createEndpoint({\n      id: 'service-worker', transport, middlewares: [connect({ transport })]\n    }).then((cache) => {\n      cache.provide('hasCache', async (context) =>\n        context.success(Boolean(await caches.match(String(context.data))))\n      )\n    })\n  )\n})"
+          code: "// service-worker.ts\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\nself.addEventListener('message', (event: ExtendableMessageEvent) => {\n  if (event.data?.type !== 'rpc-connect' || !event.source) return\n  const client = event.source as Client\n  const transport = createServiceWorkerTransport({\n    target: client, receiver: self, peerId: event.data.clientId\n  })\n  event.waitUntil(\n    createEndpoint({\n      id: 'service-worker', transport, middlewares: [connect({ transport })]\n    }).then((cache) => {\n      cache.provide('hasCache', async (context) =>\n        context.success(Boolean(await caches.match(String(context.data))))\n      )\n    })\n  )\n})"
         },
         {
           type: 'list',
@@ -855,12 +855,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// service-tab.ts: one tab provides the service\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc/core'\n\nimport { createBroadcastChannelTransport } from '@migaia/rpc/browser/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('migaia-settings-v1')\nconst transport = createBroadcastChannelTransport(channel)\nconst settings = await createEndpoint({\n  id: 'settings-service', transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nsettings.provide('readTheme', (context) => context.success(localStorage.getItem('theme') ?? 'system'))"
+          code: "// service-tab.ts: one tab provides the service\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\n\nimport { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('migaia-settings-v1')\nconst transport = createBroadcastChannelTransport(channel)\nconst settings = await createEndpoint({\n  id: 'settings-service', transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nsettings.provide('readTheme', (context) => context.success(localStorage.getItem('theme') ?? 'system'))"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// client-tab.ts: another same-origin tab calls it\nimport { connect, contract, createEndpoint, protocol, timeout } from '@migaia/rpc/core'\n\nimport { createBroadcastChannelTransport } from '@migaia/rpc/browser/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('migaia-settings-v1')\nconst transport = createBroadcastChannelTransport(channel)\nconst settings = await createEndpoint({\n  id: crypto.randomUUID(), targetIds: ['settings-service'], transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport }), timeout({ timeoutMs: 2_000 })]\n})\nconst theme = await settings.send<string>('settings-service', 'readTheme', undefined)\nawait settings.dispose()\nchannel.close()"
+          code: "// client-tab.ts: another same-origin tab calls it\nimport { connect, contract, createEndpoint, protocol, timeout } from '@migaia/rpc-core'\n\nimport { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('migaia-settings-v1')\nconst transport = createBroadcastChannelTransport(channel)\nconst settings = await createEndpoint({\n  id: crypto.randomUUID(), targetIds: ['settings-service'], transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport }), timeout({ timeoutMs: 2_000 })]\n})\nconst theme = await settings.send<string>('settings-service', 'readTheme', undefined)\nawait settings.dispose()\nchannel.close()"
         },
         {
           type: 'list',
@@ -921,12 +921,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// caller.ts: create a reliable ordered DataChannel after signaling\nimport { connect, createEndpoint } from '@migaia/rpc/core'\nimport { createRtcDataChannelTransport } from '@migaia/rpc/browser/adapters/rtc-data-channel'\n\nimport { waitForOpen } from './rtc-channel.js'\n\nconst channel = peerConnection.createDataChannel('migaia-rpc', { ordered: true })\nawait waitForOpen(channel)\nconst transport = createRtcDataChannelTransport(channel)\nconst peer = await createEndpoint({\n  id: 'browser-a', targetIds: ['browser-b'], transport,\n  middlewares: [connect({ transport })]\n})\nconst profile = await peer.send('browser-b', 'readProfile', { userId: '42' })\nawait peer.dispose()\nchannel.close()"
+          code: "// caller.ts: create a reliable ordered DataChannel after signaling\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'\n\nimport { waitForOpen } from './rtc-channel.js'\n\nconst channel = peerConnection.createDataChannel('migaia-rpc', { ordered: true })\nawait waitForOpen(channel)\nconst transport = createRtcDataChannelTransport(channel)\nconst peer = await createEndpoint({\n  id: 'browser-a', targetIds: ['browser-b'], transport,\n  middlewares: [connect({ transport })]\n})\nconst profile = await peer.send('browser-b', 'readProfile', { userId: '42' })\nawait peer.dispose()\nchannel.close()"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// receiver.ts: obtain the paired channel from the datachannel event\nimport { connect, createEndpoint } from '@migaia/rpc/core'\nimport { createRtcDataChannelTransport } from '@migaia/rpc/browser/adapters/rtc-data-channel'\n\nimport { waitForOpen } from './rtc-channel.js'\n\nconst loadProfile = async (userId: string) => ({ userId, displayName: 'Ada' })\n\npeerConnection.addEventListener('datachannel', (event) => {\n  const channel = event.channel\n  if (channel.label !== 'migaia-rpc') return\n  void waitForOpen(channel).then(async () => {\n    const transport = createRtcDataChannelTransport(channel)\n    const peer = await createEndpoint({\n      id: 'browser-b', transport, middlewares: [connect({ transport })]\n    })\n    peer.provide('readProfile', async (context) =>\n      context.success(await loadProfile((context.data as { userId: string }).userId))\n    )\n  })\n})"
+          code: "// receiver.ts: obtain the paired channel from the datachannel event\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'\n\nimport { waitForOpen } from './rtc-channel.js'\n\nconst loadProfile = async (userId: string) => ({ userId, displayName: 'Ada' })\n\npeerConnection.addEventListener('datachannel', (event) => {\n  const channel = event.channel\n  if (channel.label !== 'migaia-rpc') return\n  void waitForOpen(channel).then(async () => {\n    const transport = createRtcDataChannelTransport(channel)\n    const peer = await createEndpoint({\n      id: 'browser-b', transport, middlewares: [connect({ transport })]\n    })\n    peer.provide('readProfile', async (context) =>\n      context.success(await loadProfile((context.data as { userId: string }).userId))\n    )\n  })\n})"
         },
         {
           type: 'list',
@@ -990,12 +990,12 @@ const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = 
         {
           type: 'code',
           language: 'ts',
-          code: "// browser.ts: call the metric method exposed by the HTTP/3 server\nimport { connect, createEndpoint, protocol, timeout } from '@migaia/rpc/core'\nimport { createWebTransportDatagramTransport } from '@migaia/rpc/browser/adapters/web-transport'\n\nconst session = new WebTransport('https://api.example/rpc')\nawait session.ready\nconst transport = createWebTransportDatagramTransport(session.datagrams)\nconst codec = protocol({\n  encodedType: 'uint8array',\n  encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n  decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n})\nconst metrics = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['metrics-service'],\n  transport,\n  middlewares: [codec, connect({ transport }), timeout({ timeoutMs: 1_000 })]\n})\n\nconst snapshot = await metrics.send<{ cpu: number; at: number }>(\n  'metrics-service',\n  'latest',\n  undefined\n)\nconsole.log('metrics snapshot:', snapshot)\n\nawait metrics.dispose()\nsession.close()"
+          code: "// browser.ts: call the metric method exposed by the HTTP/3 server\nimport { connect, createEndpoint, protocol, timeout } from '@migaia/rpc-core'\nimport { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'\n\nconst session = new WebTransport('https://api.example/rpc')\nawait session.ready\nconst transport = createWebTransportDatagramTransport(session.datagrams)\nconst codec = protocol({\n  encodedType: 'uint8array',\n  encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n  decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n})\nconst metrics = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['metrics-service'],\n  transport,\n  middlewares: [codec, connect({ transport }), timeout({ timeoutMs: 1_000 })]\n})\n\nconst snapshot = await metrics.send<{ cpu: number; at: number }>(\n  'metrics-service',\n  'latest',\n  undefined\n)\nconsole.log('metrics snapshot:', snapshot)\n\nawait metrics.dispose()\nsession.close()"
         },
         {
           type: 'code',
           language: 'ts',
-          code: "// metrics-session.ts: called after the HTTP/3 framework authenticates and accepts a session\nimport { connect, createEndpoint, protocol } from '@migaia/rpc/core'\nimport { createWebTransportDatagramTransport } from '@migaia/rpc/browser/adapters/web-transport'\n\ntype IAcceptedSession = {\n  datagrams: {\n    readable: ReadableStream<Uint8Array>\n    writable: WritableStream<Uint8Array>\n  }\n  closed: Promise<void>\n}\n\nexport async function serveMetrics(session: IAcceptedSession): Promise<void> {\n  const transport = createWebTransportDatagramTransport(session.datagrams)\n  const codec = protocol({\n    encodedType: 'uint8array',\n    encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n    decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n  })\n  const metrics = await createEndpoint({\n    id: 'metrics-service',\n    transport,\n    middlewares: [codec, connect({ transport })]\n  })\n\n  metrics.provide('latest', (context) =>\n    context.success({ cpu: 0.42, at: Date.now() })\n  )\n\n  await session.closed.finally(() => metrics.dispose())\n}"
+          code: "// metrics-session.ts: called after the HTTP/3 framework authenticates and accepts a session\nimport { connect, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'\n\ntype IAcceptedSession = {\n  datagrams: {\n    readable: ReadableStream<Uint8Array>\n    writable: WritableStream<Uint8Array>\n  }\n  closed: Promise<void>\n}\n\nexport async function serveMetrics(session: IAcceptedSession): Promise<void> {\n  const transport = createWebTransportDatagramTransport(session.datagrams)\n  const codec = protocol({\n    encodedType: 'uint8array',\n    encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n    decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n  })\n  const metrics = await createEndpoint({\n    id: 'metrics-service',\n    transport,\n    middlewares: [codec, connect({ transport })]\n  })\n\n  metrics.provide('latest', (context) =>\n    context.success({ cpu: 0.42, at: Date.now() })\n  )\n\n  await session.closed.finally(() => metrics.dispose())\n}"
         },
         {
           type: 'list',
@@ -13322,7 +13322,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       ]
     }
   },
-  'rpc:index': {
+  'rpc-core:index': {
     zh: {
       title: 'RPC 学习路径',
       lede: '先选择最窄 endpoint 表面与真实 transport，再逐步加入 provider、契约、发现、控制、分片和生命周期策略。',
@@ -13476,7 +13476,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       ]
     }
   },
-  'rpc:getting-started': {
+  'rpc-core:getting-started': {
     zh: {
       title: '五分钟建立可释放的 RPC 调用链',
       lede: '用一对 Memory transport、最窄 client/provider preset 和同一组基础 middleware 完成请求、响应与释放闭环。',
@@ -13489,7 +13489,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect, contract, protocol, timeout } from '@migaia/rpc/core'\nimport { createClientEndpoint } from '@migaia/rpc/core/client'\nimport { createProviderEndpoint } from '@migaia/rpc/core/provider'\n\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst provider = await createProviderEndpoint({\n  id: 'provider',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ] as const\n})\n\nconst client = await createClientEndpoint({\n  id: 'client',\n  targetIds: ['provider'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport }),\n    timeout({ timeoutMs: 5_000 })\n  ] as const\n})"
+                code: "import { connect, contract, protocol, timeout } from '@migaia/rpc-core'\nimport { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { createProviderEndpoint } from '@migaia/rpc-core/provider'\n\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst provider = await createProviderEndpoint({\n  id: 'provider',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ] as const\n})\n\nconst client = await createClientEndpoint({\n  id: 'client',\n  targetIds: ['provider'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport }),\n    timeout({ timeoutMs: 5_000 })\n  ] as const\n})"
               },
               {
                 type: 'list',
@@ -13565,7 +13565,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       next: [
         { label: '五分钟建立首条调用链', path: 'getting-started' },
         { label: 'Provider 与契约', path: 'providers-and-contracts' },
-        { label: 'createClientEndpoint API', path: 'docs/rpc/core/client/createClientEndpoint' }
+        { label: 'createClientEndpoint API', path: 'docs/rpc-core/client/createClientEndpoint' }
       ]
     },
     en: {
@@ -13580,7 +13580,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect, contract, protocol, timeout } from '@migaia/rpc/core'\nimport { createClientEndpoint } from '@migaia/rpc/core/client'\nimport { createProviderEndpoint } from '@migaia/rpc/core/provider'\n\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst provider = await createProviderEndpoint({\n  id: 'provider',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ] as const\n})\n\nconst client = await createClientEndpoint({\n  id: 'client',\n  targetIds: ['provider'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport }),\n    timeout({ timeoutMs: 5_000 })\n  ] as const\n})"
+                code: "import { connect, contract, protocol, timeout } from '@migaia/rpc-core'\nimport { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { createProviderEndpoint } from '@migaia/rpc-core/provider'\n\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst provider = await createProviderEndpoint({\n  id: 'provider',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ] as const\n})\n\nconst client = await createClientEndpoint({\n  id: 'client',\n  targetIds: ['provider'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport }),\n    timeout({ timeoutMs: 5_000 })\n  ] as const\n})"
               },
               {
                 type: 'list',
@@ -13684,11 +13684,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       next: [
         { label: 'Build the first call path in five minutes', path: 'getting-started' },
         { label: 'Providers and contracts', path: 'providers-and-contracts' },
-        { label: 'createClientEndpoint API', path: 'docs/rpc/core/client/createClientEndpoint' }
+        { label: 'createClientEndpoint API', path: 'docs/rpc-core/client/createClientEndpoint' }
       ]
     }
   },
-  'rpc:endpoint-composition': {
+  'rpc-core:endpoint-composition': {
     zh: {
       title: '四个 Peer/Plugin 工厂：来源、类型与所有权',
       lede: '先区分进程或 Worker，再决定独立 Peer 或 PluginHost 所有。provide/expose 决定真正公开的方法，目录由库生成。',
@@ -13736,7 +13736,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createPeerPair } from '@migaia/rpc/testing'\n\nconst pair = await createPeerPair({\n  a: { provide: { echo: (text: string) => text } },\n  b: { provide: { double: (value: number) => value * 2 } }\n})\ntry {\n  console.log(await pair.a.request('double', 21))\n  console.log(await pair.b.request('echo', 'ready'))\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n}"
+                code: "import { createPeerPair } from '@migaia/rpc-core/testing'\n\nconst pair = await createPeerPair({\n  a: { provide: { echo: (text: string) => text } },\n  b: { provide: { double: (value: number) => value * 2 } }\n})\ntry {\n  console.log(await pair.a.request('double', 21))\n  console.log(await pair.b.request('echo', 'ready'))\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n}"
               },
               {
                 type: 'paragraph',
@@ -13759,11 +13759,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       next: [
         {
           label: '独立进程 Peer',
-          path: 'docs/rpc/process/createProcessPeer'
+          path: 'docs/rpc-process/createProcessPeer'
         },
         {
           label: '独立 Worker Peer',
-          path: 'docs/rpc/threads/createThreadPeer'
+          path: 'docs/rpc-threads/createThreadPeer'
         },
         {
           label: '载体与安全边界',
@@ -13818,7 +13818,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createPeerPair } from '@migaia/rpc/testing'\n\nconst pair = await createPeerPair({\n  a: { provide: { echo: (text: string) => text } },\n  b: { provide: { double: (value: number) => value * 2 } }\n})\ntry {\n  console.log(await pair.a.request('double', 21))\n  console.log(await pair.b.request('echo', 'ready'))\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n}"
+                code: "import { createPeerPair } from '@migaia/rpc-core/testing'\n\nconst pair = await createPeerPair({\n  a: { provide: { echo: (text: string) => text } },\n  b: { provide: { double: (value: number) => value * 2 } }\n})\ntry {\n  console.log(await pair.a.request('double', 21))\n  console.log(await pair.b.request('echo', 'ready'))\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n}"
               },
               {
                 type: 'paragraph',
@@ -13841,11 +13841,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       next: [
         {
           label: 'process Peer',
-          path: 'docs/rpc/process/createProcessPeer'
+          path: 'docs/rpc-process/createProcessPeer'
         },
         {
           label: 'Worker Peer',
-          path: 'docs/rpc/threads/createThreadPeer'
+          path: 'docs/rpc-threads/createThreadPeer'
         },
         {
           label: 'Transport and security',
@@ -13854,7 +13854,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       ]
     }
   },
-  'rpc:extension-authoring': {
+  'rpc-core:extension-authoring': {
     zh: {
       title: '扩展 RPC：Feature 边界与自定义 Middleware',
       lede: 'Feature 改变 Endpoint 的根能力，middleware 改变运行策略。当前公开扩展点允许编写 middleware，但 Feature token 仍由 RPC 包拥有。',
@@ -13898,7 +13898,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import type { IRpcPlugin } from '@migaia/rpc/core'\n\nconst emptyClaims = Object.freeze({\n  routes: [],\n  provides: [],\n  consumes: [],\n  publicKeys: [],\n  exposedKeys: [],\n  activator: false\n})\n\nexport function reportTransportErrors(\n  report: (error: unknown) => void\n): IRpcPlugin {\n  return Object.freeze({\n    name: 'app:report-transport-errors',\n    metadata: Object.freeze({ claims: emptyClaims }),\n    install(scope) {\n      const unsubscribe = scope.transport.onTransportError?.(report)\n\n      if (unsubscribe) {\n        // scope owns cleanup; endpoint.dispose() and construction rollback both call it.\n        scope.own(unsubscribe, () => unsubscribe())\n      }\n\n      return {\n        extension: Object.freeze({}),\n        ports: Object.freeze({})\n      }\n    }\n  })\n}"
+                code: "import type { IRpcPlugin } from '@migaia/rpc-core'\n\nconst emptyClaims = Object.freeze({\n  routes: [],\n  provides: [],\n  consumes: [],\n  publicKeys: [],\n  exposedKeys: [],\n  activator: false\n})\n\nexport function reportTransportErrors(\n  report: (error: unknown) => void\n): IRpcPlugin {\n  return Object.freeze({\n    name: 'app:report-transport-errors',\n    metadata: Object.freeze({ claims: emptyClaims }),\n    install(scope) {\n      const unsubscribe = scope.transport.onTransportError?.(report)\n\n      if (unsubscribe) {\n        // scope owns cleanup; endpoint.dispose() and construction rollback both call it.\n        scope.own(unsubscribe, () => unsubscribe())\n      }\n\n      return {\n        extension: Object.freeze({}),\n        ports: Object.freeze({})\n      }\n    }\n  })\n}"
               },
               {
                 type: 'list',
@@ -13919,7 +13919,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect } from '@migaia/rpc/core'\nimport { createClientEndpoint } from '@migaia/rpc/core/client'\nimport { reportTransportErrors } from './report-transport-errors.js'\n\ntype IDiagnostics = { capture(error: unknown): void }\n\nexport async function callCatalog(\n  transport: Parameters<typeof createClientEndpoint>[0]['transport'],\n  diagnostics: IDiagnostics\n) {\n  const client = await createClientEndpoint({\n    id: 'storefront',\n    targetIds: ['catalog'],\n    transport,\n    middlewares: [\n      connect({ transport }),\n      reportTransportErrors((error) => diagnostics.capture(error))\n    ] as const\n  })\n\n  try {\n    const product = await client.send<{ id: string; name: string }>(\n      'catalog',\n      'findProduct',\n      { id: 'sku-42' }\n    )\n    console.log(product)\n    return product\n  } finally {\n    await client.dispose() // 同时解除 transport error 订阅\n  }\n}"
+                code: "import { connect } from '@migaia/rpc-core'\nimport { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { reportTransportErrors } from './report-transport-errors.js'\n\ntype IDiagnostics = { capture(error: unknown): void }\n\nexport async function callCatalog(\n  transport: Parameters<typeof createClientEndpoint>[0]['transport'],\n  diagnostics: IDiagnostics\n) {\n  const client = await createClientEndpoint({\n    id: 'storefront',\n    targetIds: ['catalog'],\n    transport,\n    middlewares: [\n      connect({ transport }),\n      reportTransportErrors((error) => diagnostics.capture(error))\n    ] as const\n  })\n\n  try {\n    const product = await client.send<{ id: string; name: string }>(\n      'catalog',\n      'findProduct',\n      { id: 'sku-42' }\n    )\n    console.log(product)\n    return product\n  } finally {\n    await client.dispose() // 同时解除 transport error 订阅\n  }\n}"
               },
               {
                 type: 'paragraph',
@@ -13946,7 +13946,9 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '返回 Endpoint 选择指南', path: 'endpoint-composition' },
-        { label: 'Hooks 与生命周期 API', path: 'docs/rpc/core/hooks' }
+        { label: 'Hooks 与生命周期 API', path: 'docs/rpc-core/hooks' },
+        { label: 'Contract framing 规范', path: 'docs/rpc-contract/framing' },
+        { label: 'Contract handshake 规范', path: 'docs/rpc-contract/handshake' }
       ]
     },
     en: {
@@ -13992,7 +13994,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import type { IRpcPlugin } from '@migaia/rpc/core'\n\nconst emptyClaims = Object.freeze({\n  routes: [], provides: [], consumes: [],\n  publicKeys: [], exposedKeys: [], activator: false\n})\n\nexport function reportTransportErrors(\n  report: (error: unknown) => void\n): IRpcPlugin {\n  return Object.freeze({\n    name: 'app:report-transport-errors',\n    metadata: Object.freeze({ claims: emptyClaims }),\n    install(scope) {\n      const unsubscribe = scope.transport.onTransportError?.(report)\n      if (unsubscribe) scope.own(unsubscribe, () => unsubscribe())\n\n      return {\n        extension: Object.freeze({}),\n        ports: Object.freeze({})\n      }\n    }\n  })\n}"
+                code: "import type { IRpcPlugin } from '@migaia/rpc-core'\n\nconst emptyClaims = Object.freeze({\n  routes: [], provides: [], consumes: [],\n  publicKeys: [], exposedKeys: [], activator: false\n})\n\nexport function reportTransportErrors(\n  report: (error: unknown) => void\n): IRpcPlugin {\n  return Object.freeze({\n    name: 'app:report-transport-errors',\n    metadata: Object.freeze({ claims: emptyClaims }),\n    install(scope) {\n      const unsubscribe = scope.transport.onTransportError?.(report)\n      if (unsubscribe) scope.own(unsubscribe, () => unsubscribe())\n\n      return {\n        extension: Object.freeze({}),\n        ports: Object.freeze({})\n      }\n    }\n  })\n}"
               },
               {
                 type: 'list',
@@ -14013,7 +14015,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect } from '@migaia/rpc/core'\nimport { createClientEndpoint } from '@migaia/rpc/core/client'\nimport { reportTransportErrors } from './report-transport-errors.js'\n\ntype IDiagnostics = { capture(error: unknown): void }\n\nexport async function callCatalog(\n  transport: Parameters<typeof createClientEndpoint>[0]['transport'],\n  diagnostics: IDiagnostics\n) {\n  const client = await createClientEndpoint({\n    id: 'storefront',\n    targetIds: ['catalog'],\n    transport,\n    middlewares: [\n      connect({ transport }),\n      reportTransportErrors((error) => diagnostics.capture(error))\n    ] as const\n  })\n\n  try {\n    const product = await client.send<{ id: string; name: string }>(\n      'catalog',\n      'findProduct',\n      { id: 'sku-42' }\n    )\n    console.log(product)\n    return product\n  } finally {\n    await client.dispose() // also removes the transport-error subscription\n  }\n}"
+                code: "import { connect } from '@migaia/rpc-core'\nimport { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { reportTransportErrors } from './report-transport-errors.js'\n\ntype IDiagnostics = { capture(error: unknown): void }\n\nexport async function callCatalog(\n  transport: Parameters<typeof createClientEndpoint>[0]['transport'],\n  diagnostics: IDiagnostics\n) {\n  const client = await createClientEndpoint({\n    id: 'storefront',\n    targetIds: ['catalog'],\n    transport,\n    middlewares: [\n      connect({ transport }),\n      reportTransportErrors((error) => diagnostics.capture(error))\n    ] as const\n  })\n\n  try {\n    const product = await client.send<{ id: string; name: string }>(\n      'catalog',\n      'findProduct',\n      { id: 'sku-42' }\n    )\n    console.log(product)\n    return product\n  } finally {\n    await client.dispose() // also removes the transport-error subscription\n  }\n}"
               },
               {
                 type: 'paragraph',
@@ -14040,11 +14042,13 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Back to Endpoint selection', path: 'endpoint-composition' },
-        { label: 'Hooks and lifecycle API', path: 'docs/rpc/core/hooks' }
+        { label: 'Hooks and lifecycle API', path: 'docs/rpc-core/hooks' },
+        { label: 'Contract framing specification', path: 'docs/rpc-contract/framing' },
+        { label: 'Contract handshake specification', path: 'docs/rpc-contract/handshake' }
       ]
     }
   },
-  'rpc:calls-and-cancellation': {
+  'rpc-core:calls-and-cancellation': {
     zh: {
       title: '正确选择调用、广播、通知与取消语义',
       lede: 'send 系列等待结构化响应，dispatch 系列只确认发送结算；先选择业务语义，再配置 timeout、signal 与 transfer。',
@@ -14077,7 +14081,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import type { IRpcEndpoint } from '@migaia/rpc/core'\n\ntype IUser = { id: string; name: string }\n\nexport async function findUserBeforeRouteChange(client: IRpcEndpoint) {\n  const controller = new AbortController()\n  const pending = client.send<IUser>('provider', 'findUser', { id: 'u-1' }, {\n    signal: controller.signal,\n    timeoutMs: 3_000\n  })\n\n  // 页面跳转或组件卸载时调用，避免继续等待已经无用的请求。\n  controller.abort(new Error('route changed'))\n\n  try {\n    return await pending\n  } catch (error) {\n    if (controller.signal.aborted) return undefined\n    throw error\n  }\n}"
+                code: "import type { IRpcEndpoint } from '@migaia/rpc-core'\n\ntype IUser = { id: string; name: string }\n\nexport async function findUserBeforeRouteChange(client: IRpcEndpoint) {\n  const controller = new AbortController()\n  const pending = client.send<IUser>('provider', 'findUser', { id: 'u-1' }, {\n    signal: controller.signal,\n    timeoutMs: 3_000\n  })\n\n  // 页面跳转或组件卸载时调用，避免继续等待已经无用的请求。\n  controller.abort(new Error('route changed'))\n\n  try {\n    return await pending\n  } catch (error) {\n    if (controller.signal.aborted) return undefined\n    throw error\n  }\n}"
               },
               {
                 type: 'list',
@@ -14104,7 +14108,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Provider 与契约', path: 'providers-and-contracts' },
-        { label: 'createClientEndpoint API', path: 'docs/rpc/core/client/createClientEndpoint' }
+        { label: 'createClientEndpoint API', path: 'docs/rpc-core/client/createClientEndpoint' }
       ]
     },
     en: {
@@ -14147,7 +14151,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import type { IRpcEndpoint } from '@migaia/rpc/core'\n\ntype IUser = { id: string; name: string }\n\nexport async function findUserBeforeRouteChange(client: IRpcEndpoint) {\n  const controller = new AbortController()\n  const pending = client.send<IUser>('provider', 'findUser', { id: 'u-1' }, {\n    signal: controller.signal,\n    timeoutMs: 3_000\n  })\n\n  // 页面跳转或组件卸载时调用，避免继续等待已经无用的请求。\n  controller.abort(new Error('route changed'))\n\n  try {\n    return await pending\n  } catch (error) {\n    if (controller.signal.aborted) return undefined\n    throw error\n  }\n}"
+                code: "import type { IRpcEndpoint } from '@migaia/rpc-core'\n\ntype IUser = { id: string; name: string }\n\nexport async function findUserBeforeRouteChange(client: IRpcEndpoint) {\n  const controller = new AbortController()\n  const pending = client.send<IUser>('provider', 'findUser', { id: 'u-1' }, {\n    signal: controller.signal,\n    timeoutMs: 3_000\n  })\n\n  // 页面跳转或组件卸载时调用，避免继续等待已经无用的请求。\n  controller.abort(new Error('route changed'))\n\n  try {\n    return await pending\n  } catch (error) {\n    if (controller.signal.aborted) return undefined\n    throw error\n  }\n}"
               },
               {
                 type: 'list',
@@ -14174,11 +14178,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Providers and contracts', path: 'providers-and-contracts' },
-        { label: 'createClientEndpoint API', path: 'docs/rpc/core/client/createClientEndpoint' }
+        { label: 'createClientEndpoint API', path: 'docs/rpc-core/client/createClientEndpoint' }
       ]
     }
   },
-  'rpc:providers-and-contracts': {
+  'rpc-core:providers-and-contracts': {
     zh: {
       title: '用 Provider 与 Contract 固定网络边界',
       lede: 'Provider 只接收结构化 context；contract 在参数进入业务代码前、结果离开业务代码前执行 schema 校验。',
@@ -14191,7 +14195,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { contract } from '@migaia/rpc/core'\nimport { z } from 'zod'\n\nconst contracts = contract({\n  version: '1',\n  schemas: {\n    add: {\n      params: z.object({ a: z.number(), b: z.number() }),\n      result: z.number()\n    }\n  }\n})"
+                code: "import { contract } from '@migaia/rpc-core'\nimport { z } from 'zod'\n\nconst contracts = contract({\n  version: '1',\n  schemas: {\n    add: {\n      params: z.object({ a: z.number(), b: z.number() }),\n      result: z.number()\n    }\n  }\n})"
               },
               {
                 type: 'list',
@@ -14233,7 +14237,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Transport 与安全', path: 'transports-and-security' },
-        { label: 'contract API', path: 'docs/rpc/contract' }
+        { label: 'contract API', path: 'docs/rpc-core/contract' }
       ]
     },
     en: {
@@ -14248,7 +14252,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { contract } from '@migaia/rpc/core'\nimport { z } from 'zod'\n\nconst contracts = contract({\n  version: '1',\n  schemas: {\n    add: {\n      params: z.object({ a: z.number(), b: z.number() }),\n      result: z.number()\n    }\n  }\n})"
+                code: "import { contract } from '@migaia/rpc-core'\nimport { z } from 'zod'\n\nconst contracts = contract({\n  version: '1',\n  schemas: {\n    add: {\n      params: z.object({ a: z.number(), b: z.number() }),\n      result: z.number()\n    }\n  }\n})"
               },
               {
                 type: 'list',
@@ -14290,7 +14294,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Transports and security', path: 'transports-and-security' },
-        { label: 'contract API', path: 'docs/rpc/contract' }
+        { label: 'contract API', path: 'docs/rpc-core/contract' }
       ]
     }
   },
@@ -14429,7 +14433,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       ]
     }
   },
-  'rpc:transports-and-security': {
+  'rpc-core:transports-and-security': {
     zh: {
       title: '按拓扑选择 Transport，并建立真实安全边界',
       lede: 'Transport 只负责收发消息；topology、ownership、sourceProof 与 authentication 共同决定 endpoint 可以信任什么。',
@@ -14477,7 +14481,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '发现与控制', path: 'discovery-and-control' },
-        { label: 'authentication API', path: 'docs/rpc/core/authentication' }
+        { label: 'authentication API', path: 'docs/rpc-core/authentication' }
       ]
     },
     en: {
@@ -14531,11 +14535,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Discovery and control', path: 'discovery-and-control' },
-        { label: 'authentication API', path: 'docs/rpc/core/authentication' }
+        { label: 'authentication API', path: 'docs/rpc-core/authentication' }
       ]
     }
   },
-  'rpc:discovery-and-control': {
+  'rpc-core:discovery-and-control': {
     zh: {
       title: '发现远端能力，并显式启用控制面',
       lede: 'discovery 维护远端快照，control 处理控制帧；两者都不会替代 transport 身份验证或自动公开 outbound。',
@@ -14563,7 +14567,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect, ping } from '@migaia/rpc/core'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { createControlFeature } from '@migaia/rpc/core/features/control'\nimport { createDiscoveryFeature } from '@migaia/rpc/core/features/discovery'\nimport { createOutboundFeature } from '@migaia/rpc/core/features/outbound'\nimport { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'\n\nconst [, transport] = createMemoryTransportPair()\nconst chunks = createCanonicalChunkFeature()\nconst outbound = createOutboundFeature(chunks)\nconst discovery = createDiscoveryFeature(outbound)\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'health-checker',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 1_500 })] as const\n  },\n  { 'first-party-discovery': discovery, 'first-party-control': createControlFeature(outbound, discovery) }\n)\n\nconst alive = await endpoint.ping('worker')"
+                code: "import { connect, ping } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createControlFeature } from '@migaia/rpc-core/features/control'\nimport { createDiscoveryFeature } from '@migaia/rpc-core/features/discovery'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\n\nconst [, transport] = createMemoryTransportPair()\nconst chunks = createCanonicalChunkFeature()\nconst outbound = createOutboundFeature(chunks)\nconst discovery = createDiscoveryFeature(outbound)\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'health-checker',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 1_500 })] as const\n  },\n  { 'first-party-discovery': discovery, 'first-party-control': createControlFeature(outbound, discovery) }\n)\n\nconst alive = await endpoint.ping('worker')"
               },
               {
                 type: 'paragraph',
@@ -14585,7 +14589,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '分片与背压', path: 'chunking-and-backpressure' },
-        { label: 'ping API', path: 'docs/rpc/core/ping' }
+        { label: 'ping API', path: 'docs/rpc-core/ping' }
       ]
     },
     en: {
@@ -14615,7 +14619,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect, ping } from '@migaia/rpc/core'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { createControlFeature } from '@migaia/rpc/core/features/control'\nimport { createDiscoveryFeature } from '@migaia/rpc/core/features/discovery'\nimport { createOutboundFeature } from '@migaia/rpc/core/features/outbound'\nimport { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'\n\nconst [, transport] = createMemoryTransportPair()\nconst chunks = createCanonicalChunkFeature()\nconst outbound = createOutboundFeature(chunks)\nconst discovery = createDiscoveryFeature(outbound)\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'health-checker',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 1_500 })] as const\n  },\n  { 'first-party-discovery': discovery, 'first-party-control': createControlFeature(outbound, discovery) }\n)\n\nconst alive = await endpoint.ping('worker')"
+                code: "import { connect, ping } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createControlFeature } from '@migaia/rpc-core/features/control'\nimport { createDiscoveryFeature } from '@migaia/rpc-core/features/discovery'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\n\nconst [, transport] = createMemoryTransportPair()\nconst chunks = createCanonicalChunkFeature()\nconst outbound = createOutboundFeature(chunks)\nconst discovery = createDiscoveryFeature(outbound)\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'health-checker',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 1_500 })] as const\n  },\n  { 'first-party-discovery': discovery, 'first-party-control': createControlFeature(outbound, discovery) }\n)\n\nconst alive = await endpoint.ping('worker')"
               },
               {
                 type: 'paragraph',
@@ -14637,11 +14641,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Chunking and backpressure', path: 'chunking-and-backpressure' },
-        { label: 'ping API', path: 'docs/rpc/core/ping' }
+        { label: 'ping API', path: 'docs/rpc-core/ping' }
       ]
     }
   },
-  'rpc:chunking-and-backpressure': {
+  'rpc-core:chunking-and-backpressure': {
     zh: {
       title: '在明确容量预算下启用分片',
       lede: '分片解决单帧尺寸限制，不是可靠传输或无限缓冲；所有消息、分片、并发和等待都必须有界。',
@@ -14654,7 +14658,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { framer, connect } from '@migaia/rpc/core'\nimport { createStringFramer } from '@migaia/rpc/contract/framing'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'\nimport { createOutboundFeature } from '@migaia/rpc/core/features/outbound'\n\nconst [, transport] = createMemoryTransportPair()\nconst chunks = createCanonicalChunkFeature()\nconst outbound = createOutboundFeature(chunks)\nconst discovery = createDiscoveryFeature(outbound)\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'uploader',\n    transport,\n    middlewares: [\n      connect({ transport }),\n      framer(createStringFramer({\n        chunkBytes: 64 * 1024,\n        maxMessageBytes: 8 * 1024 * 1024,\n        assemblyTimeoutMs: 10_000\n      }))\n    ] as const\n  },\n  { 'first-party-outbound': outbound, 'first-party-chunk': chunks }\n)"
+                code: "import { framer, connect } from '@migaia/rpc-core'\nimport { createStringFramer } from '@migaia/rpc-contract/framing'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\n\nconst [, transport] = createMemoryTransportPair()\nconst chunks = createCanonicalChunkFeature()\nconst outbound = createOutboundFeature(chunks)\nconst discovery = createDiscoveryFeature(outbound)\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'uploader',\n    transport,\n    middlewares: [\n      connect({ transport }),\n      framer(createStringFramer({\n        chunkBytes: 64 * 1024,\n        maxMessageBytes: 8 * 1024 * 1024,\n        assemblyTimeoutMs: 10_000\n      }))\n    ] as const\n  },\n  { 'first-party-outbound': outbound, 'first-party-chunk': chunks }\n)"
               },
               {
                 type: 'paragraph',
@@ -14697,7 +14701,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '重放、重试与生命周期', path: 'replay-retry-and-lifecycle' },
-        { label: 'chunk API', path: 'docs/rpc/contract/framing/createStringFramer' }
+        { label: 'chunk API', path: 'docs/rpc-contract/framing/createStringFramer' }
       ]
     },
     en: {
@@ -14712,7 +14716,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { framer, connect } from '@migaia/rpc/core'\nimport { createStringFramer } from '@migaia/rpc/contract/framing'\nimport { createMemoryTransportPair } from '@migaia/rpc/core/adapters/memory'\nimport { createComposedEndpoint } from '@migaia/rpc/core/composed'\nimport { createCanonicalChunkFeature } from '@migaia/rpc/core/stream'\nimport { createOutboundFeature } from '@migaia/rpc/core/features/outbound'\n\nconst [, transport] = createMemoryTransportPair()\nconst chunks = createCanonicalChunkFeature()\nconst outbound = createOutboundFeature(chunks)\nconst discovery = createDiscoveryFeature(outbound)\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'uploader',\n    transport,\n    middlewares: [\n      connect({ transport }),\n      framer(createStringFramer({\n        chunkBytes: 64 * 1024,\n        maxMessageBytes: 8 * 1024 * 1024,\n        assemblyTimeoutMs: 10_000\n      }))\n    ] as const\n  },\n  { 'first-party-outbound': outbound, 'first-party-chunk': chunks }\n)"
+                code: "import { framer, connect } from '@migaia/rpc-core'\nimport { createStringFramer } from '@migaia/rpc-contract/framing'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\n\nconst [, transport] = createMemoryTransportPair()\nconst chunks = createCanonicalChunkFeature()\nconst outbound = createOutboundFeature(chunks)\nconst discovery = createDiscoveryFeature(outbound)\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'uploader',\n    transport,\n    middlewares: [\n      connect({ transport }),\n      framer(createStringFramer({\n        chunkBytes: 64 * 1024,\n        maxMessageBytes: 8 * 1024 * 1024,\n        assemblyTimeoutMs: 10_000\n      }))\n    ] as const\n  },\n  { 'first-party-outbound': outbound, 'first-party-chunk': chunks }\n)"
               },
               {
                 type: 'paragraph',
@@ -14767,11 +14771,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Replay, retry, and lifecycle', path: 'replay-retry-and-lifecycle' },
-        { label: 'chunk API', path: 'docs/rpc/contract/framing/createStringFramer' }
+        { label: 'chunk API', path: 'docs/rpc-contract/framing/createStringFramer' }
       ]
     }
   },
-  'rpc:replay-retry-and-lifecycle': {
+  'rpc-core:replay-retry-and-lifecycle': {
     zh: {
       title: '区分重放保护、业务重试与 Endpoint 终态',
       lede: 'replay 窗口防止旧消息 id 被重新接受；它不替业务重试、幂等设计或可靠队列，dispose 之后 endpoint 永久终止。',
@@ -14829,7 +14833,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '返回 RPC 学习路径', path: 'index' },
-        { label: 'dispose API', path: 'docs/rpc/core/composed/createComposedEndpoint' }
+        { label: 'dispose API', path: 'docs/rpc-core/composed/createComposedEndpoint' }
       ]
     },
     en: {
@@ -14889,7 +14893,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Return to RPC learning paths', path: 'index' },
-        { label: 'dispose ownership API', path: 'docs/rpc/core/composed/createComposedEndpoint' }
+        { label: 'dispose ownership API', path: 'docs/rpc-core/composed/createComposedEndpoint' }
       ]
     }
   },

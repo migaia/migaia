@@ -1,0 +1,93 @@
+{
+  "name": "@migaia/rpc-threads",
+  "version": "0.0.7",
+  "private": true,
+  "description": "RPC threads owner.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kimboyeme-maker/migai.git",
+    "directory": "packages/rpc-threads"
+  },
+  "files": [
+    "dist",
+    "schema",
+    "README.md",
+    "USEGUIDE.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/threads/index.d.ts",
+      "default": "./dist/threads/index.js"
+    },
+    "./adapters/node": {
+      "types": "./dist/threads/adapters/node.d.ts",
+      "default": "./dist/threads/adapters/node.js"
+    },
+    "./adapters/deno": {
+      "types": "./dist/threads/adapters/deno.d.ts",
+      "default": "./dist/threads/adapters/deno.js"
+    },
+    "./adapters/bun": {
+      "types": "./dist/threads/adapters/bun.d.ts",
+      "default": "./dist/threads/adapters/bun.js"
+    },
+    "./adapters/electron-main": {
+      "types": "./dist/threads/adapters/electron-main.d.ts",
+      "default": "./dist/threads/adapters/electron-main.js"
+    },
+    "./adapters/electron-renderer": {
+      "types": "./dist/threads/adapters/electron-renderer.d.ts",
+      "default": "./dist/threads/adapters/electron-renderer.js"
+    },
+    "./adapters/browser": {
+      "types": "./dist/threads/adapters/browser.d.ts",
+      "default": "./dist/threads/adapters/browser.js"
+    }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "build": "node ../../scripts/dist-stamp.mjs clean && node ../../scripts/dist-stamp.mjs build-rpc && node ../../scripts/dist-stamp.mjs write",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
+    "fmt": "oxfmt src test vitest.config.ts",
+    "lint": "oxlint src test vitest.config.ts",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@migaia/supervision": "workspace:^"
+  },
+  "peerDependencies": {
+    "@migaia/rpc-contract": "0.0.7",
+    "@migaia/rpc-core": "0.0.7",
+    "electron": "^44.0.0"
+  },
+  "peerDependenciesMeta": {
+    "electron": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "24.13.2",
+    "cborg": "6.1.1",
+    "elysia": "1.4.30",
+    "msgpackr": "2.1.0",
+    "protobufjs": "8.8.0",
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.10",
+    "@migaia/rpc-contract": "workspace:0.0.7",
+    "@migaia/rpc-core": "workspace:0.0.7",
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -3,7 +3,7 @@
   "library": {
     "slug": "utils",
     "description": "Runtime-neutral reusable utility primitives.",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "exports": [
       ".",
       "./bytes",
@@ -1653,6 +1653,16 @@
             ]
           },
           {
+            "id": "object-模块-含对象路径",
+            "heading": "/object 模块（含对象路径）",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`createSafeRecord<T>()` 每次创建新的 null-prototype 字典，返回 `Partial<Record<string, T>>`。未可信键名（包括 `proto` 和 `constructor`）作为普通数据键，不会调用 Object.prototype 上的 setter；赋值后字段仍为可写、可枚举、可配置的数据属性。它不读取或复制输入，也不拥有 RPC 的任务或投递 key 格式。"
+              }
+            ]
+          },
+          {
             "id": "快照与探测",
             "heading": "快照与探测",
             "blocks": [
@@ -2181,6 +2191,19 @@
             "id": "value-string-number-高频工具",
             "heading": "/value、/string、/number 高频工具",
             "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`isSafeIntegerValue(value)` 从 `/value` 导出，仅接受有限的安全整数 number，不转换字符串、bigint 或 boxed number。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`tryString(value)` 从 `/string` 导出，string 原样通过，其他值只执行一次原生 `String(value)`。它返回 `{ threw: false, value: string }` 或 `{ threw: true, error: unknown }`；失败保留精确原抛出值，不提供 fallback、不调用 reporter、不生成新错误。调用方根据自己的边界选择报告、fallback 或重抛："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { tryString } from '@migaia/utils/string';\n\nconst converted = tryString(value);\nif (converted.threw) throw converted.error;\nconst text = converted.value;"
+              },
               {
                 "type": "paragraph",
                 "text": "`isNullish` 只识别 `null | undefined`；`isBlankString` 只识别 trim 后为空的字符串。`isEmptyValue` 组合两者并额外把 `NaN` 判为空；`0`、`0n`、`false`、数组和对象保持有效。`isPrimitive` 覆盖 JavaScript 七类 primitive，不生成额外类型标签。"
@@ -2810,6 +2833,16 @@
           "ownerExportPath": "./object-path",
           "ownerModule": "object-path",
           "ownerFragment": "utils-object-path--createPathAccessor"
+        },
+        {
+          "identity": "packages/utils/dist/object.d.ts:createSafeRecord:export declare function createSafeRecord<T>(): Partial<Record<string, T>>;",
+          "name": "createSafeRecord",
+          "signature": "export declare function createSafeRecord<T>(): Partial<Record<string, T>>;",
+          "source": "packages/utils/dist/object.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./object",
+          "ownerModule": "object",
+          "ownerFragment": "utils-object--createSafeRecord"
         },
         {
           "identity": "packages/utils/dist/bytes.d.ts:decodeUtf8:export declare function decodeUtf8(value: Uint8Array, options?: { readonly fatal?: boolean; }): string;",
@@ -3592,6 +3625,26 @@
           "ownerFragment": "utils-value--isPrimitive"
         },
         {
+          "identity": "packages/utils/dist/value.d.ts:isSafeIntegerValue:export declare function isSafeIntegerValue(value: unknown): value is number;",
+          "name": "isSafeIntegerValue",
+          "signature": "export declare function isSafeIntegerValue(value: unknown): value is number;",
+          "source": "packages/utils/dist/value.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./value",
+          "ownerModule": "value",
+          "ownerFragment": "utils-value--isSafeIntegerValue"
+        },
+        {
+          "identity": "packages/utils/dist/string.d.ts:IStringConversion:export type IStringConversion = { readonly threw: false; readonly value: string; } | { readonly threw: true; readonly error: unknown; };",
+          "name": "IStringConversion",
+          "signature": "export type IStringConversion = { readonly threw: false; readonly value: string; } | { readonly threw: true; readonly error: unknown; };",
+          "source": "packages/utils/dist/string.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./string",
+          "ownerModule": "string",
+          "ownerFragment": "utils-string--IStringConversion"
+        },
+        {
           "identity": "packages/utils/dist/bytes.d.ts:isUint8Array:export declare const isUint8Array: (value: unknown) => value is Uint8Array;",
           "name": "isUint8Array",
           "signature": "export declare const isUint8Array: (value: unknown) => value is Uint8Array;",
@@ -3990,6 +4043,16 @@
           "ownerExportPath": "./error",
           "ownerModule": "error",
           "ownerFragment": "utils-error--tryReadProperty"
+        },
+        {
+          "identity": "packages/utils/dist/string.d.ts:tryString:export declare function tryString(value: unknown): IStringConversion;",
+          "name": "tryString",
+          "signature": "export declare function tryString(value: unknown): IStringConversion;",
+          "source": "packages/utils/dist/string.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./string",
+          "ownerModule": "string",
+          "ownerFragment": "utils-string--tryString"
         },
         {
           "identity": "packages/utils/dist/bytes.d.ts:utf8ByteLength:export declare function utf8ByteLength(value: string): number;",
@@ -16615,10 +16678,73 @@
       "architecturePath": "/en/architecture/utils",
       "symbols": [
         {
+          "name": "createSafeRecord",
+          "kind": "function",
+          "signature": "export declare function createSafeRecord<T>(): Partial<Record<string, T>>;",
+          "declarationLine": 3,
+          "source": "packages/utils/dist/object.d.ts",
+          "purpose": "Creates a new null-prototype dictionary whose untrusted keys cannot invoke prototype setters.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSafeRecord.",
+          "advanced": "No additional advanced behavior is declared for createSafeRecord.",
+          "parameters": ["This function declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "Partial<Record<string, T>>",
+          "errors": ["No documented errors are declared for createSafeRecord."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createSafeRecord.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./object",
+          "overloadSignatures": [
+            "export declare function createSafeRecord<T>(): Partial<Record<string, T>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": ["Partial<Record<string, T>>"],
+          "whenToUse": "Use createSafeRecord when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createSafeRecord does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Creates a new null-prototype dictionary whose untrusted keys cannot invoke prototype setters."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createSafeRecord from @migaia/utils/object, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createSafeRecord when its function contract and declared inputs match the result you need. Choose a different public symbol when createSafeRecord does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSafeRecord."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createSafeRecord."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/object.d.ts:createSafeRecord:export declare function createSafeRecord<T>(): Partial<Record<string, T>>;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "utils-object--createSafeRecord"
+        },
+        {
           "name": "diagnosticSnapshot",
           "kind": "function",
           "signature": "export declare function diagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;",
-          "declarationLine": 42,
+          "declarationLine": 44,
           "source": "packages/utils/dist/object.d.ts",
           "purpose": "Produces a best-effort value snapshot plus explicit diagnostics.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for diagnosticSnapshot.",
@@ -16697,7 +16823,7 @@
           "name": "identitySnapshot",
           "kind": "function",
           "signature": "export declare function identitySnapshot<T>(value: T): T;",
-          "declarationLine": 46,
+          "declarationLine": 48,
           "source": "packages/utils/dist/object.d.ts",
           "purpose": "Returns the original value while making identity preservation explicit.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for identitySnapshot.",
@@ -16772,7 +16898,7 @@
           "name": "IDiagnosticSnapshot",
           "kind": "type",
           "signature": "export type IDiagnosticSnapshot<T> = { readonly value: T; readonly diagnostics: readonly ISnapshotDiagnostic[]; };",
-          "declarationLine": 16,
+          "declarationLine": 18,
           "source": "packages/utils/dist/object.d.ts",
           "purpose": "IDiagnosticSnapshot is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDiagnosticSnapshot.",
@@ -16837,7 +16963,7 @@
           "name": "immutableSnapshot",
           "kind": "function",
           "signature": "export declare function immutableSnapshot<T>(value: T): T;",
-          "declarationLine": 40,
+          "declarationLine": 42,
           "source": "packages/utils/dist/object.d.ts",
           "purpose": "Produces an independent immutable data snapshot for supported plain values.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for immutableSnapshot.",
@@ -16915,7 +17041,7 @@
           "name": "IOwnDescriptorsSnapshot",
           "kind": "type",
           "signature": "export type IOwnDescriptorsSnapshot = { readonly kind: 'captured'; readonly ok: true; readonly descriptors: Readonly<Record<PropertyKey, PropertyDescriptor>>; } | { readonly kind: 'failed'; readonly ok: false; readonly error: unknown; };",
-          "declarationLine": 21,
+          "declarationLine": 23,
           "source": "packages/utils/dist/object.d.ts",
           "purpose": "Result of one non-throwing own-descriptor capture at an object boundary.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IOwnDescriptorsSnapshot.",
@@ -16978,7 +17104,7 @@
           "name": "IProbePropertyResult",
           "kind": "type",
           "signature": "export type IProbePropertyResult<T> = { readonly kind: 'missing'; } | { readonly kind: 'value'; readonly value: T; } | { readonly kind: 'failed'; readonly error: unknown; };",
-          "declarationLine": 2,
+          "declarationLine": 4,
           "source": "packages/utils/dist/object.d.ts",
           "purpose": "IProbePropertyResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProbePropertyResult.",
@@ -17044,7 +17170,7 @@
           "name": "ISnapshotDiagnostic",
           "kind": "type",
           "signature": "export type ISnapshotDiagnostic = { readonly path: readonly PropertyKey[]; readonly reason: 'accessor' | 'read-failed' | 'unsupported'; readonly cause: unknown; };",
-          "declarationLine": 11,
+          "declarationLine": 13,
           "source": "packages/utils/dist/object.d.ts",
           "purpose": "ISnapshotDiagnostic is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISnapshotDiagnostic.",
@@ -17109,7 +17235,7 @@
           "name": "isPlainObject",
           "kind": "function",
           "signature": "export declare function isPlainObject(value: unknown): value is Record<PropertyKey, unknown>;",
-          "declarationLine": 31,
+          "declarationLine": 33,
           "source": "packages/utils/dist/object.d.ts",
           "purpose": "Accepts only ordinary record objects or null-prototype records, never arrays.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isPlainObject.",
@@ -17188,7 +17314,7 @@
           "name": "probeProperty",
           "kind": "function",
           "signature": "export declare function probeProperty<T>(value: object, key: PropertyKey): IProbePropertyResult<T>;",
-          "declarationLine": 33,
+          "declarationLine": 35,
           "source": "packages/utils/dist/object.d.ts",
           "purpose": "Reads one property exactly once and exposes getter failures explicitly.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for probeProperty.",
@@ -17278,7 +17404,7 @@
           "name": "snapshotOwnDescriptors",
           "kind": "function",
           "signature": "export declare function snapshotOwnDescriptors(value: unknown): IOwnDescriptorsSnapshot;",
-          "declarationLine": 38,
+          "declarationLine": 40,
           "source": "packages/utils/dist/object.d.ts",
           "purpose": "Captures own descriptors at most once and contains revoked-proxy or descriptor-trap failures. Primitive inputs are valid empty snapshots; callers decide their module-specific value policy.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for snapshotOwnDescriptors.",
@@ -17355,7 +17481,7 @@
           "name": "structuredDiagnosticSnapshot",
           "kind": "function",
           "signature": "export declare function structuredDiagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;",
-          "declarationLine": 44,
+          "declarationLine": 46,
           "source": "packages/utils/dist/object.d.ts",
           "purpose": "Produces one structuredClone-first diagnostic projection for tolerant consumers.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for structuredDiagnosticSnapshot.",
@@ -22985,7 +23111,7 @@
           "name": "format",
           "kind": "function",
           "signature": "export declare function format(source: string, values: Readonly<Record<string, unknown>>, options?: IFormatOptions): string;",
-          "declarationLine": 16,
+          "declarationLine": 29,
           "source": "packages/utils/dist/string.d.ts",
           "purpose": "Replaces placeholder paths in one linear scan. Doubled delimiters emit literal delimiters. Missing paths are preserved by default so malformed user-visible templates fail visibly.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for format.",
@@ -23322,7 +23448,7 @@
           "name": "IFormatOptions",
           "kind": "type",
           "signature": "export type IFormatOptions = { readonly placeholder?: IFormatPlaceholder; readonly missing?: 'preserve' | 'empty' | 'throw'; readonly nullish?: 'empty' | 'stringify'; };",
-          "declarationLine": 7,
+          "declarationLine": 20,
           "source": "packages/utils/dist/string.d.ts",
           "purpose": "String-template policies; defaults preserve missing placeholders and blank nullish values.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFormatOptions.",
@@ -23385,7 +23511,7 @@
           "name": "IFormatPlaceholder",
           "kind": "type",
           "signature": "export type IFormatPlaceholder = { readonly open: string; readonly close: string; };",
-          "declarationLine": 2,
+          "declarationLine": 15,
           "source": "packages/utils/dist/string.d.ts",
           "purpose": "Placeholder delimiters used by the linear template scanner.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFormatPlaceholder.",
@@ -23443,6 +23569,148 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "utils-string--IFormatPlaceholder"
+        },
+        {
+          "name": "IStringConversion",
+          "kind": "type",
+          "signature": "export type IStringConversion = { readonly threw: false; readonly value: string; } | { readonly threw: true; readonly error: unknown; };",
+          "declarationLine": 2,
+          "source": "packages/utils/dist/string.d.ts",
+          "purpose": "Outcome of one conversion; failures retain the exact value thrown by user coercion.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStringConversion.",
+          "advanced": "No additional advanced behavior is declared for IStringConversion.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IStringConversion."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStringConversion.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./string",
+          "overloadSignatures": [
+            "export type IStringConversion = { readonly threw: false; readonly value: string; } | { readonly threw: true; readonly error: unknown; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IStringConversion when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IStringConversion does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Outcome of one conversion; failures retain the exact value thrown by user coercion."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IStringConversion from @migaia/utils/string, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IStringConversion when its type contract and declared inputs match the result you need. Choose a different public symbol when IStringConversion does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStringConversion."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IStringConversion."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/string.d.ts:IStringConversion:export type IStringConversion = { readonly threw: false; readonly value: string; } | { readonly threw: true; readonly error: unknown; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "utils-string--IStringConversion"
+        },
+        {
+          "name": "tryString",
+          "kind": "function",
+          "signature": "export declare function tryString(value: unknown): IStringConversion;",
+          "declarationLine": 13,
+          "source": "packages/utils/dist/string.d.ts",
+          "purpose": "Converts a value once with native String semantics, keeping strings unchanged. A hostile conversion returns its original thrown value; the caller owns fallback, reporting, and rethrow.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for tryString.",
+          "advanced": "No additional advanced behavior is declared for tryString.",
+          "parameters": ["value: unknown"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            }
+          ],
+          "returns": "IStringConversion",
+          "errors": ["No documented errors are declared for tryString."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for tryString.",
+          "examples": [
+            "import { tryString } from '@migaia/utils/string';\n\nconst converted = tryString(value);\nif (converted.threw) throw converted.error;\nconst text = converted.value;"
+          ],
+          "members": [],
+          "exportPath": "./string",
+          "overloadSignatures": [
+            "export declare function tryString(value: unknown): IStringConversion;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IStringConversion"],
+          "whenToUse": "Use tryString when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when tryString does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Converts a value once with native String semantics, keeping strings unchanged. A hostile conversion returns its original thrown value; the caller owns fallback, reporting, and rethrow."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import tryString from @migaia/utils/string, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use tryString when its function contract and declared inputs match the result you need. Choose a different public symbol when tryString does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for tryString."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for tryString."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/string.d.ts:tryString:export declare function tryString(value: unknown): IStringConversion;",
+          "guidance": [],
+          "usageScore": 18,
+          "configuration": [],
+          "fragment": "utils-string--tryString"
         }
       ],
       "aliases": []
@@ -23788,7 +24056,7 @@
           "name": "isBlankString",
           "kind": "const",
           "signature": "export declare const isBlankString: (value: unknown) => value is string;",
-          "declarationLine": 6,
+          "declarationLine": 8,
           "source": "packages/utils/dist/value.d.ts",
           "purpose": "Detects empty or whitespace-only strings without coercing non-string values.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isBlankString.",
@@ -23851,7 +24119,7 @@
           "name": "isEmptyValue",
           "kind": "const",
           "signature": "export declare const isEmptyValue: (value: unknown) => value is null | undefined | string | number;",
-          "declarationLine": 11,
+          "declarationLine": 13,
           "source": "packages/utils/dist/value.d.ts",
           "purpose": "Detects common business-form emptiness while preserving `0`, `0n`, and `false` as real values. Arrays and objects are never inferred empty because collection policy belongs to their owners.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isEmptyValue.",
@@ -23916,7 +24184,7 @@
           "name": "isNullish",
           "kind": "const",
           "signature": "export declare const isNullish: (value: unknown) => value is null | undefined;",
-          "declarationLine": 4,
+          "declarationLine": 6,
           "source": "packages/utils/dist/value.d.ts",
           "purpose": "Narrows null and undefined without treating other falsy business values as absent.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isNullish.",
@@ -23979,7 +24247,7 @@
           "name": "isPrimitive",
           "kind": "const",
           "signature": "export declare const isPrimitive: (value: unknown) => value is IPrimitive;",
-          "declarationLine": 13,
+          "declarationLine": 15,
           "source": "packages/utils/dist/value.d.ts",
           "purpose": "Narrows all JavaScript primitives without allocating a runtime type tag.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isPrimitive.",
@@ -24039,6 +24307,83 @@
           "usageScore": 14,
           "configuration": [],
           "fragment": "utils-value--isPrimitive"
+        },
+        {
+          "name": "isSafeIntegerValue",
+          "kind": "function",
+          "signature": "export declare function isSafeIntegerValue(value: unknown): value is number;",
+          "declarationLine": 4,
+          "source": "packages/utils/dist/value.d.ts",
+          "purpose": "Narrows finite safe integers without converting strings, boxed numbers, or other values.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isSafeIntegerValue.",
+          "advanced": "No additional advanced behavior is declared for isSafeIntegerValue.",
+          "parameters": ["value: unknown"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            }
+          ],
+          "returns": "value is number",
+          "errors": ["No documented errors are declared for isSafeIntegerValue."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isSafeIntegerValue.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./value",
+          "overloadSignatures": [
+            "export declare function isSafeIntegerValue(value: unknown): value is number;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["value is number"],
+          "whenToUse": "Use isSafeIntegerValue when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when isSafeIntegerValue does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Narrows finite safe integers without converting strings, boxed numbers, or other values."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import isSafeIntegerValue from @migaia/utils/value, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use isSafeIntegerValue when its function contract and declared inputs match the result you need. Choose a different public symbol when isSafeIntegerValue does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isSafeIntegerValue."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for isSafeIntegerValue."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/value.d.ts:isSafeIntegerValue:export declare function isSafeIntegerValue(value: unknown): value is number;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "utils-value--isSafeIntegerValue"
         }
       ],
       "aliases": []

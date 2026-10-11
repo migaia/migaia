@@ -1,0 +1,1318 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "rpc-browser",
+    "description": "RPC browser owner.",
+    "version": "0.0.7",
+    "exports": [
+      "./adapters/broadcast-channel",
+      "./adapters/rtc-data-channel",
+      "./adapters/service-worker",
+      "./adapters/shared-worker",
+      "./adapters/web-transport",
+      "./adapters/window"
+    ],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-rpc-browser",
+            "heading": "@migaia/rpc-browser",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "浏览器载体适配器。按实际载体导入 `./adapters/window`、`shared-worker`、`service-worker`、`broadcast-channel`、`web-transport` 或 `rtc-data-channel`。模块没有根 barrel。"
+              },
+              {
+                "type": "paragraph",
+                "text": "RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不发布；仓内消费方直接导入各公开包。同一 realm 的第二份模块实例在取得资源前抛出 native Error，source 为 `@migaia/rpc/core`、code 为 `DUPLICATE_MODULE_INSTANCE`；修复依赖解析并重载 realm。不同 Worker realm 独立。既有六个语义 source、wire 与错误身份保持不变。"
+              },
+              {
+                "type": "paragraph",
+                "text": "完整使用边界见 USEGUIDE。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "migaia-rpc-browser-使用指南",
+            "heading": "@migaia/rpc-browser 使用指南",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "按实际载体导入 `./adapters/window`、`shared-worker`、`service-worker`、`broadcast-channel`、`web-transport` 或 `rtc-data-channel`。模块没有根 barrel。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'"
+              },
+              {
+                "type": "paragraph",
+                "text": "各适配器使用实际持有的窗口、端口或连接资源。自定义 Endpoint 从 `@migaia/rpc-core` 构造。Dedicated Worker 适配器从 `@migaia/rpc-core/adapters/web-worker` 导入。释放规则与载体校验保持原操作语义。"
+              },
+              {
+                "type": "paragraph",
+                "text": "RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不发布；仓内消费方直接导入各公开包。同一 realm 的第二份模块实例在取得资源前抛出 native Error，source 为 `@migaia/rpc/core`、code 为 `DUPLICATE_MODULE_INSTANCE`；修复依赖解析并重载 realm。不同 Worker realm 独立。既有六个语义 source、wire 与错误身份保持不变。"
+              },
+              {
+                "type": "paragraph",
+                "text": "包内使用相对路径；跨包调用只使用公开 API。协议工具使用 `@migaia/rpc-contract`，Core/Remote/Testing 使用 `@migaia/rpc-core` 的普通入口。"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "rpc-browser:adapters/broadcast-channel",
+      "library": "rpc-browser",
+      "module": "adapters/broadcast-channel",
+      "exportPath": "./adapters/broadcast-channel",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-browser/getting-started",
+      "architecturePath": "/en/architecture/rpc-browser",
+      "symbols": [
+        {
+          "name": "createBroadcastChannelTransport",
+          "kind": "function",
+          "signature": "export declare function createBroadcastChannelTransport(channel: BroadcastChannel): IRpcTransport;",
+          "declarationLine": 3,
+          "source": "packages/rpc-browser/dist/browser/adapters/broadcast-channel.d.ts",
+          "purpose": "Adapts BroadcastChannel for tab-to-tab and storage-backed coordination.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBroadcastChannelTransport.",
+          "advanced": "No additional advanced behavior is declared for createBroadcastChannelTransport.",
+          "parameters": ["channel: BroadcastChannel"],
+          "parameterDetails": [
+            {
+              "name": "channel",
+              "type": "BroadcastChannel",
+              "optional": false
+            }
+          ],
+          "returns": "IRpcTransport",
+          "errors": ["No documented errors are declared for createBroadcastChannelTransport."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBroadcastChannelTransport.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/broadcast-channel",
+          "overloadSignatures": [
+            "export declare function createBroadcastChannelTransport(channel: BroadcastChannel): IRpcTransport;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "channel",
+                "type": "BroadcastChannel",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcTransport"],
+          "whenToUse": "Use createBroadcastChannelTransport when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createBroadcastChannelTransport does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Adapts BroadcastChannel for tab-to-tab and storage-backed coordination."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createBroadcastChannelTransport from @migaia/rpc-browser/adapters/broadcast-channel, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createBroadcastChannelTransport when its function contract and declared inputs match the result you need. Choose a different public symbol when createBroadcastChannelTransport does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBroadcastChannelTransport."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createBroadcastChannelTransport."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/adapters/broadcast-channel.d.ts:createBroadcastChannelTransport:export declare function createBroadcastChannelTransport(channel: BroadcastChannel): IRpcTransport;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-browser:adapters/rtc-data-channel",
+      "library": "rpc-browser",
+      "module": "adapters/rtc-data-channel",
+      "exportPath": "./adapters/rtc-data-channel",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-browser/getting-started",
+      "architecturePath": "/en/architecture/rpc-browser",
+      "symbols": [
+        {
+          "name": "createRtcDataChannelTransport",
+          "kind": "function",
+          "signature": "export declare function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTransport;",
+          "declarationLine": 10,
+          "source": "packages/rpc-browser/dist/browser/adapters/rtc-data-channel.d.ts",
+          "purpose": "Uses the reliable ordered data channel as a string-message transport.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRtcDataChannelTransport.",
+          "advanced": "No additional advanced behavior is declared for createRtcDataChannelTransport.",
+          "parameters": ["channel: IRTCDataChannel"],
+          "parameterDetails": [
+            {
+              "name": "channel",
+              "type": "IRTCDataChannel",
+              "optional": false
+            }
+          ],
+          "returns": "IRpcTransport",
+          "errors": ["No documented errors are declared for createRtcDataChannelTransport."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRtcDataChannelTransport.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/rtc-data-channel",
+          "overloadSignatures": [
+            "export declare function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTransport;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "channel",
+                "type": "IRTCDataChannel",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcTransport"],
+          "whenToUse": "Use createRtcDataChannelTransport when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createRtcDataChannelTransport does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Uses the reliable ordered data channel as a string-message transport."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createRtcDataChannelTransport from @migaia/rpc-browser/adapters/rtc-data-channel, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createRtcDataChannelTransport when its function contract and declared inputs match the result you need. Choose a different public symbol when createRtcDataChannelTransport does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRtcDataChannelTransport."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createRtcDataChannelTransport."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/adapters/rtc-data-channel.d.ts:createRtcDataChannelTransport:export declare function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTransport;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport"
+        },
+        {
+          "name": "IRTCDataChannel",
+          "kind": "type",
+          "signature": "export type IRTCDataChannel = { send(data: string): void; readonly readyState: string; addEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; removeEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; };",
+          "declarationLine": 3,
+          "source": "packages/rpc-browser/dist/browser/adapters/rtc-data-channel.d.ts",
+          "purpose": "Minimal RTCDataChannel surface accepted by the adapter.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRTCDataChannel.",
+          "advanced": "No additional advanced behavior is declared for IRTCDataChannel.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRTCDataChannel."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRTCDataChannel.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/rtc-data-channel",
+          "overloadSignatures": [
+            "export type IRTCDataChannel = { send(data: string): void; readonly readyState: string; addEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; removeEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRTCDataChannel when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRTCDataChannel does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Minimal RTCDataChannel surface accepted by the adapter."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRTCDataChannel from @migaia/rpc-browser/adapters/rtc-data-channel, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRTCDataChannel when its type contract and declared inputs match the result you need. Choose a different public symbol when IRTCDataChannel does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRTCDataChannel."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRTCDataChannel."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/adapters/rtc-data-channel.d.ts:IRTCDataChannel:export type IRTCDataChannel = { send(data: string): void; readonly readyState: string; addEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; removeEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-browser-adapters/rtc-data-channel--IRTCDataChannel"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-browser:adapters/service-worker",
+      "library": "rpc-browser",
+      "module": "adapters/service-worker",
+      "exportPath": "./adapters/service-worker",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-browser/getting-started",
+      "architecturePath": "/en/architecture/rpc-browser",
+      "symbols": [
+        {
+          "name": "createServiceWorkerTransport",
+          "kind": "function",
+          "signature": "export declare function createServiceWorkerTransport(options: IServiceWorkerTransportOptions): IRpcTransport<unknown, Transferable>;",
+          "declarationLine": 21,
+          "source": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts",
+          "purpose": "Wraps distinct ServiceWorker send and receive owners.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createServiceWorkerTransport.",
+          "advanced": "No additional advanced behavior is declared for createServiceWorkerTransport.",
+          "parameters": ["options: IServiceWorkerTransportOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IServiceWorkerTransportOptions",
+              "optional": false
+            }
+          ],
+          "returns": "IRpcTransport<unknown, Transferable>",
+          "errors": ["No documented errors are declared for createServiceWorkerTransport."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createServiceWorkerTransport.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/service-worker",
+          "overloadSignatures": [
+            "export declare function createServiceWorkerTransport(options: IServiceWorkerTransportOptions): IRpcTransport<unknown, Transferable>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IServiceWorkerTransportOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcTransport<unknown, Transferable>"],
+          "whenToUse": "Use createServiceWorkerTransport when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createServiceWorkerTransport does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Wraps distinct ServiceWorker send and receive owners."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createServiceWorkerTransport from @migaia/rpc-browser/adapters/service-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createServiceWorkerTransport when its function contract and declared inputs match the result you need. Choose a different public symbol when createServiceWorkerTransport does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createServiceWorkerTransport."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createServiceWorkerTransport."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "target",
+              "type": "IServiceWorkerMessageTarget",
+              "optional": false,
+              "description": "ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target."
+            },
+            {
+              "name": "receiver",
+              "type": "IServiceWorkerMessageReceiver",
+              "optional": false,
+              "description": "Message event owner, usually navigator.serviceWorker in a page or self in the worker."
+            },
+            {
+              "name": "peerId",
+              "type": "string",
+              "optional": true,
+              "description": "Expected remote Client identity; defaults to target.id when that identity is available."
+            }
+          ],
+          "identity": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts:createServiceWorkerTransport:export declare function createServiceWorkerTransport(options: IServiceWorkerTransportOptions): IRpcTransport<unknown, Transferable>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [
+            {
+              "name": "target",
+              "type": "IServiceWorkerMessageTarget",
+              "optional": false,
+              "description": "ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target.",
+              "descriptionEn": "ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "receiver",
+              "type": "IServiceWorkerMessageReceiver",
+              "optional": false,
+              "description": "Message event owner, usually navigator.serviceWorker in a page or self in the worker.",
+              "descriptionEn": "Message event owner, usually navigator.serviceWorker in a page or self in the worker.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "peerId",
+              "type": "string",
+              "optional": true,
+              "description": "Expected remote Client identity; defaults to target.id when that identity is available.",
+              "descriptionEn": "Expected remote Client identity; defaults to target.id when that identity is available.",
+              "descriptionZh": ""
+            }
+          ],
+          "fragment": "rpc-browser-adapters/service-worker--createServiceWorkerTransport"
+        },
+        {
+          "name": "IServiceWorkerMessageReceiver",
+          "kind": "type",
+          "signature": "export type IServiceWorkerMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };",
+          "declarationLine": 8,
+          "source": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts",
+          "purpose": "Inbound page or ServiceWorkerGlobalScope event target.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IServiceWorkerMessageReceiver.",
+          "advanced": "No additional advanced behavior is declared for IServiceWorkerMessageReceiver.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IServiceWorkerMessageReceiver."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IServiceWorkerMessageReceiver.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/service-worker",
+          "overloadSignatures": [
+            "export type IServiceWorkerMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IServiceWorkerMessageReceiver when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IServiceWorkerMessageReceiver does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Inbound page or ServiceWorkerGlobalScope event target."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IServiceWorkerMessageReceiver from @migaia/rpc-browser/adapters/service-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IServiceWorkerMessageReceiver when its type contract and declared inputs match the result you need. Choose a different public symbol when IServiceWorkerMessageReceiver does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IServiceWorkerMessageReceiver."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IServiceWorkerMessageReceiver."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts:IServiceWorkerMessageReceiver:export type IServiceWorkerMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver"
+        },
+        {
+          "name": "IServiceWorkerMessageTarget",
+          "kind": "type",
+          "signature": "export type IServiceWorkerMessageTarget = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; readonly id?: string; };",
+          "declarationLine": 3,
+          "source": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts",
+          "purpose": "Outbound ServiceWorker or Client target.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IServiceWorkerMessageTarget.",
+          "advanced": "No additional advanced behavior is declared for IServiceWorkerMessageTarget.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IServiceWorkerMessageTarget."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IServiceWorkerMessageTarget.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/service-worker",
+          "overloadSignatures": [
+            "export type IServiceWorkerMessageTarget = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; readonly id?: string; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IServiceWorkerMessageTarget when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IServiceWorkerMessageTarget does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Outbound ServiceWorker or Client target."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IServiceWorkerMessageTarget from @migaia/rpc-browser/adapters/service-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IServiceWorkerMessageTarget when its type contract and declared inputs match the result you need. Choose a different public symbol when IServiceWorkerMessageTarget does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IServiceWorkerMessageTarget."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IServiceWorkerMessageTarget."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts:IServiceWorkerMessageTarget:export type IServiceWorkerMessageTarget = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; readonly id?: string; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget"
+        },
+        {
+          "name": "IServiceWorkerTransportOptions",
+          "kind": "type",
+          "signature": "export type IServiceWorkerTransportOptions = { /** ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target. */ readonly target: IServiceWorkerMessageTarget; /** Message event owner, usually navigator.serviceWorker in a page or self in the worker. */ readonly receiver: IServiceWorkerMessageReceiver; /** Expected remote Client identity; defaults to target.id when that identity is available. */ readonly peerId?: string; };",
+          "declarationLine": 12,
+          "source": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts",
+          "purpose": "IServiceWorkerTransportOptions is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IServiceWorkerTransportOptions.",
+          "advanced": "No additional advanced behavior is declared for IServiceWorkerTransportOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IServiceWorkerTransportOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IServiceWorkerTransportOptions.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/service-worker",
+          "overloadSignatures": [
+            "export type IServiceWorkerTransportOptions = { /** ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target. */ readonly target: IServiceWorkerMessageTarget; /** Message event owner, usually navigator.serviceWorker in a page or self in the worker. */ readonly receiver: IServiceWorkerMessageReceiver; /** Expected remote Client identity; defaults to target.id when that identity is available. */ readonly peerId?: string; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IServiceWorkerTransportOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IServiceWorkerTransportOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IServiceWorkerTransportOptions is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IServiceWorkerTransportOptions from @migaia/rpc-browser/adapters/service-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IServiceWorkerTransportOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IServiceWorkerTransportOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IServiceWorkerTransportOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IServiceWorkerTransportOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts:IServiceWorkerTransportOptions:export type IServiceWorkerTransportOptions = { /** ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target. */ readonly target: IServiceWorkerMessageTarget; /** Message event owner, usually navigator.serviceWorker in a page or self in the worker. */ readonly receiver: IServiceWorkerMessageReceiver; /** Expected remote Client identity; defaults to target.id when that identity is available. */ readonly peerId?: string; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-browser:adapters/shared-worker",
+      "library": "rpc-browser",
+      "module": "adapters/shared-worker",
+      "exportPath": "./adapters/shared-worker",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-browser/getting-started",
+      "architecturePath": "/en/architecture/rpc-browser",
+      "symbols": [
+        {
+          "name": "createSharedWorkerTransport",
+          "kind": "function",
+          "signature": "export declare function createSharedWorkerTransport(port: ISharedWorkerPort): IRpcTransport<unknown, Transferable>;",
+          "declarationLine": 10,
+          "source": "packages/rpc-browser/dist/browser/adapters/shared-worker.d.ts",
+          "purpose": "Wraps a SharedWorker's `port` without importing DOM or worker globals at runtime.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSharedWorkerTransport.",
+          "advanced": "No additional advanced behavior is declared for createSharedWorkerTransport.",
+          "parameters": ["port: ISharedWorkerPort"],
+          "parameterDetails": [
+            {
+              "name": "port",
+              "type": "ISharedWorkerPort",
+              "optional": false
+            }
+          ],
+          "returns": "IRpcTransport<unknown, Transferable>",
+          "errors": ["No documented errors are declared for createSharedWorkerTransport."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createSharedWorkerTransport.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/shared-worker",
+          "overloadSignatures": [
+            "export declare function createSharedWorkerTransport(port: ISharedWorkerPort): IRpcTransport<unknown, Transferable>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "port",
+                "type": "ISharedWorkerPort",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcTransport<unknown, Transferable>"],
+          "whenToUse": "Use createSharedWorkerTransport when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createSharedWorkerTransport does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Wraps a SharedWorker's `port` without importing DOM or worker globals at runtime."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createSharedWorkerTransport from @migaia/rpc-browser/adapters/shared-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createSharedWorkerTransport when its function contract and declared inputs match the result you need. Choose a different public symbol when createSharedWorkerTransport does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSharedWorkerTransport."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createSharedWorkerTransport."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/adapters/shared-worker.d.ts:createSharedWorkerTransport:export declare function createSharedWorkerTransport(port: ISharedWorkerPort): IRpcTransport<unknown, Transferable>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-browser-adapters/shared-worker--createSharedWorkerTransport"
+        },
+        {
+          "name": "ISharedWorkerPort",
+          "kind": "type",
+          "signature": "export type ISharedWorkerPort = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; start?(): void; addEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; removeEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; };",
+          "declarationLine": 3,
+          "source": "packages/rpc-browser/dist/browser/adapters/shared-worker.d.ts",
+          "purpose": "Minimal SharedWorker port surface accepted by the adapter.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISharedWorkerPort.",
+          "advanced": "No additional advanced behavior is declared for ISharedWorkerPort.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ISharedWorkerPort."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISharedWorkerPort.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/shared-worker",
+          "overloadSignatures": [
+            "export type ISharedWorkerPort = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; start?(): void; addEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; removeEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ISharedWorkerPort when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ISharedWorkerPort does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Minimal SharedWorker port surface accepted by the adapter."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISharedWorkerPort from @migaia/rpc-browser/adapters/shared-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISharedWorkerPort when its type contract and declared inputs match the result you need. Choose a different public symbol when ISharedWorkerPort does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISharedWorkerPort."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ISharedWorkerPort."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/adapters/shared-worker.d.ts:ISharedWorkerPort:export type ISharedWorkerPort = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; start?(): void; addEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; removeEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-browser-adapters/shared-worker--ISharedWorkerPort"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-browser:adapters/web-transport",
+      "library": "rpc-browser",
+      "module": "adapters/web-transport",
+      "exportPath": "./adapters/web-transport",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-browser/getting-started",
+      "architecturePath": "/en/architecture/rpc-browser",
+      "symbols": [
+        {
+          "name": "createWebTransportDatagramTransport",
+          "kind": "function",
+          "signature": "export declare function createWebTransportDatagramTransport(datagrams: IWebTransportDatagrams): IRpcTransport<Uint8Array>;",
+          "declarationLine": 8,
+          "source": "packages/rpc-browser/dist/browser/adapters/web-transport.d.ts",
+          "purpose": "Wraps WebTransport datagrams; protocol middleware owns encoding and decoding.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWebTransportDatagramTransport.",
+          "advanced": "No additional advanced behavior is declared for createWebTransportDatagramTransport.",
+          "parameters": ["datagrams: IWebTransportDatagrams"],
+          "parameterDetails": [
+            {
+              "name": "datagrams",
+              "type": "IWebTransportDatagrams",
+              "optional": false
+            }
+          ],
+          "returns": "IRpcTransport<Uint8Array>",
+          "errors": ["No documented errors are declared for createWebTransportDatagramTransport."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWebTransportDatagramTransport.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/web-transport",
+          "overloadSignatures": [
+            "export declare function createWebTransportDatagramTransport(datagrams: IWebTransportDatagrams): IRpcTransport<Uint8Array>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "datagrams",
+                "type": "IWebTransportDatagrams",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcTransport<Uint8Array>"],
+          "whenToUse": "Use createWebTransportDatagramTransport when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createWebTransportDatagramTransport does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Wraps WebTransport datagrams; protocol middleware owns encoding and decoding."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createWebTransportDatagramTransport from @migaia/rpc-browser/adapters/web-transport, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createWebTransportDatagramTransport when its function contract and declared inputs match the result you need. Choose a different public symbol when createWebTransportDatagramTransport does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWebTransportDatagramTransport."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createWebTransportDatagramTransport."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/adapters/web-transport.d.ts:createWebTransportDatagramTransport:export declare function createWebTransportDatagramTransport(datagrams: IWebTransportDatagrams): IRpcTransport<Uint8Array>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-browser-adapters/web-transport--createWebTransportDatagramTransport"
+        },
+        {
+          "name": "IWebTransportDatagrams",
+          "kind": "type",
+          "signature": "export type IWebTransportDatagrams = { writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array>; };",
+          "declarationLine": 3,
+          "source": "packages/rpc-browser/dist/browser/adapters/web-transport.d.ts",
+          "purpose": "Minimal datagram surface accepted by the WebTransport adapter.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWebTransportDatagrams.",
+          "advanced": "No additional advanced behavior is declared for IWebTransportDatagrams.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IWebTransportDatagrams."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWebTransportDatagrams.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/web-transport",
+          "overloadSignatures": [
+            "export type IWebTransportDatagrams = { writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IWebTransportDatagrams when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IWebTransportDatagrams does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Minimal datagram surface accepted by the WebTransport adapter."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IWebTransportDatagrams from @migaia/rpc-browser/adapters/web-transport, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IWebTransportDatagrams when its type contract and declared inputs match the result you need. Choose a different public symbol when IWebTransportDatagrams does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWebTransportDatagrams."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IWebTransportDatagrams."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/adapters/web-transport.d.ts:IWebTransportDatagrams:export type IWebTransportDatagrams = { writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-browser-adapters/web-transport--IWebTransportDatagrams"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-browser:adapters/window",
+      "library": "rpc-browser",
+      "module": "adapters/window",
+      "exportPath": "./adapters/window",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-browser/getting-started",
+      "architecturePath": "/en/architecture/rpc-browser",
+      "symbols": [
+        {
+          "name": "createWindowMessageTransport",
+          "kind": "function",
+          "signature": "export declare function createWindowMessageTransport(options: IWindowMessageTransportOptions): IRpcTransport<unknown, Transferable>;",
+          "declarationLine": 20,
+          "source": "packages/rpc-browser/dist/browser/adapters/window.d.ts",
+          "purpose": "Adapts distinct outbound and inbound Window owners without weakening source proof.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWindowMessageTransport.",
+          "advanced": "No additional advanced behavior is declared for createWindowMessageTransport.",
+          "parameters": ["options: IWindowMessageTransportOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IWindowMessageTransportOptions",
+              "optional": false
+            }
+          ],
+          "returns": "IRpcTransport<unknown, Transferable>",
+          "errors": ["No documented errors are declared for createWindowMessageTransport."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWindowMessageTransport.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/window",
+          "overloadSignatures": [
+            "export declare function createWindowMessageTransport(options: IWindowMessageTransportOptions): IRpcTransport<unknown, Transferable>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IWindowMessageTransportOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcTransport<unknown, Transferable>"],
+          "whenToUse": "Use createWindowMessageTransport when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createWindowMessageTransport does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Adapts distinct outbound and inbound Window owners without weakening source proof."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createWindowMessageTransport from @migaia/rpc-browser/adapters/window, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createWindowMessageTransport when its function contract and declared inputs match the result you need. Choose a different public symbol when createWindowMessageTransport does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWindowMessageTransport."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createWindowMessageTransport."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "target",
+              "type": "IWindowMessageTarget",
+              "optional": false,
+              "description": "Outbound ServiceWorker or Client target. */ export type IServiceWorkerMessageTarget = { postMessage(message: unknown, transfer?: readonly Transferable[]): void readonly id?: string } /** Inbound page or ServiceWorkerGlobalScope event target. */ export type IServiceWorkerMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void } export type IServiceWorkerTransportOptions = { /** ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target."
+            },
+            {
+              "name": "receiver",
+              "type": "IWindowMessageReceiver",
+              "optional": true,
+              "description": "Message event owner, usually navigator.serviceWorker in a page or self in the worker."
+            },
+            {
+              "name": "targetOrigin",
+              "type": "string",
+              "optional": true,
+              "description": "Defaults to current window.location.origin when available."
+            },
+            {
+              "name": "allowUnsafeTargetOrigin",
+              "type": "boolean",
+              "optional": true,
+              "description": "Explicit opt-in for wildcard delivery; source identity is still required on receive."
+            }
+          ],
+          "identity": "packages/rpc-browser/dist/browser/adapters/window.d.ts:createWindowMessageTransport:export declare function createWindowMessageTransport(options: IWindowMessageTransportOptions): IRpcTransport<unknown, Transferable>;",
+          "guidance": [],
+          "usageScore": 10,
+          "configuration": [
+            {
+              "name": "target",
+              "type": "IWindowMessageTarget",
+              "optional": false,
+              "description": "Outbound ServiceWorker or Client target. */ export type IServiceWorkerMessageTarget = { postMessage(message: unknown, transfer?: readonly Transferable[]): void readonly id?: string } /** Inbound page or ServiceWorkerGlobalScope event target. */ export type IServiceWorkerMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void } export type IServiceWorkerTransportOptions = { /** ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target.",
+              "descriptionEn": "Outbound ServiceWorker or Client target. */ export type IServiceWorkerMessageTarget = { postMessage(message: unknown, transfer?: readonly Transferable[]): void readonly id?: string } /** Inbound page or ServiceWorkerGlobalScope event target. */ export type IServiceWorkerMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void } export type IServiceWorkerTransportOptions = { /** ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "receiver",
+              "type": "IWindowMessageReceiver",
+              "optional": true,
+              "description": "Message event owner, usually navigator.serviceWorker in a page or self in the worker.",
+              "descriptionEn": "Message event owner, usually navigator.serviceWorker in a page or self in the worker.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "targetOrigin",
+              "type": "string",
+              "optional": true,
+              "description": "Defaults to current window.location.origin when available.",
+              "descriptionEn": "Defaults to current window.location.origin when available.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "allowUnsafeTargetOrigin",
+              "type": "boolean",
+              "optional": true,
+              "description": "Explicit opt-in for wildcard delivery; source identity is still required on receive.",
+              "descriptionEn": "Explicit opt-in for wildcard delivery; source identity is still required on receive.",
+              "descriptionZh": ""
+            }
+          ],
+          "fragment": "rpc-browser-adapters/window--createWindowMessageTransport"
+        },
+        {
+          "name": "IWindowMessageReceiver",
+          "kind": "type",
+          "signature": "export type IWindowMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };",
+          "declarationLine": 7,
+          "source": "packages/rpc-browser/dist/browser/adapters/window.d.ts",
+          "purpose": "Inbound realm that owns message listener registration.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWindowMessageReceiver.",
+          "advanced": "No additional advanced behavior is declared for IWindowMessageReceiver.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IWindowMessageReceiver."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWindowMessageReceiver.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/window",
+          "overloadSignatures": [
+            "export type IWindowMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IWindowMessageReceiver when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IWindowMessageReceiver does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Inbound realm that owns message listener registration."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IWindowMessageReceiver from @migaia/rpc-browser/adapters/window, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IWindowMessageReceiver when its type contract and declared inputs match the result you need. Choose a different public symbol when IWindowMessageReceiver does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWindowMessageReceiver."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IWindowMessageReceiver."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/adapters/window.d.ts:IWindowMessageReceiver:export type IWindowMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-browser-adapters/window--IWindowMessageReceiver"
+        },
+        {
+          "name": "IWindowMessageTarget",
+          "kind": "type",
+          "signature": "export type IWindowMessageTarget = { postMessage(message: unknown, targetOrigin: string, transfer?: readonly Transferable[]): void; };",
+          "declarationLine": 3,
+          "source": "packages/rpc-browser/dist/browser/adapters/window.d.ts",
+          "purpose": "Outbound Window-like target that owns postMessage delivery.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWindowMessageTarget.",
+          "advanced": "No additional advanced behavior is declared for IWindowMessageTarget.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IWindowMessageTarget."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWindowMessageTarget.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/window",
+          "overloadSignatures": [
+            "export type IWindowMessageTarget = { postMessage(message: unknown, targetOrigin: string, transfer?: readonly Transferable[]): void; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IWindowMessageTarget when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IWindowMessageTarget does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Outbound Window-like target that owns postMessage delivery."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IWindowMessageTarget from @migaia/rpc-browser/adapters/window, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IWindowMessageTarget when its type contract and declared inputs match the result you need. Choose a different public symbol when IWindowMessageTarget does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWindowMessageTarget."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IWindowMessageTarget."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/adapters/window.d.ts:IWindowMessageTarget:export type IWindowMessageTarget = { postMessage(message: unknown, targetOrigin: string, transfer?: readonly Transferable[]): void; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-browser-adapters/window--IWindowMessageTarget"
+        },
+        {
+          "name": "IWindowMessageTransportOptions",
+          "kind": "type",
+          "signature": "export type IWindowMessageTransportOptions = { readonly target: IWindowMessageTarget; readonly receiver?: IWindowMessageReceiver; /** Defaults to current window.location.origin when available. */ readonly targetOrigin?: string; /** Explicit opt-in for wildcard delivery; source identity is still required on receive. */ readonly allowUnsafeTargetOrigin?: boolean; };",
+          "declarationLine": 11,
+          "source": "packages/rpc-browser/dist/browser/adapters/window.d.ts",
+          "purpose": "IWindowMessageTransportOptions is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWindowMessageTransportOptions.",
+          "advanced": "No additional advanced behavior is declared for IWindowMessageTransportOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IWindowMessageTransportOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWindowMessageTransportOptions.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/window",
+          "overloadSignatures": [
+            "export type IWindowMessageTransportOptions = { readonly target: IWindowMessageTarget; readonly receiver?: IWindowMessageReceiver; /** Defaults to current window.location.origin when available. */ readonly targetOrigin?: string; /** Explicit opt-in for wildcard delivery; source identity is still required on receive. */ readonly allowUnsafeTargetOrigin?: boolean; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IWindowMessageTransportOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IWindowMessageTransportOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IWindowMessageTransportOptions is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IWindowMessageTransportOptions from @migaia/rpc-browser/adapters/window, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IWindowMessageTransportOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IWindowMessageTransportOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWindowMessageTransportOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IWindowMessageTransportOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/adapters/window.d.ts:IWindowMessageTransportOptions:export type IWindowMessageTransportOptions = { readonly target: IWindowMessageTarget; readonly receiver?: IWindowMessageReceiver; /** Defaults to current window.location.origin when available. */ readonly targetOrigin?: string; /** Explicit opt-in for wildcard delivery; source identity is still required on receive. */ readonly allowUnsafeTargetOrigin?: boolean; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-browser-adapters/window--IWindowMessageTransportOptions"
+        }
+      ],
+      "aliases": []
+    }
+  ]
+}
