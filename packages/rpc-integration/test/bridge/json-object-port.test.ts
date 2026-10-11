@@ -4,9 +4,9 @@ import { createHmac } from 'node:crypto'
 import { bridgeFixture, flush, request, peerFrame } from './fixture.js'
 import { objectFixtureEndpoint, objectDeepValue } from './json-object-fixture.js'
 import {
-  jsonObjectCodec,
-  materializeJsonSnapshot
-} from '../../../rpc-core/dist/adapter-owned/jsonrpc/object-pipeline.js'
+  createRuntimeObjectPipeline,
+  materializeAdapterJson as materializeJsonSnapshot
+} from '../../../rpc-core/dist/runtime-adapter/object/pipeline.js'
 import { remoteProcessJsonCodec } from '../../../rpc-core/dist/adapter-owned/process/pipeline.js'
 import { readJsonObjectPort } from '../../../rpc-core/dist/core/internal/json-object-port.js'
 import { rpcProtocolV1, type IRpcEnvelope } from '@migaia/rpc-contract'
@@ -16,6 +16,9 @@ import { readAuthenticationEnvelope } from '../../../rpc-core/dist/core/middlewa
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
 import type { IRpcAuthenticationCapability } from '@migaia/rpc-core'
 import { installPlugin } from '../../../rpc-core/test/core/middleware/helpers.js'
+
+/** The moved Core factory supplies the same object encoder; this fixture never uses text decode. */
+const { codec: jsonObjectCodec } = createRuntimeObjectPipeline('object fixture expects string encoded data')
 
 /** Capture the thrown instance without replacing its native type or cause graph. */
 function thrown(operation: () => unknown): unknown {

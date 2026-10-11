@@ -1,6 +1,6 @@
-import { materializeJsonSnapshot } from './object-pipeline.js'
+import { materializeAdapterJson, readAdapterAbortReason } from '@migaia/rpc-core/adapter'
 import { deferred } from '@migaia/utils/promise'
-import { deserializeRpcError, serializeRpcError } from '../../core/internal/error-wire-metadata.js'
+import { deserializeRpcError, serializeRpcError } from '@migaia/rpc-core'
 import { fromJsonRpcError } from '@migaia/rpc-contract'
 import { toJsonRpcError } from '@migaia/rpc-contract/errors'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
@@ -15,25 +15,17 @@ import {
 } from '@migaia/rpc-contract'
 import { RpcRouteProfile } from '@migaia/rpc-contract'
 import { RpcJsonRpcWireError } from '@migaia/rpc-contract'
-import { resolveAbortReason } from '../../core/internal/async-control.js'
 import {
   collectListenerCleanupFailures,
   createListenerFailureState,
   reportListenerFailure,
   drainTerminalListenerFailures
-} from '../../core/transport-kit.js'
-import type { IRpcTransport } from '../../core/index.js'
-import type { IRpcInboundMessage } from '../../core/transport.js'
-import {
-  RpcPlatform,
-  RpcTransportEncoding,
-  RpcTransportOwnership,
-  RpcTransportTopology
-} from '../../core/transport-constants.js'
-import { RpcProcessErrorCode } from '../process/error-code.js'
-import { createProcessError } from '../process/error.js'
-import { RemoteMethodName } from '../../remote/index.js'
-import { RpcRemoteLayerErrorCode } from '../../remote/index.js'
+} from '@migaia/rpc-core/transport-kit'
+import type { IRpcTransport, IRpcSendOptions } from '@migaia/rpc-core'
+import type { IRuntimeObjectIO } from '@migaia/rpc-core/adapter'
+import { createProcessChannelClosedError } from '@migaia/rpc-process'
+import { RemoteMethodName } from '@migaia/rpc-core/remote'
+import { RpcRemoteLayerErrorCode } from '@migaia/rpc-core/remote'
 import { JsonRpcProfile, JsonRpcErrorNumber } from './constants.js'
 import { readRpcBatchMembers } from '@migaia/rpc-contract/framing'
 import { JsonRpcBridgeErrorCode } from '@migaia/rpc-contract/framing/jsonrpc'
@@ -41,20 +33,27 @@ import { createJsonRpcBridgeError } from './error.js'
 import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'
 import { validateJsonRpcDescription, type IJsonRpcBridgeOptions } from './handshake.js'
 
-/** The factory owns one pre-ready hello and one exclusive logical transport. */
-export type IJsonRpcWire = Readonly<{
-  transport: IRpcTransport
-  /** Package-private data ports share the public sender, subscribers and terminal owner. */
-  readonly sendObject: IRpcTransport['send']
-  readonly subscribeObject: IRpcTransport['subscribe']
-  readonly registerObjectPortRelease: (release: () => void) => void
-  /** Completed hello intersection alone enables JSON-RPC arrays after negotiation. */
-  setCapabilities(capabilities: readonly string[]): void
-  exchangeHello(hello: string): Promise<unknown>
-  close(reason?: unknown): Promise<void>
-  assertOpen(): void
-  readonly closed: boolean
-}>
+/** The factory holds actual wire I/O and the pre-ready correlation; Core constructs the transport. */
+export type IJsonRpcWire = Pick<
+  IRuntimeObjectIO,
+  | 'writeText'
+  | 'writeObject'
+  | 'subscribeText'
+  | 'subscribeObject'
+  | 'onTransportError'
+  | 'onClosing'
+> &
+  Readonly<{
+    /** Completed hello intersection alone enables JSON-RPC arrays after negotiation. */
+    setCapabilities(capabilities: readonly string[]): void
+    exchangeHello(hello: string): Promise<unknown>
+    close(reason?: unknown): Promise<void>
+    assertOpen(): void
+    readonly closed: boolean
+  }>
+
+/** Inbound records retain the ordinary public transport subscriber contract. */
+type IJsonRpcInboundMessage = Parameters<Parameters<IRpcTransport['subscribe']>[0]>[0]
 
 /** Bind raw bytes once, translate logical envelopes, and keep all correlation connection-local. */
 export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
@@ -73,11 +72,11 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
   /** Listener and reporter cleanup uses the shared adapter failure collector. */
   const failures = createListenerFailureState()
   /** Only this logical connection owns inbound response subscribers. */
-  const listeners = new Set<(message: IRpcInboundMessage) => void>()
+  const listeners = new Set<(message: IJsonRpcInboundMessage) => void>()
   /** Distinguishes private subscribers without changing Set identity or traversal semantics. */
-  const objectListeners = new WeakSet<(message: IRpcInboundMessage) => void>()
+  const objectListeners = new WeakSet<(message: IJsonRpcInboundMessage) => void>()
   /** Final wrapper's capability disposer is set only after successful IPC adoption. */
-  let releaseObjectPort: (() => void) | undefined
+  let closingObserver: (() => void) | undefined
   /** Transport failure subscribers settle core pending requests on termination. */
   const errorListeners = new Set<(error: unknown) => void>()
   /** All physical writes can settle promptly on close even if drain never arrives. */
@@ -104,9 +103,9 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
   const close = (reason?: unknown): Promise<void> => {
     if (closing) return closing
     closed = true
-    releaseObjectPort?.()
-    releaseObjectPort = undefined
-    terminal = reason ?? createProcessError(RpcProcessErrorCode.channelClosed)
+    closingObserver?.()
+    closingObserver = undefined
+    terminal = reason ?? createProcessChannelClosedError()
     decoder.close()
     pending.clear()
     incoming.clear()
@@ -175,7 +174,7 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
           const alreadyClosed = closed
           writes.delete(abortWrite)
           /** IO failure keeps its original instance reachable through the process error cause. */
-          const error = createProcessError(RpcProcessErrorCode.channelClosed, cause)
+          const error = createProcessChannelClosedError(cause)
           reject(error)
           if (alreadyClosed) report(error)
           else fail(error)
@@ -248,11 +247,11 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
       reportListenerFailure(
         {
           data: objectListeners.has(listener)
-            ? materializeJsonSnapshot(envelope)
+            ? materializeAdapterJson(envelope)
             : JSON.stringify(envelope),
           peerId: options.peerId
         },
-        [(value) => listener(value as IRpcInboundMessage)],
+        [(value) => listener(value as IJsonRpcInboundMessage)],
         failures
       )
   }
@@ -306,11 +305,11 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
           reportListenerFailure(
             {
               data: objectListeners.has(listener)
-                ? materializeJsonSnapshot(envelope)
+                ? materializeAdapterJson(envelope)
                 : JSON.stringify(envelope),
               peerId: options.peerId
             },
-            [(value) => listener(value as IRpcInboundMessage)],
+            [(value) => listener(value as IJsonRpcInboundMessage)],
             failures
           )
         /** The cancelling caller settles locally; Core discards the expired provider outcome. */
@@ -393,11 +392,11 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
         reportListenerFailure(
           {
             data: objectListeners.has(listener)
-              ? materializeJsonSnapshot(envelope)
+              ? materializeAdapterJson(envelope)
               : JSON.stringify(envelope),
             peerId: options.peerId
           },
-          [(value) => listener(value as IRpcInboundMessage)],
+          [(value) => listener(value as IJsonRpcInboundMessage)],
           failures
         )
       return
@@ -520,16 +519,14 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
           return
         }
         void close(
-          reason === undefined
-            ? undefined
-            : createProcessError(RpcProcessErrorCode.channelClosed, reason)
+          reason === undefined ? undefined : createProcessChannelClosedError(reason)
         ).catch(report)
       })
     )
     /** Caller cancellation keeps its original reason, particularly before channel publication. */
     const onAbort = (): void => {
       void close(
-        options.signal === undefined ? undefined : resolveAbortReason(options.signal)
+        options.signal === undefined ? undefined : readAdapterAbortReason(options.signal)
       ).catch(report)
     }
     options.signal?.addEventListener('abort', onAbort, { once: true })
@@ -616,7 +613,7 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
   /** Both public and private inputs share one whole physical write and one correlation owner. */
   const send = async (
     value: unknown,
-    sendOptions?: import('../../core/index.js').IRpcSendOptions,
+    sendOptions?: IRpcSendOptions,
     objectInput = false
   ): Promise<void> => {
     if (closed) throw terminal
@@ -635,20 +632,21 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
     if (messages.length) await write(messages)
   }
 
-  /** Metadata and ownership describe the logical single-peer connection rather than its process. */
-  const transport: IRpcTransport = {
-    platform: RpcPlatform.process,
-    topology: RpcTransportTopology.exclusive,
-    ownership: RpcTransportOwnership.owned,
-    encodedType: RpcTransportEncoding.string,
-    peerId: options.peerId,
-    send(value, sendOptions) {
-      return send(value, sendOptions)
-    },
-    subscribe(listener) {
+  return {
+    writeText: (value, sendOptions) => send(value, sendOptions),
+    writeObject: (value, sendOptions) => send(value, sendOptions, true),
+    subscribeText(listener) {
       listeners.add(listener)
       return () => {
         listeners.delete(listener)
+      }
+    },
+    subscribeObject: (listener) => {
+      objectListeners.add(listener)
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+        objectListeners.delete(listener)
       }
     },
     onTransportError(listener) {
@@ -658,25 +656,12 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
         errorListeners.delete(listener)
       }
     },
-    close: () => close(),
-    get closed() {
-      return closed
-    }
-  }
-  return {
-    transport,
-    sendObject: (value, sendOptions) => send(value, sendOptions, true),
-    subscribeObject: (listener) => {
-      objectListeners.add(listener)
-      listeners.add(listener)
+    onClosing(listener) {
+      if (closed) listener()
+      else closingObserver = listener
       return () => {
-        listeners.delete(listener)
-        objectListeners.delete(listener)
+        if (closingObserver === listener) closingObserver = undefined
       }
-    },
-    registerObjectPortRelease: (release) => {
-      if (closed) release()
-      else releaseObjectPort = release
     },
     setCapabilities(capabilities) {
       incomingReady = true

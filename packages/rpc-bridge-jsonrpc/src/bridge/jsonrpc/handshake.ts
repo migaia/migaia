@@ -1,21 +1,18 @@
 import type { IScheduler, IWallClock } from '@migaia/utils/scheduler'
-import {
-  createRpcHello,
-  completeRpcHandshake,
-  type IRpcHandshakeOffer,
-  type IRpcHandshakeAgreement
-} from '@migaia/rpc-contract'
+import type { IRpcHandshakeOffer } from '@migaia/rpc-contract'
 import { RpcCodecId } from '@migaia/rpc-contract'
 import {
   normalizeRemoteContract,
   normalizeRemoteHostCatalog,
   type IRemoteContract,
   type IRemoteHostCatalog
-} from '../../remote/index.js'
-import { contractRequiresStream } from '../../remote/serve-methods.js'
-import { normalizeRuntimeDescription } from '../../remote/runtime-api/description.js'
-import { RuntimeApiMode } from '../../remote/index.js'
-import type { IProcessByteChannel, IProcessCommonOptions } from '../process/types.js'
+} from '@migaia/rpc-core/remote'
+import {
+  adapterContractRequiresStream,
+  normalizeAdapterDescription
+} from '@migaia/rpc-core/adapter'
+import { RuntimeApiMode } from '@migaia/rpc-core/remote'
+import type { IProcessByteChannel, IProcessCommonOptions } from '@migaia/rpc-process'
 import {
   JSONRPC_ALLOWED_CAPABILITIES,
   JSONRPC_REQUIRED_CAPABILITIES,
@@ -44,15 +41,13 @@ export type IJsonRpcBridgeOptions = Readonly<{
 /** Use remote's canonical description shape before applying the bridge's stream exclusion. */
 export function validateJsonRpcDescription(value: unknown): void {
   /** The remote directory is always v2, independent of the temporary local facade declaration. */
-  const description = normalizeRuntimeDescription(value)
+  const description = normalizeAdapterDescription(value)
   if (description.methods.some((method) => method.supportedModes.includes(RuntimeApiMode.stream)))
     throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.unsupportedMode)
 }
 
 /** Reject unsupported local options before installing readers, timers or writing any byte. */
-export function prepareJsonRpcHello(
-  options: IJsonRpcBridgeOptions
-): Readonly<{ offer: IRpcHandshakeOffer; hello: string }> {
+export function prepareJsonRpcOffer(options: IJsonRpcBridgeOptions): IRpcHandshakeOffer {
   if (
     !options ||
     !options.byte ||
@@ -89,7 +84,7 @@ export function prepareJsonRpcHello(
     target.kind === 'plugin'
       ? [normalizeRemoteContract(target.contract)]
       : Object.values(normalizeRemoteHostCatalog(target.catalog))
-  if (contracts.some(contractRequiresStream))
+  if (contracts.some(adapterContractRequiresStream))
     throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.unsupportedMode)
   if (
     options.offer.capabilities.some(
@@ -104,14 +99,11 @@ export function prepareJsonRpcHello(
     codecs: [RpcCodecId.json],
     capabilities: [...new Set([...JSONRPC_REQUIRED_CAPABILITIES, ...options.offer.capabilities])]
   }
-  return { offer, hello: createRpcHello(offer) }
+  return offer
 }
 
 /** Preserve control errors unchanged and check the bridge extensions exactly once after accept. */
-export function completeJsonRpcHello(
-  offer: IRpcHandshakeOffer,
-  result: unknown
-): IRpcHandshakeAgreement {
+export function readJsonRpcReply(result: unknown): string {
   if (
     !result ||
     typeof result !== 'object' ||
@@ -121,17 +113,20 @@ export function completeJsonRpcHello(
   )
     throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid)
   /** No reply text or agreement auth is included in a bridge error or diagnostic snapshot. */
-  const agreement = completeRpcHandshake(offer, result.reply)
+  return result.reply
+}
+
+/** Check adapter extensions only after Core completes the actual control exchange. */
+export function assertJsonRpcExtensions(capabilities: readonly string[], result: unknown): void {
+  /** Reply admission already established this exact response object before Core completion. */
+  const received = result as Record<string, unknown>
   /** The responder must advertise the complete extension surface before ready. */
-  const methods = 'methods' in result ? result.methods : undefined
+  const methods = 'methods' in received ? received.methods : undefined
   if (
-    JSONRPC_REQUIRED_CAPABILITIES.some(
-      (capability) => !agreement.capabilities.includes(capability)
-    ) ||
+    JSONRPC_REQUIRED_CAPABILITIES.some((capability) => !capabilities.includes(capability)) ||
     !Array.isArray(methods) ||
     methods.some((method) => typeof method !== 'string') ||
     JSONRPC_REQUIRED_METHODS.some((method) => !methods.includes(method))
   )
     throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.extensionMissing)
-  return agreement
 }

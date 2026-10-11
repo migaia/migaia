@@ -1,4 +1,6 @@
 export { createProcessTransport } from './handshake.js'
+export { createProcessChannelClosedError } from './error.js'
+export { openProcessObjectChannel } from './object-channel.js'
 export { createProcessPeer } from './peer.js'
 export { createNativeProcessOffer } from './offer.js'
 export type {

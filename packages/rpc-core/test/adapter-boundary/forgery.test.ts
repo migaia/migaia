@@ -8,7 +8,6 @@ import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { RpcBinaryProfile } from '@migaia/rpc-contract/wire'
 import * as core from '../../dist/core/index.js'
 import * as adapter from '../../dist/adapter.js'
-import * as jsonrpc from '../../dist/adapter-jsonrpc.js'
 import * as remote from '../../dist/remote/index.js'
 import * as provider from '../../dist/core/features/provider.js'
 import { createClientEndpoint } from '../../dist/core/client.js'
@@ -34,6 +33,11 @@ const adapterRequire = createRequire(
 const threads = (await import(
   adapterRequire.resolve('@migaia/rpc-threads')
 )) as typeof import('../../../rpc-threads/dist/threads/index.js')
+
+/** The foreign-language adapter is observed through its declared package entry. */
+const jsonrpc = (await import(
+  adapterRequire.resolve('@migaia/rpc-bridge-jsonrpc')
+)) as typeof import('../../../rpc-bridge-jsonrpc/dist/bridge/jsonrpc/index.js')
 
 /** Every assertion observes only public construction and private read-only facts, never a writer. */
 const publicEntries = [core, adapter, jsonrpc, threads, remote, provider]

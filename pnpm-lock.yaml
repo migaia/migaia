@@ -160,6 +160,10 @@ importers:
         version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
 
   packages/rpc-bridge-jsonrpc:
+    dependencies:
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
     devDependencies:
       '@migaia/rpc-contract':
         specifier: workspace:0.0.7
@@ -170,9 +174,6 @@ importers:
       '@migaia/rpc-process':
         specifier: workspace:0.0.7
         version: link:../rpc-process
-      '@migaia/utils':
-        specifier: workspace:^
-        version: link:../utils
       '@types/node':
         specifier: 24.13.2
         version: 24.13.2
