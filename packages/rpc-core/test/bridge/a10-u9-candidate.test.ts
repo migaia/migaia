@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
 import { describe, it, vi } from 'vitest'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
-import { jsonObjectCodec } from '../../dist/adapter-owned/jsonrpc/object-pipeline.js'
+import { createRuntimeObjectPipeline } from '../../dist/runtime-adapter/object/pipeline.js'
 import { outboundFactory, request } from '../core/fixtures/a10-u9-candidate.js'
+
+/** Observe the moved canonical codec with a one-off non-string diagnostic fixture. */
+const jsonObjectCodec = createRuntimeObjectPipeline('object-codec-fixture').codec
 
 describe('U9 package-created outbound proof', () => {
   it('[A17] bridge JSON object codec uses the same private proof and exact materialized value', async () => {

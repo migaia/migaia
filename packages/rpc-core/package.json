@@ -129,10 +129,6 @@
     "./adapter/process/node": {
       "types": "./dist/adapter-process-node.d.ts",
       "default": "./dist/adapter-process-node.js"
-    },
-    "./adapter/jsonrpc": {
-      "types": "./dist/adapter-jsonrpc.d.ts",
-      "default": "./dist/adapter-jsonrpc.js"
     }
   },
   "publishConfig": {

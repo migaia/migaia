@@ -1,4 +1,7 @@
-/** Core's JSON-RPC operations own private non-reflecting presentation for their existing failures. */
+/**
+ * The JSON-RPC adapter operations own private non-reflecting presentation for their existing
+ * failures.
+ */
 export const JsonRpcBridgeErrorText = {
   /** Malformed Content-Length framing or body decoding keeps its original fixed diagnostic. */
   frameInvalid: 'Invalid JSON-RPC Content-Length frame.',

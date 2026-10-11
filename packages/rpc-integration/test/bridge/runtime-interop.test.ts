@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'
 import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'
-import { JSONRPC_ALLOWED_CAPABILITIES } from '../../../rpc-core/dist/adapter-owned/jsonrpc/constants.js'
+import { JSONRPC_ALLOWED_CAPABILITIES } from '../../../rpc-bridge-jsonrpc/dist/bridge/jsonrpc/constants.js'
 import { BRIDGE_CONTRACT, flush } from './fixture.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'

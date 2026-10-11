@@ -666,7 +666,7 @@ async function createBridgeIpcSession({ carrier, side, payload, peerRuntime }) {
       const { createProcessPeer } = await import('@migaia/rpc-process')
       /** Only capabilities with actual mappings in the canonical bridge profile are offered. */
       const { JSONRPC_ALLOWED_CAPABILITIES } =
-        await import('../../../rpc-core/dist/adapter-owned/jsonrpc/constants.js')
+        await import('../../../rpc-bridge-jsonrpc/dist/bridge/jsonrpc/constants.js')
       /** Contract describes the same request echo already proved by the conformance facade cases. */
       const contract = {
         schemaVersion: 1,

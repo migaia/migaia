@@ -176,11 +176,11 @@ old `runtimeApi` plumbing output is removed from both handle families. `RpcThrea
 `RPC_THREAD_ERROR_SOURCE` classify a `sampleUsage` failure with its original native error cause.
 
 A foreign-language bridge adapter supplies its held ordered byte connection to the complete
-JSON-RPC channel operation. Core owns framing, the authenticated hello, correlation and gated
-transport construction; its JSON object port and batch registration stay private.
+JSON-RPC channel operation. The bridge owns JSON-RPC framing and correlation. Core reads the authenticated hello
+through held object I/O and constructs the gated transport; its object port and batch facts stay private.
 
 ```ts
-import { createJsonRpcAdapterChannel } from '@migaia/rpc-core/adapter/jsonrpc'
+import { createJsonRpcAdapterChannel } from '@migaia/rpc-bridge-jsonrpc'
 
 const channel = await createJsonRpcAdapterChannel({
   byte: heldByteIO,
