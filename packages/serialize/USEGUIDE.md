@@ -965,25 +965,38 @@ export function makePortableBoundary(strategy: IPortableWalkerStrategy) {
 }
 ```
 
-工厂捕获策略回调与深度一次。返回函数签名为 `(value: unknown, active?: Set<object>) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean }>`。`active` 用于现有调用链的活动祖先集合，默认每次新建，遍历结束后不保留图或标记。策略须确保其成功输出符合需要的 portable 契约；`value` 不自动变更为某个协议的类型。
+工厂捕获策略回调与深度一次。返回函数签名为 `(value: unknown, active?: Set<object>, initialDepth?: number, beforeNativeBinary?: () => never) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean }>`。`active` 用于现有调用链的活动祖先集合，省略时仅在本次遍历进入容器后建立，遍历结束后不保留图或标记。策略须确保其成功输出符合需要的 portable 契约；`value` 不自动变更为某个协议的类型。
 
 | 策略字段 | 契约 |
 | --- | --- |
 | `maxDepth?` | 根深度为 0；节点深度大于该值才拒绝。省略为不限深度。RPC 策略配置 64；serialize 默认继续不限深度。 |
-| `scalar(value, context)` | 返回 `{ value, violation? }`。立即拒绝调用 `context.reject`；返回 `violation` 会保留第一个验证失败，完成本次投影后才抛。 |
-| `binary(value, context)` | 接收对象，返回原子 bytes tag 的 `base64url` 字符串或 `undefined`。策略决定是否接受 native bytes；工具由 serialize 提供。 |
+| `scalar(value, context)` | 返回原 primitive 或 `{ value, violation? }`。立即拒绝调用 `context.reject`；返回 `violation` 会保留第一个验证失败，完成本次投影后才抛。 |
+| `binary(value, context)` | 接收对象，返回 `IPortableBinaryResult`：inline `base64url` 字符串，或借用原 `Uint8Array` / `ArrayBuffer`；`undefined` 表示继续容器准入。native 策略必须提供 `nativeByteLength`，使用自己的 intrinsic 长度读取器，不读 caller shadow 属性。 |
 | `record(value, context)` | 返回 `{ entries, output?, tag?, hasBinary?, validate? }`，或返回 `undefined` 交给数组回调。`entries` 可以预捕获，也可以按选择的顺序惰性读取。`output` 缺省表示只校验原输入；提供对象表示复制。`tag` 表示原子 bytes tag。 |
-| `array?(value, visit, context)` | 返回 `{ value, length?, violation? }`。默认沿原 `map` 遍历；策略可改为只校验。传入已捕获 `length` 可避免额外读取原输入。回调通过 `visit` 使用唯一 canonical 遍历器，不能另写递归。 |
+| `array?(value, visit, context)` | 返回原 output array 或 `{ value, length?, violation? }`。默认沿原 `map` 遍历；策略可改为只校验。传入已捕获 `length` 可避免额外读取原输入。回调通过 `visit` 使用唯一 canonical 遍历器，不能另写递归。 |
+| `arrayValue?(value, visit, childDepth, ancestors, guard, bounds, context)` | 与 `array` 互斥，直接返回原始快照，不分配 admission 包装。需保留自定义 `map` 的 callback 归属时，策略用 `child => visit(child, childDepth, ancestors, guard, bounds)` 捕获词法所有权；核心仍复用同一个递归函数。仅取 `.value` 时不会探测返回值或读取其 length。 |
 | `key?(key, context)` | 在对应子值遍历前执行，可以拒绝保留字段。 |
-| `finish?(value)` | 完成输出节点，例如 `Object.freeze`；默认保留值。复制记录的原型由 `record.output` 决定。 |
+| `write?(output, key, child)` | 按策略选定的 prototype 写入 own data；默认 `Object.defineProperty` 保留 ordinary-object 的 `__proto__` 行为，null-prototype 策略可直接赋值。 |
+| `finish?(value, hasNativeBinary)` | 完成容器/inline tag，例如 freeze。native leaf 不调用 finish、不复制、不 freeze。第二参数只表示 native descendant，inline bytes tag 不会被误当 native proof。 |
 | `violation(reason, cause?)` | 必須抛使用方自己的 coded 原生错误。原失败由 `cause` 参数提供；包装必须保留该对象与原 stack。 |
 
-`context` 提供 `reject(reason, cause?)`、只读的 `isAncestor(value)`、跨 realm 的 `isUint8Array`、`bytesToBase64url`、`isCanonicalBase64url`。字节算法复用既有 runtime-neutral Base64；canonical 检查包括末尾未使用位，不分配解码 backing。通用遍历器产生 `depth`、`cycle`、`access` 原因；其他原因由策略定义。`reject` 保留策略抛出的已分类错误身份；策略原样抛回 `cause` 时，父容器仍可应用其错误边界。回调直接抛出的应用异常经 `violation('access', original)` 处理。
+`context` 提供 `reject(reason, cause?)`、只读的 `isAncestor(value)`、跨 realm 的 `isUint8Array`、`bytesToBase64url`、`isCanonicalBase64url`。字节算法复用既有 runtime-neutral Base64；canonical 检查包括末尾未使用位，不分配解码 backing。通用遍历器产生 `depth`、`cycle`、`access` 原因；调用方传入的 ancestor Set 操作抛错时使用 `ancestor`，以保留该外部状态的原始失败边界。其他原因由策略定义。`reject` 保留策略抛出的已分类错误身份；策略原样抛回 `cause` 时，父容器仍可应用其错误边界。回调直接抛出的应用异常经 `violation('access', original)` 处理。
 
 返回的 `byteUpperBound` 使用字符串每 UTF-16 单元最多 6 个 JSON 转义字节、数字最多 32 字节及容器标点估计；原子 bytes tag 计入两个字段和 base64url 文本。不会再次读取或扫描输入图，也不会为了估计字符串大小调用 `JSON.stringify`。`hasBinary` 由本次 bytes/tag 准入和子节点结果融合传播；策略的 `hasBinary` 仅表示已经识别的原子记录。
 
 包内默认投影与断言保留旧消费结果：投影输出普通可变对象，按排序后的键逐项读取并递归，真正 Uint8Array 转为 `$rpc` tag；断言保留原对象，拒绝 native bytes，wire tag 保留既有字符集校验。JSON、MessagePack、CBOR 的融合默认策略完成投影后才抛验证失败，因此较晚发生的投影 getter 异常仍优先，和此前“先投影再断言”一致。
 
-RPC 的 null-prototype/freeze、父字段先捕获、canonical tag、深度 64 和 `(source, code)` 由 Contract 自己的策略定义。本阶段只有 serialize 自有测试夹具配置这些规则；生产 serialize 不内置 RPC 策略。native binary 协商、manifest、全局 binary 标记与协议错误身份不归通用遍历器。
+RPC 的 null-prototype/freeze、父字段先捕获、canonical tag、深度 64 和 `(source, code)` 由 Contract 自己的策略定义。生产策略归 rpc-contract；serialize 自有测试保留独立策略夹具作为 oracle，生产 serialize 不内置 RPC 策略。native binary 协商、manifest、全局 binary 标记与协议错误身份不归通用遍历器。
 
 没有新增错误码：serialize 默认仍使用 `INVALID_OPTION`，文案仍为 `serialize codec value is outside the portable profile`。需要保留域错误时，`violation` 可以构造自己的 `TypeError(message, { cause })` 并附加原有 `(source, code)`；不得改写原错误的 stack 或在原因链外丢弃原失败。既有 `base64ToBytes` 的 `INVALID_OPTION`、`invalid base64 input` 和无底层 cause 的消费边界保持不变。
+
+
+### Native binary strategy results
+
+`IPortableBinaryResult = string | Uint8Array | ArrayBuffer` keeps all binary outcomes unboxed. Inline strings retain the prior tagged wire representation. Borrowed native objects retain their exact identity; the strategy owns admission and `nativeByteLength`, and must read genuine slots rather than caller getters. The generic kernel records the supplied native length and propagates native presence to `finish(value, hasNativeBinary)` in the same traversal. A protocol may mark native-bearing parents there; generic `hasBinary` also includes inline tags and is not a native-protocol proof.
+
+`walker.value(value, active?, initialDepth?, beforeNativeBinary?)` shares the same recursive implementation and returns only its value. It avoids an unused caller-visible metadata object for normalizers or codecs. The ordinary callable still returns the original three metadata fields. `initialDepth` defaults to zero; the comparison against the strategy's captured maximum remains unchanged. The invocation's optional guard is exposed as `context.beforeNativeBinary`; the policy invokes it only at its admitted native-input boundary.
+
+The factory captures callbacks and its context once. Synchronous node accounting uses primitive slots, saved/restored on invocation and nested array boundaries. Reentrant getter calls restore the outer active path and accounting, and completed calls retain no caller graph. Context is read only during its synchronous strategy hook. No global binary side table or per-request strategy factory is introduced.
+
+For native outcomes `byteUpperBound` includes the strategy-supplied native bytes and the existing scalar/container bound. It is not a manifest's complete unique-backing/offset budget; that physical protocol budget stays with its owner. Existing JSON, MessagePack and CBOR defaults remain inline-only and keep their wire bytes unchanged.

@@ -11,7 +11,18 @@ type IPortableWalkerContext = Readonly<{
   isUint8Array: typeof isUint8Array
   bytesToBase64url: typeof bytesToBase64url
   isCanonicalBase64url: typeof isCanonicalBase64url
+  /** Invocation-owned rejection guard, absent when native binary needs no extra admission. */
+  beforeNativeBinary?: () => never
 }>
+
+/**
+ * Binary outcomes are unboxed: inline text or borrowed native storage, with no descriptor
+ * allocation.
+ */
+export type IPortableBinaryResult = string | Uint8Array | ArrayBuffer
+
+/** Returning a primitive directly avoids a transient scalar admission object on hot paths. */
+type IPortablePrimitive = null | string | boolean | number
 
 /** A deferred violation lets projection finish before legacy validation chooses its failure. */
 type IPortableScalar = Readonly<{ value: unknown; violation?: string }>
@@ -25,6 +36,15 @@ type IPortableRecord = Readonly<{
   validate?: (output: Record<string, unknown>) => string | undefined
 }>
 
+/** Explicit lexical ownership lets a caller retain a visitor without observing another array frame. */
+type IPortableOwnedVisit = (
+  value: unknown,
+  depth: number,
+  ancestors: Set<object>,
+  guard: (() => never) | undefined,
+  bounds: boolean
+) => unknown
+
 /**
  * Policy owned by the caller, resolved once at factory creation. Hooks never recurse themselves.
  * Scalar/array/record validation may return a deferred violation to preserve projection failure
@@ -33,26 +53,68 @@ type IPortableRecord = Readonly<{
  */
 export type IPortableWalkerStrategy = Readonly<{
   maxDepth?: number
-  scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar
-  binary: (value: object, context: IPortableWalkerContext) => string | undefined
+  scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar | IPortablePrimitive
   record: (value: object, context: IPortableWalkerContext) => IPortableRecord | undefined
-  array?: (
-    value: unknown[],
-    visit: (child: unknown) => unknown,
-    context: IPortableWalkerContext
-  ) => Readonly<{ value: unknown[]; length?: number; violation?: string }>
   key?: (key: string, context: IPortableWalkerContext) => void
-  finish?: (value: unknown) => unknown
+  /** Output writes belong to the strategy's selected prototype and property semantics. */
+  write?: (output: Record<string, unknown>, key: string, child: unknown) => void
+  /** Native presence differs from inline bytes tags and never requires another child scan. */
+  finish?: (value: unknown, hasNativeBinary: boolean) => unknown
   violation: (reason: string, cause?: unknown) => never
-}>
+}> &
+  (
+    | Readonly<{
+        array?: (
+          value: unknown[],
+          visit: (child: unknown) => unknown,
+          context: IPortableWalkerContext
+        ) => unknown[] | Readonly<{ value: unknown[]; length?: number; violation?: string }>
+        arrayValue?: never
+      }>
+    | Readonly<{
+        array?: never
+        /** Raw snapshots avoid an admission box when the caller binds its own lexical callback. */
+        arrayValue: (
+          value: unknown[],
+          visit: IPortableOwnedVisit,
+          childDepth: number,
+          ancestors: Set<object>,
+          guard: (() => never) | undefined,
+          bounds: boolean,
+          context: IPortableWalkerContext
+        ) => unknown
+      }>
+  ) &
+  (
+    | Readonly<{
+        binary: (value: object, context: IPortableWalkerContext) => string | undefined
+        nativeByteLength?: never
+      }>
+    | Readonly<{
+        binary: (
+          value: object,
+          context: IPortableWalkerContext
+        ) => IPortableBinaryResult | undefined
+        /** Read the admitted native object's length through its owner's intrinsic slot accessor. */
+        nativeByteLength: (value: Uint8Array | ArrayBuffer) => number
+      }>
+  )
 
-/** Invocation-local value, physical bound and binary evidence; no metadata survives the call. */
-type IPortableNode = Readonly<{
-  value: unknown
-  byteUpperBound: number
-  hasBinary: boolean
-  violation?: string
-}>
+/** The ordinary function returns fused metadata; value uses the same traversal without boxing it. */
+type IPortableWalker = {
+  (
+    value: unknown,
+    active?: Set<object>,
+    initialDepth?: number,
+    beforeNativeBinary?: () => never
+  ): Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean }>
+  value: (
+    value: unknown,
+    active?: Set<object>,
+    initialDepth?: number,
+    beforeNativeBinary?: () => never
+  ) => unknown
+}
 
 /** Stable portable bytes fields belong to this codec owner, including legacy tag validation. */
 const PortableBytesField = {
@@ -65,6 +127,7 @@ const PortableBytesField = {
 const PortableViolation = {
   depth: 'depth',
   cycle: 'cycle',
+  ancestor: 'ancestor',
   access: 'access',
   scalar: 'scalar',
   prototype: 'prototype',
@@ -96,172 +159,353 @@ const finishPortableValue = (value: unknown): unknown => value
 /** Strategies without reserved fields need no key policy. */
 const admitPortableKey = (): void => {}
 
+/** Define safe own fields for the legacy ordinary-object output, including **proto**. */
+function writePortableOwnField(output: Record<string, unknown>, key: string, child: unknown): void {
+  Object.defineProperty(output, key, {
+    value: child,
+    enumerable: true,
+    configurable: true,
+    writable: true
+  })
+}
+
 /**
- * Create one specialized portable walker. Strategy callbacks and depth are captured once; callers
- * create this function at module/owner scope. One traversal returns value, JSON UTF-8 byte upper
- * bound and binary presence. No native-binary negotiation, side tables or consumer profiles exist.
+ * Create one specialized synchronous walker. Policy callbacks and context are bound once. Node
+ * accounting stays in primitive invocation slots instead of allocating a result/context per node.
+ * Nested calls save/restore the slots in finally; no caller graph survives a completed invocation.
  */
-export function createPortableWalker(
-  strategy: IPortableWalkerStrategy
-): (
-  value: unknown,
-  active?: Set<object>
-) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean }> {
-  /** Resolve the complete strategy before any request; recursion never reads the strategy object. */
+export function createPortableWalker(strategy: IPortableWalkerStrategy): IPortableWalker {
+  /** Capture strategy choices once; recursive dispatch never reads a consumer profile. */
   const {
     maxDepth = Infinity,
     scalar,
     binary,
+    nativeByteLength,
     record,
     array = mapPortableArray,
+    arrayValue,
     key = admitPortableKey,
+    write = writePortableOwnField,
     finish = finishPortableValue,
     violation
   } = strategy
   if (maxDepth !== Infinity && (!Number.isSafeInteger(maxDepth) || maxDepth < 0))
     violation(PortableViolation.depth)
-  /** Atomic bytes tags use one canonical construction and count their complete metadata. */
-  const tagged = (base64url: string): IPortableNode => ({
-    value: finish({
-      [PortableBytesField.marker]: PortableBytesField.kind,
-      [PortableBytesField.data]: base64url
-    }),
-    byteUpperBound: 31 + base64url.length,
-    hasBinary: true
-  })
-  /** The only recursive graph owner performs snapshotting and accounting in the same pass. */
-  const walk = (
-    value: unknown,
-    depth: number,
-    active: Set<object>,
-    context: IPortableWalkerContext,
-    classified: (error: unknown) => boolean
-  ): IPortableNode => {
-    if (depth > maxDepth) context.reject(PortableViolation.depth)
+  /** Metadata callers collect bytes; value-only callers never observe unused output lengths. */
+  let collectBounds = true
+  /** Retained policy visitors can run after return without keeping invocation state alive. */
+  let invocationDepth = 0
+  /** Current synchronous ancestor owner; absent for root scalars and atomic binary values. */
+  let active: Set<object> | undefined
+  /** Optional guard is supplied by the current caller, rather than captured into another walker. */
+  let beforeNativeBinary: (() => never) | undefined
+  /** Exact strategy-raised error recognizes classified failures during ancestor unwinding. */
+  let raised: unknown
+  /** Separates an actual thrown undefined from the empty error slot. */
+  let didRaise = false
+  /** Raw cause propagation remains eligible for the original enclosing container boundary. */
+  let rawFailure = false
+  /** Last completed node's JSON/native byte bound, consumed immediately by its parent. */
+  let nodeBytes = 0
+  /** Last completed node's inline or native binary presence. */
+  let nodeBinary = false
+  /** Last completed node's native-only evidence for the caller's protocol marker. */
+  let nodeNative = false
+  /** First deferred validation failure, without constructing an error before projection completes. */
+  let nodeInvalid: string | undefined
+  /** Current array callback depth; nested arrays restore the previous visitor frame. */
+  let visitDepth = 0
+  /** Current array accumulator avoids per-array visitor closures and metadata wrappers. */
+  let arrayBytes = 0
+  /** Current array's generic binary evidence. */
+  let arrayBinary = false
+  /** Current array's native-only descendant evidence. */
+  let arrayNative = false
+  /** Current array's deferred validation priority. */
+  let arrayInvalid: string | undefined
+  /** Visited elements distinguish sparse holes from JSON null values. */
+  let arrayVisited = 0
+
+  /** Route a failure through its owning policy, retaining the exact error and original cause. */
+  const reject = (reason: string, cause?: unknown): never => {
+    try {
+      return violation(reason, cause)
+    } catch (error) {
+      raised = error
+      didRaise = true
+      rawFailure = error === cause
+      throw error
+    }
+  }
+  /** One context exposes only the current synchronous invocation, including reentrant callers. */
+  const context: IPortableWalkerContext = {
+    reject,
+    isAncestor: (value) => active?.has(value) === true,
+    isUint8Array,
+    bytesToBase64url,
+    isCanonicalBase64url,
+    get beforeNativeBinary() {
+      return beforeNativeBinary
+    }
+  }
+  /** Build the unchanged inline tag, without wrapping node accounting into another object. */
+  const tagged = (base64url: string): unknown => {
+    nodeBytes = 31 + base64url.length
+    nodeBinary = true
+    nodeNative = false
+    nodeInvalid = undefined
+    return finish(
+      {
+        [PortableBytesField.marker]: PortableBytesField.kind,
+        [PortableBytesField.data]: base64url
+      },
+      false
+    )
+  }
+  /** Shared array visitor uses the same node owner and immediately consumes its fused metadata. */
+  const visit = (child: unknown): unknown => {
+    const result = walk(child, visitDepth)
+    arrayBytes += nodeBytes
+    arrayBinary ||= nodeBinary
+    arrayNative ||= nodeNative
+    arrayInvalid ??= nodeInvalid
+    arrayVisited++
+    return result
+  }
+  /** Lexically bound policy visitors reuse the same walk while restoring any reentrant owner. */
+  const ownedVisit: IPortableOwnedVisit = (child, depth, ancestors, guard, bounds) => {
+    if (invocationDepth === 0) return execute(child, ancestors, depth, guard, identity)
+    const previousActive = active
+    const previousGuard = beforeNativeBinary
+    const previousBounds = collectBounds
+    active = ancestors
+    beforeNativeBinary = guard
+    collectBounds = bounds
+    try {
+      const result = walk(child, depth)
+      arrayBytes += nodeBytes
+      arrayBinary ||= nodeBinary
+      arrayNative ||= nodeNative
+      arrayInvalid ??= nodeInvalid
+      arrayVisited++
+      return result
+    } finally {
+      active = previousActive
+      beforeNativeBinary = previousGuard
+      collectBounds = previousBounds
+    }
+  }
+  /** The sole recursive implementation returns values directly and fuses accounting in the slots. */
+  const walk = (value: unknown, depth: number): unknown => {
+    if (depth > maxDepth) reject(PortableViolation.depth)
     if (value === null || typeof value !== 'object') {
       const admitted = scalar(value, context)
-      return {
-        ...admitted,
-        byteUpperBound: portableScalarBound(admitted.value),
-        hasBinary: false
+      if (admitted !== null && typeof admitted === 'object') {
+        nodeBytes = collectBounds ? portableScalarBound(admitted.value) : 0
+        nodeInvalid = admitted.violation
+        nodeBinary = false
+        nodeNative = false
+        return admitted.value
       }
+      nodeBytes = collectBounds ? portableScalarBound(admitted) : 0
+      nodeInvalid = undefined
+      nodeBinary = false
+      nodeNative = false
+      return admitted
     }
-    /** A byte view is atomic: no backing graph scan or global binary marker is needed. */
     const bytes = binary(value, context)
-    if (bytes !== undefined) return tagged(bytes)
-    if (active.has(value)) context.reject(PortableViolation.cycle)
-    active.add(value)
+    if (typeof bytes === 'string') return tagged(bytes)
+    if (bytes !== undefined) {
+      nodeBytes = collectBounds ? nativeByteLength!(bytes) : 0
+      nodeBinary = true
+      nodeNative = true
+      nodeInvalid = undefined
+      return bytes
+    }
+    /** Binary admission precedes cycle checks; a supplied Set keeps its exact existing ownership. */
+    const ancestors = (active ??= new Set<object>())
+    /** Caller-owned Set failures keep a distinct policy boundary from container access traps. */
+    let cyclic: boolean
     try {
-      /** Strategy decides array versus record projection before any child is visited. */
+      cyclic = ancestors.has(value)
+      if (!cyclic) ancestors.add(value)
+    } catch (cause) {
+      return reject(PortableViolation.ancestor, cause)
+    }
+    if (cyclic) reject(PortableViolation.cycle)
+    try {
       const admitted = record(value, context)
       if (admitted?.tag !== undefined) return tagged(admitted.tag)
-      /** Container punctuation precedes the fused contributions of its children. */
-      let byteUpperBound = 2
-      /** Binary proof belongs to this output node and its descendants only. */
-      let hasBinary = false
-      /** Keep the first legacy validation failure without stopping the projection pass. */
-      let pending: string | undefined
       if (admitted === undefined) {
-        /** Visited count lets the wire strategy retain sparse holes and charge them as null. */
-        let visited = 0
-        const output = array(
-          value as unknown[],
-          (child) => {
-            const node = walk(child, depth + 1, active, context, classified)
-            byteUpperBound += node.byteUpperBound
-            hasBinary ||= node.hasBinary
-            pending ??= node.violation
-            visited++
-            return node.value
-          },
-          context
-        )
-        /** Length metadata avoids reading the caller array after validation-only traversal. */
-        const length = output.length ?? output.value.length
-        byteUpperBound += Math.max(0, length - 1) + Math.max(0, length - visited) * 4
-        return {
-          value: finish(output.value),
-          byteUpperBound,
-          hasBinary,
-          violation: pending ?? output.violation
+        /** Save only primitive visitor state; no array-frame object or request closure is allocated. */
+        const previousDepth = visitDepth
+        const previousBytes = arrayBytes
+        const previousBinary = arrayBinary
+        const previousNative = arrayNative
+        const previousInvalid = arrayInvalid
+        const previousVisited = arrayVisited
+        visitDepth = depth + 1
+        arrayBytes = 2
+        arrayBinary = false
+        arrayNative = false
+        arrayInvalid = undefined
+        arrayVisited = 0
+        try {
+          const admittedArray = arrayValue
+            ? arrayValue(
+                value as unknown[],
+                ownedVisit,
+                depth + 1,
+                ancestors,
+                beforeNativeBinary,
+                collectBounds,
+                context
+              )
+            : array(value as unknown[], visit, context)
+          const raw = arrayValue !== undefined || Array.isArray(admittedArray)
+          /** Annotated admission remains the default; raw policy outputs are never probed. */
+          const annotation = admittedArray as Readonly<{
+            value: unknown[]
+            length?: number
+            violation?: string
+          }>
+          const output = raw ? admittedArray : annotation.value
+          if (collectBounds) {
+            const length = raw
+              ? (output as unknown[]).length
+              : (annotation.length ?? (output as unknown[]).length)
+            nodeBytes =
+              arrayBytes + Math.max(0, length - 1) + Math.max(0, length - arrayVisited) * 4
+          } else nodeBytes = 0
+          nodeBinary = arrayBinary
+          nodeNative = arrayNative
+          nodeInvalid = arrayInvalid ?? (raw ? undefined : annotation.violation)
+          return finish(output, nodeNative)
+        } finally {
+          visitDepth = previousDepth
+          arrayBytes = previousBytes
+          arrayBinary = previousBinary
+          arrayNative = previousNative
+          arrayInvalid = previousInvalid
+          arrayVisited = previousVisited
         }
       }
-      /** Validation-only records keep the caller object; copies get own data properties. */
       const output = admitted.output ?? (value as Record<string, unknown>)
-      /** Count commas as entries are consumed without a second object-key traversal. */
+      /** Parent-local accounting stays on the ordinary call stack across child calls. */
+      let bytes = 2
+      let binary = admitted.hasBinary === true
+      let native = false
+      let pending: string | undefined
       let count = 0
       for (const [name, child] of admitted.entries) {
         key(name, context)
-        const node = walk(child, depth + 1, active, context, classified)
-        if (admitted.output !== undefined)
-          Object.defineProperty(output, name, {
-            value: node.value,
-            enumerable: true,
-            configurable: true,
-            writable: true
-          })
-        byteUpperBound += portableScalarBound(name) + 1 + node.byteUpperBound + (count++ ? 1 : 0)
-        hasBinary ||= node.hasBinary
-        pending ??= node.violation
+        const normalized = walk(child, depth + 1)
+        if (admitted.output !== undefined) write(output, name, normalized)
+        if (collectBounds) bytes += portableScalarBound(name) + 1 + nodeBytes + (count++ ? 1 : 0)
+        binary ||= nodeBinary
+        native ||= nodeNative
+        pending ??= nodeInvalid
       }
-      /** Parent tag shape is checked before child validation, matching decoded assertion order. */
-      const invalid = admitted.validate?.(output)
-      return {
-        value: finish(output),
-        byteUpperBound,
-        hasBinary: hasBinary || admitted.hasBinary === true,
-        violation: invalid ?? pending
-      }
+      nodeBytes = bytes
+      nodeBinary = binary
+      nodeNative = native
+      nodeInvalid = admitted.validate?.(output) ?? pending
+      return finish(output, native)
     } catch (cause) {
-      // Classified failures cross parents unchanged; a raw failure enters its container boundary.
-      if (classified(cause)) throw cause
-      return context.reject(PortableViolation.access, cause)
+      if (didRaise && cause === raised && !rawFailure) throw cause
+      return reject(PortableViolation.access, cause)
     } finally {
-      active.delete(value)
+      try {
+        ancestors.delete(value)
+      } catch (cause) {
+        reject(PortableViolation.ancestor, cause)
+      }
     }
   }
-  /** Each call shares this factory-owned traversal and creates only invocation state. */
-  return (value, active = new Set<object>()) => {
-    /** Identifies the exact error already raised by this strategy during this invocation. */
-    let raised: unknown
-    /** Distinguish a strategy that throws undefined from an application trap with that value. */
-    let didRaise = false
-    /** A strategy may deliberately pass through the original failure at a leaf boundary. */
-    let rawFailure = false
-    /** Route one violation through the caller owner, retaining its error identity across unwinding. */
-    const reject = (reason: string, cause?: unknown): never => {
-      try {
-        return violation(reason, cause)
-      } catch (error) {
-        raised = error
-        didRaise = true
-        rawFailure = error === cause
-        throw error
-      }
-    }
-    /** Helpers and failure routing are local to this walk; canonical byte algorithms remain shared. */
-    const context: IPortableWalkerContext = {
-      reject,
-      isAncestor: (candidate) => active.has(candidate),
-      isUint8Array,
-      bytesToBase64url,
-      isCanonicalBase64url
-    }
-    /** Raw pass-through failures remain eligible for the enclosing container's error policy. */
-    const classified = (error: unknown): boolean => didRaise && error === raised && !rawFailure
+  /** Metadata selection allocates only the caller-visible result, after the fused walk finishes. */
+  const metadata = (value: unknown): unknown =>
+    Object.freeze({ value, byteUpperBound: nodeBytes, hasBinary: nodeBinary })
+  /** Value-only consumers skip the unused result box while still using the exact same traversal. */
+  const identity = (value: unknown): unknown => value
+  /**
+   * Run one synchronous invocation; save/restore protects getter-driven reentry without side
+   * tables.
+   */
+  const execute = (
+    value: unknown,
+    ancestors: Set<object> | undefined,
+    depth: number,
+    guard: (() => never) | undefined,
+    select: (value: unknown) => unknown
+  ): unknown => {
+    const previousBounds = collectBounds
+    const previousActive = active
+    const previousGuard = beforeNativeBinary
+    const previousRaised = raised
+    const previousDidRaise = didRaise
+    const previousRaw = rawFailure
+    const previousBytes = nodeBytes
+    const previousBinary = nodeBinary
+    const previousNative = nodeNative
+    const previousInvalid = nodeInvalid
+    collectBounds = select === metadata
+    active = ancestors
+    beforeNativeBinary = guard
+    raised = undefined
+    didRaise = false
+    rawFailure = false
+    invocationDepth++
     try {
-      const result = walk(value, 0, active, context, classified)
-      if (result.violation !== undefined) reject(result.violation)
-      return Object.freeze({
-        value: result.value,
-        byteUpperBound: result.byteUpperBound,
-        hasBinary: result.hasBinary
-      })
+      const output = walk(value, depth)
+      if (nodeInvalid !== undefined) reject(nodeInvalid)
+      return select(output)
     } catch (cause) {
       if (didRaise && cause === raised) throw cause
       return reject(PortableViolation.access, cause)
+    } finally {
+      invocationDepth--
+      collectBounds = previousBounds
+      active = previousActive
+      beforeNativeBinary = previousGuard
+      raised = previousRaised
+      didRaise = previousDidRaise
+      rawFailure = previousRaw
+      nodeBytes = previousBytes
+      nodeBinary = previousBinary
+      nodeNative = previousNative
+      nodeInvalid = previousInvalid
     }
   }
+  /** Both result shapes are module-level functions over one specialized recursive implementation. */
+  const result = ((value: unknown, ancestors?: Set<object>, depth = 0, guard?: () => never) =>
+    execute(value, ancestors, depth, guard, metadata)) as IPortableWalker
+  result.value = (value, ancestors, depth = 0, guard) => {
+    if (invocationDepth !== 0 || (value !== null && typeof value === 'object'))
+      return execute(value, ancestors, depth, guard, identity)
+    // An outer scalar cannot have a previous frame; keep the same walk without saving empty slots.
+    collectBounds = false
+    active = ancestors
+    beforeNativeBinary = guard
+    invocationDepth = 1
+    try {
+      const output = walk(value, depth)
+      if (nodeInvalid !== undefined) reject(nodeInvalid)
+      return output
+    } catch (cause) {
+      if (didRaise && cause === raised) throw cause
+      return reject(PortableViolation.access, cause)
+    } finally {
+      invocationDepth = 0
+      collectBounds = true
+      active = undefined
+      beforeNativeBinary = undefined
+      raised = undefined
+      didRaise = false
+      rawFailure = false
+      nodeInvalid = undefined
+    }
+  }
+  return result
 }
 
 /** Legacy record keys read lazily so nested getters retain sorted or decoded traversal order. */
@@ -284,7 +528,7 @@ function portableScalar(value: unknown): boolean {
 
 /** Preserve legacy public identity; raw projection/accessor failures stay with format wrappers. */
 function raisePortableViolation(reason: string, cause?: unknown): never {
-  if (reason === PortableViolation.access) throw cause
+  if (reason === PortableViolation.access || reason === PortableViolation.ancestor) throw cause
   throw createSerializeTypeError(
     SerializeErrorCode.invalidOption,
     CodecErrorText.portableValueInvalid,
@@ -427,15 +671,15 @@ const codecStrategy: IPortableWalkerStrategy = {
 }
 
 /** Module-level default instances capture policy once; callers allocate only invocation state. */
-const projectPortable = createPortableWalker(projectionStrategy)
+const projectPortable = /* @__PURE__ */ createPortableWalker(projectionStrategy)
 /** Standalone assertion remains a thin identity-preserving default instance. */
-const validatePortable = createPortableWalker(assertionStrategy)
+const validatePortable = /* @__PURE__ */ createPortableWalker(assertionStrategy)
 /** Format codecs share the single fused default instance. */
-const normalizeCodecPortable = createPortableWalker(codecStrategy)
+const normalizeCodecPortable = /* @__PURE__ */ createPortableWalker(codecStrategy)
 
 /** Assert the legacy decoded portable profile without replacing or freezing caller data. */
 export function assertPortableValue(value: unknown, active = new Set<object>()): void {
-  validatePortable(value, active)
+  validatePortable.value(value, active)
 }
 
 /** Validate and narrow a decoded format value while preserving its original identity. */
@@ -446,10 +690,10 @@ export function asCodecValue(value: unknown): ICodecValue {
 
 /** Preserve the legacy intermediate projection with a thin default walker instance. */
 export function toPortableValue(value: unknown, active = new Set<object>()): unknown {
-  return projectPortable(value, active).value
+  return projectPortable.value(value, active)
 }
 
 /** Fused default used only by this package's format codecs; its output remains byte-for-byte stable. */
 export function toCodecPortableValue(value: unknown): ICodecValue {
-  return normalizeCodecPortable(value).value as ICodecValue
+  return normalizeCodecPortable.value(value) as ICodecValue
 }

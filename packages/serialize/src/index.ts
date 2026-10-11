@@ -5,7 +5,12 @@
  */
 export * from './core.js'
 export * from './plugins.js'
-export type { ICodec, ICodecValue, IPortableWalkerStrategy } from './codec.js'
+export type {
+  ICodec,
+  ICodecValue,
+  IPortableWalkerStrategy,
+  IPortableBinaryResult
+} from './codec.js'
 export { createPortableWalker } from './codec.js'
 export { emitOutput } from './output.js'
 export { chunkToBytes, chunkToText, createSerializeRegistry } from './registry.js'

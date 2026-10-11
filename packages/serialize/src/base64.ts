@@ -43,7 +43,10 @@ export function base64ToBytes(text: string): Uint8Array {
 
 /** Encode the portable wire spelling without padding or host-specific APIs. */
 export function bytesToBase64url(bytes: Uint8Array): string {
-  return bytesToBase64(bytes).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/u, '')
+  /** The canonical encoder adds at most two padding characters; never scan the whole wire text. */
+  const text = bytesToBase64(bytes).replaceAll('+', '-').replaceAll('/', '_')
+  const padding = text.endsWith('==') ? 2 : text.endsWith('=') ? 1 : 0
+  return padding === 0 ? text : text.slice(0, -padding)
 }
 
 /** Validate unpadded base64url, including the unused low bits of the final character. */
