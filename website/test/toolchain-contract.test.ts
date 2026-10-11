@@ -229,7 +229,8 @@ test('SITE-T-A24 generated projections contain no volatile metadata', () => {
   assert.equal(apiManifest.version, 1)
   assert.equal(routeManifest.version, 1)
   assert.equal(relationshipManifest.version, 1)
-  assert.equal(libraryManifest.libraries.length, 27)
+  /** Six RPC runtime owners replace the former single package, adding exactly five libraries. */
+  assert.equal(libraryManifest.libraries.length, 32)
   assert.equal(
     libraryManifest.libraries.some((library: { readonly slug: string }) => library.slug === 'docs'),
     false

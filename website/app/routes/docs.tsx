@@ -2854,26 +2854,28 @@ function groupWebRpcGuideApiLinks(
       label: locale === 'zh' ? 'API' : 'APIs',
       matches: (link: IGuideApiLink) =>
         !middlewareNames.has(link.name) &&
-        !link.module.startsWith('core/features/') &&
-        !link.module.includes('/adapters/') &&
-        link.module !== 'core/transport-constants' &&
+        !link.module.startsWith('features/') &&
+        !link.module.startsWith('adapters/') &&
+        !link.module.startsWith('adapter/') &&
+        link.module !== 'transport-constants' &&
         !isErrorEntry(link)
     },
     {
       key: 'plugins',
       label: locale === 'zh' ? '插件' : 'Plugins',
       matches: (link: IGuideApiLink) =>
-        middlewareNames.has(link.name) || link.module.startsWith('core/features/')
+        middlewareNames.has(link.name) || link.module.startsWith('features/')
     },
     {
       key: 'contracts',
       label: locale === 'zh' ? '规范' : 'Specifications',
-      matches: (link: IGuideApiLink) => link.module === 'core/transport-constants'
+      matches: (link: IGuideApiLink) => link.module === 'transport-constants'
     },
     {
       key: 'adapters',
       label: locale === 'zh' ? '宿主适配器' : 'Host adapters',
-      matches: (link: IGuideApiLink) => link.module.includes('/adapters/')
+      matches: (link: IGuideApiLink) =>
+        link.module.startsWith('adapters/') || link.module.startsWith('adapter/')
     },
     {
       key: 'errors',

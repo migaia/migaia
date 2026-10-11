@@ -190564,7 +190564,7 @@
           "errors": ["No documented errors are declared for deserializeRpcError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for deserializeRpcError.",
           "examples": [
-            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) }, {\n    summaries,\n    routes\n  })\n  return deserializeRpcError(wire, undefined, routes)\n}"
+            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(\n    error,\n    { report: ({ error: failure }) => report(failure) },\n    {\n      summaries,\n      routes\n    }\n  )\n  return deserializeRpcError(wire, undefined, routes)\n}"
           ],
           "members": [],
           "aliasOf": "deserializeRpcError",
@@ -190630,13 +190630,13 @@
           "identity": "packages/rpc-contract/dist/contract/error.d.ts:deserializeRpcError:export declare function deserializeRpcError(value: unknown, options?: IRpcWireErrorOptions, routes?: IRpcErrorWireRouteStore): Error;",
           "guidance": [
             {
-              "id": "caller-held-error-metadata",
-              "heading": "Caller-held error metadata",
+              "id": "advanced-usage-caller-held-error-metadata",
+              "heading": "Advanced usage: Caller-held error metadata",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) }, {\n    summaries,\n    routes\n  })\n  return deserializeRpcError(wire, undefined, routes)\n}"
+                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(\n    error,\n    { report: ({ error: failure }) => report(failure) },\n    {\n      summaries,\n      routes\n    }\n  )\n  return deserializeRpcError(wire, undefined, routes)\n}"
                 },
                 {
                   "type": "paragraph",
@@ -191006,7 +191006,7 @@
           "errors": ["No documented errors are declared for IRpcErrorWireSummary."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcErrorWireSummary.",
           "examples": [
-            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) }, {\n    summaries,\n    routes\n  })\n  return deserializeRpcError(wire, undefined, routes)\n}"
+            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(\n    error,\n    { report: ({ error: failure }) => report(failure) },\n    {\n      summaries,\n      routes\n    }\n  )\n  return deserializeRpcError(wire, undefined, routes)\n}"
           ],
           "members": [],
           "aliasOf": "IRpcErrorWireSummary",
@@ -191054,13 +191054,13 @@
           "identity": "packages/rpc-contract/dist/contract/types.d.ts:IRpcErrorWireSummary:export type IRpcErrorWireSummary = Readonly<{ code: string; message: string; /** Keep this node's existing serialized descendants instead of selecting the five-field summary. */ preserveSerializedError?: true; }>;",
           "guidance": [
             {
-              "id": "caller-held-error-metadata",
-              "heading": "Caller-held error metadata",
+              "id": "advanced-usage-caller-held-error-metadata",
+              "heading": "Advanced usage: Caller-held error metadata",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) }, {\n    summaries,\n    routes\n  })\n  return deserializeRpcError(wire, undefined, routes)\n}"
+                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(\n    error,\n    { report: ({ error: failure }) => report(failure) },\n    {\n      summaries,\n      routes\n    }\n  )\n  return deserializeRpcError(wire, undefined, routes)\n}"
                 },
                 {
                   "type": "paragraph",
@@ -191766,13 +191766,13 @@
           "identity": "packages/rpc-contract/dist/contract/error-text.d.ts:RpcContractErrorDiagnostic:export declare const RpcContractErrorDiagnostic: Readonly<{ /** Whole physical-frame quotas retain the canonical semantic source, code and stable message. */ frameLimitExceeded: Readonly<{ source: \"@migaia/rpc/contract\"; code: \"FRAME_LIMIT_EXCEEDED\"; message: \"rpc frame limit exceeded\"; }>; }>;",
           "guidance": [
             {
-              "id": "caller-held-error-metadata",
-              "heading": "Caller-held error metadata",
+              "id": "advanced-usage-caller-held-error-metadata",
+              "heading": "Advanced usage: Caller-held error metadata",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) }, {\n    summaries,\n    routes\n  })\n  return deserializeRpcError(wire, undefined, routes)\n}"
+                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(\n    error,\n    { report: ({ error: failure }) => report(failure) },\n    {\n      summaries,\n      routes\n    }\n  )\n  return deserializeRpcError(wire, undefined, routes)\n}"
                 },
                 {
                   "type": "paragraph",
@@ -192335,7 +192335,7 @@
           "errors": ["No documented errors are declared for serializeRpcError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for serializeRpcError.",
           "examples": [
-            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) }, {\n    summaries,\n    routes\n  })\n  return deserializeRpcError(wire, undefined, routes)\n}"
+            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(\n    error,\n    { report: ({ error: failure }) => report(failure) },\n    {\n      summaries,\n      routes\n    }\n  )\n  return deserializeRpcError(wire, undefined, routes)\n}"
           ],
           "members": [],
           "aliasOf": "serializeRpcError",
@@ -192401,13 +192401,13 @@
           "identity": "packages/rpc-contract/dist/contract/error.d.ts:serializeRpcError:export declare function serializeRpcError(value: unknown, options: IRpcSerializeErrorOptions, metadata?: IRpcErrorWireMetadata): IRpcSerializedError;",
           "guidance": [
             {
-              "id": "caller-held-error-metadata",
-              "heading": "Caller-held error metadata",
+              "id": "advanced-usage-caller-held-error-metadata",
+              "heading": "Advanced usage: Caller-held error metadata",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) }, {\n    summaries,\n    routes\n  })\n  return deserializeRpcError(wire, undefined, routes)\n}"
+                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  type IRpcErrorWireSummary\n} from '@migaia/rpc-contract/errors'\n\n/** The application owns these actual Error-reference resources and its diagnostic policy. */\nexport function projectFailure(error: Error, report: (failure: unknown) => void) {\n  const summaries = new WeakMap<Error, IRpcErrorWireSummary>()\n  const routes = new WeakMap<Error, readonly string[]>()\n  const wire = serializeRpcError(\n    error,\n    { report: ({ error: failure }) => report(failure) },\n    {\n      summaries,\n      routes\n    }\n  )\n  return deserializeRpcError(wire, undefined, routes)\n}"
                 },
                 {
                   "type": "paragraph",
@@ -193885,7 +193885,7 @@
           "errors": ["No documented errors are declared for createJsonRpcFrameDecoder."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createJsonRpcFrameDecoder.",
           "examples": [
-            "import {\n  createJsonRpcFrameDecoder,\n  encodeJsonRpcFrame\n} from '@migaia/rpc-contract/framing/jsonrpc'\n\n/** The application supplies actual byte writes and consumes decoded protocol messages. */\nexport function createCarrierProtocol(\n  write: (frame: Uint8Array) => Promise<void>,\n  receive: (message: unknown) => void\n) {\n  const decoder = createJsonRpcFrameDecoder()\n  return {\n    send: (message: unknown) => write(encodeJsonRpcFrame(message)),\n    push: (chunk: Uint8Array) => {\n      for (const message of decoder.push(chunk)) receive(message)\n    },\n    finish: () => decoder.finish(),\n    close: () => decoder.close()\n  }\n}"
+            "import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'\n\n/** The application supplies actual byte writes and consumes decoded protocol messages. */\nexport function createCarrierProtocol(\n  write: (frame: Uint8Array) => Promise<void>,\n  receive: (message: unknown) => void\n) {\n  const decoder = createJsonRpcFrameDecoder()\n  return {\n    send: (message: unknown) => write(encodeJsonRpcFrame(message)),\n    push: (chunk: Uint8Array) => {\n      for (const message of decoder.push(chunk)) receive(message)\n    },\n    finish: () => decoder.finish(),\n    close: () => decoder.close()\n  }\n}"
           ],
           "members": [],
           "exportPath": "./framing/jsonrpc",
@@ -193956,7 +193956,7 @@
           "errors": ["No documented errors are declared for encodeJsonRpcFrame."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for encodeJsonRpcFrame.",
           "examples": [
-            "import {\n  createJsonRpcFrameDecoder,\n  encodeJsonRpcFrame\n} from '@migaia/rpc-contract/framing/jsonrpc'\n\n/** The application supplies actual byte writes and consumes decoded protocol messages. */\nexport function createCarrierProtocol(\n  write: (frame: Uint8Array) => Promise<void>,\n  receive: (message: unknown) => void\n) {\n  const decoder = createJsonRpcFrameDecoder()\n  return {\n    send: (message: unknown) => write(encodeJsonRpcFrame(message)),\n    push: (chunk: Uint8Array) => {\n      for (const message of decoder.push(chunk)) receive(message)\n    },\n    finish: () => decoder.finish(),\n    close: () => decoder.close()\n  }\n}"
+            "import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'\n\n/** The application supplies actual byte writes and consumes decoded protocol messages. */\nexport function createCarrierProtocol(\n  write: (frame: Uint8Array) => Promise<void>,\n  receive: (message: unknown) => void\n) {\n  const decoder = createJsonRpcFrameDecoder()\n  return {\n    send: (message: unknown) => write(encodeJsonRpcFrame(message)),\n    push: (chunk: Uint8Array) => {\n      for (const message of decoder.push(chunk)) receive(message)\n    },\n    finish: () => decoder.finish(),\n    close: () => decoder.close()\n  }\n}"
           ],
           "members": [],
           "exportPath": "./framing/jsonrpc",
@@ -206343,7 +206343,10 @@
           "returns": "Promise<IRuntimeTypedPeer<TRemote, IRuntimeFlatten<TRemote>, typeof RuntimePluginKey.process>>",
           "errors": ["No documented errors are declared for createProcessPeer."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createProcessPeer.",
-          "examples": [],
+          "examples": [
+            "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: { math: { double: (value: number) => value * 2 } },\n  report: (error) => console.error(error)\n})",
+            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport {\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessByteChannel\n} from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IChildApi = { math: { double: (value: number) => number } }\ntype IOptions = Parameters<typeof createProcessPeer<IChildApi>>[0]\ntype ISpawn = Exclude<NonNullable<IOptions['spawn']>, Function>\n/** 收集原 source/code/cause 错误，不把失败当成重执许可。 */\nconst report = (error: unknown) => console.error(error)\n/** 此 launcher 创建并持有本次原生进程。 */\nconst launcher = createNodeProcessLauncher()\n/** 新会话凭据通过实际 bootstrap 交给该子进程，不写入日志。 */\nconst token = randomBytes(32).toString('base64url')\n/** 保留 launcher 返回的实际 handle，建立连接时复用其字节资源与身份。 */\nlet handle: Awaited<ReturnType<typeof launcher.launch>>\n/** 一个 source 组合监督预算、bootstrap 与同一次 launch 的真实通道。 */\nconst spawn: ISpawn = {\n  kind: 'spawn',\n  channelKind: 'byte',\n  wire: 'native',\n  token,\n  supervision: {\n    id: 'math-process',\n    isolation: 'best-effort',\n    report,\n    launcher: {\n      ...launcher,\n      launch: async (spec, request) => {\n        handle = await launcher.launch(spec, request)\n        return handle\n      }\n    },\n    budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n    spec: {\n      command: process.execPath,\n      args: [fileURLToPath(new URL('./service.js', import.meta.url))],\n      env: { inherit: ['PATH'], set: {} },\n      stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n      bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n    }\n  },\n  rawChannel: async () => handle.channel!,\n  establish: (raw, prepared) =>\n    createProcessTransport(raw as IProcessByteChannel, {\n      role: 'initiator',\n      offer: prepared.offer!,\n      peerId: handle.runtimeApiIdentity!.instanceId,\n      scheduler: prepared.scheduler,\n      ipc: { ...prepared.session, log: () => undefined },\n      report\n    })\n}\n/** 工厂完成协商后，Peer 持有本次连接与执行单元的生命周期。 */\nconst typedRemote = await createProcessPeer<IChildApi>({ spawn, report })\ntry {\n  console.log(await typedRemote.request('math.double', 21))\n} finally {\n  await typedRemote.close()\n}"
+          ],
           "members": [],
           "aliasOf": "createProcessPeer",
           "exportPath": ".",
@@ -206399,7 +206402,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-process/dist/process/peer.d.ts:createProcessPeer:export declare function createProcessPeer<TRemote = Record<never, never>>(options: IRuntimeProcessPeerOptions): Promise<IRuntimeTypedPeer<TRemote, IRuntimeFlatten<TRemote>, typeof RuntimePluginKey.process>>;",
           "guidance": [],
-          "usageScore": 16,
+          "usageScore": 60,
           "configuration": [],
           "fragment": "rpc-process-index--createProcessPeer"
         },
@@ -206540,7 +206543,9 @@
           "returns": "Promise<IRuntimePeerSourceResult> | Promise<IRemoteChannel>",
           "errors": ["No documented errors are declared for createProcessTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createProcessTransport.",
-          "examples": [],
+          "examples": [
+            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport {\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessByteChannel\n} from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IChildApi = { math: { double: (value: number) => number } }\ntype IOptions = Parameters<typeof createProcessPeer<IChildApi>>[0]\ntype ISpawn = Exclude<NonNullable<IOptions['spawn']>, Function>\n/** 收集原 source/code/cause 错误，不把失败当成重执许可。 */\nconst report = (error: unknown) => console.error(error)\n/** 此 launcher 创建并持有本次原生进程。 */\nconst launcher = createNodeProcessLauncher()\n/** 新会话凭据通过实际 bootstrap 交给该子进程，不写入日志。 */\nconst token = randomBytes(32).toString('base64url')\n/** 保留 launcher 返回的实际 handle，建立连接时复用其字节资源与身份。 */\nlet handle: Awaited<ReturnType<typeof launcher.launch>>\n/** 一个 source 组合监督预算、bootstrap 与同一次 launch 的真实通道。 */\nconst spawn: ISpawn = {\n  kind: 'spawn',\n  channelKind: 'byte',\n  wire: 'native',\n  token,\n  supervision: {\n    id: 'math-process',\n    isolation: 'best-effort',\n    report,\n    launcher: {\n      ...launcher,\n      launch: async (spec, request) => {\n        handle = await launcher.launch(spec, request)\n        return handle\n      }\n    },\n    budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n    spec: {\n      command: process.execPath,\n      args: [fileURLToPath(new URL('./service.js', import.meta.url))],\n      env: { inherit: ['PATH'], set: {} },\n      stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n      bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n    }\n  },\n  rawChannel: async () => handle.channel!,\n  establish: (raw, prepared) =>\n    createProcessTransport(raw as IProcessByteChannel, {\n      role: 'initiator',\n      offer: prepared.offer!,\n      peerId: handle.runtimeApiIdentity!.instanceId,\n      scheduler: prepared.scheduler,\n      ipc: { ...prepared.session, log: () => undefined },\n      report\n    })\n}\n/** 工厂完成协商后，Peer 持有本次连接与执行单元的生命周期。 */\nconst typedRemote = await createProcessPeer<IChildApi>({ spawn, report })\ntry {\n  console.log(await typedRemote.request('math.double', 21))\n} finally {\n  await typedRemote.close()\n}"
+          ],
           "members": [],
           "aliasOf": "createProcessTransport",
           "exportPath": ".",
@@ -206612,7 +206617,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-process/dist/process/handshake.d.ts:createProcessTransport:export declare function createProcessTransport(channel: IProcessByteChannel, options: IProcessByteOptions): Promise<IRuntimePeerSourceResult>;\nexport declare function createProcessTransport(channel: IProcessMessageChannel, options: IProcessMessageOptions): Promise<IRemoteChannel>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "rpc-process-index--createProcessTransport"
         }
@@ -207416,7 +207421,9 @@
           "returns": "IProcessLauncher<INodeProcessHandle>",
           "errors": ["No documented errors are declared for createNodeProcessLauncher."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeProcessLauncher.",
-          "examples": [],
+          "examples": [
+            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport {\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessByteChannel\n} from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IChildApi = { math: { double: (value: number) => number } }\ntype IOptions = Parameters<typeof createProcessPeer<IChildApi>>[0]\ntype ISpawn = Exclude<NonNullable<IOptions['spawn']>, Function>\n/** 收集原 source/code/cause 错误，不把失败当成重执许可。 */\nconst report = (error: unknown) => console.error(error)\n/** 此 launcher 创建并持有本次原生进程。 */\nconst launcher = createNodeProcessLauncher()\n/** 新会话凭据通过实际 bootstrap 交给该子进程，不写入日志。 */\nconst token = randomBytes(32).toString('base64url')\n/** 保留 launcher 返回的实际 handle，建立连接时复用其字节资源与身份。 */\nlet handle: Awaited<ReturnType<typeof launcher.launch>>\n/** 一个 source 组合监督预算、bootstrap 与同一次 launch 的真实通道。 */\nconst spawn: ISpawn = {\n  kind: 'spawn',\n  channelKind: 'byte',\n  wire: 'native',\n  token,\n  supervision: {\n    id: 'math-process',\n    isolation: 'best-effort',\n    report,\n    launcher: {\n      ...launcher,\n      launch: async (spec, request) => {\n        handle = await launcher.launch(spec, request)\n        return handle\n      }\n    },\n    budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n    spec: {\n      command: process.execPath,\n      args: [fileURLToPath(new URL('./service.js', import.meta.url))],\n      env: { inherit: ['PATH'], set: {} },\n      stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n      bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n    }\n  },\n  rawChannel: async () => handle.channel!,\n  establish: (raw, prepared) =>\n    createProcessTransport(raw as IProcessByteChannel, {\n      role: 'initiator',\n      offer: prepared.offer!,\n      peerId: handle.runtimeApiIdentity!.instanceId,\n      scheduler: prepared.scheduler,\n      ipc: { ...prepared.session, log: () => undefined },\n      report\n    })\n}\n/** 工厂完成协商后，Peer 持有本次连接与执行单元的生命周期。 */\nconst typedRemote = await createProcessPeer<IChildApi>({ spawn, report })\ntry {\n  console.log(await typedRemote.request('math.double', 21))\n} finally {\n  await typedRemote.close()\n}"
+          ],
           "members": [],
           "exportPath": "./adapters/node-child-process",
           "overloadSignatures": [
@@ -207469,7 +207476,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-process/dist/process/adapters/node-child-process.d.ts:createNodeProcessLauncher:export declare function createNodeProcessLauncher(options?: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions; }>): IProcessLauncher<INodeProcessHandle>;",
           "guidance": [],
-          "usageScore": 10,
+          "usageScore": 24,
           "configuration": [],
           "fragment": "rpc-process-adapters/node-child-process--createNodeProcessLauncher"
         },
@@ -207999,7 +208006,10 @@
           "returns": "Promise<IRuntimeTypedPeer<TRemote>>",
           "errors": ["No documented errors are declared for createThreadPeer."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createThreadPeer.",
-          "examples": [],
+          "examples": [
+            "import { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: { math: { double: (value: number) => value * 2 } },\n  report: (error) => console.error(error)\n})",
+            "import { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IChildApi = { math: { double: (value: number) => number } }\n/** 原错误进入本应用的报告策略，保留其身份与 cause。 */\nconst report = (error: unknown) => console.error(error)\n/** 该 source 用实际 Node Worker launcher 与 channel factory 持有执行单元。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** Peer 在真实 bootstrap、ACK 与协商完成后提供类型化调用。 */\nconst typedRemote = await createThreadPeer<IChildApi>({ spawn, report })\ntry {\n  console.log(await typedRemote.request('math.double', 21))\n} finally {\n  await typedRemote.close()\n}"
+          ],
           "members": [],
           "aliasOf": "createThreadPeer",
           "exportPath": ".",
@@ -208053,7 +208063,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-threads/dist/threads/peer.d.ts:createThreadPeer:export declare function createThreadPeer<TRemote = Record<never, never>>(options: IRuntimeThreadPeerOptions): Promise<IRuntimeTypedPeer<TRemote>>;",
           "guidance": [],
-          "usageScore": 16,
+          "usageScore": 56,
           "configuration": [],
           "fragment": "rpc-threads-index--createThreadPeer"
         },
@@ -209261,7 +209271,9 @@
           "returns": "Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").INodeThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>",
           "errors": ["No documented errors are declared for createNodeThreadChannelFactory."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeThreadChannelFactory.",
-          "examples": [],
+          "examples": [
+            "import { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IChildApi = { math: { double: (value: number) => number } }\n/** 原错误进入本应用的报告策略，保留其身份与 cause。 */\nconst report = (error: unknown) => console.error(error)\n/** 该 source 用实际 Node Worker launcher 与 channel factory 持有执行单元。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** Peer 在真实 bootstrap、ACK 与协商完成后提供类型化调用。 */\nconst typedRemote = await createThreadPeer<IChildApi>({ spawn, report })\ntry {\n  console.log(await typedRemote.request('math.double', 21))\n} finally {\n  await typedRemote.close()\n}"
+          ],
           "members": [],
           "exportPath": "./adapters/node",
           "overloadSignatures": [
@@ -209316,7 +209328,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-threads/dist/threads/adapters/node.d.ts:createNodeThreadChannelFactory:export declare function createNodeThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"@migaia/rpc-core/adapter/threads\").INodeThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
           "guidance": [],
-          "usageScore": 10,
+          "usageScore": 28,
           "configuration": [],
           "fragment": "rpc-threads-adapters/node--createNodeThreadChannelFactory"
         },
@@ -209342,7 +209354,9 @@
           "returns": "import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterNodeThreadHandle>",
           "errors": ["No documented errors are declared for createNodeThreadLauncher."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeThreadLauncher.",
-          "examples": [],
+          "examples": [
+            "import { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IChildApi = { math: { double: (value: number) => number } }\n/** 原错误进入本应用的报告策略，保留其身份与 cause。 */\nconst report = (error: unknown) => console.error(error)\n/** 该 source 用实际 Node Worker launcher 与 channel factory 持有执行单元。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** Peer 在真实 bootstrap、ACK 与协商完成后提供类型化调用。 */\nconst typedRemote = await createThreadPeer<IChildApi>({ spawn, report })\ntry {\n  console.log(await typedRemote.request('math.double', 21))\n} finally {\n  await typedRemote.close()\n}"
+          ],
           "members": [],
           "exportPath": "./adapters/node",
           "overloadSignatures": [
@@ -209397,7 +209411,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-threads/dist/threads/adapters/node.d.ts:createNodeThreadLauncher:export declare function createNodeThreadLauncher(options?: Readonly<{ runtimeApi?: IRuntimePeerSourceContext; }>): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"@migaia/rpc-core/adapter/threads\").IAdapterNodeThreadHandle>;",
           "guidance": [],
-          "usageScore": 10,
+          "usageScore": 28,
           "configuration": [],
           "fragment": "rpc-threads-adapters/node--createNodeThreadLauncher"
         }
@@ -209440,7 +209454,9 @@
           "returns": "Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>",
           "errors": ["No documented errors are declared for createJsonRpcRemoteChannel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createJsonRpcRemoteChannel.",
-          "examples": [],
+          "examples": [
+            "import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\nimport { createRuntimePeer } from '@migaia/rpc-core/remote'\n\n/** 类型对应外部服务实际公开的 echo，不代替其握手目录或鉴权。 */\ntype IForeignApi = { echo: (payload: readonly string[]) => readonly string[] }\n\n/** Peer 只拥有这条已取得字节连接；本端身份与实际 offer 相同。 */\nconst peer = await createRuntimePeer<IForeignApi>({\n  self: { name: 'foreign-client', instanceId: localOffer.peer.id },\n  connect: () =>\n    createJsonRpcRemoteChannel({\n      byte: heldByteIO,\n      peerId,\n      target: { kind: 'plugin', contract: remoteContract },\n      offer: localOffer,\n      token: issuedToken,\n      scheduler,\n      wallClock,\n      ipc,\n      report\n    }),\n  report\n})\ntry {\n  console.log(await peer.request('echo', ['hello']))\n} finally {\n  await peer.close()\n}"
+          ],
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
@@ -209495,7 +209511,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/index.d.ts:createJsonRpcRemoteChannel:export declare function createJsonRpcRemoteChannel(options: IJsonRpcBridgeOptions): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>;",
           "guidance": [],
-          "usageScore": 16,
+          "usageScore": 30,
           "configuration": [],
           "fragment": "rpc-bridge-jsonrpc-index--createJsonRpcRemoteChannel"
         }

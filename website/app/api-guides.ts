@@ -56,6 +56,67 @@ export type IApiGuide = {
 const optionTranslations: Readonly<
   Record<string, Readonly<Partial<Record<IGuideLocale, string>>>>
 > = {
+  /** Runtime endpoint timing stays in the injected monotonic domain, separate from wire timestamps. */
+  'rpc-core:index:createRuntimeApiEndpoint:scheduler': {
+    en: 'Monotonic clock and timer owner shared by the endpoint and PluginHost deadlines; now() returns finite non-negative milliseconds, never epoch time.',
+    zh: 'endpoint 与 PluginHost 截止时间共用的单调时钟和 timer；now() 返回有限、非负毫秒，不能把 epoch 时间当作调度时间。'
+  },
+  /** Wall time supplies diagnostics without changing the monotonic deadline budget. */
+  'rpc-core:index:createRuntimeApiEndpoint:wallClock': {
+    en: 'Epoch clock used only for wire sentAt and hook at diagnostics; timestamp() returns a non-negative safe integer and defaults to the host wall clock.',
+    zh: '只为 wire sentAt 与 hook at 诊断提供 epoch 时间；timestamp() 必须返回非负安全整数，默认使用宿主 wall clock，不参与单调截止时间计算。'
+  },
+  /**
+   * Endpoint transport accepts the selected framer output and owns its documented connection
+   * lifetime.
+   */
+  'rpc-core:index:createRuntimeApiEndpoint:transport': {
+    en: 'The actual transport receiving the selected framer output; retain its existing ownership and close policy rather than treating a copied transport as a native resource.',
+    zh: '接收选定 framer 输出的实际 transport；遵循它已有的连接所有权与关闭策略，复制 transport 不能取得原生资源的生命周期权限。'
+  },
+  /**
+   * Protocol descriptors define the semantic input to the codec, independent from the physical
+   * carrier.
+   */
+  'rpc-core:index:createRuntimeApiEndpoint:protocol': {
+    en: 'Semantic envelope descriptor supplied to the canonical codec edge; choose it together with a compatible codec and framer for the actual carrier.',
+    zh: '送入规范 codec 边界的语义 envelope 描述；应为实际 carrier 配置相互兼容的 protocol、codec 与 framer，而不是让物理连接承担业务语义。'
+  },
+  /** Provider budgets belong to admission and may be shared through the existing quota handle. */
+  'rpc-core:index:createRuntimeApiEndpoint:providerLimits': {
+    en: 'Provider concurrency budget, defaulting to 256 globally and 64 per peer; a shared admission scope keeps one quota handle across attached endpoints.',
+    zh: 'Provider 并发预算，默认全局 256、每个 peer 64；共享 admission scope 时多个 endpoint 使用同一 quota handle，不能以 client 在途数量代替 provider 占用。'
+  },
+  /** Keyed provider calls retain the caller-selected store and session scope. */
+  'rpc-core:index:createRuntimeApiEndpoint:idempotency': {
+    en: 'Store and session scope used only for keyed provider requests; retain the original logical call outcome instead of treating an unknown result as proof of non-execution.',
+    zh: '只为带 idempotency key 的 provider 请求选择 store 与 session scope；保留原逻辑调用 outcome，unknown 不能证明业务尚未执行，也不能据此安全重试。'
+  },
+  /** Construction cancellation still rolls back each middleware installed before the abort. */
+  'rpc-core:index:createRuntimeApiEndpoint:construction.signal': {
+    en: 'Abort signal for endpoint construction; cancellation stops installation while preserving rollback of every middleware already installed.',
+    zh: '中止 endpoint 构造的信号；取消后停止后续安装，同时回滚此前已经安装的每项 middleware，不把未完成初始化的 endpoint 交给业务使用。'
+  },
+  /** Thread peer calls share the canonical request cancellation contract. */
+  'rpc-core:adapter/threads:createAdapterNodeThreadPeer:signal': {
+    en: 'Abort signal for the current operation; pass the caller-owned signal so cancellation reaches the canonical runtime call without closing unrelated peer work.',
+    zh: '当前操作的中止信号；传入调用方持有的 AbortSignal，让取消进入规范 runtime 调用，不把单次取消当作关闭其他 peer 工作的权限。'
+  },
+  /** Transfer applies to the actual channel send and never grants ownership of the remote Worker. */
+  'rpc-core:adapter/threads:createAdapterNodeThreadPeer:transfer': {
+    en: 'Transfer list passed to the physical channel send; use resources the caller may transfer, and do not infer Worker termination authority from transferring a port.',
+    zh: '送入实际物理 channel 的 transfer list；只转移调用方有权交出的资源，转移 MessagePort 不代表取得远端 Worker 的终止或替换权限。'
+  },
+  /** Idempotency keys identify one logical provider request and its existing outcome record. */
+  'rpc-core:adapter/threads:createAdapterNodeThreadPeer:idempotencyKey': {
+    en: 'Stable key identifying one logical provider request in its session store; reuse it only for that same operation and query outcome when execution is uncertain.',
+    zh: '在 session store 中标识一次逻辑 provider 请求的稳定 key；只为同一操作复用，执行结果不确定时查询已有 outcome，不把新 key 当作恢复旧调用。'
+  },
+  /** Trace is diagnostic correlation supplied by the caller, not routing or authentication evidence. */
+  'rpc-core:adapter/threads:createAdapterNodeThreadPeer:trace': {
+    en: 'Opaque caller-supplied diagnostic trace; downstream sends must forward it explicitly, and it provides neither routing identity nor authentication authority.',
+    zh: '调用方传入的不透明诊断 trace；下游发送必须显式转发，它不提供路由身份、鉴权依据或原生资源生命周期权限。'
+  },
   'rpc-core:*:*:peerId': {
     en: 'Expected authenticated peer identity used for source admission; a display name or operating-system PID is not a routing authority.',
     zh: 'source 准入使用的预期已认证 peer 身份；显示名称和操作系统 PID 不能作为路由授权。'
@@ -1101,50 +1162,50 @@ const optionTranslations: Readonly<
     en: 'Custom identifier generator for task, message, and variation IDs. Defaults to the built-in secure random generator.',
     zh: '自定义语义请求 ID 生成器，必须避免当前 owner 内冲突；使用它会保留 legacy 重放账本速率边界。'
   },
-  'rpc:adapters-message-port:createBrowserMessagePortTransport:ownership': {
+  'rpc-core:adapters-message-port:createBrowserMessagePortTransport:ownership': {
     en: "MessagePort custody: 'owned' closes the port during disposal, while 'borrowed' removes installed listeners without closing the caller's port.",
     zh: 'MessagePort custody：owned 在 dispose 时关闭 port，borrowed 只移除已安装 listener，不关闭调用方拥有的 port。'
   },
-  'rpc:adapters/message-port:createBrowserMessagePortTransport:ownership': {
+  'rpc-core:adapters/message-port:createBrowserMessagePortTransport:ownership': {
     en: "MessagePort custody: 'owned' closes the port during disposal; 'borrowed' removes installed listeners without closing the caller's port.",
     zh: 'MessagePort custody：owned 在 dispose 时关闭 port，borrowed 只移除已安装 listener，不关闭调用方拥有的 port。'
   },
-  'rpc:adapters-message-port:createBrowserMessagePortTransport:ownership:legacy': {
+  'rpc-core:adapters-message-port:createBrowserMessagePortTransport:ownership:legacy': {
     en: "Controls MessagePort custody. 'owned' closes the port on dispose; 'borrowed' removes framework listeners without closing it."
   },
-  'rpc:adapters-service-worker:createServiceWorkerTransport:target': {
+  'rpc-browser:adapters-service-worker:createServiceWorkerTransport:target': {
     en: 'ServiceWorker postMessage target used for outbound messages.'
   },
-  'rpc:adapters/service-worker:createServiceWorkerTransport:target': {
+  'rpc-browser:adapters/service-worker:createServiceWorkerTransport:target': {
     en: 'ServiceWorker controller or worker target receiving outbound RPC messages.',
     zh: '接收 outbound RPC message 的 ServiceWorker controller 或 worker target。'
   },
-  'rpc:adapters/service-worker:createServiceWorkerTransport:receiver': {
+  'rpc-browser:adapters/service-worker:createServiceWorkerTransport:receiver': {
     en: 'Inbound ServiceWorker event source used to receive RPC messages and errors.',
     zh: '用于接收 RPC message 与 error 的 inbound ServiceWorker event source。'
   },
-  'rpc:adapters-service-worker:createServiceWorkerTransport:receiver': {
+  'rpc-browser:adapters-service-worker:createServiceWorkerTransport:receiver': {
     en: 'ServiceWorker event source used to receive inbound message and error events.'
   },
-  'rpc:adapters-web-worker:createWebWorkerTransport:origin': {
+  'rpc-core:adapters-web-worker:createWebWorkerTransport:origin': {
     en: 'Optional expected origin metadata for the connected worker peer.'
   },
-  'rpc:adapters/web-worker:createWebWorkerTransport:origin': {
+  'rpc-core:adapters/web-worker:createWebWorkerTransport:origin': {
     en: 'Optional expected origin metadata used to reject worker messages from an unexpected origin.',
     zh: '用于拒绝 unexpected origin worker message 的可选 expected origin metadata。'
   },
-  'rpc:adapters-window:createWindowMessageTransport:target': {
+  'rpc-browser:adapters-window:createWindowMessageTransport:target': {
     en: 'Required postMessage target, such as iframe.contentWindow or window.opener.'
   },
-  'rpc:adapters/window:createWindowMessageTransport:target': {
+  'rpc-browser:adapters/window:createWindowMessageTransport:target': {
     en: 'Required postMessage target, such as iframe.contentWindow or window.opener.',
     zh: '必需的 postMessage target，例如 iframe.contentWindow 或 window.opener。'
   },
-  'rpc:adapters/window:createWindowMessageTransport:receiver': {
+  'rpc-browser:adapters/window:createWindowMessageTransport:receiver': {
     en: 'Inbound message-event source used to receive frames from the window peer.',
     zh: '用于接收 window peer frame 的 inbound message-event source。'
   },
-  'rpc:adapters-window:createWindowMessageTransport:receiver': {
+  'rpc-browser:adapters-window:createWindowMessageTransport:receiver': {
     en: 'Inbound message-event source. Same-origin usage may omit it and use the host default receiver.'
   }
 }
@@ -2972,8 +3033,798 @@ const createSerializeGuide = createStorageContractGuide
 /** Creates an explicitly maintained bilingual Storage Web guide. */
 const createStorageWebGuide = createStorageContractGuide
 
-/** Maintained guides for current non-RPC runtime exports omitted by the older registries. */
+/** The one Phase-A walker factory guide covers its two existing public entry points. */
+const serializePortableWalkerGuide = createSerializeGuide({
+  purposeEn:
+    "Creates one reusable portable walker from the caller's actual IPortableWalkerStrategy. The factory captures strategy callbacks and depth once; each invocation returns value, a conservative JSON UTF-8 byteUpperBound and hasBinary. It retains no input graph after a walk and does not choose a consumer profile.",
+  purposeZh:
+    '根据调用者实际 IPortableWalkerStrategy 创建可复用的 portable walker，工厂只捕获一次策略回调与深度。每次调用返回 value、JSON UTF-8 保守字节上界 byteUpperBound 与 hasBinary；遍历后不保留输入图，也不自动选择消费方 profile。',
+  quickStart:
+    "import { createPortableWalker, type IPortableWalkerStrategy } from '@migaia/serialize/codec'\n\n/** The application supplies its actual supported strategy and reuses this boundary. */\nexport function makePortableBoundary(strategy: IPortableWalkerStrategy) {\n  const walk = createPortableWalker(strategy)\n  return (input: unknown) => walk(input)\n}\n// Create the boundary once per module or owner, then consume value, byteUpperBound and hasBinary.\n// The supplied strategy owns field ordering, native bytes, freezing and violation policy.",
+  scenariosEn: [
+    'An existing consumer needs one fused traversal with its own explicit portable strategy.',
+    'A module or owner reuses the same captured callbacks and depth policy across independent input graphs.'
+  ],
+  scenariosZh: [
+    '既有消费方需要按自身明确 portable 策略完成一次融合遍历。',
+    '模块或 owner 需要跨独立输入图复用同一捕获回调与深度策略。'
+  ],
+  avoidEn: [
+    'Do not create a new factory per request; the returned function is the intended reusable boundary.',
+    'Use toPortableValue or assertPortableValue when the Serialize default profile already meets the requirement.'
+  ],
+  avoidZh: [
+    '不要逐请求创建新工厂，返回的函数才是预期的可复用边界。',
+    'Serialize 默认 profile 已满足需求时，使用 toPortableValue 或 assertPortableValue。'
+  ]
+})
+
+/** Maintained guides for current runtime exports omitted by the older registries. */
 const runtimeCompletionApiGuides = {
+  'serialize:codec:createPortableWalker': serializePortableWalkerGuide,
+  'serialize:index:createPortableWalker': serializePortableWalkerGuide,
+  'rpc-core:index:createAuthenticationNonce': createStorageContractGuide({
+    purposeEn:
+      'Returns a fresh 128-bit cryptographic nonce for authentication envelopes. It takes no input and rejects unavailable secure randomness instead of falling back to predictable identifiers; a nonce is not a peer identity or secret-key substitute.',
+    purposeZh:
+      '为认证 envelope 返回新的 128-bit 加密随机 nonce，无需参数；安全随机源不可用时拒绝配置，不降级到可预测标识。nonce 不代替 peer 身份、签名或密钥。',
+    quickStart:
+      "import { createAuthenticationNonce } from '@migaia/rpc-core'\n\n// Generate once for this outgoing authentication envelope.\nconst authenticationHeaders = { 'X-Rpc-Nonce': createAuthenticationNonce() }\n// Supply these headers to the authenticated carrier; do not reuse a nonce.\nconsole.log(Object.keys(authenticationHeaders))",
+    scenariosEn: [
+      'Create a fresh nonce while building an authenticated outbound envelope.',
+      'A custom authentication adapter needs the same secure nonce owner as Core.'
+    ],
+    scenariosZh: [
+      '构造已认证出站 envelope 时生成一次新的 nonce。',
+      '自定义鉴权 adapter 需要复用 Core 的安全随机 nonce owner。'
+    ],
+    avoidEn: [
+      'Do not reuse a nonce for a different authenticated message.',
+      'Do not replace authentication, peer admission or a secret key with random labels.'
+    ],
+    avoidZh: ['不要为另一条已认证消息复用旧 nonce。', '不要用随机标签代替鉴权、peer 准入或密钥。']
+  }),
+  'rpc-core:index:createRuntimeApiEndpoint': createStorageContractGuide({
+    purposeEn:
+      'Synchronously returns the runtime endpoint for the actual supplied channel, then installs its canonical provider, outbound and stream kernel behind the stable ready Promise. Await ready before calls and dispose the endpoint after use. The binding overload borrows only the operations and lifecycle already held by that binding.',
+    purposeZh:
+      '为实际传入的 channel 同步返回 runtime endpoint，并通过稳定的 ready Promise 安装规范 provider、outbound 与 stream kernel；调用前等待 ready，使用后 dispose。binding overload 只借用 binding 已有操作与生命周期，不授予额外原生执行权限。',
+    quickStart:
+      "import { createRuntimeApiEndpoint } from '@migaia/rpc-core'\n\n/** Use an already established channel and the method actually exposed by its peer. */\nexport async function requestThroughRuntimeEndpoint(\n  config: Parameters<typeof createRuntimeApiEndpoint>[0],\n  channel: Parameters<typeof createRuntimeApiEndpoint>[1],\n  method: string,\n  payload: unknown\n) {\n  const endpoint = createRuntimeApiEndpoint(config, channel)\n  try {\n    await endpoint.ready\n    return await endpoint.request(method, payload)\n  } finally {\n    await endpoint.dispose()\n  }\n}",
+    scenariosEn: [
+      'A carrier adapter has completed channel establishment and needs request, notify and stream operations.',
+      'An existing binding must retain its original Promise, retry and lifecycle owners.'
+    ],
+    scenariosZh: [
+      '载体 adapter 已完成 channel 建立，需要 request、notify 与 stream 操作。',
+      '借用已有 binding 时需要保留原 Promise、retry 与 lifecycle owner。'
+    ],
+    avoidEn: [
+      'Do not call before ready has fulfilled or reuse a disposed endpoint.',
+      'Do not fabricate channel capabilities or infer process termination rights from a transport.'
+    ],
+    avoidZh: [
+      '不要在 ready 完成前调用，也不要复活已 dispose 的 endpoint。',
+      '不要伪造 channel capabilities，或从 transport 推导进程终止权限。'
+    ]
+  }),
+  'rpc-core:adapter:createAdapterChannel': createStorageContractGuide({
+    purposeEn:
+      'Accepts the ordered byte or message I/O held by a custom carrier and returns a complete remote channel. Byte I/O negotiates framed JSON; message I/O validates the two matching static proposals. Core owns framing, handshake and private channel facts; the caller closes the returned channel without acquiring native execution control.',
+    purposeZh:
+      '接收自定义载体实际持有的有序 byte 或 message I/O，返回完整 remote channel。byte 路径协商 framed JSON，message 路径验证双方一致的 static proposals；Core 拥有 framing、handshake 与私有 channel 事实，调用方关闭返回 channel，但不取得原生执行控制。',
+    quickStart:
+      "import { createAdapterChannel, type IProcessByteChannel, type IProcessByteOptions } from '@migaia/rpc-core/adapter'\n\n/** The caller transfers its actual raw I/O to channel establishment. */\nexport async function establishByteAdapter(raw: IProcessByteChannel, options: IProcessByteOptions) {\n  const channel = await createAdapterChannel(raw, options)\n  console.log(channel.peerId, channel.agreement)\n  // Retain this exact channel and close it when the owning connection ends.\n  return channel\n}",
+    scenariosEn: [
+      'A custom runtime supplies ordered bytes from its real connection.',
+      'A message carrier supplies both static protocol proposals for the new channel.'
+    ],
+    scenariosZh: [
+      '自定义 runtime 将实际连接的有序字节交给规范 channel owner。',
+      'message carrier 为新 channel 提供双方实际 static protocol proposals。'
+    ],
+    avoidEn: [
+      'Do not pass an existing RPC transport for marking or registration.',
+      'Do not treat a copied agreement or capability label as a handshake result.'
+    ],
+    avoidZh: [
+      '不要传入既有 RPC transport 要求标记或注册权限。',
+      '不要把复制的 agreement 或 capability label 当作 handshake 结果。'
+    ]
+  }),
+  'rpc-core:adapter:receiveAdapterBootstrap': createStorageContractGuide({
+    purposeEn:
+      'Reads an optional framed stdin bootstrap from the held byte connection and returns the same decoder/channel for handshake continuation. The stdin mode consumes the bootstrap under its scheduler deadline; none preserves an ordinary connection. Business data and bootstrap metadata do not grant native execution ownership.',
+    purposeZh:
+      '从持有的 byte 连接读取可选 framed stdin bootstrap，并把同一 decoder/channel 交给后续 handshake。stdin 模式在 scheduler deadline 内读取 bootstrap，none 模式保留普通连接；业务 data 与 bootstrap metadata 不授予原生执行所有权。',
+    quickStart:
+      "import { receiveAdapterBootstrap, createAdapterChannel, type IProcessByteChannel, type IProcessByteOptions } from '@migaia/rpc-core/adapter'\n\n/** Continue handshake on the same raw reader that consumed stdin bootstrap. */\nexport async function connectBootstrappedStdio(raw: IProcessByteChannel, options: IProcessByteOptions) {\n  const received = await receiveAdapterBootstrap(raw, 'stdin', { bootstrapTimeoutMs: 5_000 })\n  console.log('bootstrap bytes:', received.bootstrap?.byteLength ?? 0)\n  return createAdapterChannel(received.channel, options)\n}",
+    scenariosEn: [
+      'A launched child receives its bootstrap on stdin before protocol negotiation.',
+      'An ordinary byte carrier explicitly chooses none and keeps its existing framing path.'
+    ],
+    scenariosZh: [
+      '已启动子进程在 protocol 协商前通过 stdin 接收 bootstrap。',
+      '普通 byte carrier 明确选择 none，保留原有 framing 路径。'
+    ],
+    avoidEn: [
+      'Do not attach a second reader that consumes the same physical bytes.',
+      'Do not infer parent ownership or launch authority from bootstrap contents.'
+    ],
+    avoidZh: [
+      '不要另装第二个 reader 消费同一份物理字节。',
+      '不要从 bootstrap 内容推导 parent 所有权或 launch 权限。'
+    ]
+  }),
+  'rpc-core:adapter-jsonrpc:createJsonRpcAdapterChannel': createStorageContractGuide({
+    purposeEn:
+      'Builds the complete gated remote channel over held JSON-RPC byte I/O using the supplied offer, peer identity and issued authentication token. The authenticated hello precedes describe/invoke traffic; framing, correlation and cleanup stay in Core, and the returned channel must be closed by its connection owner.',
+    purposeZh:
+      '在持有的 JSON-RPC byte I/O 上，使用实际 offer、peer 身份及已签发 token 建立完整 gated remote channel。authenticated hello 先于 describe/invoke，framing、correlation 与 cleanup 由 Core 负责；返回 channel 由连接 owner 关闭。',
+    quickStart:
+      "import { createJsonRpcAdapterChannel } from '@migaia/rpc-core/adapter/jsonrpc'\n\n/** Options contain the held byte connection and credentials issued for that peer. */\nexport async function establishForeignLanguageAdapter(options: Parameters<typeof createJsonRpcAdapterChannel>[0]) {\n  const channel = await createJsonRpcAdapterChannel(options)\n  console.log(channel.peerId, channel.agreement)\n  // The deployment retains this exact channel and later awaits channel.close().\n  return channel\n}",
+    scenariosEn: [
+      'An authenticated foreign-language service supplies an ordered JSON-RPC byte connection.',
+      'A carrier adapter needs Core to own hello, frame decoding and response correlation.'
+    ],
+    scenariosZh: [
+      '已认证外部语言服务提供有序 JSON-RPC byte 连接。',
+      '载体 adapter 需要 Core 统一拥有 hello、frame decoding 与响应 correlation。'
+    ],
+    avoidEn: [
+      'Do not use copied tokens or capability labels to qualify another transport.',
+      'Do not advertise server streaming when the JSON-RPC bridge does not support it.'
+    ],
+    avoidZh: [
+      '不要用复制的 token 或 capability label 为另一 transport 授权。',
+      '不要宣称 JSON-RPC bridge 支持其未实现的 server stream。'
+    ]
+  }),
+  'rpc-core:adapter-node:createAdapterChildStdio': createStorageContractGuide({
+    purposeEn:
+      'Constructs ordered raw byte I/O from the actual spawned child pipes, then lets createAdapterChannel establish the protocol. Physical pipe lifetime and the exclusive reader are observed on this new channel, without accepting a target transport. The native launcher still owns child termination. The connection owner closes the channel after use.',
+    purposeZh:
+      '从实际已 spawn 的子进程 pipes构造有序 raw byte I/O，随后通过 createAdapterChannel 建立 protocol。该新 channel 观察实际 pipe lifetime 与 exclusive reader，不接受 target transport。子进程终止仍归原生 launcher owner。连接 owner 在使用后关闭 channel。',
+    quickStart:
+      "import { createAdapterChildStdio } from '@migaia/rpc-core/adapter/node'\nimport { createAdapterChannel, type IProcessByteOptions } from '@migaia/rpc-core/adapter'\n\n/** The deployment supplies the actual spawned child pipes; no native resource is fabricated here. */\nexport async function establishChildStdio(child: Parameters<typeof createAdapterChildStdio>[0], options: IProcessByteOptions) {\n  const raw = createAdapterChildStdio(child)\n  const channel = await createAdapterChannel(raw, options)\n  console.log(channel.peerId)\n  // The connection owner retains and closes this exact channel.\n  return channel\n}",
+    scenariosEn: [
+      'A native adapter already holds the actual spawned child pipes and needs framed RPC over it.',
+      'Keep one physical reader and the original raw I/O close semantics during handshake.'
+    ],
+    scenariosZh: [
+      '原生 adapter 已持有实际已 spawn 的子进程 pipes，需要在其上建立 framed RPC。',
+      'handshake 期间保持单一物理 reader 与原 raw I/O 关闭语义。'
+    ],
+    avoidEn: [
+      'Do not pass copied stream metadata instead of the actual held I/O.',
+      'The native launcher still owns child termination.'
+    ],
+    avoidZh: [
+      '不要传入复制的 stream metadata 代替实际持有的 I/O。',
+      '子进程终止仍归原生 launcher owner。'
+    ]
+  }),
+  'rpc-core:adapter-node:createAdapterProcessStdio': createStorageContractGuide({
+    purposeEn:
+      'Constructs ordered raw byte I/O from the current process stdin/stdout resources, then lets createAdapterChannel establish the protocol. Closing retains the original stdin pause and stdout end behavior. It does not create or terminate a separate child process. The connection owner closes the channel after use.',
+    purposeZh:
+      '从当前进程实际 stdin/stdout 资源构造有序 raw byte I/O，随后通过 createAdapterChannel 建立 protocol。关闭保留原 stdin pause 与 stdout end 行为。它不会创建或终止另一个子进程。连接 owner 在使用后关闭 channel。',
+    quickStart:
+      "import { createAdapterProcessStdio } from '@migaia/rpc-core/adapter/node'\nimport { createAdapterChannel, type IProcessByteOptions } from '@migaia/rpc-core/adapter'\n\n/** The deployment supplies the current process stdin/stdout resources; no native resource is fabricated here. */\nexport async function establishProcessStdio(io: Parameters<typeof createAdapterProcessStdio>[0], options: IProcessByteOptions) {\n  const raw = createAdapterProcessStdio(io)\n  const channel = await createAdapterChannel(raw, options)\n  console.log(channel.peerId)\n  // The connection owner retains and closes this exact channel.\n  return channel\n}",
+    scenariosEn: [
+      'A native adapter already holds the current process stdin/stdout resources and needs framed RPC over it.',
+      'Keep one physical reader and the original raw I/O close semantics during handshake.'
+    ],
+    scenariosZh: [
+      '原生 adapter 已持有当前进程实际 stdin/stdout 资源，需要在其上建立 framed RPC。',
+      'handshake 期间保持单一物理 reader 与原 raw I/O 关闭语义。'
+    ],
+    avoidEn: [
+      'Do not pass copied stream metadata instead of the actual held I/O.',
+      'It does not create or terminate a separate child process.'
+    ],
+    avoidZh: [
+      '不要传入复制的 stream metadata 代替实际持有的 I/O。',
+      '它不会创建或终止另一个子进程。'
+    ]
+  }),
+  'rpc-core:adapter-node:createAdapterSocketByteIO': createStorageContractGuide({
+    purposeEn:
+      'Constructs ordered raw byte I/O from the held Node duplex socket, then lets createAdapterChannel establish the protocol. Borrowed socket I/O keeps its ordinary profile and does not gain launch/stdio replay qualification from its stream shape. It grants no process launch or termination rights. The connection owner closes the channel after use.',
+    purposeZh:
+      '从持有的 Node duplex socket构造有序 raw byte I/O，随后通过 createAdapterChannel 建立 protocol。借用 socket I/O 保留普通连接 profile，不因 stream 形状取得 launch/stdio replay 资格。它不授予进程启动或终止权限。连接 owner 在使用后关闭 channel。',
+    quickStart:
+      "import { createAdapterSocketByteIO } from '@migaia/rpc-core/adapter/node'\nimport { createAdapterChannel, type IProcessByteOptions } from '@migaia/rpc-core/adapter'\n\n/** The deployment supplies the held Node duplex socket; no native resource is fabricated here. */\nexport async function establishSocketByteIO(socket: Parameters<typeof createAdapterSocketByteIO>[0], options: IProcessByteOptions) {\n  const raw = createAdapterSocketByteIO(socket)\n  const channel = await createAdapterChannel(raw, options)\n  console.log(channel.peerId)\n  // The connection owner retains and closes this exact channel.\n  return channel\n}",
+    scenariosEn: [
+      'A native adapter already holds the held Node duplex socket and needs framed RPC over it.',
+      'Keep one physical reader and the original raw I/O close semantics during handshake.'
+    ],
+    scenariosZh: [
+      '原生 adapter 已持有持有的 Node duplex socket，需要在其上建立 framed RPC。',
+      'handshake 期间保持单一物理 reader 与原 raw I/O 关闭语义。'
+    ],
+    avoidEn: [
+      'Do not pass copied stream metadata instead of the actual held I/O.',
+      'It grants no process launch or termination rights.'
+    ],
+    avoidZh: ['不要传入复制的 stream metadata 代替实际持有的 I/O。', '它不授予进程启动或终止权限。']
+  }),
+  'rpc-core:adapter-process:createAdapterProcessLaunch': createStorageContractGuide({
+    purposeEn:
+      'Prepares one actual supervisor launch request before the native spawn, retaining its signal and reserved generation. Its bootstrap belongs to that launch; createWebChannel builds a new channel from the resulting real streams. Core-private replay and physical handoff facts cannot be recreated from an existing transport.',
+    purposeZh:
+      '在原生 spawn 前准备一次实际 supervisor launch request，保留其 signal 与已预留 generation。bootstrap 归该 launch 所有，createWebChannel 从真正产生的 streams 构造新 channel；既有 transport 不能重建 Core 私有 replay 与物理 handoff 事实。',
+    quickStart:
+      "import { createAdapterProcessLaunch } from '@migaia/rpc-core/adapter/process'\n\n/** The native owner spawns with these exact prepared bootstrap bytes. */\nexport async function launchCustomByteProcess(\n  spec: Parameters<typeof createAdapterProcessLaunch>[0],\n  context: Parameters<typeof createAdapterProcessLaunch>[1],\n  options: Parameters<typeof createAdapterProcessLaunch>[2],\n  spawn: (bootstrap: ReturnType<typeof createAdapterProcessLaunch>['bootstrap']) => Promise<{ readable: ReadableStream<Uint8Array>; writable: WritableStream<Uint8Array> }>\n) {\n  const launch = createAdapterProcessLaunch(spec, context, options)\n  launch.assertActive()\n  const streams = await spawn(launch.bootstrap)\n  return launch.createWebChannel(streams.readable, streams.writable)\n}",
+    scenariosEn: [
+      'A custom process launcher must prepare the original bootstrap before its actual spawn.',
+      'The launcher receives real Web Streams and hands their new channel to Core.'
+    ],
+    scenariosZh: [
+      '自定义进程 launcher 在实际 spawn 前准备原 bootstrap。',
+      'launcher 获得真实 Web Streams 后把新 channel 交给 Core。'
+    ],
+    avoidEn: [
+      'Do not give this operation an existing RPC transport to register.',
+      'Do not replace the actual supervisor request with a copied generation or ownership flag.'
+    ],
+    avoidZh: [
+      '不要交出既有 RPC transport 要求该操作注册。',
+      '不要用复制的 generation 或 ownership flag 代替实际 supervisor request。'
+    ]
+  }),
+  'rpc-core:adapter-process:createAdapterProcessPeer': createStorageContractGuide({
+    purposeEn:
+      'Builds a symmetric process Peer from the caller-owned runtime I/O loader and validated Peer options. Core assembles authenticated bootstrap and the canonical request/notify/stream owner; close releases this connection while native execution control remains with its original launcher.',
+    purposeZh:
+      '从调用方持有的 runtime I/O loader 与已校验 Peer options 建立对称 process Peer。Core 装配 authenticated bootstrap 和规范 request/notify/stream owner；close 释放这条连接，原生 execution control 仍归原 launcher。',
+    quickStart:
+      "import { createAdapterProcessPeer } from '@migaia/rpc-core/adapter/process'\n\n/** Call a method actually exposed by the connected process, then release the Peer. */\nexport async function requestThroughCustomProcess(\n  options: Parameters<typeof createAdapterProcessPeer>[0],\n  runtime: Parameters<typeof createAdapterProcessPeer>[1],\n  method: string, payload: unknown\n) {\n  const peer = await createAdapterProcessPeer(options, runtime)\n  try { return await peer.request(method, payload) }\n  finally { await peer.close() }\n}",
+    scenariosEn: [
+      'A third-party process runtime supplies its real child-side I/O acquisition.',
+      'An adapter needs request results and stream semantics without reimplementing Remote.'
+    ],
+    scenariosZh: [
+      '第三方 process runtime 提供真实 child-side I/O 获取方式。',
+      'adapter 需要复用 Remote 的 request 结果与 stream 语义。'
+    ],
+    avoidEn: [
+      'Ordinary Node/Bun/Deno applications should use their native rpc-process Peer factory.',
+      'Do not derive process stop or replacement rights from borrowed I/O.'
+    ],
+    avoidZh: [
+      '普通 Node/Bun/Deno 应用应使用对应 rpc-process 原生 Peer 工厂。',
+      '不要从借用 I/O 推导 process stop 或 replacement 权限。'
+    ]
+  }),
+  'rpc-core:adapter-process:createAdapterProcessPlugin': createStorageContractGuide({
+    purposeEn:
+      'Creates a process Plugin definition from the actual runtime I/O loader and declared process options. The symmetric and advanced overloads retain their original assembly; the real Host installation owns connection activation, retry and release. Constructing the definition alone does not connect or publish a process slot.',
+    purposeZh:
+      '使用实际 runtime I/O loader 与声明的 process options 创建 Plugin definition。对称及高级 overload 保留原装配方式，实际 Host 安装拥有连接激活、retry 与 release；仅构造 definition 不连接或发布 process slot。',
+    quickStart:
+      "import { createAdapterProcessPlugin } from '@migaia/rpc-core/adapter/process'\n\n/** Install through the deployment's real Host, which owns later release. */\nexport async function installCustomProcessPlugin(\n  options: Parameters<typeof createAdapterProcessPlugin>[0],\n  runtime: Parameters<typeof createAdapterProcessPlugin>[1],\n  install: (plugin: ReturnType<typeof createAdapterProcessPlugin>) => PromiseLike<void>\n) {\n  const plugin = createAdapterProcessPlugin(options, runtime)\n  await install(plugin)\n}",
+    scenariosEn: [
+      'A third-party process runtime integrates one connection with an existing PluginHost.',
+      'The advanced process configuration needs its original supervision and retry policies.'
+    ],
+    scenariosZh: [
+      '第三方 process runtime 将一条连接集成到既有 PluginHost。',
+      '高级 process 配置需要保留原 supervision 与 retry 策略。'
+    ],
+    avoidEn: [
+      'Do not publish a Plugin slot before the actual Host installation commits.',
+      'Use the native rpc-process Plugin factory when no custom runtime I/O is needed.'
+    ],
+    avoidZh: [
+      '不要在实际 Host install commit 前发布 Plugin slot。',
+      '不需要自定义 runtime I/O 时使用 rpc-process 原生 Plugin 工厂。'
+    ]
+  }),
+  'rpc-core:adapter-process:createNativeProcessOffer': createStorageContractGuide({
+    purposeEn:
+      'Builds the handshake offer for an actual native byte connection from its peer record, authentication proposal and explicitly installed capabilities. The offer is protocol data, not authentication or execution ownership; the channel constructor still validates and negotiates it with the remote peer.',
+    purposeZh:
+      '从实际 native byte 连接的 peer record、鉴权 proposal 与明确已安装 capabilities 构造 handshake offer。offer 是 protocol data，不是鉴权或 execution ownership；channel constructor 仍须与远端验证并协商。',
+    quickStart:
+      "import { createNativeProcessOffer } from '@migaia/rpc-core/adapter/process'\nimport { RpcPeerRuntime } from '@migaia/rpc-contract'\n\nconst offer = createNativeProcessOffer({\n  peer: { id: 'orders-adapter', runtime: RpcPeerRuntime.node },\n  stream: false\n})\n// Feed the offer to the actual channel constructor, not to a transport marker.\nconsole.log(offer.versions, offer.codecs)",
+    scenariosEn: [
+      'A native byte adapter constructs its local protocol proposal before handshake.',
+      'The endpoint owner explicitly chooses whether its installed service supports streaming.'
+    ],
+    scenariosZh: [
+      'native byte adapter 在 handshake 前构造本端 protocol proposal。',
+      'endpoint owner 根据已安装服务明确选择是否支持 streaming。'
+    ],
+    avoidEn: [
+      'Do not advertise capabilities absent from the endpoint implementation.',
+      'Do not treat the returned offer as proof of a negotiated or authenticated connection.'
+    ],
+    avoidZh: [
+      '不要宣称 endpoint 实现中没有安装的 capabilities。',
+      '不要把返回 offer 当作已协商或已鉴权连接的证明。'
+    ]
+  }),
+  'rpc-core:adapter-process:createProcessResilience': createStorageContractGuide({
+    purposeEn:
+      'Creates the bounded resilience owner for registered process supervisor sessions and their diagnostics. The caller supplies the actual limits, scheduler and reporter; registration keeps each real supervisor generation distinct, and connection recovery must preserve original launch and cleanup ownership.',
+    purposeZh:
+      '创建已注册 process supervisor sessions 与诊断的 bounded resilience owner。调用方提供实际 limits、scheduler 与 reporter；registration 区分每个真实 supervisor generation，连接恢复保留原 launch 与 cleanup ownership。',
+    quickStart:
+      "import { createProcessResilience } from '@migaia/rpc-core/adapter/process'\n\n/** Return this owner to the process integration that registers its actual supervisors. */\nexport function configureProcessRecovery(options: Parameters<typeof createProcessResilience>[0]) {\n  const resilience = createProcessResilience(options)\n  // Reuse one owner for these configured process sessions; do not create one per request.\n  return resilience\n}",
+    scenariosEn: [
+      'A process integration needs one bounded owner for reconnecting supervisor sessions.',
+      'Terminal process diagnostics must retain their actual generation and timing owner.'
+    ],
+    scenariosZh: [
+      'process 集成需要由一个 bounded owner 管理重连 supervisor sessions。',
+      'terminal process 诊断需要保留实际 generation 与时间 owner。'
+    ],
+    avoidEn: [
+      'Do not create a new resilience registry for every RPC request.',
+      'Do not use reconnect policy to claim ownership of an unrelated process.'
+    ],
+    avoidZh: [
+      '不要为每次 RPC request 新建 resilience registry。',
+      '不要用 reconnect 策略声称拥有无关进程。'
+    ]
+  }),
+  'rpc-core:adapter-process:parseProcessPluginDescriptor': createStorageContractGuide({
+    purposeEn:
+      'Validates unknown input and returns the portable process Plugin descriptor used for discovery. It retains declarative method/contract data without retaining launch ports or secrets; malformed data rejects before any native resource acquisition, and parsing alone starts no process.',
+    purposeZh:
+      '校验未知输入，返回供 discovery 使用的 portable process Plugin descriptor。它保留声明式 method/contract 数据，不保留 launch ports 或 secrets；非法数据在获取原生资源前拒绝，解析本身不启动进程。',
+    quickStart:
+      "import { parseProcessPluginDescriptor } from '@migaia/rpc-core/adapter/process'\n\n/** This is externally received descriptor data, not a launch or authentication request. */\nexport function readProcessDescription(input: unknown) {\n  const descriptor = parseProcessPluginDescriptor(input)\n  console.log(descriptor)\n  return descriptor\n}",
+    scenariosEn: [
+      'Read a process Plugin descriptor received over an existing discovery connection.',
+      'Validate portable metadata before choosing the actual native process integration.'
+    ],
+    scenariosZh: [
+      '读取通过既有 discovery 连接收到的 process Plugin descriptor。',
+      '选择实际 native process 集成前校验 portable metadata。'
+    ],
+    avoidEn: [
+      'Do not include native handles, callbacks or secrets in portable descriptors.',
+      'Do not treat successful parsing as permission to launch or trust a process.'
+    ],
+    avoidZh: [
+      '不要在 portable descriptor 中包含 native handles、callbacks 或 secrets。',
+      '不要把解析成功当作 launch 或信任进程的许可。'
+    ]
+  }),
+  'rpc-core:adapter-process-node:createAdapterNodeProcessLaunch': createStorageContractGuide({
+    purposeEn:
+      'Prepares one actual Node/Bun process launch before spawn and builds its child-stdio channel from the resulting held ChildProcess. It preserves the original request, signal, bootstrap and private physical lifetime handoff; no existing target transport or ownership assertion is accepted.',
+    purposeZh:
+      '在 spawn 前准备一次实际 Node/Bun process launch，再从真正持有的 ChildProcess 构造 child-stdio channel。它保留原 request、signal、bootstrap 与私有物理 lifetime handoff，不接收既有 target transport 或 ownership assertion。',
+    quickStart:
+      "import { createAdapterNodeProcessLaunch } from '@migaia/rpc-core/adapter/process/node'\n\n/** The native spawn callback owns the ChildProcess and writes the prepared bootstrap. */\nexport async function launchNodeByteProcess(\n  spec: Parameters<typeof createAdapterNodeProcessLaunch>[0],\n  context: Parameters<typeof createAdapterNodeProcessLaunch>[1],\n  options: Parameters<typeof createAdapterNodeProcessLaunch>[2],\n  spawn: (bootstrap: ReturnType<typeof createAdapterNodeProcessLaunch>['bootstrap']) => Promise<Parameters<ReturnType<typeof createAdapterNodeProcessLaunch>['createChildChannel']>[0]>\n) {\n  const launch = createAdapterNodeProcessLaunch(spec, context, options)\n  launch.assertActive()\n  const child = await spawn(launch.bootstrap)\n  return launch.createChildChannel(child)\n}",
+    scenariosEn: [
+      'A Node/Bun launcher delegates channel construction while retaining the actual ChildProcess.',
+      'The original launch request must own bootstrap and private child-pipe handoff facts.'
+    ],
+    scenariosZh: [
+      'Node/Bun launcher 保留实际 ChildProcess，把 channel 构造交给 Core。',
+      '原 launch request 必须拥有 bootstrap 与私有 child-pipe handoff 事实。'
+    ],
+    avoidEn: [
+      'Do not pass a transport created for a different process launch.',
+      'Do not substitute a PID, name or owned flag for the original launch resource.'
+    ],
+    avoidZh: [
+      '不要传入属于另一 process launch 的 transport。',
+      '不要用 PID、name 或 owned flag 代替原 launch resource。'
+    ]
+  }),
+  'rpc-core:adapter-threads:AdapterNodeThreadParentChannel': createStorageContractGuide({
+    purposeEn:
+      'Holds the actual Node parent MessagePort without installing listeners. Its open(peerId, options) constructs the complete borrowed channel on that same port; the first canonical construction starts lifetime observation. Closing releases the local channel and never grants authority to terminate the parent Worker.',
+    purposeZh:
+      '持有实际 Node parent MessagePort，构造时不安装 listeners。open(peerId, options) 在同一 port 上建立完整借用 channel，第一次规范构造才启动 lifetime observation；close 只释放本地 channel，不授予终止 parent Worker 的权限。',
+    quickStart:
+      "import { parentPort } from 'node:worker_threads'\nimport { AdapterNodeThreadParentChannel } from '@migaia/rpc-core/adapter/threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** Run inside a Node Worker using the peer id accepted by its bootstrap owner. */\nexport async function inspectParentChannel(peerId: string) {\n  if (!parentPort) return\n  const resource = new AdapterNodeThreadParentChannel(parentPort)\n  const channel = resource.open(peerId, { scheduler: systemScheduler })\n  try { console.log(channel.peerId) }\n  finally { await channel.close() }\n}",
+    scenariosEn: [
+      'A Node Worker retains its genuine parentPort for lazy channel construction.',
+      'An adapter must preserve physical parent-port lifetime facts without another registry.'
+    ],
+    scenariosZh: [
+      'Node Worker 保留真实 parentPort，供懒 channel 构造使用。',
+      'adapter 需要保留实际 parent-port lifetime 事实，不另建 registry。'
+    ],
+    avoidEn: [
+      'Do not fabricate a parent port or copied bootstrap to claim Worker provenance.',
+      'Do not use a borrowed parent connection to terminate or replace its execution owner.'
+    ],
+    avoidZh: [
+      '不要伪造 parent port 或复制 bootstrap 来声称 Worker provenance。',
+      '不要利用借用 parent connection 终止或替换其 execution owner。'
+    ]
+  }),
+  'rpc-core:adapter-threads:createAdapterNodeThreadChannel': createStorageContractGuide({
+    purposeEn:
+      'Constructs a complete borrowed remote channel from the actual held Node-style MessagePort I/O, the accepted peer id and scheduler. It retains the original raw message path and static capability declaration; channel.close removes this connection without claiming termination of the Worker execution.',
+    purposeZh:
+      '从实际持有的Node-style MessagePort I/O、已采纳 peer id 与 scheduler 构造完整借用 remote channel。它保留原 raw message 路径与 static capability 声明；channel.close 释放这条连接，不取得 Worker execution 的终止权。',
+    quickStart:
+      "import { createAdapterNodeThreadChannel } from '@migaia/rpc-core/adapter/threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** The caller supplies the actual port and the identity admitted for that port. */\nexport async function inspectNodeThreadChannel(port: Parameters<typeof createAdapterNodeThreadChannel>[0], peerId: string) {\n  const channel = createAdapterNodeThreadChannel(port, peerId, { scheduler: systemScheduler })\n  try { console.log(channel.peerId, channel.agreement) }\n  finally { await channel.close() }\n}",
+    scenariosEn: [
+      'A custom thread adapter already holds Node-style MessagePort I/O for one accepted peer.',
+      'The caller needs a complete channel without reimplementing thread message framing.'
+    ],
+    scenariosZh: [
+      '自定义 thread adapter 已持有对应 peer 的真实Node-style MessagePort I/O。',
+      '调用方需要完整 channel，不重写 thread message framing。'
+    ],
+    avoidEn: [
+      'Do not claim private startup acknowledgement from a copied handle or port.',
+      'Do not confuse local connection close with Worker termination.'
+    ],
+    avoidZh: [
+      '不要从复制的 handle 或 port 声称获得私有 startup acknowledgement。',
+      '不要把本地 connection close 当作 Worker termination。'
+    ]
+  }),
+  'rpc-core:adapter-threads:createAdapterWebThreadChannel': createStorageContractGuide({
+    purposeEn:
+      'Constructs a complete borrowed remote channel from the actual held EventTarget message I/O, the accepted peer id and scheduler. It retains the original raw message path and static capability declaration; channel.close removes this connection without claiming termination of the Worker execution.',
+    purposeZh:
+      '从实际持有的EventTarget message I/O、已采纳 peer id 与 scheduler 构造完整借用 remote channel。它保留原 raw message 路径与 static capability 声明；channel.close 释放这条连接，不取得 Worker execution 的终止权。',
+    quickStart:
+      "import { createAdapterWebThreadChannel } from '@migaia/rpc-core/adapter/threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** The caller supplies the actual port and the identity admitted for that port. */\nexport async function inspectWebThreadChannel(port: Parameters<typeof createAdapterWebThreadChannel>[0], peerId: string) {\n  const channel = createAdapterWebThreadChannel(port, peerId, { scheduler: systemScheduler })\n  try { console.log(channel.peerId, channel.agreement) }\n  finally { await channel.close() }\n}",
+    scenariosEn: [
+      'A custom thread adapter already holds EventTarget message I/O for one accepted peer.',
+      'The caller needs a complete channel without reimplementing thread message framing.'
+    ],
+    scenariosZh: [
+      '自定义 thread adapter 已持有对应 peer 的真实EventTarget message I/O。',
+      '调用方需要完整 channel，不重写 thread message framing。'
+    ],
+    avoidEn: [
+      'Do not claim private startup acknowledgement from a copied handle or port.',
+      'Do not confuse local connection close with Worker termination.'
+    ],
+    avoidZh: [
+      '不要从复制的 handle 或 port 声称获得私有 startup acknowledgement。',
+      '不要把本地 connection close 当作 Worker termination。'
+    ]
+  }),
+  'rpc-core:adapter-threads:createAdapterNodeThreadChannelFactory': createStorageContractGuide({
+    purposeEn:
+      'Creates the Node-style channel factory using the actual injected scheduler and installed capabilities. open(handle, signal) constructs the complete channel from that real launcher handle; arbitrary copies cannot supply private startup acknowledgement or receive-handoff authority. The connection owner closes the opened channel.',
+    purposeZh:
+      '使用实际注入 scheduler 与已安装 capabilities 创建Node-style channel factory。open(handle, signal) 从真实 launcher handle 构造完整 channel；任意副本不能提供私有 startup acknowledgement 或 receive-handoff 权限，连接 owner 关闭打开的 channel。',
+    quickStart:
+      "import { createAdapterNodeThreadChannelFactory } from '@migaia/rpc-core/adapter/threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** Handle and signal come from the original launcher/supervisor operation. */\nexport async function openNodeThreadChannelFactory(\n  handle: Parameters<ReturnType<typeof createAdapterNodeThreadChannelFactory>['open']>[0],\n  signal: Parameters<ReturnType<typeof createAdapterNodeThreadChannelFactory>['open']>[1]\n) {\n  const factory = createAdapterNodeThreadChannelFactory({ scheduler: systemScheduler })\n  const channel = await factory.open(handle, signal)\n  console.log(channel.peerId)\n  // Return the exact channel to its owner, which later awaits close().\n  return channel\n}",
+    scenariosEn: [
+      'A supervisor opens a channel for the exact handle returned by its launcher.',
+      'A custom native runtime needs the canonical receive handoff and channel ownership.'
+    ],
+    scenariosZh: [
+      'supervisor 为原 launcher 返回的确切 handle 打开 channel。',
+      '自定义 native runtime 需要规范 receive handoff 与 channel ownership。'
+    ],
+    avoidEn: [
+      'Do not spread or reconstruct launcher handles to claim startup authority.',
+      'Do not open an unrelated execution generation through a stale handle.'
+    ],
+    avoidZh: [
+      '不要展开或重建 launcher handle 来声称 startup 权限。',
+      '不要使用 stale handle 打开无关 execution generation。'
+    ]
+  }),
+  'rpc-core:adapter-threads:createAdapterWebThreadChannelFactory': createStorageContractGuide({
+    purposeEn:
+      'Creates the EventTarget channel factory using the actual injected scheduler and installed capabilities. open(handle, signal) constructs the complete channel from that real launcher handle; arbitrary copies cannot supply private startup acknowledgement or receive-handoff authority. The connection owner closes the opened channel.',
+    purposeZh:
+      '使用实际注入 scheduler 与已安装 capabilities 创建EventTarget channel factory。open(handle, signal) 从真实 launcher handle 构造完整 channel；任意副本不能提供私有 startup acknowledgement 或 receive-handoff 权限，连接 owner 关闭打开的 channel。',
+    quickStart:
+      "import { createAdapterWebThreadChannelFactory } from '@migaia/rpc-core/adapter/threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** Handle and signal come from the original launcher/supervisor operation. */\nexport async function openWebThreadChannelFactory(\n  handle: Parameters<ReturnType<typeof createAdapterWebThreadChannelFactory>['open']>[0],\n  signal: Parameters<ReturnType<typeof createAdapterWebThreadChannelFactory>['open']>[1]\n) {\n  const factory = createAdapterWebThreadChannelFactory({ scheduler: systemScheduler })\n  const channel = await factory.open(handle, signal)\n  console.log(channel.peerId)\n  // Return the exact channel to its owner, which later awaits close().\n  return channel\n}",
+    scenariosEn: [
+      'A supervisor opens a channel for the exact handle returned by its launcher.',
+      'A custom native runtime needs the canonical receive handoff and channel ownership.'
+    ],
+    scenariosZh: [
+      'supervisor 为原 launcher 返回的确切 handle 打开 channel。',
+      '自定义 native runtime 需要规范 receive handoff 与 channel ownership。'
+    ],
+    avoidEn: [
+      'Do not spread or reconstruct launcher handles to claim startup authority.',
+      'Do not open an unrelated execution generation through a stale handle.'
+    ],
+    avoidZh: [
+      '不要展开或重建 launcher handle 来声称 startup 权限。',
+      '不要使用 stale handle 打开无关 execution generation。'
+    ]
+  }),
+  'rpc-core:adapter-threads:createAdapterNodeThreadLauncher': createStorageContractGuide({
+    purposeEn:
+      'Creates the Node Worker launcher from the real runtime module loader and pid provider. Launch observes native error/exit immediately and returns the actual handle with channel open and usage sampling. Termination request and actual exit remain separate; the original handle owns both observations.',
+    purposeZh:
+      '使用真实 runtime module loader 与 pid provider 创建 Node Worker launcher。launch 立即观察 native error/exit，返回带 channel open 与 usage sampling 的实际 handle。终止请求与真实退出分开，由原 handle 保留两者观察。',
+    quickStart:
+      "import { createAdapterNodeThreadLauncher } from '@migaia/rpc-core/adapter/threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** The supervisor supplies its actual spec and cancellation signal. */\nexport async function inspectOwnedNodeWorker(\n  spec: Parameters<ReturnType<typeof createAdapterNodeThreadLauncher>['launch']>[0],\n  signal: Parameters<ReturnType<typeof createAdapterNodeThreadLauncher>['launch']>[1]['signal']\n) {\n  const launcher = createAdapterNodeThreadLauncher({ load: () => import('node:worker_threads'), get pid() { return process.pid } })\n  const handle = await launcher.launch(spec, { signal })\n  try {\n    const channel = await handle.open(signal, { scheduler: systemScheduler })\n    try { console.log(channel.peerId) }\n    finally { await channel.close() }\n  } finally {\n    await handle.terminate()\n    await handle.exited\n  }\n}",
+    scenariosEn: [
+      'A custom Node runtime adapter supplies its real worker_threads acquisition operation.',
+      'A supervisor requires true error, exit and termination observations for its original Worker.'
+    ],
+    scenariosZh: [
+      '自定义 Node runtime adapter 提供真实 worker_threads 获取操作。',
+      'supervisor 需要原 Worker 的真实 error、exit 与 termination 观察。'
+    ],
+    avoidEn: [
+      'Do not fabricate private startup acknowledgement or copy an existing handle.',
+      'Use rpc-threads/adapters/node when the ordinary Node adapter already suffices.'
+    ],
+    avoidZh: [
+      '不要伪造私有 startup acknowledgement 或复制既有 handle。',
+      '普通 Node adapter 足够时使用 rpc-threads/adapters/node。'
+    ]
+  }),
+  'rpc-core:adapter-threads:createAdapterNodeThreadPeer': createStorageContractGuide({
+    purposeEn:
+      'Constructs the child-side symmetric Peer from genuine parentPort, complete library workerData and validated runtime options. Its request/notify/stream operations retain their canonical call semantics; close releases this connection, while fabricated bootstrap or a missing parent port cannot grant automatic Worker discovery.',
+    purposeZh:
+      '从真实 parentPort、完整库 workerData 与已校验 runtime options 构造 child-side 对称 Peer。request/notify/stream 保留规范调用语义，close 释放这条连接；伪造 bootstrap 或缺失 parent port 不能取得自动 Worker discovery。',
+    quickStart:
+      "import { parentPort, workerData } from 'node:worker_threads'\nimport { createAdapterNodeThreadPeer } from '@migaia/rpc-core/adapter/threads'\n\n/** Run in the actual library-launched Worker and call an exposed parent method. */\nexport async function requestParentMethod(options: Parameters<typeof createAdapterNodeThreadPeer>[0], method: string, payload: unknown) {\n  const peer = await createAdapterNodeThreadPeer(options, parentPort, workerData)\n  try { return await peer.request(method, payload) }\n  finally { await peer.close() }\n}",
+    scenariosEn: [
+      'An actual Node Worker joins the parent connection using its native workerData.',
+      'A custom runtime adapter needs the canonical child-side method and cancellation semantics.'
+    ],
+    scenariosZh: [
+      '实际 Node Worker 使用原生 workerData 加入 parent connection。',
+      '自定义 runtime adapter 需要规范 child-side method 与取消语义。'
+    ],
+    avoidEn: [
+      'Do not synthesize workerData or parentPort to claim automatic discovery.',
+      'Do not treat closing this Peer as authority to stop the parent execution.'
+    ],
+    avoidZh: [
+      '不要合成 workerData 或 parentPort 来声称自动 discovery。',
+      '不要把关闭该 Peer 当作停止 parent execution 的权限。'
+    ]
+  }),
+  'rpc-core:adapter-threads:createAdapterWebThreadLauncher': createStorageContractGuide({
+    purposeEn:
+      'Creates a Web Worker launcher from the actual Worker constructor and supplied runtime policy. The returned handle retains its prepared Promise and complete open operation. Web termination cannot prove execution has stopped; the supervisor must retain abandoned execution leases instead of inventing a confirmed exit.',
+    purposeZh:
+      '从实际 Worker constructor 与传入 runtime policy 创建 Web Worker launcher。返回 handle 保留 prepared Promise 与完整 open 操作；Web termination 不能证明 execution 已停止，supervisor 必须保留 abandoned execution leases，不能编造已确认退出。',
+    quickStart:
+      "import { createAdapterWebThreadLauncher } from '@migaia/rpc-core/adapter/threads'\n\n/** Options carry the deployment's actual Worker constructor, not a copied handle. */\nexport async function launchOwnedWebWorker(\n  options: Parameters<typeof createAdapterWebThreadLauncher>[0],\n  spec: Parameters<ReturnType<typeof createAdapterWebThreadLauncher>['launch']>[0],\n  context: Parameters<ReturnType<typeof createAdapterWebThreadLauncher>['launch']>[1]\n) {\n  const launcher = createAdapterWebThreadLauncher(options)\n  const handle = await launcher.launch(spec, context)\n  // Pass this exact handle to the supervisor; it owns open, release and abandoned leases.\n  console.log(handle.identity)\n  return handle\n}",
+    scenariosEn: [
+      'A browser runtime adapter provides the actual Worker constructor for its deployment.',
+      'A supervisor must preserve prepared/open ordering and abandoned Web execution leases.'
+    ],
+    scenariosZh: [
+      '浏览器 runtime adapter 提供部署环境的实际 Worker constructor。',
+      'supervisor 需要保留 prepared/open 顺序与 abandoned Web execution leases。'
+    ],
+    avoidEn: [
+      'Do not report a terminate request as proof of stopped Web execution.',
+      'Use rpc-threads/adapters/browser when no custom Worker runtime is required.'
+    ],
+    avoidZh: [
+      '不要把 terminate 请求报告为 Web execution 已停止的证明。',
+      '不需要自定义 Worker runtime 时使用 rpc-threads/adapters/browser。'
+    ]
+  }),
+  'rpc-core:adapter-threads:createThreadPeer': createStorageContractGuide({
+    purposeEn:
+      'Constructs the thread-side symmetric Peer from a caller-held runtime module resource and validated library bootstrap. The actual platform context grants automatic discovery; request, notify and stream stay in the canonical Remote owner, and close releases the connection without terminating an unrelated Worker.',
+    purposeZh:
+      '从调用方持有的 runtime module resource 与已校验库 bootstrap 构造 thread-side 对称 Peer。真实 platform context 授予自动 discovery；request、notify 与 stream 仍归规范 Remote owner，close 释放连接，不终止无关 Worker。',
+    quickStart:
+      "import { createThreadPeer } from '@migaia/rpc-core/adapter/threads'\n\n/** The adapter supplies its real runtime acquisition resource and an exposed method. */\nexport async function requestViaThreadRuntime(\n  options: Parameters<typeof createThreadPeer>[0],\n  runtime: Parameters<typeof createThreadPeer>[1],\n  method: string, payload: unknown\n) {\n  const peer = await createThreadPeer(options, runtime)\n  try { return await peer.request(method, payload) }\n  finally { await peer.close() }\n}",
+    scenariosEn: [
+      'A third-party thread runtime reuses the canonical symmetric Peer construction.',
+      'Child-side bootstrap and physical platform context must remain in their original owner.'
+    ],
+    scenariosZh: [
+      '第三方 thread runtime 复用规范对称 Peer 构造。',
+      'child-side bootstrap 与物理 platform context 必须留在原 owner。'
+    ],
+    avoidEn: [
+      'Ordinary application code should use the rpc-threads Peer factory.',
+      'Do not use business data or an owned label as evidence of native platform provenance.'
+    ],
+    avoidZh: [
+      '普通应用代码应使用 rpc-threads Peer 工厂。',
+      '不要用业务 data 或 owned 标签证明 native platform provenance。'
+    ]
+  }),
+  'rpc-core:adapter-threads:createThreadPlugin': createStorageContractGuide({
+    purposeEn:
+      'Creates the thread Plugin definition using the actual runtime resource and either symmetric or advanced thread options. Host installation shares the canonical thread slot, supervision and Remote retry owner; resources activate and publish at the original install commit and release through that Host scope.',
+    purposeZh:
+      '使用实际 runtime resource 及对称或高级 thread options 创建 Plugin definition。Host 安装共享规范 thread slot、supervision 与 Remote retry owner；资源在原 install commit 激活和发布，通过同一 Host scope 释放。',
+    quickStart:
+      "import { createThreadPlugin } from '@migaia/rpc-core/adapter/threads'\n\n/** Install this definition through the actual Host operation owned by the deployment. */\nexport async function installCustomThreadPlugin(\n  options: Parameters<typeof createThreadPlugin>[0],\n  runtime: Parameters<typeof createThreadPlugin>[1],\n  install: (plugin: ReturnType<typeof createThreadPlugin>) => PromiseLike<void>\n) {\n  const plugin = createThreadPlugin(options, runtime)\n  await install(plugin)\n}",
+    scenariosEn: [
+      'A custom thread runtime integrates its owned launcher with an existing Host.',
+      'Advanced thread supervision must share the original Remote assembly and retry owner.'
+    ],
+    scenariosZh: [
+      '自定义 thread runtime 把自有 launcher 集成到既有 Host。',
+      '高级 thread supervision 需要共享原 Remote 装配与 retry owner。'
+    ],
+    avoidEn: [
+      'Do not publish a thread slot before the actual install batch commits.',
+      'Use the rpc-threads Plugin factory when no custom runtime resource is required.'
+    ],
+    avoidZh: [
+      '不要在实际 install batch commit 前发布 thread slot。',
+      '不需要自定义 runtime resource 时使用 rpc-threads Plugin 工厂。'
+    ]
+  }),
+  'rpc-core:adapter-threads:readThreadBootstrap': createStorageContractGuide({
+    purposeEn:
+      'Reads the actual Node workerData or Web bootstrap wrapper and returns only its accepted peer address and portable business data. Invalid wrappers reject without creating a connection; the wrapper is not retained in business configuration and supplies no native lifetime ownership on its own.',
+    purposeZh:
+      '读取实际 Node workerData 或 Web bootstrap wrapper，只返回已采纳 peer 地址与 portable 业务 data。非法 wrapper 在建立连接前拒绝；wrapper 不进入业务配置，其自身不提供 native lifetime ownership。',
+    quickStart:
+      "import { workerData } from 'node:worker_threads'\nimport { readThreadBootstrap } from '@migaia/rpc-core/adapter/threads'\n\n// Read the real library-launched Worker's addressing/data wrapper.\nconst bootstrap = readThreadBootstrap(workerData)\nconsole.log(bootstrap.peerId)\n// Pass only the portable data to business configuration, not the bootstrap wrapper.\nconst configuration = bootstrap.data\nconsole.log(configuration)",
+    scenariosEn: [
+      'A library-launched Worker needs its accepted peer address before starting the service.',
+      'Separate portable business configuration from the native addressing wrapper.'
+    ],
+    scenariosZh: [
+      '库启动的 Worker 在服务启动前需要已采纳 peer 地址。',
+      '将 portable 业务配置与 native addressing wrapper 分离。'
+    ],
+    avoidEn: [
+      'Do not copy the wrapper into application configuration or persistent secrets.',
+      'Do not treat parsed peer labels as authentication or execution ownership.'
+    ],
+    avoidZh: [
+      '不要把 wrapper 复制到应用配置或持久化 secrets 中。',
+      '不要把解析出的 peer 标签当作鉴权或 execution ownership。'
+    ]
+  }),
+  'rpc-core:adapter-threads:receiveThreadData': createStorageContractGuide({
+    purposeEn:
+      'Receives portable startup data and peer address on the actual Web message port, removes its bootstrap listener, then awaits service preparation before acknowledging readiness. A preparation rejection remains a startup failure; the returned value is business data, not a Worker ownership receipt.',
+    purposeZh:
+      '在实际 Web message port 上接收 portable startup data 与 peer 地址，移除 bootstrap listener，并等待服务准备后才发送 readiness acknowledgement。prepare 拒绝仍是 startup failure；返回值是业务 data，不是 Worker ownership receipt。',
+    quickStart:
+      "import { receiveThreadData } from '@migaia/rpc-core/adapter/threads'\n\n/** The supplied preparation callback installs the actual service before readiness ACK. */\nexport async function receivePreparedWorkerData(\n  port: Parameters<typeof receiveThreadData>[0],\n  prepareService: Parameters<typeof receiveThreadData>[1]\n) {\n  const data = await receiveThreadData(port, async (input, peerId) => {\n    await prepareService(input, peerId)\n    console.log('prepared peer:', peerId)\n  })\n  return data\n}",
+    scenariosEn: [
+      'A Web Worker must finish installing its service before acknowledging startup.',
+      'The application needs only portable input after addressing admission and listener removal.'
+    ],
+    scenariosZh: [
+      'Web Worker 必须完成服务安装后才确认 startup。',
+      '应用在地址准入与 listener 移除后只需要 portable input。'
+    ],
+    avoidEn: [
+      'Do not acknowledge readiness before the preparation Promise fulfills.',
+      'Do not add a competing listener that consumes the same bootstrap message.'
+    ],
+    avoidZh: [
+      '不要在 preparation Promise 完成前确认 readiness。',
+      '不要另装竞争 listener 消费同一条 bootstrap message。'
+    ]
+  }),
+  'rpc-core:adapter-web-streams:createAdapterWebByteIO': createStorageContractGuide({
+    purposeEn:
+      'Constructs ordered byte I/O from the actual readable and writable Web Streams, keeping the original owned reader/writer scope. createAdapterChannel adds the protocol handshake on this same I/O. Closing releases stream resources; it does not terminate the external execution owner or assert native replay ownership.',
+    purposeZh:
+      '从实际 readable 与 writable Web Streams 构造有序 byte I/O，保留原 owned reader/writer scope；createAdapterChannel 在同一 I/O 上加入 protocol handshake。close 释放 stream 资源，不终止外部 execution owner，也不声明 native replay ownership。',
+    quickStart:
+      "import { createAdapterWebByteIO } from '@migaia/rpc-core/adapter/web-streams'\nimport { createAdapterChannel, type IProcessByteOptions } from '@migaia/rpc-core/adapter'\n\n/** These streams belong to the already established deployment connection. */\nexport async function establishWebStreamAdapter(readable: ReadableStream<Uint8Array>, writable: WritableStream<Uint8Array>, options: IProcessByteOptions) {\n  const raw = createAdapterWebByteIO(readable, writable)\n  const channel = await createAdapterChannel(raw, options)\n  console.log(channel.peerId)\n  // The connection owner retains this channel and later awaits channel.close().\n  return channel\n}",
+    scenariosEn: [
+      'A Web Streams carrier has acquired the real ordered reader and writer.',
+      'A custom byte adapter needs canonical stream cleanup and channel framing.'
+    ],
+    scenariosZh: [
+      'Web Streams carrier 已获取真实有序 reader 与 writer。',
+      '自定义 byte adapter 需要规范 stream cleanup 与 channel framing。'
+    ],
+    avoidEn: [
+      'Do not acquire another reader or writer over streams already owned by this scope.',
+      'Do not infer native execution or replay qualification from stream shapes.'
+    ],
+    avoidZh: [
+      '不要在该 scope 已拥有的 streams 上再获取 reader 或 writer。',
+      '不要从 stream 形状推导 native execution 或 replay 资格。'
+    ]
+  }),
+  'rpc-core:features-provider:createProviderAdmissionScope': createStorageContractGuide({
+    purposeEn:
+      'Creates one lazy caller-owned provider quota handle for explicit sharing between endpoints. The first actual attachment selects its initial limits; constrain after readiness only tightens them, while cold constrain validates without storing policy. clear removes occupancy owned by this handle without granting access to another registry.',
+    purposeZh:
+      '创建一个 lazy 调用方所有的 provider quota handle，供 endpoint 显式共享。第一次实际 attachment 决定初始 limits；ready 后 constrain 只收紧，cold constrain 只校验而不保存策略；clear 清理该 handle 所属占用，不取得其他 registry 的访问权。',
+    quickStart:
+      "import { createRuntimeApiEndpoint } from '@migaia/rpc-core'\nimport { createProviderAdmissionScope } from '@migaia/rpc-core/features/provider'\n\n/** Share the exact quota handle with a channel whose framing permits shared admission. */\nexport async function requestWithProviderQuota(\n  config: Parameters<typeof createRuntimeApiEndpoint>[0],\n  channel: Parameters<typeof createRuntimeApiEndpoint>[1],\n  method: string, payload: unknown\n) {\n  const admission = createProviderAdmissionScope()\n  const endpoint = createRuntimeApiEndpoint(config, channel, admission)\n  try {\n    await endpoint.ready\n    admission.constrain(32, 8) // Applied after real attachment; cold constrain would not persist.\n    return await endpoint.request(method, payload)\n  } finally {\n    await endpoint.dispose()\n    admission.clear()\n  }\n}",
+    scenariosEn: [
+      'Several physical endpoint sessions must share one logical provider quota handle.',
+      'Tighten an attached provider budget after readiness without replacing its owner.'
+    ],
+    scenariosZh: [
+      '多个物理 endpoint sessions 需要共享同一逻辑 provider quota handle。',
+      'ready 后收紧已 attachment 的 provider budget，不替换原 owner。'
+    ],
+    avoidEn: [
+      'Do not expect constrain on an unattached handle to save the initial policy.',
+      'Do not reconstruct a structural scope or use clear to access another registry.'
+    ],
+    avoidZh: [
+      '不要期待未 attachment 的 handle 通过 constrain 保存初始策略。',
+      '不要重建结构相似的 scope，或用 clear 访问其他 registry。'
+    ]
+  }),
+  'rpc-core:remote:createManagedRuntimePeer': createStorageContractGuide({
+    purposeEn:
+      'Builds the callable runtime Peer on the actual Remote binding and its original generation/resource owners. It reuses the existing retry port and deadline cap rather than adding a second retry path. Preparation owns only explicitly supplied resources; close releases that captured binding without choosing a different execution generation.',
+    purposeZh:
+      '在实际 Remote binding 与原 generation/resource owners 上建立可调用 runtime Peer，复用原 retry port 与 deadline cap，不增加第二条 retry 路径。prepare 只拥有明确传入资源；close 释放捕获 binding，不选择另一 execution generation。',
+    quickStart:
+      "import { createManagedRuntimePeer } from '@migaia/rpc-core/remote'\n\n/** The binding comes from the original managed Remote generation. */\nexport async function requestManagedGeneration(\n  options: Parameters<typeof createManagedRuntimePeer>[0],\n  binding: Parameters<typeof createManagedRuntimePeer>[1],\n  method: string, payload: unknown\n) {\n  const peer = await createManagedRuntimePeer(options, binding)\n  try { return await peer.request(method, payload) }\n  finally { await peer.close() }\n}",
+    scenariosEn: [
+      'A platform integration already owns a managed Remote binding and its accepted generation.',
+      'Runtime call semantics must share the existing retry and resource release owners.'
+    ],
+    scenariosZh: [
+      'platform 集成已持有 managed Remote binding 与已采纳 generation。',
+      'runtime 调用语义需要共享既有 retry 与 resource release owners。'
+    ],
+    avoidEn: [
+      'Do not retry a possibly committed call through a new binding without its original outcome policy.',
+      'Do not supply a copied generation or another process handle as ownership proof.'
+    ],
+    avoidZh: [
+      '不要绕过原 outcome 策略，在新 binding 上重试可能已 commit 的调用。',
+      '不要将复制的 generation 或其他 process handle 作为 ownership proof。'
+    ]
+  }),
+  'rpc-core:remote:createRuntimePeer': createStorageContractGuide({
+    purposeEn:
+      'Validates the caller-supplied source and method declarations before constructing a symmetric request/notify/stream Peer. It uses one canonical provider/outbound/stream closure; construction failure closes only acquired resources and retains the primary failure, while close ends the resulting connection through its original resource owner.',
+    purposeZh:
+      '先校验调用方的 source 与 method 声明，再构造对称 request/notify/stream Peer。它复用单一规范 provider/outbound/stream closure；构造失败只关闭实际获取的资源并保留 primary failure，close 通过原 resource owner 结束返回连接。',
+    quickStart:
+      "import { createRuntimePeer } from '@migaia/rpc-core/remote'\n\n/** Options provide the actual spawn/connect/listen source and declared methods. */\nexport async function requestCustomRuntime(options: Parameters<typeof createRuntimePeer>[0], method: string, payload: unknown) {\n  const peer = await createRuntimePeer(options)\n  try { return await peer.request(method, payload) }\n  finally { await peer.close() }\n}",
+    scenariosEn: [
+      'A custom runtime assembles an actual channel source with explicit method declarations.',
+      'A symmetric peer needs shared provider, outbound and stream ownership without platform duplication.'
+    ],
+    scenariosZh: [
+      '自定义 runtime 组合实际 channel source 与明确 method 声明。',
+      '对称 peer 需要共享 provider、outbound 与 stream ownership，不复制平台实现。'
+    ],
+    avoidEn: [
+      'Use native Process/Thread Peer factories when they already own the required source.',
+      'Do not turn a copied channel label or bootstrap object into source authority.'
+    ],
+    avoidZh: [
+      '原生 Process/Thread Peer 工厂已拥有所需 source 时优先使用它们。',
+      '不要把复制的 channel label 或 bootstrap object 变成 source 权限。'
+    ]
+  }),
+  'rpc-core:remote:createRuntimePlugin': createStorageContractGuide({
+    purposeEn:
+      'Creates the managed runtime Plugin definition from the actual options and canonical slot resource. The original Host install batch owns registration and connection lifetime; the shared slot becomes visible only at the same commit that publishes this Plugin, and uninstall releases the acquired resources through that scope.',
+    purposeZh:
+      '使用实际 options 与规范 slot resource 创建 managed runtime Plugin definition。原 Host install batch 拥有 registration 与 connection lifetime；shared slot 只在发布该 Plugin 的同一次 commit 可见，uninstall 通过同一 scope 释放已获取资源。',
+    quickStart:
+      "import { createRuntimePlugin } from '@migaia/rpc-core/remote'\n\n/** Host installation, not this definition constructor, commits the shared slot. */\nexport async function installRuntimeConnection(\n  options: Parameters<typeof createRuntimePlugin>[0],\n  slotResource: Parameters<typeof createRuntimePlugin>[1],\n  install: (plugin: ReturnType<typeof createRuntimePlugin>) => PromiseLike<void>\n) {\n  const plugin = createRuntimePlugin(options, slotResource)\n  await install(plugin)\n}",
+    scenariosEn: [
+      'A platform runtime integrates one real managed connection with its canonical Host slot.',
+      'Plugin registration and shared-slot publication must commit in the original install batch.'
+    ],
+    scenariosZh: [
+      'platform runtime 将一条真实 managed connection 集成到规范 Host slot。',
+      'Plugin registration 与 shared-slot publication 必须在原 install batch 同时 commit。'
+    ],
+    avoidEn: [
+      'Do not publish a shared slot or start resources outside the Host installation scope.',
+      'Use the native Process/Thread Plugin factory when the platform owner already supplies this assembly.'
+    ],
+    avoidZh: [
+      '不要在 Host installation scope 外发布 shared slot 或启动资源。',
+      'platform owner 已提供此装配时使用原生 Process/Thread Plugin 工厂。'
+    ]
+  }),
   'capability:graph-dependency:collectPlanEdges': createStorageContractGuide({
     purposeEn:
       'Collects required edges inside the affected set and optional edges touching affected providers in canonical consumer order. It reads the topology only and never starts or releases a node.',
@@ -3626,19 +4477,22 @@ const runtimeCompletionApiGuides = {
 
 /** RPC constants reuse the existing shape-aware reference guide without callable fallback prose. */
 const rpcConstantGuides = Object.fromEntries(
-  Object.entries(rpcReferences).flatMap(([library, reference]) => reference.apis.flatMap((api) =>
-    api.symbols
-      .filter(
-        (symbol) => symbol.kind === 'const' && !isCallableApiSymbol(symbol as unknown as IApiSymbol)
-      )
-      .map((symbol) => [
-        `${library}:${api.module.replaceAll('/', '-')}:${symbol.name}`,
-        {
-          en: createSupportingContractGuide(library, symbol, 'en'),
-          zh: createSupportingContractGuide(library, symbol, 'zh')
-        }
-      ])
-  ))
+  Object.entries(rpcReferences).flatMap(([library, reference]) =>
+    reference.apis.flatMap((api) =>
+      api.symbols
+        .filter(
+          (symbol) =>
+            symbol.kind === 'const' && !isCallableApiSymbol(symbol as unknown as IApiSymbol)
+        )
+        .map((symbol) => [
+          `${library}:${api.module.replaceAll('/', '-')}:${symbol.name}`,
+          {
+            en: createSupportingContractGuide(library, symbol, 'en'),
+            zh: createSupportingContractGuide(library, symbol, 'zh')
+          }
+        ])
+    )
+  )
 )
 
 const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, IApiGuide>>>>> = {
@@ -27130,12 +27984,11 @@ export function findApiGuide(
       : undefined))?.[locale]
   /** Option translations belong to the same canonical guide, not a second rendered description. */
   /** Existing extracted RPC fields keep their exact names and gain only maintained localized prose. */
-  const rpcFields =
-    rpcReferences[library]
-      ? (rpcReferences[library].apis
-          .find((api) => api.module === moduleName)
-          ?.symbols.find((symbol) => symbol.name === symbolName)?.configuration ?? [])
-      : []
+  const rpcFields = rpcReferences[library]
+    ? (rpcReferences[library].apis
+        .find((api) => api.module === moduleName)
+        ?.symbols.find((symbol) => symbol.name === symbolName)?.configuration ?? [])
+    : []
   const guide = storedGuide && {
     ...storedGuide,
     options: [
