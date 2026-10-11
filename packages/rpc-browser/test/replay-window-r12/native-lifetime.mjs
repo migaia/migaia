@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { setTimeout as delay } from 'node:timers/promises'
-import { nativeSession } from '../../../rpc-core/test/replay-window-r12/native-harness.mjs'
+import { nativeSession } from '../../../rpc-integration/test/replay-window-r12/native-harness.mjs'
 import { createNodeMessagePortTransport } from '@migaia/rpc-core/adapters/message-port'
 import { createEndpoint } from '@migaia/rpc-core'
 import { codec } from '@migaia/rpc-core'

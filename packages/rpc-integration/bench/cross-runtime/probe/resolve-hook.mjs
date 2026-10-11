@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 /** Fixture imports use RPC's declared dependencies rather than incidental root hoisting. */
 const rpcParentURL = new URL('../../../../rpc-core/src/core/index.ts', import.meta.url).href
 /** Limit package anchoring to scratch fixtures; package modules keep their own dependency scope. */
-const fixtureRootURL = new URL('../', import.meta.url).href
+const fixtureRootURL = new URL('..', import.meta.url).href
 
 /**
  * Resolve fixture workspace dependencies from RPC and relative .js imports from TS source. Package

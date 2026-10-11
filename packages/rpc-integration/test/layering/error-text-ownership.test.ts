@@ -11,7 +11,7 @@ const packageRoots = [
   'rpc-threads',
   'rpc-bridge-jsonrpc',
   'rpc-browser'
-].map((owner) => resolve(import.meta.dirname, '../../../', owner, 'src'))
+].map((owner) => resolve(import.meta.dirname, '../../..', owner, 'src'))
 
 /** Preserve semantic text-owner labels after neutral adapter bodies moved into Core. */
 function sourceLabel(root: string, path: string): string {

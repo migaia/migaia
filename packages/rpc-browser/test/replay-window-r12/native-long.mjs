@@ -13,7 +13,7 @@ import { createHash } from 'node:crypto'
 import { resolve, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { performance } from 'node:perf_hooks'
-import { nativeSession } from '../../../rpc-core/test/replay-window-r12/native-harness.mjs'
+import { nativeSession } from '../../../rpc-integration/test/replay-window-r12/native-harness.mjs'
 import {
   nativeSample,
   classifyFailure,

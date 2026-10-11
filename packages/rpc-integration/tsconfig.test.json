@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "allowJs": true,
     "noEmit": true,
     "types": ["vite/client", "vitest/globals", "node"]
   },

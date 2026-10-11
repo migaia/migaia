@@ -99,8 +99,6 @@
     "vitest": "^4.1.10",
     "@migaia/rpc-contract": "workspace:0.0.7",
     "@migaia/rpc-core": "workspace:0.0.7",
-    "@migaia/rpc-bridge-jsonrpc": "workspace:0.0.7",
-    "@migaia/rpc-threads": "workspace:0.0.7",
     "@migaia/serialize": "workspace:^"
   },
   "engines": {

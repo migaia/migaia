@@ -16,7 +16,7 @@ import { execFileSync } from 'node:child_process'
 import { CrossRuntimeErrorText } from '../error-text.mjs'
 
 /** All writes stay inside the handed-off fixture directory. */
-const wt = resolve(fileURLToPath(new URL('../../../../', import.meta.url)))
+const wt = resolve(fileURLToPath(new URL('../../../..', import.meta.url)))
 /** The final owner supplies the exact current source commit before any fixture writes. */
 const expected = process.env.FINAL_SOURCE_HEAD
 if (!/^[0-9a-f]{40}$/.test(expected ?? ''))
@@ -281,7 +281,7 @@ for (const mode of ['plain', 'count']) {
   manifest.trees[mode] = { root: target, items: rows, manifestSHA256: hash(JSON.stringify(rows)) }
 }
 for (const runtime of ['python', 'go', 'rust']) {
-  const from = join(wt, 'packages/rpc-process/test/process/peers', runtime),
+  const from = join(wt, 'packages/rpc-integration/test/process/peers', runtime),
     to = join(root, 'fixture/foreign', runtime)
   cpSync(from, to, {
     recursive: true,

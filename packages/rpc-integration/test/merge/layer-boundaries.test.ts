@@ -5,7 +5,7 @@ import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 
 /** Source root whose dependency direction is enforced by A2. */
-const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../src')
+const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-core/src')
 /** Actual independent owner roots make the source-tree assertion non-vacuous after physical split. */
 const ownerRoots = [
   'rpc-contract',
@@ -14,7 +14,7 @@ const ownerRoots = [
   'rpc-threads',
   'rpc-bridge-jsonrpc',
   'rpc-browser'
-].map((owner) => ({ owner, root: resolve(import.meta.dirname, '../../../', owner, 'src') }))
+].map((owner) => ({ owner, root: resolve(import.meta.dirname, '../../..', owner, 'src') }))
 /** Ordinary package entries are checked against real manifests, never against a wildcard path. */
 const ordinaryRpcEntries = new Set(
   ownerRoots.flatMap(({ root }) => {

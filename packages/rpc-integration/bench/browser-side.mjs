@@ -7,7 +7,7 @@ import { join, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createMacPidObserver } from './bare-node.mjs'
 import { nearestRank } from './ipc.mjs'
-import { BrowserBenchText as text } from '../../rpc-core/test/core/fixtures/da1-browser/text.mjs'
+import { BrowserBenchText as text } from '../test/core/fixtures/da1-browser/text.mjs'
 
 /**
  * Measure one real Chromium page/Worker pair, excluding the Node driver and trace from timing.
@@ -29,10 +29,7 @@ export async function runBrowserSide(unit, side, options) {
     ['page', 'worker'].map((role) => [
       role + '-' + side,
       fileURLToPath(
-        new URL(
-          '../../rpc-core/test/core/fixtures/da1-browser/' + role + '-' + side + '.mjs',
-          import.meta.url
-        )
+        new URL('../test/core/fixtures/da1-browser/' + role + '-' + side + '.mjs', import.meta.url)
       )
     ])
   )

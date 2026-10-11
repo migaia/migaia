@@ -1,7 +1,7 @@
 import { IpcBenchErrorText } from './error-text.mjs'
 import { fileURLToPath } from 'node:url'
 import { writeFileSync } from 'node:fs'
-import { createIpcSession } from '../../rpc-core/test/bench/ipc-session.mjs'
+import { createIpcSession } from '../test/bench/ipc-session.mjs'
 import { createMacPidObserver } from './bare-node.mjs'
 import { measureBare } from './ipc.mjs'
 import { snapshot } from './observe.mjs'

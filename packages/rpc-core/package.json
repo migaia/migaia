@@ -176,11 +176,7 @@
     "vitest": "^4.1.10",
     "@migaia/rpc-contract": "workspace:0.0.7",
     "@migaia/capability": "workspace:^",
-    "@migaia/middleware-pipeline": "workspace:^",
-    "@migaia/rpc-bridge-jsonrpc": "workspace:0.0.7",
-    "@migaia/rpc-browser": "workspace:0.0.7",
-    "@migaia/rpc-process": "workspace:0.0.7",
-    "@migaia/rpc-threads": "workspace:0.0.7"
+    "@migaia/middleware-pipeline": "workspace:^"
   },
   "engines": {
     "node": ">=18"

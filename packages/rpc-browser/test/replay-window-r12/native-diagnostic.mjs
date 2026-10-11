@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { nativeSession } from '../../../rpc-core/test/replay-window-r12/native-harness.mjs'
+import { nativeSession } from '../../../rpc-integration/test/replay-window-r12/native-harness.mjs'
 import { executionCounters } from '../../../rpc-core/test/replay-window-r12/native-counters.mjs'
 import { loadedModules } from './native-loaded.mjs'
 import { assertClosureFresh } from '../../../../scripts/dist-stamp.mjs'
