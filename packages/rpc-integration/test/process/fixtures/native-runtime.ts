@@ -8,7 +8,7 @@ import { framer } from '@migaia/rpc-core'
 import { ping } from '@migaia/rpc-core'
 import type { IRpcEndpoint } from '@migaia/rpc-core'
 import type { IRemoteChannel, IRemoteServeEndpoint } from '@migaia/rpc-core/remote'
-import type { IProcessServeEndpointFactory } from '@migaia/rpc-core/adapter/process'
+import type { IProcessServeEndpointFactory } from '@migaia/rpc-process'
 import type { IProcessByteChannel } from '@migaia/rpc-process'
 
 /** Ordered byte ports exercise the real native handshake and core endpoint without a second codec. */

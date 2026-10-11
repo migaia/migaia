@@ -6,9 +6,9 @@ import {
   listenProcessByteChannel
 } from '@migaia/rpc-process/adapters/node-socket'
 import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '../../../rpc-core/dist/adapter-owned/process/offer.js'
-import { listenProcessRegistrations } from '../../../rpc-core/dist/adapter-owned/process/resilience/rendezvous.js'
-import { createProcessSessionManager } from '../../../rpc-core/dist/adapter-owned/process/resilience/session.js'
+import { createNativeProcessOffer } from '../../../rpc-process/dist/process/offer.js'
+import { listenProcessRegistrations } from '../../../rpc-process/dist/process/resilience/rendezvous.js'
+import { createProcessSessionManager } from '../../../rpc-process/dist/process/resilience/session.js'
 import type { IProcessSessionLease } from '@migaia/rpc-process'
 
 /** Each transport carries a distinct physical-session identity. */

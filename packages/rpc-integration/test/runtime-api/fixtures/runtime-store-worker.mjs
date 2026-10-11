@@ -3,24 +3,22 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import { createRuntimePeer } from '@migaia/rpc-core/remote'
 import { prepareRuntimePeerEndpoint } from '../../../../rpc-core/dist/remote/runtime-api/peer.js'
 import { createRpcIdempotencyStore } from '@migaia/rpc-core'
-import { retainRuntimeIdempotencyScope } from '../../../../rpc-core/dist/core/internal/provider.js'
+import { createRuntimeProviderScope } from '@migaia/rpc-core/adapter'
 import { readFileSync, appendFileSync } from 'node:fs'
 import { RUNTIME_API_CAPABILITIES } from '../../../../rpc-core/dist/remote/runtime-api/constants.js'
-import {
-  readThreadRuntimeBootstrap,
-  intersectThreadCapabilities
-} from '../../../../rpc-core/dist/adapter-owned/threads/bootstrap.js'
-import { createNodeThreadBootstrapHandoff } from '../../../../rpc-core/dist/adapter-owned/threads/receive-handoff.js'
-import { constructNodeThreadChannel as createNodeThreadChannel } from '../../../../rpc-core/dist/adapter-owned/threads/channel.js'
-import {
-  ThreadBootstrap,
-  THREAD_RUNTIME_API_VERSION
-} from '../../../../rpc-core/dist/adapter-owned/threads/constants.js'
-import { bindNativeReplayTransport } from '../../../../rpc-core/dist/core/internal/native-replay.js'
+import { createEventEmitterMessageResource } from '@migaia/rpc-core/adapter'
+import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
+import { readAdapterMessagePreparation } from '../../../../rpc-core/dist/runtime-adapter/message/resource.js'
 import '@migaia/rpc-threads/adapters/node'
 
 /** Only the actual native launcher supplies execution identity; fixture offers are explicit. */
-const bootstrap = readThreadRuntimeBootstrap(workerData)
+const resource = createEventEmitterMessageResource(parentPort)
+/** Core admits the actual native initial data once and retains its exact preparation identity. */
+await resource.receiveInitial({ read: () => workerData, direction: 'inbound' })
+/** Existing store/generation observations use the actual Core-held preparation, never copied fields. */
+const preparation = readAdapterMessagePreparation(resource)
+/** The initial metadata came from the same canonical parser used by the real adapter. */
+const bootstrap = preparation.initial
 /** New-profile fixture labels do not change production default declarations. */
 const capabilities = RUNTIME_API_CAPABILITIES
 /** This isolate owns both its actual default store and its actual business execution count. */
@@ -61,31 +59,21 @@ const external = journal
       })
     }
   : undefined
+/** The actual Core channel's inbound native preparation supplies its stable parent scope privately. */
+const runtimeScope = external ? createRuntimeProviderScope(external) : undefined
 /** The actual cold handoff supplies bootstrap ownership only after native acquisition. */
-const resources = { generation: bootstrap.generation, bootstrap: undefined }
+const resources = { generation: bootstrap.generation, bootstrap: preparation }
 await createRuntimePeer(
   {
     self: bootstrap.self,
     /** Retain the original handoff, ACK and channel activation sequence. */
     connect: async () => {
-      const handoff = createNodeThreadBootstrapHandoff(parentPort)
-      resources.bootstrap = handoff
-      parentPort.postMessage({
-        kind: ThreadBootstrap.runtimeAcknowledged,
-        version: THREAD_RUNTIME_API_VERSION,
-        capabilities
+      return resource.open({
+        peerId: bootstrap.parent.instanceId,
+        scheduler: systemScheduler,
+        offer: capabilities,
+        control: rpcMessageCapabilityControl
       })
-      const channel = createNodeThreadChannel(
-        handoff.port,
-        bootstrap.parent.instanceId,
-        {
-          scheduler: systemScheduler,
-          capabilities: intersectThreadCapabilities(capabilities, bootstrap.capabilities)
-        },
-        handoff
-      )
-      bindNativeReplayTransport(parentPort, channel.transport)
-      return channel
     },
     provide: { value: () => ({ executions: ++executions, threadId }) },
     ...(external
@@ -96,14 +84,7 @@ await createRuntimePeer(
               channel,
               signal,
               {
-                idempotency: {
-                  store: external,
-                  /** The original trusted native bootstrap proves this exact stable direct parent. */
-                  scope: retainRuntimeIdempotencyScope(
-                    () => bootstrap.parent.instanceId,
-                    bootstrap.parent.instanceId
-                  )
-                }
+                idempotency: runtimeScope.session(channel, {}).idempotency
               }
             )
         }

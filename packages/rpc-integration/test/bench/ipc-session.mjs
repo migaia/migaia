@@ -832,7 +832,7 @@ async function childMain(side, carrier, address) {
     if (side === 'bare') {
       const { createServer } = await import('node:net')
       const { nodeByteStream } =
-        await import('../../../rpc-core/dist/adapter-owned/process/node-byte-stream.js')
+        await import('../../../rpc-process/dist/process/node-byte-stream.js')
       const server = createServer((socket) => {
         void serveBare(nodeByteStream(socket, socket, () => socket.destroy())).catch((error) => {
           process.stderr.write(String(error))

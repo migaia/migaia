@@ -6,15 +6,16 @@ import type { IRemoteChannel } from '@migaia/rpc-core/remote'
 import {
   createProcessSessionService,
   serveProcessSessions
-} from '../../../rpc-core/dist/adapter-owned/process/plugin/serve.js'
+} from '../../../rpc-process/dist/process/plugin/serve.js'
 import { serveRemotePlugin } from '@migaia/rpc-core/remote'
 import { createProcessResilience } from '@migaia/rpc-process'
-import { createProcessInstanceFallback } from '../../../rpc-core/dist/adapter-owned/process/resilience/fallback.js'
+import { createProcessInstanceFallback } from '../../../rpc-process/dist/process/resilience/fallback.js'
 import type { IProcessServeChildIngress, IProcessServeListenerIngress } from '@migaia/rpc-process'
-import type { IProcessServeEndpointFactory } from '@migaia/rpc-core/adapter/process'
+import type { IProcessServeEndpointFactory } from '@migaia/rpc-process'
 import type { IProcessPendingByteConnection } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '../../../rpc-core/dist/adapter-owned/process/offer.js'
+import { createNativeProcessOffer } from '../../../rpc-process/dist/process/offer.js'
 import type { IProcessSessionIdentity } from '@migaia/rpc-process'
+import { createProcessFixtureChannel } from '../fixtures/process-diagnostics.js'
 
 /** A single request contract lets the test observe per-connection service ownership. */
 const contract = {
@@ -44,26 +45,28 @@ async function targetHost() {
   return { host, targetHandle }
 }
 
-/** A fake accepted channel exposes its terminal notification and close count. */
-function acceptedChannel(id: string) {
+/** Core constructs the accepted channel over this fixture's actual held message subscription. */
+async function acceptedChannel(id: string, closeResource?: () => Promise<void>) {
   /** The callback belongs to this physical connection alone. */
   let onError: ((error: unknown) => void) | undefined
-  const close = vi.fn(async () => undefined)
-  const channel = {
-    peerId: id,
-    scheduler: createManualScheduler(),
-    agreement: { capabilities: [] },
-    transport: {
-      subscribe: () => () => undefined,
-      onTransportError(listener: (error: unknown) => void) {
+  /** Physical close remains observable without copying the Core channel's private identity. */
+  const close = closeResource ?? vi.fn(async () => undefined)
+  /** The held message input is inert until the original service subscribes or injects EOF. */
+  const channel = await createProcessFixtureChannel(
+    {
+      kind: 'message',
+      send: () => undefined,
+      onMessage: () => () => undefined,
+      onClose(listener) {
         onError = listener
         return () => {
           onError = undefined
         }
-      }
+      },
+      close
     },
-    close
-  } as unknown as IRemoteChannel
+    { peerId: id, scheduler: createManualScheduler() }
+  )
   return { channel, close, fail: () => onError?.(new Error('EOF')) }
 }
 
@@ -75,9 +78,9 @@ async function settle(): Promise<void> {
 describe('process plugin service ingress', () => {
   it('[A5] closes the unhealthy shared session and replaces its real Host target', async () => {
     const { host, targetHandle } = await targetHost()
-    const physical = acceptedChannel('first')
-    const second = acceptedChannel('second')
-    const third = acceptedChannel('third')
+    const physical = await acceptedChannel('first')
+    const second = await acceptedChannel('second')
+    const third = await acceptedChannel('third')
     let onConnection: (pending: IProcessPendingByteConnection) => void | Promise<void> = () =>
       undefined
     let unhealthy: (event: { targetName: string; reason: unknown }) => void = () => undefined
@@ -260,8 +263,8 @@ describe('process plugin service ingress', () => {
 
   it('[A2] creates one target Host per authenticated connection', async () => {
     const { host: fallback } = await targetHost()
-    const first = acceptedChannel('first')
-    const second = acceptedChannel('second')
+    const first = await acceptedChannel('first')
+    const second = await acceptedChannel('second')
     const created: Array<Awaited<ReturnType<typeof targetHost>>> = []
     let onConnection!: (pending: IProcessPendingByteConnection) => void | Promise<void>
     const createSessionHost = vi.fn(async (_session: IProcessSessionIdentity) => {
@@ -462,8 +465,8 @@ describe('process plugin service ingress', () => {
 
   it('[A4] gives accepted sessions distinct endpoints and closes only the departed session', async () => {
     const { host, targetHandle } = await targetHost()
-    const first = acceptedChannel('first')
-    const second = acceptedChannel('second')
+    const first = await acceptedChannel('first')
+    const second = await acceptedChannel('second')
     const dispose = [vi.fn(async () => undefined), vi.fn(async () => undefined)]
     const provide = [
       vi.fn((_method: string, _handler: (context: never) => unknown) => undefined),
@@ -596,7 +599,7 @@ describe('process plugin service ingress', () => {
 
   it('[A6] closes a channel that authenticates after the serve handle starts closing', async () => {
     const { host, targetHandle } = await targetHost()
-    const accepted = acceptedChannel('late')
+    const accepted = await acceptedChannel('late')
     /** The pending accept controls the precise close/handshake ordering. */
     let finishAccept!: (value: { channel: IRemoteChannel; principalId: string }) => void
     const authenticated = new Promise<{ channel: IRemoteChannel; principalId: string }>(
@@ -674,7 +677,7 @@ describe('process plugin service ingress', () => {
 
   it('[A6] disposes an endpoint returned after listener close without publishing it', async () => {
     const { host } = await targetHost()
-    const accepted = acceptedChannel('late-endpoint')
+    const accepted = await acceptedChannel('late-endpoint')
     /** The endpoint becomes available only after the handle has begun closing. */
     let finishEndpoint!: (value: { endpoint: IRpcEndpoint }) => void
     const prepared = new Promise<{ endpoint: IRpcEndpoint }>((resolve) => {
@@ -811,13 +814,12 @@ describe('process plugin service ingress', () => {
         { release: () => resilience.close() }
       )
     })()
+    /** Failure belongs to the actual held close operation, rather than a copied channel surface. */
+    const accepted = await acceptedChannel('cleanup', closeChannel)
     try {
       await onConnection({
         accept: async () => ({
-          channel: {
-            ...acceptedChannel('cleanup').channel,
-            close: closeChannel
-          },
+          channel: accepted.channel,
           principalId: 'principal'
         }),
         close: vi.fn(async () => undefined)

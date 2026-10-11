@@ -16,7 +16,7 @@ import { createProcessTransport } from '@migaia/rpc-process'
 import { createNativeProcessOffer } from '@migaia/rpc-process'
 import type { IRuntimePeerSourceContext } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
 import type { IRuntimePluginOptions } from '../../../rpc-core/dist/remote/runtime-api/plugin.js'
-import type { ISpawnProcessPluginDeployment } from '../../../rpc-core/dist/adapter-owned/process/plugin/types.js'
+import type { ISpawnProcessPluginDeployment } from '../../../rpc-process/dist/process/plugin/types.js'
 
 /** A real child loads built public factories independently from the source-side parent Host. */
 const entry = fileURLToPath(new URL('./fixtures/automatic-plugin.mjs', import.meta.url))

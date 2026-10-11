@@ -139,6 +139,8 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'normalizeRuntimeSteps',
       'readRuntimeCarrier',
       'runtimeOperationCapabilities',
+      'rpcByteRuntimeBootstrap',
+      'rpcMessageCapabilityControl',
       'wrapRuntimeCarrier'
     ],
     './runtime/metadata': [
@@ -206,54 +208,34 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
     ]
   },
   'rpc-core': {
-    './adapter': ['createAdapterChannel', 'receiveAdapterBootstrap'],
-    './adapter/node': [
-      'createAdapterChildStdio',
-      'createAdapterProcessStdio',
-      'createAdapterSocketByteIO'
-    ],
-    './adapter/diagnostics': [
+    './adapter': [
       'IpcReporterContext',
-      'RPC_PROCESS_ERROR_SOURCE',
-      'RpcProcessErrorCode'
-    ],
-    './adapter/process-data': [
-      'PROCESS_HANDSHAKE_MAX_FRAME_BYTES',
-      'PROCESS_RUNTIME_API_BOOTSTRAP_KIND',
-      'PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS',
-      'PROCESS_RUNTIME_API_BOOTSTRAP_VERSION',
-      'PROCESS_RUNTIME_API_ENV',
-      'PROCESS_RUNTIME_API_ENV_VERSION',
-      'PROCESS_RUNTIME_API_FINGERPRINT_PREFIX'
-    ],
-    './adapter/web-streams': ['createAdapterWebByteIO'],
-    './adapter/process': [
-      'ProcessPluginWire',
-      'createAdapterProcessLaunch',
-      'createAdapterProcessPeer',
-      'createAdapterProcessPlugin',
-      'createNativeProcessOffer',
-      'createProcessResilience',
-      'parseProcessPluginDescriptor'
-    ],
-    './adapter/process/node': ['createAdapterNodeProcessLaunch'],
-    './adapter/threads': [
-      'AdapterNodeThreadParentChannel',
-      'RPC_THREAD_ERROR_SOURCE',
-      'RpcThreadErrorCode',
-      'createAdapterNodeThreadChannel',
-      'createAdapterNodeThreadChannelFactory',
-      'createAdapterNodeThreadLauncher',
-      'createAdapterNodeThreadPeer',
-      'createAdapterWebThreadChannel',
-      'createAdapterWebThreadChannelFactory',
-      'createAdapterWebThreadLauncher',
-      'createThreadPeer',
-      'createThreadPlugin',
-      'readThreadBootstrap',
-      'receiveThreadData'
-    ],
-    './adapter/jsonrpc': ['createJsonRpcAdapterChannel']
+      'adapterContractRequiresStream',
+      'createAdapterBindingDrain',
+      'createAdapterConfigurationError',
+      'createAdapterConfigurationTypeError',
+      'createAdapterId',
+      'createAdapterPlugin',
+      'createAdapterSourceConfigurationError',
+      'createAdapterTransportError',
+      'createEventEmitterMessageResource',
+      'createEventTargetMessageResource',
+      'createRuntimeByteConnection',
+      'createRuntimeEventByteIO',
+      'createRuntimeMessageConnection',
+      'createRuntimeProviderGovernor',
+      'createRuntimeProviderScope',
+      'holdAdapterLaunch',
+      'holdAdapterObjectChannel',
+      'holdAdapterRegistration',
+      'materializeAdapterJson',
+      'normalizeAdapterDescription',
+      'prepareAdapterPeer',
+      'readAdapterAbortReason',
+      'readRuntimeByteBootstrap',
+      'validateAdapterPeerMethods',
+      'validateAdapterPeerTimeout'
+    ]
   }
 }
 /** C3 retires factories/claim-oriented helpers; ordinary operations now own each violation or state. */
@@ -372,7 +354,7 @@ describe('A1 merged public exports', () => {
     for (const [owner, entries] of Object.entries(ordinaryEntries))
       currentEntries.push(...Object.keys(entries).map((key) => `${owner}:${key}`))
     currentEntries.push('rpc-contract:./schema/wire-error')
-    expect(currentEntries).toHaveLength(72)
+    expect(currentEntries).toHaveLength(64)
     expect(
       Object.entries(manifests)
         .flatMap(([owner, entry]) => Object.keys(entry.exports).map((key) => `${owner}:${key}`))
@@ -517,25 +499,60 @@ describe('A1 merged public exports', () => {
       ).toEqual(
         [
           ...names.filter((name) => name !== 'JsonRpcBridgeErrorText'),
-          'JSONRPC_BRIDGE_ERROR_SOURCE'
+          'JSONRPC_BRIDGE_ERROR_SOURCE',
+          'createJsonRpcAdapterChannel'
         ].sort()
       )
     }
+    /** Former Core Process operations retain one exact namespace at their owning package root. */
     const processEntry = manifests['rpc-process']!.exports['.']!
     expect(
       Object.keys(
         await import(pathToFileURL(join(packageRoot, 'rpc-process', processEntry.default)).href)
-      )
+      ).sort()
     ).toEqual(
-      expect.arrayContaining([
+      [
+        'PROCESS_HANDSHAKE_MAX_FRAME_BYTES',
+        'PROCESS_RUNTIME_API_BOOTSTRAP_KIND',
+        'PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS',
+        'PROCESS_RUNTIME_API_BOOTSTRAP_VERSION',
+        'PROCESS_RUNTIME_API_ENV',
+        'PROCESS_RUNTIME_API_ENV_VERSION',
+        'PROCESS_RUNTIME_API_FINGERPRINT_PREFIX',
+        'ProcessPluginWire',
+        'RPC_PROCESS_ERROR_SOURCE',
+        'RpcProcessErrorCode',
+        'createAdapterChannel',
+        'createAdapterProcessLaunch',
+        'createAdapterProcessPeer',
+        'createAdapterProcessPlugin',
+        'createAdapterWebByteIO',
+        'createNativeProcessOffer',
+        'createProcessChannelClosedError',
         'createProcessPeer',
         'createProcessPlugin',
         'createProcessResilience',
+        'createProcessTransport',
+        'openProcessObjectChannel',
         'parseProcessPluginDescriptor',
-        'ProcessPluginWire',
-        'RPC_PROCESS_ERROR_SOURCE',
-        'RpcProcessErrorCode'
-      ])
+        'receiveAdapterBootstrap'
+      ].sort()
+    )
+    /** Moved raw native operations belong to the already-public native adapter entries. */
+    const nodeProcesses = await import('@migaia/rpc-process/adapters/node-child-process')
+    expect(Object.keys(nodeProcesses).sort()).toEqual(
+      [
+        'createAdapterChildStdio',
+        'createAdapterNodeProcessLaunch',
+        'createAdapterProcessStdio',
+        'createNodeProcessLauncher',
+        'openProcessStdioChannel'
+      ].sort()
+    )
+    /** The socket adapter owns its actual held native stream constructor. */
+    const nodeSockets = await import('@migaia/rpc-process/adapters/node-socket')
+    expect(Object.keys(nodeSockets).sort()).toEqual(
+      ['createAdapterSocketByteIO', 'dialProcessByteChannel', 'listenProcessByteChannel'].sort()
     )
     /** C5 removes text/constructor/lazy aliases without weakening the exact ordinary namespaces. */
     for (const [owner, entries] of Object.entries(manifests)) {
@@ -559,6 +576,29 @@ describe('A1 merged public exports', () => {
     )
     /** Native adapters expose diagnostics at their user-facing package root. */
     const threads = await import('@migaia/rpc-threads')
+    /** Former Core Thread operations now retain one exact owning package namespace. */
+    expect(Object.keys(threads).sort()).toEqual(
+      [
+        'AdapterNodeThreadParentChannel',
+        'RPC_THREAD_ERROR_SOURCE',
+        'RpcThreadErrorCode',
+        'createAdapterNodeThreadLauncher',
+        'createAdapterNodeThreadPeer',
+        'createNodeThreadChannel',
+        'createThreadPeer',
+        'createThreadPlugin',
+        'createWebThreadChannel',
+        'createWebThreadChannelFactory',
+        'createWebThreadLauncher',
+        'readThreadBootstrap',
+        'receiveThreadData'
+      ].sort()
+    )
+    /** The moved Node channel factory uses its already-public native-owner entry. */
+    const nodeThreads = await import('@migaia/rpc-threads/adapters/node')
+    expect(Object.keys(nodeThreads).sort()).toEqual(
+      ['createNodeThreadChannelFactory', 'createNodeThreadLauncher'].sort()
+    )
     expect(threads.RPC_THREAD_ERROR_SOURCE).toBe('@migaia/rpc/threads')
     expect(threads.RpcThreadErrorCode.usageSampleFailed).toBe('THREAD_USAGE_SAMPLE_FAILED')
   })

@@ -1,9 +1,9 @@
 import { PluginHost } from '@migaia/plugin-host'
 import { describe, expect, it, vi } from 'vitest'
 import { createProcessPlugin } from '@migaia/rpc-process'
-import { serveProcessSessions } from '../../../rpc-core/dist/adapter-owned/process/plugin/serve.js'
+import { serveProcessSessions } from '../../../rpc-process/dist/process/plugin/serve.js'
 import { serveRemotePlugin } from '@migaia/rpc-core/remote'
-import { createNativeProcessOffer } from '../../../rpc-core/dist/adapter-owned/process/offer.js'
+import { createNativeProcessOffer } from '../../../rpc-process/dist/process/offer.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 import {
   dialProcessByteChannel,
@@ -12,7 +12,8 @@ import {
 import type { IProcessPendingByteConnection } from '@migaia/rpc-process'
 import type { IRemoteServeEndpoint } from '@migaia/rpc-core/remote'
 import { createProcessResilience } from '@migaia/rpc-process'
-import { processSessionManager } from '../../../rpc-core/dist/adapter-owned/process/resilience/index.js'
+import type { IRuntimeByteConnection } from '@migaia/rpc-core/adapter'
+import { processSessionManager } from '../../../rpc-process/dist/process/resilience/index.js'
 import {
   matrixEndpoint,
   matrixFixture,
@@ -269,17 +270,16 @@ describe('I15 real failure and rollback matrix', () => {
                   accept: async (options) => {
                     const result = await physical.accept(options)
                     if (phase === 'accept') await accepted.promise
-                    return {
-                      ...result,
-                      channel: {
-                        ...result.channel,
-                        close: async () => {
-                          closeCount += 1
-                          await result.channel.close()
-                          throw cleanup
-                        }
+                    /** Keep Core's exact connection; this real cleanup resource owns the failure. */
+                    const channel = result.channel as IRuntimeByteConnection
+                    channel.ownClose({
+                      async close() {
+                        closeCount += 1
+                        await physical.close()
+                        throw cleanup
                       }
-                    }
+                    })
+                    return result
                   }
                 }
                 accepting = Promise.resolve(options.onConnection(pending))

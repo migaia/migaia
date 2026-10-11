@@ -2,18 +2,15 @@ import assert from 'node:assert/strict'
 import { MessageChannel } from 'node:worker_threads'
 import { it } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createAutomaticWebThreadPeer } from '../../../rpc-core/dist/adapter-owned/threads/automatic-peer.js'
-import { constructWebThreadChannel as createWebThreadChannel } from '../../../rpc-core/dist/adapter-owned/threads/channel.js'
-import {
-  createThreadRuntimeBootstrap,
-  readThreadRuntimeAcknowledgement
-} from '../../../rpc-core/dist/adapter-owned/threads/bootstrap.js'
-import { createWebThreadBootstrapHandoff } from '../../../rpc-core/dist/adapter-owned/threads/receive-handoff.js'
-import { ThreadBootstrap } from '../../../rpc-core/dist/adapter-owned/threads/constants.js'
+import { createAutomaticWebThreadPeer } from '../../../rpc-threads/dist/threads/automatic-peer.js'
+import { createThreadRuntimeBootstrap } from '../../../rpc-threads/dist/threads/bootstrap.js'
+import { createEventTargetMessageResource } from '@migaia/rpc-core/adapter'
+import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
+import { ThreadBootstrap } from '../../../rpc-threads/dist/threads/constants.js'
 import { createRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import { createAutomaticProcessPeer } from '../../../rpc-core/dist/adapter-owned/process/automatic-peer.js'
+import { createAutomaticProcessPeer } from '../../../rpc-process/dist/process/automatic-peer.js'
 import type { IThreadWebPort } from '@migaia/rpc-threads'
-import { PROCESS_RUNTIME_API_ENV_VERSION } from '../../../rpc-core/dist/adapter-owned/process/constants.js'
+import { PROCESS_RUNTIME_API_ENV_VERSION } from '../../../rpc-process/dist/process/constants.js'
 
 it('[A2][A3][A17] automatic EventTarget handoff preserves real business and original parent identity', async () => {
   /**
@@ -37,36 +34,22 @@ it('[A2][A3][A17] automatic EventTarget handoff preserves real business and orig
           capabilities: context.capabilities
         }
       )
-      /** Parent preparation waits for the genuine child's accepted offer before activating receive. */
-      let acknowledge!: () => void
-      const acknowledged = new Promise<void>((resolve) => {
-        acknowledge = resolve
-      })
-      /** The original parent capture consumes only the private acknowledgement before dispatch. */
-      const handoff = createWebThreadBootstrapHandoff(ports.port1 as unknown as IThreadWebPort, {
-        consume: (message) => {
-          if (Reflect.get(message as object, 'kind') !== ThreadBootstrap.runtimeAcknowledged)
-            return false
-          readThreadRuntimeAcknowledgement(message)
-          acknowledge()
-          return true
-        }
-      })
-      ports.port1.postMessage({
+      /** The real parent port gives Core the original cold capture and observed child ACK. */
+      const resource = createEventTargetMessageResource(ports.port1 as unknown as IThreadWebPort)
+      /** Actual outbound launch data remains a local proposal rather than an accepted claim. */
+      const initial = {
         kind: ThreadBootstrap.data,
         peerId: bootstrap.self.instanceId,
         runtimeApi: bootstrap
+      }
+      resource.prepareControl(context.capabilities, { read: () => initial, direction: 'outbound' })
+      ports.port1.postMessage(initial)
+      return resource.open({
+        peerId: bootstrap.self.instanceId,
+        scheduler: systemScheduler,
+        offer: context.capabilities,
+        control: rpcMessageCapabilityControl
       })
-      await acknowledged
-      return createWebThreadChannel(
-        handoff.port,
-        bootstrap.self.instanceId,
-        {
-          scheduler: systemScheduler,
-          capabilities: context.capabilities
-        },
-        handoff
-      )
     },
     report: (error) => failures.push(error)
   })
@@ -92,16 +75,17 @@ it('[A1][A3] automatic Web source rejects explicit sources and malformed bootstr
   let calls = 0
   try {
     await assert.rejects(
-      createAutomaticWebThreadPeer(
-        {
-          connect: async () => {
-            calls++
-            throw new Error('source must not execute')
+      async () =>
+        createAutomaticWebThreadPeer(
+          {
+            connect: async () => {
+              calls++
+              throw new Error('source must not execute')
+            },
+            report: () => undefined
           },
-          report: () => undefined
-        },
-        ports.port2 as unknown as IThreadWebPort
-      ),
+          ports.port2 as unknown as IThreadWebPort
+        ),
       { code: 'INVALID_CONFIG' }
     )
     assert.equal(calls, 0)

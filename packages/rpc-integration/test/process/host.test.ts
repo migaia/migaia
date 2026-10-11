@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { hostFixture, runtimeHostFixture } from './fixtures/host-control.js'
-import * as bindingModule from '../../../rpc-core/dist/adapter-owned/process/plugin/binding.js'
+import * as bindingModule from '../../../rpc-process/dist/process/plugin/binding.js'
 import { nativeHostFixture } from './fixtures/host-native.js'
 import { createProcessPlugin } from '@migaia/rpc-process'
 import { createRemoteHost } from '@migaia/rpc-core/remote'

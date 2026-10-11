@@ -43,10 +43,7 @@ const inwardOwners: Record<string, readonly string[]> = {
 function logicalPath(file: string): string {
   const entry = ownerRoots.find(({ root }) => file.startsWith(root + sep))
   return entry
-    ? relative(entry.root, file)
-        .split(sep)
-        .join('/')
-        .replace(/^adapter-owned\//u, '')
+    ? relative(entry.root, file).split(sep).join('/')
     : relative(sourceRoot, file).split(sep).join('/')
 }
 

@@ -1,4 +1,4 @@
-import * as resilienceOwner from '../../../rpc-core/dist/adapter-owned/process/resilience/index.js'
+import * as resilienceOwner from '../../../rpc-process/dist/process/resilience/index.js'
 import { definePlugin, PluginHost } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle } from '@migaia/supervision/process'

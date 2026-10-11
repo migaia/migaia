@@ -1,16 +1,17 @@
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import type { IRpcContext, IRpcEndpoint, IRpcProvider, IRpcProviderResult } from '@migaia/rpc-core'
-import type { IRemoteChannel, IRemoteServeEndpoint } from '@migaia/rpc-core/remote'
-import { createProcessProviderAdmission } from '../../../rpc-core/dist/adapter-owned/process/resilience/provider-admission.js'
-import { createProcessSessionManager } from '../../../rpc-core/dist/adapter-owned/process/resilience/session.js'
+import type { IRemoteServeEndpoint } from '@migaia/rpc-core/remote'
+import { createProcessProviderAdmission } from '../../../rpc-process/dist/process/resilience/provider-admission.js'
+import { createProcessSessionManager } from '../../../rpc-process/dist/process/resilience/session.js'
 import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '../../../rpc-core/dist/adapter-owned/process/offer.js'
+import { createNativeProcessOffer } from '../../../rpc-process/dist/process/offer.js'
 import { nativeBytePair, nativeEndpoint } from './fixtures/native-runtime.js'
 import { RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE, deserializeRpcError } from '@migaia/rpc-core'
 import { createRpcTimeoutError, RpcTimeoutError } from '../../../rpc-core/dist/core/errors.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { createListenerFailure } from '@migaia/rpc-core/transport-kit'
+import { createProcessFixtureChannel } from '../fixtures/process-diagnostics.js'
 
 /** Flush continuations of actual native frames without advancing the deadline clock. */
 async function flush(): Promise<void> {
@@ -18,7 +19,7 @@ async function flush(): Promise<void> {
 }
 
 /** Observe actual provider registration and inbound activity without a platform adapter. */
-function fixture(maxCallsPerMinute: number) {
+async function fixture(maxCallsPerMinute: number) {
   const scheduler = createManualScheduler()
   const options = createProcessSessionManager({
     scheduler,
@@ -26,19 +27,25 @@ function fixture(maxCallsPerMinute: number) {
     maxCallsPerMinute,
     idleTimeoutMs: 100
   }).options
-  let onFrame: (() => void) | undefined
+  let onFrame: ((message: unknown) => void) | undefined
   let provider: IRpcProvider | undefined
   const close = vi.fn(async () => undefined)
-  const channel = {
-    transport: {
-      subscribe(listener: () => void) {
+  /** The governor observes the original Core transport constructed over held fixture message I/O. */
+  const channel = await createProcessFixtureChannel(
+    {
+      kind: 'message',
+      send: () => undefined,
+      onMessage(listener) {
         onFrame = listener
         return () => {
           onFrame = undefined
         }
-      }
-    }
-  } as unknown as IRemoteChannel
+      },
+      onClose: () => () => undefined,
+      close: () => undefined
+    },
+    { peerId: 'provider-admission-fixture', scheduler }
+  )
   const endpoint = {
     endpoint: {
       provide(_method: string, next: IRpcProvider) {
@@ -57,7 +64,7 @@ function fixture(maxCallsPerMinute: number) {
     admission,
     close,
     context,
-    frame: () => onFrame?.(),
+    frame: () => onFrame?.({}),
     provider: () => provider!,
     scheduler
   }
@@ -68,7 +75,7 @@ describe('process session provider admission', () => {
     '[C5-E12] %s forged timeout diagnostics cannot close the session through the live consecutive-deadline policy',
     async (kind) => {
       /** The existing provider wrapper supplies the actual policy and its original close owner. */
-      const test = fixture(100)
+      const test = await fixture(100)
       /** A real observed timeout exposes only its constructor, not the factory's private record. */
       const Constructor = createRpcTimeoutError().constructor as typeof RpcTimeoutError
       /** Public restored fields cannot prove that Core's own deadline fired. */
@@ -111,7 +118,7 @@ describe('process session provider admission', () => {
     }
   )
   it('[A3] rejects excess calls before the provider and closes after a second violation', async () => {
-    const test = fixture(1)
+    const test = await fixture(1)
     expect(await test.provider()(test.context)).toMatchObject({ ok: true })
     const first = () => test.provider()(test.context)
     expect(first).toThrowError(expect.objectContaining({ code: 'PROCESS_CONNECTION_LIMIT' }))
@@ -123,7 +130,7 @@ describe('process session provider admission', () => {
   })
 
   it('[A3] resets the idle timer on inbound frames and keeps it cancelled after close', async () => {
-    const test = fixture(2)
+    const test = await fixture(2)
     test.scheduler.advance(90)
     test.frame()
     test.scheduler.advance(99)

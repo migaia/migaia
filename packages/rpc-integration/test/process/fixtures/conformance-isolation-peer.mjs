@@ -13,8 +13,8 @@ import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child
 import {
   serveProcessSessions,
   createProcessSessionService
-} from '../../../../rpc-core/dist/adapter-owned/process/plugin/serve.js'
-import { createProcessInstanceFallback } from '../../../../rpc-core/dist/adapter-owned/process/resilience/fallback.js'
+} from '../../../../rpc-process/dist/process/plugin/serve.js'
+import { createProcessInstanceFallback } from '../../../../rpc-process/dist/process/resilience/fallback.js'
 import { createComposedEndpoint } from '@migaia/rpc-core/composed'
 import { codec, framer, abort, connect, ping, isRpcTimeoutError } from '@migaia/rpc-core'
 import { createCanonicalChunkFeature, createStreamFeature } from '@migaia/rpc-core/stream'

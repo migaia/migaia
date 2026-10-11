@@ -3,12 +3,12 @@ import { it } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createProcessTransport } from '@migaia/rpc-process'
 import { createNativeProcessOffer } from '@migaia/rpc-process'
-import { deferProcessByteReceive } from '../../../rpc-core/dist/adapter-owned/process/channel.js'
+import { deferRuntimeByteReceive as deferProcessByteReceive } from '../../../rpc-core/dist/runtime-adapter/byte/carrier.js'
 import {
   createRuntimePeer,
   type IRuntimePeer
 } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import type { IProcessByteChannel } from '../../../rpc-core/dist/adapter-owned/process/types.js'
+import type { IProcessByteChannel } from '../../../rpc-process/dist/process/types.js'
 
 /** A controlled physical byte pair exposes delivery independently from write drain. */
 function bytePair(holdAccept: boolean) {

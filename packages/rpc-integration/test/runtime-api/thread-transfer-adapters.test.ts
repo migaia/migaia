@@ -7,7 +7,7 @@ import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
 } from '@migaia/rpc-threads/adapters/node'
-import { threadWebPort } from '../../../rpc-core/dist/adapter-owned/threads/channel.js'
+import { threadWebPort } from '../../../rpc-threads/dist/threads/channel.js'
 import type { IThreadWebPort } from '@migaia/rpc-threads'
 
 /** The genuine Worker reports native bytes through its own parentPort. */

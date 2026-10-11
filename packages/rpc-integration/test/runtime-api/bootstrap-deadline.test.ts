@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { receiveAdapterBootstrap as openBootstrapFrameChannel } from '@migaia/rpc-core/adapter'
+import { receiveAdapterBootstrap as openBootstrapFrameChannel } from '@migaia/rpc-process'
 import type { IProcessByteChannel } from '@migaia/rpc-process'
 
 vi.mock('@migaia/utils/promise', async (original) => ({

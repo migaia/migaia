@@ -4,7 +4,7 @@ import { it } from 'vitest'
 import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
 import { createProcessTransport } from '@migaia/rpc-process'
 import { createNativeProcessOffer } from '@migaia/rpc-process'
-import { PROCESS_RUNTIME_API_ENV } from '../../../rpc-core/dist/adapter-owned/process/constants.js'
+import { PROCESS_RUNTIME_API_ENV } from '../../../rpc-process/dist/process/constants.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 
 /** The genuine child imports built public factories, independently from Vitest's source loader. */

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { PROCESS_RUNTIME_API_ENV } from '@migaia/rpc-core/adapter/process-data'
+import { PROCESS_RUNTIME_API_ENV } from '@migaia/rpc-process'
 import * as processApi from '@migaia/rpc-process'
 import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'
 import { createComposedEndpoint } from '@migaia/rpc-core/composed'

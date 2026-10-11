@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict'
 import { PassThrough } from 'node:stream'
 import { it } from 'vitest'
-import { createAutomaticProcessPeer } from '../../../rpc-core/dist/adapter-owned/process/automatic-peer.js'
-import { nodeByteStream } from '../../../rpc-core/dist/adapter-owned/process/node-byte-stream.js'
-import { prepareProcessRuntimeBootstrap } from '../../../rpc-core/dist/adapter-owned/process/runtime-bootstrap.js'
-import { createProcessTransport } from '@migaia/rpc-process'
+import { createAutomaticProcessPeer } from '../../../rpc-process/dist/process/automatic-peer.js'
+import { nodeByteStream } from '../../../rpc-process/dist/process/node-byte-stream.js'
+import { prepareProcessRuntimeBootstrap } from '../../../rpc-process/dist/process/runtime-bootstrap.js'
+import { createProcessTransport, receiveAdapterBootstrap } from '@migaia/rpc-process'
+import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
 import { createNativeProcessOffer } from '@migaia/rpc-process'
-import { PROCESS_RUNTIME_API_ENV_VERSION } from '../../../rpc-core/dist/adapter-owned/process/constants.js'
+import { PROCESS_RUNTIME_API_ENV_VERSION } from '../../../rpc-process/dist/process/constants.js'
 import { createRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
 
 it('[A1][A3][A17] automatic process authenticates its bootstrap parent and retains bidirectional business', async () => {
@@ -39,13 +40,16 @@ it('[A1][A3][A17] automatic process authenticates its bootstrap parent and retai
   let opens = 0
   /** Genuine report callbacks remain visible throughout handshake and business. */
   const failures: unknown[] = []
-  /** Platform opening supplies only its original channel and already decoded private first frame. */
+  /**
+   * The actual Core receiver admits the first frame on the same held channel before automatic
+   * setup.
+   */
   const platform = {
     marker: PROCESS_RUNTIME_API_ENV_VERSION,
     runtime: 'node',
     open: async () => {
       opens++
-      return { channel: childChannel, bootstrap: bootstrap.payload }
+      return receiveAdapterBootstrap(childChannel, 'stdin')
     }
   }
   /** A conflicting explicit source is rejected before claiming the one process reader. */
@@ -66,8 +70,10 @@ it('[A1][A3][A17] automatic process authenticates its bootstrap parent and retai
     createRuntimePeer({
       self: parentIdentity,
       provide: { increment: (value: number) => value + 1 },
-      connect: (context) =>
-        createProcessTransport(parentChannel, {
+      connect: async (context) => {
+        /** Native launch writes the same canonical bootstrap frame before the ordinary hello. */
+        await parentChannel.write(encodeRpcStreamFrame(bootstrap.payload))
+        return createProcessTransport(parentChannel, {
           role: 'initiator',
           peerId: bootstrap.self.instanceId,
           offer: createNativeProcessOffer({
@@ -81,7 +87,8 @@ it('[A1][A3][A17] automatic process authenticates its bootstrap parent and retai
             log: () => undefined
           },
           report: (error) => failures.push(error)
-        }),
+        })
+      },
       report: (error) => failures.push(error)
     }),
     createAutomaticProcessPeer(
