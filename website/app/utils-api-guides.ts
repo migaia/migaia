@@ -272,7 +272,7 @@ const errorChainStrategyOption: Readonly<Record<IGuideLocale, IApiOptionGuide>> 
     optional: true,
     defaultValue: '{}',
     description:
-      'The default fields are source, code, name, message, stack, cause, errors, data, and truncated. Keep the first five fields in that order in a custom whitelist; excluded optional fields are not read. limits defaults to maxNesting 32, maxNodes 128, maxBytes 65536, maxStringBytes 4096, and maxObjects 10000. Bytes count UTF-8 text units, including data keys and text, rather than the complete JSON encoding. sanitizeText owns redaction and returns value, bytes, and changed; the default only repairs lone surrogates and bounds text. presentation selects public code/message by the exact local object and hides descendants unless preserveSerializedError is true. fallback supplies unknown/UNKNOWN/Error and non-error value thrown. normalizeData, dataTextLeaf, and extensions own portable data and extension admission. createError selects native restoration; attachIdentity attaches diagnostic source/code; createViolation owns validation errors. These trusted callbacks never turn received identity into local control authority.',
+      'One trusted caller policy owns field admission, privacy, limits, portable data, and restoration. Default behavior is described by the fields below. No callback turns received source/code into local control authority.',
     whenToUse:
       'Set only the policy needed by your boundary. RPC callers use rpc-contract public functions and its existing strategy.'
   },
@@ -282,9 +282,110 @@ const errorChainStrategyOption: Readonly<Record<IGuideLocale, IApiOptionGuide>> 
     optional: true,
     defaultValue: '{}',
     description:
-      '默认字段为 source、code、name、message、stack、cause、errors、data、truncated。自定义白名单须按此顺序保留前五个必填字段；排除的可选字段不会被读取。limits 默认 maxNesting 32、maxNodes 128、maxBytes 65536、maxStringBytes 4096、maxObjects 10000。字节计数覆盖 UTF-8 文本单元及 data 的键与文本，并非完整 JSON 编码长度。sanitizeText 负责脱敏并返回 value、bytes、changed；默认只修复孤立 surrogate 并限制文本长度。presentation 按确切本地对象选择公开 code/message，除非 preserveSerializedError 为 true，否则隐藏其后代。fallback 提供 unknown/UNKNOWN/Error 与 non-error value thrown。normalizeData、dataTextLeaf、extensions 负责可移植数据和扩展准入。createError 选择原生类还原；attachIdentity 附加诊断 source/code；createViolation 定义校验错误。这些可信回调不能把收到的身份变成本地控制权限。',
+      '由一份可信调用方策略拥有字段准入、隐私、上限、可移植数据与还原规则。各字段默认行为见下方说明。任何回调都不能把收到的 source/code 变成本地控制权限。',
     whenToUse: '只配置边界确实需要的策略。RPC 调用方使用 rpc-contract 公开函数及其既有策略。'
   }
+}
+
+/** Policy fields remain separate readable option paragraphs on every generic error guide. */
+const errorChainPolicyOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGuide[]>> = {
+  en: [
+    {
+      name: 'strategy.fields',
+      description:
+        'The default whitelist is source, code, name, message, stack, cause, errors, data, and truncated. A custom whitelist keeps the first five fields in that order. Excluded optional fields are not read.',
+      whenToUse: 'Restrict admitted diagnostic fields at the consuming boundary.'
+    },
+    {
+      name: 'strategy.limits',
+      defaultValue:
+        'maxNesting 32; maxNodes 128; maxBytes 65536; maxStringBytes 4096; maxObjects 10000',
+      description:
+        'maxNodes counts serialized tree occurrences; maxObjects caps the identity walk. Cause adds one nesting level; errors adds array and entry levels. Bytes count UTF-8 text units, including data keys and text, rather than complete JSON encoding.',
+      whenToUse: 'Set budgets accepted by this boundary; retain the shared defaults otherwise.'
+    },
+    {
+      name: 'strategy.sanitizeText',
+      description:
+        'Owns send-side redaction and returns { value, bytes, changed } for every text unit, including stack and data keys. The default repairs lone surrogates and bounds text; it does not remove secrets. changed marks the serialized node truncated.',
+      whenToUse: 'Apply the boundary privacy policy before byte accounting.'
+    },
+    {
+      name: 'strategy.presentation',
+      description:
+        'Selects public code/message from the exact local object. Its descendants are hidden unless preserveSerializedError is true. Received fields cannot select this local presentation policy.',
+      whenToUse: 'Expose a safe public summary for a held local error.'
+    },
+    {
+      name: 'strategy.fallback',
+      defaultValue:
+        'source unknown; code UNKNOWN; name Error; nonErrorMessage non-error value thrown',
+      description:
+        'Supplies diagnostic presentation when a thrown value lacks usable error fields. The fallback does not assign package authority to an unclassified value.',
+      whenToUse: 'Choose the boundary presentation for otherwise unclassified thrown values.'
+    },
+    {
+      name: 'strategy.normalizeData',
+      description:
+        'Owns portable data conversion; the default admits finite plain JSON data. dataTextLeaf may select an atomic record text unit. extensions own extra field normalization, byte accounting, and restoration; their fields must be in the whitelist.',
+      whenToUse: 'Admit boundary-owned data or extensions with their existing grammar.'
+    },
+    {
+      name: 'strategy.createError',
+      description:
+        'Selects native restoration. attachIdentity attaches diagnostic source/code without granting control authority. createViolation owns validation errors. Defaults preserve supported native classes and remote stack, and attach received identity as diagnostic properties.',
+      whenToUse:
+        'Reuse the native defaults unless the boundary owns a narrower restoration or violation contract.'
+    }
+  ],
+  zh: [
+    {
+      name: 'strategy.fields',
+      description:
+        '默认白名单为 source、code、name、message、stack、cause、errors、data、truncated。自定义白名单须按此顺序保留前五个必填字段。排除的可选字段不会被读取。',
+      whenToUse: '在消费边界限制允许进入的诊断字段。'
+    },
+    {
+      name: 'strategy.limits',
+      defaultValue:
+        'maxNesting 32; maxNodes 128; maxBytes 65536; maxStringBytes 4096; maxObjects 10000',
+      description:
+        'maxNodes 按序列化树中出现次数计数；maxObjects 限制对象身份遍历。cause 增加一层深度；errors 增加数组与元素两层。字节计数覆盖 UTF-8 文本单元及 data 键与文本，并非完整 JSON 编码长度。',
+      whenToUse: '设置本边界接受的预算；没有特殊要求时保留共同默认值。'
+    },
+    {
+      name: 'strategy.sanitizeText',
+      description:
+        '负责发送端脱敏，为每个文本单元返回 { value, bytes, changed }，包括 stack 与 data 键。默认只修复孤立 surrogate 并限制文本长度，不移除秘密。changed 会将序列化节点标为 truncated。',
+      whenToUse: '先应用边界隐私规则，再进行字节计数。'
+    },
+    {
+      name: 'strategy.presentation',
+      description:
+        '按确切本地对象选择公开 code/message。除非 preserveSerializedError 为 true，否则隐藏其后代。收到的字段不能选择本地展示策略。',
+      whenToUse: '为持有的本地 error 公开安全摘要。'
+    },
+    {
+      name: 'strategy.fallback',
+      defaultValue:
+        'source unknown; code UNKNOWN; name Error; nonErrorMessage non-error value thrown',
+      description:
+        '抛出值缺少可用错误字段时提供诊断展示。fallback 不能把未分类值赋予某个模块的控制权限。',
+      whenToUse: '选择未分类抛出值在本边界的展示形式。'
+    },
+    {
+      name: 'strategy.normalizeData',
+      description:
+        '负责可移植数据转换，默认准入有限纯 JSON 数据。dataTextLeaf 可选择原子 record 的文本单元。extensions 拥有扩展字段的校验、字节计数与还原，其字段必须进入白名单。',
+      whenToUse: '按边界既有语法准入它拥有的数据或扩展。'
+    },
+    {
+      name: 'strategy.createError',
+      description:
+        '选择原生类还原。attachIdentity 附加诊断 source/code，不授予控制权限；createViolation 定义校验错误。默认保留支持的原生类与远端 stack，并把收到的身份附加为诊断属性。',
+      whenToUse: '复用原生默认行为；只有边界已有更窄的还原或校验契约时才配置。'
+    }
+  ]
 }
 
 /** Send and reachability failures preserve the exact caught value through reporting or cause. */
@@ -295,7 +396,7 @@ const errorChainSendOption: Readonly<Record<IGuideLocale, IApiOptionGuide>> = {
     optional: true,
     defaultValue: '{}',
     description:
-      'report receives { pointer, field, error } for caught getter or portable-data failures and retains the exact thrown value. Serialization marks the affected output truncated and continues when a reporter handles it. Traversal reports failed reads and continues along available edges. Without report, the default throws a TypeError with source @migaia/utils, code ERROR_CHAIN_INVALID, pointer, violation, and the original value on cause. A reporter failure propagates to the caller.',
+      'report receives { pointer, field, error } with the exact getter or data failure. Serialization marks the affected output truncated and continues; traversal follows available edges. Without report, the default throws a TypeError with source @migaia/utils, code ERROR_CHAIN_INVALID, pointer, violation, and the original value on cause. Reporter failures propagate.',
     whenToUse:
       'Provide a real diagnostic sink when a partial result is useful; otherwise let the violation propagate.'
   },
@@ -318,7 +419,7 @@ const errorChainReceiveOption: Readonly<Record<IGuideLocale, IApiOptionGuide>> =
     optional: true,
     defaultValue: '{ unknownFields: "reject" }',
     description:
-      'unknownFields defaults to reject. Select ignore only when the boundary intentionally drops unlisted own fields; onUnknownField(pointer, field) observes each dropped field. Required fields, non-empty source/code/name/stack, scalar-safe text, finite plain data, non-empty errors arrays, cycles, and tree/text budgets are still validated. Cause adds one nesting level; errors adds the array and entry levels. The first invalid field raises the strategy violation; by default it is ERROR_CHAIN_INVALID with the received value or failed getter on cause.',
+      'unknownFields defaults to reject. Explicit ignore drops unlisted own fields and calls onUnknownField(pointer, field). Required fields, non-empty source/code/name/stack, valid Unicode, finite plain data, non-empty errors arrays, cycles, and budgets remain validated. The first invalid field raises ERROR_CHAIN_INVALID by default, preserving the received value or failed getter on cause.',
     whenToUse:
       'Keep strict validation for ordinary receive paths; use ignore with an observation callback for a documented compatibility boundary.'
   },
@@ -338,7 +439,7 @@ const errorChainGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IA
   serializeErrorChain: {
     en: {
       purpose:
-        'Projects an unknown thrown value into a fresh frozen error tree. It preserves available source/code/name/message/stack and bounded cause/errors reachability without mutating the original graph; cleanupErrors entries join the serialized errors array. maxNodes counts tree occurrences, including repeated shared children. Cycles and exceeded child budgets produce truncated output; a root whose own text exceeds maxBytes throws. No receiver stack is generated here, and privacy requires an explicit strategy.',
+        'Projects an unknown thrown value into a fresh frozen error tree without mutating the original graph. Available source/code/name/message/stack and bounded cause/errors remain; cleanupErrors joins errors. Cycles and exceeded child budgets produce truncated output. A root whose own text exceeds maxBytes throws. Privacy requires an explicit strategy.',
       quickStart: `import { attachErrorIdentity, sanitizeErrorText, serializeErrorChain } from '@migaia/utils/error'
 
 /** Keep the local error for local handling; only this snapshot crosses the boundary. */
@@ -365,7 +466,7 @@ console.log(failure.message) // request failed token=private: local input stays 
         'The caller needs original object identity; use reachErrorChain on the local graph instead of serializing it.',
         'RPC wire fields, jsonrpc mapping, or contract control identities are required; use serializeRpcError from rpc-contract.'
       ],
-      options: [errorChainStrategyOption.en, errorChainSendOption.en]
+      options: [errorChainStrategyOption.en, ...errorChainPolicyOptions.en, errorChainSendOption.en]
     },
     zh: {
       purpose:
@@ -396,7 +497,7 @@ console.log(failure.message) // request failed token=private：本地输入未�
         '需要原对象身份时，在本地图上使用 reachErrorChain，不把快照当作原 error。',
         '需要 RPC wire 字段、jsonrpc 映射或 contract 控制身份时，使用 rpc-contract 的 serializeRpcError。'
       ],
-      options: [errorChainStrategyOption.zh, errorChainSendOption.zh]
+      options: [errorChainStrategyOption.zh, ...errorChainPolicyOptions.zh, errorChainSendOption.zh]
     }
   },
   deserializeErrorChain: {
@@ -428,7 +529,11 @@ for (const entry of reachErrorChain(failure)) console.error(entry) // Consume bo
         'The caller needs the exact original object; cross-boundary restoration creates new objects.',
         'The payload is an RPC envelope or needs contract-local identity handling; use deserializeRpcError from rpc-contract.'
       ],
-      options: [errorChainStrategyOption.en, errorChainReceiveOption.en]
+      options: [
+        errorChainStrategyOption.en,
+        ...errorChainPolicyOptions.en,
+        errorChainReceiveOption.en
+      ]
     },
     zh: {
       purpose:
@@ -458,7 +563,11 @@ for (const entry of reachErrorChain(failure)) console.error(entry) // 消费两�
         '需要确切原对象时不能使用跨边界还原；还原会创建新对象。',
         '输入是 RPC envelope 或需要 contract 的本地身份处理时，使用 rpc-contract 的 deserializeRpcError。'
       ],
-      options: [errorChainStrategyOption.zh, errorChainReceiveOption.zh]
+      options: [
+        errorChainStrategyOption.zh,
+        ...errorChainPolicyOptions.zh,
+        errorChainReceiveOption.zh
+      ]
     }
   },
   normalizeSerializedErrorChain: {
@@ -488,7 +597,11 @@ console.log(JSON.stringify(snapshot)) // Forward only the admitted frozen tree.`
         'The input is a local thrown value requiring projection and redaction; use serializeErrorChain.',
         'The receiver needs native errors for instanceof or cause handling; use deserializeErrorChain, which already validates.'
       ],
-      options: [errorChainStrategyOption.en, errorChainReceiveOption.en]
+      options: [
+        errorChainStrategyOption.en,
+        ...errorChainPolicyOptions.en,
+        errorChainReceiveOption.en
+      ]
     },
     zh: {
       purpose:
@@ -516,7 +629,11 @@ console.log(JSON.stringify(snapshot)) // 只转发已准入的冻结树。`,
         '输入是需要投影与脱敏的本地抛出值时，使用 serializeErrorChain。',
         '接收方需要原生 instanceof 或 cause 处理时，使用已内置完整校验的 deserializeErrorChain。'
       ],
-      options: [errorChainStrategyOption.zh, errorChainReceiveOption.zh]
+      options: [
+        errorChainStrategyOption.zh,
+        ...errorChainPolicyOptions.zh,
+        errorChainReceiveOption.zh
+      ]
     }
   },
   reachErrorChain: {
@@ -543,7 +660,7 @@ for (const entry of entries) console.error(entry) // Report every reachable fail
         'The caller needs a frozen transport snapshot or privacy transform; use serializeErrorChain.',
         'The caller needs proof that an unbounded graph is complete after the maxObjects cap has stopped iteration.'
       ],
-      options: [errorChainStrategyOption.en, errorChainSendOption.en]
+      options: [errorChainStrategyOption.en, ...errorChainPolicyOptions.en, errorChainSendOption.en]
     },
     zh: {
       purpose:
@@ -568,7 +685,7 @@ for (const entry of entries) console.error(entry) // 报告每个可达失败。
         '需要冻结的传输快照或隐私变换时，使用 serializeErrorChain。',
         'maxObjects 已截断遍历时，不能用结果证明一个无界图已完整检查。'
       ],
-      options: [errorChainStrategyOption.zh, errorChainSendOption.zh]
+      options: [errorChainStrategyOption.zh, ...errorChainPolicyOptions.zh, errorChainSendOption.zh]
     }
   },
   sanitizeErrorText: {

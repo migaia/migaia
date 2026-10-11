@@ -13193,7 +13193,85 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/ICollector",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/ICollectorActions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/IFieldCollector",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/bytes",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/bytes/base64ToBytes",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/bytes/bytesToBase64",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/bytes/decodeUtf8",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/bytes/encodeUtf8",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/bytes/isArrayBuffer",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/bytes/isUint8Array",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/bytes/splitUtf8",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/bytes/streamBase64Chunks",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/bytes/utf8ByteLength",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/collect",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -13205,7 +13283,277 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/config/CONFIG_DELETE",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/ConfigProfile",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/IConfigCombineOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/IConfigConflictContext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/IConfigConflictDecision",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/IConfigLimits",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/IConfigMergeStrategies",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/IConfigPatch",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/IConfigPatchOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/IConfigPathRule",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/IConfigProfile",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/IConfigReadResult",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/IConfigRecord",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/IOwnConfigOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/IOwnedConfig",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/combineConfig",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/ownConfig",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/parseConfigPath",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/patchConfig",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/readConfigPath",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config/readonlyConfig",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/error",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/IErrorChainData",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/IErrorChainStrategy",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/IErrorIdentity",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/IErrorIdentityHooks",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/IPropertyRead",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/ISerializedErrorChain",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/UtilsAbortError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/UtilsError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/UtilsTimeoutError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/attachErrorIdentity",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/attachSecondaryErrors",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/combineErrors",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/deserializeErrorChain",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/isUtilsAbortError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/isUtilsError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/isUtilsTimeoutError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/normalizeSerializedErrorChain",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/reachErrorChain",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/safeErrorReason",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/sanitizeErrorText",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/serializeErrorChain",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/toError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/tryReadProperty",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error/walkErrorCauses",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -13217,7 +13565,133 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/function/IThenableInspection",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/function/IThenableProbe",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/function/IThenableProbeKind",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/function/MAX_NATIVE_RECURSION_DEPTH",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/function/ThenableProbeKind",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/function/assimilateCapturedThen",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/function/inspectThenable",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/function/noop",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/function/observeThenableRejection",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/function/once",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/function/onceAsync",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/function/probeThenable",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/number",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/number/INumberFormatOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/number/INumberFormatter",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/number/INumericValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/number/createNumberFormatter",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/number/formatCompactNumber",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/number/formatCurrency",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/number/formatInteger",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/number/formatNumber",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/number/formatPercent",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -13235,6 +13709,210 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/object-path/IObjectPath",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/IObjectPathInput",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/IObjectPathSegment",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/IObjectPathTuple",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/IObjectPathTupleFor",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/IObjectPathValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/IObjectPathWriteValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/IPathAccessor",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/IPathAccessorOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/IPathBlockedProbe",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/IPathFailedProbe",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/IPathGetEvent",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/IPathMissingProbe",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/IPathProbe",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/IPathSetEvent",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/IPathValueProbe",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/createPathAccessor",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/get",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/parseObjectPath",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/probeObjectPath",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/probeObjectPathSegments",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path/set",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object/IDiagnosticSnapshot",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object/IOwnDescriptorsSnapshot",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object/IProbePropertyResult",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object/ISnapshotDiagnostic",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object/createSafeRecord",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object/diagnosticSnapshot",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object/identitySnapshot",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object/immutableSnapshot",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object/isPlainObject",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object/probeProperty",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object/snapshotOwnDescriptors",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object/structuredDiagnosticSnapshot",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/overview",
       "locale": "en",
       "domain": "docs",
@@ -13247,7 +13925,193 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/promise/IAbortControllerLike",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/IAbortOperation",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/IAbortSignal",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/IAbortSignalAdmission",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/IAbortSignalRejection",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/IAbortTimeoutSignal",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/IAbortTimeoutSignalOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/IAsyncControls",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/IConcurrencyLimiter",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/IDeferred",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/IRetryContext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/IRetryFailureContext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/ITimeoutOperation",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/IUtilsReporter",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/admitAbortSignal",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/createAbortTimeoutSignal",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/createConcurrencyLimiter",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/deferred",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/hostRethrowReporter",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/raceWithAbort",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/retry",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/sleep",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/toPromise",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise/withTimeout",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/scheduler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/scheduler/IManualScheduler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/scheduler/IScheduledTask",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/scheduler/IScheduler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/scheduler/IWallClock",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/scheduler/createManualScheduler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/scheduler/systemScheduler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/scheduler/systemWallClock",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -13259,13 +14123,91 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/string/IFormatOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/string/IFormatPlaceholder",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/string/IStringConversion",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/string/format",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/string/tryString",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/typing",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/typing/IDiscriminatedByField",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/typing/IDiscriminatedByPath",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/value",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/value/IPrimitive",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/value/isBlankString",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/value/isEmptyValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/value/isNullish",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/value/isPrimitive",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/value/isSafeIntegerValue",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -28019,6 +28961,24 @@
       "library": "utils"
     },
     {
+      "path": "/zh/docs/utils/ICollector",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/ICollectorActions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/IFieldCollector",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/zh/docs/utils/advanced",
       "locale": "zh",
       "domain": "docs",
@@ -28037,7 +28997,193 @@
       "library": "utils"
     },
     {
+      "path": "/zh/docs/utils/bytes/base64ToBytes",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/bytes/bytesToBase64",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/bytes/decodeUtf8",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/bytes/encodeUtf8",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/bytes/isArrayBuffer",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/bytes/isUint8Array",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/bytes/splitUtf8",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/bytes/streamBase64Chunks",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/bytes/utf8ByteLength",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/collect",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/zh/docs/utils/config",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/CONFIG_DELETE",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/ConfigProfile",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/IConfigCombineOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/IConfigConflictContext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/IConfigConflictDecision",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/IConfigLimits",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/IConfigMergeStrategies",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/IConfigPatch",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/IConfigPatchOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/IConfigPathRule",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/IConfigProfile",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/IConfigReadResult",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/IConfigRecord",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/IOwnConfigOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/IOwnedConfig",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/combineConfig",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/ownConfig",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/parseConfigPath",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/patchConfig",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/readConfigPath",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config/readonlyConfig",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"
@@ -28049,13 +29195,283 @@
       "library": "utils"
     },
     {
+      "path": "/zh/docs/utils/error/IErrorChainData",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/IErrorChainStrategy",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/IErrorIdentity",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/IErrorIdentityHooks",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/IPropertyRead",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/ISerializedErrorChain",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/UtilsAbortError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/UtilsError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/UtilsTimeoutError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/attachErrorIdentity",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/attachSecondaryErrors",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/combineErrors",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/deserializeErrorChain",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/isUtilsAbortError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/isUtilsError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/isUtilsTimeoutError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/normalizeSerializedErrorChain",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/reachErrorChain",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/safeErrorReason",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/sanitizeErrorText",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/serializeErrorChain",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/toError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/tryReadProperty",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error/walkErrorCauses",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/zh/docs/utils/function",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"
     },
     {
+      "path": "/zh/docs/utils/function/IThenableInspection",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/function/IThenableProbe",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/function/IThenableProbeKind",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/function/MAX_NATIVE_RECURSION_DEPTH",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/function/ThenableProbeKind",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/function/assimilateCapturedThen",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/function/inspectThenable",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/function/noop",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/function/observeThenableRejection",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/function/once",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/function/onceAsync",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/function/probeThenable",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/zh/docs/utils/number",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/number/INumberFormatOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/number/INumberFormatter",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/number/INumericValue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/number/createNumberFormatter",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/number/formatCompactNumber",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/number/formatCurrency",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/number/formatInteger",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/number/formatNumber",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/number/formatPercent",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"
@@ -28073,6 +29489,210 @@
       "library": "utils"
     },
     {
+      "path": "/zh/docs/utils/object-path/IObjectPath",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/IObjectPathInput",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/IObjectPathSegment",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/IObjectPathTuple",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/IObjectPathTupleFor",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/IObjectPathValue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/IObjectPathWriteValue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/IPathAccessor",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/IPathAccessorOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/IPathBlockedProbe",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/IPathFailedProbe",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/IPathGetEvent",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/IPathMissingProbe",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/IPathProbe",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/IPathSetEvent",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/IPathValueProbe",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/createPathAccessor",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/get",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/parseObjectPath",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/probeObjectPath",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/probeObjectPathSegments",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path/set",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object/IDiagnosticSnapshot",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object/IOwnDescriptorsSnapshot",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object/IProbePropertyResult",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object/ISnapshotDiagnostic",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object/createSafeRecord",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object/diagnosticSnapshot",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object/identitySnapshot",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object/immutableSnapshot",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object/isPlainObject",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object/probeProperty",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object/snapshotOwnDescriptors",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object/structuredDiagnosticSnapshot",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/zh/docs/utils/overview",
       "locale": "zh",
       "domain": "docs",
@@ -28080,6 +29700,150 @@
     },
     {
       "path": "/zh/docs/utils/promise",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/IAbortControllerLike",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/IAbortOperation",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/IAbortSignal",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/IAbortSignalAdmission",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/IAbortSignalRejection",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/IAbortTimeoutSignal",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/IAbortTimeoutSignalOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/IAsyncControls",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/IConcurrencyLimiter",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/IDeferred",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/IRetryContext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/IRetryFailureContext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/ITimeoutOperation",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/IUtilsReporter",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/admitAbortSignal",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/createAbortTimeoutSignal",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/createConcurrencyLimiter",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/deferred",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/hostRethrowReporter",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/raceWithAbort",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/retry",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/sleep",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/toPromise",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise/withTimeout",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"
@@ -28097,7 +29861,79 @@
       "library": "utils"
     },
     {
+      "path": "/zh/docs/utils/scheduler/IManualScheduler",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/scheduler/IScheduledTask",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/scheduler/IScheduler",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/scheduler/IWallClock",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/scheduler/createManualScheduler",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/scheduler/systemScheduler",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/scheduler/systemWallClock",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/zh/docs/utils/string",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/string/IFormatOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/string/IFormatPlaceholder",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/string/IStringConversion",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/string/format",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/string/tryString",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"
@@ -28109,7 +29945,55 @@
       "library": "utils"
     },
     {
+      "path": "/zh/docs/utils/typing/IDiscriminatedByField",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/typing/IDiscriminatedByPath",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/zh/docs/utils/value",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/value/IPrimitive",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/value/isBlankString",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/value/isEmptyValue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/value/isNullish",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/value/isPrimitive",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/value/isSafeIntegerValue",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"
