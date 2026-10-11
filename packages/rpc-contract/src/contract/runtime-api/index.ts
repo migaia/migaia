@@ -1,5 +1,6 @@
 export {
   normalizeRuntimeEnvelope,
+  normalizeRuntimeEnvelopeDecoded,
   normalizeRuntimeGeneration,
   normalizeRuntimeSteps
 } from './normalize.js'

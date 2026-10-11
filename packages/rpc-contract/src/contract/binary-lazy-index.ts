@@ -2,6 +2,7 @@
 export {
   prepareRpcBinaryLazy as prepareRpcBinary,
   restoreRpcBinaryLazy as restoreRpcBinary,
+  restoreRpcBinaryDecodedLazy as restoreRpcBinaryDecoded,
   RpcBinaryProfile,
   RpcBinaryStorage,
   RpcNativeBinaryKind

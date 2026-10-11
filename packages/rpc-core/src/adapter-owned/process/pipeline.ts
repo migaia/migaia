@@ -65,7 +65,8 @@ registerFastCodec(
         Reflect.apply(nativeBase64, bytes, [
           { alphabet: RpcOwnedBinaryAlphabet, omitPadding: true }
         ]) as string
-    : undefined
+    : undefined,
+  remoteProcessJsonCodec.decode
 )
 registerFastFramer(remoteProcessStringFramer)
 

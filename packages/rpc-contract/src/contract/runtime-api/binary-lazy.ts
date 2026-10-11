@@ -91,3 +91,17 @@ export function restoreRpcBinaryLazy(
     loaded.restoreRpcBinary(value, storage, sidecars, limit, digest)
   )
 }
+
+/** Preserve the same cold/warm Promise schedule for actual codec-decoded metadata. */
+export function restoreRpcBinaryDecodedLazy(
+  value: unknown,
+  storage: RpcBinaryStorage,
+  sidecars: unknown = [],
+  limit = RpcBatchPhysical.maxBytes,
+  digest?: IRpcBinaryDigest
+): Promise<IRpcRuntimeEnvelope> {
+  if (codec) return codec.restoreRpcBinaryDecoded(value, storage, sidecars, limit, digest)
+  return loadBinaryCodec().then((loaded) =>
+    loaded.restoreRpcBinaryDecoded(value, storage, sidecars, limit, digest)
+  )
+}

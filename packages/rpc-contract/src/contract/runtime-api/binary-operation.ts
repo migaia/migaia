@@ -1,6 +1,7 @@
 import {
   prepareRpcBinary as prepareCanonicalBinary,
   restoreRpcBinary,
+  restoreRpcBinaryDecoded,
   finishRpcBinaryCapture
 } from './binary.js'
 import { captureRpcBinary, invalid, rejectRpcBinaryPreparation } from './binary-capture.js'
@@ -11,7 +12,7 @@ import { RpcBinaryStorage } from './binary-constants.js'
 import { RpcBatchPhysical } from '../wire-constants.js'
 import type { IRpcRuntimeEnvelope } from './types.js'
 
-export { restoreRpcBinary }
+export { restoreRpcBinary, restoreRpcBinaryDecoded }
 export type { IRpcBinaryDataCodec } from './binary-data-codec.js'
 export type {
   IRpcBinaryBacking,

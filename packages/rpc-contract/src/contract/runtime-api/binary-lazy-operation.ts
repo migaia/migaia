@@ -1,6 +1,7 @@
 import {
   prepareRpcBinaryLazy as prepareCanonicalBinaryLazy,
-  restoreRpcBinaryLazy
+  restoreRpcBinaryLazy,
+  restoreRpcBinaryDecodedLazy
 } from './binary-lazy.js'
 import { rejectRpcBinaryPreparation } from './binary-capture.js'
 import type { IRpcBinaryDigest, IRpcPreparedBinary } from './binary-capture.js'
@@ -10,7 +11,7 @@ import { RpcBinaryStorage } from './binary-constants.js'
 import { RpcBatchPhysical } from '../wire-constants.js'
 import type { IRpcRuntimeEnvelope } from './types.js'
 
-export { restoreRpcBinaryLazy }
+export { restoreRpcBinaryLazy, restoreRpcBinaryDecodedLazy }
 export type { IRpcBinaryDataCodec } from './binary-data-codec.js'
 export type {
   IRpcBinaryBacking,
