@@ -1,5 +1,7 @@
 import { runInNewContext } from 'node:vm'
 import { isUint8Array as canonicalIsUint8Array } from '@migaia/utils/bytes'
+import { createSafeRecord as canonicalCreateSafeRecord } from '@migaia/utils/object'
+import { isSafeIntegerValue as canonicalIsSafeIntegerValue } from '@migaia/utils/value'
 import { describe, expect, it } from 'vitest'
 import {
   createSafeRecord,
@@ -32,6 +34,7 @@ describe('safe-value utilities', () => {
   })
 
   it('accepts only safe integer values', () => {
+    expect(isSafeIntegerValue).toBe(canonicalIsSafeIntegerValue)
     expect(isSafeIntegerValue(0)).toBe(true)
     expect(isSafeIntegerValue(Number.MAX_SAFE_INTEGER)).toBe(true)
     expect(isSafeIntegerValue(Number.NaN)).toBe(false)
@@ -58,10 +61,44 @@ describe('safe-value utilities', () => {
   })
 
   it('returns a null-prototype dictionary for attacker-controlled keys', () => {
+    expect(createSafeRecord).toBe(canonicalCreateSafeRecord)
     const record = createSafeRecord<number>()
     record['__proto__'] = 1
     expect(Object.getPrototypeOf(record)).toBeNull()
     expect(Object.hasOwn(record, '__proto__')).toBe(true)
+  })
+
+  it('keeps inherited getter receivers and performs no has or descriptor trap', () => {
+    /** Each trap is observable at this untrusted property boundary. */
+    const operations: string[] = []
+    /** A prototype getter exercises inherited reads without a descriptor snapshot. */
+    const prototype = {
+      get value() {
+        expect(this).toBe(proxy)
+        return 3
+      }
+    }
+    /** The proxy exposes any additional lookup operation introduced by convergence. */
+    const proxy = new Proxy(Object.create(prototype) as object, {
+      get(target, key, originalReceiver) {
+        operations.push('get')
+        return Reflect.get(target, key, originalReceiver)
+      },
+      has() {
+        operations.push('has')
+        return true
+      },
+      getOwnPropertyDescriptor() {
+        operations.push('descriptor')
+        return undefined
+      },
+      ownKeys() {
+        operations.push('keys')
+        return []
+      }
+    })
+    expect(safeRead(proxy, 'value')).toBe(3)
+    expect(operations).toEqual(['get'])
   })
 
   it('reuses the canonical intrinsic brand across realms and subclasses', () => {
