@@ -62,7 +62,9 @@
     "test": "vitest run --coverage"
   },
   "dependencies": {
-    "@migaia/supervision": "workspace:^"
+    "@migaia/supervision": "workspace:^",
+    "@migaia/utils": "workspace:^",
+    "@migaia/lifecycle": "workspace:^"
   },
   "peerDependencies": {
     "@migaia/rpc-contract": "0.0.7",

@@ -1,4 +1,4 @@
-import type { INodeMessagePortLike } from '../../core/adapters/message-port.js'
+import type { INodeMessagePortLike } from '@migaia/rpc-core/adapters/message-port'
 
 /** A held parent port supplies its real physical close and reader-count operations. */
 export type IThreadParentPort = INodeMessagePortLike &

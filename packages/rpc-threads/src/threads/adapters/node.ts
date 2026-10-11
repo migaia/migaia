@@ -1,14 +1,14 @@
 import { parentPort } from 'node:worker_threads'
-import { AdapterNodeThreadParentChannel } from '@migaia/rpc-core/adapter/threads'
-import type { IThreadParentPort } from '@migaia/rpc-core/adapter/threads'
+import { AdapterNodeThreadParentChannel } from '../node-parent.js'
+import type { IThreadParentPort } from '../runtime-types.js'
 import {
   createAdapterNodeThreadLauncher,
   createAdapterNodeThreadChannelFactory
-} from '@migaia/rpc-core/adapter/threads'
+} from '../node-launcher.js'
 import type { IRuntimePeerSourceContext } from '@migaia/rpc-core/remote'
 import type { IThreadChannelOptions } from '../types.js'
 import { threadRuntimeResource } from '../runtime-resource.js'
-export type { INodeThreadHandle } from '@migaia/rpc-core/adapter/threads'
+export type { INodeThreadHandle } from '../node-launcher.js'
 
 /** Actual child import borrows its held port but preserves the original listener-free cold state. */
 const parentChannel = parentPort ? borrowNodeThreadParent(parentPort) : undefined

@@ -438,9 +438,15 @@ importers:
 
   packages/rpc-threads:
     dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
       '@migaia/supervision':
         specifier: workspace:^
         version: link:../supervision
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
       electron:
         specifier: ^44.0.0
         version: 44.5.0(supports-color@7.2.0)
@@ -454,9 +460,6 @@ importers:
       '@migaia/rpc-core':
         specifier: workspace:0.0.7
         version: link:../rpc-core
-      '@migaia/utils':
-        specifier: workspace:^
-        version: link:../utils
       '@types/node':
         specifier: 24.13.2
         version: 24.13.2

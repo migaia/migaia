@@ -1,23 +1,21 @@
 import type { IThreadHandle, IThreadLauncher, IThreadUsage } from '@migaia/supervision/threads'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { ERROR_SOURCE, RpcThreadErrorCode } from './error-code.js'
-import type { IThreadRuntimeResource } from './runtime-resource.js'
+import { ERROR_SOURCE, RpcThreadErrorCode } from '../error-code.js'
+import type { IThreadRuntimeResource } from './runtime-types.js'
 import type { IAbortSignal } from '@migaia/lifecycle'
-import type { IRuntimePeerSourceResult } from '../../remote/index.js'
-import { registerNativeReplayOwner } from '../../core/internal/native-replay.js'
-import { ThreadLimit } from '@migaia/supervision/threads'
-import type { INodeMessagePortLike } from '../../core/adapters/message-port.js'
-import { resolveAbortReason } from '../../core/internal/async-control.js'
-import { awaitThreadPreparation, constructNodeThreadChannel } from './channel.js'
+import type { IRuntimePeerSourceResult } from '@migaia/rpc-core/remote'
 import {
-  createThreadRuntimeBootstrap,
-  readThreadRuntimeAcknowledgement,
-  intersectThreadCapabilities
-} from './bootstrap.js'
-import { createNodeThreadBootstrapHandoff } from './receive-handoff.js'
-import type { IRuntimePeerSourceContext } from '../../remote/index.js'
-import { readRuntimeLaunchContext } from '../../remote/runtime-api/launch-context.js'
-import { invalidThreadConfig } from './error.js'
+  createEventEmitterMessageResource,
+  holdAdapterLaunch,
+  type IAdapterMessageResource
+} from '@migaia/rpc-core/adapter'
+import { ThreadLimit } from '@migaia/supervision/threads'
+import type { INodeMessagePortLike } from '@migaia/rpc-core/adapters/message-port'
+import { readAdapterAbortReason } from '@migaia/rpc-core/adapter'
+import { openThreadMessageResource, constructNodeThreadChannel } from './channel.js'
+import { createThreadRuntimeBootstrap, intersectThreadCapabilities } from './bootstrap.js'
+import type { IRuntimePeerSourceContext } from '@migaia/rpc-core/remote'
+
 import { ThreadErrorText } from './error-text.js'
 import {
   THREAD_FINGERPRINT_PREFIX,
@@ -41,8 +39,8 @@ export type IAdapterNodeThreadHandle = INodeThreadHandle &
 const nodePreparations = new WeakMap<
   INodeThreadHandle,
   Readonly<{
-    prepared: Promise<readonly string[]>
-    handoff: ReturnType<typeof createNodeThreadBootstrapHandoff>
+    resource: IAdapterMessageResource
+    offer?: readonly string[]
   }>
 >()
 
@@ -64,28 +62,30 @@ export function createAdapterNodeThreadLauncher(
     }),
     async launch(input, context) {
       /** Per-launch metadata cannot leak across concurrent uses of a caller-owned launcher. */
-      const runtimeApi = readRuntimeLaunchContext(context) ?? configuredRuntimeApi
-      if (context.signal.aborted) throw resolveAbortReason(context.signal)
+      const runtimeApi = holdAdapterLaunch(context).proposal ?? configuredRuntimeApi
+      if (context.signal.aborted) throw readAdapterAbortReason(context.signal)
       /** Snapshot data and resolve entry before importing or constructing a platform Worker. */
       const spec = portableThreadSpec(input)
       /** Only this deep adapter can load Node; the threads entry has no platform dependency. */
       const { Worker } = await runtime.load()
-      if (context.signal.aborted) throw resolveAbortReason(context.signal)
+      if (context.signal.aborted) throw readAdapterAbortReason(context.signal)
       /** Address must be known before Worker creation so its endpoint can accept this peerId. */
       const fingerprint = `${THREAD_FINGERPRINT_PREFIX}${++sequence}`
       /** Runtime metadata is admitted before creating a genuine native Worker. */
       const bootstrap = runtimeApi
         ? createThreadRuntimeBootstrap(spec.name || fingerprint, fingerprint, runtimeApi)
         : undefined
+      /** The native runtime receives this same actual raw initial message. */
+      const initialMessage = {
+        kind: ThreadBootstrap.data,
+        peerId: fingerprint,
+        ...(bootstrap ? { runtimeApi: bootstrap } : {}),
+        ...(spec.data === undefined ? {} : { data: spec.data })
+      }
       /** Error and exit hooks attach in this same synchronous construction segment. */
       const worker = new Worker(absoluteThreadEntry(spec.entry, true), {
         name: spec.name,
-        workerData: {
-          kind: ThreadBootstrap.data,
-          peerId: fingerprint,
-          ...(bootstrap ? { runtimeApi: bootstrap } : {}),
-          ...(spec.data === undefined ? {} : { data: spec.data })
-        },
+        workerData: initialMessage,
         ...(spec.limits?.heapBytes === undefined
           ? {}
           : { resourceLimits: { maxOldGenerationSizeMb: spec.limits.heapBytes / 1024 / 1024 } })
@@ -93,7 +93,11 @@ export function createAdapterNodeThreadLauncher(
       /** Retain the original runtime failure until its corresponding actual exit. */
       let failure: unknown
       /** Native failures settle only the opt-in incomplete preparation owner. */
-      let rejectPreparation: ((error?: unknown) => void) | undefined
+      let failedResolve!: (error: unknown) => void
+      /** Core receives this actual native failure observation independently of eventual exit. */
+      const failed = new Promise<unknown>((resolve) => {
+        failedResolve = resolve
+      })
       /** Resolve only from the real exit event, never the terminate request or Promise. */
       let exitedResolve!: (status: { code: number; error?: unknown; limit?: 'heapBytes' }) => void
       /** No external state machine is added to this settled runtime observation. */
@@ -105,12 +109,12 @@ export function createAdapterNodeThreadLauncher(
       /** Worker error is observed before Node can treat it as an unhandled host exception. */
       const onError = (error: unknown): void => {
         failure = error
-        rejectPreparation?.(error)
+        failedResolve(error)
       }
       worker.on(ThreadEvent.error, onError)
       worker.once(ThreadEvent.exit, (code) => {
         worker.off(ThreadEvent.error, onError)
-        rejectPreparation?.(failure)
+        failedResolve(failure)
         exitedResolve({
           code,
           ...(failure === undefined ? {} : { error: failure }),
@@ -131,86 +135,32 @@ export function createAdapterNodeThreadLauncher(
       /** Concurrent supervisor teardown requests terminate at most once. */
       let terminating = false
       /** Launcher provenance belongs to this exact borrowed surface, independent of public shape. */
-      const native: INodeMessagePortLike = {
+      const native: import('@migaia/rpc-core/adapter').IAdapterEventEmitterMessagePort = {
         postMessage: (message, transfer) =>
           worker.postMessage(message, transfer as Parameters<typeof worker.postMessage>[1]),
         on: (event, listener) => worker.on(event === 'close' ? ThreadEvent.exit : event, listener),
-        off: (event, listener) => worker.off(event === 'close' ? ThreadEvent.exit : event, listener)
+        off: (event, listener) =>
+          worker.off(event === 'close' ? ThreadEvent.exit : event, listener),
+        once: (_event: 'close', listener: () => void) => worker.once(ThreadEvent.exit, listener),
+        listenerCount: (_event: 'message') => worker.listenerCount(ThreadEvent.message)
       }
-      /** The original launcher retains termination/exit while preparation holds one cold message. */
-      let preparation:
-        | Readonly<{
-            prepared: Promise<readonly string[]>
-            handoff: ReturnType<typeof createNodeThreadBootstrapHandoff>
-          }>
-        | undefined
-      /** The launch-only abort listener is withdrawn when the exact handle is handed off. */
-      let detachLaunchAbort: (() => void) | undefined
+      /** The message resource borrows the launcher's actual completion and original raw input. */
+      let resource: IAdapterMessageResource | undefined
       /** Concurrent supervisor requests terminate this actual Worker at most once. */
       const terminate = (): void => {
         if (terminating) return
         terminating = true
-        preparation?.handoff.close()
+        void resource?.close()
         void worker.terminate()
       }
-      if (bootstrap) {
-        /** The independent child declaration determines the negotiated static agreement. */
-        let resolvePrepared!: (capabilities: readonly string[]) => void
-        /** Abort, exit, malformed ACK and cold overflow settle the same preparation consumer. */
-        let rejectPrepared!: (error: unknown) => void
-        /** Duplicate ACK is invalid during this private negotiation. */
-        let acknowledged = false
-        /** Capability acknowledgement does not assert endpoint receive readiness. */
-        const prepared = new Promise<readonly string[]>((resolve, reject) => {
-          resolvePrepared = resolve
-          rejectPrepared = reject
-        })
-        /** Canonical receive becomes direct after the endpoint finishes provider/stream setup. */
-        const handoff = createNodeThreadBootstrapHandoff(native, {
-          consume(message) {
-            if (
-              !message ||
-              typeof message !== 'object' ||
-              !('kind' in message) ||
-              message.kind !== ThreadBootstrap.runtimeAcknowledged
-            )
-              return false
-            if (acknowledged) invalidThreadConfig('runtimeApi.ack', ThreadErrorText.bootstrapFailed)
-            /** Closed ACK grammar and bounds are validated by the bootstrap owner. */
-            const peer = readThreadRuntimeAcknowledgement(message)
-            acknowledged = true
-            resolvePrepared(intersectThreadCapabilities(bootstrap.capabilities, peer))
-            return true
-          },
-          onFailure: (error) => {
-            rejectPrepared(error)
-            terminate()
-          }
-        })
-        preparation = Object.freeze({ prepared, handoff })
-        rejectPreparation = handoff.fail
-        /** Launch cancellation retains its original reason and original native termination owner. */
-        const abort = (): void => {
-          /** Settle cancellation before cold cleanup can publish its bootstrap wrapper. */
-          const reason = resolveAbortReason(context.signal)
-          rejectPrepared(reason)
-          handoff.fail(reason)
-          terminate()
-        }
-        context.signal.addEventListener('abort', abort, { once: true })
-        detachLaunchAbort = () => context.signal.removeEventListener('abort', abort)
-        if (context.signal.aborted) abort()
-        void exited.then(() => context.signal.removeEventListener('abort', abort))
-        // The open consumer owns this rejection; this observer prevents late unhandled rejection.
-        void prepared.catch(() => undefined)
-      }
-      /** The default launcher keeps its original port; opt-in changes cold subscription only. */
-      const port = preparation?.handoff.port ?? native
-      registerNativeReplayOwner(port, {
-        alive: () => !terminating && worker.threadId !== -1,
-        exclusive: () => worker.listenerCount('message') <= 1
+      resource = createEventEmitterMessageResource(native, {
+        exited,
+        failed,
+        terminate,
+        initialMessage
       })
-      detachLaunchAbort?.()
+      /** Public messaging retains the same borrowed raw port; Core keeps cold preparation private. */
+      const port = native
       /** This exact resource exposes whole channel opening, never preparation callbacks. */
       const handle: IAdapterNodeThreadHandle = {
         identity,
@@ -254,7 +204,7 @@ export function createAdapterNodeThreadLauncher(
           }
         }
       }
-      if (preparation) nodePreparations.set(handle, preparation)
+      nodePreparations.set(handle, { resource, offer: bootstrap?.capabilities })
       return handle
     }
   }
@@ -266,31 +216,34 @@ async function openNodeThreadHandle(
   signal: IAbortSignal,
   options: IThreadChannelOptions
 ): Promise<IRuntimePeerSourceResult> {
-  if (signal.aborted) throw resolveAbortReason(signal)
-  /** Only actual Core construction retains a private ACK and cold receiver. */
+  if (signal.aborted) throw readAdapterAbortReason(signal)
+  /** Only the actual launcher retains this Core-owned capture and its own local launch proposal. */
   const preparation = nodePreparations.get(handle)
   if (preparation) {
     try {
-      /** The child's original ACK and parent's offer determine the same bilateral intersection. */
-      const negotiated = await awaitThreadPreparation(preparation.prepared, signal)
-      /** Explicit policy narrows the original agreement at its original read point. */
-      const capabilities =
-        options.capabilities === undefined
-          ? negotiated
-          : intersectThreadCapabilities(negotiated, options.capabilities)
-      return constructNodeThreadChannel(
-        handle.port,
+      /** Caller policy narrows our own offer; it never supplies peer acceptance. */
+      const offer =
+        preparation.offer === undefined
+          ? options.capabilities
+          : options.capabilities === undefined
+            ? preparation.offer
+            : intersectThreadCapabilities(preparation.offer, options.capabilities)
+      return await openThreadMessageResource(
+        preparation.resource,
         handle.identity.fingerprint,
-        { ...options, capabilities },
-        preparation.handoff
+        {
+          ...options,
+          ...(offer === undefined ? {} : { capabilities: offer })
+        },
+        signal
       )
     } catch (error) {
-      preparation.handoff.close()
+      void preparation.resource.close()
       handle.terminate()
       throw error
     }
   }
-  return constructNodeThreadChannel(handle.port, handle.identity.fingerprint, options)
+  return await constructNodeThreadChannel(handle.port, handle.identity.fingerprint, options)
 }
 
 /**

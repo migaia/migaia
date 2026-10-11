@@ -1,13 +1,12 @@
 import { normalizePortable } from '@migaia/rpc-contract'
-import { RpcCoreErrorCode } from '../../core/index.js'
-import { tagRpcError } from '../../core/errors.js'
+import { createAdapterConfigurationTypeError } from '@migaia/rpc-core/adapter'
 import type { IThreadSpec } from '@migaia/supervision/threads'
 import { ThreadErrorText } from './error-text.js'
 
 /** Preserve native TypeError and original cause while naming the rejected field. */
 export function invalidThreadConfig(field: string, message: string, cause?: unknown): never {
   /** Error identity attaches to the original native error, including its stack. */
-  const error = tagRpcError(new TypeError(message, { cause }), RpcCoreErrorCode.invalidConfig)
+  const error = createAdapterConfigurationTypeError(message, cause)
   Object.defineProperty(error, 'detail', { value: Object.freeze({ field }), enumerable: true })
   throw error
 }

@@ -1,24 +1,27 @@
-import { createRpcTransportError } from '../../core/errors.js'
+import { createAdapterTransportError } from '@migaia/rpc-core/adapter'
 import type { IAbortSignal } from '@migaia/lifecycle'
-import { type IRuntimePeerSourceResult } from '../../remote/index.js'
+import { type IRuntimePeerSourceResult } from '@migaia/rpc-core/remote'
 import type { IThreadHandle, IThreadLauncher } from '@migaia/supervision/threads'
-import { awaitThreadPreparation, constructWebThreadChannel } from './channel.js'
 import {
-  createThreadRuntimeBootstrap,
-  readThreadRuntimeAcknowledgement,
-  intersectThreadCapabilities
-} from './bootstrap.js'
-import { createWebThreadBootstrapHandoff } from './receive-handoff.js'
-import { type IRuntimePeerSourceContext } from '../../remote/index.js'
-import { readRuntimeLaunchContext } from '../../remote/runtime-api/launch-context.js'
-import { invalidThreadConfig } from './error.js'
+  awaitThreadPreparation,
+  constructWebThreadChannel,
+  openThreadMessageResource
+} from './channel.js'
+import { createThreadRuntimeBootstrap } from './bootstrap.js'
+import {
+  createEventTargetMessageResource,
+  holdAdapterLaunch,
+  type IAdapterMessageResource
+} from '@migaia/rpc-core/adapter'
+import { type IRuntimePeerSourceContext } from '@migaia/rpc-core/remote'
+
 import { THREAD_FINGERPRINT_PREFIX, ThreadBootstrap, ThreadEvent } from './constants.js'
 import { absoluteThreadEntry, portableThreadSpec } from './error.js'
-import { resolveAbortReason } from '../../core/internal/async-control.js'
+import { readAdapterAbortReason } from '@migaia/rpc-core/adapter'
 
 import { ThreadErrorText } from './error-text.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
+import { IpcReporterContext } from '@migaia/rpc-core/adapter'
 import type { IThreadChannelFactory, IThreadChannelOptions, IThreadWebPort } from './types.js'
 
 /** Web handles expose preparation but never counterfeit an unsupported actual-exit receipt. */
@@ -36,7 +39,10 @@ export type IAdapterWebThreadHandle = IWebThreadHandle &
 /** Cold receive owners belong only to exact handles constructed here, never copied shape fields. */
 const webPreparations = new WeakMap<
   IWebThreadHandle,
-  ReturnType<typeof createWebThreadBootstrapHandoff>
+  Readonly<{
+    resource: IAdapterMessageResource
+    offer: readonly string[]
+  }>
 >()
 
 /** Structural constructors admit actual runtime Workers and controlled adapter fixtures. */
@@ -62,8 +68,8 @@ export function createAdapterWebThreadLauncher(
     }),
     async launch(input, context) {
       /** The exact original request carries each independent parent's compiled bootstrap offer. */
-      const runtimeApi = readRuntimeLaunchContext(context) ?? options.runtimeApi
-      if (context.signal.aborted) throw resolveAbortReason(context.signal)
+      const runtimeApi = holdAdapterLaunch(context).proposal ?? options.runtimeApi
+      if (context.signal.aborted) throw readAdapterAbortReason(context.signal)
       /** Portable data admission precedes all runtime side effects. */
       const spec = portableThreadSpec(input)
       /** Adapter entry is absolute rather than relative to this module. */
@@ -83,7 +89,7 @@ export function createAdapterWebThreadLauncher(
       /** A terminate request has no effect on the independently unsupported exited Promise. */
       let terminating = false
       /** Only the opt-in protocol transfers a bounded cold receive owner to core. */
-      let handoff: ReturnType<typeof createWebThreadBootstrapHandoff> | undefined
+      let resource: IAdapterMessageResource | undefined
       /** Bootstrap listener is released on acknowledgement or explicit termination. */
       let receive: ((event: { data: unknown }) => void) | undefined
       /** Pending bootstrap rejects when cancellation reclaims its candidate Worker. */
@@ -98,20 +104,35 @@ export function createAdapterWebThreadLauncher(
         if (terminating) return
         terminating = true
         removeBootstrap()
-        handoff?.close()
-        rejectPrepared?.(resolveAbortReason(context.signal))
+        void resource?.close()
+        rejectPrepared?.(readAdapterAbortReason(context.signal))
         rejectPrepared = undefined
         worker.terminate()
       }
+      /** Unsupported actual-exit observation stays the original never-settled native handle Promise. */
+      const exited = new Promise<never>(() => undefined)
+      /** The same raw launch message enters Worker I/O and Core's held-resource control operation. */
+      const initialMessage = {
+        kind: ThreadBootstrap.data,
+        peerId: fingerprint,
+        ...(bootstrap ? { runtimeApi: bootstrap } : {}),
+        ...(spec.data === undefined ? {} : { data: spec.data })
+      }
+      /**
+       * Runtime capture attaches before the original native failure reporter and before initial
+       * write.
+       */
+      if (bootstrap)
+        resource = createEventTargetMessageResource(worker, { exited, terminate, initialMessage })
       worker.addEventListener(
         ThreadEvent.error,
         (event: { preventDefault(): void; error?: unknown }) => {
           event.preventDefault()
-          // Preparation owns this failure even when no launch cancellation has occurred.
-          handoff?.fail(event.error ?? event)
-          rejectPrepared?.(
-            createRpcTransportError(ThreadErrorText.bootstrapFailed, event.error ?? event)
-          )
+          /** Core already settled runtime control with this same observed native cause. */
+          if (!bootstrap)
+            rejectPrepared?.(
+              createAdapterTransportError(ThreadErrorText.bootstrapFailed, event.error ?? event)
+            )
           rejectPrepared = undefined
           try {
             options.report(event.error ?? event)
@@ -121,80 +142,39 @@ export function createAdapterWebThreadLauncher(
           terminate()
         }
       )
-      /** Even absent business data requires the private address before channel open. */
-      const prepared = new Promise<void | readonly string[]>((resolve, reject) => {
-        rejectPrepared = reject
-        if (bootstrap) {
-          /** Child capability ACK is independent of parent claims and application readiness. */
-          let acknowledged = false
-          handoff = createWebThreadBootstrapHandoff(worker, {
-            consume(message) {
+      /** Public runtime readiness is Core's exact original Promise, with no adapter agreement input. */
+      const prepared: Promise<void | readonly string[]> = bootstrap
+        ? resource!.prepareControl(bootstrap.capabilities)
+        : new Promise<void>((resolve, reject) => {
+            rejectPrepared = reject
+            receive = (event) => {
               if (
-                !message ||
-                typeof message !== 'object' ||
-                !('kind' in message) ||
-                message.kind !== ThreadBootstrap.runtimeAcknowledged
+                event.data === null ||
+                typeof event.data !== 'object' ||
+                !('kind' in event.data) ||
+                event.data.kind !== ThreadBootstrap.acknowledged
               )
-                return false
-              if (acknowledged)
-                invalidThreadConfig('runtimeApi.ack', ThreadErrorText.bootstrapFailed)
-              /** The private bootstrap reader owns ACK version, field and offer bounds. */
-              const peer = readThreadRuntimeAcknowledgement(message)
-              acknowledged = true
+                return
+              removeBootstrap()
               rejectPrepared = undefined
-              resolve(intersectThreadCapabilities(bootstrap.capabilities, peer))
-              return true
-            },
-            onFailure: (error) => {
-              reject(error)
-              terminate()
+              resolve()
             }
+            worker.addEventListener(ThreadEvent.message, receive)
           })
-          worker.postMessage(
-            {
-              kind: ThreadBootstrap.data,
-              peerId: fingerprint,
-              runtimeApi: bootstrap,
-              ...(spec.data === undefined ? {} : { data: spec.data })
-            },
-            undefined
-          )
-          return
-        }
-        receive = (event) => {
-          if (
-            event.data === null ||
-            typeof event.data !== 'object' ||
-            !('kind' in event.data) ||
-            event.data.kind !== ThreadBootstrap.acknowledged
-          )
-            return
-          removeBootstrap()
-          rejectPrepared = undefined
-          resolve()
-        }
-        worker.addEventListener(ThreadEvent.message, receive)
-        worker.postMessage(
-          {
-            kind: ThreadBootstrap.data,
-            peerId: fingerprint,
-            ...(spec.data === undefined ? {} : { data: spec.data })
-          },
-          undefined
-        )
-      })
+      worker.postMessage(initialMessage, undefined)
       /** The preparation consumer rethrows; this observer only prevents a late unhandled rejection. */
       void prepared.catch(() => undefined)
       /** Retain startup internally and expose only complete resource operations. */
       const handle: IAdapterWebThreadHandle = {
         identity: Object.freeze({ fingerprint }),
-        port: handoff?.port ?? worker,
+        port: worker,
         prepared,
-        exited: new Promise(() => undefined),
+        exited,
         terminate,
         open: (signal, channelOptions) => openWebThreadHandle(handle, signal, channelOptions)
       }
-      if (handoff) webPreparations.set(handle, handoff)
+      if (resource && bootstrap)
+        webPreparations.set(handle, { resource, offer: bootstrap.capabilities })
       return handle
     }
   }
@@ -206,20 +186,22 @@ async function openWebThreadHandle(
   signal: IAbortSignal,
   options: IThreadChannelOptions
 ): Promise<IRuntimePeerSourceResult> {
-  /** Foreign handles retain the old prepared Promise path but carry no internal receive authority. */
-  const handoff = webPreparations.get(handle)
+  /** Only this actual launcher retains Core's original raw control resource. */
+  const preparation = webPreparations.get(handle)
   try {
-    const capabilities = await awaitThreadPreparation(handle.prepared, signal)
-    if (handoff)
-      return constructWebThreadChannel(
-        handle.port,
+    await awaitThreadPreparation(handle.prepared, signal)
+    if (preparation) {
+      /** Open uses our original local offer; received capabilities remain private inside Core. */
+      return await openThreadMessageResource(
+        preparation.resource,
         handle.identity.fingerprint,
-        { ...options, capabilities: capabilities as readonly string[] },
-        handoff
+        { ...options, capabilities: preparation.offer },
+        signal
       )
-    return constructWebThreadChannel(handle.port, handle.identity.fingerprint, options)
+    }
+    return await constructWebThreadChannel(handle.port, handle.identity.fingerprint, options)
   } catch (error) {
-    handoff?.close()
+    void preparation?.resource.close()
     throw error
   }
 }

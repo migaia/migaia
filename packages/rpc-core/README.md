@@ -160,12 +160,9 @@ returned handle exposes `identity`, `port`, `exited`, `terminate`, `sampleUsage`
 `open` operation; preparation and receive-handoff callbacks remain private.
 
 ```ts
-import { createAdapterNodeThreadLauncher } from '@migaia/rpc-core/adapter/threads'
+import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'
 
-const launcher = createAdapterNodeThreadLauncher({
-  load: () => import('node:worker_threads'),
-  get pid() { return process.pid }
-})
+const launcher = createNodeThreadLauncher()
 const handle = await launcher.launch(threadSpec, { signal })
 const channel = await handle.open(signal, { scheduler })
 ```
