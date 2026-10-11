@@ -39,7 +39,7 @@ describe('A12 retained inventory equality', () => {
         unexpected: [],
         countMatches: true
       })
-      expect(current, consumer).not.toContain('src/core/error-serialization.ts')
+      expect(current, consumer).not.toContain('dist/core/error-serialization.js')
 
       const added = [...reviewed, 'src/core/not-retained.ts']
       expect(compareInventory(added, current)).toEqual({
