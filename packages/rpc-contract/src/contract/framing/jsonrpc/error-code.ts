@@ -1,5 +1,10 @@
+/**
+ * Registry-visible declaration of the bridge protocol source; it never changes with the package
+ * name.
+ */
+export const ERROR_SOURCE = '@migaia/rpc/bridge/jsonrpc'
 /** Dedicated public source separates bridge protocol failures from core and process failures. */
-export const JSONRPC_BRIDGE_ERROR_SOURCE = '@migaia/rpc/bridge/jsonrpc'
+export const JSONRPC_BRIDGE_ERROR_SOURCE = ERROR_SOURCE
 /** Public bridge codes describe one profile failure each; native error types stay intact. */
 export const JsonRpcBridgeErrorCode = {
   /** Invalid headers, body encoding, JSON or truncated EOF closes this byte connection. */
