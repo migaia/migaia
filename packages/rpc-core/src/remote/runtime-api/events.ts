@@ -1,7 +1,8 @@
+import { createRpcError } from '../../core/errors.js'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
-import { RpcCoreErrorCode, RpcError } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
 import { createRemoteLayerError } from '../error.js'
 import { RpcRemoteLayerErrorCode } from '../error-code.js'
 import { RuntimeEventName, RuntimeQueryLimit, RuntimeApiErrorText } from './constants.js'
@@ -66,7 +67,7 @@ export function createRuntimeEventPublisher(): IRuntimeEventPublisher {
   return Object.freeze({
     on(event, listener) {
       if (!Object.values(RuntimeEventName).includes(event) || typeof listener !== 'function')
-        throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.eventInvalid)
+        throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.eventInvalid)
       if (closed) return () => undefined
       const receipt = { event, invoke: listener }
       listeners.add(receipt)

@@ -1,3 +1,4 @@
+import { createRpcAbortError, createRpcError, isRpcRemoteError } from '../core/errors.js'
 import { createRuntimeBindingCalls } from './internal/runtime-call.js'
 import type { IRuntimeCallOptions } from './runtime-api/typing.js'
 import { SupervisorState, type ISupervisor } from '@migaia/supervision'
@@ -39,8 +40,8 @@ import { readRuntimePeerConnection } from './runtime-api/peer.js'
 import { RuntimeApiErrorText, RuntimeApiMode } from './runtime-api/constants.js'
 import { RpcCoreErrorText } from '../core/error-text.js'
 import { createProviderGenerationRetired } from '../core/internal/provider.js'
-import { RpcAbortError, RpcCoreErrorCode, RpcError } from '../core/index.js'
-import { isRpcRemoteError } from '../core/errors.js'
+import { RpcCoreErrorCode } from '../core/index.js'
+
 import { nativeReplayReceipt } from '../core/internal/native-replay.js'
 import { resolveAbortReason } from '../core/internal/async-control.js'
 import { assertRpcIdempotencyKey, defaultRpcId } from '../core/internal/id.js'
@@ -278,7 +279,7 @@ class RemoteRegistration<TUnit, TSpec> {
       options.callDeadlineCapMs !== undefined &&
       (!Number.isSafeInteger(options.callDeadlineCapMs) || options.callDeadlineCapMs <= 0)
     )
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.timeoutInvalid)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.timeoutInvalid)
     this.events = Object.freeze({
       current: () => ({
         generation: this.#current?.number ?? this.#options.binding.supervisor.generation,
@@ -534,7 +535,7 @@ class RemoteRegistration<TUnit, TSpec> {
     }
     own(closeChannel)
     if (channel.scheduler !== this.#options.binding.scheduler)
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.schedulerInvalid)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.schedulerInvalid)
     const contracts = this.#options.prepareRuntime
       ? []
       : this.#catalog
@@ -550,7 +551,7 @@ class RemoteRegistration<TUnit, TSpec> {
       )
     )
     if (hasStream && !channel.agreement.capabilities.includes('stream@1'))
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.capabilityConflict,
         RpcRemoteLayerErrorText.streamUnavailable
       )
@@ -565,7 +566,7 @@ class RemoteRegistration<TUnit, TSpec> {
     if (this.#options.prepareRuntime) {
       /** Native L can retire during a core checkpoint before the adapter's exit event arrives. */
       const removeRetirement = nativeReplayReceipt(channel.transport)?.onRetire(() =>
-        this.#leave(outcome.generation, new RpcAbortError())
+        this.#leave(outcome.generation, createRpcAbortError())
       )
       if (removeRetirement) own(async () => removeRetirement())
     }
@@ -592,7 +593,7 @@ class RemoteRegistration<TUnit, TSpec> {
     }
     own(closeEndpoint)
     if (hasStream && !served.stream)
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.capabilityConflict,
         RpcRemoteLayerErrorText.streamUnavailable
       )
@@ -885,7 +886,7 @@ class RemoteRegistration<TUnit, TSpec> {
       !(this.#options.prepareRuntime && call.timeoutMs === false) &&
       (typeof call.timeoutMs !== 'number' || !Number.isFinite(call.timeoutMs) || call.timeoutMs < 0)
     )
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.timeoutInvalid)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.timeoutInvalid)
   }
 
   /** Shared request path preserves the core send error object and logical key. */
@@ -936,7 +937,7 @@ class RemoteRegistration<TUnit, TSpec> {
           input: Readonly<{ expectedGeneration: number; remainingMs?: number; key?: string }>
         ) => {
           if (input.key !== key)
-            throw new RpcError(
+            throw createRpcError(
               RpcCoreErrorCode.invalidConfig,
               RpcCoreErrorText.idempotencyKeyInvalid
             )
@@ -944,7 +945,7 @@ class RemoteRegistration<TUnit, TSpec> {
             input.remainingMs !== undefined &&
             (!Number.isFinite(input.remainingMs) || input.remainingMs <= 0)
           )
-            throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.timeoutInvalid)
+            throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.timeoutInvalid)
           const live = this.#active()
           if (live.number !== input.expectedGeneration)
             throw createRemoteLayerError(
@@ -996,9 +997,9 @@ class RemoteRegistration<TUnit, TSpec> {
     if (!connection.description) return undefined
     const declaration = connection.routes.get(method)
     if (!declaration)
-      throw new RpcError(RpcCoreErrorCode.providerNotFound, RuntimeApiErrorText.methodUnavailable)
+      throw createRpcError(RpcCoreErrorCode.providerNotFound, RuntimeApiErrorText.methodUnavailable)
     if (!declaration.supportedModes.includes(mode))
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.capabilityUnsupported,
         RpcCoreErrorText.capabilityUnsupported
       )
@@ -1021,7 +1022,7 @@ class RemoteRegistration<TUnit, TSpec> {
       })
       const active = this.#active()
       if (!active.served.oneWay)
-        throw new RpcError(
+        throw createRpcError(
           RpcCoreErrorCode.capabilityConflict,
           RpcRemoteLayerErrorText.oneWayUnavailable
         )
@@ -1094,7 +1095,7 @@ class RemoteRegistration<TUnit, TSpec> {
     })
     const active = this.#active()
     if (!active.served.stream)
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.capabilityConflict,
         RpcRemoteLayerErrorText.streamUnavailable
       )
@@ -1143,7 +1144,7 @@ class RemoteRegistration<TUnit, TSpec> {
   #timeout(requested?: number | false): number | undefined {
     if (requested === false) return this.#options.callDeadlineCapMs
     if (requested !== undefined && (!Number.isFinite(requested) || requested < 0))
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.timeoutInvalid)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.timeoutInvalid)
     const cap = this.#options.callDeadlineCapMs
     return cap === undefined ? requested : requested === undefined ? cap : Math.min(cap, requested)
   }

@@ -1,5 +1,32 @@
-import { RpcError, RpcAbortError, RpcCoreErrorCode } from '@migaia/rpc-core'
-import { RpcCoreErrorText } from '../../../../rpc-core/dist/core/error-text.js'
+import { RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'
+import { attachErrorIdentity } from '@migaia/utils/error'
+
+/** Fixture-only historical diagnostics pin existing forwarded wire values, not Core identity. */
+const FixtureErrorText = {
+  capabilityUnsupported: 'Runtime operation capability is unavailable',
+  cancelled: 'Web RPC request cancelled'
+}
+/** Only the retained wire vectors own these diagnostic names; they do not mint live Core families. */
+const FixtureErrorFamily = { rpc: 'RpcError', abort: 'AbortError' }
+
+/**
+ * Create only a native diagnostic Error; no Core factory or private operation identity is used.
+ *
+ * @param {string} code Historical fixture wire code.
+ * @param {string} name Historical fixture native family name.
+ * @param {string} message Fixture-owned diagnostic wording.
+ * @param {unknown} [cause] Original diagnostic cause retained for forwarding assertions.
+ * @returns {Error} The native Error with public fields, without Core's private decision identity.
+ */
+function diagnosticError(code, name, message, cause) {
+  /** These fields preserve the existing fixture wire contract without minting Core's WeakMap. */
+  const error = attachErrorIdentity(new Error(message, { cause }), {
+    source: RPC_CORE_ERROR_SOURCE,
+    code
+  })
+  error.name = name
+  return error
+}
 
 /** Actual child business invocations remain independent of caller-side request counts. */
 let effects = 0
@@ -43,16 +70,22 @@ export const provide = {
 
   value: () => ++effects,
   fail: () => {
-    throw new RpcError(
+    throw diagnosticError(
       RpcCoreErrorCode.capabilityUnsupported,
-      RpcCoreErrorText.capabilityUnsupported
+      FixtureErrorFamily.rpc,
+      FixtureErrorText.capabilityUnsupported
     )
   },
   cancelled: () => {
-    throw new RpcAbortError(
-      undefined,
-      undefined,
-      new RpcError(RpcCoreErrorCode.capabilityUnsupported, RpcCoreErrorText.capabilityUnsupported)
+    throw diagnosticError(
+      RpcCoreErrorCode.cancelled,
+      FixtureErrorFamily.abort,
+      FixtureErrorText.cancelled,
+      diagnosticError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        FixtureErrorFamily.rpc,
+        FixtureErrorText.capabilityUnsupported
+      )
     )
   },
   hold: async () => {

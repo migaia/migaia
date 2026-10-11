@@ -1,6 +1,7 @@
+import { createRpcError, RpcCoreErrorCode } from '../errors.js'
 import { registerJsonObjectDescriptorMiddleware } from '../internal/json-object-port.js'
 import type { ICodec } from '@migaia/serialize/codec'
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcPlugin, IRpcPluginInstallResult } from '../typing.js'
 
@@ -20,7 +21,7 @@ export function codec<TDescriptor extends ICodecDescriptor>(
     typeof descriptor.encode !== 'function' ||
     typeof descriptor.decode !== 'function'
   )
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
   return registerJsonObjectDescriptorMiddleware(
     Object.freeze({
       name: 'codec',

@@ -1,3 +1,4 @@
+import { createRpcError, RpcCoreErrorCode, RpcError } from '../errors.js'
 import { registerJsonObjectMiddleware } from '../internal/json-object-port.js'
 import { RpcMiddlewareErrorText } from './error-text.js'
 import type {
@@ -6,7 +7,7 @@ import type {
   IRpcTimeoutCapability,
   IRpcTimeoutConfig
 } from '../typing.js'
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcPortName } from '../internal/plugin-shared-keys.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
 
@@ -25,7 +26,7 @@ function snapshotTimeout(
 ): { readonly timeoutMs?: number | false } | { readonly error: RpcError } {
   if (!config || typeof config !== 'object' || Array.isArray(config))
     return {
-      error: new RpcError(
+      error: createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcMiddlewareErrorText.timeoutDescriptorIsInvalid
       )
@@ -35,7 +36,7 @@ function snapshotTimeout(
     timeoutMs = config.timeoutMs
   } catch (error) {
     return {
-      error: new RpcError(
+      error: createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcMiddlewareErrorText.timeoutDescriptorIsUnreadable,
         error
@@ -46,7 +47,7 @@ function snapshotTimeout(
     return Object.freeze({ timeoutMs })
   } catch (error) {
     return {
-      error: new RpcError(
+      error: createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcMiddlewareErrorText.timeoutDescriptorIsUnreadable,
         error
@@ -69,7 +70,7 @@ function createTimeoutPlugin(config: IRpcTimeoutConfig): IRpcPlugin {
         timeoutMs !== false &&
         (!Number.isFinite(timeoutMs) || timeoutMs < 0)
       )
-        throw new RpcError(
+        throw createRpcError(
           RpcCoreErrorCode.invalidConfig,
           RpcMiddlewareErrorText.timeoutMsMustBeFalseOrANonNegativeNumber
         )

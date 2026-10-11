@@ -1,8 +1,9 @@
+import { createRpcError } from '../../core/errors.js'
 import { readRuntimeDefaultTimeout } from '../../remote/runtime-api/timeout.js'
 import type { IProcessHandle } from '@migaia/supervision/process'
 import { RpcRuntimeGenerationKind } from '@migaia/rpc-contract/framing/v1'
 import { defaultRpcId } from '../../core/internal/id.js'
-import { RpcError, RpcCoreErrorCode } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
 import { RuntimeApiErrorText } from '../../remote/runtime-api/constants.js'
 import { RuntimePluginKey } from '../../remote/index.js'
 import { createManagedRuntimePeer } from '../../remote/index.js'
@@ -49,7 +50,7 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
     (source) => source !== undefined
   )
   if (sources.length !== 1 || sources[0] === null || typeof sources[0] !== 'object')
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
   /** Parent identity is local; neither bootstrap markers nor peer claims may replace it. */
   const listen = typeof options.listen === 'object' ? options.listen : undefined
   /** Only the genuine local Plugin scope may identify its own generated default identity. */
@@ -87,7 +88,7 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
     offer.peer.id !== self.instanceId ||
     offer.capabilities.some((value) => !context.capabilities.includes(value))
   )
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
   if (listen)
     return createProcessListenerPeer(
       {

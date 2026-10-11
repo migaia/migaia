@@ -103,6 +103,7 @@ function layerViolations(file: string, source: string): string[] {
         outside ||
         (!isRelative &&
           specifier !== '@migaia/utils/bytes' &&
+          specifier !== '@migaia/utils/error' &&
           !ordinaryRpcEntries.has(specifier)) ||
         (target.startsWith('core/') && !browserCoreAllowlist.has(target))
     }

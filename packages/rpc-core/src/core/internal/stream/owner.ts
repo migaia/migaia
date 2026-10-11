@@ -1,4 +1,13 @@
 import {
+  createRpcAbortError,
+  createRpcError,
+  createRpcTimeoutError,
+  isLocalRpcError,
+  localRpcErrorCode,
+  RpcAbortError,
+  RpcCoreErrorCode
+} from '../../errors.js'
+import {
   checkRpcStreamInitialSequence,
   checkRpcStreamSequence,
   checkRpcStreamProgress,
@@ -6,7 +15,7 @@ import {
   checkRpcStreamProducerCredit,
   checkRpcRuntimeStreamFinish
 } from '@migaia/rpc-contract/stream'
-import { normalizeRuntimePortable } from '@migaia/rpc-contract/portable'
+import { normalizePortable } from '@migaia/rpc-contract'
 import {
   createOutboundEnvelope,
   retainForwardOptions,
@@ -27,7 +36,7 @@ import {
   type IRpcStreamPayload
 } from '@migaia/rpc-contract'
 import { deserializeRpcError, serializeRpcError } from '../error-wire-metadata.js'
-import { RpcCoreErrorCode, RpcError, RpcAbortError, RpcTimeoutError } from '../../errors.js'
+
 import { RpcCoreErrorText } from '../../error-text.js'
 import { RpcStreamErrorText } from './error-text.js'
 import { EndpointOwnerKey, type IEndpointKernelHost } from '../../endpoint-kernel.js'
@@ -78,7 +87,7 @@ export function prepareRuntimeStreamConsumer(
 ): Promise<void> {
   const prepare = Reflect.get(iterator, runtimeStreamReady) as (() => Promise<void>) | undefined
   if (!prepare)
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.capabilityUnsupported,
       RpcCoreErrorText.capabilityUnsupported
     )
@@ -270,7 +279,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     generation?: IRpcRuntimeGeneration
   ): AsyncIterableIterator<IRpcPortableValue> {
     this.#kernel.assertActive()
-    if (this.#closed) throw new RpcAbortError()
+    if (this.#closed) throw createRpcAbortError()
     let state: IConsumerState | undefined
     let unopenedTerminal: IConsumerState['terminal']
     let tail = Promise.resolve<unknown>(undefined)
@@ -354,7 +363,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
 
   /** Claim a provider method in the ordinary namespace and release it idempotently. */
   provide(method: string, run: IRpcStreamRun): () => void {
-    if (this.#closed) throw new RpcAbortError()
+    if (this.#closed) throw createRpcAbortError()
     const release = this.#registerStream(
       method,
       retainProviderPreflight(
@@ -379,10 +388,10 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     for (const release of this.#registrations) release()
     this.#registrations.clear()
     for (const state of this.#consumers.values())
-      this.#finishConsumer(state, { error: new RpcAbortError() })
+      this.#finishConsumer(state, { error: createRpcAbortError() })
     for (const state of this.#producers.values()) {
       if (state.lifetime) state.lifetime.pending += 1
-      this.#finishProducer(state, new RpcAbortError())
+      this.#finishProducer(state, createRpcAbortError())
       try {
         await state.iterator.return?.()
       } catch (error) {
@@ -412,7 +421,10 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     generation?: IRpcRuntimeGeneration
   ): IConsumerState {
     if (this.#capability && !this.#capability.supports(targetId))
-      throw new RpcError(RpcCoreErrorCode.capabilityConflict, RpcStreamErrorText.capabilityMissing)
+      throw createRpcError(
+        RpcCoreErrorCode.capabilityConflict,
+        RpcStreamErrorText.capabilityMissing
+      )
     if (options?.signal?.aborted) throw readStreamAbortReason(options.signal)
     const id = allocateRpcId(
       this.#outbound.defaultGenerate
@@ -503,7 +515,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     })
     if (options?.timeoutMs !== undefined && options.timeoutMs !== false) {
       state.timer = this.#kernel.time.setTimeout(() => {
-        void this.#cancelConsumer(state, { error: new RpcTimeoutError() })
+        void this.#cancelConsumer(state, { error: createRpcTimeoutError() })
       }, options.timeoutMs)
     }
     if (options?.signal) {
@@ -537,7 +549,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
           queueSignal: admission.signal,
           assertCanSend: () => {
             this.#kernel.assertActive()
-            if (state.terminal || !state.pending || state.seq !== seq) throw new RpcAbortError()
+            if (state.terminal || !state.pending || state.seq !== seq) throw createRpcAbortError()
           }
         },
         state.receiverId,
@@ -560,8 +572,8 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
 
   /** Only a top-level overload proves no physical frame was sent. */
   #sendFailureReason(error: unknown): unknown {
-    if ((error as { readonly code?: unknown })?.code === RpcCoreErrorCode.overloaded) return error
-    return new RpcError(
+    if (localRpcErrorCode(error) === RpcCoreErrorCode.overloaded) return error
+    return createRpcError(
       RpcCoreErrorCode.streamResultUnknown,
       RpcStreamErrorText.resultUnknown,
       error
@@ -609,7 +621,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
           this.#sendRuntimeIntent(
             state,
             serializeRpcError(
-              RpcRuntimeField.error in terminal ? terminal.error : new RpcAbortError(),
+              RpcRuntimeField.error in terminal ? terminal.error : createRpcAbortError(),
               {
                 report: (failure) => this.#report(failure.error)
               }
@@ -764,7 +776,9 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     runtime?: IProviderRuntimeStream | IRpcRuntimeEnvelope
   ): Promise<void> {
     const normalized = runtime
-      ? normalizeStreamPayload(payload, normalizeRuntimePortable)
+      ? normalizeStreamPayload(payload, (value) =>
+          normalizePortable(value, 0, new Set<object>(), true)
+        )
       : normalizeStreamPayload(payload)
     if (runtime) {
       /** The protected task is copied from accepted state, never reconstructed from business data. */
@@ -786,7 +800,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
                   ok: false,
                   error:
                     normalized.error ??
-                    serializeRpcError(new RpcAbortError(), {
+                    serializeRpcError(createRpcAbortError(), {
                       report: (failure) => this.#report(failure.error)
                     })
                 }
@@ -842,7 +856,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     const senderId = envelope.data.route.senderId
     if (this.#capability && !this.#capability.supports(senderId)) {
       this.#report(
-        new RpcError(RpcCoreErrorCode.protocolInvalid, RpcStreamErrorText.capabilityMissing)
+        createRpcError(RpcCoreErrorCode.protocolInvalid, RpcStreamErrorText.capabilityMissing)
       )
       return
     }
@@ -947,7 +961,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         }
         this.#finishConsumer(state, {
           error:
-            payload.error === undefined ? new RpcAbortError() : deserializeRpcError(payload.error)
+            payload.error === undefined ? createRpcAbortError() : deserializeRpcError(payload.error)
         })
         return
       }
@@ -1050,7 +1064,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         senderId,
         request.id,
         0,
-        new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.requestReplayLedgerIsFull),
+        createRpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.requestReplayLedgerIsFull),
         undefined,
         receiverId,
         runtime
@@ -1059,7 +1073,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     }
     if (this.#capability && !this.#capability.supports(senderId)) {
       this.#report(
-        new RpcError(RpcCoreErrorCode.protocolInvalid, RpcStreamErrorText.capabilityMissing)
+        createRpcError(RpcCoreErrorCode.protocolInvalid, RpcStreamErrorText.capabilityMissing)
       )
       return
     }
@@ -1084,7 +1098,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         senderId,
         request.id,
         0,
-        new RpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded),
+        createRpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded),
         undefined,
         receiverId,
         runtime
@@ -1099,7 +1113,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         senderId,
         request.id,
         0,
-        new RpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded),
+        createRpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded),
         undefined,
         receiverId,
         runtime
@@ -1133,7 +1147,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         (typeof source?.[Symbol.asyncIterator] !== 'function' &&
           typeof source?.[Symbol.iterator] !== 'function')
       )
-        throw new RpcError(RpcCoreErrorCode.payloadInvalid, RpcStreamErrorText.iterableInvalid)
+        throw createRpcError(RpcCoreErrorCode.payloadInvalid, RpcStreamErrorText.iterableInvalid)
       const iterator =
         typeof source[Symbol.asyncIterator] === 'function'
           ? source[Symbol.asyncIterator]!()
@@ -1223,7 +1237,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         state.timer = this.#kernel.time.setTimeout(() => {
           if (state.terminal) return
           if (state.lifetime) state.lifetime.pending += 1
-          this.#finishProducer(state, new RpcTimeoutError())
+          this.#finishProducer(state, createRpcTimeoutError())
           void Promise.resolve()
             .then(() => state.iterator.return?.())
             .catch((error) => this.#report(error))
@@ -1424,10 +1438,13 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
           : { value: result.value })
       }
       try {
-        if (state.runtime) normalizeStreamPayload(outboundPayload, normalizeRuntimePortable)
+        if (state.runtime)
+          normalizeStreamPayload(outboundPayload, (value) =>
+            normalizePortable(value, 0, new Set<object>(), true)
+          )
         else normalizeStreamPayload(outboundPayload)
       } catch (error) {
-        const failure = new RpcError(
+        const failure = createRpcError(
           RpcCoreErrorCode.payloadInvalid,
           RpcStreamErrorText.valueInvalid,
           error
@@ -1498,7 +1515,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
             queueSignal: admission.signal,
             assertCanSend: () => {
               this.#kernel.assertActive()
-              if (state.terminal || state.seq !== seq) throw new RpcAbortError()
+              if (state.terminal || state.seq !== seq) throw createRpcAbortError()
             },
             onStarted: commit
           },
@@ -1610,14 +1627,13 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
 
   /** A connection failure terminates all live streams without replaying delivered items. */
   #transportFailed(cause: unknown): void {
-    const error =
-      cause instanceof RpcAbortError
-        ? cause
-        : new RpcError(
-            RpcCoreErrorCode.streamResultUnknown,
-            RpcStreamErrorText.resultUnknown,
-            cause
-          )
+    const error = isLocalRpcError(cause, RpcAbortError)
+      ? cause
+      : createRpcError(
+          RpcCoreErrorCode.streamResultUnknown,
+          RpcStreamErrorText.resultUnknown,
+          cause
+        )
     for (const state of this.#consumers.values()) this.#finishConsumer(state, { error })
     for (const key of this.#pendingCancels.keys()) this.#resolveCancel(key, error)
     for (const state of this.#producers.values()) {

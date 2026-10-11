@@ -11,7 +11,7 @@ import { normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime'
 import { prepareRpcBinary } from '../../dist/contract/runtime-api/binary.js'
 import { restoreRpcBinary } from '@migaia/rpc-contract/binary'
 import { RpcBinaryStorage } from '@migaia/rpc-contract/wire'
-import { normalizeRuntimePortable } from '@migaia/rpc-contract/portable'
+import { normalizeRuntimePortable } from '../../dist/contract/normalize.js'
 import { normalizeStreamPayload } from '@migaia/rpc-contract'
 import { measurePortableStreamValue, RpcStreamLimit } from '@migaia/rpc-contract'
 

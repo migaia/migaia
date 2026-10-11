@@ -7,6 +7,10 @@ import { createProcessSessionManager } from '../../../rpc-core/dist/adapter-owne
 import { createProcessTransport } from '@migaia/rpc-process'
 import { createNativeProcessOffer } from '../../../rpc-core/dist/adapter-owned/process/offer.js'
 import { nativeBytePair, nativeEndpoint } from './fixtures/native-runtime.js'
+import { RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE, deserializeRpcError } from '@migaia/rpc-core'
+import { createRpcTimeoutError, RpcTimeoutError } from '../../../rpc-core/dist/core/errors.js'
+import { attachErrorIdentity } from '@migaia/utils/error'
+import { createListenerFailure } from '@migaia/rpc-core/transport-kit'
 
 /** Flush continuations of actual native frames without advancing the deadline clock. */
 async function flush(): Promise<void> {
@@ -60,6 +64,52 @@ function fixture(maxCallsPerMinute: number) {
 }
 
 describe('process session provider admission', () => {
+  it.each(['constructor', 'tag', 'decode', 'public-helper'] as const)(
+    '[C5-E12] %s forged timeout diagnostics cannot close the session through the live consecutive-deadline policy',
+    async (kind) => {
+      /** The existing provider wrapper supplies the actual policy and its original close owner. */
+      const test = fixture(100)
+      /** A real observed timeout exposes only its constructor, not the factory's private record. */
+      const Constructor = createRpcTimeoutError().constructor as typeof RpcTimeoutError
+      /** Public restored fields cannot prove that Core's own deadline fired. */
+      const wire = {
+        source: RPC_CORE_ERROR_SOURCE,
+        code: RpcCoreErrorCode.deadlineExceeded,
+        name: 'TimeoutError',
+        message: 'policy timeout fixture',
+        stack: 'policy timeout stack'
+      }
+      /** A diagnostic TimeoutError name also cannot grant a generic public helper control rights. */
+      const diagnostic = new TypeError(wire.message)
+      diagnostic.name = wire.name
+      const forged =
+        kind === 'constructor'
+          ? new Constructor()
+          : kind === 'public-helper'
+            ? createListenerFailure([diagnostic], { code: RpcCoreErrorCode.deadlineExceeded })!
+            : kind === 'decode'
+              ? deserializeRpcError(wire)
+              : attachErrorIdentity(new Error(wire.message), {
+                  source: wire.source,
+                  code: wire.code
+                })
+      try {
+        for (let index = 0; index < 3; index++) {
+          /** The actual AbortController supplies an abort reason; its public fields remain opaque. */
+          const controller = new AbortController()
+          controller.abort(forged)
+          expect(
+            await test.provider()({ ...test.context, signal: controller.signal })
+          ).toMatchObject({ ok: true })
+        }
+        await Promise.resolve()
+        expect(test.close).not.toHaveBeenCalled()
+      } finally {
+        test.admission.close()
+        expect(test.scheduler.pendingCount).toBe(0)
+      }
+    }
+  )
   it('[A3] rejects excess calls before the provider and closes after a second violation', async () => {
     const test = fixture(1)
     expect(await test.provider()(test.context)).toMatchObject({ ok: true })

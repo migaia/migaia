@@ -1,4 +1,4 @@
-import { ERROR_SOURCE, RpcContractErrorCode } from './error-code.js'
+import { ERROR_SOURCE } from './error-code.js'
 
 /** Contract-layer identity attached to every RPC contract boundary error. */
 export const RPC_CONTRACT_SOURCE = ERROR_SOURCE
@@ -23,16 +23,3 @@ export const RpcContractErrorText = {
   /** Public diagnostic for a rejected remote handshake with its original cause retained. */
   handshakeRejected: 'rpc handshake was rejected'
 } as const
-
-/**
- * Public diagnostic data lets callers classify a physical quota failure without obtaining a
- * factory.
- */
-export const RpcContractErrorDiagnostic = Object.freeze({
-  /** Whole physical-frame quotas retain the canonical semantic source, code and stable message. */
-  frameLimitExceeded: Object.freeze({
-    source: RPC_CONTRACT_SOURCE,
-    code: RpcContractErrorCode.frameLimitExceeded,
-    message: RpcContractErrorText.frameLimitExceeded
-  })
-})

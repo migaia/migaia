@@ -1,4 +1,11 @@
-import { RpcError, RpcCoreErrorCode, RpcLifecycleError } from '../errors.js'
+import {
+  createRpcError,
+  createRpcLifecycleError,
+  isLocalRpcError,
+  RpcCoreErrorCode,
+  RpcError
+} from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import { registerComposedDisposalPromises } from './composed-disposal-observer.js'
 import { RpcRuntimeMode } from '@migaia/rpc-contract/wire'
@@ -142,8 +149,8 @@ export function createEndpointProjection(
       values.set(key, descriptor.value)
     }
   } catch (error) {
-    if (error instanceof RpcError) throw error
-    throw new RpcError(
+    if (isLocalRpcError(error, RpcError)) throw error
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.endpointModuleInvalid,
       error
@@ -207,8 +214,8 @@ function readHostKeys(host: object): readonly string[] {
     if (keys.some((key) => typeof key !== 'string')) throw projectionError()
     return keys.filter((key): key is string => typeof key === 'string')
   } catch (error) {
-    if (error instanceof RpcError) throw error
-    throw new RpcError(
+    if (isLocalRpcError(error, RpcError)) throw error
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.endpointModuleInvalid,
       error
@@ -240,7 +247,7 @@ function defineValue(target: Record<string, unknown>, key: string, value: unknow
 
 /** Uses the package's existing invalid-composition contract for every projection rejection. */
 function projectionError(): RpcError {
-  return new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+  return createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
 }
 
 /**
@@ -281,6 +288,6 @@ function asEndpointDisposed(error: unknown): unknown {
       (error as { code?: unknown }).code === 'HOST_DISPOSED') &&
     (error as { source?: unknown }).source === '@migaia/plugin-host'
   )
-    return new RpcLifecycleError(RpcCoreErrorText.endpointDisposed, error)
+    return createRpcLifecycleError(RpcCoreErrorText.endpointDisposed, error)
   return error
 }

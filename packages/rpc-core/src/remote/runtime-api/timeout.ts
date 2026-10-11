@@ -1,4 +1,5 @@
-import { RpcCoreErrorCode, RpcError } from '../../core/index.js'
+import { createRpcError } from '../../core/errors.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
 import { RUNTIME_API_DEFAULT_TIMEOUT_MS, RuntimeApiErrorText } from './constants.js'
 
 /** Validate the simple factory's default before any original native/source owner is acquired. */
@@ -9,7 +10,7 @@ export function readRuntimeDefaultTimeout(
   const value = options.defaultTimeoutMs
   if (value === undefined) return RUNTIME_API_DEFAULT_TIMEOUT_MS
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0)
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.defaultTimeoutInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.defaultTimeoutInvalid)
   return value
 }
 

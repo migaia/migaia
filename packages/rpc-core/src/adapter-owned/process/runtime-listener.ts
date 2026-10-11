@@ -1,3 +1,4 @@
+import { createRpcError } from '../../core/errors.js'
 import { withRuntimePreparationContext } from '../../remote/runtime-api/launch-context.js'
 import {
   runtimeQuery,
@@ -14,7 +15,7 @@ import {
 } from '../../remote/index.js'
 import { ProcessPluginChannelKind } from './plugin/constants.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { RpcCoreErrorCode, RpcError } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
 import { RuntimeApiErrorText } from '../../remote/runtime-api/constants.js'
 import { compileRuntimeMethods } from '../../remote/runtime-api/catalog.js'
 import {
@@ -27,7 +28,7 @@ import {
   retainRuntimePeerSessions
 } from '../../remote/runtime-api/peer.js'
 import type { IRuntimePreparationContext } from '../../remote/runtime-api/launch-context.js'
-import type { IRemoteServePluginHandle } from '../../remote/index.js'
+import { type IRemoteServePluginHandle } from '../../remote/index.js'
 import { serveProcessSessions, type IProcessSessionsHandle } from './plugin/serve.js'
 import type { IProcessServeListenerIngress } from './plugin/types.js'
 import { reportSafely } from './plugin/binding.js'
@@ -150,7 +151,7 @@ export async function createProcessListenerPeer(
     /** This read projects the original Set; it cannot choose a winner among active sessions. */
     const service = sessions.current() as IRuntimeProcessService | null | undefined
     if (!service)
-      throw new RpcError(
+      throw createRpcError(
         service === null ? RpcCoreErrorCode.capabilityConflict : RpcCoreErrorCode.targetUnknown,
         service === null ? RuntimeApiErrorText.targetAmbiguous : RuntimeApiErrorText.targetUnknown
       )

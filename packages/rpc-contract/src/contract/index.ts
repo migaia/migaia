@@ -1,4 +1,8 @@
-export { RpcContractErrorCode, type IRpcContractErrorCode } from './error-code.js'
+export {
+  RpcContractErrorCode,
+  ERROR_SOURCE as RPC_CONTRACT_SOURCE,
+  type IRpcContractErrorCode
+} from './error-code.js'
 export { createDescriptor } from './protocol.js'
 export { fromJsonRpcError, toJsonRpcError } from './error-jsonrpc.js'
 export { normalizePortable } from './normalize.js'

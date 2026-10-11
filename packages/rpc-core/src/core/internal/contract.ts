@@ -1,4 +1,5 @@
-import { RpcError, RpcCoreErrorCode, RpcSchemaValidationError } from '../errors.js'
+import { createRpcError, createRpcSchemaValidationError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcContractConfig } from '../typing.js'
 import { safeRead, safeString } from './safe-value.js'
@@ -19,7 +20,7 @@ export function validateContractData(
     const methodSchema = safeRead<Record<string, unknown>>(safeRead(schemas, method), side)
     schema = methodSchema as { parse?: unknown } | undefined
   } catch (cause) {
-    throw new RpcSchemaValidationError(
+    throw createRpcSchemaValidationError(
       failureText,
       {
         kind: RpcContractFailureKind.schemaValidation,
@@ -87,7 +88,7 @@ export function validateContractData(
       secondaryFailures.push(error)
       causeMessage = RpcCoreErrorText.schemaValidationFallback
     }
-    throw new RpcSchemaValidationError(
+    throw createRpcSchemaValidationError(
       failureText,
       {
         kind: RpcContractFailureKind.schemaValidation,
@@ -105,6 +106,6 @@ export function validateContractData(
 /** Validates public operation names at the existing contract-validation boundary. */
 export function assertContractMethod(method: string): string {
   if (typeof method !== 'string' || method.length === 0)
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.methodInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.methodInvalid)
   return method
 }

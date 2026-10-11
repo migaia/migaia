@@ -13,6 +13,8 @@ export const PeerMethod = {
 
 /** Fixed fixture diagnostics never retain untrusted input or authentication material. */
 export const PeerText = {
+  /** The existing wire vector's diagnostic family is data, never Core control identity. */
+  rpcDiagnosticFamily: 'RpcError',
   cause: 'peer cause',
   error: 'peer error',
   mismatch: 'peer echo mismatch',

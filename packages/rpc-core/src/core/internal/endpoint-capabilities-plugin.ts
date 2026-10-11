@@ -1,5 +1,6 @@
+import { createRpcError, RpcCoreErrorCode } from '../errors.js'
 import { definePlugin, type IFeatureRecord } from '@migaia/plugin-host'
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import {
   readFeaturePolicy,
@@ -131,7 +132,7 @@ export const createEndpointCapabilitiesPlugin = (
               const output = core.features[name]
               const prepare = output && (output as { readonly prepare?: unknown }).prepare
               if (typeof prepare !== 'function')
-                throw new RpcError(
+                throw createRpcError(
                   RpcCoreErrorCode.invalidConfig,
                   RpcCoreErrorText.endpointModuleInvalid
                 )
@@ -153,7 +154,7 @@ export const createEndpointCapabilitiesPlugin = (
           const output = core.features[name]
           const activateFeature = output && (output as { readonly activate?: unknown }).activate
           if (typeof activateFeature !== 'function')
-            throw new RpcError(
+            throw createRpcError(
               RpcCoreErrorCode.invalidConfig,
               RpcCoreErrorText.endpointModuleInvalid
             )
@@ -167,25 +168,25 @@ export const createEndpointCapabilitiesPlugin = (
           const output = core.features[name]
           const createPorts = output && (output as { readonly ports?: unknown }).ports
           if (typeof createPorts !== 'function')
-            throw new RpcError(
+            throw createRpcError(
               RpcCoreErrorCode.invalidConfig,
               RpcCoreErrorText.endpointModuleInvalid
             )
           const values = createPorts()
           if (!values || typeof values !== 'object')
-            throw new RpcError(
+            throw createRpcError(
               RpcCoreErrorCode.invalidConfig,
               RpcCoreErrorText.endpointModuleInvalid
             )
           for (const key of Reflect.ownKeys(values)) {
             if (key in ports)
-              throw new RpcError(
+              throw createRpcError(
                 RpcCoreErrorCode.capabilityConflict,
                 RpcCoreErrorText.endpointModuleDuplicated
               )
             const descriptor = Object.getOwnPropertyDescriptor(values, key)
             if (!descriptor || !('value' in descriptor))
-              throw new RpcError(
+              throw createRpcError(
                 RpcCoreErrorCode.invalidConfig,
                 RpcCoreErrorText.endpointModuleInvalid
               )
@@ -208,12 +209,12 @@ export const createEndpointCapabilitiesPlugin = (
           for (const key of keys) {
             const descriptor = Object.getOwnPropertyDescriptor(projectionSource, key)
             if (!descriptor || !('value' in descriptor))
-              throw new RpcError(
+              throw createRpcError(
                 RpcCoreErrorCode.invalidConfig,
                 RpcCoreErrorText.endpointModuleInvalid
               )
             if (key in projection)
-              throw new RpcError(
+              throw createRpcError(
                 RpcCoreErrorCode.capabilityConflict,
                 RpcCoreErrorText.endpointModuleDuplicated
               )

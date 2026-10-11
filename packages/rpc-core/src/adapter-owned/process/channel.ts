@@ -11,7 +11,7 @@ import {
   type IRpcStreamFrameDecoder
 } from '@migaia/rpc-contract/framing/stream'
 import { RpcCoreErrorCode } from '../../core/index.js'
-import { tagRpcError } from '../../core/transport-kit.js'
+import { tagRpcError } from '../../core/errors.js'
 import type { IRpcTransport } from '../../core/index.js'
 import {
   RpcPlatform,

@@ -1,3 +1,4 @@
+import { createRpcError } from '../core/errors.js'
 import {
   isDefinedPlugin,
   isPluginHandleCurrent,
@@ -10,7 +11,7 @@ import { probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import { serializeRpcError } from '../core/internal/error-wire-metadata.js'
 import { normalizePortable } from '@migaia/rpc-contract'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
-import { RpcCoreErrorCode, RpcError } from '../core/index.js'
+import { RpcCoreErrorCode } from '../core/index.js'
 import { readEndpointIdentity } from '../core/internal/endpoint-projection.js'
 import { RemoteMethodName } from './constants.js'
 import {
@@ -251,7 +252,7 @@ export async function serveRemoteHost(
     } catch (cleanupError) {
       options.report(cleanupError)
     }
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.capabilityConflict,
       RpcRemoteLayerErrorText.streamUnavailable
     )

@@ -148,7 +148,7 @@ const channel = await createAdapterChannel(raw, {
 await channel.close()
 ```
 
-Adapters propagate the original owner errors. Existing Process code/text tables remain ordinary diagnostic data at `@migaia/rpc-core/adapter/diagnostics`; their semantic source stays `@migaia/rpc/process`. Error constructors, trust writers, owned snapshots and physical receipt readers remain private. Native-only detector sites use the shared public diagnostics and attach identity to their own original native error; they do not ask Core to mint arbitrary errors.
+Adapters propagate the original owner errors. `RPC_PROCESS_ERROR_SOURCE` and `RpcProcessErrorCode` remain ordinary diagnostic data at `@migaia/rpc-core/adapter/diagnostics`; their semantic source stays `@migaia/rpc/process`. Process text and stderr diagnostic tables are private. Trust writers, owned snapshots and physical receipt readers remain private. Adapter authors attach their own source/code through `@migaia/utils/error`; they do not ask Core to mint arbitrary operation errors.
 
 
 ### Thread execution and foreign-language byte adapters
@@ -213,3 +213,13 @@ calls preserve lazy replay qualification. Only actual channel construction consu
 Core-private initializer; there is no public lifetime registrar or target transport input.
 
 自定义载体可从 Core 根入口使用 `serializeRpcError` / `deserializeRpcError`，对持有的错误或 wire 数据编码/恢复，保留 Core/Remote 的原脱敏与 forwarding-route 策略；私有 maps 留 Core，完整 walker 仍唯一归 Contract。
+
+## 第三方公开错误面
+
+协议实现者使用 `@migaia/rpc-contract/errors` 的 wire schema、序列化/校验/遍历及 JSON-RPC 映射；适配器作者使用 Core 根入口的 wire 操作和 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError`。六个 source 常量与各 owner 的错误码表公开，原 source 字符串不变。B6 守卫跨 realm/模块副本用于诊断；`isRpcError` 的 code-is-string 检查不能替代它们。
+
+`*ErrorText` / `*Diagnostic` 文本表和 `tagRpcError` 私有；这是更名后包的破坏性导出收敛。错误类仅作类型导出，唯一 `RpcLifecycleError` 运行时类供 Store Worker 等持有自身 dispose 状态的消费方构造诊断，不 mint Core 操作身份。真实 dispose 失败后的 cleanup 展示沿原路径复用原 Error 身份，不决定是否关闭操作。
+
+已接纳错误的现有字段，包括 caller 取消 reason、store/缓存及解码后的 wire 错误，可沿既有 wire 和 terminal report 展示。mint、cancel、retry、close、计数、retire 与 replay admission 由 owner 私有身份或实际操作状态决定，不能依据这些错误的公开 source/code。普通解码与公开 listener failure helpers 只产生诊断，不登记 Core 控制身份。
+
+第三方通过 `@migaia/utils/error` 的 `attachErrorIdentity` 抛自己的 source/code；Core 保留原错误或 cause。source/code 表、wire schema/限额、普通 JSON-RPC 映射及短例见 [USEGUIDE](./USEGUIDE.md#第三方公开错误面与错误编码)。

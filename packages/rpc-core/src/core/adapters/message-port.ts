@@ -1,3 +1,4 @@
+import { createRpcTransportError, RpcCoreErrorCode, tagRpcError } from '../errors.js'
 import { RpcAdapterErrorText } from './error-text.js'
 import { registerCloneTransferCarrier } from '../internal/batch-frame.js'
 import {
@@ -5,7 +6,7 @@ import {
   EventAdmissionPolicy,
   withSnapshotEntries
 } from '@migaia/event-subscriber'
-import { RpcCoreErrorCode, RpcTransportError, tagRpcError } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcSendOptions, IRpcTransport } from '../transport.js'
 import { safeRead, safeString } from '../internal/safe-value.js'
@@ -134,7 +135,7 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
     const data = safeRead<unknown>(event, 'data', ({ error }) => {
       readFailed = true
       errorListeners.report(
-        new RpcTransportError(RpcCoreErrorText.propertyReadFailed, error),
+        createRpcTransportError(RpcCoreErrorText.propertyReadFailed, error),
         secondaryFailures
       )
       return undefined
@@ -163,11 +164,11 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
       return closed
     },
     send(message, options?: IRpcSendOptions<TTransfer>) {
-      if (closed) throw new RpcTransportError(RpcMessagePortErrorText.browserMessagePortClosed)
+      if (closed) throw createRpcTransportError(RpcMessagePortErrorText.browserMessagePortClosed)
       port.postMessage(message, options?.transfer)
     },
     subscribe(listener) {
-      if (closed) throw new RpcTransportError(RpcMessagePortErrorText.browserMessagePortClosed)
+      if (closed) throw createRpcTransportError(RpcMessagePortErrorText.browserMessagePortClosed)
       messageListeners.add(listener, () =>
         registerListeners(
           [
@@ -277,7 +278,7 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
         ? ''
         : `: ${safeString(error, RpcCoreErrorText.unknownError, ({ error: conversionError }) => {
             emitTransportError(
-              new RpcTransportError(
+              createRpcTransportError(
                 RpcMessagePortErrorText.messagePortDeserializeFailed(''),
                 conversionError
               )
@@ -311,14 +312,14 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
       return closed
     },
     send(message, options?: IRpcSendOptions) {
-      if (closed) throw new RpcTransportError(RpcMessagePortErrorText.messagePortClosed)
+      if (closed) throw createRpcTransportError(RpcMessagePortErrorText.messagePortClosed)
       port.postMessage(message, options?.transfer)
     },
     // Lazily attached/detached the same way as the web-worker adapter —
     // a client that closes must not leave the underlying port still
     // referencing listeners it can no longer reach.
     subscribe(listener) {
-      if (closed) throw new RpcTransportError(RpcMessagePortErrorText.messagePortClosed)
+      if (closed) throw createRpcTransportError(RpcMessagePortErrorText.messagePortClosed)
       messageListeners.add(listener, () =>
         registerListeners(
           [

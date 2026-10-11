@@ -1,3 +1,4 @@
+import { createRpcError, createRpcSerializationError } from '../../core/errors.js'
 import { createRuntimePeerCalls } from '../internal/runtime-call.js'
 import {
   runtimeConnectionDetail,
@@ -24,7 +25,7 @@ import type { IRpcPortableValue } from '@migaia/rpc-contract'
 import { RpcCapability, RpcWireLimit } from '@migaia/rpc-contract'
 import { createRuntimeApiEndpoint } from '../../core/index.js'
 import { rejectRuntimeApiCapability } from '../../core/runtime-api-endpoint.js'
-import { RpcError, RpcCoreErrorCode, RpcSerializationError } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
 import { completeProviderReturn } from '../../core/internal/provider.js'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import { abort } from '../../core/index.js'
@@ -46,12 +47,12 @@ import type { IProviderAdmissionScope } from '../../core/features/provider.js'
 import { createAuthenticationNonce } from '../../core/index.js'
 import { hooks } from '../../core/index.js'
 import { ping } from '../../core/index.js'
-import type {
-  IRpcEndpoint,
-  IRpcProvider,
-  IRpcProviderLimits,
-  IRpcFactoryConfig,
-  IRpcAbortSignal
+import {
+  type IRpcEndpoint,
+  type IRpcProvider,
+  type IRpcProviderLimits,
+  type IRpcFactoryConfig,
+  type IRpcAbortSignal
 } from '../../core/index.js'
 import { RemoteMethodName } from '../constants.js'
 import type { IRemoteContract } from '../contract.js'
@@ -77,7 +78,7 @@ import {
   readProviderRuntimeRelay,
   type ProviderRegistry
 } from '../../core/internal/provider.js'
-import type { IRpcStreamRun } from '../../core/stream/index.js'
+import { type IRpcStreamRun } from '../../core/stream/index.js'
 import { prepareRuntimeStreamConsumer } from '../../core/internal/stream/owner.js'
 import {
   normalizeRuntimeDescription,
@@ -207,7 +208,7 @@ export function readRuntimePeerConnection(peer: IRuntimePeer): IRuntimePeerConne
     /** This cold read retains no membership beyond the original listener owner. */
     const peers = connection.peers()
     if (peers.length !== 1)
-      throw new RpcError(
+      throw createRpcError(
         peers.length === 0 ? RpcCoreErrorCode.targetUnknown : RpcCoreErrorCode.capabilityConflict,
         peers.length === 0 ? RuntimeApiErrorText.targetUnknown : RuntimeApiErrorText.targetAmbiguous
       )
@@ -233,7 +234,7 @@ export function retainRuntimePeerSessions(
 
 /** Configuration rejection keeps its canonical code and does not reflect source secrets. */
 function invalid(message: string): never {
-  throw new RpcError(RpcCoreErrorCode.invalidConfig, message)
+  throw createRpcError(RpcCoreErrorCode.invalidConfig, message)
 }
 
 /** Both raw and supervised factories validate safe identity through this same cold owner. */
@@ -370,7 +371,7 @@ export async function createRuntimePeer(
         supportsBinary || rejectRuntimeApiCapability
       )
     } catch (cause) {
-      const failure = new RpcSerializationError(RuntimeApiErrorText.resultInvalid, cause)
+      const failure = createRpcSerializationError(RuntimeApiErrorText.resultInvalid, cause)
       registerLocalErrorWireSummary(
         failure,
         RpcCoreErrorCode.payloadInvalid,
@@ -599,7 +600,7 @@ export async function createRuntimePeer(
               (entry) => entry?.kind !== 'forward' || entry.forwardedVia !== first.forwardedVia
             )
           )
-            throw new RpcError(
+            throw createRpcError(
               RpcCoreErrorCode.invalidConfig,
               RpcCoreErrorText.runtimeGroupTargetsInvalid
             )
@@ -611,7 +612,7 @@ export async function createRuntimePeer(
           const route = runtimeForwardRoute(first, envelope.route.forwardRoute, remoteNodeId)
           const selected = () => {
             if (first.slot() !== connection)
-              throw new RpcError(
+              throw createRpcError(
                 RpcCoreErrorCode.providerGenerationRetired,
                 RpcCoreErrorText.providerGenerationRetired
               )
@@ -723,7 +724,10 @@ export async function createRuntimePeer(
       /** Admission uses the accepted generation's compiled whitelist and actual installed modes. */
       const selected = routes.get(method)
       if (!selected)
-        throw new RpcError(RpcCoreErrorCode.providerNotFound, RuntimeApiErrorText.methodUnavailable)
+        throw createRpcError(
+          RpcCoreErrorCode.providerNotFound,
+          RuntimeApiErrorText.methodUnavailable
+        )
       if (!selected.supportedModes.includes(mode)) rejectRuntimeApiCapability()
     }
     /** Capture original operation surfaces; hot calls allocate no facade Promise or bound function. */

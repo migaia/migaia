@@ -1,4 +1,5 @@
-import { RpcCoreErrorCode, RpcError } from '../errors.js'
+import { createRpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import { isForwardedOperation, retainForwardOptions } from './outbound-envelope.js'
 import type { ISendOptions } from '../typing.js'
@@ -21,7 +22,7 @@ export function retainRuntimeTransferOptions<T extends object>(source: object, c
 /** The held Process factory rejects transfer before any transfer getter or caller payload is read. */
 export function assertRuntimeProcessTransfer(options: object | undefined): void {
   if (options && Object.hasOwn(options, transferField))
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.runtimeProcessTransferInvalid
     )

@@ -11,7 +11,8 @@ import {
   reportListenerFailure,
   safeRead
 } from '@migaia/rpc-core/transport-kit'
-import { RpcCoreErrorCode, RpcTransportError } from '@migaia/rpc-core'
+import { RpcCoreErrorCode } from '@migaia/rpc-core'
+import { createBrowserTransportError } from '../error.js'
 import { BrowserRpcErrorText } from '../error-text.js'
 
 /** Outbound ServiceWorker or Client target. */
@@ -47,7 +48,7 @@ export function createServiceWorkerTransport(
     (peerId !== undefined &&
       safeRead<unknown>(source, 'id', ({ error }) => {
         reportListenerFailure(
-          new RpcTransportError(BrowserRpcErrorText.serviceWorkerSourceReadFailed, error),
+          createBrowserTransportError(BrowserRpcErrorText.serviceWorkerSourceReadFailed, error),
           transportErrors,
           secondaryFailures
         )

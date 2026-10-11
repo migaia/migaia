@@ -6,13 +6,12 @@ import { JsonRpcBridgeErrorText } from './jsonrpc-error-text.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { RPC_FRAME_TEXT_ENCODING } from './text-encoding.js'
 
-/** Existing diagnostic catalogs let custom JSON-RPC carriers classify stable source/code failures. */
+/** Custom JSON-RPC carriers classify failures by stable semantic source and code. */
 export {
   JsonRpcBridgeErrorCode,
   JSONRPC_BRIDGE_ERROR_SOURCE,
   type IJsonRpcBridgeErrorCode
 } from './jsonrpc-error-code.js'
-export { JsonRpcBridgeErrorText } from './jsonrpc-error-text.js'
 /** A custom byte carrier can size its buffers against the existing supported frame limits. */
 export { JsonRpcLimit } from './jsonrpc-constants.js'
 

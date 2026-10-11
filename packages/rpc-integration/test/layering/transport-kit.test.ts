@@ -2,8 +2,9 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
-import { createEndpoint, RpcCoreErrorCode, RpcTransportError } from '@migaia/rpc-core'
+import { createEndpoint, isRpcErrorInstance } from '@migaia/rpc-core'
 import { connect } from '@migaia/rpc-core'
+import { attachErrorIdentity } from '@migaia/utils/error'
 import * as kit from '@migaia/rpc-core/transport-kit'
 import type { IRpcTransport } from '@migaia/rpc-core/transport-kit'
 
@@ -11,7 +12,6 @@ import type { IRpcTransport } from '@migaia/rpc-core/transport-kit'
 const runtimeExports = [
   'RpcPlatform',
   'RpcTransportOwnership',
-  'tagRpcError',
   'collectListenerCleanupFailures',
   'collectListenerFailure',
   'createListenerFailure',
@@ -76,7 +76,7 @@ describe('public transport kit', () => {
           )
           continue
         }
-        expect(specifier, path).toMatch(/^(?:\.\.\/error-text|\.\/shared-worker)\.js$/u)
+        expect(specifier, path).toMatch(/^(?:\.\.\/error(?:-text)?|\.\/shared-worker)\.js$/u)
       }
     }
   })
@@ -98,10 +98,11 @@ describe('public transport kit', () => {
     await client.dispose()
     await server.dispose()
 
-    const original = kit.tagRpcError(
-      new TypeError('adapter send failed'),
-      RpcCoreErrorCode.transport
-    )
+    /** This carrier owns its failure identity; Core wraps the exact native cause. */
+    const original = attachErrorIdentity(new TypeError('adapter send failed'), {
+      source: '@example/carrier',
+      code: 'SEND_FAILED'
+    })
     const failing: IRpcTransport = {
       platform: kit.RpcPlatform.memory,
       ownership: kit.RpcTransportOwnership.borrowed,
@@ -122,11 +123,13 @@ describe('public transport kit', () => {
       await sender.send('server', 'echo', null)
       expect.fail('send should reject')
     } catch (error) {
-      expect(error).toBeInstanceOf(RpcTransportError)
+      expect(error).toBeInstanceOf(Error)
+      expect(isRpcErrorInstance(error)).toBe(true)
+      expect((error as Error).name).toBe('RpcTransportError')
       expect(error).toMatchObject({ source: '@migaia/rpc/core', code: 'TRANSPORT' })
       expect((error as Error & { cause: unknown }).cause).toBe(original)
       expect(original).toBeInstanceOf(TypeError)
-      expect(original).toMatchObject({ source: '@migaia/rpc/core', code: 'TRANSPORT' })
+      expect(original).toMatchObject({ source: '@example/carrier', code: 'SEND_FAILED' })
     }
     await sender.dispose()
   })

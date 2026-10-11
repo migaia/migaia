@@ -18,9 +18,23 @@ import {
   type IRemoteChannel,
   type IRemoteContract
 } from '@migaia/rpc-core/remote'
-import { RpcError, RpcCoreErrorCode, type IRpcContext } from '@migaia/rpc-core'
+import {
+  RpcCoreErrorCode,
+  RPC_CORE_ERROR_SOURCE,
+  type IRpcContext,
+  type IRpcCoreErrorCode
+} from '@migaia/rpc-core'
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { serializeRpcError } from '@migaia/rpc-contract'
 import { endpointFor } from './runtime.js'
+
+/** Preserve this peer's historical wire diagnostics without constructing or minting Core errors. */
+function peerDiagnosticError(code: IRpcCoreErrorCode, message: string, cause?: unknown): Error {
+  /** The original native error and exact cause remain the transmitted graph's held objects. */
+  const error = new Error(message, cause === undefined ? undefined : { cause })
+  error.name = PeerText.rpcDiagnosticFamily
+  return attachErrorIdentity(error, { source: RPC_CORE_ERROR_SOURCE, code })
+}
 
 /** CLI selects physical deployment; protocol and framing remain public package concerns. */
 const { values } = parseArgs({
@@ -136,8 +150,8 @@ async function serve(channel: IRemoteChannel): Promise<void> {
     })
   runtime.endpoint.provide(PeerMethod.error, () => {
     /** Two original errors stay reachable in the transmitted error graph. */
-    const cause = new RpcError(RpcCoreErrorCode.internal, PeerText.cause)
-    throw new RpcError(RpcCoreErrorCode.internal, PeerText.error, cause)
+    const cause = peerDiagnosticError(RpcCoreErrorCode.internal, PeerText.cause)
+    throw peerDiagnosticError(RpcCoreErrorCode.internal, PeerText.error, cause)
   })
   runtime.endpoint.provide(PeerMethod.wait, async (context: IRpcContext) => {
     await new Promise<void>((resolve) =>
@@ -223,7 +237,7 @@ async function initiate(channel: IRemoteChannel): Promise<void> {
       timeoutMs: 3000
     })
     if (JSON.stringify(answer) !== JSON.stringify(payload))
-      throw new RpcError(RpcCoreErrorCode.internal, PeerText.mismatch)
+      throw peerDiagnosticError(RpcCoreErrorCode.internal, PeerText.mismatch)
     if (!closing) await runtime.endpoint.announceClose(channel.peerId, { drainMs: 0 })
     process.stderr.write(PeerText.result)
   } finally {
@@ -261,7 +275,7 @@ async function main(): Promise<void> {
         mode: 'required',
         verify(auth) {
           if (auth !== token)
-            throw new RpcError(RpcCoreErrorCode.authenticationFailed, PeerText.authRejected)
+            throw peerDiagnosticError(RpcCoreErrorCode.authenticationFailed, PeerText.authRejected)
           return 'peer-test'
         }
       },
@@ -323,7 +337,7 @@ async function main(): Promise<void> {
                   mode: 'required',
                   verify(auth) {
                     if (auth !== token)
-                      throw new RpcError(
+                      throw peerDiagnosticError(
                         RpcCoreErrorCode.authenticationFailed,
                         PeerText.authRejected
                       )

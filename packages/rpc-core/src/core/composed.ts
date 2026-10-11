@@ -1,10 +1,13 @@
-import { isJsonObjectFeature } from './internal/json-object-port.js'
 import {
-  RpcConstructionError,
-  RpcError,
+  createRpcConstructionError,
+  createRpcError,
+  type IRpcCleanupError,
+  isLocalRpcError,
   RpcCoreErrorCode,
-  type IRpcCleanupError
+  RpcError
 } from './errors.js'
+import { isJsonObjectFeature } from './internal/json-object-port.js'
+
 import { RpcCoreErrorText } from './error-text.js'
 import {
   buildNativePluginBatch,
@@ -107,16 +110,19 @@ async function createComposedEndpointRuntime<
       (feature) => readFeaturePolicy(feature).publicKeys ?? []
     )
     if (declaredFeatureKeys.some((key) => reservedKeys.has(key)))
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.capabilityConflict,
         RpcCoreErrorText.endpointModuleDuplicated
       )
     if (new Set(declaredFeatureKeys).size !== declaredFeatureKeys.length)
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleDuplicated)
+      throw createRpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.endpointModuleDuplicated
+      )
   } catch (error) {
     if (config.transport) rollbackTransportConstruction(config.transport)
-    if (error instanceof RpcError) throw error
-    throw new RpcError(
+    if (isLocalRpcError(error, RpcError)) throw error
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.endpointModuleInvalid,
       error
@@ -219,7 +225,7 @@ async function createComposedEndpointRuntime<
               getKernel: () => activationKernel,
               getPrepared: () => {
                 if (!prepared)
-                  throw new RpcError(
+                  throw createRpcError(
                     RpcCoreErrorCode.invalidConfig,
                     RpcCoreErrorText.endpointModuleInvalid
                   )
@@ -284,7 +290,7 @@ async function createComposedEndpointRuntime<
     preflightFeatureClaims(admissions)
     const activationHost = host
     if (!activationHost || !activationKernel)
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
     activationPreflight = (state, candidateHost) => {
       const capabilityKeys = capabilityPlugin?.getPublicKeys() ?? []
       const dynamicKeys = [...capabilityKeys, ...activationHost.readNativeMiddlewareKeys()]
@@ -309,7 +315,7 @@ async function createComposedEndpointRuntime<
         ) ||
         new Set(dynamicKeys).size !== dynamicKeys.length
       )
-        throw new RpcError(
+        throw createRpcError(
           RpcCoreErrorCode.capabilityConflict,
           RpcCoreErrorText.endpointModuleDuplicated
         )
@@ -343,7 +349,7 @@ async function createComposedEndpointRuntime<
       try {
         await host.dispose()
       } catch (error) {
-        throw new RpcConstructionError(RpcCoreErrorText.endpointModuleInvalid, primary, [
+        throw createRpcConstructionError(RpcCoreErrorText.endpointModuleInvalid, primary, [
           { resource: 'plugin-host', error }
         ])
       }
@@ -358,7 +364,7 @@ async function createComposedEndpointRuntime<
           error instanceof AggregateError ? [...error.errors] : [error]
         )
         if (rollbackErrors.length > 0)
-          throw new RpcConstructionError(
+          throw createRpcConstructionError(
             RpcCoreErrorText.endpointModuleInvalid,
             cause,
             rollbackErrors.map((error, index) => ({
@@ -376,7 +382,7 @@ async function createComposedEndpointRuntime<
           await kernel.resources.releaseAll()
           kernel.completeDispose()
         } catch (error) {
-          throw new RpcConstructionError(RpcCoreErrorText.endpointModuleInvalid, primary, [
+          throw createRpcConstructionError(RpcCoreErrorText.endpointModuleInvalid, primary, [
             { resource: 'endpoint-kernel', error }
           ])
         }
@@ -389,7 +395,7 @@ async function createComposedEndpointRuntime<
           cleanupErrors.push({ resource: 'transport', error })
         }
       if (cleanupErrors.length > 0)
-        throw new RpcConstructionError(
+        throw createRpcConstructionError(
           RpcCoreErrorText.endpointModuleInvalid,
           primary,
           cleanupErrors
@@ -442,7 +448,7 @@ async function createComposedEndpointRuntime<
     try {
       await host!.dispose()
     } catch (error) {
-      throw new RpcConstructionError(RpcCoreErrorText.endpointModuleInvalid, primary, [
+      throw createRpcConstructionError(RpcCoreErrorText.endpointModuleInvalid, primary, [
         { resource: 'plugin-host', error }
       ])
     }
@@ -509,7 +515,7 @@ function resolveMiddlewarePorts(
   handles.forEach((handle, index) => {
     for (const name of admissions[index]?.sharedProvides ?? []) {
       if (typeof name !== 'string' || ports.has(name))
-        throw new RpcError(
+        throw createRpcError(
           RpcCoreErrorCode.capabilityConflict,
           RpcCoreErrorText.endpointModuleDuplicated
         )
@@ -527,7 +533,7 @@ function mergeMiddlewareExtensions(
   for (const handle of handles)
     for (const key of Reflect.ownKeys(handle.extensions)) {
       if (typeof key !== 'string' || Object.hasOwn(merged, key))
-        throw new RpcError(
+        throw createRpcError(
           RpcCoreErrorCode.capabilityConflict,
           RpcCoreErrorText.endpointModuleDuplicated
         )
@@ -547,11 +553,11 @@ function snapshotFeatureTuple(
 ): readonly IRpcFeature[] {
   if (features === undefined) return []
   if (!Array.isArray(features))
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
   try {
     return Object.freeze([...features])
   } catch (error) {
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.endpointModuleInvalid,
       error
@@ -567,7 +573,7 @@ function assertNativeRootRecord(
     Array.isArray(value) ||
     (typeof value === 'object' && value !== null && Symbol.iterator in value)
   )
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
 }
 
 /** Mirrors the runtime branch: only private first-party roots prepare then project `public`. */

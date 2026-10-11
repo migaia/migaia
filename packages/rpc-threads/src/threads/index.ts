@@ -2,6 +2,11 @@ export { createThreadPlugin } from './plugin.js'
 export { createThreadPeer } from './peer.js'
 export { createNodeThreadChannel, createWebThreadChannel } from './channel.js'
 export { receiveThreadData, readThreadBootstrap } from './bootstrap.js'
+export {
+  RpcThreadErrorCode,
+  ERROR_SOURCE as RPC_THREAD_ERROR_SOURCE,
+  type IRpcThreadErrorCode
+} from '../error-code.js'
 export type {
   IThreadChannelFactory,
   IThreadChannelOptions,

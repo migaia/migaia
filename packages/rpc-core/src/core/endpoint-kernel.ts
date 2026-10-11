@@ -1,4 +1,10 @@
-import { RpcConstructionError, RpcError, RpcCoreErrorCode, RpcLifecycleError } from './errors.js'
+import {
+  createRpcConstructionError,
+  createRpcError,
+  createRpcLifecycleError,
+  RpcCoreErrorCode
+} from './errors.js'
+
 import { RpcCoreErrorText } from './error-text.js'
 import { ResourceScope } from './internal/resource-scope.js'
 import { safeRead, safeString } from './internal/safe-value.js'
@@ -167,7 +173,7 @@ class EndpointKernel implements IEndpointKernelHost {
       ownership
     } = transportSnapshot
     if (typeof transportSend !== 'function' || typeof transportSubscribe !== 'function')
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcCoreErrorText.transportDescriptorInvalid
       )
@@ -176,7 +182,7 @@ class EndpointKernel implements IEndpointKernelHost {
       (onTransportError !== undefined && typeof onTransportError !== 'function') ||
       (onListenerError !== undefined && typeof onListenerError !== 'function')
     )
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcCoreErrorText.transportDescriptorInvalid
       )
@@ -193,7 +199,7 @@ class EndpointKernel implements IEndpointKernelHost {
         encodedType !== 'uint8array') ||
       (ownership !== undefined && ownership !== 'owned' && ownership !== 'borrowed')
     )
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcCoreErrorText.transportIdentityDescriptorInvalid
       )
@@ -282,7 +288,7 @@ class EndpointKernel implements IEndpointKernelHost {
    */
   activate(activation: IEndpointKernelActivation): void {
     if (this.#state !== EndpointKernelState.constructing)
-      throw new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+      throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     try {
       this.#resources.addSync('transport subscription', activation.unsubscribe)
       if (activation.unsubscribeTransportError)
@@ -319,19 +325,19 @@ class EndpointKernel implements IEndpointKernelHost {
       } catch (readError) {
         primary = new AggregateError([error, readError], message)
       }
-      throw new RpcConstructionError(message, primary, [], cleanupPromise)
+      throw createRpcConstructionError(message, primary, [], cleanupPromise)
     }
   }
 
   /** Rejects work after closing or when its captured generation is stale. */
   assertActive(generation?: number): void {
     if (generation !== undefined && generation !== this.#generation)
-      throw new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+      throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     if (
       this.#state !== EndpointKernelState.constructing &&
       this.#state !== EndpointKernelState.active
     )
-      throw new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+      throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
   }
 
   /** Sends through the canonical transport while preserving class-instance method context. */
@@ -347,7 +353,7 @@ class EndpointKernel implements IEndpointKernelHost {
   registerRoute(kind: string, route: IEndpointKernelRoute): () => void {
     this.assertActive()
     if (this.#routes.has(kind))
-      throw new RpcError(RpcCoreErrorCode.capabilityConflict, RpcCoreErrorText.endpointRouteOwned)
+      throw createRpcError(RpcCoreErrorCode.capabilityConflict, RpcCoreErrorText.endpointRouteOwned)
     this.#routes.set(kind, route)
     let registered = true
     return () => {
@@ -361,7 +367,7 @@ class EndpointKernel implements IEndpointKernelHost {
   registerOwner(key: string, owner: object): void {
     this.assertActive()
     if (this.#owners.has(key))
-      throw new RpcError(RpcCoreErrorCode.capabilityConflict, RpcCoreErrorText.endpointOwnerOwned)
+      throw createRpcError(RpcCoreErrorCode.capabilityConflict, RpcCoreErrorText.endpointOwnerOwned)
     this.#owners.set(key, owner)
   }
 
@@ -424,7 +430,7 @@ export function readTransportSnapshot(transport: IRpcTransport): IEndpointKernel
       ownership: safeRead<unknown>(transport, 'ownership')
     })
   } catch (error) {
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.transportDescriptorInvalid,
       error

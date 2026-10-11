@@ -18,7 +18,7 @@ import {
   RpcCapability
 } from '@migaia/rpc-contract'
 import { RpcCoreErrorCode } from '../../core/index.js'
-import { tagRpcError } from '../../core/transport-kit.js'
+import { tagRpcError } from '../../core/errors.js'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import type { IRemoteChannel } from '../../remote/index.js'
 import type { IRuntimePeerSourceResult } from '../../remote/index.js'

@@ -1,7 +1,8 @@
+import { createRpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcControlAttachment } from '../internal/control-attachment.js'
 import type { IRpcCandidatePingPort } from '../internal/plugin-shared-keys.js'
 import { RpcPortName } from '../internal/plugin-shared-keys.js'
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcEndpoint } from '../typing.js'
 import type { IRpcFeature } from '../feature.js'
@@ -81,7 +82,7 @@ export const createControlFeature = (
       }
       const ports = (): Readonly<Record<PropertyKey, unknown>> => {
         if (!candidatePing)
-          throw new RpcError(
+          throw createRpcError(
             RpcCoreErrorCode.invalidConfig,
             RpcCoreErrorText.endpointModuleDependencyMissing
           )

@@ -1,3 +1,9 @@
+import {
+  createRpcConfigurationError,
+  createRpcError,
+  RpcCoreErrorCode,
+  tagRpcError
+} from '../errors.js'
 import { selectedJsonObjectPort } from './json-object-port.js'
 import { checkRpcStreamInitialSequence, RpcStreamPointer } from '@migaia/rpc-contract/stream'
 import { createOutboundEnvelope } from './outbound-envelope.js'
@@ -5,7 +11,7 @@ import { readProviderPreflight } from './provider.js'
 import { hasFastEndpoint } from './fast-path.js'
 import type { IRpcProviderController } from './plugin-shared-keys.js'
 import { RpcPlatform } from '../transport-constants.js'
-import { RpcConfigurationError, RpcError, RpcCoreErrorCode, tagRpcError } from '../errors.js'
+
 import {
   RpcMessageKind,
   RpcProviderRejectionReason,
@@ -189,7 +195,7 @@ export class RpcProviderAttachment {
           if (capacity.occupancy >= capacity.limit || capacity.peerOccupancy >= capacity.peerLimit)
             this.#outbound.send({
               kind: 'report',
-              error: new RpcError(
+              error: createRpcError(
                 RpcCoreErrorCode.overloaded,
                 RpcCoreErrorText.requestReplayLedgerIsFull
               ),
@@ -271,9 +277,12 @@ export class RpcProviderAttachment {
   provide(method: string, provider: IRpcProvider): this {
     this.#kernel.assertActive()
     if (typeof method !== 'string' || method.length === 0 || typeof provider !== 'function')
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.providerDescriptorInvalid)
+      throw createRpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.providerDescriptorInvalid
+      )
     if (!this.#registry.register(method, provider))
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.providerDuplicated,
         RpcCoreErrorText.providerDuplicated(method)
       )
@@ -291,9 +300,12 @@ export class RpcProviderAttachment {
   ): () => void {
     this.#kernel.assertActive()
     if (typeof method !== 'string' || method.length === 0 || typeof handler !== 'function')
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.providerDescriptorInvalid)
+      throw createRpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.providerDescriptorInvalid
+      )
     if (!this.#registry.registerStream(method, handler))
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.providerDuplicated,
         RpcCoreErrorText.providerDuplicated(method)
       )
@@ -308,7 +320,7 @@ export class RpcProviderAttachment {
     this.#kernel.assertActive()
     assertContractMethod(event)
     if (typeof listener !== 'function')
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.eventListenerInvalid)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.eventListenerInvalid)
     return this.#registry.listen(event, listener)
   }
 
@@ -425,7 +437,7 @@ export class RpcProviderAttachment {
     const generation = outbound.runtimeGeneration
     const callerGeneration = outbound.inboundIdentity.readGeneration(record.admission.token)
     if (!generation || !callerGeneration)
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.providerGenerationMismatch,
         RpcCoreErrorText.providerGenerationMismatch
       )
@@ -456,7 +468,7 @@ export class RpcProviderAttachment {
     const generation = outbound.runtimeGeneration
     const callerGeneration = outbound.inboundIdentity.readGeneration(record.admission.token)
     if (!generation || !callerGeneration)
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.providerGenerationMismatch,
         RpcCoreErrorText.providerGenerationMismatch
       )
@@ -502,7 +514,7 @@ export class RpcProviderAttachment {
       runtimeTaskKey({ ...envelope.task, callerGeneration, targetGeneration: generation }) !==
         association
     )
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.providerGenerationMismatch,
         RpcCoreErrorText.providerGenerationMismatch
       )
@@ -699,6 +711,6 @@ function snapshotProviderEntries(
   try {
     return Object.entries(providers ?? {})
   } catch (error) {
-    throw new RpcConfigurationError(RpcCoreErrorText.providerDescriptorInvalid, error)
+    throw createRpcConfigurationError(RpcCoreErrorText.providerDescriptorInvalid, error)
   }
 }

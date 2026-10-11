@@ -1,6 +1,6 @@
 import { normalizePortable } from '@migaia/rpc-contract'
 import { RpcCoreErrorCode } from '../../core/index.js'
-import { tagRpcError } from '../../core/transport-kit.js'
+import { tagRpcError } from '../../core/errors.js'
 import type { IThreadSpec } from '@migaia/supervision/threads'
 import { ThreadErrorText } from './error-text.js'
 

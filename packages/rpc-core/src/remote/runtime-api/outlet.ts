@@ -1,3 +1,4 @@
+import { createRpcError } from '../../core/errors.js'
 import { createRuntimeEventPublisher, type IRuntimeEventPublisher } from './events.js'
 import {
   runtimeQueryOutput,
@@ -27,7 +28,7 @@ import type {
 import type { IPluginConstraint, IPluginRuntimeSharedSlot } from '@migaia/plugin-host'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
 import { serializeRpcError } from '../../core/internal/error-wire-metadata.js'
-import { RpcCoreErrorCode, RpcError } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
 import type { IRuntimeCallOptions } from './typing.js'
 import type { IRuntimePeerDescription, IRuntimePeerIdentity } from './description.js'
 import type { IRuntimePeer } from './peer.js'
@@ -134,7 +135,7 @@ function validateFilter(filter?: IRuntimeListFilter): void {
         Object.hasOwn(name, 'exact') === Object.hasOwn(name, 'prefix') ||
         typeof (Object.hasOwn(name, 'exact') ? name.exact : name.prefix) !== 'string'))
   )
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.filterInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.filterInvalid)
 }
 
 /** Process signals are limited to the native graceful operation already owned by the launcher. */
@@ -221,33 +222,33 @@ export function createRuntimeOutlet(
     const name = typeof target === 'string' ? target : target?.name
     const id = typeof target === 'string' ? target : target?.instanceId
     if (typeof name !== 'string' || !name || typeof id !== 'string' || !id)
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.targetInvalid)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.targetInvalid)
     /** The canonical index rejects multiple matches without selecting a winner. */
     const connection = slot.find(id)
     if (connection === null)
-      throw new RpcError(RpcCoreErrorCode.capabilityConflict, RuntimeApiErrorText.targetAmbiguous)
+      throw createRpcError(RpcCoreErrorCode.capabilityConflict, RuntimeApiErrorText.targetAmbiguous)
     if (!connection)
-      throw new RpcError(RpcCoreErrorCode.targetUnknown, RuntimeApiErrorText.targetUnknown)
+      throw createRpcError(RpcCoreErrorCode.targetUnknown, RuntimeApiErrorText.targetUnknown)
     if (typeof target !== 'string' && (connection as IRuntimePluginConnection).name !== name)
-      throw new RpcError(RpcCoreErrorCode.targetUnknown, RuntimeApiErrorText.targetUnknown)
+      throw createRpcError(RpcCoreErrorCode.targetUnknown, RuntimeApiErrorText.targetUnknown)
     return connection as IRuntimePluginConnection
   }
   /** Execution authority is looked up on committed registration metadata before native side effects. */
   const controlled = (name: string): ISupervisor<unknown, unknown> => {
     if (typeof name !== 'string' || !name)
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.targetInvalid)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.targetInvalid)
     slot.find(name)
     const records = (slot.registered() as readonly IRuntimePluginRegistration[]).filter(
       (record) => record.name === name
     )
     if (records.length !== 1)
-      throw new RpcError(
+      throw createRpcError(
         records.length ? RpcCoreErrorCode.capabilityConflict : RpcCoreErrorCode.targetUnknown,
         records.length ? RuntimeApiErrorText.targetAmbiguous : RuntimeApiErrorText.targetUnknown
       )
     const execution = records[0]!.execution
     if (!execution)
-      throw new RpcError(RpcCoreErrorCode.capabilityConflict, RuntimeApiErrorText.controlBorrowed)
+      throw createRpcError(RpcCoreErrorCode.capabilityConflict, RuntimeApiErrorText.controlBorrowed)
     return execution
   }
   return Object.freeze({
@@ -263,7 +264,7 @@ export function createRuntimeOutlet(
           Object.hasOwn(options, 'signal') &&
           (kind === RuntimePluginKey.thread || options.signal !== RuntimeProcessSignal.graceful))
       )
-        throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.stopInvalid)
+        throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.stopInvalid)
       return controlled(name).stop(
         options?.graceMs === undefined ? undefined : { graceMs: options.graceMs }
       )
@@ -325,7 +326,7 @@ export function createRuntimeOutlet(
       const name = typeof target === 'string' ? target : target?.name
       const id = typeof target === 'string' ? target : target?.instanceId
       if (typeof name !== 'string' || !name || typeof id !== 'string' || !id)
-        throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.targetInvalid)
+        throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.targetInvalid)
       /** Captured reservations cannot select later installations while resource sampling awaits. */
       const records = slot.registered() as readonly IRuntimePluginRegistration[]
       /** Exact instance identity has the same precedence as the original ready index. */
@@ -339,7 +340,7 @@ export function createRuntimeOutlet(
           ? records.filter((record) => record.name === name)
           : ids
       if (candidates.length !== 1)
-        throw new RpcError(
+        throw createRpcError(
           candidates.length ? RpcCoreErrorCode.capabilityConflict : RpcCoreErrorCode.targetUnknown,
           candidates.length
             ? RuntimeApiErrorText.targetAmbiguous
@@ -353,7 +354,7 @@ export function createRuntimeOutlet(
           )
         : details
       if (matches.length !== 1)
-        throw new RpcError(
+        throw createRpcError(
           matches.length ? RpcCoreErrorCode.capabilityConflict : RpcCoreErrorCode.targetUnknown,
           matches.length ? RuntimeApiErrorText.targetAmbiguous : RuntimeApiErrorText.targetUnknown
         )
@@ -371,7 +372,7 @@ export function createRuntimeOutlet(
       for (const connection of connections) {
         try {
           if (slot.find(connection.instanceId) !== connection)
-            throw new RpcError(RpcCoreErrorCode.targetUnknown, RuntimeApiErrorText.targetUnknown)
+            throw createRpcError(RpcCoreErrorCode.targetUnknown, RuntimeApiErrorText.targetUnknown)
           await connection.peer.notify(method, payload, options)
           results.push(Object.freeze({ instanceId: connection.instanceId, ok: true }))
         } catch (error) {

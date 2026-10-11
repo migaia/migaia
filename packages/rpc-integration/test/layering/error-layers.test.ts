@@ -18,7 +18,12 @@ const retired = (
   ) as { readonly codes: readonly string[] }
 ).codes
 
-type ICodeReference = { readonly table: string; readonly key: string }
+type ICodeReference = {
+  readonly table: string
+  readonly key: string
+  /** A public Contract source import paired with this exact attach identity's emitted code. */
+  readonly contractWireSource?: true
+}
 
 /** Lists only maintained TypeScript source files under one layer. */
 function sourceFiles(directory: string): string[] {
@@ -60,7 +65,46 @@ function declaredCodes(layer: 'contract' | 'core'): Map<string, string> {
 function thrownCodes(sourceText: string, filename: string): ICodeReference[] {
   const source = ts.createSourceFile(filename, sourceText, ts.ScriptTarget.Latest, true)
   const found: ICodeReference[] = []
-  const references = (node: ts.Node): void => {
+  /** Only an ordinary public Contract import can prove the cross-layer wire source. */
+  const contractSourceBindings = new Set(
+    source.statements.flatMap((statement) =>
+      ts.isImportDeclaration(statement) &&
+      ts.isStringLiteral(statement.moduleSpecifier) &&
+      /^@migaia\/rpc-contract(?:\/errors)?$/u.test(statement.moduleSpecifier.text) &&
+      statement.importClause?.namedBindings &&
+      ts.isNamedImports(statement.importClause.namedBindings)
+        ? statement.importClause.namedBindings.elements
+            .filter(
+              (element) => (element.propertyName ?? element.name).text === 'RPC_CONTRACT_SOURCE'
+            )
+            .map((element) => element.name.text)
+        : []
+    )
+  )
+  const references = (node: ts.Node, contractWireSource?: true): void => {
+    /** A predicate chooses a reported code; its compared diagnostics are never emitted codes. */
+    if (ts.isConditionalExpression(node)) {
+      references(node.whenTrue, contractWireSource)
+      references(node.whenFalse, contractWireSource)
+      return
+    }
+    /** Equality/range checks return booleans, including classifier tests nested in error arguments. */
+    if (
+      ts.isBinaryExpression(node) &&
+      [
+        ts.SyntaxKind.EqualsEqualsToken,
+        ts.SyntaxKind.EqualsEqualsEqualsToken,
+        ts.SyntaxKind.ExclamationEqualsToken,
+        ts.SyntaxKind.ExclamationEqualsEqualsToken,
+        ts.SyntaxKind.LessThanToken,
+        ts.SyntaxKind.LessThanEqualsToken,
+        ts.SyntaxKind.GreaterThanToken,
+        ts.SyntaxKind.GreaterThanEqualsToken,
+        ts.SyntaxKind.InKeyword,
+        ts.SyntaxKind.InstanceOfKeyword
+      ].includes(node.operatorToken.kind)
+    )
+      return
     if (
       ts.isPropertyAccessExpression(node) &&
       ts.isIdentifier(node.expression) &&
@@ -68,9 +112,13 @@ function thrownCodes(sourceText: string, filename: string): ICodeReference[] {
         node.expression.text
       )
     ) {
-      found.push({ table: node.expression.text, key: node.name.text })
+      found.push({
+        table: node.expression.text,
+        key: node.name.text,
+        ...(contractWireSource ? { contractWireSource } : {})
+      })
     }
-    ts.forEachChild(node, references)
+    ts.forEachChild(node, (child) => references(child, contractWireSource))
   }
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
@@ -79,7 +127,7 @@ function thrownCodes(sourceText: string, filename: string): ICodeReference[] {
         ts.isPropertyAccessExpression(node.expression) &&
         node.expression.name.text === 'failureResponse'
       if (
-        /^(?:attachErrorIdentity|createContractError|tag(?:Web)?RpcError|(?:Web)?Rpc\w*Error|failureResponse)$/u.test(
+        /^(?:attachErrorIdentity|createContractError|create(?:Web)?Rpc\w*Error|tag(?:Web)?RpcError|(?:Web)?Rpc\w*Error|failureResponse)$/u.test(
           callee
         ) ||
         failureResponse ||
@@ -90,7 +138,33 @@ function thrownCodes(sourceText: string, filename: string): ICodeReference[] {
             return Boolean(parent && parent.name?.text.endsWith('Error'))
           })())
       ) {
-        for (const argument of node.arguments ?? []) references(argument)
+        for (const [index, argument] of (node.arguments ?? []).entries()) {
+          if (
+            callee === 'attachErrorIdentity' &&
+            index === 1 &&
+            ts.isObjectLiteralExpression(argument)
+          ) {
+            /** The explicit source and code must belong to this same identity object. */
+            const origin = argument.properties.find(
+              (property) =>
+                ts.isPropertyAssignment(property) && property.name.getText(source) === 'source'
+            )
+            const paired =
+              origin &&
+              ts.isPropertyAssignment(origin) &&
+              ts.isIdentifier(origin.initializer) &&
+              contractSourceBindings.has(origin.initializer.text)
+            for (const property of argument.properties) {
+              if (
+                paired &&
+                ts.isPropertyAssignment(property) &&
+                property.name.getText(source) === 'code'
+              )
+                references(property.initializer, true)
+              else references(property)
+            }
+          } else references(argument)
+        }
       }
     }
     if (ts.isObjectLiteralExpression(node)) {
@@ -139,8 +213,12 @@ describe('layered error ownership', () => {
       )
     ).toEqual([])
     expect(
-      coreThrows.filter(
-        ({ table, key }) => !/^(?:WebRpcErrorCode|RpcCoreErrorCode)$/u.test(table) || !core.has(key)
+      coreThrows.filter(({ table, key, contractWireSource }) =>
+        table === 'RpcContractErrorCode'
+          ? !contractWireSource || !contract.has(key)
+          : contractWireSource ||
+            !/^(?:WebRpcErrorCode|RpcCoreErrorCode)$/u.test(table) ||
+            !core.has(key)
       )
     ).toEqual([])
     expect(
@@ -154,6 +232,38 @@ describe('layered error ownership', () => {
     expect(thrownCodes('const event = { code: RpcCoreErrorCode.transport }', 'fixture.ts')).toEqual(
       []
     )
+    expect(
+      thrownCodes('throw createRpcError(RpcCoreErrorCode.internal, message)', 'fixture.ts')
+    ).toEqual([{ table: 'RpcCoreErrorCode', key: 'internal' }])
+    expect(
+      thrownCodes(
+        'throw createRpcError(classifyRpcContractError(error)?.code === RpcContractErrorCode.frameLimitExceeded ? RpcCoreErrorCode.payloadInvalid : RpcCoreErrorCode.internal, message)',
+        'fixture.ts'
+      )
+    ).toEqual([
+      { table: 'RpcCoreErrorCode', key: 'payloadInvalid' },
+      { table: 'RpcCoreErrorCode', key: 'internal' }
+    ])
+    expect(
+      thrownCodes(
+        'import { RPC_CONTRACT_SOURCE } from "@migaia/rpc-contract/errors"; throw attachErrorIdentity(error, { source: RPC_CONTRACT_SOURCE, code: RpcContractErrorCode.frameLimitExceeded })',
+        'fixture.ts'
+      )
+    ).toEqual([
+      { table: 'RpcContractErrorCode', key: 'frameLimitExceeded', contractWireSource: true }
+    ])
+    expect(
+      thrownCodes(
+        'import { RPC_CONTRACT_SOURCE } from "wrong-package"; throw attachErrorIdentity(error, { source: RPC_CONTRACT_SOURCE, code: RpcContractErrorCode.frameLimitExceeded })',
+        'fixture.ts'
+      )
+    ).toEqual([{ table: 'RpcContractErrorCode', key: 'frameLimitExceeded' }])
+    expect(
+      thrownCodes(
+        'import { RPC_CONTRACT_SOURCE } from "@migaia/rpc-contract"; throw attachErrorIdentity(error, { source: "wrong-source", code: RpcContractErrorCode.frameLimitExceeded })',
+        'fixture.ts'
+      )
+    ).toEqual([{ table: 'RpcContractErrorCode', key: 'frameLimitExceeded' }])
   })
 
   it('A2 removes every dead core code while retaining a throw site for each declared code', () => {
@@ -163,7 +273,11 @@ describe('layered error ownership', () => {
     expect(core.get('duplicateModuleInstance')).toBe('DUPLICATE_MODULE_INSTANCE')
     for (const value of retired) expect([...core.values()]).not.toContain(value)
     const contractThrown = new Set(layerThrows('contract').map(({ key }) => key))
-    const coreThrown = new Set(layerThrows('core').map(({ key }) => key))
+    const coreThrown = new Set(
+      layerThrows('core')
+        .filter(({ table }) => /^(?:WebRpcErrorCode|RpcCoreErrorCode)$/u.test(table))
+        .map(({ key }) => key)
+    )
     /** The virtual Source is true compiler input; do not waive a declared code merely by name. */
     const compiler = readFileSync(compilerSource, 'utf8')
     expect(compiler).toContain(

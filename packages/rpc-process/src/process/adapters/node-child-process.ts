@@ -3,8 +3,7 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
-import { RpcCoreErrorCode } from '@migaia/rpc-core'
-import { tagRpcError } from '@migaia/rpc-core/transport-kit'
+import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-core'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { CapabilityLevel, StandardCapability, type TerminationMode } from '@migaia/supervision'
 import {
@@ -152,10 +151,10 @@ export function createNodeProcessLauncher(
         }
         if (stdinFailure) throw stdinFailure
         if (spec.bootstrap?.via === 'fd')
-          throw tagRpcError(
-            new TypeError(RpcProcessErrorText.optionsInvalid),
-            RpcCoreErrorCode.invalidConfig
-          )
+          throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
+            source: RPC_CORE_ERROR_SOURCE,
+            code: RpcCoreErrorCode.invalidConfig
+          })
         /** Stdout channel is never also consumed by the output drain. */
         const channel =
           spec.stdio.stdin === 'channel' &&
@@ -212,10 +211,10 @@ export async function openProcessStdioChannel(
   }>
 ): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array }>> {
   if (options.bootstrap === 'fd')
-    throw tagRpcError(
-      new TypeError(RpcProcessErrorText.optionsInvalid),
-      RpcCoreErrorCode.invalidConfig
-    )
+    throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
+      source: RPC_CORE_ERROR_SOURCE,
+      code: RpcCoreErrorCode.invalidConfig
+    })
   const channel = createAdapterProcessStdio(process)
   return receiveAdapterBootstrap(channel, options.bootstrap, options)
 }

@@ -7,6 +7,13 @@ import type {
   IRpcOutboundOperationsPort
 } from '../../dist/core/internal/plugin-shared-keys.js'
 import { RpcStreamOwner } from '../../dist/core/internal/stream/owner.js'
+import {
+  RpcCoreErrorCode,
+  RPC_CORE_ERROR_SOURCE,
+  deserializeRpcError
+} from '../../dist/core/index.js'
+import { createRpcError } from '../../dist/core/errors.js'
+import { attachErrorIdentity } from '@migaia/utils/error'
 
 /** Inspect a test frame after the contract normalizer has accepted it. */
 function streamPayload(command: IRpcOutboundCommand) {
@@ -83,6 +90,44 @@ function heldOpen() {
 
 /** A8 cancel cannot outrun the initial request's unresolved send Promise. */
 describe('streaming A8 send-order races', () => {
+  it.each(['tag', 'decode'] as const)(
+    '[C5-E10] %s forged overload cannot claim that the initial stream frame was never sent',
+    async (kind) => {
+      /** The actual stream owner waits for its original outbound completion. */
+      const fixture = heldOpen()
+      /** Public diagnostics cannot prove the physical admission state. */
+      const wire = {
+        source: RPC_CORE_ERROR_SOURCE,
+        code: RpcCoreErrorCode.overloaded,
+        name: 'RpcError',
+        message: 'overload fixture',
+        stack: 'overload fixture stack'
+      }
+      const forged =
+        kind === 'decode'
+          ? deserializeRpcError(wire)
+          : attachErrorIdentity(new Error(wire.message), { source: wire.source, code: wire.code })
+      const pending = fixture.owner.open('server', 'count', null).next()
+      fixture.rejectOpen(forged)
+      await expect(pending).rejects.toMatchObject({
+        code: RpcCoreErrorCode.streamResultUnknown,
+        cause: forged
+      })
+      expect(fixture.commands.filter((command) => command.kind === 'frame')).toHaveLength(0)
+      await fixture.owner.dispose()
+    }
+  )
+
+  it('[C5-E11] the original owner-minted overload keeps its exact no-send capacity refusal', async () => {
+    /** A genuine original admission refusal retains its existing instance and semantic code. */
+    const fixture = heldOpen()
+    const original = createRpcError(RpcCoreErrorCode.overloaded, 'owner overload fixture')
+    const pending = fixture.owner.open('server', 'count', null).next()
+    fixture.rejectOpen(original)
+    await expect(pending).rejects.toBe(original)
+    expect(fixture.commands.filter((command) => command.kind === 'frame')).toHaveLength(0)
+    await fixture.owner.dispose()
+  })
   it('keeps an unopened iterator local and never issues a later request', async () => {
     const fixture = heldOpen()
     const iterator = fixture.owner.open('server', 'count', null)

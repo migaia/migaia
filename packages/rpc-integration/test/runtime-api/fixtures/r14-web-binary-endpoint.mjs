@@ -3,18 +3,15 @@
  * .js/.mjs specifiers; production is unchanged.
  */
 import { createRuntimeApiEndpoint } from '@migaia/rpc-core'
-import {
-  codec,
-  framer,
-  connect,
-  abort,
-  timeout,
-  hooks,
-  authentication,
-  RpcAuthenticationError
-} from '@migaia/rpc-core'
-import { RpcMiddlewareErrorText } from '../../../../rpc-core/dist/core/middleware/error-text.js'
+import { codec, framer, connect, abort, timeout, hooks, authentication } from '@migaia/rpc-core'
+import { attachErrorIdentity } from '@migaia/utils/error'
 import fixture from './managed-binary-key.json' with { type: 'json' }
+/** This fixture's verifier owns its failure; production authentication supplies Core's wrapper. */
+const VERIFIER_SOURCE = '@example/web-binary-verifier'
+/** Failed HMAC verification is local adapter diagnosis, not Core operation identity. */
+const VerifierErrorCode = { signatureInvalid: 'SIGNATURE_INVALID' }
+/** Fixture presentation preserves its earlier wording without publishing a message contract. */
+const VerifierErrorText = { signatureInvalid: 'Inbound frame authentication failed' }
 /** A genuine runtime key is imported lazily after the original Worker listener is installed. */
 let key
 /** Actual WebCrypto signs the original protected envelope; no fixture replay or codec exists. */
@@ -66,9 +63,10 @@ export async function webBinaryEndpoint(channel, id, report) {
                 new TextEncoder().encode(JSON.stringify(signed.body))
               ))
             )
-              throw new RpcAuthenticationError(
-                RpcMiddlewareErrorText.inboundFrameAuthenticationFailed
-              )
+              throw attachErrorIdentity(new Error(VerifierErrorText.signatureInvalid), {
+                source: VERIFIER_SOURCE,
+                code: VerifierErrorCode.signatureInvalid
+              })
             return signed.body
           }
         })

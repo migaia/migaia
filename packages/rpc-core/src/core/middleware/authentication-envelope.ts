@@ -1,4 +1,5 @@
-import { RpcAuthenticationError, RpcConfigurationError } from '../errors.js'
+import { createRpcAuthenticationError, createRpcConfigurationError } from '../errors.js'
+
 import { RpcMiddlewareErrorText } from './error-text.js'
 import type { IAuthenticationChallengeFields } from '../internal/authentication-replay.js'
 
@@ -26,13 +27,13 @@ export type IAuthenticationEnvelope = IAuthenticationChallengeFields & {
 /** Allocates a 128-bit cryptographic nonce or rejects configuration without weak fallback. */
 export function createAuthenticationNonce(): string {
   if (!globalThis.crypto?.getRandomValues)
-    throw new RpcConfigurationError(RpcMiddlewareErrorText.authenticationNonceUnavailable)
+    throw createRpcConfigurationError(RpcMiddlewareErrorText.authenticationNonceUnavailable)
   try {
     /** Sixteen secure bytes become canonical lowercase hex inside the signed wrapper. */
     const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16))
     return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
   } catch (error) {
-    throw new RpcConfigurationError(RpcMiddlewareErrorText.authenticationNonceFailed, error)
+    throw createRpcConfigurationError(RpcMiddlewareErrorText.authenticationNonceFailed, error)
   }
 }
 
@@ -66,11 +67,11 @@ export function readAuthenticationEnvelope(value: unknown): IAuthenticationEnvel
   let decoded = bytes ? new TextDecoder('utf-8', { fatal: true }).decode(value) : value
   if (typeof decoded === 'string') {
     if (!decoded.startsWith(RpcAuthenticationEnvelope.prefix))
-      throw new RpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
+      throw createRpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
     decoded = JSON.parse(decoded.slice(RpcAuthenticationEnvelope.prefix.length))
   }
   if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded))
-    throw new RpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
+    throw createRpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
   /** Each binding field is read once before grammar checks or counter arithmetic. */
   const { authentication, version, nonce, counter, payload, ...fields } =
     decoded as IAuthenticationEnvelope
@@ -83,13 +84,13 @@ export function readAuthenticationEnvelope(value: unknown): IAuthenticationEnvel
     !/^[1-9][0-9]{0,19}$/u.test(counter) ||
     BigInt(counter) > RpcAuthenticationEnvelope.maximumCounter
   )
-    throw new RpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
+    throw createRpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
   if (
     bytes &&
     (!Array.isArray(payload) ||
       !payload.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255))
   )
-    throw new RpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
+    throw createRpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
   return {
     authentication,
     version,

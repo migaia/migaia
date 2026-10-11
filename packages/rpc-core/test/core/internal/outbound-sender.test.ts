@@ -1,10 +1,6 @@
+import { createRpcAuthenticationError } from '../../../dist/core/errors.js'
 import { describe, expect, it, vi } from 'vitest'
-import {
-  RpcAuthenticationError,
-  RpcError,
-  RpcCoreErrorCode,
-  RpcSerializationError
-} from '../../../dist/core/errors.js'
+import { RpcError, RpcCoreErrorCode, RpcSerializationError } from '../../../dist/core/errors.js'
 import { RpcOutboundSender } from '../../../dist/core/internal/outbound-sender.js'
 import { RpcCoreErrorText } from '../../../dist/core/error-text.js'
 import type { IRpcAuthenticationTransform } from '../../../dist/core/typing.js'
@@ -129,8 +125,8 @@ describe('outbound sender encoded type boundary', () => {
     let protectCalls = 0
     let rejectFirst: ((error: unknown) => void) | undefined
     let rejectSecond: ((error: unknown) => void) | undefined
-    const firstAuthenticationError = new RpcAuthenticationError('first authentication failure')
-    const secondAuthenticationError = new RpcAuthenticationError('second authentication failure')
+    const firstAuthenticationError = createRpcAuthenticationError('first authentication failure')
+    const secondAuthenticationError = createRpcAuthenticationError('second authentication failure')
     const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,
@@ -168,7 +164,7 @@ describe('outbound sender encoded type boundary', () => {
   })
 
   it('keeps an authentication failure reachable through the sender boundary', async () => {
-    const authenticationError = new RpcAuthenticationError('authentication failure')
+    const authenticationError = createRpcAuthenticationError('authentication failure')
     const pipeline = new RpcOutboundSender(
       {
         platform: 'Memory' as const,

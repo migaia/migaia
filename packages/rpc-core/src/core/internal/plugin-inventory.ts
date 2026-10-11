@@ -1,3 +1,4 @@
+import { createRpcError, type IRpcCleanupError, RpcCoreErrorCode } from '../errors.js'
 import { EndpointKernelState, type IEndpointKernelHost } from '../endpoint-kernel.js'
 import type {
   IDeferredPreparedEndpoint,
@@ -10,8 +11,7 @@ import type { IRpcPluginConstraint, IRpcPluginCore, IRpcPluginHostCore } from '.
 import { runConstructionInstall } from './construction-install.js'
 import { assertPluginInstallResult } from './plugin-descriptor.js'
 import { RpcPortName, type IRpcHooksPort, type IRpcTimePort } from './plugin-shared-keys.js'
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
-import type { IRpcCleanupError } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcHookEvent } from '../typing.js'
 import type { IRpcClaimAdmission } from './feature-policy.js'
@@ -356,7 +356,7 @@ function copyExtensionOutput(
   for (const key of publicKeys) {
     const descriptor = Object.getOwnPropertyDescriptor(source, key)
     if (!descriptor || !('value' in descriptor))
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
     Object.defineProperty(output, key, {
       configurable: true,
       enumerable: true,

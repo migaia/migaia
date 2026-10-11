@@ -1,3 +1,22 @@
+import {
+  createRpcAbortError,
+  createRpcAuthenticationError,
+  createRpcContractError,
+  createRpcError,
+  createRpcProtocolError,
+  createRpcRemoteError,
+  createRpcSerializationError,
+  createRpcTimeoutError,
+  isLocalRpcError,
+  localRpcErrorCode,
+  RpcAbortError,
+  RpcCoreErrorCode,
+  RpcError,
+  RpcLifecycleError,
+  RpcRemoteError,
+  RpcTimeoutError,
+  tagRpcError
+} from '../errors.js'
 import { readCanonicalReceiver } from './plugin-shared-keys.js'
 import { deferred } from '@migaia/utils/promise'
 import {
@@ -18,7 +37,7 @@ import {
   hasCloneTransferCarrier
 } from './batch-frame.js'
 import { readRuntimeCarrier } from '@migaia/rpc-contract/runtime'
-import { normalizeRuntimeEnvelopeLazy as normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime/lazy'
+import { normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime/lazy'
 import {
   readRpcNativeBinary,
   assertRpcNativeBinaryFrameSize,
@@ -49,10 +68,10 @@ import type {
 import { RpcCapability, RpcBatchPhysical } from '@migaia/rpc-contract'
 import type { ProviderAdmissionRegistry, IProviderIngressReceipt } from './provider-admission.js'
 import { readRpcBatchMembers, assertRpcPhysicalFrameSize } from '@migaia/rpc-contract/framing'
-import { RpcContractErrorDiagnostic } from '@migaia/rpc-contract/errors'
+import { RPC_CONTRACT_SOURCE, RpcContractErrorCode } from '@migaia/rpc-contract/errors'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import type { IInboundIdentityPreparedSource } from './inbound-identity.js'
-import { RpcSerializationError } from '../errors.js'
+
 import { enableFastTimePort } from './time-port.js'
 import {
   selectedJsonObjectPort,
@@ -61,18 +80,7 @@ import {
 } from './json-object-port.js'
 import { bindRpcFrameIngress } from '@migaia/rpc-contract/framing'
 import { RpcPlatform } from '../transport-constants.js'
-import {
-  RpcAbortError,
-  RpcContractError,
-  RpcError,
-  RpcAuthenticationError,
-  RpcCoreErrorCode,
-  RpcLifecycleError,
-  RpcRemoteError,
-  RpcProtocolError,
-  RpcTimeoutError,
-  tagRpcError
-} from '../errors.js'
+
 import {
   RpcMessageKind,
   RpcProviderRejectionReason,
@@ -365,7 +373,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         if (this.#settled) return
         if (options.timeoutMs !== undefined && options.timeoutMs !== false)
           this.#timer = owner.kernel.time.setTimeout(
-            () => this.cancel(new RpcTimeoutError()),
+            () => this.cancel(createRpcTimeoutError()),
             options.timeoutMs
           )
         this.signals = options.signal ? [options.signal] : []
@@ -410,7 +418,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
 
     /** Original live checks reject a late or cancelled write without another admission pass. */
     #assertActive(): void {
-      if (this.#settled) throw new RpcAbortError()
+      if (this.#settled) throw createRpcAbortError()
       this.#plan.operation.assertActive(this.#plan.owner.kernel.generation)
     }
 
@@ -482,7 +490,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     #onAbort(): void {
       const options = this.#plan.options
       this.cancel(
-        new RpcAbortError(
+        createRpcAbortError(
           undefined,
           undefined,
           options.signal ? resolveAbortReason(options.signal) : undefined
@@ -712,7 +720,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         NativeDefaultIdText.terminalSubscription,
         this.#native.onRetire(() => {
           kernel.beginClose()
-          this.#failAll(new RpcAbortError())
+          this.#failAll(createRpcAbortError())
           this.#replay.clear()
         })
       )
@@ -801,11 +809,17 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
             : undefined
           if (carrier && !receipt) {
             /** Core detected its actual ingress quota; retain the original native wire identity. */
-            const diagnostic = RpcContractErrorDiagnostic.frameLimitExceeded
             /** This error belongs to the provider admission attempt, not a synthetic byte frame. */
-            const error = new RangeError(diagnostic.message)
-            registerLocalErrorWireSummary(error, diagnostic.code, diagnostic.message)
-            throw attachErrorIdentity(error, { source: diagnostic.source, code: diagnostic.code })
+            const error = new RangeError(RpcCoreErrorText.runtimeIngressFrameLimitExceeded)
+            registerLocalErrorWireSummary(
+              error,
+              RpcContractErrorCode.frameLimitExceeded,
+              RpcCoreErrorText.runtimeIngressFrameLimitExceeded
+            )
+            throw attachErrorIdentity(error, {
+              source: RPC_CONTRACT_SOURCE,
+              code: RpcContractErrorCode.frameLimitExceeded
+            })
           }
           /** Closing withdraws exact candidates while a caller-owned asynchronous transform waits. */
           const closeCandidate = receipt
@@ -833,7 +847,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                 !this.#runtimeCapabilities?.includes(RpcCapability.portableBinary) ||
                 !this.#runtimeCapabilities.includes(RpcCapability.nativeBinary)
               )
-                throw new RpcError(
+                throw createRpcError(
                   RpcCoreErrorCode.capabilityUnsupported,
                   RpcCoreErrorText.capabilityUnsupported
                 )
@@ -846,7 +860,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                */
               const facts = this.#components.ingressPrepare.singleFrameLimits
               if (!facts)
-                throw new RpcError(
+                throw createRpcError(
                   RpcCoreErrorCode.capabilityUnsupported,
                   RpcCoreErrorText.capabilityUnsupported
                 )
@@ -886,7 +900,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                     messageId: 'whole'
                   })
                   if (accepted.status !== 'complete')
-                    throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
+                    throw createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
                   const manifest = this.#runtimeComponents.codec.decode(accepted.value)
                   restoredBinary = await restoreInboundRuntimeBinary(
                     manifest,
@@ -898,11 +912,11 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                   return restoredBinary
                 } catch (cause) {
                   throw this.#authentication && isRpcBinaryIntegrityFailure(cause)
-                    ? new RpcAuthenticationError(
+                    ? createRpcAuthenticationError(
                         RpcMiddlewareErrorText.inboundFrameAuthenticationFailed,
                         cause
                       )
-                    : new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid, cause)
+                    : createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid, cause)
                 }
               })
             if (this.#authentication) {
@@ -957,7 +971,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
             /** Private component proof omits generic whole-frame fanout, never semantic admission. */
             let decoded: unknown
             if (nativeBinary) {
-              if (!restoredBinary) throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
+              if (!restoredBinary)
+                throw createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
               decoded = restoredBinary
             } else if (this.#fast && !carrier) decoded = this.#runtimeComponents.codec.decode(frame)
             else {
@@ -992,7 +1007,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
               try {
                 members = readRpcBatchMembers(decoded)
               } catch (cause) {
-                throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
+                throw createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
               }
             }
             if (!members)
@@ -1058,7 +1073,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       typeof decoded === 'object' &&
       Object.getOwnPropertyDescriptor(decoded, 'profile')?.value === RpcBinaryProfile
     if (binary && !this.#runtimeCapabilities?.includes(RpcCapability.portableBinary))
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.capabilityUnsupported,
         RpcCoreErrorText.capabilityUnsupported
       )
@@ -1081,7 +1096,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           if (this.#native && !this.#native.active) return
         }
       } catch (cause) {
-        throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid, cause)
+        throw createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid, cause)
       }
     } else {
       const normalized = normalizeInboundRuntimeEnvelope(decoded)
@@ -1099,7 +1114,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       'options' in envelope ? envelope.options : {}
     )
     if (required.some((capability) => !this.#runtimeCapabilities?.includes(capability)))
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.capabilityUnsupported,
         RpcCoreErrorText.capabilityUnsupported
       )
@@ -1110,7 +1125,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       !this.#runtimeCapabilities?.includes(RpcCapability.abort) &&
       !this.#runtimeCapabilities?.includes(RpcCapability.cancelBeforeStart)
     )
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.capabilityUnsupported,
         RpcCoreErrorText.capabilityUnsupported
       )
@@ -1180,7 +1195,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   /** Reverse freshness is retained only after the original identity owner accepted this hop. */
   configureRuntime(generation: IRpcRuntimeGeneration): void {
     if (this.#runtimeGeneration !== undefined || !this.#runtimeCapabilities)
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcCoreErrorText.providerGenerationMismatch
       )
@@ -1190,7 +1205,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   /** Incoming describe binds its exact already-authenticated invocation token. */
   bindRuntimeCaller(token: string, generation: IRpcRuntimeGeneration): void {
     if (!this.inboundIdentity.bindGeneration(token, generation))
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.providerGenerationMismatch,
         RpcCoreErrorText.providerGenerationMismatch
       )
@@ -1203,7 +1218,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   bindRuntimeTarget(targetId: string, generation: IRpcRuntimeGeneration): void {
     const binding = this.#responseBindings.get(targetId)
     if (!binding || !this.inboundIdentity.bindResponseGeneration(binding, generation))
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.providerGenerationMismatch,
         RpcCoreErrorText.providerGenerationMismatch
       )
@@ -1254,7 +1269,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     /** Full capability and local control validation precedes original task reservation. */
     const wireOptions = this.#runtimeOptions(RpcRuntimeMode.stream, options)
     if (!this.#replay.reserveId(id))
-      throw new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
+      throw createRpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
     return {
       task: {
         mode: RpcRuntimeMode.stream,
@@ -1317,7 +1332,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   #runtimeOptions(mode: RpcRuntimeMode, options: IRpcRuntimeSendOptions): IRpcRuntimeOptions {
     this.#pipeline.assertRuntimeTransfer(this.#runtimeCapabilities ?? [], options)
     if (!this.#runtimeGeneration)
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.capabilityUnsupported,
         RpcCoreErrorText.capabilityUnsupported
       )
@@ -1334,14 +1349,14 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     }
     const required = runtimeOperationCapabilities(mode, wireOptions, options.signal !== undefined)
     if (required.some((capability) => !this.#runtimeCapabilities?.includes(capability)))
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.capabilityUnsupported,
         RpcCoreErrorText.capabilityUnsupported
       )
     if (options.signal) this.#assertAbortSignal(options.signal)
     assertTimeout(options.timeoutMs)
     if (options.signal?.aborted)
-      throw new RpcAbortError(undefined, undefined, resolveAbortReason(options.signal))
+      throw createRpcAbortError(undefined, undefined, resolveAbortReason(options.signal))
     return wireOptions
   }
 
@@ -1371,13 +1386,13 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         wireOptions.orderKey === undefined &&
         readForwardRoute(options) === undefined
       )
-        throw new RpcError(
+        throw createRpcError(
           RpcCoreErrorCode.capabilityUnsupported,
           RpcCoreErrorText.capabilityUnsupported
         )
       const taskId = allocateRpcId(this.#uuid, 'task', this.id, targetId, this.#runtimeReserved)
       if (!this.#replay.reserveId(taskId))
-        throw new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
+        throw createRpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
       /** Invalid/custom ID allocation cannot strand a child lifecycle listener. */
       const operation = new OperationScope(
         this.kernel.generation,
@@ -1572,7 +1587,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       )
       if (!handled && envelope.kind === RpcEnvelopeKind.stream)
         this.emitFailure(
-          new RpcProtocolError(RpcCoreErrorText.streamRouteUnclaimed),
+          createRpcProtocolError(RpcCoreErrorText.streamRouteUnclaimed),
           RpcCoreErrorCode.protocolInvalid
         )
     } finally {
@@ -1590,7 +1605,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         options.trace.length > RpcWireLimit.maxTraceChars ||
         !/^[\x20-\x7E]+$/u.test(options.trace))
     )
-      throw new RpcContractError(RpcCoreErrorText.traceInvalid)
+      throw createRpcContractError(RpcCoreErrorText.traceInvalid)
     return this.#sendAsync(targetId, method, data, options)
   }
 
@@ -1618,7 +1633,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     )
     const remaining = operation.remaining(timeoutMs)
     operation.assertActive(this.kernel.generation)
-    if (remaining === 0) throw new RpcTimeoutError()
+    if (remaining === 0) throw createRpcTimeoutError()
     /** The original options copy retains only Core's exact captured input and forward association. */
     const callOptions = retainForwardOptions(options, { ...options, timeoutMs: remaining })
     /** Private fields are deliberately not copied by spread; Core carries its own input explicitly. */
@@ -1652,7 +1667,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     )
     if (!this.#replay.reserveId(taskId)) {
       /** Preserve the original caller error object while exposing only numeric local capacity. */
-      const error = new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
+      const error = createRpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
       this.#reportReplayCapacity(error)
       return Promise.reject(error)
     }
@@ -1735,7 +1750,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         const aborted = registeredSignals.find((signal) => signal.aborted)
         const reason = aborted === undefined ? undefined : resolveAbortReason(aborted)
         notifyRemoteAbort(reason)
-        settleReject(new RpcAbortError(undefined, undefined, reason))
+        settleReject(createRpcAbortError(undefined, undefined, reason))
       }
       this.#pending.set(taskId, {
         targetId,
@@ -1753,7 +1768,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         }
       } catch (error) {
         settleReject(
-          new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.abortSignalInvalid, error)
+          createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.abortSignalInvalid, error)
         )
         return
       }
@@ -1761,7 +1776,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       if (options.timeoutMs !== false && options.timeoutMs !== undefined)
         timer = this.kernel.time.setTimeout(() => {
           notifyRemoteAbort()
-          settleReject(new RpcTimeoutError())
+          settleReject(createRpcTimeoutError())
         }, options.timeoutMs)
       void this.resolveReceiver(
         targetId,
@@ -1795,7 +1810,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           }
           const assertCanSend = (): void => {
             if (settled) throw settlementError
-            if (options.signal?.aborted) throw new RpcAbortError()
+            if (options.signal?.aborted) throw createRpcAbortError()
             operation.assertActive(this.kernel.generation)
             this.kernel.assertActive()
           }
@@ -1815,7 +1830,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
               ? () => {
                   assertCanSend()
                   const remaining = operation.remaining(options.timeoutMs)
-                  if (remaining === 0) throw new RpcTimeoutError()
+                  if (remaining === 0) throw createRpcTimeoutError()
                   request.data.route.sentAt = this.kernel.time.timestamp()
                   if (typeof remaining === 'number')
                     (request.data.route as { timeoutMs?: number }).timeoutMs = Math.ceil(remaining)
@@ -1842,7 +1857,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   #reportOutboundFailure(error: unknown): void {
     this.emitFailure(
       error,
-      error instanceof RpcError && error.code === RpcCoreErrorCode.overloaded
+      isLocalRpcError(error, RpcError) && localRpcErrorCode(error) === RpcCoreErrorCode.overloaded
         ? RpcCoreErrorCode.overloaded
         : RpcCoreErrorCode.transport
     )
@@ -1861,14 +1876,18 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       } catch (cleanup) {
         this.emitFailure(cleanup)
       }
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.abortSignalInvalid, error)
+      throw createRpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.abortSignalInvalid,
+        error
+      )
     }
     if (!this.#abortEnabled)
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.middlewareMissing,
         RpcCoreErrorText.abortMiddlewareMissing
       )
-    if (signal.aborted) throw new RpcAbortError(undefined, undefined, resolveAbortReason(signal))
+    if (signal.aborted) throw createRpcAbortError(undefined, undefined, resolveAbortReason(signal))
   }
 
   /** Opt-in controls retain the same outbound operation scope without allocating a response waiter. */
@@ -1903,28 +1922,29 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
           .catch((error: unknown) => {
             if (
               operation.signal.aborted &&
-              !(error instanceof RpcAbortError) &&
-              !(error instanceof RpcTimeoutError) &&
-              !(error instanceof RpcLifecycleError)
+              !isLocalRpcError(error, RpcAbortError) &&
+              !isLocalRpcError(error, RpcTimeoutError) &&
+              !isLocalRpcError(error, RpcLifecycleError)
             )
               this.emitFailure(
                 error,
-                error instanceof RpcError ? error.code : RpcCoreErrorCode.internal
+                isLocalRpcError(error, RpcError)
+                  ? localRpcErrorCode(error)!
+                  : RpcCoreErrorCode.internal
               )
             throw error
           }),
       createTimeoutError: () => {
         /** The same classified timeout both seals send admission and rejects the caller. */
-        const error = new RpcTimeoutError()
+        const error = createRpcTimeoutError()
         operation.abort(error)
         return error
       },
       createAbortError: (reason) => {
         /** Preserve lifecycle departure, otherwise retain the exact original caller reason as cause. */
-        const error =
-          reason instanceof RpcLifecycleError
-            ? reason
-            : new RpcAbortError(undefined, undefined, reason)
+        const error = isLocalRpcError(reason, RpcLifecycleError)
+          ? reason
+          : createRpcAbortError(undefined, undefined, reason)
         operation.abort(error)
         return error
       },
@@ -1993,18 +2013,18 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   ): Promise<void> {
     if (!this.#replay.reserveId(command.id)) {
       /** Reservation fails synchronously, before dispatch can install its asynchronous reporter. */
-      const error = new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
+      const error = createRpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.outboundReplayFull)
       this.#reportReplayCapacity(error)
       throw error
     }
     return Promise.resolve()
       .then(() => this.resolveReceiver(command.targetId))
       .then((receiver) => {
-        if (command.operation?.signal.aborted) throw new RpcAbortError()
+        if (command.operation?.signal.aborted) throw createRpcAbortError()
         /** Notify's deadline ends at physical send; it never imposes a provider business deadline. */
         const remaining = command.dispatchOnly ? undefined : command.operation?.remaining()
         const wireTimeout = typeof remaining === 'number' ? Math.floor(remaining) : undefined
-        if (wireTimeout === 0) throw new RpcTimeoutError()
+        if (wireTimeout === 0) throw createRpcTimeoutError()
         const request = {
           kind: 'request' as const,
           id: command.id,
@@ -2026,8 +2046,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         }
         const assertCanSend = (): void => {
           this.kernel.assertActive()
-          if (command.operation?.signal.aborted) throw new RpcAbortError()
-          if (command.operation?.remaining() === 0) throw new RpcTimeoutError()
+          if (command.operation?.signal.aborted) throw createRpcAbortError()
+          if (command.operation?.remaining() === 0) throw createRpcTimeoutError()
         }
         return this.#pipeline.send(
           createOutboundEnvelope(request, command),
@@ -2128,7 +2148,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     )
     const lifecycleFailure = results.find(
       (result): result is PromiseRejectedResult =>
-        result.status === 'rejected' && result.reason instanceof RpcLifecycleError
+        result.status === 'rejected' && isLocalRpcError(result.reason, RpcLifecycleError)
     )
     if (lifecycleFailure) throw lifecycleFailure.reason
     const fulfilled = createSafeRecord<T>()
@@ -2260,7 +2280,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     this.#featureDisposePromise = Promise.resolve().then(() => {
       this.#native?.retire()
       this.kernel.beginClose()
-      this.#failAll(new RpcAbortError())
+      this.#failAll(createRpcAbortError())
       this.#responseBindings.clear()
       this.#hooks.clear()
       this.#replay.clear()
@@ -2366,7 +2386,7 @@ function restoreRemoteError(
     report(error)
     restored = error
   }
-  return new RpcRemoteError(
+  return createRpcRemoteError(
     canonical.code ?? RpcCoreErrorCode.internal,
     canonical.message ?? RpcCoreErrorText.remoteRequestFailed,
     payload,
@@ -2381,5 +2401,5 @@ export function assertTimeout(timeoutMs: number | false | undefined): void {
     timeoutMs !== false &&
     (!Number.isFinite(timeoutMs) || timeoutMs < 0)
   )
-    throw new RpcContractError(RpcCoreErrorText.timeoutInvalid)
+    throw createRpcContractError(RpcCoreErrorText.timeoutInvalid)
 }

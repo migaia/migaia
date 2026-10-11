@@ -794,7 +794,7 @@ function createSmokeModule() {
   const publicImports = [
     ...publicSubpaths.map(
       (specifier) =>
-        `{ const publicModule = await import('${specifier}'); if ('assertRpcModuleInstance' in publicModule) throw new Error('Private instance helper is publicly exported: ${specifier}'); process.stdout.write('SUBPATH ${specifier} ' + Object.keys(publicModule).length + '\\n'); }`
+        `{ const publicModule = await import('${specifier}'${specifier === '@migaia/rpc-contract/schema/wire-error' ? ", { with: { type: 'json' } }" : ''}); ${specifier === '@migaia/rpc-contract/schema/wire-error' ? "if (Object.keys(publicModule).length !== 1 || !('default' in publicModule)) throw new Error('Native wire-error schema must expose only its default JSON value');" : ''} if ('assertRpcModuleInstance' in publicModule) throw new Error('Private instance helper is publicly exported: ${specifier}'); process.stdout.write('SUBPATH ${specifier} ' + Object.keys(publicModule).length + '\\n'); }`
     ),
     "process.stdout.write('CHECK subpath-imports PASS\\n');"
   ].join('\n')
@@ -989,7 +989,12 @@ function assertPackedOwnerManifests(packedPackages) {
         subpath.includes('module-instance')
       )
         throw new Error(`Packed owner exposes a private entry: ${owner}${subpath}`)
-      for (const field of ['types', 'default'])
+      /** The public JSON schema resolves its own JSON type; every code entry has a declaration. */
+      const targetFields =
+        owner === 'rpc-contract' && subpath === './schema/wire-error'
+          ? ['default']
+          : ['types', 'default']
+      for (const field of targetFields)
         if (
           typeof entry[field] !== 'string' ||
           entry[field].includes('/internal/module-instance') ||

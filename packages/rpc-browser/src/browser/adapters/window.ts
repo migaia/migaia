@@ -1,4 +1,5 @@
 import { BrowserRpcErrorText } from '../error-text.js'
+import { createBrowserConfigurationError } from '../error.js'
 import type { IRpcSendOptions, IRpcTransport } from '@migaia/rpc-core/transport-kit'
 import {
   RpcPlatform,
@@ -11,7 +12,7 @@ import {
   releaseListenerRegistration,
   reportListenerFailure
 } from '@migaia/rpc-core/transport-kit'
-import { RpcError, RpcCoreErrorCode } from '@migaia/rpc-core'
+import { RpcCoreErrorCode } from '@migaia/rpc-core'
 
 /** Outbound Window-like target that owns postMessage delivery. */
 export type IWindowMessageTarget = {
@@ -47,18 +48,15 @@ export function createWindowMessageTransport(
     options.targetOrigin ??
     (globalThis as unknown as { location?: { origin?: unknown } }).location?.origin
   if (!receiver)
-    throw new RpcError(
-      RpcCoreErrorCode.invalidConfig,
+    throw createBrowserConfigurationError(
       BrowserRpcErrorText.receiverIsRequiredOutsideAWindowLikeRealm
     )
   if (typeof targetOrigin !== 'string' || targetOrigin.length === 0)
-    throw new RpcError(
-      RpcCoreErrorCode.invalidConfig,
+    throw createBrowserConfigurationError(
       BrowserRpcErrorText.targetOriginMustBeExplicitUseOnlyIntentionally
     )
   if (targetOrigin === '*' && options.allowUnsafeTargetOrigin !== true)
-    throw new RpcError(
-      RpcCoreErrorCode.invalidConfig,
+    throw createBrowserConfigurationError(
       BrowserRpcErrorText.wildcardTargetOriginRequiresAllowUnsafeTargetOrigin
     )
   const listeners = createMessageListenerHub<{

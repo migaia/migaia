@@ -1,5 +1,11 @@
+import {
+  createRpcConfigurationError,
+  createRpcContractError,
+  createRpcError,
+  RpcCoreErrorCode
+} from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
-import { RpcConfigurationError, RpcContractError, RpcError, RpcCoreErrorCode } from '../errors.js'
+
 import type { IRpcUuidConfig, IRpcUuidContext } from '../typing.js'
 import { isNativeDefaultCounterExhaustion } from './native-default-id.js'
 
@@ -27,10 +33,10 @@ export function allocateRpcId(
     // validation and invocation.
     generate = config.generate
   } catch (error) {
-    throw new RpcConfigurationError(UUID_GENERATOR_UNREADABLE, error)
+    throw createRpcConfigurationError(UUID_GENERATOR_UNREADABLE, error)
   }
   if (generate !== undefined && typeof generate !== 'function')
-    throw new RpcConfigurationError(UUID_GENERATOR_NOT_CALLABLE)
+    throw createRpcConfigurationError(UUID_GENERATOR_NOT_CALLABLE)
   let generated: string
   if (generate === undefined) {
     generated = defaultRpcId()
@@ -40,17 +46,17 @@ export function allocateRpcId(
       generated = generate({ variation, senderId, targetId })
     } catch (error) {
       if (isNativeDefaultCounterExhaustion(error)) throw error
-      throw new RpcConfigurationError(UUID_GENERATOR_FAILED, error)
+      throw createRpcConfigurationError(UUID_GENERATOR_FAILED, error)
     }
   }
   if (typeof generated !== 'string' || generated.length === 0)
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.uuidGeneratorMustReturnANonEmptyString
     )
   const id = `${variation.toUpperCase()}:${senderId}:${generated}`
   if (isUsed(id))
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.uuidConflict(id))
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.uuidConflict(id))
   return id
 }
 
@@ -64,11 +70,11 @@ export function defaultRpcId(): string {
     const bytes = cryptoApi.getRandomValues(new Uint8Array(16))
     return [...bytes].map((value) => value.toString(16).padStart(2, '0')).join('')
   }
-  throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.uuidUnavailable)
+  throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.uuidUnavailable)
 }
 
 /** Enforces the single wire grammar used by core send admission and remote retries. */
 export function assertRpcIdempotencyKey(value: unknown): asserts value is string {
   if (typeof value !== 'string' || !/^[A-Za-z0-9._:~-]{1,128}$/u.test(value))
-    throw new RpcContractError(RpcCoreErrorText.idempotencyKeyInvalid)
+    throw createRpcContractError(RpcCoreErrorText.idempotencyKeyInvalid)
 }

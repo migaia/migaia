@@ -13,6 +13,8 @@ RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不�
 
 包内使用相对路径；跨包调用只使用公开 API。协议工具使用 `@migaia/rpc-contract`，Core/Remote/Testing 使用 `@migaia/rpc-core` 的普通入口。
 
+从包根导入 `RPC_PROCESS_ERROR_SOURCE` 和 `RpcProcessErrorCode`，按 `(source, code)` 处理 launch、dial、listen 与资源采样失败。source 固定为 `@migaia/rpc/process`；原生 cause 与错误类型沿原路径保留。`RpcProcessErrorText` 已从公开面删除，这是更名后包的破坏性导出变更；消息只用于展示，不作为重试或终止依据。自定义 child bootstrap 继续使用 `@migaia/rpc-core/adapter/process-data` 的环境名、版本、frame 限额与发现超时常量；stderr 文本与配额常量属于私有诊断策略。
+
 ## Advanced usage：拥有子进程并调用远端服务
 
 下面沿已存在的 Node stdio source 启动一个服务，在父端调用 `math.double`，并在 `finally` 关闭 Peer。两个 TypeScript 文件使用 ESM，先编译到同目录的 `.js`；`service.js` 必须是本应用实际部署的子端入口。

@@ -1,3 +1,4 @@
+import { createRpcError, RpcCoreErrorCode } from '../errors.js'
 import { normalizeRpcEnvelope, RpcEnvelopeKind, type IRpcEnvelope } from '@migaia/rpc-contract'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
 import type { IRpcContext } from '../typing.js'
@@ -20,7 +21,7 @@ import {
   prepareOwnedJsonSnapshot
 } from './outbound-owned-codec.js'
 import { isInboundNormalizedPayload } from './inbound-normalization.js'
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import type { RpcOutboundAttachment, IRpcRuntimeSendOptions } from './outbound-attachment.js'
 
@@ -186,7 +187,7 @@ export function captureRuntimeGroupSteps(
   try {
     return createRuntimeGroupSteps(steps)
   } catch (cause) {
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.runtimeGroupStepsInvalid,
       cause

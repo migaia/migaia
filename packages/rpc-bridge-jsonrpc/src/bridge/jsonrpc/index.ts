@@ -5,7 +5,8 @@ export type { IJsonRpcBridgeOptions } from '@migaia/rpc-core/adapter/jsonrpc'
 export type { IProcessByteChannel } from '@migaia/rpc-process'
 export {
   JsonRpcBridgeErrorCode,
-  JsonRpcBridgeErrorText
+  JSONRPC_BRIDGE_ERROR_SOURCE,
+  type IJsonRpcBridgeErrorCode
 } from '@migaia/rpc-contract/framing/jsonrpc'
 
 /** Construct the foreign-language channel and retain the Core owner's exact Promise. */

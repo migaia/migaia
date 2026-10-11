@@ -1,5 +1,5 @@
 import { RpcCoreErrorCode } from '../../core/index.js'
-import { tagRpcError } from '../../core/transport-kit.js'
+import { tagRpcError } from '../../core/errors.js'
 import { RpcProcessErrorText } from './error-text.js'
 
 /** Codec and physical string admission retain their original Core error boundary; BC7 is framing. */

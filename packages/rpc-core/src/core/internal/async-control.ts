@@ -1,5 +1,5 @@
 import { RpcCoreErrorText } from '../error-text.js'
-import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcCoreErrorCode, tagRpcError } from '../errors.js'
 import { tryReadProperty } from '@migaia/utils/error'
 import { reportDiagnostic } from './diagnostic-reporter.js'
 import type { IEndpointTimePort } from './time-port.js'

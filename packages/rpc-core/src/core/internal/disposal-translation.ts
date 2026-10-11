@@ -1,7 +1,7 @@
+import { createRpcLifecycleError, type IRpcCleanupError, RpcLifecycleError } from '../errors.js'
 import { PluginHostDisposalNodeKind, readPluginHostDisposalProvenance } from '@migaia/plugin-host'
-import { RpcLifecycleError } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
-import type { IRpcCleanupError } from '../errors.js'
 
 /** Stable PluginHost cleanup-group label retained in the endpoint diagnostic contract. */
 const HOST_RESOURCE_DISPOSER_LABEL = 'resource disposer'
@@ -32,7 +32,10 @@ const isPluginHostAggregateContainer = (
   value instanceof Error &&
   readPluginHostDisposalProvenance(value)?.kind === PluginHostDisposalNodeKind.aggregate
 
-/** Finds an endpoint-owned lifecycle error retained inside a host cleanup wrapper. */
+/**
+ * Reuses the native lifecycle diagnostic after cleanup has failed. This only presents the original
+ * error; the host's independent finally block owns terminal state and grants no control identity.
+ */
 const findLifecycleError = (
   value: unknown,
   seen: Set<object> = new Set()
@@ -104,10 +107,10 @@ export const translateEndpointDisposalError = (
     translatedCleanupErrors.push(cleanupError)
   }
   if (translatedCleanupErrors.length > 0)
-    return new RpcLifecycleError(
+    return createRpcLifecycleError(
       RpcCoreErrorText.endpointDisposalCleanupFailed,
       translatedCleanupErrors[0]?.error,
       translatedCleanupErrors
     )
-  return new RpcLifecycleError(RpcCoreErrorText.endpointDisposalCleanupFailed, error)
+  return createRpcLifecycleError(RpcCoreErrorText.endpointDisposalCleanupFailed, error)
 }

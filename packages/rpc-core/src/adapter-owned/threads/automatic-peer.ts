@@ -1,10 +1,11 @@
+import { createRpcError } from '../../core/errors.js'
 import {
   readRuntimePreparationContext,
   withRuntimePreparationContext
 } from '../../remote/runtime-api/launch-context.js'
 import { readRuntimeDefaultTimeout } from '../../remote/runtime-api/timeout.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { RpcCoreErrorCode, RpcError } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import { compileRuntimeMethods } from '../../remote/runtime-api/catalog.js'
@@ -32,7 +33,7 @@ export async function createAutomaticWebThreadPeer(
 ) {
   readRuntimeDefaultTimeout(options)
   if (options.spawn !== undefined || options.connect !== undefined || options.listen !== undefined)
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
   compileRuntimeMethods(options.provide, options.contract)
   /** A real library bootstrap must arrive before any automatic endpoint is constructed. */
   let resolveBootstrap!: (value: IThreadRuntimeBootstrap) => void
@@ -79,7 +80,7 @@ export async function createAutomaticWebThreadPeer(
           (options.self.name !== bootstrap.self.name ||
             options.self.instanceId !== bootstrap.self.instanceId)
         )
-          throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
+          throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
         /** This native child derives only its own compiled offer before the bilateral agreement. */
         const capabilities = createThreadRuntimeCapabilityOffer(context.capabilities)
         native.postMessage(

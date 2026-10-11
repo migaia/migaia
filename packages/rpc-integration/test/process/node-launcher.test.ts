@@ -10,7 +10,7 @@ import {
 import { createNodeProcessLauncher } from '../../../rpc-process/src/process/adapters/node-child-process.js'
 import { createProcessTransport } from '@migaia/rpc-process'
 import { createNativeProcessOffer } from '../../../rpc-process/src/process/offer.js'
-import { CHILD_STDERR_REDACTED } from '@migaia/rpc-core/adapter/process-data'
+import { CHILD_STDERR_REDACTED } from '../fixtures/process-diagnostics.js'
 import type { IIpcLogRecord } from '@migaia/rpc-core/plugins/flow-control'
 
 /** The fixture is a separate Node process and imports only the built package output. */

@@ -1,7 +1,8 @@
+import { createRpcError } from '../../core/errors.js'
 import { RPC_PORTABLE_MAX_DEPTH } from '@migaia/rpc-contract'
 import { RpcWireLimit } from '@migaia/rpc-contract'
-import { RpcError, RpcCoreErrorCode } from '../../core/index.js'
-import type { IRpcContext } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
+import { type IRpcContext } from '../../core/index.js'
 import { RemoteMethodName } from '../constants.js'
 import {
   RemoteCatalogLimit,
@@ -92,7 +93,7 @@ export function runtimeForwardRoute(
   assertProviderForwardRoute(route, entry.nodeId, node)
   if (node === undefined) return undefined
   if (route.length === 0)
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.capabilityUnsupported,
       RuntimeApiErrorText.forwardOriginUnavailable
     )
@@ -112,7 +113,7 @@ export function registerRuntimePluginMethods(
 
 /** Reject malformed explicit configuration without disclosing the supplied member or value. */
 function invalid(cause?: unknown): never {
-  throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.provideInvalid, cause)
+  throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.provideInvalid, cause)
 }
 
 /**

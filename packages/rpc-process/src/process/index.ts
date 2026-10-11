@@ -5,8 +5,11 @@ export type {
   IProcessHostRegistrationApproval,
   IProcessHostRegistrations
 } from '@migaia/rpc-core/adapter/process'
-export { RpcProcessErrorCode } from './error-code.js'
-export { RpcProcessErrorText } from './error-text.js'
+export {
+  RpcProcessErrorCode,
+  ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE,
+  type IRpcProcessErrorCode
+} from './error-code.js'
 export { createProcessResilience } from '@migaia/rpc-core/adapter/process'
 export type {
   IProcessResilience,

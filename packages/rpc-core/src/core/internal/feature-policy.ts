@@ -1,4 +1,12 @@
-import { RpcConfigurationError, RpcError, RpcCoreErrorCode } from '../errors.js'
+import {
+  createRpcConfigurationError,
+  createRpcError,
+  isLocalRpcError,
+  RpcConfigurationError,
+  RpcCoreErrorCode,
+  RpcError
+} from '../errors.js'
+
 import { RpcCoreErrorText, roleAdmissionMessage } from '../error-text.js'
 import type { IRpcFeature } from '../feature.js'
 import type { IRpcPluginClaims } from '../typing.js'
@@ -147,7 +155,7 @@ function freezeClaims(claims: IRpcPluginClaims): IRpcPluginClaims {
 
 /** Uses the existing package error contract for invalid public Feature declarations. */
 export function createInvalidFeatureError(): RpcError {
-  return new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+  return createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
 }
 
 /**
@@ -172,7 +180,7 @@ export function preflightFeatureClaims(
       current = definition
       const { claims } = definition
       if (definition.name.length === 0 || names.has(definition.name))
-        throw new RpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
+        throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
       names.add(definition.name)
       const roleName = definition.name.replace(/^middleware:/, '')
       const expectedCancellationKey =
@@ -186,7 +194,7 @@ export function preflightFeatureClaims(
         (definition.sharedProvides?.length !== 1 ||
           definition.sharedProvides[0] !== expectedCancellationKey)
       )
-        throw new RpcConfigurationError(
+        throw createRpcConfigurationError(
           roleAdmissionMessage(roleName, 'sharedProvides', definition.sharedProvides?.[0])
         )
       const roleSchema =
@@ -204,7 +212,7 @@ export function preflightFeatureClaims(
             actual?.length !== expected.length ||
             actual?.some((key, index) => key !== expected[index])
           )
-            throw new RpcConfigurationError(roleAdmissionMessage(roleName, slot, actual?.[0]))
+            throw createRpcConfigurationError(roleAdmissionMessage(roleName, slot, actual?.[0]))
         }
         assertExactKeys('sharedProvides', definition.sharedProvides, roleSchema.sharedProvides)
         assertExactKeys('sharedConsumes', definition.sharedConsumes, roleSchema.sharedConsumes)
@@ -215,7 +223,7 @@ export function preflightFeatureClaims(
         )
       }
       if (definition.sharedProvides?.some((key) => definition.sharedConsumes?.includes(key)))
-        throw new RpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
+        throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
       if (claims.activator) activators += 1
       for (const provided of definition.sharedProvides ?? [])
         if (
@@ -223,23 +231,23 @@ export function preflightFeatureClaims(
             (item) => item !== definition && item.sharedProvides?.includes(provided) === true
           )
         )
-          throw new RpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
+          throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
       for (const consumed of definition.sharedConsumes ?? [])
         if (!admitted.some((item) => item.sharedProvides?.includes(consumed) === true))
-          throw new RpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
+          throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
       for (const route of claims.routes) {
         if (routes.has(route))
-          throw new RpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
+          throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
         routes.add(route)
       }
       for (const provided of claims.provides) {
         if (provides.has(provided))
-          throw new RpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
+          throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
         provides.add(provided)
       }
       for (const publicKey of claims.publicKeys) {
         if (publicKeys.has(publicKey))
-          throw new RpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
+          throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
         publicKeys.add(publicKey)
       }
       if (requireCompleteGraph) {
@@ -248,15 +256,15 @@ export function preflightFeatureClaims(
             !publicKeys.has(exposedKey) &&
             !admitted.some((item) => item.claims.publicKeys.includes(exposedKey))
           )
-            throw new RpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
+            throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
         for (const consumed of claims.consumes)
           if (!admitted.some((item) => item.claims.provides.includes(consumed)))
-            throw new RpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
+            throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
       }
     }
   } catch (error) {
-    if (error instanceof RpcConfigurationError) throw error
-    throw new RpcConfigurationError(
+    if (isLocalRpcError(error, RpcConfigurationError)) throw error
+    throw createRpcConfigurationError(
       roleAdmissionMessage(
         current?.name.replace(/^middleware:/, '') ?? 'unknown',
         'claims',
@@ -270,7 +278,7 @@ export function preflightFeatureClaims(
     admitted.some((definition) => definition.claims.routes.length > 0) &&
     activators !== 1
   )
-    throw new RpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
+    throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
 }
 
 /** Snapshots every native admission field once so hostile getters retain their exact role and slot. */
@@ -279,13 +287,13 @@ function snapshotFeatureClaimAdmission(source: IRpcClaimAdmission): IRpcClaimAdm
   try {
     name = source.name
   } catch (error) {
-    throw new RpcConfigurationError(roleAdmissionMessage(name, 'name', undefined), error)
+    throw createRpcConfigurationError(roleAdmissionMessage(name, 'name', undefined), error)
   }
   const read = <T>(slot: string, value: () => T): T => {
     try {
       return value()
     } catch (error) {
-      throw new RpcConfigurationError(
+      throw createRpcConfigurationError(
         roleAdmissionMessage(name.replace(/^middleware:/, ''), slot, undefined),
         error
       )
@@ -312,13 +320,12 @@ export function preflightNativeRoleClaims(
     } catch (error) {
       return Object.freeze({
         failedName: snapshot.name,
-        error:
-          error instanceof RpcConfigurationError
-            ? error
-            : new RpcConfigurationError(
-                roleAdmissionMessage(snapshot.name, 'claims', undefined),
-                error
-              )
+        error: isLocalRpcError(error, RpcConfigurationError)
+          ? error
+          : createRpcConfigurationError(
+              roleAdmissionMessage(snapshot.name, 'claims', undefined),
+              error
+            )
       })
     }
   }
@@ -337,7 +344,7 @@ export function assertFeatureClaimParity(
   }>
 ): void {
   const fail = (): never => {
-    throw new RpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
+    throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
   }
   const claims = definitions.map((definition) => definition.claims)
   const activatorCount = claims.filter((claim) => claim.activator).length
@@ -377,7 +384,7 @@ function readPublishedFeatureExtensions(host: object): object {
   } catch {
     // A revoked Host view fails closed through the policy error below.
   }
-  throw new RpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
+  throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
 }
 
 /** Reads hostile declaration accessors once, preserving the pre-Host cutoff. */
@@ -393,7 +400,7 @@ function snapshotRoleClaimSource(source: IRpcNativeRoleClaimSource): IRpcNativeR
       sharedOptionalConsumes: source.sharedOptionalConsumes
     })
   } catch (error) {
-    throw new RpcConfigurationError(roleAdmissionMessage(name, 'claims', undefined), error)
+    throw createRpcConfigurationError(roleAdmissionMessage(name, 'claims', undefined), error)
   }
 }
 
@@ -413,7 +420,7 @@ function assertNativeProviderRole(source: IRpcNativeRoleClaimSource): void {
     claims.exposedKeys.includes('provide')
   if (!candidate) return
   /** Public plugin descriptors never mint the package-private provider Feature policy. */
-  throw new RpcConfigurationError(
+  throw createRpcConfigurationError(
     roleAdmissionMessage(RpcProviderRole.provider, 'claims', undefined)
   )
 }
@@ -440,5 +447,5 @@ function assertExactRoleKeys(
   expected: readonly PropertyKey[]
 ): void {
   if (actual?.length !== expected.length || actual.some((key, index) => key !== expected[index]))
-    throw new RpcConfigurationError(roleAdmissionMessage(role, slot, actual?.[0]))
+    throw createRpcConfigurationError(roleAdmissionMessage(role, slot, actual?.[0]))
 }
