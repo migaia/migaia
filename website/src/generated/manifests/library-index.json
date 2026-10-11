@@ -4,19 +4,19 @@
     {
       "slug": "capability",
       "description": "Store-neutral capability lifecycle and feature gate.",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": [".", "./graph", "./graph/dependency", "./graph/dynamic", "./graph/topology"]
     },
     {
       "slug": "event-subscriber",
       "description": "Runtime-neutral transient event subscription and fan-out primitives.",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "exports": [".", "./subscriber"]
     },
     {
       "slug": "lifecycle",
       "description": "Runtime-neutral lifecycle primitives: scopes, generations, quiescence tracking and dispose transactions.",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "exports": [
         ".",
         "./abort",
@@ -31,25 +31,25 @@
     {
       "slug": "logger",
       "description": null,
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [".", "./plugins", "./plugins/file"]
     },
     {
       "slug": "middleware-pipeline",
       "description": "Runtime-neutral sync, async middleware and generator chain executors.",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "exports": ["."]
     },
     {
       "slug": "plugin-host",
       "description": "Runtime-neutral plugin lifecycle, extension and pipeline host for Node.js, Bun, browsers and workers.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [".", "./composition"]
     },
     {
       "slug": "reactive",
       "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "exports": [
         ".",
         "./copy-check",
@@ -65,8 +65,120 @@
     {
       "slug": "resource",
       "description": "Store-neutral cancellable asynchronous reactive resources.",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "exports": ["."]
+    },
+    {
+      "slug": "rpc-bridge-jsonrpc",
+      "description": "RPC bridge-jsonrpc owner.",
+      "version": "0.0.7",
+      "exports": ["."]
+    },
+    {
+      "slug": "rpc-browser",
+      "description": "RPC browser owner.",
+      "version": "0.0.7",
+      "exports": [
+        "./adapters/broadcast-channel",
+        "./adapters/rtc-data-channel",
+        "./adapters/service-worker",
+        "./adapters/shared-worker",
+        "./adapters/web-transport",
+        "./adapters/window"
+      ]
+    },
+    {
+      "slug": "rpc-contract",
+      "description": "RPC contract owner.",
+      "version": "0.0.7",
+      "exports": [
+        ".",
+        "./binary",
+        "./binary/capture",
+        "./binary/inspect",
+        "./binary/lazy",
+        "./errors",
+        "./framing",
+        "./framing/jsonrpc",
+        "./framing/stream",
+        "./framing/v1",
+        "./handshake",
+        "./portable",
+        "./runtime",
+        "./runtime/lazy",
+        "./runtime/metadata",
+        "./schema/wire-error",
+        "./stream",
+        "./v1",
+        "./wire"
+      ]
+    },
+    {
+      "slug": "rpc-core",
+      "description": "RPC core owner.",
+      "version": "0.0.7",
+      "exports": [
+        ".",
+        "./adapter",
+        "./adapter/diagnostics",
+        "./adapter/jsonrpc",
+        "./adapter/node",
+        "./adapter/process",
+        "./adapter/process-data",
+        "./adapter/process/node",
+        "./adapter/threads",
+        "./adapter/web-streams",
+        "./adapters/memory",
+        "./adapters/message-port",
+        "./adapters/web-worker",
+        "./client",
+        "./composed",
+        "./features/control",
+        "./features/discovery",
+        "./features/one-way",
+        "./features/outbound",
+        "./features/provider",
+        "./full",
+        "./plugins/flow-control",
+        "./plugins/log",
+        "./plugins/send-queue",
+        "./provider",
+        "./remote",
+        "./stream",
+        "./testing",
+        "./transport-constants",
+        "./transport-kit"
+      ]
+    },
+    {
+      "slug": "rpc-process",
+      "description": "RPC process owner.",
+      "version": "0.0.7",
+      "exports": [
+        ".",
+        "./adapters/bun-socket",
+        "./adapters/bun-spawn",
+        "./adapters/deno-command",
+        "./adapters/deno-socket",
+        "./adapters/electron-utility-process",
+        "./adapters/node-child-process",
+        "./adapters/node-socket",
+        "./adapters/windows-job"
+      ]
+    },
+    {
+      "slug": "rpc-threads",
+      "description": "RPC threads owner.",
+      "version": "0.0.7",
+      "exports": [
+        ".",
+        "./adapters/browser",
+        "./adapters/bun",
+        "./adapters/deno",
+        "./adapters/electron-main",
+        "./adapters/electron-renderer",
+        "./adapters/node"
+      ]
     },
     {
       "slug": "serialize",
@@ -190,7 +302,7 @@
     {
       "slug": "supervision",
       "description": "Runtime-neutral supervision for execution units and coroutines.",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "exports": [".", "./coroutine", "./process", "./threads"]
     },
     {
@@ -224,118 +336,6 @@
       "description": null,
       "version": "0.1.1",
       "exports": ["."]
-    },
-    {
-      "slug": "rpc-core",
-      "description": "RPC core owner.",
-      "version": "0.0.7",
-      "exports": [
-        ".",
-        "./adapter",
-        "./adapter/diagnostics",
-        "./adapter/jsonrpc",
-        "./adapter/node",
-        "./adapter/process",
-        "./adapter/process-data",
-        "./adapter/process/node",
-        "./adapter/threads",
-        "./adapter/web-streams",
-        "./adapters/memory",
-        "./adapters/message-port",
-        "./adapters/web-worker",
-        "./client",
-        "./composed",
-        "./features/control",
-        "./features/discovery",
-        "./features/one-way",
-        "./features/outbound",
-        "./features/provider",
-        "./full",
-        "./plugins/flow-control",
-        "./plugins/log",
-        "./plugins/send-queue",
-        "./provider",
-        "./remote",
-        "./stream",
-        "./testing",
-        "./transport-constants",
-        "./transport-kit"
-      ]
-    },
-    {
-      "slug": "rpc-contract",
-      "description": "RPC contract owner.",
-      "version": "0.0.7",
-      "exports": [
-        ".",
-        "./binary",
-        "./binary/capture",
-        "./binary/inspect",
-        "./binary/lazy",
-        "./errors",
-        "./framing",
-        "./framing/jsonrpc",
-        "./framing/stream",
-        "./framing/v1",
-        "./handshake",
-        "./portable",
-        "./runtime",
-        "./runtime/lazy",
-        "./runtime/metadata",
-        "./schema/wire-error",
-        "./stream",
-        "./v1",
-        "./wire"
-      ]
-    },
-    {
-      "slug": "rpc-process",
-      "description": "RPC process owner.",
-      "version": "0.0.7",
-      "exports": [
-        ".",
-        "./adapters/bun-socket",
-        "./adapters/bun-spawn",
-        "./adapters/deno-command",
-        "./adapters/deno-socket",
-        "./adapters/electron-utility-process",
-        "./adapters/node-child-process",
-        "./adapters/node-socket",
-        "./adapters/windows-job"
-      ]
-    },
-    {
-      "slug": "rpc-threads",
-      "description": "RPC threads owner.",
-      "version": "0.0.7",
-      "exports": [
-        ".",
-        "./adapters/browser",
-        "./adapters/bun",
-        "./adapters/deno",
-        "./adapters/electron-main",
-        "./adapters/electron-renderer",
-        "./adapters/node"
-      ]
-    },
-    {
-      "slug": "rpc-bridge-jsonrpc",
-      "description": "RPC bridge-jsonrpc owner.",
-      "version": "0.0.7",
-      "exports": ["."]
-    },
-    {
-      "slug": "rpc-browser",
-      "description": "RPC browser owner.",
-      "version": "0.0.7",
-      "exports": [
-        "./adapters/broadcast-channel",
-        "./adapters/rtc-data-channel",
-        "./adapters/service-worker",
-        "./adapters/shared-worker",
-        "./adapters/web-transport",
-        "./adapters/window"
-      ]
     }
   ]
 }

@@ -241,6 +241,69 @@
     },
     {
       "locale": "zh",
+      "library": "rpc-bridge-jsonrpc",
+      "source": "src/content/zh/packages/rpc-bridge-jsonrpc/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "rpc-browser",
+      "source": "src/content/zh/packages/rpc-browser/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "rpc-contract",
+      "source": "src/content/zh/packages/rpc-contract/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "rpc-core",
+      "source": "src/content/zh/packages/rpc-core/advanced.mdx",
+      "slug": "advanced",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "rpc-core",
+      "source": "src/content/zh/packages/rpc-core/api.mdx",
+      "slug": "api",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "rpc-core",
+      "source": "src/content/zh/packages/rpc-core/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "rpc-core",
+      "source": "src/content/zh/packages/rpc-core/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "rpc-process",
+      "source": "src/content/zh/packages/rpc-process/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "rpc-threads",
+      "source": "src/content/zh/packages/rpc-threads/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
       "library": "serialize",
       "source": "src/content/zh/packages/serialize/advanced.mdx",
       "slug": "advanced",
@@ -349,69 +412,6 @@
       "library": "utils",
       "source": "src/content/zh/packages/utils/quickstart.mdx",
       "slug": "quickstart",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "rpc-core",
-      "source": "src/content/zh/packages/rpc-core/advanced.mdx",
-      "slug": "advanced",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "rpc-core",
-      "source": "src/content/zh/packages/rpc-core/api.mdx",
-      "slug": "api",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "rpc-core",
-      "source": "src/content/zh/packages/rpc-core/overview.mdx",
-      "slug": "overview",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "rpc-core",
-      "source": "src/content/zh/packages/rpc-core/quickstart.mdx",
-      "slug": "quickstart",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "rpc-contract",
-      "source": "src/content/zh/packages/rpc-contract/overview.mdx",
-      "slug": "overview",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "rpc-process",
-      "source": "src/content/zh/packages/rpc-process/overview.mdx",
-      "slug": "overview",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "rpc-threads",
-      "source": "src/content/zh/packages/rpc-threads/overview.mdx",
-      "slug": "overview",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "rpc-bridge-jsonrpc",
-      "source": "src/content/zh/packages/rpc-bridge-jsonrpc/overview.mdx",
-      "slug": "overview",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "rpc-browser",
-      "source": "src/content/zh/packages/rpc-browser/overview.mdx",
-      "slug": "overview",
       "format": "mdx"
     }
   ]
