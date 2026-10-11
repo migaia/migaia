@@ -36,28 +36,25 @@ import type { IRpcRuntimeStep, IRpcRuntimeOutcomeResult } from '@migaia/rpc-cont
 import type { IRpcRuntimeStepOutcome } from '@migaia/rpc-contract/v1'
 import { RuntimeApiErrorText } from './constants.js'
 
-/** The publisher lives on the same original facade and never in a second connection registry. */
-const eventPublisher = Symbol('runtime-outlet-event-publisher')
+/** Only the exact original facade retains its lifecycle publisher, without a connection registry. */
+const eventPublisher = new WeakMap<object, IRuntimeEventPublisher>()
 /** Only actual package facades provide this private lifecycle publication seam. */
 export function readRuntimeOutletEvents(facade: object): IRuntimeEventPublisher {
-  return (facade as { [eventPublisher]: IRuntimeEventPublisher })[eventPublisher]
+  return eventPublisher.get(facade)!
 }
 
-/** Internal cold/current reads use the original slot's indexes without a second connection table. */
-const connectionReader = Symbol('runtime-outlet-connection-reader')
+/** Exact facade identity retains the original slot reader without a second connection table. */
+const connectionReader = new WeakMap<
+  object,
+  (target: string) => IRuntimePluginConnection | null | undefined
+>()
 
 /** Resolve only a canonical facade's current exact receipt; absent names do not select a fallback. */
 export function readRuntimeOutletConnection(
   facade: object | undefined,
   target: string
 ): IRuntimePluginConnection | null | undefined {
-  return facade && connectionReader in facade
-    ? (
-        facade as {
-          [connectionReader]: (target: string) => IRuntimePluginConnection | null | undefined
-        }
-      )[connectionReader](target)
-    : undefined
+  return facade ? connectionReader.get(facade)?.(target) : undefined
 }
 
 /** Canonical slot receipts retain their exact prepared Peer; projection never exposes this object. */
@@ -251,8 +248,8 @@ export function createRuntimeOutlet(
       throw createRpcError(RpcCoreErrorCode.capabilityConflict, RuntimeApiErrorText.controlBorrowed)
     return execution
   }
-  return Object.freeze({
-    [eventPublisher]: events,
+  /** Public operations preserve their original callables; private seams belong to this facade only. */
+  const facade: IRuntimeOutlet = Object.freeze({
     on: events.on,
     watch: events.watch,
     stop: (name, options) => {
@@ -272,8 +269,6 @@ export function createRuntimeOutlet(
     kill: (name) => controlled(name).kill(),
     restart: (name) => controlled(name).restart(),
     replace: (name, spec) => controlled(name).replace(spec === undefined ? undefined : { spec }),
-    [connectionReader]: (target: string) =>
-      slot.find(target) as IRuntimePluginConnection | null | undefined,
     request: (target, method, payload, options) =>
       selected(target).peer.request(method, payload, options),
     notify: (target, method, payload, options) =>
@@ -391,6 +386,12 @@ export function createRuntimeOutlet(
       return Object.freeze(results)
     }
   })
+  eventPublisher.set(facade, events)
+  connectionReader.set(
+    facade,
+    (target: string) => slot.find(target) as IRuntimePluginConnection | null | undefined
+  )
+  return facade
 }
 
 /** TypeScript declaration merging exposes only actually committed optional runtime outlets. */

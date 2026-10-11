@@ -142,8 +142,8 @@ type IProviderExecutorOptions<TTargetId extends string> = {
   readonly runtimeDefaultMemoryStore?: boolean
   readonly idempotencyScope?: (admission: Readonly<{ token: string; senderId: string }>) => string
 }
-const providerResultBrand = Symbol('web-rpc-provider-result')
-type IBrandedProviderResult = IRpcProviderResult & { readonly [providerResultBrand]: object }
+/** Only the exact context-created result retains its original task's settlement authority. */
+const providerResultBrand = new WeakMap<IRpcProviderResult, object>()
 const maxProviderTransferItems = 64
 
 /** These facts come from the accepted original identity and replay owners, never business data. */
@@ -354,13 +354,14 @@ export class ProviderExecutor<TTargetId extends string> {
         : ProviderExecutor.#RuntimeExecution.signalFor(this.#signal)
     }
     /** Expired results retain their original unfrozen shape, message, code and task identity. */
-    #expiredResult(): IBrandedProviderResult {
-      const result: IBrandedProviderResult = {
+    #expiredResult(): IRpcProviderResult {
+      /** Expiry still returns the original unfrozen failure record without copyable authority. */
+      const result: IRpcProviderResult = {
         ok: false,
         message: RpcCoreErrorText.providerContextExpired,
-        code: RpcCoreErrorCode.contextExpired,
-        [providerResultBrand]: this.#taskToken
+        code: RpcCoreErrorCode.contextExpired
       }
+      providerResultBrand.set(result, this.#taskToken)
       return result
     }
     /** Exact owner-created success retains the original transfer snapshot and frozen public shape. */
@@ -369,12 +370,13 @@ export class ProviderExecutor<TTargetId extends string> {
       options?: { readonly transfer?: readonly unknown[] }
     ): IRpcProviderResult {
       if (contextExpired(this.#expired)) return this.#expiredResult()
+      /** Business and transfer values retain the original immutable result identity. */
       const result = Object.freeze({
-        ok: true,
+        ok: true as const,
         data,
-        transfer: normalizeTransfer(options?.transfer),
-        [providerResultBrand]: this.#taskToken
-      } as IBrandedProviderResult)
+        transfer: normalizeTransfer(options?.transfer)
+      })
+      providerResultBrand.set(result, this.#taskToken)
       new ProviderExecutor.#Result(result, this.#taskToken)
       return result
     }
@@ -382,12 +384,13 @@ export class ProviderExecutor<TTargetId extends string> {
     failed(message: string, code: string): IRpcProviderResult {
       if (contextExpired(this.#expired)) return this.#expiredResult()
       const failure = normalizeFailure(message, code)
+      /** This exact immutable failure remains associated with the context's original task. */
       const result = Object.freeze({
-        ok: false,
+        ok: false as const,
         message: failure.message,
-        code: failure.code,
-        [providerResultBrand]: this.#taskToken
-      } as IBrandedProviderResult)
+        code: failure.code
+      })
+      providerResultBrand.set(result, this.#taskToken)
       new ProviderExecutor.#Result(result, this.#taskToken)
       return result
     }
@@ -1183,7 +1186,7 @@ export class ProviderExecutor<TTargetId extends string> {
           if (
             !response ||
             typeof response !== 'object' ||
-            (response as Partial<IBrandedProviderResult>)[providerResultBrand] !== taskToken
+            providerResultBrand.get(response) !== taskToken
           )
             throw createRpcError(
               RpcCoreErrorCode.providerNotSettled,
@@ -1237,7 +1240,7 @@ export class ProviderExecutor<TTargetId extends string> {
             if (
               !response ||
               typeof response !== 'object' ||
-              (response as Partial<IBrandedProviderResult>)[providerResultBrand] !== taskToken
+              providerResultBrand.get(response) !== taskToken
             )
               throw createRpcError(
                 RpcCoreErrorCode.providerNotSettled,
@@ -1770,9 +1773,7 @@ export class ProviderExecutor<TTargetId extends string> {
       if (request.route.route.dispatchOnly) return
       if (isExpired()) return
       const response: IRpcProviderResult =
-        result &&
-        typeof result === 'object' &&
-        (result as Partial<IBrandedProviderResult>)[providerResultBrand] === taskToken
+        result && typeof result === 'object' && providerResultBrand.get(result) === taskToken
           ? (result as IRpcProviderResult)
           : {
               ok: false,

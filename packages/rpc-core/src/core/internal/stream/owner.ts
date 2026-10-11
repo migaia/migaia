@@ -69,15 +69,18 @@ import {
   RpcRuntimeField
 } from '@migaia/rpc-contract/framing/v1'
 
-/** Only an original opt-in consumer exposes its existing lazy open/ready boundary to a relay. */
-const runtimeStreamReady = Symbol('rpc-runtime-stream-ready')
+/** Only the exact opt-in consumer retains its existing lazy open/ready operation for a relay. */
+const runtimeStreamReady = new WeakMap<
+  AsyncIterableIterator<IRpcPortableValue>,
+  () => Promise<void>
+>()
 
 /** Keep the existing managed facade's preparation tied to its sole original downstream consumer. */
 export function retainRuntimeStreamPreparation<T extends AsyncIterableIterator<IRpcPortableValue>>(
   facade: T,
   prepare: () => Promise<void>
 ): T {
-  Object.defineProperty(facade, runtimeStreamReady, { value: prepare })
+  runtimeStreamReady.set(facade, prepare)
   return facade
 }
 
@@ -85,7 +88,8 @@ export function retainRuntimeStreamPreparation<T extends AsyncIterableIterator<I
 export function prepareRuntimeStreamConsumer(
   iterator: AsyncIterableIterator<IRpcPortableValue>
 ): Promise<void> {
-  const prepare = Reflect.get(iterator, runtimeStreamReady) as (() => Promise<void>) | undefined
+  /** Descriptor copies cannot prepare the original consumer's private stream resource. */
+  const prepare = runtimeStreamReady.get(iterator)
   if (!prepare)
     throw createRpcError(
       RpcCoreErrorCode.capabilityUnsupported,
@@ -345,18 +349,16 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       }
     }
     if (generation)
-      Object.defineProperty(iterator, runtimeStreamReady, {
-        value: () => {
-          if (!state) {
-            try {
-              state = this.#start(targetId, method, params, options, generation)
-            } catch (error) {
-              unopenedTerminal = { error }
-              throw error
-            }
+      runtimeStreamReady.set(iterator, () => {
+        if (!state) {
+          try {
+            state = this.#start(targetId, method, params, options, generation)
+          } catch (error) {
+            unopenedTerminal = { error }
+            throw error
           }
-          return state.ready
         }
+        return state.ready
       })
     return Object.freeze(iterator)
   }

@@ -3,6 +3,7 @@ import type { IRpcPortableValue, IRpcRuntimeEnvelope } from '@migaia/rpc-contrac
 import type { IRpcRuntimeStepOutcome } from '@migaia/rpc-contract/v1'
 import {
   createRuntimeRequestInput,
+  retainForwardOptions,
   retainRuntimeRequestInput,
   isForwardedPayload,
   type IRuntimeRequestInput
@@ -258,8 +259,8 @@ export function createRuntimeApiEndpoint(
         callOptions
       ) as Promise<IRpcPortableValue | undefined>
     }
-    /** Legacy formatting uses the existing depth-two capture association. */
-    const options = { ...callOptions }
+    /** Legacy formatting retains admitted forwarding provenance alongside the depth-two input. */
+    const options = retainForwardOptions(callOptions, { ...callOptions })
     retainRuntimeRequestInput(options, input)
     return mode === 'notify' && !isForwardedPayload(callOptions, input.payload)
       ? current().sendOneWay(channel.peerId, input.method, input.payload, options)
@@ -397,8 +398,8 @@ export function createRuntimeApiEndpoint(
               rejectRuntimeApiCapability,
             args[3]
           )
-          /** One options association and one original consumer serve every cold control. */
-          const options = { ...args[3] }
+          /** Cold controls retain admitted forwarding provenance on their one input association. */
+          const options = retainForwardOptions(args[3], { ...args[3] })
           retainRuntimeRequestInput(options, input)
           /** An unpulled stream observes only ready; the first control activates one consumer. */
           let consumer: Promise<AsyncIterableIterator<IRpcPortableValue>> | undefined
