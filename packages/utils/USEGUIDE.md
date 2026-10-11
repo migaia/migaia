@@ -582,6 +582,8 @@ splitUtf8('你好世界', 6); // 每个汉字 3 字节 → ['你好', '世界']
 
 ## `/object` 模块（含对象路径）
 
+`createSafeRecord<T>()` 每次创建新的 null-prototype 字典，返回 `Partial<Record<string, T>>`。未可信键名（包括 `__proto__` 和 `constructor`）作为普通数据键，不会调用 Object.prototype 上的 setter；赋值后字段仍为可写、可枚举、可配置的数据属性。它不读取或复制输入，也不拥有 RPC 的任务或投递 key 格式。
+
 ### 快照与探测
 
 ```ts
@@ -1257,6 +1259,18 @@ await request.catch(() => undefined);
 ---
 
 ## `/value`、`/string`、`/number` 高频工具
+
+`isSafeIntegerValue(value)` 从 `/value` 导出，仅接受有限的安全整数 number，不转换字符串、bigint 或 boxed number。
+
+`tryString(value)` 从 `/string` 导出，string 原样通过，其他值只执行一次原生 `String(value)`。它返回 `{ threw: false, value: string }` 或 `{ threw: true, error: unknown }`；失败保留精确原抛出值，不提供 fallback、不调用 reporter、不生成新错误。调用方根据自己的边界选择报告、fallback 或重抛：
+
+```ts
+import { tryString } from '@migaia/utils/string';
+
+const converted = tryString(value);
+if (converted.threw) throw converted.error;
+const text = converted.value;
+```
 
 `isNullish` 只识别 `null | undefined`；`isBlankString` 只识别 trim 后为空的字符串。`isEmptyValue` 组合两者并额外把 `NaN` 判为空；`0`、`0n`、`false`、数组和对象保持有效。`isPrimitive` 覆盖 JavaScript 七类 primitive，不生成额外类型标签。
 

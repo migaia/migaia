@@ -1,6 +1,9 @@
 // Keep the internal compatibility path while preserving the canonical utility function identity.
 export { isUint8Array } from '@migaia/utils/bytes'
+export { createSafeRecord } from '@migaia/utils/object'
+export { isSafeIntegerValue } from '@migaia/utils/value'
 import { attachErrorIdentity, tryReadProperty } from '@migaia/utils/error'
+import { tryString } from '@migaia/utils/string'
 import { ERROR_SOURCE, RpcCoreErrorCode } from '../error-code.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcRuntimeTask } from '@migaia/rpc-contract/runtime'
@@ -37,11 +40,6 @@ export function safeRead<T>(
   })
 }
 
-/** Accepts only finite safe integer values from an untrusted boundary. */
-export function isSafeIntegerValue(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value)
-}
-
 /**
  * Converts an untrusted value once. A throwing conversion is reported synchronously or rethrown as
  * a coded TypeError with the original value preserved as its cause.
@@ -51,24 +49,25 @@ export function safeString(
   fallback: string = RpcCoreErrorText.unknownError,
   report?: (failure: Readonly<{ error: unknown }>) => undefined
 ): string {
-  try {
-    return typeof value === 'string' ? value : String(value)
-  } catch (error) {
-    /** A failing reporter must keep the conversion failure first in the cause graph. */
-    let cause: unknown = error
-    if (report) {
-      try {
-        report({ error })
-      } catch (reportError) {
-        cause = new AggregateError([error, reportError], RpcCoreErrorText.stringConversionFailed)
-      }
-      if (cause === error) return fallback
+  /** Utils owns conversion; Core owns its synchronous reporting and original error identity. */
+  const conversion = tryString(value)
+  if (!conversion.threw) return conversion.value
+  /** The exact thrown value remains the primary failure in Core's reporting boundary. */
+  const error = conversion.error
+  /** A failing reporter must keep the conversion failure first in the cause graph. */
+  let cause: unknown = error
+  if (report) {
+    try {
+      report({ error })
+    } catch (reportError) {
+      cause = new AggregateError([error, reportError], RpcCoreErrorText.stringConversionFailed)
     }
-    throw attachErrorIdentity(new TypeError(RpcCoreErrorText.stringConversionFailed, { cause }), {
-      source: ERROR_SOURCE,
-      code: RpcCoreErrorCode.stringConversionFailed
-    })
+    if (cause === error) return fallback
   }
+  throw attachErrorIdentity(new TypeError(RpcCoreErrorText.stringConversionFailed, { cause }), {
+    source: ERROR_SOURCE,
+    code: RpcCoreErrorCode.stringConversionFailed
+  })
 }
 
 /** Builds an injective key for attacker-controlled tuple components. */
@@ -89,11 +88,6 @@ export function runtimeTaskKey(task: IRpcRuntimeTask): string {
     String(task.targetGeneration.value),
     task.targetGeneration.providerId
   )
-}
-
-/** Creates a dictionary that cannot interpret attacker-controlled keys as properties. */
-export function createSafeRecord<T>(): Partial<Record<string, T>> {
-  return Object.create(null) as Partial<Record<string, T>>
 }
 
 /**
