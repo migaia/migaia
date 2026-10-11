@@ -8,18 +8,19 @@ import legacyRoot from '../fixtures/legacy-tree-shaking-root.json'
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-core')
 
 /**
- * C4 re-pins the fresh six-package root: 198 modules, 977832 raw bytes and 239477 gzip bytes. The
- * prior C10 root was 191/959391/234430; seven actual owner/guard modules account for the module
- * increase. Raw and per-module attribution: docs/rpc/scratch/package-split/c4-tree-*.json. These
- * measured caps contain no headroom; the immutable legacy comparison remains unchanged.
+ * C5 final re-pins the fresh six-package root: 200 modules, 985824 raw bytes and 240805 gzip bytes.
+ * The C4 root was 198/977832/239477; K290 retains Utils string/object and C5 owner-only error
+ * identity accounts for the measured byte change. Exact source, module and byte attribution lives
+ * in docs/rpc/scratch/package-split/c5-tree-final-attribution.json. These measured caps contain no
+ * headroom; the immutable legacy comparison remains unchanged.
  */
 const allowedIncrease = {
-  rawBytes: 385978 / legacyRoot.rawBytes,
-  gzipBytes: 96565 / legacyRoot.gzipBytes
+  rawBytes: 393970 / legacyRoot.rawBytes,
+  gzipBytes: 97893 / legacyRoot.gzipBytes
 } as const
 
-/** Exact C4 delta from the immutable 157-module legacy root, including both instance guards. */
-const expectedModuleIncrease = 41
+/** Exact C5 delta from the immutable 157-module legacy root, including canonical Utils owners. */
+const expectedModuleIncrease = 43
 
 describe('A9 root tree-shaking cost', () => {
   it('keeps module count exact and both byte costs within reviewed caps', () => {

@@ -6,9 +6,9 @@ const reviewed = (...modules: readonly string[]): readonly string[] =>
   Object.freeze([...modules].sort())
 
 /**
- * C4 exact fresh-built five-consumer sets: 129/186/193/198/197 modules, with no inventory slack.
- * Real owner paths, resolved edges and bundle hashes are retained in c4-tree-retained.json;
- * predecessor originals and per-module changes live beside the C4 attribution in local scratch.
+ * C5 final exact fresh-built five-consumer sets: 130/188/195/200/199 modules, with no inventory
+ * slack. Real owner paths, edges and bundle hashes are retained in c5-tree-final-retained.json; the
+ * full C4 predecessor sets and per-module changes remain in c5-tree-final-attribution.json.
  */
 export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, readonly string[]>> =
   Object.freeze({
@@ -141,6 +141,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/error-B4iC5cDy.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
+      'workspace:packages/utils/dist/string.js',
       'workspace:packages/utils/dist/scheduler.js'
     ),
     client: reviewed(
@@ -328,7 +329,9 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/error-B4iC5cDy.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
+      'workspace:packages/utils/dist/object.js',
       'workspace:packages/utils/dist/promise.js',
+      'workspace:packages/utils/dist/string.js',
       'workspace:packages/utils/dist/scheduler.js'
     ),
     provider: reviewed(
@@ -523,7 +526,9 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/error-B4iC5cDy.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
+      'workspace:packages/utils/dist/object.js',
       'workspace:packages/utils/dist/promise.js',
+      'workspace:packages/utils/dist/string.js',
       'workspace:packages/utils/dist/scheduler.js'
     ),
     full: reviewed(
@@ -723,7 +728,9 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/error-B4iC5cDy.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
+      'workspace:packages/utils/dist/object.js',
       'workspace:packages/utils/dist/promise.js',
+      'workspace:packages/utils/dist/string.js',
       'workspace:packages/utils/dist/scheduler.js'
     ),
     custom: reviewed(
@@ -922,7 +929,9 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/error-B4iC5cDy.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
+      'workspace:packages/utils/dist/object.js',
       'workspace:packages/utils/dist/promise.js',
+      'workspace:packages/utils/dist/string.js',
       'workspace:packages/utils/dist/scheduler.js'
     )
   })
