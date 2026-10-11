@@ -50,8 +50,12 @@ function logicalPath(file: string): string {
     : relative(sourceRoot, file).split(sep).join('/')
 }
 
-/** Only byte classification and error identity utilities may cross into contract. */
-const contractBareAllowlist = new Set(['@migaia/utils/bytes', '@migaia/utils/error'])
+/** Contract portable traversal depends inward on serialize alongside byte/error utilities. */
+const contractBareAllowlist = new Set([
+  '@migaia/serialize',
+  '@migaia/utils/bytes',
+  '@migaia/utils/error'
+])
 /** Published adapter boundary: shared primitives, errors, and local text only. */
 const browserCoreAllowlist = new Set(['core/transport-kit.ts', 'core/index.ts'])
 

@@ -110,6 +110,7 @@
     "typecheck:contract": "tsc --noEmit -p tsconfig.contract.json"
   },
   "dependencies": {
+    "@migaia/serialize": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
   "peerDependencies": {},
