@@ -141,29 +141,37 @@ export function assertProviderForwardRoute(
   throw error
 }
 
-/** Pure pre-admission policy stays on the already registered provider, never a second table. */
-const providerPreflight = Symbol('rpc-provider-preflight')
-/** Only forwarding contexts carry private access to their admitted operation metadata. */
-const providerInvocation = Symbol('rpc-provider-invocation')
-/** Cold registration carries the original native quota owner without a second routing table. */
-const providerBulkAdmission = Symbol('rpc-provider-bulk-admission')
-/** Native stream policy starts at the original producer's construction, before relay preparation. */
-const providerStreamAdmission = Symbol('rpc-provider-stream-admission')
-/** The original scope callback can carry a stable authenticated principal for the new key domain. */
-const runtimeIdempotencyScope = Symbol('rpc-runtime-idempotency-scope')
+/** Only the exact registered provider retains its private pre-admission policy. */
+const providerPreflight = new WeakMap<Function, (route: IRpcRouteHeader) => void>()
+/** Admitted operation metadata stays private to the exact original forwarding context. */
+const providerInvocation = new WeakMap<
+  IRpcContext,
+  Readonly<{
+    route: IRpcRouteHeader
+    peerKey?: string
+    runtime?: IRpcRuntimeEnvelope
+    relay?: IProviderRuntimeRelay
+  }>
+>()
+/** Exact callback identity retains the original quota owner without exposing a copyable fact. */
+const providerBulkAdmission = new WeakMap<Function, IProviderBulkRegistration>()
+/** Native producer identity privately retains its original construction-time lifetime policy. */
+const providerStreamAdmission = new WeakMap<Function, IProviderStreamAdmission>()
+/** Only the exact Core-owned scope callback retains its authenticated principal. */
+const runtimeIdempotencyScope = new WeakMap<Function, string>()
 
 /**
  * Native session construction preserves old scope behavior while retaining actual principal
  * provenance.
  */
 export function retainRuntimeIdempotencyScope<T extends Function>(scope: T, principal: string): T {
-  Object.defineProperty(scope, runtimeIdempotencyScope, { value: principal })
+  runtimeIdempotencyScope.set(scope, principal)
   return scope
 }
 
 /** Only a canonical native callback supplies stable scope; opaque user scope keeps its own policy. */
 export function readRuntimeIdempotencyScope(scope: Function | undefined): string | undefined {
-  return scope ? Reflect.get(scope, runtimeIdempotencyScope) : undefined
+  return scope ? runtimeIdempotencyScope.get(scope) : undefined
 }
 
 /** Register a policy owner on the actual callback consumed by the original executor. */
@@ -171,7 +179,7 @@ export function attachProviderBulkAdmission<T extends Function>(
   provider: T,
   registration: IProviderBulkRegistration
 ): T {
-  Object.defineProperty(provider, providerBulkAdmission, { value: registration })
+  providerBulkAdmission.set(provider, registration)
   return provider
 }
 
@@ -179,7 +187,7 @@ export function attachProviderBulkAdmission<T extends Function>(
 export function readProviderBulkAdmission(
   provider: Function
 ): IProviderBulkRegistration | undefined {
-  return Reflect.get(provider, providerBulkAdmission)
+  return providerBulkAdmission.get(provider)
 }
 
 /** Existing native policy counters release only when this exact original producer lifetime ends. */
@@ -195,23 +203,21 @@ export function wrapProviderStreamAdmission<T extends Function>(
 ): T {
   /** Already wrapped policy must enter before the outer drain owns this same producer. */
   const prior = readProviderStreamAdmission(source)
-  Object.defineProperty(target, providerStreamAdmission, {
-    value: (context: IRpcContext): IProviderStreamSettlement => {
-      /** Original policy rollback runs even if the next owner refuses construction. */
-      const releasePrior = prior?.(context)
-      let release: IProviderStreamSettlement
+  providerStreamAdmission.set(target, (context: IRpcContext): IProviderStreamSettlement => {
+    /** Original policy rollback runs even if the next owner refuses construction. */
+    const releasePrior = prior?.(context)
+    let release: IProviderStreamSettlement
+    try {
+      release = enter(context)
+    } catch (error) {
+      releasePrior?.(false)
+      throw error
+    }
+    return (succeeded) => {
       try {
-        release = enter(context)
-      } catch (error) {
-        releasePrior?.(false)
-        throw error
-      }
-      return (succeeded) => {
-        try {
-          release(succeeded)
-        } finally {
-          releasePrior?.(succeeded)
-        }
+        release(succeeded)
+      } finally {
+        releasePrior?.(succeeded)
       }
     }
   })
@@ -222,7 +228,7 @@ export function wrapProviderStreamAdmission<T extends Function>(
 export function readProviderStreamAdmission(
   provider: Function
 ): IProviderStreamAdmission | undefined {
-  return Reflect.get(provider, providerStreamAdmission)
+  return providerStreamAdmission.get(provider)
 }
 
 /** Attach the synchronous route check to the canonical scalar or stream provider. */
@@ -230,7 +236,7 @@ export function attachProviderPreflight<T extends Function>(
   provider: T,
   check: (route: IRpcRouteHeader) => void
 ): T {
-  Object.defineProperty(provider, providerPreflight, { value: check })
+  providerPreflight.set(provider, check)
   return provider
 }
 
@@ -238,7 +244,7 @@ export function attachProviderPreflight<T extends Function>(
 export function readProviderPreflight(
   provider: Function | undefined
 ): ((route: IRpcRouteHeader) => void) | undefined {
-  return provider ? Reflect.get(provider, providerPreflight) : undefined
+  return provider ? providerPreflight.get(provider) : undefined
 }
 
 /** Original native wrappers retain forward policy while registering their own callback identity. */
@@ -257,8 +263,8 @@ export function retainProviderPreflight<T extends Function>(
   const check = readProviderPreflight(source)
   /** Core registration preserves the same cold native lifetime port through its own callback. */
   const streamAdmission = readProviderStreamAdmission(source)
-  if (streamAdmission && !Object.hasOwn(target, providerStreamAdmission))
-    Object.defineProperty(target, providerStreamAdmission, { value: streamAdmission })
+  if (streamAdmission && !providerStreamAdmission.has(target))
+    providerStreamAdmission.set(target, streamAdmission)
   return check ? attachProviderPreflight(target, check) : target
 }
 
@@ -270,29 +276,29 @@ export function retainProviderInvocation(
   runtime?: IRpcRuntimeEnvelope,
   relay?: IProviderRuntimeRelay
 ): void {
-  Object.defineProperty(context, providerInvocation, { value: { route, peerKey, runtime, relay } })
+  providerInvocation.set(context, { route, peerKey, runtime, relay })
 }
 
 /** Forwarding reads the original admitted task/options without trusting payload metadata. */
 export function readProviderRuntimeOperation(
   context: IRpcContext
 ): IRpcRuntimeEnvelope | undefined {
-  return Reflect.get(context, providerInvocation)?.runtime
+  return providerInvocation.get(context)?.runtime
 }
 
 /** The admitted relay captures one exact original slot receipt before waiting in the key queue. */
 export function readProviderRuntimeRelay(context: IRpcContext): IProviderRuntimeRelay | undefined {
-  return Reflect.get(context, providerInvocation)?.relay
+  return providerInvocation.get(context)?.relay
 }
 
 /** The compiled forward entry reads its actual operation without trusting payload fields. */
 export function readProviderInvocation(context: IRpcContext): IRpcRouteHeader | undefined {
-  return Reflect.get(context, providerInvocation)?.route
+  return providerInvocation.get(context)?.route
 }
 
 /** Authenticated describe reads its original admitted token without accepting payload credentials. */
 export function readProviderIdentity(context: IRpcContext): string | undefined {
-  return Reflect.get(context, providerInvocation)?.peerKey
+  return providerInvocation.get(context)?.peerKey
 }
 
 /** Owns provider and event routing tables for one endpoint. */
