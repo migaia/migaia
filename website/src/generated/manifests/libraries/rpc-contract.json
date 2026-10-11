@@ -2530,6 +2530,130 @@
           "fragment": "rpc-contract-binary--restoreRpcBinary"
         },
         {
+          "name": "restoreRpcBinaryDecoded",
+          "kind": "function",
+          "signature": "export declare function restoreRpcBinaryDecoded(value: unknown, storage: RpcBinaryStorage, sidecarInput?: unknown, limit?: number, digest?: IRpcBinaryDigest): Promise<IRpcRuntimeEnvelope>;",
+          "declarationLine": 25,
+          "source": "packages/rpc-contract/dist/contract/runtime-api/binary.d.ts",
+          "purpose": "Restore only canonical codec output selected by its receive owner from actual provenance. Reading own enumerable properties executes getters; this entry does not accept or validate caller-constructed objects. Use `restoreRpcBinary` for strict object validation. Binary digest, error identity and Promise scheduling remain with the canonical restore owner.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for restoreRpcBinaryDecoded.",
+          "advanced": "No additional advanced behavior is declared for restoreRpcBinaryDecoded.",
+          "parameters": [
+            "value: unknown",
+            "storage: RpcBinaryStorage",
+            "sidecarInput: unknown (optional)",
+            "limit: number (optional)",
+            "digest: IRpcBinaryDigest (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            },
+            {
+              "name": "storage",
+              "type": "RpcBinaryStorage",
+              "optional": false
+            },
+            {
+              "name": "sidecarInput",
+              "type": "unknown",
+              "optional": true
+            },
+            {
+              "name": "limit",
+              "type": "number",
+              "optional": true
+            },
+            {
+              "name": "digest",
+              "type": "IRpcBinaryDigest",
+              "optional": true
+            }
+          ],
+          "returns": "Promise<IRpcRuntimeEnvelope>",
+          "errors": ["No documented errors are declared for restoreRpcBinaryDecoded."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for restoreRpcBinaryDecoded.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "restoreRpcBinaryDecoded",
+          "exportPath": "./binary",
+          "overloadSignatures": [
+            "export declare function restoreRpcBinaryDecoded(value: unknown, storage: RpcBinaryStorage, sidecarInput?: unknown, limit?: number, digest?: IRpcBinaryDigest): Promise<IRpcRuntimeEnvelope>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              },
+              {
+                "name": "storage",
+                "type": "RpcBinaryStorage",
+                "optional": false
+              },
+              {
+                "name": "sidecarInput",
+                "type": "unknown",
+                "optional": true
+              },
+              {
+                "name": "limit",
+                "type": "number",
+                "optional": true
+              },
+              {
+                "name": "digest",
+                "type": "IRpcBinaryDigest",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["Promise<IRpcRuntimeEnvelope>"],
+          "whenToUse": "Use restoreRpcBinaryDecoded when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when restoreRpcBinaryDecoded does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Restore only canonical codec output selected by its receive owner from actual provenance. Reading own enumerable properties executes getters; this entry does not accept or validate caller-constructed objects. Use `restoreRpcBinary` for strict object validation. Binary digest, error identity and Promise scheduling remain with the canonical restore owner."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import restoreRpcBinaryDecoded from @migaia/rpc-contract/binary, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use restoreRpcBinaryDecoded when its function contract and declared inputs match the result you need. Choose a different public symbol when restoreRpcBinaryDecoded does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for restoreRpcBinaryDecoded."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for restoreRpcBinaryDecoded."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/contract/runtime-api/binary.d.ts:restoreRpcBinaryDecoded:export declare function restoreRpcBinaryDecoded(value: unknown, storage: RpcBinaryStorage, sidecarInput?: unknown, limit?: number, digest?: IRpcBinaryDigest): Promise<IRpcRuntimeEnvelope>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-binary--restoreRpcBinaryDecoded"
+        },
+        {
           "name": "RpcBinaryProfile",
           "kind": "const",
           "signature": "export declare const RpcBinaryProfile = \"migaia.rpc.portable-binary/1\";",
@@ -3778,6 +3902,130 @@
           "usageScore": 6,
           "configuration": [],
           "fragment": "rpc-contract-binary/lazy--restoreRpcBinary"
+        },
+        {
+          "name": "restoreRpcBinaryDecoded",
+          "kind": "function",
+          "signature": "export declare function restoreRpcBinaryDecoded(value: unknown, storage: RpcBinaryStorage, sidecars?: unknown, limit?: number, digest?: IRpcBinaryDigest): Promise<IRpcRuntimeEnvelope>;",
+          "declarationLine": 17,
+          "source": "packages/rpc-contract/dist/contract/runtime-api/binary-lazy.d.ts",
+          "purpose": "Restore only canonical codec output while preserving the existing cold/warm Promise schedule. Reading own enumerable properties executes getters; this entry does not accept or validate caller-constructed objects. Use this subpath's `restoreRpcBinary` strict entry instead. The receive owner must select this entry from the actual canonical decoder's provenance.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for restoreRpcBinaryDecoded.",
+          "advanced": "No additional advanced behavior is declared for restoreRpcBinaryDecoded.",
+          "parameters": [
+            "value: unknown",
+            "storage: RpcBinaryStorage",
+            "sidecars: unknown (optional)",
+            "limit: number (optional)",
+            "digest: IRpcBinaryDigest (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            },
+            {
+              "name": "storage",
+              "type": "RpcBinaryStorage",
+              "optional": false
+            },
+            {
+              "name": "sidecars",
+              "type": "unknown",
+              "optional": true
+            },
+            {
+              "name": "limit",
+              "type": "number",
+              "optional": true
+            },
+            {
+              "name": "digest",
+              "type": "IRpcBinaryDigest",
+              "optional": true
+            }
+          ],
+          "returns": "Promise<IRpcRuntimeEnvelope>",
+          "errors": ["No documented errors are declared for restoreRpcBinaryDecoded."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for restoreRpcBinaryDecoded.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "restoreRpcBinaryDecodedLazy",
+          "exportPath": "./binary/lazy",
+          "overloadSignatures": [
+            "export declare function restoreRpcBinaryDecoded(value: unknown, storage: RpcBinaryStorage, sidecars?: unknown, limit?: number, digest?: IRpcBinaryDigest): Promise<IRpcRuntimeEnvelope>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              },
+              {
+                "name": "storage",
+                "type": "RpcBinaryStorage",
+                "optional": false
+              },
+              {
+                "name": "sidecars",
+                "type": "unknown",
+                "optional": true
+              },
+              {
+                "name": "limit",
+                "type": "number",
+                "optional": true
+              },
+              {
+                "name": "digest",
+                "type": "IRpcBinaryDigest",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["Promise<IRpcRuntimeEnvelope>"],
+          "whenToUse": "Use restoreRpcBinaryDecoded when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when restoreRpcBinaryDecoded does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Restore only canonical codec output while preserving the existing cold/warm Promise schedule. Reading own enumerable properties executes getters; this entry does not accept or validate caller-constructed objects. Use this subpath's `restoreRpcBinary` strict entry instead. The receive owner must select this entry from the actual canonical decoder's provenance."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import restoreRpcBinaryDecoded from @migaia/rpc-contract/binary/lazy, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use restoreRpcBinaryDecoded when its function contract and declared inputs match the result you need. Choose a different public symbol when restoreRpcBinaryDecoded does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for restoreRpcBinaryDecoded."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for restoreRpcBinaryDecoded."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/contract/runtime-api/binary-lazy.d.ts:restoreRpcBinaryDecoded:export declare function restoreRpcBinaryDecoded(value: unknown, storage: RpcBinaryStorage, sidecars?: unknown, limit?: number, digest?: IRpcBinaryDigest): Promise<IRpcRuntimeEnvelope>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-binary/lazy--restoreRpcBinaryDecoded"
         }
       ],
       "aliases": [
@@ -13300,10 +13548,101 @@
           "fragment": "rpc-contract-runtime--normalizeRuntimeEnvelope"
         },
         {
+          "name": "normalizeRuntimeEnvelopeDecoded",
+          "kind": "function",
+          "signature": "export declare function normalizeRuntimeEnvelopeDecoded(value: unknown, portable?: (value: unknown) => IRpcPortableValue): IRpcRuntimeEnvelope;",
+          "declarationLine": 12,
+          "source": "packages/rpc-contract/dist/contract/runtime-api/normalize.d.ts",
+          "purpose": "Validate only canonical codec output selected by its decoding owner from actual provenance. Reading own enumerable properties executes getters; this entry does not accept or validate caller-constructed objects. Use `normalizeRuntimeEnvelope` for strict object validation. The shared union parser still checks wire fields; calling this entry grants no RPC authority.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizeRuntimeEnvelopeDecoded.",
+          "advanced": "No additional advanced behavior is declared for normalizeRuntimeEnvelopeDecoded.",
+          "parameters": [
+            "value: unknown",
+            "portable: (value: unknown) => IRpcPortableValue (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            },
+            {
+              "name": "portable",
+              "type": "(value: unknown) => IRpcPortableValue",
+              "optional": true
+            }
+          ],
+          "returns": "IRpcRuntimeEnvelope",
+          "errors": ["No documented errors are declared for normalizeRuntimeEnvelopeDecoded."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for normalizeRuntimeEnvelopeDecoded.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "normalizeRuntimeEnvelopeDecoded",
+          "exportPath": "./runtime",
+          "overloadSignatures": [
+            "export declare function normalizeRuntimeEnvelopeDecoded(value: unknown, portable?: (value: unknown) => IRpcPortableValue): IRpcRuntimeEnvelope;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              },
+              {
+                "name": "portable",
+                "type": "(value: unknown) => IRpcPortableValue",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcRuntimeEnvelope"],
+          "whenToUse": "Use normalizeRuntimeEnvelopeDecoded when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when normalizeRuntimeEnvelopeDecoded does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Validate only canonical codec output selected by its decoding owner from actual provenance. Reading own enumerable properties executes getters; this entry does not accept or validate caller-constructed objects. Use `normalizeRuntimeEnvelope` for strict object validation. The shared union parser still checks wire fields; calling this entry grants no RPC authority."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import normalizeRuntimeEnvelopeDecoded from @migaia/rpc-contract/runtime, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use normalizeRuntimeEnvelopeDecoded when its function contract and declared inputs match the result you need. Choose a different public symbol when normalizeRuntimeEnvelopeDecoded does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizeRuntimeEnvelopeDecoded."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for normalizeRuntimeEnvelopeDecoded."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/contract/runtime-api/normalize.d.ts:normalizeRuntimeEnvelopeDecoded:export declare function normalizeRuntimeEnvelopeDecoded(value: unknown, portable?: (value: unknown) => IRpcPortableValue): IRpcRuntimeEnvelope;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-runtime--normalizeRuntimeEnvelopeDecoded"
+        },
+        {
           "name": "normalizeRuntimeGeneration",
           "kind": "function",
           "signature": "export declare function normalizeRuntimeGeneration(value: unknown): IRpcRuntimeGeneration;",
-          "declarationLine": 14,
+          "declarationLine": 120,
           "source": "packages/rpc-contract/dist/contract/runtime-api/metadata.d.ts",
           "purpose": "Generation counters are separate nonnegative safe-integer facts issued by their existing owners.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizeRuntimeGeneration.",
@@ -13381,7 +13720,7 @@
           "name": "normalizeRuntimeSteps",
           "kind": "function",
           "signature": "export declare function normalizeRuntimeSteps(value: unknown, portable?: (value: unknown) => IRpcPortableValue): readonly IRpcRuntimeStep[];",
-          "declarationLine": 6,
+          "declarationLine": 112,
           "source": "packages/rpc-contract/dist/contract/runtime-api/metadata.d.ts",
           "purpose": "Local factories and wire admission share this exact closed, request-only group step snapshot.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizeRuntimeSteps.",
@@ -14725,6 +15064,97 @@
           "fragment": "rpc-contract-runtime/lazy--normalizeRuntimeEnvelope"
         },
         {
+          "name": "normalizeRuntimeEnvelopeDecoded",
+          "kind": "function",
+          "signature": "export declare function normalizeRuntimeEnvelopeDecoded(value: unknown, portable?: (value: unknown) => IRpcPortableValue): IRpcRuntimeEnvelope | Promise<IRpcRuntimeEnvelope>;",
+          "declarationLine": 12,
+          "source": "packages/rpc-contract/dist/contract/runtime-api/normalize-lazy.d.ts",
+          "purpose": "Validate only canonical codec output selected by its decoding owner from actual provenance. Reading own enumerable properties executes getters; this entry does not accept or validate caller-constructed objects. Use this subpath's `normalizeRuntimeEnvelope` strict entry instead. The shared union yields only when an actual stream branch loads its parser; no authority is granted by calling this entry.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizeRuntimeEnvelopeDecoded.",
+          "advanced": "No additional advanced behavior is declared for normalizeRuntimeEnvelopeDecoded.",
+          "parameters": [
+            "value: unknown",
+            "portable: (value: unknown) => IRpcPortableValue (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            },
+            {
+              "name": "portable",
+              "type": "(value: unknown) => IRpcPortableValue",
+              "optional": true
+            }
+          ],
+          "returns": "IRpcRuntimeEnvelope | Promise<IRpcRuntimeEnvelope>",
+          "errors": ["No documented errors are declared for normalizeRuntimeEnvelopeDecoded."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for normalizeRuntimeEnvelopeDecoded.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "normalizeRuntimeEnvelopeDecodedLazy",
+          "exportPath": "./runtime/lazy",
+          "overloadSignatures": [
+            "export declare function normalizeRuntimeEnvelopeDecoded(value: unknown, portable?: (value: unknown) => IRpcPortableValue): IRpcRuntimeEnvelope | Promise<IRpcRuntimeEnvelope>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              },
+              {
+                "name": "portable",
+                "type": "(value: unknown) => IRpcPortableValue",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcRuntimeEnvelope | Promise<IRpcRuntimeEnvelope>"],
+          "whenToUse": "Use normalizeRuntimeEnvelopeDecoded when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when normalizeRuntimeEnvelopeDecoded does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Validate only canonical codec output selected by its decoding owner from actual provenance. Reading own enumerable properties executes getters; this entry does not accept or validate caller-constructed objects. Use this subpath's `normalizeRuntimeEnvelope` strict entry instead. The shared union yields only when an actual stream branch loads its parser; no authority is granted by calling this entry."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import normalizeRuntimeEnvelopeDecoded from @migaia/rpc-contract/runtime/lazy, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use normalizeRuntimeEnvelopeDecoded when its function contract and declared inputs match the result you need. Choose a different public symbol when normalizeRuntimeEnvelopeDecoded does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizeRuntimeEnvelopeDecoded."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for normalizeRuntimeEnvelopeDecoded."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/contract/runtime-api/normalize-lazy.d.ts:normalizeRuntimeEnvelopeDecoded:export declare function normalizeRuntimeEnvelopeDecoded(value: unknown, portable?: (value: unknown) => IRpcPortableValue): IRpcRuntimeEnvelope | Promise<IRpcRuntimeEnvelope>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-runtime/lazy--normalizeRuntimeEnvelopeDecoded"
+        },
+        {
           "name": "normalizeStreamPayload",
           "kind": "function",
           "signature": "export declare function normalizeStreamPayload(value: unknown, portable?: (value: unknown) => IRpcPortableValue): IRpcStreamPayload | Promise<IRpcStreamPayload>;",
@@ -14974,7 +15404,176 @@
       ],
       "guidePath": "/en/guides/rpc-contract/getting-started",
       "architecturePath": "/en/architecture/rpc-contract",
-      "symbols": [],
+      "symbols": [
+        {
+          "name": "createRuntimeCallEnvelope",
+          "kind": "function",
+          "signature": "export declare function createRuntimeCallEnvelope(header: IRpcRuntimeCallHeader, payload?: IRpcPortableValue, portable?: (value: unknown) => IRpcPortableValue): Extract<IRpcRuntimeEnvelope, { kind: typeof RpcRuntimeKind.call; }>;",
+          "declarationLine": 106,
+          "source": "packages/rpc-contract/dist/contract/runtime-api/metadata.d.ts",
+          "purpose": "Construct one typed call using the canonical field validators in their original failure order. Core supplies its owned header; this operation grants no transport or private snapshot authority. The portable data operation runs last and defaults to the existing full payload admission. Caller input objects are never frozen by this constructor.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRuntimeCallEnvelope.",
+          "advanced": "No additional advanced behavior is declared for createRuntimeCallEnvelope.",
+          "parameters": [
+            "header: IRpcRuntimeCallHeader",
+            "payload: IRpcPortableValue (optional)",
+            "portable: (value: unknown) => IRpcPortableValue (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "header",
+              "type": "IRpcRuntimeCallHeader",
+              "optional": false
+            },
+            {
+              "name": "payload",
+              "type": "IRpcPortableValue",
+              "optional": true
+            },
+            {
+              "name": "portable",
+              "type": "(value: unknown) => IRpcPortableValue",
+              "optional": true
+            }
+          ],
+          "returns": "Extract<IRpcRuntimeEnvelope, { kind: typeof RpcRuntimeKind.call; }>",
+          "errors": ["No documented errors are declared for createRuntimeCallEnvelope."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRuntimeCallEnvelope.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "createRuntimeCallEnvelope",
+          "exportPath": "./runtime/metadata",
+          "overloadSignatures": [
+            "export declare function createRuntimeCallEnvelope(header: IRpcRuntimeCallHeader, payload?: IRpcPortableValue, portable?: (value: unknown) => IRpcPortableValue): Extract<IRpcRuntimeEnvelope, { kind: typeof RpcRuntimeKind.call; }>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "header",
+                "type": "IRpcRuntimeCallHeader",
+                "optional": false
+              },
+              {
+                "name": "payload",
+                "type": "IRpcPortableValue",
+                "optional": true
+              },
+              {
+                "name": "portable",
+                "type": "(value: unknown) => IRpcPortableValue",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "Extract<IRpcRuntimeEnvelope, { kind: typeof RpcRuntimeKind.call; }>"
+          ],
+          "whenToUse": "Use createRuntimeCallEnvelope when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createRuntimeCallEnvelope does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Construct one typed call using the canonical field validators in their original failure order. Core supplies its owned header; this operation grants no transport or private snapshot authority. The portable data operation runs last and defaults to the existing full payload admission. Caller input objects are never frozen by this constructor."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createRuntimeCallEnvelope from @migaia/rpc-contract/runtime/metadata, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createRuntimeCallEnvelope when its function contract and declared inputs match the result you need. Choose a different public symbol when createRuntimeCallEnvelope does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRuntimeCallEnvelope."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createRuntimeCallEnvelope."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/contract/runtime-api/metadata.d.ts:createRuntimeCallEnvelope:export declare function createRuntimeCallEnvelope(header: IRpcRuntimeCallHeader, payload?: IRpcPortableValue, portable?: (value: unknown) => IRpcPortableValue): Extract<IRpcRuntimeEnvelope, { kind: typeof RpcRuntimeKind.call; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-runtime/metadata--createRuntimeCallEnvelope"
+        },
+        {
+          "name": "IRpcRuntimeCallHeader",
+          "kind": "type",
+          "signature": "export type IRpcRuntimeCallHeader = Readonly<{ id: string; route: IRpcRuntimeRoute; task: IRpcRuntimeTask; options: IRpcRuntimeOptions; }>;",
+          "declarationLine": 5,
+          "source": "packages/rpc-contract/dist/contract/runtime-api/metadata.d.ts",
+          "purpose": "Typed call fields supplied by Core's existing owned input and held generation resources.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcRuntimeCallHeader.",
+          "advanced": "No additional advanced behavior is declared for IRpcRuntimeCallHeader.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcRuntimeCallHeader."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcRuntimeCallHeader.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcRuntimeCallHeader",
+          "exportPath": "./runtime/metadata",
+          "overloadSignatures": [
+            "export type IRpcRuntimeCallHeader = Readonly<{ id: string; route: IRpcRuntimeRoute; task: IRpcRuntimeTask; options: IRpcRuntimeOptions; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcRuntimeCallHeader when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcRuntimeCallHeader does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Typed call fields supplied by Core's existing owned input and held generation resources."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcRuntimeCallHeader from @migaia/rpc-contract/runtime/metadata, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcRuntimeCallHeader when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcRuntimeCallHeader does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcRuntimeCallHeader."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcRuntimeCallHeader."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/contract/runtime-api/metadata.d.ts:IRpcRuntimeCallHeader:export type IRpcRuntimeCallHeader = Readonly<{ id: string; route: IRpcRuntimeRoute; task: IRpcRuntimeTask; options: IRpcRuntimeOptions; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-runtime/metadata--IRpcRuntimeCallHeader"
+        }
+      ],
       "aliases": [
         {
           "identity": "packages/rpc-contract/dist/contract/runtime-api/types.d.ts:IRpcRuntimeGeneration:export type IRpcRuntimeGeneration = Readonly<{ kind: RpcRuntimeGenerationKind; value: number; providerId: string; }>;",

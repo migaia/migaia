@@ -3947,6 +3947,12 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/en/docs/rpc-contract/binary/lazy/restoreRpcBinaryDecoded",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/en/docs/rpc-contract/binary/prepareRpcBinary",
       "locale": "en",
       "domain": "docs",
@@ -3954,6 +3960,12 @@
     },
     {
       "path": "/en/docs/rpc-contract/binary/restoreRpcBinary",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/binary/restoreRpcBinaryDecoded",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-contract"
@@ -4721,6 +4733,12 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/en/docs/rpc-contract/runtime/lazy/normalizeRuntimeEnvelopeDecoded",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/en/docs/rpc-contract/runtime/lazy/normalizeStreamPayload",
       "locale": "en",
       "domain": "docs",
@@ -4733,7 +4751,25 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/en/docs/rpc-contract/runtime/metadata/IRpcRuntimeCallHeader",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/runtime/metadata/createRuntimeCallEnvelope",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/en/docs/rpc-contract/runtime/normalizeRuntimeEnvelope",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/runtime/normalizeRuntimeEnvelopeDecoded",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-contract"
@@ -19649,6 +19685,12 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/zh/docs/rpc-contract/binary/lazy/restoreRpcBinaryDecoded",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/zh/docs/rpc-contract/binary/prepareRpcBinary",
       "locale": "zh",
       "domain": "docs",
@@ -19656,6 +19698,12 @@
     },
     {
       "path": "/zh/docs/rpc-contract/binary/restoreRpcBinary",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/binary/restoreRpcBinaryDecoded",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-contract"
@@ -20423,6 +20471,12 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/zh/docs/rpc-contract/runtime/lazy/normalizeRuntimeEnvelopeDecoded",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/zh/docs/rpc-contract/runtime/lazy/normalizeStreamPayload",
       "locale": "zh",
       "domain": "docs",
@@ -20435,7 +20489,25 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/zh/docs/rpc-contract/runtime/metadata/IRpcRuntimeCallHeader",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/runtime/metadata/createRuntimeCallEnvelope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/zh/docs/rpc-contract/runtime/normalizeRuntimeEnvelope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/runtime/normalizeRuntimeEnvelopeDecoded",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-contract"

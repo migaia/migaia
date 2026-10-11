@@ -6652,6 +6652,16 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/docs/rpc-contract/binary/restoreRpcBinaryDecoded",
+      "to": "/en/guides/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-contract",
+      "to": "/en/docs/rpc-contract/binary/restoreRpcBinaryDecoded",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/docs/rpc-contract/binary/RpcBinaryProfile",
       "to": "/en/guides/rpc-contract",
       "type": "domain-peer"
@@ -6799,6 +6809,16 @@
     {
       "from": "/en/guides/rpc-contract",
       "to": "/en/docs/rpc-contract/binary/lazy/restoreRpcBinary",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-contract/binary/lazy/restoreRpcBinaryDecoded",
+      "to": "/en/guides/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-contract",
+      "to": "/en/docs/rpc-contract/binary/lazy/restoreRpcBinaryDecoded",
       "type": "domain-peer"
     },
     {
@@ -7882,6 +7902,16 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/docs/rpc-contract/runtime/normalizeRuntimeEnvelopeDecoded",
+      "to": "/en/guides/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-contract",
+      "to": "/en/docs/rpc-contract/runtime/normalizeRuntimeEnvelopeDecoded",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/docs/rpc-contract/runtime/normalizeRuntimeGeneration",
       "to": "/en/guides/rpc-contract",
       "type": "domain-peer"
@@ -8092,6 +8122,16 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/docs/rpc-contract/runtime/lazy/normalizeRuntimeEnvelopeDecoded",
+      "to": "/en/guides/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-contract",
+      "to": "/en/docs/rpc-contract/runtime/lazy/normalizeRuntimeEnvelopeDecoded",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/docs/rpc-contract/runtime/lazy/normalizeStreamPayload",
       "to": "/en/guides/rpc-contract",
       "type": "domain-peer"
@@ -8109,6 +8149,26 @@
     {
       "from": "/en/guides/rpc-contract",
       "to": "/en/docs/rpc-contract/runtime/metadata",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime/metadata/createRuntimeCallEnvelope",
+      "to": "/en/guides/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-contract",
+      "to": "/en/docs/rpc-contract/runtime/metadata/createRuntimeCallEnvelope",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime/metadata/IRpcRuntimeCallHeader",
+      "to": "/en/guides/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-contract",
+      "to": "/en/docs/rpc-contract/runtime/metadata/IRpcRuntimeCallHeader",
       "type": "domain-peer"
     },
     {
@@ -32582,6 +32642,16 @@
       "type": "domain-peer"
     },
     {
+      "from": "/zh/docs/rpc-contract/binary/restoreRpcBinaryDecoded",
+      "to": "/zh/guides/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-contract",
+      "to": "/zh/docs/rpc-contract/binary/restoreRpcBinaryDecoded",
+      "type": "domain-peer"
+    },
+    {
       "from": "/zh/docs/rpc-contract/binary/RpcBinaryProfile",
       "to": "/zh/guides/rpc-contract",
       "type": "domain-peer"
@@ -32729,6 +32799,16 @@
     {
       "from": "/zh/guides/rpc-contract",
       "to": "/zh/docs/rpc-contract/binary/lazy/restoreRpcBinary",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/binary/lazy/restoreRpcBinaryDecoded",
+      "to": "/zh/guides/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-contract",
+      "to": "/zh/docs/rpc-contract/binary/lazy/restoreRpcBinaryDecoded",
       "type": "domain-peer"
     },
     {
@@ -33812,6 +33892,16 @@
       "type": "domain-peer"
     },
     {
+      "from": "/zh/docs/rpc-contract/runtime/normalizeRuntimeEnvelopeDecoded",
+      "to": "/zh/guides/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-contract",
+      "to": "/zh/docs/rpc-contract/runtime/normalizeRuntimeEnvelopeDecoded",
+      "type": "domain-peer"
+    },
+    {
       "from": "/zh/docs/rpc-contract/runtime/normalizeRuntimeGeneration",
       "to": "/zh/guides/rpc-contract",
       "type": "domain-peer"
@@ -34022,6 +34112,16 @@
       "type": "domain-peer"
     },
     {
+      "from": "/zh/docs/rpc-contract/runtime/lazy/normalizeRuntimeEnvelopeDecoded",
+      "to": "/zh/guides/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-contract",
+      "to": "/zh/docs/rpc-contract/runtime/lazy/normalizeRuntimeEnvelopeDecoded",
+      "type": "domain-peer"
+    },
+    {
       "from": "/zh/docs/rpc-contract/runtime/lazy/normalizeStreamPayload",
       "to": "/zh/guides/rpc-contract",
       "type": "domain-peer"
@@ -34039,6 +34139,26 @@
     {
       "from": "/zh/guides/rpc-contract",
       "to": "/zh/docs/rpc-contract/runtime/metadata",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime/metadata/createRuntimeCallEnvelope",
+      "to": "/zh/guides/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-contract",
+      "to": "/zh/docs/rpc-contract/runtime/metadata/createRuntimeCallEnvelope",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime/metadata/IRpcRuntimeCallHeader",
+      "to": "/zh/guides/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-contract",
+      "to": "/zh/docs/rpc-contract/runtime/metadata/IRpcRuntimeCallHeader",
       "type": "domain-peer"
     },
     {
@@ -90483,6 +90603,36 @@
     },
     {
       "from": "/en/docs/rpc-contract/binary",
+      "to": "/en/docs/rpc-contract/binary#rpc-contract-binary--restoreRpcBinaryDecoded",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-contract/binary#rpc-contract-binary--restoreRpcBinaryDecoded",
+      "to": "/en/docs/rpc-contract/binary",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-contract/binary#rpc-contract-binary--restoreRpcBinaryDecoded",
+      "to": "/en/guides/rpc-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-contract/getting-started",
+      "to": "/en/docs/rpc-contract/binary#rpc-contract-binary--restoreRpcBinaryDecoded",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-contract/binary#rpc-contract-binary--restoreRpcBinaryDecoded",
+      "to": "/en/architecture/rpc-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-contract",
+      "to": "/en/docs/rpc-contract/binary#rpc-contract-binary--restoreRpcBinaryDecoded",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-contract/binary",
       "to": "/en/docs/rpc-contract/binary#rpc-contract-binary--RpcBinaryProfile",
       "type": "api-symbol"
     },
@@ -90859,6 +91009,36 @@
     {
       "from": "/zh/architecture/rpc-contract",
       "to": "/zh/docs/rpc-contract/binary#rpc-contract-binary--restoreRpcBinary",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/binary",
+      "to": "/zh/docs/rpc-contract/binary#rpc-contract-binary--restoreRpcBinaryDecoded",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/binary#rpc-contract-binary--restoreRpcBinaryDecoded",
+      "to": "/zh/docs/rpc-contract/binary",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/binary#rpc-contract-binary--restoreRpcBinaryDecoded",
+      "to": "/zh/guides/rpc-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-contract/getting-started",
+      "to": "/zh/docs/rpc-contract/binary#rpc-contract-binary--restoreRpcBinaryDecoded",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/binary#rpc-contract-binary--restoreRpcBinaryDecoded",
+      "to": "/zh/architecture/rpc-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-contract",
+      "to": "/zh/docs/rpc-contract/binary#rpc-contract-binary--restoreRpcBinaryDecoded",
       "type": "architecture-symbol"
     },
     {
@@ -91792,6 +91972,36 @@
       "type": "architecture-symbol"
     },
     {
+      "from": "/en/docs/rpc-contract/binary/lazy",
+      "to": "/en/docs/rpc-contract/binary/lazy#rpc-contract-binary/lazy--restoreRpcBinaryDecoded",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-contract/binary/lazy#rpc-contract-binary/lazy--restoreRpcBinaryDecoded",
+      "to": "/en/docs/rpc-contract/binary/lazy",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-contract/binary/lazy#rpc-contract-binary/lazy--restoreRpcBinaryDecoded",
+      "to": "/en/guides/rpc-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-contract/getting-started",
+      "to": "/en/docs/rpc-contract/binary/lazy#rpc-contract-binary/lazy--restoreRpcBinaryDecoded",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-contract/binary/lazy#rpc-contract-binary/lazy--restoreRpcBinaryDecoded",
+      "to": "/en/architecture/rpc-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-contract",
+      "to": "/en/docs/rpc-contract/binary/lazy#rpc-contract-binary/lazy--restoreRpcBinaryDecoded",
+      "type": "architecture-symbol"
+    },
+    {
       "from": "/en/docs/rpc-contract/binary/lazy#IRpcBinaryBacking",
       "to": "/en/docs/rpc-contract/binary#rpc-contract-binary--IRpcBinaryBacking",
       "type": "symbol-alias"
@@ -91949,6 +92159,36 @@
     {
       "from": "/zh/architecture/rpc-contract",
       "to": "/zh/docs/rpc-contract/binary/lazy#rpc-contract-binary/lazy--restoreRpcBinary",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/binary/lazy",
+      "to": "/zh/docs/rpc-contract/binary/lazy#rpc-contract-binary/lazy--restoreRpcBinaryDecoded",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/binary/lazy#rpc-contract-binary/lazy--restoreRpcBinaryDecoded",
+      "to": "/zh/docs/rpc-contract/binary/lazy",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/binary/lazy#rpc-contract-binary/lazy--restoreRpcBinaryDecoded",
+      "to": "/zh/guides/rpc-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-contract/getting-started",
+      "to": "/zh/docs/rpc-contract/binary/lazy#rpc-contract-binary/lazy--restoreRpcBinaryDecoded",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/binary/lazy#rpc-contract-binary/lazy--restoreRpcBinaryDecoded",
+      "to": "/zh/architecture/rpc-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-contract",
+      "to": "/zh/docs/rpc-contract/binary/lazy#rpc-contract-binary/lazy--restoreRpcBinaryDecoded",
       "type": "architecture-symbol"
     },
     {
@@ -98233,6 +98473,36 @@
     },
     {
       "from": "/en/docs/rpc-contract/runtime",
+      "to": "/en/docs/rpc-contract/runtime#rpc-contract-runtime--normalizeRuntimeEnvelopeDecoded",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime#rpc-contract-runtime--normalizeRuntimeEnvelopeDecoded",
+      "to": "/en/docs/rpc-contract/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime#rpc-contract-runtime--normalizeRuntimeEnvelopeDecoded",
+      "to": "/en/guides/rpc-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-contract/getting-started",
+      "to": "/en/docs/rpc-contract/runtime#rpc-contract-runtime--normalizeRuntimeEnvelopeDecoded",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime#rpc-contract-runtime--normalizeRuntimeEnvelopeDecoded",
+      "to": "/en/architecture/rpc-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-contract",
+      "to": "/en/docs/rpc-contract/runtime#rpc-contract-runtime--normalizeRuntimeEnvelopeDecoded",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime",
       "to": "/en/docs/rpc-contract/runtime#rpc-contract-runtime--normalizeRuntimeGeneration",
       "type": "api-symbol"
     },
@@ -99243,6 +99513,36 @@
     },
     {
       "from": "/zh/docs/rpc-contract/runtime",
+      "to": "/zh/docs/rpc-contract/runtime#rpc-contract-runtime--normalizeRuntimeEnvelopeDecoded",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime#rpc-contract-runtime--normalizeRuntimeEnvelopeDecoded",
+      "to": "/zh/docs/rpc-contract/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime#rpc-contract-runtime--normalizeRuntimeEnvelopeDecoded",
+      "to": "/zh/guides/rpc-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-contract/getting-started",
+      "to": "/zh/docs/rpc-contract/runtime#rpc-contract-runtime--normalizeRuntimeEnvelopeDecoded",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime#rpc-contract-runtime--normalizeRuntimeEnvelopeDecoded",
+      "to": "/zh/architecture/rpc-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-contract",
+      "to": "/zh/docs/rpc-contract/runtime#rpc-contract-runtime--normalizeRuntimeEnvelopeDecoded",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime",
       "to": "/zh/docs/rpc-contract/runtime#rpc-contract-runtime--normalizeRuntimeGeneration",
       "type": "api-symbol"
     },
@@ -99859,6 +100159,36 @@
     {
       "from": "/en/architecture/rpc-contract",
       "to": "/en/docs/rpc-contract/runtime/lazy#rpc-contract-runtime/lazy--normalizeRuntimeEnvelope",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime/lazy",
+      "to": "/en/docs/rpc-contract/runtime/lazy#rpc-contract-runtime/lazy--normalizeRuntimeEnvelopeDecoded",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime/lazy#rpc-contract-runtime/lazy--normalizeRuntimeEnvelopeDecoded",
+      "to": "/en/docs/rpc-contract/runtime/lazy",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime/lazy#rpc-contract-runtime/lazy--normalizeRuntimeEnvelopeDecoded",
+      "to": "/en/guides/rpc-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-contract/getting-started",
+      "to": "/en/docs/rpc-contract/runtime/lazy#rpc-contract-runtime/lazy--normalizeRuntimeEnvelopeDecoded",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime/lazy#rpc-contract-runtime/lazy--normalizeRuntimeEnvelopeDecoded",
+      "to": "/en/architecture/rpc-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-contract",
+      "to": "/en/docs/rpc-contract/runtime/lazy#rpc-contract-runtime/lazy--normalizeRuntimeEnvelopeDecoded",
       "type": "architecture-symbol"
     },
     {
@@ -100083,6 +100413,36 @@
     },
     {
       "from": "/zh/docs/rpc-contract/runtime/lazy",
+      "to": "/zh/docs/rpc-contract/runtime/lazy#rpc-contract-runtime/lazy--normalizeRuntimeEnvelopeDecoded",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime/lazy#rpc-contract-runtime/lazy--normalizeRuntimeEnvelopeDecoded",
+      "to": "/zh/docs/rpc-contract/runtime/lazy",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime/lazy#rpc-contract-runtime/lazy--normalizeRuntimeEnvelopeDecoded",
+      "to": "/zh/guides/rpc-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-contract/getting-started",
+      "to": "/zh/docs/rpc-contract/runtime/lazy#rpc-contract-runtime/lazy--normalizeRuntimeEnvelopeDecoded",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime/lazy#rpc-contract-runtime/lazy--normalizeRuntimeEnvelopeDecoded",
+      "to": "/zh/architecture/rpc-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-contract",
+      "to": "/zh/docs/rpc-contract/runtime/lazy#rpc-contract-runtime/lazy--normalizeRuntimeEnvelopeDecoded",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime/lazy",
       "to": "/zh/docs/rpc-contract/runtime/lazy#rpc-contract-runtime/lazy--normalizeStreamPayload",
       "type": "api-symbol"
     },
@@ -100272,6 +100632,66 @@
       "type": "architecture-api"
     },
     {
+      "from": "/en/docs/rpc-contract/runtime/metadata",
+      "to": "/en/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--createRuntimeCallEnvelope",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--createRuntimeCallEnvelope",
+      "to": "/en/docs/rpc-contract/runtime/metadata",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--createRuntimeCallEnvelope",
+      "to": "/en/guides/rpc-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-contract/getting-started",
+      "to": "/en/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--createRuntimeCallEnvelope",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--createRuntimeCallEnvelope",
+      "to": "/en/architecture/rpc-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-contract",
+      "to": "/en/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--createRuntimeCallEnvelope",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime/metadata",
+      "to": "/en/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--IRpcRuntimeCallHeader",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--IRpcRuntimeCallHeader",
+      "to": "/en/docs/rpc-contract/runtime/metadata",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--IRpcRuntimeCallHeader",
+      "to": "/en/guides/rpc-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-contract/getting-started",
+      "to": "/en/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--IRpcRuntimeCallHeader",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--IRpcRuntimeCallHeader",
+      "to": "/en/architecture/rpc-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-contract",
+      "to": "/en/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--IRpcRuntimeCallHeader",
+      "type": "architecture-symbol"
+    },
+    {
       "from": "/en/docs/rpc-contract/runtime/metadata#IRpcRuntimeGeneration",
       "to": "/en/docs/rpc-contract/runtime#rpc-contract-runtime--IRpcRuntimeGeneration",
       "type": "symbol-alias"
@@ -100330,6 +100750,66 @@
       "from": "/zh/architecture/rpc-contract",
       "to": "/zh/docs/rpc-contract/runtime/metadata",
       "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime/metadata",
+      "to": "/zh/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--createRuntimeCallEnvelope",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--createRuntimeCallEnvelope",
+      "to": "/zh/docs/rpc-contract/runtime/metadata",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--createRuntimeCallEnvelope",
+      "to": "/zh/guides/rpc-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-contract/getting-started",
+      "to": "/zh/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--createRuntimeCallEnvelope",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--createRuntimeCallEnvelope",
+      "to": "/zh/architecture/rpc-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-contract",
+      "to": "/zh/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--createRuntimeCallEnvelope",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime/metadata",
+      "to": "/zh/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--IRpcRuntimeCallHeader",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--IRpcRuntimeCallHeader",
+      "to": "/zh/docs/rpc-contract/runtime/metadata",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--IRpcRuntimeCallHeader",
+      "to": "/zh/guides/rpc-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-contract/getting-started",
+      "to": "/zh/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--IRpcRuntimeCallHeader",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--IRpcRuntimeCallHeader",
+      "to": "/zh/architecture/rpc-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-contract",
+      "to": "/zh/docs/rpc-contract/runtime/metadata#rpc-contract-runtime/metadata--IRpcRuntimeCallHeader",
+      "type": "architecture-symbol"
     },
     {
       "from": "/zh/docs/rpc-contract/runtime/metadata#IRpcRuntimeGeneration",
