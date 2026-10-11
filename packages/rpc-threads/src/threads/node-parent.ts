@@ -4,7 +4,6 @@ import {
 } from '@migaia/rpc-core/adapter'
 import type { IThreadChannelOptions } from './types.js'
 import type { IThreadParentPort } from './runtime-types.js'
-import { openThreadMessageResource } from './channel.js'
 
 /** Borrow the actual parent message resource without installing listeners before first opening. */
 export class AdapterNodeThreadParentChannel {
@@ -16,8 +15,12 @@ export class AdapterNodeThreadParentChannel {
     this.#resource = createEventEmitterMessageResource(native)
   }
 
-  /** Open only this original resource; expanded local proposals wait for actual peer ACK. */
+  /** Borrow this held parent resource through the synchronous fixed Thread profile. */
   open(peerId: string, options: IThreadChannelOptions) {
-    return openThreadMessageResource(this.#resource, peerId, options)
+    return this.#resource.openStatic({
+      peerId,
+      scheduler: options.scheduler,
+      enabled: options.capabilities
+    })
   }
 }

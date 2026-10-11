@@ -4,7 +4,6 @@ import { RpcCapability } from '@migaia/rpc-contract'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { createEventEmitterMessageResource } from '@migaia/rpc-core/adapter'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createNodeThreadChannel } from '../../src/threads/channel.js'
 
 /** Both local proposals travel through the actual two native message ports. */
 const expanded = [
@@ -16,21 +15,25 @@ const expanded = [
   RpcCapability.transfer
 ]
 
-describe('thread capability ACK startup', () => {
+describe('thread runtime resource ACK startup', () => {
   it('enables only extensions independently acknowledged by both actual ports', async () => {
     /** Actual native messaging supplies both independent control inputs and close operations. */
     const ports = new MessageChannel()
     /** The peer intentionally does not offer transfer, even though this side requests it. */
     const peerOffer = expanded.filter((value) => value !== RpcCapability.transfer)
-    /** Both ordinary Thread opens await the same existing ACK grammar before publication. */
+    /** Runtime held resources await the existing Core ACK grammar before publication. */
     const channels = await Promise.all([
-      createNodeThreadChannel(ports.port1, 'right', {
+      createEventEmitterMessageResource(ports.port1).open({
+        peerId: 'right',
         scheduler: systemScheduler,
-        capabilities: expanded
+        offer: expanded,
+        control: rpcMessageCapabilityControl
       }),
-      createNodeThreadChannel(ports.port2, 'left', {
+      createEventEmitterMessageResource(ports.port2).open({
+        peerId: 'left',
         scheduler: systemScheduler,
-        capabilities: peerOffer
+        offer: peerOffer,
+        control: rpcMessageCapabilityControl
       })
     ])
     try {

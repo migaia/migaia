@@ -221,13 +221,18 @@ async function openNodeThreadHandle(
   const preparation = nodePreparations.get(handle)
   if (preparation) {
     try {
-      /** Caller policy narrows our own offer; it never supplies peer acceptance. */
+      /** A raw launch keeps the fixed profile; only genuine runtime bootstrap enters ACK startup. */
+      if (preparation.offer === undefined)
+        return preparation.resource.openStatic({
+          peerId: handle.identity.fingerprint,
+          scheduler: options.scheduler,
+          enabled: options.capabilities
+        })
+      /** Caller policy only narrows the actual runtime offer retained by this launcher. */
       const offer =
-        preparation.offer === undefined
-          ? options.capabilities
-          : options.capabilities === undefined
-            ? preparation.offer
-            : intersectThreadCapabilities(preparation.offer, options.capabilities)
+        options.capabilities === undefined
+          ? preparation.offer
+          : intersectThreadCapabilities(preparation.offer, options.capabilities)
       return await openThreadMessageResource(
         preparation.resource,
         handle.identity.fingerprint,

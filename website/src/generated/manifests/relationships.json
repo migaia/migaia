@@ -13912,16 +13912,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-threads/IThreadCommonOptions",
-      "to": "/en/guides/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-threads",
-      "to": "/en/docs/rpc-threads/IThreadCommonOptions",
-      "type": "domain-peer"
-    },
-    {
       "from": "/en/docs/rpc-threads/IThreadNativeRuntimeModule",
       "to": "/en/guides/rpc-threads",
       "type": "domain-peer"
@@ -13959,16 +13949,6 @@
     {
       "from": "/en/guides/rpc-threads",
       "to": "/en/docs/rpc-threads/IThreadParentPort",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-threads/IThreadPluginOptions",
-      "to": "/en/guides/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-threads",
-      "to": "/en/docs/rpc-threads/IThreadPluginOptions",
       "type": "domain-peer"
     },
     {
@@ -39942,16 +39922,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc-threads/IThreadCommonOptions",
-      "to": "/zh/guides/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-threads",
-      "to": "/zh/docs/rpc-threads/IThreadCommonOptions",
-      "type": "domain-peer"
-    },
-    {
       "from": "/zh/docs/rpc-threads/IThreadNativeRuntimeModule",
       "to": "/zh/guides/rpc-threads",
       "type": "domain-peer"
@@ -39989,16 +39959,6 @@
     {
       "from": "/zh/guides/rpc-threads",
       "to": "/zh/docs/rpc-threads/IThreadParentPort",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/IThreadPluginOptions",
-      "to": "/zh/guides/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-threads",
-      "to": "/zh/docs/rpc-threads/IThreadPluginOptions",
       "type": "domain-peer"
     },
     {
@@ -135423,36 +135383,6 @@
     },
     {
       "from": "/en/docs/rpc-threads",
-      "to": "/en/docs/rpc-threads#rpc-threads-index--IThreadCommonOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-threads#rpc-threads-index--IThreadCommonOptions",
-      "to": "/en/docs/rpc-threads",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-threads#rpc-threads-index--IThreadCommonOptions",
-      "to": "/en/guides/rpc-threads/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-threads/getting-started",
-      "to": "/en/docs/rpc-threads#rpc-threads-index--IThreadCommonOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-threads#rpc-threads-index--IThreadCommonOptions",
-      "to": "/en/architecture/rpc-threads",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-threads",
-      "to": "/en/docs/rpc-threads#rpc-threads-index--IThreadCommonOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-threads",
       "to": "/en/docs/rpc-threads#rpc-threads-index--IThreadNativeRuntimeModule",
       "type": "api-symbol"
     },
@@ -135569,36 +135499,6 @@
     {
       "from": "/en/architecture/rpc-threads",
       "to": "/en/docs/rpc-threads#rpc-threads-index--IThreadParentPort",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-threads",
-      "to": "/en/docs/rpc-threads#rpc-threads-index--IThreadPluginOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-threads#rpc-threads-index--IThreadPluginOptions",
-      "to": "/en/docs/rpc-threads",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-threads#rpc-threads-index--IThreadPluginOptions",
-      "to": "/en/guides/rpc-threads/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-threads/getting-started",
-      "to": "/en/docs/rpc-threads#rpc-threads-index--IThreadPluginOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-threads#rpc-threads-index--IThreadPluginOptions",
-      "to": "/en/architecture/rpc-threads",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-threads",
-      "to": "/en/docs/rpc-threads#rpc-threads-index--IThreadPluginOptions",
       "type": "architecture-symbol"
     },
     {
@@ -136823,36 +136723,6 @@
     },
     {
       "from": "/zh/docs/rpc-threads",
-      "to": "/zh/docs/rpc-threads#rpc-threads-index--IThreadCommonOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads#rpc-threads-index--IThreadCommonOptions",
-      "to": "/zh/docs/rpc-threads",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-threads#rpc-threads-index--IThreadCommonOptions",
-      "to": "/zh/guides/rpc-threads/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-threads/getting-started",
-      "to": "/zh/docs/rpc-threads#rpc-threads-index--IThreadCommonOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads#rpc-threads-index--IThreadCommonOptions",
-      "to": "/zh/architecture/rpc-threads",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-threads",
-      "to": "/zh/docs/rpc-threads#rpc-threads-index--IThreadCommonOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads",
       "to": "/zh/docs/rpc-threads#rpc-threads-index--IThreadNativeRuntimeModule",
       "type": "api-symbol"
     },
@@ -136969,36 +136839,6 @@
     {
       "from": "/zh/architecture/rpc-threads",
       "to": "/zh/docs/rpc-threads#rpc-threads-index--IThreadParentPort",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads",
-      "to": "/zh/docs/rpc-threads#rpc-threads-index--IThreadPluginOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads#rpc-threads-index--IThreadPluginOptions",
-      "to": "/zh/docs/rpc-threads",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-threads#rpc-threads-index--IThreadPluginOptions",
-      "to": "/zh/guides/rpc-threads/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-threads/getting-started",
-      "to": "/zh/docs/rpc-threads#rpc-threads-index--IThreadPluginOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads#rpc-threads-index--IThreadPluginOptions",
-      "to": "/zh/architecture/rpc-threads",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-threads",
-      "to": "/zh/docs/rpc-threads#rpc-threads-index--IThreadPluginOptions",
       "type": "architecture-symbol"
     },
     {

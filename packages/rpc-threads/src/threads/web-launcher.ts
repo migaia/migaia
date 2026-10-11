@@ -23,7 +23,6 @@ import { ThreadErrorText } from './error-text.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '@migaia/rpc-core/adapter'
 import type { IThreadChannelFactory, IThreadChannelOptions, IThreadWebPort } from './types.js'
-import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 
 /** Web handles expose preparation but never counterfeit an unsupported actual-exit receipt. */
 export type IWebThreadHandle = IThreadHandle &
@@ -191,31 +190,6 @@ async function openWebThreadHandle(
   const preparation = webPreparations.get(handle)
   try {
     if (signal.aborted) throw readAdapterAbortReason(signal)
-    /** Expanded legacy children need the parent's ACK before they can publish service readiness. */
-    if (
-      !preparation &&
-      options.capabilities?.some(
-        (value) => !rpcMessageCapabilityControl.staticCapabilities.includes(value)
-      )
-    ) {
-      /** The actual port owns ACK capture while the independent legacy ready fence remains active. */
-      const resource = createEventTargetMessageResource(handle.port)
-      try {
-        /** Both operations must finish; capability acceptance alone never publishes readiness. */
-        const [channel] = await Promise.all([
-          openThreadMessageResource(resource, handle.identity.fingerprint, options, signal),
-          awaitThreadPreparation(handle.prepared, signal)
-        ])
-        return channel
-      } catch (primary) {
-        try {
-          await resource.close()
-        } catch (cleanup) {
-          hostRethrowReporter(cleanup, IpcReporterContext)
-        }
-        throw primary
-      }
-    }
     await awaitThreadPreparation(handle.prepared, signal)
     if (preparation) {
       /** Open uses our original local offer; received capabilities remain private inside Core. */

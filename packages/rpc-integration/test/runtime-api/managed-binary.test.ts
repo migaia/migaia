@@ -4,7 +4,14 @@ import { createHmac } from 'node:crypto'
 import { it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadBinding } from '../../../rpc-threads/dist/threads/binding.js'
+import { createAdapterBindingDrain, createAdapterId } from '@migaia/rpc-core/adapter'
+import {
+  createThreadSupervisor,
+  type IThreadHandle,
+  type IThreadSpec
+} from '@migaia/supervision/threads'
+import type { IRuntimeThreadSpawn } from '@migaia/rpc-threads'
+import type { IRemoteBinding } from '@migaia/rpc-core/remote'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory,
@@ -40,9 +47,58 @@ const capabilities = [
 /** Original launch and native cleanup are independently observable, without a fake supervisor. */
 const entry = fileURLToPath(new URL('./fixtures/managed-binary-worker.mjs', import.meta.url))
 
+/**
+ * These advanced custom authenticated assemblies declare their implemented binary profile directly.
+ * The stock runtime source advertises only baseline capabilities for custom endpoint factories;
+ * this test-local binding uses canonical supervision and drain without restoring legacy Plugin
+ * API.
+ */
+function managedBinaryBinding<THandle extends IThreadHandle>(
+  source: IRuntimeThreadSpawn<THandle>
+): IRemoteBinding<THandle, IThreadSpec> &
+  Readonly<{
+    bindEndpoint: ReturnType<typeof createAdapterBindingDrain>['wrap']
+  }> {
+  /** The same endpoint drain owns physical native stop and already admitted business requests. */
+  const drain = createAdapterBindingDrain(source.scheduler, source.report)
+  /** Existing supervisor preserves budget, restart, cleanup and native-exit semantics. */
+  const supervisor = createThreadSupervisor({
+    ...source.supervisor,
+    id: source.supervisor?.id ?? createAdapterId(),
+    launcher: source.launcher,
+    spec: source.spec,
+    budget: source.budget,
+    scheduler: source.scheduler,
+    report: source.report,
+    health: source.health,
+    stop: {
+      ...source.supervisor?.stop,
+      beforeTerminate: async (unit, signal, remainingMs) => {
+        await drain.drainCurrent({ drainMs: remainingMs() })
+        if (!signal.aborted)
+          await source.supervisor?.stop?.beforeTerminate?.(unit, signal, remainingMs)
+      }
+    }
+  })
+  return {
+    ownership: 'owned',
+    bindEndpoint: drain.wrap,
+    trackRequest: drain.trackCurrent,
+    supervisor,
+    scheduler: source.scheduler,
+    openChannel: (handle, signal) => source.channelFactory.open(handle, signal)
+  }
+}
+
 it('[A86][A88] managed genuine Worker transfers through the original owner without entering keyed automatic retry', async () => {
   const budget = createUnitBudget({ kind: 'thread', maxUnits: 1 })
-  const native = createNodeThreadLauncher()
+  /** The custom endpoint's implemented profile enters actual launcher bootstrap, never static flags. */
+  const native = createNodeThreadLauncher({
+    runtimeApi: {
+      self: { name: 'managed-binary-parent', instanceId: 'managed-binary-parent' },
+      capabilities
+    }
+  })
   const handles: INodeThreadHandle[] = []
   let sequence = 0
   let starts = 0
@@ -60,7 +116,7 @@ it('[A86][A88] managed genuine Worker transfers through the original owner witho
   }
   const signature = (value: unknown) =>
     createHmac('sha256', fixture.key).update(JSON.stringify(value)).digest('hex')
-  const binding = createThreadBinding({
+  const binding = managedBinaryBinding({
     spec: { entry, data: { parentId: 'managed-binary-parent', capabilities } },
     budget,
     scheduler: systemScheduler,
@@ -210,13 +266,19 @@ it('[A84/F1] genuine managed binding rejects UInt8Array without bilateral binary
       !['portable-binary@1', 'native-binary-authenticated-manifest@1', 'transfer@1'].includes(value)
   )
   const budget = createUnitBudget({ kind: 'thread', maxUnits: 1 })
-  const native = createNodeThreadLauncher()
+  /** This negative fixture's actual launch offer omits binary and transfer independently. */
+  const native = createNodeThreadLauncher({
+    runtimeApi: {
+      self: { name: 'managed-no-binary-parent', instanceId: 'managed-no-binary-parent' },
+      capabilities: scalarCapabilities
+    }
+  })
   /** Real native handles retain the original close and exit ownership during the negative case. */
   const handles: INodeThreadHandle[] = []
   const parentId = 'managed-no-binary-parent'
   const signature = (value: unknown) =>
     createHmac('sha256', fixture.key).update(JSON.stringify(value)).digest('hex')
-  const binding = createThreadBinding({
+  const binding = managedBinaryBinding({
     spec: { entry, data: { parentId, capabilities: scalarCapabilities } },
     budget,
     scheduler: systemScheduler,

@@ -7,13 +7,7 @@ export {
   ERROR_SOURCE as RPC_THREAD_ERROR_SOURCE,
   type IRpcThreadErrorCode
 } from '../error-code.js'
-export type {
-  IThreadChannelFactory,
-  IThreadChannelOptions,
-  IThreadCommonOptions,
-  IThreadPluginOptions,
-  IThreadWebPort
-} from './types.js'
+export type { IThreadChannelFactory, IThreadChannelOptions, IThreadWebPort } from './types.js'
 export type { IThreadBootstrapData } from './bootstrap.js'
 /** Existing user-level thread source configuration moved from Core's retired thread adapter entry. */
 export type { IRuntimeThreadPeerOptions, IRuntimeThreadSpawn } from './runtime-peer.js'

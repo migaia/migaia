@@ -8195,12 +8195,6 @@
       "library": "rpc-threads"
     },
     {
-      "path": "/en/docs/rpc-threads/IThreadCommonOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
       "path": "/en/docs/rpc-threads/IThreadNativeRuntimeModule",
       "locale": "en",
       "domain": "docs",
@@ -8220,12 +8214,6 @@
     },
     {
       "path": "/en/docs/rpc-threads/IThreadParentPort",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/en/docs/rpc-threads/IThreadPluginOptions",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-threads"
@@ -23975,12 +23963,6 @@
       "library": "rpc-threads"
     },
     {
-      "path": "/zh/docs/rpc-threads/IThreadCommonOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
       "path": "/zh/docs/rpc-threads/IThreadNativeRuntimeModule",
       "locale": "zh",
       "domain": "docs",
@@ -24000,12 +23982,6 @@
     },
     {
       "path": "/zh/docs/rpc-threads/IThreadParentPort",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-threads"
-    },
-    {
-      "path": "/zh/docs/rpc-threads/IThreadPluginOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-threads"

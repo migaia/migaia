@@ -1,15 +1,13 @@
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it } from 'vitest'
-import type { IThreadCommonOptions } from '../../src/threads/types.js'
-import type { IThreadHandle } from '@migaia/supervision/threads'
 import { createNodeThreadChannelFactory } from '../../src/threads/adapters/node.js'
 import { createThreadPlugin } from '../../src/threads/plugin.js'
 import { RemoteMethodName } from '@migaia/rpc-core/remote'
 import { runtimeTestHost } from '../../../rpc-core/test/runtime-api/public-host.js'
-import { contract, nativeFixture, workerEntry } from './fixture.js'
+import { contract, nativeFixture, workerEntry, type IFixtureOptions } from './fixture.js'
 
 /** Each facade owns its own actual Worker and borrows neither another connection nor its Host. */
-function hostFixture(overrides: Partial<IThreadCommonOptions<IThreadHandle>> = {}) {
+function hostFixture(overrides: Partial<IFixtureOptions> = {}) {
   return nativeFixture(overrides, { hostMode: true })
 }
 

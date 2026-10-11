@@ -1,15 +1,24 @@
-/**
- * Fixture emit of maintained fixtures/web-binary-worker.ts for runtimes requiring concrete .js/.mjs
- * specifiers; production is unchanged.
- */
-import { receiveThreadData, createWebThreadChannel } from '@migaia/rpc-threads'
+import { readThreadBootstrap } from '@migaia/rpc-threads'
+/** Concrete ESM fixture mirrors web-binary-worker.ts for runtimes requiring emitted sources. */
+import { createEventTargetMessageResource } from '@migaia/rpc-core/adapter'
+import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { createRuntimePeer } from '@migaia/rpc-core/remote'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { webBinaryEndpoint } from './r14-web-binary-endpoint.mjs'
-/** The real Worker global is the EventTarget carrier, never a structural fake port. */
+
+/** The real Worker global supplies initial input and ACK through the canonical Core resource. */
 const port = globalThis
-/** The original bootstrap carries the launcher's actual identity before any application message. */
-let initialized
+/** Capture before awaiting anything so the actual launcher bootstrap cannot be missed. */
+const resource = createEventTargetMessageResource(port)
+/** Core admits the original versioned launch message and keeps its received offer private. */
+const raw = await resource.receiveInitial()
+/** Fixture identity is read from actual bootstrap I/O, separate from business bytes. */
+const parsed = rpcMessageCapabilityControl.readInitial(raw)
+if (!parsed.valid) throw new TypeError(`Invalid binary fixture bootstrap: ${parsed.field}`)
+/** Exact runtime identities are supplied by the actual original launch message. */
+const { self, parent } = parsed.value.metadata
+/** Custom authenticated assembly explicitly implements this independently declared profile. */
+const data = readThreadBootstrap(raw).data
 /** Business receipt records actual native provider inputs, not caller-side buffer metadata. */
 let received = 0
 /** Failures remain classified without printing signature, configuration or raw payload. */
@@ -17,40 +26,26 @@ const report = (error) => {
   const failure = error
   console.error(JSON.stringify({ source: failure.source, code: failure.code, name: failure.name }))
 }
-await receiveThreadData(port, async (value, peerId) => {
-  /** This is the launcher-owned portable bootstrap, separate from business bytes. */
-  const data = value
-  /** ACK waits for actual canonical subscription, while directory exchange needs the parent ACK. */
-  let subscribed
-  const active = new Promise((resolve) => {
-    subscribed = resolve
-  })
-  initialized = createRuntimePeer({
-    self: { name: 'binary-web-child', instanceId: peerId },
-    provide: {
-      echo: (payload) => {
-        received++
-        return payload
-      },
-      count: () => received,
-      values: async function* (payload) {
-        received++
-        yield payload
-      }
+await createRuntimePeer({
+  self,
+  provide: {
+    echo: (payload) => {
+      received++
+      return payload
     },
-    connect: async () =>
-      createWebThreadChannel(port, data.parentId, {
-        scheduler: systemScheduler,
-        capabilities: data.capabilities
-      }),
-    endpointFactory: async (channel) => {
-      const endpoint = await webBinaryEndpoint(channel, peerId, report)
-      subscribed()
-      return endpoint
-    },
-    report
-  })
-  void initialized.catch(report)
-  await active
+    count: () => received,
+    values: async function* (payload) {
+      received++
+      yield payload
+    }
+  },
+  connect: async () =>
+    resource.open({
+      peerId: parent.instanceId,
+      scheduler: systemScheduler,
+      offer: data.capabilities,
+      control: rpcMessageCapabilityControl
+    }),
+  endpointFactory: (channel) => webBinaryEndpoint(channel, self.instanceId, report),
+  report
 })
-await initialized
