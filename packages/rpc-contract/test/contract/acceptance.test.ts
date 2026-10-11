@@ -35,8 +35,15 @@ describe('RPCC-T01 architecture and export boundary', () => {
       '.': expect.any(Object),
       './framing': expect.any(Object)
     })
-    /** Contract source stays free of bare package and platform imports. */
-    const allowedBareSpecifiers = new Set<string>(['@migaia/utils/bytes', '@migaia/utils/error'])
+    /**
+     * Portable traversal moves inward to serialize; platform and unrelated package imports stay
+     * forbidden.
+     */
+    const allowedBareSpecifiers = new Set<string>([
+      '@migaia/serialize',
+      '@migaia/utils/bytes',
+      '@migaia/utils/error'
+    ])
     const bareSpecifiers = new Set<string>()
     for (const path of sourceFiles(join(packageRoot, 'src', 'contract'))) {
       const source = readFileSync(path, 'utf8')

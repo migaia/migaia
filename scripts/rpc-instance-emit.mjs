@@ -15,7 +15,7 @@ export const RPC_RESOURCE_POINTS = {
     'contract/framing/bootstrap-receiver.ts': ['createRpcBootstrapFrameReceiver'],
     'contract/unknown-field.ts': ['createRpcUnknownFieldWarner'],
     'contract/contract-error.ts': ['createContractError'],
-    'contract/normalize.ts': ['markRpcPortableBinary'],
+    'contract/portable-binary.ts': ['markRpcPortableBinary'],
     'contract/runtime-api/binary-operation.ts': ['prepareRpcBinary', 'captureRpcBinaryData'],
     'contract/runtime-api/binary-lazy-operation.ts': ['prepareRpcBinaryLazy'],
     'contract/runtime-api/binary.ts': ['restoreRpcBinary'],

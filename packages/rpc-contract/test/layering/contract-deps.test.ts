@@ -31,7 +31,7 @@ function rejection(action: () => unknown): { ctor: Function; code: unknown } {
 }
 
 describe('contract utility ownership', () => {
-  it('A4 uses only the two utils imports and preserves native error identity', () => {
+  it('A4 uses only serialize and the two utils imports and preserves native error identity', () => {
     const bare = new Set<string>()
     for (const path of sourceFiles(contractRoot)) {
       const source = ts.createSourceFile(
@@ -46,7 +46,11 @@ describe('contract utility ownership', () => {
         if (!specifier.startsWith('.')) bare.add(specifier)
       }
     }
-    expect([...bare].sort()).toEqual(['@migaia/utils/bytes', '@migaia/utils/error'])
+    expect([...bare].sort()).toEqual([
+      '@migaia/serialize',
+      '@migaia/utils/bytes',
+      '@migaia/utils/error'
+    ])
     const normalizeSource = readFileSync(join(contractRoot, 'normalize.ts'), 'utf8')
     const framerSource = readFileSync(join(contractRoot, 'framing/message-framer.ts'), 'utf8')
     const errorSource = readFileSync(join(contractRoot, 'contract-error.ts'), 'utf8')

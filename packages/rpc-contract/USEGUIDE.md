@@ -40,6 +40,8 @@ Normalize the received payload with `normalizeStreamPayload` from `@migaia/rpc-c
 
 ## Binary protocol data
 
+`normalizePortable` from `@migaia/rpc-contract/portable` snapshots the existing wire domain: ordinary records become frozen null-prototype copies, parent getters run once before child traversal, arrays retain their wire map semantics, and byte views become canonical unpadded base64url tags. `RPC_PORTABLE_MAX_DEPTH` stays 64. Contract's module-level wire and native strategies use Serialize's single canonical traversal; callers keep the existing API and error handling. Negotiated native handling and exact-reference binary proofs remain internal Contract responsibilities.
+
 Use `prepareRpcBinary` from `@migaia/rpc-contract/binary`, or the same canonical name from `@migaia/rpc-contract/binary/lazy`, with a runtime envelope, selected storage, byte limit and actual whole-backing digest. Both return the canonical manifest, original native sidecars and backing byte total. The selected entry also exports `restoreRpcBinary`, which validates the manifest and native integrity before returning runtime protocol data. The light entry retains synchronous capture and the first native digest before loading the full codec; it introduces no second operation name.
 
 For cold receive paths, import `normalizeRuntimeEnvelope` or `normalizeStreamPayload` from `@migaia/rpc-contract/runtime/lazy` and await the result. Scalar runtime messages do not load the full stream parser. The ordinary `./runtime` and `./stream` entries keep their existing synchronous contracts. Package-internal code imports its light implementation file directly.

@@ -237,6 +237,9 @@ importers:
 
   packages/rpc-contract:
     dependencies:
+      '@migaia/serialize':
+        specifier: workspace:^
+        version: link:../serialize
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
