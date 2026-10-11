@@ -12,10 +12,11 @@ import {
   registerListeners,
   releaseListenerRegistration,
   reportListenerFailure,
-  safeRead,
-  tagRpcError
+  safeRead
 } from '@migaia/rpc-core/transport-kit'
-import { RpcCoreErrorCode, RpcTransportError } from '@migaia/rpc-core'
+import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-core'
+import { createBrowserTransportError } from '../error.js'
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { BrowserRpcErrorText } from '../error-text.js'
 
 /** Minimal RTCDataChannel surface accepted by the adapter. */
@@ -42,16 +43,16 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTra
     typeof channel.addEventListener !== 'function' ||
     typeof channel.removeEventListener !== 'function'
   )
-    throw tagRpcError(
+    throw attachErrorIdentity(
       new TypeError(
         BrowserRpcErrorText.rtcDataChannelMustExposeReadyStateAndTerminalEventListeners
       ),
-      RpcCoreErrorCode.invalidConfig
+      { source: RPC_CORE_ERROR_SOURCE, code: RpcCoreErrorCode.invalidConfig }
     )
   if (channel.readyState !== 'open' && channel.readyState !== 'closed')
-    throw tagRpcError(
+    throw attachErrorIdentity(
       new TypeError(BrowserRpcErrorText.rtcDataChannelMustBeOpenBeforeTransportConstruction),
-      RpcCoreErrorCode.invalidConfig
+      { source: RPC_CORE_ERROR_SOURCE, code: RpcCoreErrorCode.invalidConfig }
     )
   const listeners = createMessageListenerHub<{ data: unknown }>()
   const listenerErrors = new Set<(error: unknown) => void>()
@@ -60,7 +61,10 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTra
   let closed = channel.readyState === 'closed'
   let terminalReported = closed
   let terminalError: unknown = closed
-    ? tagRpcError(new Error(BrowserRpcErrorText.rtcClosed), RpcCoreErrorCode.transport)
+    ? attachErrorIdentity(new Error(BrowserRpcErrorText.rtcClosed), {
+        source: RPC_CORE_ERROR_SOURCE,
+        code: RpcCoreErrorCode.transport
+      })
     : undefined
   let terminalListenersInstalled = false
   const installTerminalListeners = (): void => {
@@ -89,7 +93,7 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTra
     const data = safeRead<unknown>(event, 'data', ({ error }) => {
       readFailed = true
       reportListenerFailure(
-        new RpcTransportError(BrowserRpcErrorText.rtcMessageReadFailed, error),
+        createBrowserTransportError(BrowserRpcErrorText.rtcMessageReadFailed, error),
         transportErrors,
         secondaryFailures
       )
@@ -124,20 +128,26 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTra
       try {
         error =
           Object.isExtensible(event) && !('source' in event) && !('code' in event)
-            ? tagRpcError(event, RpcCoreErrorCode.transport)
-            : tagRpcError(
-                new Error(BrowserRpcErrorText.rtcClosed, { cause: event }),
-                RpcCoreErrorCode.transport
-              )
+            ? attachErrorIdentity(event, {
+                source: RPC_CORE_ERROR_SOURCE,
+                code: RpcCoreErrorCode.transport
+              })
+            : attachErrorIdentity(new Error(BrowserRpcErrorText.rtcClosed, { cause: event }), {
+                source: RPC_CORE_ERROR_SOURCE,
+                code: RpcCoreErrorCode.transport
+              })
       } catch (failure) {
         secondary.push(failure)
-        error = tagRpcError(
-          new Error(BrowserRpcErrorText.rtcClosed, { cause: event }),
-          RpcCoreErrorCode.transport
-        )
+        error = attachErrorIdentity(new Error(BrowserRpcErrorText.rtcClosed, { cause: event }), {
+          source: RPC_CORE_ERROR_SOURCE,
+          code: RpcCoreErrorCode.transport
+        })
       }
     } else {
-      error = tagRpcError(new Error(BrowserRpcErrorText.rtcClosed), RpcCoreErrorCode.transport)
+      error = attachErrorIdentity(new Error(BrowserRpcErrorText.rtcClosed), {
+        source: RPC_CORE_ERROR_SOURCE,
+        code: RpcCoreErrorCode.transport
+      })
     }
     terminalError = error
     const failure = createListenerFailure([error, ...secondary, ...cleanupErrors], {
@@ -155,11 +165,11 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTra
     },
     encodedType: 'string',
     send(message) {
-      if (closed) throw new RpcTransportError(BrowserRpcErrorText.rtcDataChannelIsClosed)
+      if (closed) throw createBrowserTransportError(BrowserRpcErrorText.rtcDataChannelIsClosed)
       channel.send(typeof message === 'string' ? message : JSON.stringify(message))
     },
     subscribe(listener) {
-      if (closed) throw new RpcTransportError(BrowserRpcErrorText.rtcDataChannelIsClosed)
+      if (closed) throw createBrowserTransportError(BrowserRpcErrorText.rtcDataChannelIsClosed)
       listeners.add(listener, () => {
         installTerminalListeners()
         try {

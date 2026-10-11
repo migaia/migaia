@@ -1,5 +1,5 @@
 import { RpcCoreErrorText } from '../error-text.js'
-import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcCoreErrorCode, tagRpcError } from '../errors.js'
 
 /** Owns bounded active outbound identifiers and released replay tombstones. */
 export class ReplayWindow {

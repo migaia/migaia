@@ -1,5 +1,6 @@
+import { createRpcTransportError } from '../../core/errors.js'
 import type { IAbortSignal } from '@migaia/lifecycle'
-import type { IRuntimePeerSourceResult } from '../../remote/index.js'
+import { type IRuntimePeerSourceResult } from '../../remote/index.js'
 import type { IThreadHandle, IThreadLauncher } from '@migaia/supervision/threads'
 import { awaitThreadPreparation, constructWebThreadChannel } from './channel.js'
 import {
@@ -8,13 +9,13 @@ import {
   intersectThreadCapabilities
 } from './bootstrap.js'
 import { createWebThreadBootstrapHandoff } from './receive-handoff.js'
-import type { IRuntimePeerSourceContext } from '../../remote/index.js'
+import { type IRuntimePeerSourceContext } from '../../remote/index.js'
 import { readRuntimeLaunchContext } from '../../remote/runtime-api/launch-context.js'
 import { invalidThreadConfig } from './error.js'
 import { THREAD_FINGERPRINT_PREFIX, ThreadBootstrap, ThreadEvent } from './constants.js'
 import { absoluteThreadEntry, portableThreadSpec } from './error.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
-import { RpcTransportError } from '../../core/index.js'
+
 import { ThreadErrorText } from './error-text.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
@@ -109,7 +110,7 @@ export function createAdapterWebThreadLauncher(
           // Preparation owns this failure even when no launch cancellation has occurred.
           handoff?.fail(event.error ?? event)
           rejectPrepared?.(
-            new RpcTransportError(ThreadErrorText.bootstrapFailed, event.error ?? event)
+            createRpcTransportError(ThreadErrorText.bootstrapFailed, event.error ?? event)
           )
           rejectPrepared = undefined
           try {

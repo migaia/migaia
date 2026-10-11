@@ -8,11 +8,12 @@ import {
   drainListenerFailures,
   drainTerminalListenerFailures,
   observeListener,
-  reportListenerFailure,
-  tagRpcError
+  reportListenerFailure
 } from '@migaia/rpc-core/transport-kit'
 import { isUint8Array } from '@migaia/utils/bytes'
-import { RpcCoreErrorCode, RpcTransportError } from '@migaia/rpc-core'
+import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-core'
+import { createBrowserTransportError } from '../error.js'
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { BrowserRpcErrorText } from '../error-text.js'
 
 /** Minimal datagram surface accepted by the WebTransport adapter. */
@@ -63,10 +64,10 @@ export function createWebTransportDatagramTransport(
           // EOF is terminal for a datagram transport. Leaving the adapter open
           // would make timeout=false operations wait forever on a dead reader.
           transitionTerminal(
-            tagRpcError(
-              new Error(BrowserRpcErrorText.webTransportDatagramStreamEnded),
-              RpcCoreErrorCode.transport
-            )
+            attachErrorIdentity(new Error(BrowserRpcErrorText.webTransportDatagramStreamEnded), {
+              source: RPC_CORE_ERROR_SOURCE,
+              code: RpcCoreErrorCode.transport
+            })
           )
           break
         }
@@ -100,16 +101,16 @@ export function createWebTransportDatagramTransport(
       return closed
     },
     send(message) {
-      if (closed) throw new RpcTransportError(BrowserRpcErrorText.webTransportIsClosed)
+      if (closed) throw createBrowserTransportError(BrowserRpcErrorText.webTransportIsClosed)
       if (!isUint8Array(message))
-        throw tagRpcError(
+        throw attachErrorIdentity(
           new TypeError(BrowserRpcErrorText.webTransportRequiresUint8ArrayEncodedMessages),
-          RpcCoreErrorCode.invalidConfig
+          { source: RPC_CORE_ERROR_SOURCE, code: RpcCoreErrorCode.invalidConfig }
         )
       return writer.write(message)
     },
     subscribe(listener) {
-      if (closed) throw new RpcTransportError(BrowserRpcErrorText.webTransportIsClosed)
+      if (closed) throw createBrowserTransportError(BrowserRpcErrorText.webTransportIsClosed)
       listeners.add(listener, () => undefined)
       if (!readPromise) {
         readPromise = read().finally(() => {

@@ -8,6 +8,45 @@ export { RpcCoreErrorCode, type IRpcCoreErrorCode }
 /** Core-layer `source` stamped onto each locally thrown Rpc error. */
 export const RPC_CORE_ERROR_SOURCE = ERROR_SOURCE
 
+/** Only owner factories retain the original code and native family for live control decisions. */
+const localErrors = new WeakMap<Error, Readonly<{ code: string; family: Function }>>()
+
+/** Read the original minted code without consulting mutable public diagnostic properties. */
+export function localRpcErrorCode(value: unknown): string | undefined {
+  /** A Core-created remote wrapper still carries peer-selected codes, never local control rights. */
+  const identity =
+    (typeof value === 'object' && value !== null) || typeof value === 'function'
+      ? localErrors.get(value as Error)
+      : undefined
+  return identity?.family === RpcRemoteError ? undefined : identity?.code
+}
+
+/** Class construction and prototype imitation alone cannot obtain an owner's decision identity. */
+export function isLocalRpcError<T extends Error>(
+  value: unknown,
+  family: abstract new (...args: never[]) => T
+): value is T {
+  /** Mutable public fields and prototypes cannot alter the family selected by the owner factory. */
+  const identity =
+    (typeof value === 'object' && value !== null) || typeof value === 'function'
+      ? localErrors.get(value as Error)
+      : undefined
+  return (
+    identity !== undefined &&
+    (identity.family === family ||
+      ((family as Function) === RpcError &&
+        identity.family !== RpcRemoteError &&
+        identity.family !== Error) ||
+      ((family as Function) === RpcConfigurationError && identity.family === RpcConstructionError))
+  )
+}
+
+/** The original owner records a newly constructed error; callers receive only its diagnostics. */
+function mintLocalRpcError<E extends Error>(error: E, code: string, family: Function): E {
+  localErrors.set(error, { code, family })
+  return error
+}
+
 export type IRpcCleanupError = { readonly resource: string; readonly error: unknown }
 export type IRpcError = {
   readonly source: string
@@ -37,6 +76,7 @@ export function tagRpcError<E extends Error>(
   error: E,
   code: IRpcCoreErrorCode
 ): E & Pick<IRpcError, 'source' | 'code'> {
+  /** Tagging diagnostics cannot grant control identity through public listener helpers. */
   return attachErrorIdentity(error, { source: RPC_CORE_ERROR_SOURCE, code }) as E &
     Pick<IRpcError, 'source' | 'code'>
 }
@@ -152,6 +192,169 @@ export class RpcTimeoutError extends RpcError {
     this.cleanupPromise = cleanupPromise
   }
 }
+/** Owner-only construction preserves the native RpcError instance and records its original code. */
+export function createRpcError(...args: ConstructorParameters<typeof RpcError>): RpcError {
+  /** The selected owner class supplies the immutable decision family. */
+  const error = new RpcError(...args)
+  return mintLocalRpcError(error, error.code, RpcError)
+}
+
+/**
+ * Owner-only construction preserves the native RpcSchemaValidationError instance and records its
+ * original code.
+ */
+export function createRpcSchemaValidationError(
+  ...args: ConstructorParameters<typeof RpcSchemaValidationError>
+): RpcSchemaValidationError {
+  /** The selected owner class supplies the immutable decision family. */
+  const error = new RpcSchemaValidationError(...args)
+  return mintLocalRpcError(error, error.code, RpcSchemaValidationError)
+}
+
+/**
+ * Owner-only construction preserves the native RpcConfigurationError instance and records its
+ * original code.
+ */
+export function createRpcConfigurationError(
+  ...args: ConstructorParameters<typeof RpcConfigurationError>
+): RpcConfigurationError {
+  /** The selected owner class supplies the immutable decision family. */
+  const error = new RpcConfigurationError(...args)
+  return mintLocalRpcError(error, error.code, RpcConfigurationError)
+}
+
+/**
+ * Owner-only construction preserves the native RpcConstructionError instance and records its
+ * original code.
+ */
+export function createRpcConstructionError(
+  ...args: ConstructorParameters<typeof RpcConstructionError>
+): RpcConstructionError {
+  /** The selected owner class supplies the immutable decision family. */
+  const error = new RpcConstructionError(...args)
+  return mintLocalRpcError(error, error.code, RpcConstructionError)
+}
+
+/**
+ * Owner-only construction preserves the native RpcLifecycleError instance and records its original
+ * code.
+ */
+export function createRpcLifecycleError(
+  ...args: ConstructorParameters<typeof RpcLifecycleError>
+): RpcLifecycleError {
+  /** The selected owner class supplies the immutable decision family. */
+  const error = new RpcLifecycleError(...args)
+  return mintLocalRpcError(error, error.code, RpcLifecycleError)
+}
+
+/**
+ * Owner-only construction preserves the native RpcSerializationError instance and records its
+ * original code.
+ */
+export function createRpcSerializationError(
+  ...args: ConstructorParameters<typeof RpcSerializationError>
+): RpcSerializationError {
+  /** The selected owner class supplies the immutable decision family. */
+  const error = new RpcSerializationError(...args)
+  return mintLocalRpcError(error, error.code, RpcSerializationError)
+}
+
+/**
+ * Owner-only construction preserves the native RpcProtocolError instance and records its original
+ * code.
+ */
+export function createRpcProtocolError(
+  ...args: ConstructorParameters<typeof RpcProtocolError>
+): RpcProtocolError {
+  /** The selected owner class supplies the immutable decision family. */
+  const error = new RpcProtocolError(...args)
+  return mintLocalRpcError(error, error.code, RpcProtocolError)
+}
+
+/**
+ * Owner-only construction preserves the native RpcContractError instance and records its original
+ * code.
+ */
+export function createRpcContractError(
+  ...args: ConstructorParameters<typeof RpcContractError>
+): RpcContractError {
+  /** The selected owner class supplies the immutable decision family. */
+  const error = new RpcContractError(...args)
+  return mintLocalRpcError(error, error.code, RpcContractError)
+}
+
+/**
+ * Owner-only construction preserves the native RpcTransportError instance and records its original
+ * code.
+ */
+export function createRpcTransportError(
+  ...args: ConstructorParameters<typeof RpcTransportError>
+): RpcTransportError {
+  /** The selected owner class supplies the immutable decision family. */
+  const error = new RpcTransportError(...args)
+  return mintLocalRpcError(error, error.code, RpcTransportError)
+}
+
+/**
+ * Owner-only construction preserves the native RpcAuthenticationError instance and records its
+ * original code.
+ */
+export function createRpcAuthenticationError(
+  ...args: ConstructorParameters<typeof RpcAuthenticationError>
+): RpcAuthenticationError {
+  /** The selected owner class supplies the immutable decision family. */
+  const error = new RpcAuthenticationError(...args)
+  return mintLocalRpcError(error, error.code, RpcAuthenticationError)
+}
+
+/**
+ * Owner-only construction preserves the native RpcChunkError instance and records its original
+ * code.
+ */
+export function createRpcChunkError(
+  ...args: ConstructorParameters<typeof RpcChunkError>
+): RpcChunkError {
+  /** The selected owner class supplies the immutable decision family. */
+  const error = new RpcChunkError(...args)
+  return mintLocalRpcError(error, error.code, RpcChunkError)
+}
+
+/**
+ * Owner-only construction preserves the native RpcRemoteError instance and records its original
+ * code.
+ */
+export function createRpcRemoteError(
+  ...args: ConstructorParameters<typeof RpcRemoteError>
+): RpcRemoteError {
+  /** The selected owner class supplies the immutable decision family. */
+  const error = new RpcRemoteError(...args)
+  return mintLocalRpcError(error, error.code, RpcRemoteError)
+}
+
+/**
+ * Owner-only construction preserves the native RpcAbortError instance and records its original
+ * code.
+ */
+export function createRpcAbortError(
+  ...args: ConstructorParameters<typeof RpcAbortError>
+): RpcAbortError {
+  /** The selected owner class supplies the immutable decision family. */
+  const error = new RpcAbortError(...args)
+  return mintLocalRpcError(error, error.code, RpcAbortError)
+}
+
+/**
+ * Owner-only construction preserves the native RpcTimeoutError instance and records its original
+ * code.
+ */
+export function createRpcTimeoutError(
+  ...args: ConstructorParameters<typeof RpcTimeoutError>
+): RpcTimeoutError {
+  /** The selected owner class supplies the immutable decision family. */
+  const error = new RpcTimeoutError(...args)
+  return mintLocalRpcError(error, error.code, RpcTimeoutError)
+}
+
 export const isRpcError = (value: unknown): value is IRpcError =>
   typeof value === 'object' && value !== null && typeof safeRead(value, 'code') === 'string'
 
@@ -164,7 +367,6 @@ const coreErrorFamilies = new Set<string>(
 
 /** Recognize the original native class or a coded equivalent received from another realm. */
 export function isRpcErrorInstance(value: unknown): value is RpcError {
-  if (value instanceof RpcError) return true
   if (typeof value !== 'object' || value === null) return false
   /** Reading hostile diagnostics retains the existing safe getter boundary. */
   const code = safeRead(value, 'code')
@@ -182,23 +384,21 @@ export function isRpcErrorInstance(value: unknown): value is RpcError {
 /** Classify a received remote failure while retaining its unrestricted remote code domain. */
 export function isRpcRemoteError(value: unknown): value is RpcRemoteError {
   return (
-    value instanceof RpcRemoteError ||
-    (typeof value === 'object' &&
-      value !== null &&
-      safeRead(value, 'source') === RPC_CORE_ERROR_SOURCE &&
-      safeRead(value, 'name') === RpcErrorFamily.remote &&
-      typeof safeRead(value, 'code') === 'string')
+    typeof value === 'object' &&
+    value !== null &&
+    safeRead(value, 'source') === RPC_CORE_ERROR_SOURCE &&
+    safeRead(value, 'name') === RpcErrorFamily.remote &&
+    typeof safeRead(value, 'code') === 'string'
   )
 }
 
 /** Recognize a genuine native deadline error or its exact coded cross-realm equivalent. */
 export function isRpcTimeoutError(value: unknown): value is RpcTimeoutError {
   return (
-    value instanceof RpcTimeoutError ||
-    (typeof value === 'object' &&
-      value !== null &&
-      safeRead(value, 'source') === RPC_CORE_ERROR_SOURCE &&
-      safeRead(value, 'name') === RpcErrorFamily.timeout &&
-      safeRead(value, 'code') === RpcCoreErrorCode.deadlineExceeded)
+    typeof value === 'object' &&
+    value !== null &&
+    safeRead(value, 'source') === RPC_CORE_ERROR_SOURCE &&
+    safeRead(value, 'name') === RpcErrorFamily.timeout &&
+    safeRead(value, 'code') === RpcCoreErrorCode.deadlineExceeded
   )
 }

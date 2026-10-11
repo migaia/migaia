@@ -32,7 +32,9 @@ for (const name of [
   'rpc-threads',
   'rpc-bridge-jsonrpc',
   'rpc-browser',
-  'plugin-host'
+  'plugin-host',
+  // The peer attaches its own diagnostic identity through this ordinary public dependency.
+  'utils'
 ]) {
   /** Package imports continue through package.json exports rather than internal dist paths. */
   const link = join(output, 'node_modules/@migaia', name)

@@ -1,3 +1,9 @@
+import {
+  createRpcError,
+  isLocalRpcError,
+  RpcCoreErrorCode,
+  RpcRemoteError
+} from '../../core/errors.js'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
 import type {
@@ -7,9 +13,10 @@ import type {
 } from '@migaia/rpc-contract/runtime'
 import { RpcCapability } from '@migaia/rpc-contract/wire'
 import { RpcRuntimeMode } from '@migaia/rpc-contract/wire'
-import { normalizePortable, hasRpcPortableBinary } from '@migaia/rpc-contract/portable'
+import { normalizePortable } from '@migaia/rpc-contract/portable'
+import { hasRpcBinaryEnvelope } from '@migaia/rpc-contract/binary/inspect'
 import type { IRpcEndpoint, ISendOptions, IRpcAbortSignal } from '../../core/typing.js'
-import { RpcError, RpcCoreErrorCode, RpcRemoteError } from '../../core/errors.js'
+
 import { RpcCoreErrorText } from '../../core/error-text.js'
 import {
   captureRuntimeGroupSteps,
@@ -106,7 +113,7 @@ function payloadValue(payload: unknown, binary = false): IRpcPortableValue | und
 }
 /** Preserve a provider's original cross-realm error and stack. */
 export function restoreForwardError(error: unknown): never {
-  if (error instanceof RpcRemoteError && error.cause instanceof Error) throw error.cause
+  if (isLocalRpcError(error, RpcRemoteError) && error.cause instanceof Error) throw error.cause
   throw error
 }
 function sendInput(
@@ -129,7 +136,7 @@ function sendInput(
     RpcCapability.portableBinary
   )
   /** Binding payloads must not fall through to the legacy byte-conversion grammar. */
-  const binaryPayload = hasRpcPortableBinary(input.payload)
+  const binaryPayload = hasRpcBinaryEnvelope(input)
   /** Actual agreement and owned payload kind select the original physical profile. */
   const native =
     (mode === 'notify' ? binaryPayload : binaryPayload || negotiatedBinary) ||
@@ -262,12 +269,15 @@ function requestBound(
       events: binding.events,
       sendOnce: async (attempt) => {
         if (attempt.key !== key)
-          throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.idempotencyKeyInvalid)
+          throw createRpcError(
+            RpcCoreErrorCode.invalidConfig,
+            RpcCoreErrorText.idempotencyKeyInvalid
+          )
         if (
           attempt.remainingMs !== undefined &&
           (!Number.isFinite(attempt.remainingMs) || attempt.remainingMs <= 0)
         )
-          throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.timeoutInvalid)
+          throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.timeoutInvalid)
         const live = binding.current()
         if (live.number !== attempt.expectedGeneration)
           throw binding.closed(
@@ -496,7 +506,7 @@ export function createRuntimePeerCalls(
         ? (payload as IRpcPortableValue | undefined)
         : payloadValue(payload, supportsBinary)
       if (
-        hasRpcPortableBinary(normalizedPayload) ||
+        hasRpcBinaryEnvelope({ payload: normalizedPayload }) ||
         callOptions?.orderKey !== undefined ||
         callOptions?.cancel !== undefined ||
         (callOptions !== undefined && Object.hasOwn(callOptions, 'transfer'))

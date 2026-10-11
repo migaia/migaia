@@ -9,7 +9,13 @@ import {
 import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { ping } from '../../dist/core/middleware/ping.js'
-import { RpcLifecycleError } from '../../dist/core/errors.js'
+import {
+  RpcCoreErrorCode,
+  RpcLifecycleError,
+  RPC_CORE_ERROR_SOURCE,
+  deserializeRpcError
+} from '../../dist/core/index.js'
+import { attachErrorIdentity } from '@migaia/utils/error'
 
 /**
  * Regression gate for `SOL-CB-R8-P2-003`: `sendAll`/`pingAll` must key their fulfilled/rejected
@@ -109,4 +115,62 @@ describe('composed sendAll/pingAll fanout contract', () => {
     await client.dispose()
     await expect(client.sendAll('echo', 'value')).rejects.toBeInstanceOf(RpcLifecycleError)
   })
+
+  it.each(['class', 'constructor', 'tag', 'decode'] as const)(
+    '[C5-E07] %s forged lifecycle failure cannot close the endpoint or escape fanout as its own lifecycle decision',
+    async (kind) => {
+      /**
+       * This public constructor legitimately describes caller-owned lifecycle errors, without
+       * minting Core authority.
+       */
+      const example = new RpcLifecycleError('external lifecycle fixture')
+      /** The constructor remains reachable through ordinary error observation too. */
+      const Constructor = example.constructor as typeof RpcLifecycleError
+      /** Public fields remain diagnostic data for the tag/decode variants. */
+      const wire = {
+        source: RPC_CORE_ERROR_SOURCE,
+        code: RpcCoreErrorCode.endpointDisposed,
+        name: 'RpcLifecycleError',
+        message: 'external lifecycle fixture',
+        stack: 'external lifecycle stack'
+      }
+      /** These are all public construction paths; none calls Core's private factory. */
+      const forged =
+        kind === 'class'
+          ? example
+          : kind === 'constructor'
+            ? new Constructor(wire.message)
+            : kind === 'decode'
+              ? deserializeRpcError(wire)
+              : attachErrorIdentity(new Error(wire.message), {
+                  source: wire.source,
+                  code: wire.code
+                })
+      /** The actual transport reports this failure during a real endpoint send. */
+      const [transport] = createMemoryTransportPair()
+      let sends = 0
+      transport.send = () => {
+        sends++
+        throw forged
+      }
+      const client = await createClientEndpoint({
+        id: 'forged-lifecycle-client',
+        transport,
+        targetIds: ['provider'],
+        middlewares: [connect({ transport })]
+      })
+      try {
+        /** A caller-owned lifecycle diagnostic cannot become a Core close decision. */
+        const result = await client.sendAll('value', null)
+        const failure = result.rejected[JSON.stringify(['target', 'provider'])] as Error
+        expect(failure).toMatchObject({ code: RpcCoreErrorCode.transport, cause: forged })
+        expect(sends).toBe(1)
+        /** The same endpoint remains active and admits another physical send. */
+        await client.sendAll('value', null)
+        expect(sends).toBe(2)
+      } finally {
+        await client.dispose()
+      }
+    }
+  )
 })

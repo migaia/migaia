@@ -1,7 +1,8 @@
+import { createRpcConfigurationError, createRpcContractError } from './errors.js'
 import { utf8ByteLength, isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
 import { rpcBinaryBackingLength, rpcBinaryView } from '@migaia/rpc-contract/binary/inspect'
 import type { IRpcPortableValue, IRpcSerializedError } from '@migaia/rpc-contract'
-import { RpcConfigurationError, RpcContractError } from './errors.js'
+
 import { RpcCoreErrorText } from './error-text.js'
 import { RpcRuntimeOutcomeState } from '@migaia/rpc-contract/framing/v1'
 import { RpcRuntimeStoreKind, RpcRuntimeStoreContinuity } from '@migaia/rpc-contract/framing/v1'
@@ -106,7 +107,7 @@ function outcomeBytes(outcome: IRpcIdempotencyOutcome): number {
 function capacity(value: number | undefined, fallback: number): number {
   if (value === undefined) return fallback
   if (!Number.isSafeInteger(value) || value < 1)
-    throw new RpcConfigurationError(RpcCoreErrorText.idempotencyConfigInvalid)
+    throw createRpcConfigurationError(RpcCoreErrorText.idempotencyConfigInvalid)
   return value
 }
 
@@ -201,7 +202,7 @@ export function createRpcIdempotencyStore(
       purge(now)
       const existing = scopes.get(scope)?.get(key)
       if (fingerprint !== undefined && existing && existing.fingerprint !== fingerprint)
-        throw new RpcContractError(RpcCoreErrorText.runtimeIdempotencyConflict)
+        throw createRpcContractError(RpcCoreErrorText.runtimeIdempotencyConflict)
       if (existing?.status === 'done')
         return Object.freeze({ status: 'done', outcome: existing.outcome! })
       if (existing?.status === 'pending')

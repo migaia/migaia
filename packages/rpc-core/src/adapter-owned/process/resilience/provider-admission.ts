@@ -12,7 +12,7 @@ import { portableBytes } from '../../../core/idempotency-store.js'
 import { resolveAbortReason } from '../../../core/internal/async-control.js'
 import type { IRpcProviderRejection } from '../../../core/index.js'
 import { RpcProviderRejectionReason } from '../../../core/index.js'
-import { isRpcTimeoutError } from '../../../core/errors.js'
+import { localRpcErrorCode, RpcCoreErrorCode } from '../../../core/errors.js'
 import type {
   IRpcContext,
   IRpcEndpoint,
@@ -163,7 +163,7 @@ export function createProcessProviderAdmission(
       if (closed || timedOut) return
       /** This guarded read preserves the core-owned cancellation reason. */
       const reason = resolveAbortReason(context.signal)
-      if (!isRpcTimeoutError(reason)) return
+      if (localRpcErrorCode(reason) !== RpcCoreErrorCode.deadlineExceeded) return
       timedOut = true
       consecutiveTimeouts += 1
       if (consecutiveTimeouts === options.maxConsecutiveTimeouts) queueMicrotask(requestClose)

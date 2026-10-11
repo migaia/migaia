@@ -1,8 +1,9 @@
+import { createRpcError } from '../../core/errors.js'
 import {
   readRuntimePreparationContext,
   withRuntimePreparationContext
 } from '../../remote/runtime-api/launch-context.js'
-import { RpcError, RpcCoreErrorCode } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
 import { RuntimeApiErrorText } from '../../remote/runtime-api/constants.js'
 import { readRuntimeDefaultTimeout } from '../../remote/runtime-api/timeout.js'
 import type { IThreadParentPort } from './runtime-resource.js'
@@ -54,7 +55,7 @@ export function createAdapterNodeThreadPeer(
         (options.self.name !== bootstrap.self.name ||
           options.self.instanceId !== bootstrap.self.instanceId)
       )
-        throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
+        throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
       /** Cold capture attaches before ACK can cause the parent to send its directory. */
       const handoff = createNodeThreadBootstrapHandoff(native)
       resources.bootstrap = handoff

@@ -16,6 +16,8 @@ RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不�
 
 包内使用相对路径；跨包调用只使用公开 API。协议工具使用 `@migaia/rpc-contract`，Core/Remote/Testing 使用 `@migaia/rpc-core` 的普通入口。
 
+从包根导入 `RPC_THREAD_ERROR_SOURCE` 和 `RpcThreadErrorCode`；source 固定为 `@migaia/rpc/threads`。资源采样失败按 `usageSampleFailed` 报告 unavailable 并保留原 cause，不将显示消息或复制的 source/code 当作 Worker 控制权。Core 的普通错误族守卫处理跨 realm 的 Core 错误，详见 Core USEGUIDE。
+
 ## Advanced usage：拥有 Worker 并保证关闭
 
 以下父端用 Node launcher 创建实际 Worker，复用同一个 scheduler 与单执行单元预算，调用子端后关闭 Peer。两个文件使用 ESM，先编译到同目录的 `.js`；每次启动使用新的 source，不复用已经关闭的 Worker。

@@ -1,6 +1,7 @@
-import { RpcCoreErrorCode, RpcError } from '../../core/index.js'
+import { createRpcError } from '../../core/errors.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
 import { RpcWireLimit } from '@migaia/rpc-contract'
-import type { IRuntimePeerIdentity } from '../../remote/index.js'
+import { type IRuntimePeerIdentity } from '../../remote/index.js'
 import type { IRpcRuntimeGeneration } from '@migaia/rpc-contract'
 import { normalizeRuntimeGeneration } from '@migaia/rpc-contract/runtime/metadata'
 import {
@@ -33,7 +34,7 @@ let sequence = 0
 
 /** Reject malformed secret-bearing input without retaining parser diagnostics or payload bytes. */
 export function invalidProcessRuntimeBootstrap(): never {
-  throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcProcessErrorText.runtimeBootstrapInvalid)
+  throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcProcessErrorText.runtimeBootstrapInvalid)
 }
 
 /** Identity labels use the same bounded domain as the canonical RPC handshake. */

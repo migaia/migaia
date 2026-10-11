@@ -1,10 +1,11 @@
+import { createRpcLifecycleError, createRpcTimeoutError } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import {
   createGenerationController,
   type IGenerationController,
   type IGenerationToken
 } from '@migaia/lifecycle'
-import { RpcLifecycleError, RpcTimeoutError } from '../errors.js'
+
 import { resolveAbortReason, type IAbortSignal } from './async-control.js'
 
 /**
@@ -87,9 +88,9 @@ export class OperationScope {
       this.#signal?.aborted ||
       currentGeneration !== this.#generation
     )
-      throw new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+      throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     if (this.#deadlineAt !== undefined && this.#deadlineAt <= this.#now())
-      throw new RpcTimeoutError()
+      throw createRpcTimeoutError()
   }
 
   /** Cancels the scope and releases its closing listener. */

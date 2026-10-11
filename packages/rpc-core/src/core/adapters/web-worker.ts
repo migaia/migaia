@@ -1,3 +1,4 @@
+import { createRpcTransportError, tagRpcError } from '../errors.js'
 import { registerBatchAgreement } from '../internal/batch-frame.js'
 import { RpcCapability } from '@migaia/rpc-contract/wire'
 import { RpcAdapterErrorText as BrowserRpcErrorText } from './error-text.js'
@@ -12,10 +13,10 @@ import {
   registerListeners,
   releaseListenerRegistration,
   reportListenerFailure,
-  safeString,
-  tagRpcError
+  safeString
 } from '../transport-kit.js'
-import { RpcCoreErrorCode, RpcTransportError } from '../index.js'
+
+import { RpcCoreErrorCode } from '../index.js'
 
 /**
  * Minimal event-listener worker/port surface — a real `Worker`, `MessagePort`, or
@@ -86,7 +87,7 @@ export function createWebWorkerTransport(
     } catch (error) {
       const detail = safeString(error, undefined, ({ error: conversionError }) => {
         emitTransportError(
-          new RpcTransportError(BrowserRpcErrorText.workerMessageReadFailed(''), conversionError)
+          createRpcTransportError(BrowserRpcErrorText.workerMessageReadFailed(''), conversionError)
         )
         return undefined
       })
@@ -116,14 +117,14 @@ export function createWebWorkerTransport(
           reason,
           ({ error }) => {
             emitTransportError(
-              new RpcTransportError(BrowserRpcErrorText.workerFailure(reason, reason), error)
+              createRpcTransportError(BrowserRpcErrorText.workerFailure(reason, reason), error)
             )
             return undefined
           }
         )
       } catch (error) {
         emitTransportError(
-          new RpcTransportError(BrowserRpcErrorText.workerFailure(reason, reason), error)
+          createRpcTransportError(BrowserRpcErrorText.workerFailure(reason, reason), error)
         )
         detail = reason
       }

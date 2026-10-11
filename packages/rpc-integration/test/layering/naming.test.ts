@@ -8,9 +8,11 @@ const surface = core as Record<string, unknown>
 describe('Rpc naming boundary', () => {
   it('A3 publishes Rpc names and wire names without WebRpc aliases', () => {
     for (const name of [
-      'RpcError',
-      'RpcTransportError',
+      'RpcLifecycleError',
       'isRpcError',
+      'isRpcErrorInstance',
+      'isRpcRemoteError',
+      'isRpcTimeoutError',
       'RpcCoreErrorCode',
       'RPC_CORE_ERROR_SOURCE'
     ]) {
@@ -23,20 +25,33 @@ describe('Rpc naming boundary', () => {
       'WEBRPC_SOURCE',
       'WebRpcErrorCode',
       'WebRpcTransportError',
-      'isWebRpcError'
+      'isWebRpcError',
+      'tagRpcError',
+      'RpcError',
+      'RpcSchemaValidationError',
+      'RpcConfigurationError',
+      'RpcConstructionError',
+      'RpcSerializationError',
+      'RpcProtocolError',
+      'RpcContractError',
+      'RpcTransportError',
+      'RpcAuthenticationError',
+      'RpcChunkError',
+      'RpcRemoteError',
+      'RpcAbortError',
+      'RpcTimeoutError'
     ]) {
       expect(surface[name], name).toBeUndefined()
     }
-    const TransportError = surface.RpcTransportError as new (message: string) => Error
-    const AbortError = surface.RpcAbortError as new () => Error
-    const TimeoutError = surface.RpcTimeoutError as new () => Error
-    const transport = new TransportError('transport failed')
-    expect(transport.name).toBe('RpcTransportError')
-    expect(new AbortError().name).toBe('AbortError')
-    expect(new TimeoutError().name).toBe('TimeoutError')
-    expect(serializeRpcError(transport, { report: () => {} })).toMatchObject({
-      name: 'RpcTransportError',
-      source: '@migaia/rpc/core'
+    /** Store Worker owns its disposal state and constructs only a lifecycle diagnostic. */
+    const lifecycle = new core.RpcLifecycleError('consumer disposed')
+    expect(lifecycle).toBeInstanceOf(Error)
+    expect(lifecycle.name).toBe('RpcLifecycleError')
+    expect(core.isRpcErrorInstance(lifecycle)).toBe(true)
+    expect(serializeRpcError(lifecycle, { report: () => {} })).toMatchObject({
+      name: 'RpcLifecycleError',
+      source: core.RPC_CORE_ERROR_SOURCE,
+      code: core.RpcCoreErrorCode.endpointDisposed
     })
     const abort = new DOMException('aborted', 'AbortError')
     const restored = deserializeRpcError(serializeRpcError(abort, { report: () => {} }))

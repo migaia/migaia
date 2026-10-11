@@ -3,8 +3,7 @@ import { attachErrorIdentity, tryReadProperty } from '@migaia/utils/error'
 import { lstat } from 'node:fs/promises'
 import { createConnection, createServer, type Server, type Socket } from 'node:net'
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { RpcCoreErrorCode } from '@migaia/rpc-core'
-import { tagRpcError } from '@migaia/rpc-core/transport-kit'
+import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-core'
 import { IpcReporterContext } from '@migaia/rpc-core/adapter/diagnostics'
 import { RpcProcessErrorCode } from '../error-code.js'
 
@@ -57,10 +56,10 @@ function parseAddress(address: string): INodeSocketAddress {
   } catch {
     // Invalid addresses use the same fixed, non-secret diagnostic as forbidden hosts.
   }
-  throw tagRpcError(
-    new TypeError(RpcProcessErrorText.optionsInvalid),
-    RpcCoreErrorCode.invalidConfig
-  )
+  throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
+    source: RPC_CORE_ERROR_SOURCE,
+    code: RpcCoreErrorCode.invalidConfig
+  })
 }
 
 /** Preserve the caller's error even if its diagnostic reporter fails. */
@@ -153,10 +152,10 @@ export const listenProcessByteChannel: IListenProcessByteChannel = async (
     typeof options.onConnection !== 'function' ||
     typeof options.report !== 'function'
   )
-    throw tagRpcError(
-      new TypeError(RpcProcessErrorText.optionsInvalid),
-      RpcCoreErrorCode.invalidConfig
-    )
+    throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
+      source: RPC_CORE_ERROR_SOURCE,
+      code: RpcCoreErrorCode.invalidConfig
+    })
   const address = parseAddress(options.address)
   if (options.signal?.aborted)
     throw ((originalCause: unknown) =>

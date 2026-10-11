@@ -1,5 +1,10 @@
+import {
+  createRpcAbortError,
+  createRpcConfigurationError,
+  createRpcTimeoutError
+} from '../errors.js'
 import { createLifecycleScope, type ILifecycleScope } from '@migaia/lifecycle'
-import { RpcAbortError, RpcConfigurationError, RpcTimeoutError } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import { raceWithAsyncControl, resolveAbortReason } from './async-control.js'
 import type { IRpcAbortSignal, IRpcHookEvent } from '../typing.js'
@@ -31,7 +36,7 @@ export function createConstructionControl(options: {
     timeoutMs !== false &&
     (!Number.isFinite(timeoutMs) || timeoutMs < 0)
   )
-    throw new RpcConfigurationError(RpcCoreErrorText.timeoutInvalid)
+    throw createRpcConfigurationError(RpcCoreErrorText.timeoutInvalid)
   /** Construction borrows the kernel-owned time capability. */
   const time = options.time
   /** Snapshot the caller signal once so construction observes one source identity. */
@@ -163,13 +168,13 @@ export function runConstructionInstall<T>(
     closeGate()
     options.control.close()
     return Promise.reject(
-      new RpcAbortError(undefined, undefined, resolveAbortReason(options.control.signal))
+      createRpcAbortError(undefined, undefined, resolveAbortReason(options.control.signal))
     )
   }
   if (timeoutMs === 0) {
     closeGate()
     options.control.close()
-    return Promise.reject(new RpcTimeoutError())
+    return Promise.reject(createRpcTimeoutError())
   }
   return raceWithAsyncControl({
     time: options.control.time,
@@ -177,8 +182,8 @@ export function runConstructionInstall<T>(
     timeoutMs,
     signals: [options.control.signal],
     onTimeout: closeGate,
-    createTimeoutError: () => new RpcTimeoutError(),
-    createAbortError: (reason) => new RpcAbortError(undefined, undefined, reason),
+    createTimeoutError: () => createRpcTimeoutError(),
+    createAbortError: (reason) => createRpcAbortError(undefined, undefined, reason),
     onSetupFailure: () => closeGate(),
     onDiagnostic: report
   })

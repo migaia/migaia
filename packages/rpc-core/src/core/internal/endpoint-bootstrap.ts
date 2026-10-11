@@ -1,4 +1,14 @@
 import {
+  createRpcConfigurationError,
+  createRpcError,
+  isLocalRpcError,
+  RpcAbortError,
+  RpcConfigurationError,
+  RpcCoreErrorCode,
+  RpcError,
+  RpcTimeoutError
+} from '../errors.js'
+import {
   isJsonObjectMiddleware,
   readJsonObjectPort,
   rememberJsonObjectCandidate,
@@ -11,13 +21,7 @@ import { rpcProtocol as rpcProtocolV1 } from '@migaia/rpc-contract/v1'
 import { identityCodecV1, type ICodec } from '@migaia/serialize/codec'
 import { bindRpcFrameIngress } from '@migaia/rpc-contract/framing'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
-import {
-  RpcAbortError,
-  RpcConfigurationError,
-  RpcError,
-  RpcCoreErrorCode,
-  RpcTimeoutError
-} from '../errors.js'
+
 import type { IScheduler, IWallClock } from '@migaia/utils/scheduler'
 import { isEndpointSystemScheduler } from '../endpoint-kernel.js'
 import { proveFastComponents, proveFastEndpoint } from './fast-path.js'
@@ -157,7 +161,7 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
 ): Promise<IPreparedEndpoint<TTargetId>> {
   const installedConnect = getPort(RpcPortName.connect) as IRpcConnectCapability | undefined
   if (!installedConnect)
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.middlewareMissing,
       RpcCoreErrorText.connectMiddlewareIsRequired
     )
@@ -195,7 +199,7 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
     factoryId.length > maxIdentifierLength ||
     factoryTargetIds?.some((targetId) => targetId.length > maxIdentifierLength)
   )
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.idAndTargetIdsMustFitTheConfiguredIdentifierLimit
     )
@@ -208,8 +212,9 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
         )
       )
     } catch (error) {
-      if (error instanceof RpcAbortError || error instanceof RpcTimeoutError) throw error
-      throw new RpcError(
+      if (isLocalRpcError(error, RpcAbortError) || isLocalRpcError(error, RpcTimeoutError))
+        throw error
+      throw createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcCoreErrorText.connectUniqueTargetIdFactoryFailed,
         error
@@ -241,7 +246,7 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
     connectCapability = { ...connectCapability, uniqueTargetId: undefined }
   }
   if (!isDirectedCompatible(components, authenticationCapability, encodedType))
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.outboundFrameAndTransportEncodedTypesAreIncompatible
     )
@@ -311,7 +316,7 @@ export async function prepareEndpoint<
   let factoryFramer: IRpcFactoryConfig['framer']
   try {
     if (!config || typeof config !== 'object' || Array.isArray(config))
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcCoreErrorText.factoryDescriptorIsInvalid
       )
@@ -334,8 +339,8 @@ export async function prepareEndpoint<
     factoryCodec = config.codec
     factoryFramer = config.framer
   } catch (error) {
-    if (error instanceof RpcError) throw error
-    throw new RpcError(
+    if (isLocalRpcError(error, RpcError)) throw error
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.factoryDescriptorIsUnreadable,
       error
@@ -345,7 +350,7 @@ export async function prepareEndpoint<
     const input = config.idempotency
     if (input !== undefined) {
       if (typeof input !== 'object' || input === null || Array.isArray(input))
-        throw new RpcConfigurationError(RpcCoreErrorText.idempotencyConfigInvalid)
+        throw createRpcConfigurationError(RpcCoreErrorText.idempotencyConfigInvalid)
       const store = input.store
       const scope = input.scope
       if (
@@ -353,18 +358,18 @@ export async function prepareEndpoint<
           (typeof store !== 'object' || store === null || typeof store.claim !== 'function')) ||
         (scope !== undefined && typeof scope !== 'function')
       )
-        throw new RpcConfigurationError(RpcCoreErrorText.idempotencyConfigInvalid)
+        throw createRpcConfigurationError(RpcCoreErrorText.idempotencyConfigInvalid)
       factoryIdempotency = Object.freeze({
         ...(store === undefined ? {} : { store }),
         ...(scope === undefined ? {} : { scope })
       })
     }
   } catch (cause) {
-    if (cause instanceof RpcConfigurationError) throw cause
-    throw new RpcConfigurationError(RpcCoreErrorText.idempotencyConfigInvalid, cause)
+    if (isLocalRpcError(cause, RpcConfigurationError)) throw cause
+    throw createRpcConfigurationError(RpcCoreErrorText.idempotencyConfigInvalid, cause)
   }
   if (typeof factoryId !== 'string' || factoryId.length === 0)
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.idMustBeANonEmptyString)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.idMustBeANonEmptyString)
   let injectedScheduler: IScheduler | undefined
   if (factoryScheduler !== undefined) {
     try {
@@ -372,15 +377,15 @@ export async function prepareEndpoint<
       const now = scheduler?.now
       const schedule = scheduler?.schedule
       if (!scheduler || typeof now !== 'function' || typeof schedule !== 'function')
-        throw new RpcConfigurationError(RpcCoreErrorText.schedulerInvalid)
+        throw createRpcConfigurationError(RpcCoreErrorText.schedulerInvalid)
       /** One monotonic reading; only its domain is checked, never an epoch interpretation. */
       const instant: unknown = scheduler.now()
       if (typeof instant !== 'number' || !Number.isFinite(instant) || instant < 0)
-        throw new RpcConfigurationError(RpcCoreErrorText.schedulerInvalid)
+        throw createRpcConfigurationError(RpcCoreErrorText.schedulerInvalid)
       injectedScheduler = scheduler
     } catch (error) {
-      if (error instanceof RpcConfigurationError) throw error
-      throw new RpcConfigurationError(RpcCoreErrorText.schedulerInvalid, error)
+      if (isLocalRpcError(error, RpcConfigurationError)) throw error
+      throw createRpcConfigurationError(RpcCoreErrorText.schedulerInvalid, error)
     }
   }
   /** Admitted caller wall clock; undefined keeps the time port's host default. */
@@ -389,34 +394,37 @@ export async function prepareEndpoint<
     try {
       const wallClock = factoryWallClock as IWallClock
       if (!wallClock || typeof wallClock.timestamp !== 'function')
-        throw new RpcConfigurationError(RpcCoreErrorText.wallClockInvalid)
+        throw createRpcConfigurationError(RpcCoreErrorText.wallClockInvalid)
       /** One admission probe of the epoch diagnostic clock. */
       const probe: unknown = wallClock.timestamp()
       if (!Number.isSafeInteger(probe) || (probe as number) < 0)
-        throw new RpcConfigurationError(RpcCoreErrorText.wallClockInvalid)
+        throw createRpcConfigurationError(RpcCoreErrorText.wallClockInvalid)
       injectedWallClock = wallClock
     } catch (error) {
-      if (error instanceof RpcConfigurationError) throw error
-      throw new RpcConfigurationError(RpcCoreErrorText.wallClockInvalid, error)
+      if (isLocalRpcError(error, RpcConfigurationError)) throw error
+      throw createRpcConfigurationError(RpcCoreErrorText.wallClockInvalid, error)
     }
   }
   try {
     if (!Array.isArray(factoryMiddlewares))
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.middlewaresMustBeAnArray)
+      throw createRpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.middlewaresMustBeAnArray
+      )
     if (factoryTargetIds !== undefined && !Array.isArray(factoryTargetIds))
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.targetIdsMustBeAnArray)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.targetIdsMustBeAnArray)
     if (
       (factoryTargetIds as readonly unknown[] | undefined)?.some(
         (targetId) => typeof targetId !== 'string' || targetId.length === 0
       )
     )
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcCoreErrorText.targetIdsMustContainNonEmptyStrings
       )
   } catch (error) {
-    if (error instanceof RpcError) throw error
-    throw new RpcError(
+    if (isLocalRpcError(error, RpcError)) throw error
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.factoryCollectionIsUnreadable,
       error
@@ -428,7 +436,7 @@ export async function prepareEndpoint<
       const name = safeRead<unknown>(middleware, 'name')
       if (isDefinedMiddleware(middleware)) {
         if (typeof name !== 'string' || name.length === 0)
-          throw new RpcError(
+          throw createRpcError(
             RpcCoreErrorCode.invalidConfig,
             RpcCoreErrorText.middlewareMustBePlugin
           )
@@ -476,7 +484,10 @@ export async function prepareEndpoint<
         (middlewareTransport !== undefined &&
           (!middlewareTransport || typeof middlewareTransport !== 'object'))
       )
-        throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.middlewareMustBePlugin)
+        throw createRpcError(
+          RpcCoreErrorCode.invalidConfig,
+          RpcCoreErrorText.middlewareMustBePlugin
+        )
       /** Carry factory identity through the already validated immutable descriptor copy. */
       const proof = readCanonicalMiddlewareProof(middleware)
       if (proof === true) registerJsonObjectMiddleware(plugin)
@@ -492,15 +503,15 @@ export async function prepareEndpoint<
     const names = new Set<string>()
     for (const middleware of middlewareSnapshots) {
       if (names.has(middleware.name))
-        throw new RpcError(
+        throw createRpcError(
           RpcCoreErrorCode.middlewareDuplicated,
           RpcCoreErrorText.duplicateMiddleware(middleware.name)
         )
       names.add(middleware.name)
     }
   } catch (error) {
-    if (error instanceof RpcError) throw error
-    throw new RpcError(
+    if (isLocalRpcError(error, RpcError)) throw error
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.middlewaresAreUnreadable,
       error
@@ -510,10 +521,10 @@ export async function prepareEndpoint<
     item.transport === undefined ? [] : [item.transport]
   )
   if (transportCandidates.length > 1)
-    throw new RpcError(RpcCoreErrorCode.capabilityConflict, RpcCoreErrorText.endpointRouteOwned)
+    throw createRpcError(RpcCoreErrorCode.capabilityConflict, RpcCoreErrorText.endpointRouteOwned)
   const transport = (factoryTransport as IRpcTransport | undefined) ?? transportCandidates[0]
   if (!transport)
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.connectMiddlewareMustProvideTransport
     )
@@ -530,7 +541,10 @@ export async function prepareEndpoint<
       encodedType !== 'uint8array') ||
     (ownership !== undefined && ownership !== 'owned' && ownership !== 'borrowed')
   )
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.transportDescriptorInvalid)
+    throw createRpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.transportDescriptorInvalid
+    )
   const components = selectWebRpcComponents({
     transport,
     protocol: factoryProtocol,
@@ -617,7 +631,7 @@ function selectWebRpcComponents(
       return value === undefined ? [] : [value]
     })
     if (contributed.length > 1)
-      throw new RpcError(RpcCoreErrorCode.capabilityConflict, RpcCoreErrorText.endpointRouteOwned)
+      throw createRpcError(RpcCoreErrorCode.capabilityConflict, RpcCoreErrorText.endpointRouteOwned)
     return Object.freeze({
       value: topLevel ?? contributed[0] ?? fallback,
       ...(topLevel !== undefined && contributed[0] !== undefined
@@ -664,7 +678,7 @@ function selectWebRpcComponents(
       })
     )
   if (!isCompatible(codec, framer))
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
   /** Public snapshot remains the original string pipeline even when a private candidate exists. */
   const components = Object.freeze({
     protocol,
@@ -685,7 +699,7 @@ function snapshotIdentity(
   const id = readDescriptorField(value, 'id')
   const version = readDescriptorField(value, 'version')
   if (!isDescriptorIdentity(id, version) || typeof version !== 'number')
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
   return Object.freeze({ id, version })
 }
 
@@ -695,7 +709,7 @@ function readDescriptorField(value: unknown, field: string): unknown {
     if (!value || typeof value !== 'object') return undefined
     return (value as Record<string, unknown>)[field]
   } catch (cause) {
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.codecDescriptorInvalid,
       cause
@@ -714,7 +728,7 @@ function snapshotProtocol(value: unknown): IRpcProtocol<IRpcEnvelope, string, nu
     readDescriptorField(value, 'encode') !== undefined ||
     readDescriptorField(value, 'decode') !== undefined
   )
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
   return Object.freeze({
     id,
     version,
@@ -735,7 +749,7 @@ function snapshotCodec(value: unknown): ICodec<IRpcEnvelope, unknown> {
     !isDescriptorIdentity(id, version) ||
     !isEncodedType(encodedType)
   )
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
   return Object.freeze({
     id,
     version,
@@ -762,7 +776,7 @@ function snapshotFramer(value: unknown): IRpcFramer<unknown, unknown, string, nu
     !isEncodedType(inputEncodedType) ||
     !isEncodedType(outputEncodedType)
   )
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.framerDescriptorInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.framerDescriptorInvalid)
   return Object.freeze({
     id,
     version,

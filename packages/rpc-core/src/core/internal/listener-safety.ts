@@ -5,10 +5,10 @@
  */
 import { RpcAuxiliaryErrorText } from './auxiliary-error-text.js'
 import {
+  type IRpcCoreErrorCode,
   RPC_CORE_ERROR_SOURCE,
   RpcCoreErrorCode,
-  tagRpcError,
-  type IRpcCoreErrorCode
+  tagRpcError
 } from '../errors.js'
 
 /** Canonical WebRPC codes accepted on an already package-tagged native error. */

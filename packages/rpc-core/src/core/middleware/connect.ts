@@ -1,3 +1,4 @@
+import { createRpcError, isLocalRpcError, RpcCoreErrorCode, RpcError } from '../errors.js'
 import { registerJsonObjectMiddleware } from '../internal/json-object-port.js'
 import { RpcMiddlewareErrorText } from './error-text.js'
 import { RpcPlatform } from '../transport-constants.js'
@@ -8,7 +9,7 @@ import type {
   IRpcPlugin
 } from '../typing.js'
 import type { IRpcTransport } from '../transport.js'
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import { safeRead } from '../internal/safe-value.js'
 import { RpcPortName } from '../internal/plugin-shared-keys.js'
@@ -75,8 +76,8 @@ export const connect = <TMode extends IRpcDiscoveryMode = 'automatic'>(
           }
         }
       } catch (cause) {
-        if (cause instanceof RpcError) throw cause
-        throw new RpcError(
+        if (isLocalRpcError(cause, RpcError)) throw cause
+        throw createRpcError(
           RpcCoreErrorCode.invalidConfig,
           RpcCoreErrorText.transportDescriptorInvalid,
           cause
@@ -116,22 +117,22 @@ function createConnectCapability(
     transportTopology !== 'multiplexed' &&
     transportTopology !== 'broadcast'
   )
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.transportTopologyIsInvalid
     )
   if (discoveryMode !== 'automatic' && discoveryMode !== 'manual')
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.connectDiscoveryModeIsInvalid
     )
   if (receiverSelector !== undefined && typeof receiverSelector !== 'function')
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.connectReceiverSelectorMustBeAFunction
     )
   if (useBaseIdVerifyOnly === false && !identifier)
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.connectIdentifierIsRequiredWhenBaseVerificationIsDisabled
     )
@@ -149,24 +150,24 @@ function createConnectCapability(
       ? uniqueTargetId
       : undefined
   if (!transport || (typeof transport !== 'object' && typeof transport !== 'function'))
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.connectTransportIsRequired
     )
   const transportSend = safeRead<unknown>(transport, 'send')
   const transportSubscribe = safeRead<unknown>(transport, 'subscribe')
   if (typeof transportSend !== 'function' || typeof transportSubscribe !== 'function')
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.connectTransportMustProvideSendAndSubscribeFunctions
     )
   if (useBaseIdVerifyOnly !== undefined && typeof useBaseIdVerifyOnly !== 'boolean')
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.connectUseBaseIdVerifyOnlyMustBeABoolean
     )
   if (identifier !== undefined && typeof identifier !== 'function')
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.connectIdentifierMustBeAFunction
     )
@@ -176,7 +177,7 @@ function createConnectCapability(
     (transportPeerId !== undefined && typeof transportPeerId !== 'string') ||
     (transportOrigin !== undefined && typeof transportOrigin !== 'string')
   )
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.transportIdentityDescriptorInvalid
     )
@@ -248,7 +249,7 @@ function invalidConnectPlugin(message: string, cause?: unknown): IRpcPlugin {
       sharedProvides: [RpcPortName.connect]
     },
     install: () => {
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, message, cause)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, message, cause)
     }
   }
 }

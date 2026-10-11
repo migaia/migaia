@@ -1,4 +1,5 @@
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
+import { createRpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import { RpcPortName } from './plugin-shared-keys.js'
 import { RpcProviderAttachment } from './provider-attachment.js'
@@ -105,7 +106,7 @@ export const createProviderFeatureWithScope = (
       }
       const ports = (): Readonly<Record<PropertyKey, unknown>> => {
         if (!attachment)
-          throw new RpcError(
+          throw createRpcError(
             RpcCoreErrorCode.invalidConfig,
             RpcCoreErrorText.endpointModuleDependencyMissing
           )

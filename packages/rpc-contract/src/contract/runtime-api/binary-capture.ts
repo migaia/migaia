@@ -57,8 +57,14 @@ const bufferGetter = Object.getOwnPropertyDescriptor(typedArrayPrototype, 'buffe
 /** Captured offset accessor preserves the real view boundary across realms. */
 const offsetGetter = Object.getOwnPropertyDescriptor(typedArrayPrototype, 'byteOffset')!.get!
 
-/** Native-bearing business snapshots select the codec without a second recursive payload scan. */
-export function hasRpcBinaryEnvelope(envelope: IRpcRuntimeEnvelope): boolean {
+/**
+ * Protocol implementers select the binary profile from normalized envelopes or an actual held
+ * business payload slot. The existing snapshot proof avoids another recursive payload scan; this
+ * operation does not normalize untrusted input or grant transport capabilities.
+ */
+export function hasRpcBinaryEnvelope(
+  envelope: IRpcRuntimeEnvelope | Readonly<{ payload?: IRpcPortableValue }>
+): boolean {
   if ('payload' in envelope && hasRpcPortableBinary(envelope.payload)) return true
   if ('steps' in envelope) return envelope.steps.some((step) => hasRpcPortableBinary(step.payload))
   if (

@@ -1,3 +1,4 @@
+import { createRpcError, RpcCoreErrorCode, RpcError } from '../errors.js'
 import { createEventChannel, withSnapshotEntries } from '@migaia/event-subscriber'
 import type { ICanonicalEventChannel } from '@migaia/event-subscriber'
 import type { IRpcEventListener, IRpcProvider, IRpcProviderResult } from '../typing.js'
@@ -9,7 +10,7 @@ import {
   registerLocalErrorWireRoute,
   localErrorWireRoute
 } from './error-wire-metadata.js'
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
 import type {
@@ -103,7 +104,7 @@ export type IProviderBulkRegistration = Readonly<{
 
 /** The original generation event is the cause of a forwarding execution's terminal failure. */
 export function createProviderGenerationRetired(cause: unknown): RpcError {
-  return new RpcError(
+  return createRpcError(
     RpcCoreErrorCode.providerGenerationRetired,
     RpcCoreErrorText.providerGenerationRetired,
     cause
@@ -127,9 +128,9 @@ export function assertProviderForwardRoute(
   const error =
     route.includes(nodeId) ||
     (nextNodeId !== undefined && (nextNodeId === nodeId || route.includes(nextNodeId)))
-      ? new RpcError(RpcCoreErrorCode.forwardLoop, RpcCoreErrorText.forwardLoop)
+      ? createRpcError(RpcCoreErrorCode.forwardLoop, RpcCoreErrorText.forwardLoop)
       : route.length >= 4
-        ? new RpcError(RpcCoreErrorCode.forwardHopLimit, RpcCoreErrorText.forwardHopLimit)
+        ? createRpcError(RpcCoreErrorCode.forwardHopLimit, RpcCoreErrorText.forwardHopLimit)
         : undefined
   if (!error) return
   /** One immutable snapshot feeds the caller-visible diagnostic and original wire metadata. */

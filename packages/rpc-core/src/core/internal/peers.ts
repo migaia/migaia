@@ -1,5 +1,5 @@
 import { RpcAuxiliaryErrorText } from './auxiliary-error-text.js'
-import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcCoreErrorCode, tagRpcError } from '../errors.js'
 
 export class PeerRegistry<T extends string = string> {
   readonly #configured = new Set<T>()

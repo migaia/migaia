@@ -1,6 +1,6 @@
 import { RpcCoreErrorText } from '../error-text.js'
 import { tupleKey } from './safe-value.js'
-import { tagRpcError, RpcCoreErrorCode } from '../errors.js'
+import { RpcCoreErrorCode, tagRpcError } from '../errors.js'
 import type { IRpcRuntimeGeneration } from '@migaia/rpc-contract'
 
 /** Owns verified source bindings and issues unique, non-cryptographic identifiers. */

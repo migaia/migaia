@@ -1,3 +1,4 @@
+import { createRpcError } from '../../dist/core/errors.js'
 import { describe, expect, it } from 'vitest'
 import { normalizeRpcEnvelope, RpcRouteProfile, RpcStreamLimit } from '@migaia/rpc-contract'
 import type { IEndpointKernelHost, IEndpointKernelRoute } from '../../dist/core/endpoint-kernel.js'
@@ -7,7 +8,7 @@ import type {
   IRpcOutboundOperationsPort
 } from '../../dist/core/internal/plugin-shared-keys.js'
 import { RpcStreamOwner } from '../../dist/core/internal/stream/owner.js'
-import { RpcCoreErrorCode, RpcError } from '../../dist/core/errors.js'
+import { RpcCoreErrorCode } from '../../dist/core/errors.js'
 import { RpcStreamErrorText } from '../../dist/core/internal/stream/error-text.js'
 
 /** A12 uses the stream ports directly because IPC queue admission belongs to its later leaf. */
@@ -190,7 +191,7 @@ describe('streaming A12 admission', () => {
   })
 
   it('keeps an overloaded pull error by identity and withdraws its queued admission', async () => {
-    const overload = new RpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded)
+    const overload = createRpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded)
     const fixture = streamPorts((command) => (eventOf(command) === 'pull' ? overload : undefined))
     const iterator = fixture.owner.open('client', 'count', null)
     const pending = iterator.next()
@@ -215,7 +216,7 @@ describe('streaming A12 admission', () => {
   })
 
   it('returns the producer iterator once and attempts fail after an overloaded item', async () => {
-    const overload = new RpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded)
+    const overload = createRpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded)
     const fixture = streamPorts((command) => (eventOf(command) === 'item' ? overload : undefined))
     let returned = 0
     fixture.owner.provide('count', () => ({

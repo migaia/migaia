@@ -1,10 +1,11 @@
+import { createRpcError } from '../../core/errors.js'
 import {
   readRuntimePreparationContext,
   withRuntimePreparationContext
 } from '../../remote/runtime-api/launch-context.js'
 import { readRuntimeDefaultTimeout } from '../../remote/runtime-api/timeout.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { RpcCoreErrorCode, RpcError } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
 import { defaultRpcId } from '../../core/internal/id.js'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import { compileRuntimeMethods } from '../../remote/runtime-api/catalog.js'
@@ -56,7 +57,7 @@ export async function createAutomaticProcessPeer(
   if (platform.marker !== PROCESS_RUNTIME_API_ENV_VERSION || claimed)
     invalidProcessRuntimeBootstrap()
   if (options.spawn !== undefined || options.connect !== undefined || options.listen !== undefined)
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
   // Reuse the method owner for admission before opening the sole process input reader.
   compileRuntimeMethods(options.provide, options.contract)
   claimed = true
@@ -77,7 +78,7 @@ export async function createAutomaticProcessPeer(
           (options.self.name !== bootstrap.self.name ||
             options.self.instanceId !== bootstrap.self.instanceId)
         )
-          throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
+          throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
         /** Override the legacy native offer's defaults with the endpoint's actual installed roots. */
         const offer = createNativeProcessOffer({
           peer: { id: context.self.instanceId, runtime: platform.runtime }

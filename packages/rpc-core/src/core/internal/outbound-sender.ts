@@ -1,4 +1,16 @@
 import {
+  createRpcAuthenticationError,
+  createRpcError,
+  createRpcSerializationError,
+  createRpcTransportError,
+  isLocalRpcError,
+  RpcAuthenticationError,
+  RpcCoreErrorCode,
+  RpcLifecycleError,
+  RpcSerializationError,
+  RpcTransportError
+} from '../errors.js'
+import {
   selectedJsonObjectPort,
   jsonObjectCandidate,
   type IRpcJsonObjectPort
@@ -9,14 +21,7 @@ import {
   readAuthenticationChallengePort,
   readAuthenticationBinaryDigest
 } from './authentication-replay.js'
-import {
-  RpcAuthenticationError,
-  RpcLifecycleError,
-  RpcSerializationError,
-  RpcTransportError,
-  RpcError,
-  RpcCoreErrorCode
-} from '../errors.js'
+
 import type {
   IRpcAuthenticationCapability,
   IRpcAuthenticationContext,
@@ -33,7 +38,7 @@ import { registerBatchWriter, type IBatchWriteGuard } from './batch-frame.js'
 import { RpcBatchPhysical, RpcCapability } from '@migaia/rpc-contract'
 import { hasRpcBinaryEnvelope } from '@migaia/rpc-contract/binary/inspect'
 import { assertRpcNativeBinaryFrameSize } from '@migaia/rpc-contract/binary/inspect'
-import { prepareRpcBinaryLazy as prepareRpcBinary } from '@migaia/rpc-contract/binary/lazy'
+import { prepareRpcBinary } from '@migaia/rpc-contract/binary/lazy'
 import type { IRpcBinaryDataCodec, IRpcBinaryManifest } from '@migaia/rpc-contract/binary/lazy'
 import { RpcBinaryStorage } from '@migaia/rpc-contract/framing/v1'
 import { RpcNativeBinaryKind } from '@migaia/rpc-contract/framing/v1'
@@ -297,7 +302,7 @@ export class RpcOutboundSender {
   ): void {
     if (!options || !Object.hasOwn(options, 'transfer')) return
     if (!this.#nativeBinaryEnabled(capabilities) || !capabilities.includes(RpcCapability.transfer))
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.capabilityUnsupported,
         RpcCoreErrorText.capabilityUnsupported
       )
@@ -349,7 +354,7 @@ export class RpcOutboundSender {
       const unique = new Set<object>()
       for (const backing of transfer) {
         if (!isArrayBuffer(backing) || unique.has(backing))
-          throw new RpcSerializationError(RpcCoreErrorText.invalidTransferList)
+          throw createRpcSerializationError(RpcCoreErrorText.invalidTransferList)
         unique.add(backing)
       }
     }
@@ -363,7 +368,7 @@ export class RpcOutboundSender {
       (binary && !capabilities.includes(RpcCapability.portableBinary)) ||
       (this.#bridge && envelope.kind === RpcRuntimeKind.group)
     )
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.capabilityUnsupported,
         RpcCoreErrorText.capabilityUnsupported
       )
@@ -372,7 +377,7 @@ export class RpcOutboundSender {
     /** No opaque callable is invoked merely to guess whether it fragments. */
     const facts = this.#singleFrameLimits
     if (!facts)
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.capabilityUnsupported,
         RpcCoreErrorText.capabilityUnsupported
       )
@@ -507,7 +512,7 @@ export class RpcOutboundSender {
         sidecars = prepared.sidecars
         backingBytes = prepared.backingBytes
         if (transfer?.some((backing) => !sidecars.includes(backing as ArrayBuffer)))
-          throw new RpcSerializationError(RpcCoreErrorText.invalidTransferList)
+          throw createRpcSerializationError(RpcCoreErrorText.invalidTransferList)
       }
       /**
        * Ordinary large values get one owned JSON walk; binary preparation already retained its
@@ -522,7 +527,7 @@ export class RpcOutboundSender {
         encodedByteUpperBound = readOwnedJsonSnapshot(selected)?.byteUpperBound
       if (!this.#objectPort) this.assertProtocolEncodedType(encoded)
     } catch (cause) {
-      throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
+      throw createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
     /** Known string encodings reuse their preparation bound without a second character scan. */
     if (!(encodedByteUpperBound !== undefined && encodedByteUpperBound <= limit))
@@ -530,7 +535,7 @@ export class RpcOutboundSender {
     /** Native framing runs once; multiple fragments are refused before protection or host send. */
     const frames = framer.frame(encoded, { source: this.id, messageId: envelope.id })
     if (frames.length !== 1)
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.capabilityUnsupported,
         RpcCoreErrorText.capabilityUnsupported
       )
@@ -550,7 +555,7 @@ export class RpcOutboundSender {
         isUint8Array(protectedValue) ||
         ![Object.prototype, null].includes(Object.getPrototypeOf(protectedValue)))
     )
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.capabilityUnsupported,
         RpcCoreErrorText.capabilityUnsupported
       )
@@ -837,11 +842,11 @@ export class RpcOutboundSender {
     } catch (cause) {
       /** Existing native contract/authentication errors retain their original instances and causes. */
       const error =
-        cause instanceof RpcAuthenticationError ||
-        cause instanceof RpcLifecycleError ||
-        cause instanceof RpcTransportError
+        isLocalRpcError(cause, RpcAuthenticationError) ||
+        isLocalRpcError(cause, RpcLifecycleError) ||
+        isLocalRpcError(cause, RpcTransportError)
           ? cause
-          : new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
+          : createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
       for (const entry of entries) entry.reject(error)
       return []
     }
@@ -856,7 +861,7 @@ export class RpcOutboundSender {
       try {
         inspection.splitBatch(entries)
       } catch (cause) {
-        throw new RpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
+        throw createRpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
       }
     }
     /** Oversize frames recurse only until individually bounded semantic members remain. */
@@ -971,7 +976,7 @@ export class RpcOutboundSender {
       encoded = (this.#objectPort?.codec ?? this.components.codec).encode(message)
       if (!this.#objectPort) this.assertProtocolEncodedType(encoded)
     } catch (cause) {
-      throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
+      throw createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
     this.#lifecycle?.assertActive(generation)
     if (immediate) this.#assertPhysicalSize(encoded)
@@ -1013,7 +1018,7 @@ export class RpcOutboundSender {
       encoded = (this.#objectPort?.codec ?? this.components.codec).encode(message)
       if (!this.#objectPort) this.assertProtocolEncodedType(encoded)
     } catch (cause) {
-      throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
+      throw createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
     let frames: readonly unknown[]
     try {
@@ -1022,11 +1027,11 @@ export class RpcOutboundSender {
         messageId: message.id
       })
     } catch (cause) {
-      throw new RpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
+      throw createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
     this.#lifecycle?.assertActive(generation)
     if (hasTransfer && frames.length !== 1)
-      throw new RpcSerializationError(RpcCoreErrorText.transferUnsupportedForChunking)
+      throw createRpcSerializationError(RpcCoreErrorText.transferUnsupportedForChunking)
     if (immediate) {
       /** Private JSON materialization preserves the original owned snapshot's byte bound. */
       this.#assertPhysicalSize(
@@ -1089,7 +1094,7 @@ export class RpcOutboundSender {
       if (bound !== undefined && bound <= this.#physicalLimit) return
       assertRpcPhysicalFrameSize(value, this.#physicalLimit)
     } catch (cause) {
-      throw new RpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
+      throw createRpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
     }
   }
 
@@ -1100,7 +1105,7 @@ export class RpcOutboundSender {
       (encodedType === 'string' && typeof value !== 'string') ||
       (encodedType === 'uint8array' && !isUint8Array(value))
     )
-      throw new RpcSerializationError(RpcCoreErrorText.protocolEncodedType(encodedType))
+      throw createRpcSerializationError(RpcCoreErrorText.protocolEncodedType(encodedType))
   }
 
   /** Validates protected output against transport payload requirements. */
@@ -1110,7 +1115,7 @@ export class RpcOutboundSender {
       (encodedType === 'string' && typeof value !== 'string') ||
       (encodedType === 'uint8array' && !isUint8Array(value))
     )
-      throw new RpcAuthenticationError(RpcCoreErrorText.protectedEncodedType(encodedType))
+      throw createRpcAuthenticationError(RpcCoreErrorText.protectedEncodedType(encodedType))
   }
 
   /** Captures one owned, immutable transfer-list snapshot before any encoding or framing work. */
@@ -1119,21 +1124,21 @@ export class RpcOutboundSender {
     try {
       transfer = options?.transfer
     } catch (cause) {
-      throw new RpcSerializationError(RpcCoreErrorText.invalidTransferList, cause)
+      throw createRpcSerializationError(RpcCoreErrorText.invalidTransferList, cause)
     }
     if (transfer === undefined) return undefined
     try {
       if (!Array.isArray(transfer))
-        throw new RpcSerializationError(RpcCoreErrorText.invalidTransferList)
+        throw createRpcSerializationError(RpcCoreErrorText.invalidTransferList)
       const transferLength = transfer.length
       if (!Number.isSafeInteger(transferLength))
-        throw new RpcSerializationError(RpcCoreErrorText.invalidTransferList)
+        throw createRpcSerializationError(RpcCoreErrorText.invalidTransferList)
       const snapshot: unknown[] = []
       for (let index = 0; index < transferLength; index += 1) snapshot.push(transfer[index])
       return Object.freeze(snapshot)
     } catch (cause) {
-      if (cause instanceof RpcSerializationError) throw cause
-      throw new RpcSerializationError(RpcCoreErrorText.invalidTransferList, cause)
+      if (isLocalRpcError(cause, RpcSerializationError)) throw cause
+      throw createRpcSerializationError(RpcCoreErrorText.invalidTransferList, cause)
     }
   }
 
@@ -1236,8 +1241,8 @@ export class RpcOutboundSender {
       if (!this.#objectPort) this.assertTransportEncodedType(value)
       return value
     } catch (cause) {
-      if (cause instanceof RpcLifecycleError) throw cause
-      throw new RpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
+      if (isLocalRpcError(cause, RpcLifecycleError)) throw cause
+      throw createRpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
     }
   }
 
@@ -1251,7 +1256,7 @@ export class RpcOutboundSender {
   ): Promise<unknown> {
     if (this.authentication && hasTransfer)
       return Promise.reject(
-        new RpcAuthenticationError(RpcCoreErrorText.transferUnsupportedWithAuthentication)
+        createRpcAuthenticationError(RpcCoreErrorText.transferUnsupportedWithAuthentication)
       )
     const authentication = this.authentication
     if (!authentication)
@@ -1269,9 +1274,9 @@ export class RpcOutboundSender {
           this.#reportConfiguration?.(cause)
           throw cause
         }
-        if (cause instanceof RpcAuthenticationError) throw cause
-        if (cause instanceof RpcLifecycleError) throw cause
-        throw new RpcAuthenticationError(RpcCoreErrorText.authenticationFailed, cause)
+        if (isLocalRpcError(cause, RpcAuthenticationError)) throw cause
+        if (isLocalRpcError(cause, RpcLifecycleError)) throw cause
+        throw createRpcAuthenticationError(RpcCoreErrorText.authenticationFailed, cause)
       })
       .then((protectedValue) => {
         try {
@@ -1279,9 +1284,9 @@ export class RpcOutboundSender {
           this.assertTransportEncodedType(protectedValue)
           return protectedValue
         } catch (cause) {
-          if (cause instanceof RpcAuthenticationError) throw cause
-          if (cause instanceof RpcLifecycleError) throw cause
-          throw new RpcAuthenticationError(
+          if (isLocalRpcError(cause, RpcAuthenticationError)) throw cause
+          if (isLocalRpcError(cause, RpcLifecycleError)) throw cause
+          throw createRpcAuthenticationError(
             RpcCoreErrorText.protectedEncodedType(this.#transportEncodedType ?? 'any'),
             cause
           )
@@ -1333,9 +1338,9 @@ export class RpcOutboundSender {
     } catch (cause) {
       if (cause === record.admissionFailure && (record.beforeSend || record.runtimeStart))
         throw cause
-      if (cause instanceof RpcAuthenticationError) throw cause
-      if (cause instanceof RpcLifecycleError) throw cause
-      throw new RpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
+      if (isLocalRpcError(cause, RpcAuthenticationError)) throw cause
+      if (isLocalRpcError(cause, RpcLifecycleError)) throw cause
+      throw createRpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
     }
   }
 }

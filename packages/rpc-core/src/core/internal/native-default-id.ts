@@ -1,4 +1,5 @@
-import { RpcConfigurationError } from '../errors.js'
+import { createRpcConfigurationError } from '../errors.js'
+
 import type { IRpcUuidConfig } from '../typing.js'
 import { NativeDefaultIdText } from './native-default-id-text.js'
 import { bytesToBase64 } from '@migaia/utils/bytes'
@@ -26,7 +27,7 @@ export function createNativeDefaultAllocator(
   try {
     bytes = globalThis.crypto.getRandomValues(new Uint8Array(16))
   } catch (error) {
-    throw new RpcConfigurationError(NativeDefaultIdText.nonceFailed, error)
+    throw createRpcConfigurationError(NativeDefaultIdText.nonceFailed, error)
   }
   /** Unpadded base64url represents the fixed 16-byte nonce in exactly 22 characters. */
   const nonce = bytesToBase64(bytes).replace(/\+/gu, '-').replace(/\//gu, '_').replace(/=+$/u, '')
@@ -35,7 +36,7 @@ export function createNativeDefaultAllocator(
   return () => {
     if (counter === 0xffffffffffffffffn) {
       /** Reporting occurs before rejection through the existing endpoint diagnostic owner. */
-      const error = new RpcConfigurationError(NativeDefaultIdText.counterExhausted)
+      const error = createRpcConfigurationError(NativeDefaultIdText.counterExhausted)
       exhaustionErrors.add(error)
       report(error)
       throw error

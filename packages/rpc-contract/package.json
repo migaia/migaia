@@ -50,6 +50,9 @@
       "types": "./dist/contract/error-index.d.ts",
       "default": "./dist/contract/error-index.js"
     },
+    "./schema/wire-error": {
+      "default": "./schema/wire-error.schema.json"
+    },
     "./handshake": {
       "types": "./dist/contract/handshake-index.d.ts",
       "default": "./dist/contract/handshake-index.js"

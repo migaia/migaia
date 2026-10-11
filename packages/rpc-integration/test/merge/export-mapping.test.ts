@@ -88,17 +88,10 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'RpcWireLimit',
       'measurePortableStreamValue'
     ],
-    './portable': [
-      'RPC_PORTABLE_MAX_DEPTH',
-      'hasRpcPortableBinary',
-      'normalizePortable',
-      'normalizeRuntimePortable'
-    ],
+    './portable': ['RPC_PORTABLE_MAX_DEPTH', 'normalizePortable'],
     './errors': [
       'RPC_CONTRACT_SOURCE',
       'RpcContractErrorCode',
-      'RpcContractErrorDiagnostic',
-      'RpcContractErrorText',
       'RpcErrorReachLimit',
       'RpcJsonRpcWireError',
       'RpcWireErrorFallback',
@@ -148,7 +141,7 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'wrapRuntimeCarrier'
     ],
     './runtime/metadata': ['normalizeRuntimeGeneration', 'normalizeRuntimeSteps'],
-    './runtime/lazy': ['normalizeRuntimeEnvelopeLazy', 'normalizeStreamPayloadLazy'],
+    './runtime/lazy': ['normalizeRuntimeEnvelope', 'normalizeStreamPayload'],
     './binary/inspect': [
       'RpcBinaryProfile',
       'RpcBinaryStorage',
@@ -164,7 +157,6 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
     './framing/jsonrpc': [
       'JSONRPC_BRIDGE_ERROR_SOURCE',
       'JsonRpcBridgeErrorCode',
-      'JsonRpcBridgeErrorText',
       'JsonRpcLimit',
       'createJsonRpcFrameDecoder',
       'encodeJsonRpcFrame'
@@ -181,8 +173,8 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'RpcBinaryProfile',
       'RpcBinaryStorage',
       'RpcNativeBinaryKind',
-      'prepareRpcBinaryLazy',
-      'restoreRpcBinaryLazy'
+      'prepareRpcBinary',
+      'restoreRpcBinary'
     ],
     './binary/capture': ['RpcBinaryStorage', 'captureRpcBinaryData'],
     './stream': [
@@ -212,20 +204,16 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
     './adapter/diagnostics': [
       'IpcReporterContext',
       'RPC_PROCESS_ERROR_SOURCE',
-      'RpcProcessErrorCode',
-      'RpcProcessErrorText'
+      'RpcProcessErrorCode'
     ],
     './adapter/process-data': [
-      'CHILD_STDERR_REDACTED',
       'PROCESS_HANDSHAKE_MAX_FRAME_BYTES',
       'PROCESS_RUNTIME_API_BOOTSTRAP_KIND',
       'PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS',
       'PROCESS_RUNTIME_API_BOOTSTRAP_VERSION',
       'PROCESS_RUNTIME_API_ENV',
       'PROCESS_RUNTIME_API_ENV_VERSION',
-      'PROCESS_RUNTIME_API_FINGERPRINT_PREFIX',
-      'PROCESS_STDERR_EVENT_BUDGET',
-      'PROCESS_STDERR_INTERVAL_MS'
+      'PROCESS_RUNTIME_API_FINGERPRINT_PREFIX'
     ],
     './adapter/web-streams': ['createAdapterWebByteIO'],
     './adapter/process': [
@@ -261,7 +249,24 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
 const retiredSymbols: Record<string, readonly string[]> = {
   '@migaia/rpc/contract': ['invalidRpcStream'],
   '@migaia/rpc/contract/v1': ['invalidRpcStream'],
-  '@migaia/rpc/contract/framing': ['rejectRpcPhysicalFrameSize']
+  '@migaia/rpc/contract/framing': ['rejectRpcPhysicalFrameSize'],
+  /** Core constructors are internal except the real caller-owned lifecycle error use. */
+  '@migaia/rpc/core': [
+    'RpcError',
+    'RpcSchemaValidationError',
+    'RpcConfigurationError',
+    'RpcConstructionError',
+    'RpcSerializationError',
+    'RpcProtocolError',
+    'RpcContractError',
+    'RpcTransportError',
+    'RpcAuthenticationError',
+    'RpcChunkError',
+    'RpcRemoteError',
+    'RpcAbortError',
+    'RpcTimeoutError',
+    'tagRpcError'
+  ]
 }
 /**
  * Explicit former helper symbol routing retains protocol users without re-creating helper
@@ -355,7 +360,8 @@ describe('A1 merged public exports', () => {
     })
     for (const [owner, entries] of Object.entries(ordinaryEntries))
       currentEntries.push(...Object.keys(entries).map((key) => `${owner}:${key}`))
-    expect(currentEntries).toHaveLength(71)
+    currentEntries.push('rpc-contract:./schema/wire-error')
+    expect(currentEntries).toHaveLength(72)
     expect(
       Object.entries(manifests)
         .flatMap(([owner, entry]) => Object.keys(entry.exports).map((key) => `${owner}:${key}`))
@@ -398,9 +404,17 @@ describe('A1 merged public exports', () => {
             ...((streamingDelta.added as Record<string, string[]>)[name] ?? []),
             ...(name === '@migaia/rpc/core' ? ['RpcProviderRejectionReason'] : []),
             ...(name === '@migaia/rpc/contract'
-              ? ['RpcBatchPhysical', 'classifyRpcContractError']
+              ? ['RPC_CONTRACT_SOURCE', 'RpcBatchPhysical', 'classifyRpcContractError']
               : []),
-            ...(name === '@migaia/rpc/core' ? ['serializeRpcError', 'deserializeRpcError'] : []),
+            ...(name === '@migaia/rpc/core'
+              ? [
+                  'serializeRpcError',
+                  'deserializeRpcError',
+                  'isRpcErrorInstance',
+                  'isRpcRemoteError',
+                  'isRpcTimeoutError'
+                ]
+              : []),
             ...(name === '@migaia/rpc/contract/framing'
               ? ['processStringFramer', 'remoteProcessStringFramer', 'inspectRpcPhysicalFrame']
               : []),
@@ -440,7 +454,7 @@ describe('A1 merged public exports', () => {
           'RemoteMethodName',
           'RuntimePluginKey',
           'RpcRemoteLayerErrorCode',
-          'RpcRemoteLayerErrorText',
+          'RPC_REMOTE_ERROR_SOURCE',
           'normalizeRemoteContract',
           'normalizeRemoteHostCatalog',
           'normalizeRemoteControlShape',
@@ -489,7 +503,12 @@ describe('A1 merged public exports', () => {
       expect(existsSync(join(ownerRoot, entry.types))).toBe(true)
       expect(
         Object.keys(await import(pathToFileURL(join(ownerRoot, entry.default)).href)).sort()
-      ).toEqual([...names].sort())
+      ).toEqual(
+        [
+          ...names.filter((name) => name !== 'JsonRpcBridgeErrorText'),
+          'JSONRPC_BRIDGE_ERROR_SOURCE'
+        ].sort()
+      )
     }
     const processEntry = manifests['rpc-process']!.exports['.']!
     expect(
@@ -502,9 +521,35 @@ describe('A1 merged public exports', () => {
         'createProcessPlugin',
         'createProcessResilience',
         'parseProcessPluginDescriptor',
-        'ProcessPluginWire'
+        'ProcessPluginWire',
+        'RPC_PROCESS_ERROR_SOURCE',
+        'RpcProcessErrorCode'
       ])
     )
+    /** C5 removes text/constructor/lazy aliases without weakening the exact ordinary namespaces. */
+    for (const [owner, entries] of Object.entries(manifests)) {
+      for (const [key, entry] of Object.entries(entries.exports)) {
+        if (owner === 'rpc-contract' && key === './schema/wire-error') continue
+        const namespace = await import(pathToFileURL(join(packageRoot, owner, entry.default)).href)
+        expect(
+          Object.keys(namespace).filter((name) => /(?:ErrorText|Diagnostic|Lazy)$/.test(name))
+        ).toEqual([])
+      }
+    }
+    /** Protocol implementations consume the unchanged closed JSON schema through its public path. */
+    const schemaEntry = manifests['rpc-contract']!.exports['./schema/wire-error']!
+    expect(schemaEntry).toEqual({ default: './schema/wire-error.schema.json' })
+    const wireSchema = await import('@migaia/rpc-contract/schema/wire-error', {
+      with: { type: 'json' }
+    })
+    // Vitest's JSON transform adds named keys; the native namespace is checked by packed smoke.
+    expect(wireSchema.default).toEqual(
+      JSON.parse(readFileSync(join(packageRoot, 'rpc-contract', schemaEntry.default), 'utf8'))
+    )
+    /** Native adapters expose diagnostics at their user-facing package root. */
+    const threads = await import('@migaia/rpc-threads')
+    expect(threads.RPC_THREAD_ERROR_SOURCE).toBe('@migaia/rpc/threads')
+    expect(threads.RpcThreadErrorCode.usageSampleFailed).toBe('THREAD_USAGE_SAMPLE_FAILED')
   })
 
   it('keeps contract protocol and normalizer implementations outside compiled core', () => {

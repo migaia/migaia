@@ -1,8 +1,9 @@
+import { createRpcError } from '../../core/errors.js'
 import { readRuntimeDefaultTimeout } from '../../remote/runtime-api/timeout.js'
 import type { IThreadHandle } from '@migaia/supervision/threads'
 import { RpcRuntimeGenerationKind } from '@migaia/rpc-contract/runtime'
 import { defaultRpcId } from '../../core/internal/id.js'
-import { RpcError, RpcCoreErrorCode } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
 import { RuntimeApiErrorText } from '../../remote/runtime-api/constants.js'
 import { RuntimePluginKey } from '../../remote/index.js'
 import { createManagedRuntimePeer } from '../../remote/index.js'
@@ -37,7 +38,7 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
 ) {
   readRuntimeDefaultTimeout(options)
   if (!options.spawn || typeof options.spawn !== 'object' || options.connect || options.listen)
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
   /** The caller's source object is snapshotted before the original binding can start. */
   const source = options.spawn
   /** This local identity cannot be supplied by the remote child or its business directory. */

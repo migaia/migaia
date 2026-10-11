@@ -9,8 +9,7 @@ import {
   type IProcessLauncher
 } from '@migaia/supervision/process'
 import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
-import { RpcCoreErrorCode } from '@migaia/rpc-core'
-import { tagRpcError } from '@migaia/rpc-core/transport-kit'
+import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-core'
 import { receiveAdapterBootstrap } from '@migaia/rpc-core/adapter'
 import { RpcProcessErrorCode } from '../error-code.js'
 
@@ -66,10 +65,10 @@ const DENO_CAPABILITIES = Object.freeze({
 function denoRuntime(): IDenoRuntime {
   const runtime: unknown = Reflect.get(globalThis, 'Deno')
   if (!runtime || typeof runtime !== 'object' || !('Command' in runtime))
-    throw tagRpcError(
-      new TypeError(RpcProcessErrorText.optionsInvalid),
-      RpcCoreErrorCode.invalidConfig
-    )
+    throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
+      source: RPC_CORE_ERROR_SOURCE,
+      code: RpcCoreErrorCode.invalidConfig
+    })
   return runtime as IDenoRuntime
 }
 
@@ -120,10 +119,10 @@ export function createDenoProcessLauncher(
       if (runtimeBootstrap) env[PROCESS_RUNTIME_API_ENV] = PROCESS_RUNTIME_API_ENV_VERSION
       /** Deno has no supported dedicated bootstrap fd in this adapter. */
       if (spec.bootstrap?.via === 'fd')
-        throw tagRpcError(
-          new TypeError(RpcProcessErrorText.optionsInvalid),
-          RpcCoreErrorCode.invalidConfig
-        )
+        throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
+          source: RPC_CORE_ERROR_SOURCE,
+          code: RpcCoreErrorCode.invalidConfig
+        })
       let child: IDenoChild
       try {
         child = new runtime.Command(spec.command, {
@@ -226,10 +225,10 @@ export function openProcessStdioChannel(
   }>
 ): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array }>> {
   if (options.bootstrap === 'fd')
-    throw tagRpcError(
-      new TypeError(RpcProcessErrorText.optionsInvalid),
-      RpcCoreErrorCode.invalidConfig
-    )
+    throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
+      source: RPC_CORE_ERROR_SOURCE,
+      code: RpcCoreErrorCode.invalidConfig
+    })
   const runtime = denoRuntime()
   const channel = createAdapterWebByteIO(runtime.stdin.readable, runtime.stdout.writable)
   return receiveAdapterBootstrap(channel, options.bootstrap, options)

@@ -1,3 +1,4 @@
+import { createRpcError, RpcCoreErrorCode } from '../errors.js'
 import { registerJsonObjectDescriptorMiddleware } from '../internal/json-object-port.js'
 import { rpcProtocolV1, type IRpcEnvelope, type IRpcProtocol } from '@migaia/rpc-contract'
 import type {
@@ -6,7 +7,7 @@ import type {
   IRpcPluginInstallResult,
   IRpcPluginMetadata
 } from '../typing.js'
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import { RpcPortName } from '../internal/plugin-shared-keys.js'
 
@@ -39,7 +40,7 @@ export function canonicalProtocol(
     typeof descriptor !== 'object' ||
     typeof readProtocolNormalize(descriptor) !== 'function'
   )
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.codecDescriptorInvalid)
   return registerJsonObjectDescriptorMiddleware(
     Object.freeze({
       name: 'protocol',
@@ -61,7 +62,7 @@ function readProtocolNormalize(descriptor: object): unknown {
   try {
     return (descriptor as { readonly normalize?: unknown }).normalize
   } catch (cause) {
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcCoreErrorText.codecDescriptorInvalid,
       cause

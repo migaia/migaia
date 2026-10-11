@@ -13,7 +13,6 @@ export {
   type IRpcContractErrorCode
 } from './error-code.js'
 export * from './wire-error-constants.js'
-export { RpcContractErrorDiagnostic, RpcContractErrorText } from './error-text.js'
 export type {
   IRpcContractError,
   IRpcErrorWireMetadata,

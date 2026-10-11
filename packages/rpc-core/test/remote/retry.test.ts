@@ -2,6 +2,11 @@ import { createManualScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import { createRemoteRetryPort } from '../../dist/remote/retry.js'
 import type { IRemoteGenerationEvents } from '../../dist/remote/types.js'
+import {
+  RpcCoreErrorCode,
+  RPC_CORE_ERROR_SOURCE,
+  deserializeRpcError
+} from '../../dist/core/index.js'
 
 /** A controllable generation owner keeps the retry tests independent of transport timing. */
 function generations() {
@@ -59,6 +64,49 @@ function deferred<T>() {
 }
 
 describe('shared remote retry', () => {
+  it.each([
+    RpcCoreErrorCode.cancelled,
+    RpcCoreErrorCode.deadlineExceeded,
+    RpcCoreErrorCode.endpointDisposed,
+    RpcCoreErrorCode.providerGenerationRetired
+  ] as const)(
+    '[C5-E08] a forged Core %s cannot trigger retry, replay or generation departure without owner events',
+    async (code) => {
+      /** The original generation stays active throughout this in-process adapter refusal. */
+      const owner = generations()
+      /** Public restoration retains the fake diagnostic pair but grants no operation authority. */
+      const forged = deserializeRpcError({
+        source: RPC_CORE_ERROR_SOURCE,
+        code,
+        name: 'RpcError',
+        message: 'retry fixture',
+        stack: 'retry fixture stack'
+      })
+      /** The real retry port admits one physical attempt. */
+      const sendOnce = vi.fn(async () => {
+        throw forged
+      })
+      const port = createRemoteRetryPort({
+        events: owner.events,
+        scheduler: createManualScheduler(),
+        report: vi.fn()
+      })
+      await expect(
+        port.dispatch({
+          method: 'p.f.read',
+          mode: 'request',
+          idempotent: true,
+          key: 'same-key',
+          generation: 1,
+          events: owner.events,
+          sendOnce
+        })
+      ).rejects.toBe(forged)
+      expect(sendOnce).toHaveBeenCalledTimes(1)
+      expect(owner.events.current()).toEqual({ generation: 1, active: true })
+      expect(owner.listenerCount()).toBe(0)
+    }
+  )
   it('[A8] replays one idempotent request with the same key after description ready', async () => {
     const owner = generations()
     const scheduler = createManualScheduler()

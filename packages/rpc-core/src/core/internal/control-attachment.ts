@@ -1,11 +1,14 @@
 import {
-  RpcContractError,
-  RpcError,
+  createRpcContractError,
+  createRpcError,
+  createRpcProtocolError,
+  isLocalRpcError,
   RpcCoreErrorCode,
   RpcLifecycleError,
   RpcProtocolError,
   RpcTransportError
 } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import { authenticationReplyReceiverId } from './authentication-replay.js'
 import { RpcControl, RpcRouteProfile, RpcWireLimit, type IRpcEnvelope } from '@migaia/rpc-contract'
@@ -109,7 +112,7 @@ export class RpcControlAttachment {
           handler
         })
         if (typeof release !== 'function')
-          throw new RpcError(
+          throw createRpcError(
             RpcCoreErrorCode.invalidConfig,
             RpcCoreErrorText.endpointModuleDependencyMissing
           )
@@ -154,7 +157,7 @@ export class RpcControlAttachment {
       options.drainMs < 0 ||
       options.drainMs > RpcWireLimit.maxDurationMs
     )
-      throw new RpcContractError(RpcCoreErrorText.drainInvalid)
+      throw createRpcContractError(RpcCoreErrorText.drainInvalid)
     const taskId = allocateRpcId(this.#uuid, 'variation', this.#id, targetId, () => false)
     const selectedReceiver = this.#ports.discoveryResolver.resolve(targetId, options.receiverId)
     return selectedReceiver.then((selected) =>
@@ -170,7 +173,7 @@ export class RpcControlAttachment {
   /** Validates a caller-facing identifier against the shared contract-capability domain. */
   #validateIdentifier(value: string, label: string): void {
     if (typeof value !== 'string' || value.length === 0 || value.length > this.#maxIdentifierLength)
-      throw new RpcContractError(RpcCoreErrorText.identifierInvalid(label))
+      throw createRpcContractError(RpcCoreErrorText.identifierInvalid(label))
   }
 
   /**
@@ -182,7 +185,10 @@ export class RpcControlAttachment {
     this.#validateIdentifier(targetId, 'targetId')
     if (receiverId !== undefined) this.#validateIdentifier(receiverId, 'receiverId')
     if (!this.#pingEnabled)
-      throw new RpcError(RpcCoreErrorCode.middlewareMissing, RpcCoreErrorText.pingMiddlewareMissing)
+      throw createRpcError(
+        RpcCoreErrorCode.middlewareMissing,
+        RpcCoreErrorText.pingMiddlewareMissing
+      )
     const timeoutMs = this.#resolveTimeout(options?.timeoutMs)
     assertTimeout(timeoutMs)
     if (options?.signal?.aborted) return Promise.resolve(false)
@@ -222,7 +228,9 @@ export class RpcControlAttachment {
           settle(false)
           try {
             const reportError =
-              error instanceof RpcTransportError && error.cause !== undefined ? error.cause : error
+              isLocalRpcError(error, RpcTransportError) && error.cause !== undefined
+                ? error.cause
+                : error
             this.#ports.outboundOperations.send({ kind: 'report', error: reportError })
           } catch {
             // The canonical report owner isolates diagnostics; a report failure must not create
@@ -249,7 +257,7 @@ export class RpcControlAttachment {
     )
     const lifecycleFailure = results.find(
       (result): result is PromiseRejectedResult =>
-        result.status === 'rejected' && result.reason instanceof RpcLifecycleError
+        result.status === 'rejected' && isLocalRpcError(result.reason, RpcLifecycleError)
     )
     if (lifecycleFailure) throw lifecycleFailure.reason
     const fulfilled = createSafeRecord<boolean>()
@@ -332,19 +340,18 @@ export class RpcControlAttachment {
     let drainMs: unknown
     try {
       if (typeof payload !== 'object' || payload === null || Array.isArray(payload))
-        throw new RpcProtocolError(RpcCoreErrorText.drainInvalid)
+        throw createRpcProtocolError(RpcCoreErrorText.drainInvalid)
       const prototype = Object.getPrototypeOf(payload)
       if (prototype !== Object.prototype && prototype !== null)
-        throw new RpcProtocolError(RpcCoreErrorText.drainInvalid)
+        throw createRpcProtocolError(RpcCoreErrorText.drainInvalid)
       fields = Object.keys(payload)
       drainMs = (payload as { readonly drainMs?: unknown }).drainMs
     } catch (cause) {
       this.#ports.outboundOperations.send({
         kind: 'report',
-        error:
-          cause instanceof RpcProtocolError
-            ? cause
-            : new RpcProtocolError(RpcCoreErrorText.drainInvalid, cause),
+        error: isLocalRpcError(cause, RpcProtocolError)
+          ? cause
+          : createRpcProtocolError(RpcCoreErrorText.drainInvalid, cause),
         code: RpcCoreErrorCode.protocolInvalid
       })
       return
@@ -356,7 +363,7 @@ export class RpcControlAttachment {
     ) {
       this.#ports.outboundOperations.send({
         kind: 'report',
-        error: new RpcProtocolError(RpcCoreErrorText.drainInvalid),
+        error: createRpcProtocolError(RpcCoreErrorText.drainInvalid),
         code: RpcCoreErrorCode.protocolInvalid
       })
       return

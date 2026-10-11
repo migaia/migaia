@@ -1,3 +1,4 @@
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { BrowserRpcErrorText } from '../error-text.js'
 import type { IRpcSendOptions, IRpcTransport } from '@migaia/rpc-core/transport-kit'
 import {
@@ -9,10 +10,9 @@ import {
   observeListener,
   registerListeners,
   releaseListenerRegistration,
-  reportListenerFailure,
-  tagRpcError
+  reportListenerFailure
 } from '@migaia/rpc-core/transport-kit'
-import { RpcCoreErrorCode } from '@migaia/rpc-core'
+import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-core'
 
 /** Minimal SharedWorker port surface accepted by the adapter. */
 export type ISharedWorkerPort = {
@@ -63,10 +63,10 @@ export function createSharedWorkerTransport(
   }
   const onError = (): void => {
     reportListenerFailure(
-      tagRpcError(
-        new Error(BrowserRpcErrorText.rpcSharedWorkerMessageError),
-        RpcCoreErrorCode.transport
-      ),
+      attachErrorIdentity(new Error(BrowserRpcErrorText.rpcSharedWorkerMessageError), {
+        source: RPC_CORE_ERROR_SOURCE,
+        code: RpcCoreErrorCode.transport
+      }),
       transportErrors,
       secondaryFailures
     )

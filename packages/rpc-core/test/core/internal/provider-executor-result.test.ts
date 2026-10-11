@@ -1,6 +1,6 @@
+import { createRpcSchemaValidationError } from '../../../dist/core/errors.js'
 import { assert, describe, expect, it, vi } from 'vitest'
 import { RpcRouteProfile, normalizeRpcEnvelope } from '@migaia/rpc-contract'
-import { RpcSchemaValidationError } from '../../../dist/core/errors.js'
 import {
   ProviderExecutor,
   type IProviderRequestInput
@@ -85,7 +85,7 @@ describe('ProviderExecutor result normalization', () => {
         sent.push(response)
       },
       validate: () => {
-        throw new RpcSchemaValidationError('invalid params', { field: 'data' })
+        throw createRpcSchemaValidationError('invalid params', { field: 'data' })
       },
       emitFailure: () => undefined,
       retainBinding: () => true,
@@ -350,7 +350,7 @@ describe('ProviderExecutor result normalization', () => {
   it('maps provider schema exceptions and invalid dispatch ids without leaking controllers', async () => {
     const cases: IRpcProvider[] = [
       () => {
-        throw new RpcSchemaValidationError('result invalid', { result: true })
+        throw createRpcSchemaValidationError('result invalid', { result: true })
       },
       (context: IRpcContext) => {
         context.dispatchTo({ id: '', method: 'event', data: null })

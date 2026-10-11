@@ -1,10 +1,13 @@
-import { RpcMiddlewareErrorText } from './error-text.js'
 import {
+  createRpcAuthenticationError,
+  createRpcError,
+  isLocalRpcError,
   RpcAuthenticationError,
   RpcConfigurationError,
-  RpcError,
   RpcCoreErrorCode
 } from '../errors.js'
+import { RpcMiddlewareErrorText } from './error-text.js'
+
 import {
   authenticationReplaySession,
   authenticationCounterExhaustion,
@@ -67,7 +70,7 @@ function createAuthenticationCapability(
   config: IRpcAuthenticationConfig
 ): IRpcAuthenticationCapability {
   if (!config || typeof config !== 'object' || Array.isArray(config))
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.authenticationDescriptorIsInvalid
     )
@@ -79,7 +82,7 @@ function createAuthenticationCapability(
   try {
     ;({ encrypt, decrypt, sign, verify, encodedType } = config)
   } catch (error) {
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.authenticationDescriptorIsUnreadable,
       error
@@ -87,32 +90,32 @@ function createAuthenticationCapability(
   }
   for (const [name, transform] of Object.entries({ encrypt, decrypt, sign, verify }))
     if (transform !== undefined && typeof transform !== 'function')
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcMiddlewareErrorText.authenticationTransformInvalid(name)
       )
   if (!!encrypt !== !!decrypt)
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.authenticationEncryptDecryptMustBeConfiguredTogether
     )
   if (!!sign !== !!verify)
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.authenticationSignVerifyMustBeConfiguredTogether
     )
   if (encrypt && !sign)
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.authenticationEncryptionRequiresSigning
     )
   if (!encrypt && !sign)
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.authenticationRequiresEncryptionOrSigningTransforms
     )
   if (encodedType !== undefined && !['any', 'string', 'uint8array'].includes(encodedType))
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.authenticationEncodedTypeIsInvalid
     )
@@ -283,9 +286,12 @@ function createAuthenticationCapability(
       const encrypted = encrypt ? await encrypt(bound, context) : bound
       return await sign!(encrypted, context)
     } catch (error) {
-      if (error instanceof RpcAuthenticationError || error instanceof RpcConfigurationError)
+      if (
+        isLocalRpcError(error, RpcAuthenticationError) ||
+        isLocalRpcError(error, RpcConfigurationError)
+      )
         throw error
-      throw new RpcAuthenticationError(
+      throw createRpcAuthenticationError(
         RpcMiddlewareErrorText.outboundFrameAuthenticationFailed,
         error
       )
@@ -309,7 +315,9 @@ function createAuthenticationCapability(
       /** Async verification cannot commit against a retired receiver generation. */
       const session = authenticationReplaySession(context)
       if (!session)
-        throw new RpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
+        throw createRpcAuthenticationError(
+          RpcMiddlewareErrorText.authenticationReplayBindingInvalid
+        )
       /** Native integrity must finish before nonce pinning or any counter bitmap mutation. */
       const frameContext = authenticationFrameContext(context)
       const binary = frameContext?.binary
@@ -322,7 +330,7 @@ function createAuthenticationCapability(
           throw failure
         }
         if (authenticationReplaySession(context) !== session)
-          throw new RpcAuthenticationError(
+          throw createRpcAuthenticationError(
             RpcMiddlewareErrorText.authenticationReplayBindingInvalid
           )
       }
@@ -393,15 +401,17 @@ function createAuthenticationCapability(
         sessions.set(session, state)
       }
       if (state.nonce !== envelope.nonce)
-        throw new RpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
+        throw createRpcAuthenticationError(
+          RpcMiddlewareErrorText.authenticationReplayBindingInvalid
+        )
       /** Counter grammar is validated before bounded uint64 arithmetic. */
       admitAuthenticationCounter(state, BigInt(envelope.counter))
       recordAuthenticationReplayBinding(context)
       return envelope.payload
     } catch (error) {
       if (binaryFailed && error === binaryFailure) throw error
-      if (error instanceof RpcAuthenticationError) throw error
-      throw new RpcAuthenticationError(
+      if (isLocalRpcError(error, RpcAuthenticationError)) throw error
+      throw createRpcAuthenticationError(
         RpcMiddlewareErrorText.inboundFrameAuthenticationFailed,
         error
       )

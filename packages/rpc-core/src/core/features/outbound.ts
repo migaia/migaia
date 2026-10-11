@@ -1,6 +1,7 @@
+import { createRpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcOutboundAttachment } from '../internal/outbound-attachment.js'
 import { RpcRuntimeKind, RpcRuntimeMode } from '@migaia/rpc-contract/framing/v1'
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import { registerEndpointDebugSnapshot } from '../internal/test-observer.js'
 import type { IRpcFeature } from '../feature.js'
@@ -86,7 +87,7 @@ export const createOutboundFeature = (
         let installation: IOutboundInstallation | undefined
         const requireAttachment = (): RpcOutboundAttachment => {
           if (!attachment)
-            throw new RpcError(
+            throw createRpcError(
               RpcCoreErrorCode.invalidConfig,
               RpcCoreErrorText.endpointModuleInvalid
             )
@@ -97,7 +98,7 @@ export const createOutboundFeature = (
           /** Resolve before caller group capture, preserving the original unavailable error point. */
           const generation = owner.runtimeTargetGeneration(targetId)
           if (!generation)
-            throw new RpcError(
+            throw createRpcError(
               RpcCoreErrorCode.capabilityUnsupported,
               RpcCoreErrorText.capabilityUnsupported
             )

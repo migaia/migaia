@@ -1,4 +1,5 @@
-import { RPC_PROCESS_ERROR_SOURCE, RpcProcessErrorText } from '@migaia/rpc-core/adapter/diagnostics'
+import { RPC_PROCESS_ERROR_SOURCE } from '@migaia/rpc-core/adapter/diagnostics'
+import { RpcProcessErrorText } from '../error-text.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { randomUUID } from 'node:crypto'
 import { createConnection } from 'node:net'

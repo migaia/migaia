@@ -1,5 +1,6 @@
+import { createRpcError, RpcCoreErrorCode } from '../errors.js'
 import { RpcDiscoveryAttachment } from '../internal/discovery-attachment.js'
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import {
   registerCanonicalReceiver,
@@ -70,7 +71,7 @@ export const createDiscoveryFeature = (
             candidatePing: (candidate, options) => {
               const candidatePing = core.featureExpose.getCandidatePing()
               if (!candidatePing)
-                throw new RpcError(
+                throw createRpcError(
                   RpcCoreErrorCode.middlewareMissing,
                   RpcCoreErrorText.endpointModuleDependencyMissing
                 )
@@ -122,7 +123,7 @@ export const createDiscoveryFeature = (
         }
         const ports = (): Readonly<Record<PropertyKey, unknown>> => {
           if (!installation)
-            throw new RpcError(
+            throw createRpcError(
               RpcCoreErrorCode.invalidConfig,
               RpcCoreErrorText.endpointModuleDependencyMissing
             )

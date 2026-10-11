@@ -1,3 +1,4 @@
+import { createRpcError } from '../core/errors.js'
 import {
   defineFeature,
   definePlugin,
@@ -7,9 +8,9 @@ import {
   type IPluginConstraint
 } from '@migaia/plugin-host'
 import type { IHostHandle } from '@migaia/plugin-host'
-import { RpcCoreErrorCode, RpcError } from '../core/index.js'
+import { RpcCoreErrorCode } from '../core/index.js'
 import { readEndpointIdentity } from '../core/internal/endpoint-projection.js'
-import type { IRpcContext } from '../core/index.js'
+import { type IRpcContext } from '../core/index.js'
 import { REMOTE_SERVE_PLUGIN_PREFIX, RemoteMethodName } from './constants.js'
 import { normalizeRemoteContract, type IRemoteContract } from './contract.js'
 import { RpcRemoteLayerErrorText } from './error-text.js'
@@ -45,7 +46,7 @@ export async function serveRemotePlugin(
   const contract = normalizeRemoteContract(options.contract)
   const hasStream = contractRequiresStream(contract)
   if (hasStream && !options.endpoint.stream) {
-    const error = new RpcError(
+    const error = createRpcError(
       RpcCoreErrorCode.capabilityConflict,
       RpcRemoteLayerErrorText.streamUnavailable
     )

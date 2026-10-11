@@ -1,3 +1,4 @@
+import { createRpcSchemaValidationError } from '../../dist/core/errors.js'
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -7,7 +8,6 @@ import { createNodeMessagePortTransport } from '../../dist/core/adapters/message
 import { createEndpointKernel } from '../../dist/core/endpoint-kernel.js'
 import { validateContractData } from '../../dist/core/internal/contract.js'
 import { RpcRouteProfile, normalizeRpcEnvelope } from '@migaia/rpc-contract'
-import { RpcSchemaValidationError } from '../../dist/core/errors.js'
 import { ProviderExecutor } from '../../dist/core/internal/provider-executor.js'
 import { ProviderRegistry } from '../../dist/core/internal/provider.js'
 import { ProviderAdmissionRegistry } from '../../dist/core/internal/provider-admission.js'
@@ -194,7 +194,7 @@ describe('[A11] safeString failure reporting', () => {
 
   it('reports provider schema conversion before sending the fallback response', async () => {
     const conversion = new Error('provider conversion')
-    const primary = new RpcSchemaValidationError('schema failed', {}, undefined)
+    const primary = createRpcSchemaValidationError('schema failed', {}, undefined)
     Object.defineProperty(primary, 'message', {
       value: {
         toString() {

@@ -4,7 +4,7 @@ import {
   JsonRpcBridgeErrorCode,
   type IJsonRpcBridgeErrorCode
 } from '@migaia/rpc-contract/framing/jsonrpc'
-import { JsonRpcBridgeErrorText } from '@migaia/rpc-contract/framing/jsonrpc'
+import { JsonRpcBridgeErrorText } from './error-text.js'
 
 /** One constructor owns code/text pairing and preserves non-secret original failures. */
 export function createJsonRpcBridgeError(

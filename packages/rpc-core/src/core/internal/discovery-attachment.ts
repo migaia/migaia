@@ -1,13 +1,14 @@
+import {
+  createRpcAbortError,
+  createRpcContractError,
+  createRpcError,
+  createRpcLifecycleError,
+  createRpcTimeoutError,
+  RpcCoreErrorCode
+} from '../errors.js'
 import { createOutboundEnvelope } from './outbound-envelope.js'
 import { RpcPlatform } from '../transport-constants.js'
-import {
-  RpcAbortError,
-  RpcContractError,
-  RpcError,
-  RpcCoreErrorCode,
-  RpcLifecycleError,
-  RpcTimeoutError
-} from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import type {
   IRpcConnectControl,
@@ -221,7 +222,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
             ) => {
               this.#assertActive()
               if (typeof listener !== 'function')
-                throw new RpcError(
+                throw createRpcError(
                   RpcCoreErrorCode.invalidConfig,
                   RpcCoreErrorText.queryListenerMustBeAFunction
                 )
@@ -254,7 +255,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     listener: (query: IRpcInboundDiscoveryQuery<TTargetId>) => void | Promise<void>
   ): () => void {
     if (this.#manualQueryListeners.size > 0)
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.capabilityConflict,
         RpcCoreErrorText.manualQueryListenerDuplicate
       )
@@ -315,7 +316,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       receiverId === String(targetId) &&
       this.#uniqueTargetId === undefined
     )
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.targetNotIdentifiable,
         RpcCoreErrorText.broadcastTargetNotIdentifiable(targetId)
       )
@@ -324,7 +325,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       .map(([, candidate]) => candidate)
       .find((candidate) => candidate.targetId === targetId && candidate.receiverId === receiverId)
     if (!entry || entry.status !== 'active')
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.targetUnknown,
         RpcCoreErrorText.unknownReceiver(receiverId)
       )
@@ -515,7 +516,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       })
     }
     if (entry?.status !== 'active')
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.targetUnknown,
         RpcCoreErrorText.pinnedReceiverUnavailable(receiverId)
       )
@@ -558,14 +559,14 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         ),
       timeoutMs,
       signals: [this.#kernel.closingSignal, ...(signal ? [signal] : [])],
-      createTimeoutError: () => new RpcTimeoutError(),
-      createAbortError: () => new RpcAbortError(),
+      createTimeoutError: () => createRpcTimeoutError(),
+      createAbortError: () => createRpcAbortError(),
       onDiagnostic: (error) =>
         this.#emit({ name: 'failure', code: RpcCoreErrorCode.internal, error })
     })
     if (selected === undefined) return this.receiverForTarget(targetId)
     if (typeof selected !== 'string')
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.targetUnknown,
         RpcCoreErrorText.receiverSelectorReturnedAnInvalidReceiver
       )
@@ -573,7 +574,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       (candidate) => candidate.receiverId === selected && candidate.status === 'active'
     )
     if (!entry)
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.targetUnknown,
         RpcCoreErrorText.selectedReceiverUnavailable(selected)
       )
@@ -677,7 +678,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   ): Promise<void> {
     if (waiter.references >= this.limits.maxWaitersPerSession)
       return Promise.reject(
-        new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.discoveryWaiterLimit)
+        createRpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.discoveryWaiterLimit)
       )
     waiter.references += 1
     return raceWithAsyncControl({
@@ -685,11 +686,11 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       operation: () => waiter.promise,
       timeoutMs,
       signals: [this.#kernel.closingSignal, ...(signal ? [signal] : [])],
-      createTimeoutError: () => new RpcTimeoutError(),
+      createTimeoutError: () => createRpcTimeoutError(),
       createAbortError: (reason) =>
         this.#kernel.closingSignal.aborted
-          ? new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
-          : new RpcAbortError(undefined, undefined, reason),
+          ? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+          : createRpcAbortError(undefined, undefined, reason),
       onDiagnostic: (error) =>
         this.#emit({ name: 'failure', code: RpcCoreErrorCode.internal, error })
     }).finally(() => {
@@ -704,7 +705,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         this.#clearAutomaticTimer(waiter.taskId, waiter)
       }
       waiter.reject(
-        new RpcError(RpcCoreErrorCode.targetUnknown, RpcCoreErrorText.unknownTarget(targetId))
+        createRpcError(RpcCoreErrorCode.targetUnknown, RpcCoreErrorText.unknownTarget(targetId))
       )
     })
   }
@@ -775,7 +776,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     )
     if (!this.#registry.setWaiter(key, waiter)) {
       return Promise.reject(
-        new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.discoveryWaiterLimit)
+        createRpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.discoveryWaiterLimit)
       )
     }
     try {
@@ -830,7 +831,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       if (this.#registry.deleteTask(taskId)) {
         this.#registry.deleteWaiter(String(targetId))
         waiter.reject(
-          new RpcError(RpcCoreErrorCode.targetUnknown, RpcCoreErrorText.unknownTarget(targetId))
+          createRpcError(RpcCoreErrorCode.targetUnknown, RpcCoreErrorText.unknownTarget(targetId))
         )
       }
     }, delayMs)
@@ -867,12 +868,12 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     this.#validateIdentifier(targetId, 'targetId')
     const timeoutMs = options?.timeoutMs ?? 1000
     if (!Number.isFinite(timeoutMs) || timeoutMs < 0)
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcCoreErrorText.discoveryTimeoutMustBeFiniteAndNonNegative
       )
     if (options?.signal?.aborted)
-      throw new RpcError(RpcCoreErrorCode.cancelled, RpcCoreErrorText.discoveryAborted)
+      throw createRpcError(RpcCoreErrorCode.cancelled, RpcCoreErrorText.discoveryAborted)
     const taskId = this.#makeId(targetId)
     return new Promise((resolve, reject) => {
       const settleResolve = (value: readonly IRpcDiscoveryCandidate<TTargetId>[]): void => {
@@ -897,7 +898,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       this.#registry.setManualWaiter(taskId, waiter)
       if (options?.signal) {
         const onAbort = (): void => {
-          const abortError = new RpcError(
+          const abortError = createRpcError(
             RpcCoreErrorCode.cancelled,
             RpcCoreErrorText.discoveryAborted
           )
@@ -960,7 +961,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   #manualRegister(candidate: IRpcDiscoveryCandidate<TTargetId>): void {
     this.#assertManualMode()
     if (!candidate || typeof candidate !== 'object')
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcCoreErrorText.discoveryCandidateIsInvalid
       )
@@ -973,20 +974,20 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       candidateRecord.revoked ||
       candidateRecord.registered
     )
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.targetUnknown,
         RpcCoreErrorText.discoveryCandidateWasNotProducedByAVerifiedManualQuery
       )
     this.#validateIdentifier(candidate.targetId, 'targetId')
     if (typeof candidate.receiverId !== 'string')
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcCoreErrorText.discoveryCandidateReceiverIdIsInvalid
       )
     try {
       this.#validateIdentifier(candidate.receiverId, 'receiverId')
     } catch {
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcCoreErrorText.discoveryCandidateReceiverIdIsInvalid
       )
@@ -994,7 +995,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     const uniqueTargetId = this.#registry.getCandidateUniqueId(candidate as object)
     const key = tupleKey(candidate.targetId, candidate.receiverId)
     if (this.#registry.isCandidateRevoked(key))
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.targetUnknown,
         RpcCoreErrorText.discoveryCandidateWasRevoked
       )
@@ -1008,7 +1009,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         targetId: candidate.targetId,
         receiverId: candidate.receiverId
       })
-      throw new RpcError(RpcCoreErrorCode.targetUnknown, RpcCoreErrorText.receiverLimitExceeded)
+      throw createRpcError(RpcCoreErrorCode.targetUnknown, RpcCoreErrorText.receiverLimitExceeded)
     }
     const now = this.#ports.time.now()
     const previous = this.#registry.getRemote<IRpcServerMetadata<TTargetId>>(key)
@@ -1016,7 +1017,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       | { verifiedPeerKey?: string }
       | undefined
     if (candidateProof?.verifiedPeerKey === undefined)
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.targetUnknown,
         RpcCoreErrorText.verifiedDiscoveryBindingIsNoLongerAvailable
       )
@@ -1039,7 +1040,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         candidate.targetId
       )
     )
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.targetUnknown,
         RpcCoreErrorText.remoteDiscoveryTargetLimitExceeded
       )
@@ -1078,7 +1079,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     }
     for (const key of keysToRevoke)
       if (!this.#registry.canRevokeCandidate(key, this.limits.maxManualRevokedCandidates))
-        throw new RpcError(
+        throw createRpcError(
           RpcCoreErrorCode.overloaded,
           RpcCoreErrorText.manualRevocationCapacityExceeded
         )
@@ -1090,7 +1091,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       ) {
         this.#registry.deleteRemote(key)
         if (!this.#registry.revokeCandidate(key, this.limits.maxManualRevokedCandidates))
-          throw new RpcError(
+          throw createRpcError(
             RpcCoreErrorCode.overloaded,
             RpcCoreErrorText.manualRevocationCapacityExceeded
           )
@@ -1123,12 +1124,12 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   ): Promise<boolean> {
     this.#assertManualMode()
     if (!candidate || typeof candidate !== 'object')
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.targetUnknown,
         RpcCoreErrorText.discoveryCandidateWasNotProducedByAVerifiedManualQuery
       )
     if (typeof candidate.receiverId !== 'string')
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcCoreErrorText.discoveryCandidateReceiverIdIsInvalid
       )
@@ -1141,7 +1142,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       candidateRecord.revoked ||
       this.#registry.isCandidateRevoked(tupleKey(candidate.targetId, candidate.receiverId))
     )
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.targetUnknown,
         RpcCoreErrorText.discoveryCandidateWasNotProducedByAVerifiedManualQuery
       )
@@ -1342,7 +1343,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         this.#emit({
           name: 'failure',
           code: RpcCoreErrorCode.invalidConfig,
-          error: new RpcError(
+          error: createRpcError(
             RpcCoreErrorCode.invalidConfig,
             RpcCoreErrorText.discoveryCandidateUniqueTargetIdMustBeAString
           )
@@ -1545,7 +1546,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     const query = this.#registry.takeInboundQuery(key) as IManualInboundQuery | undefined
     if (!query) return false
     if (reason !== undefined && typeof reason !== 'string')
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcCoreErrorText.queryRejectionReasonMustBeAString
       )
@@ -1647,7 +1648,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     const replayError = faults?.replay?.[0]
     if (replayError !== undefined) cleanupErrors.push(replayError)
     cleanupErrors.push(
-      ...this.#registry.closeAndCollect(new RpcLifecycleError(RpcCoreErrorText.endpointDisposed))
+      ...this.#registry.closeAndCollect(createRpcLifecycleError(RpcCoreErrorText.endpointDisposed))
     )
     for (const registryError of faults?.registry ?? []) cleanupErrors.push(registryError)
     if (cleanupErrors.length === 1) {
@@ -1853,7 +1854,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   #assertManualMode(): void {
     this.#assertActive()
     if (this.#mode !== 'manual')
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.invalidConfig,
         RpcCoreErrorText.manualDiscoveryIsUnavailable
       )
@@ -1862,7 +1863,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   /** Validates one wire identifier against the prepared contract snapshot. */
   #validateIdentifier(value: string, label: string): void {
     if (typeof value !== 'string' || value.length === 0 || value.length > this.#maxIdentifierLength)
-      throw new RpcContractError(RpcCoreErrorText.identifierInvalid(label))
+      throw createRpcContractError(RpcCoreErrorText.identifierInvalid(label))
   }
 
   /** Allocates one collision-checked discovery correlation ID without a second ledger owner. */

@@ -40,7 +40,9 @@ Normalize the received payload with `normalizeStreamPayload` from `@migaia/rpc-c
 
 ## Binary protocol data
 
-Use `prepareRpcBinary` from `@migaia/rpc-contract/binary`, or `prepareRpcBinaryLazy` from `./binary/lazy`, with a runtime envelope, selected storage, byte limit and actual whole-backing digest. Both return the canonical manifest, original native sidecars and backing byte total. `restoreRpcBinary` and its lazy counterpart validate the manifest and native integrity before returning runtime protocol data.
+Use `prepareRpcBinary` from `@migaia/rpc-contract/binary`, or the same canonical name from `@migaia/rpc-contract/binary/lazy`, with a runtime envelope, selected storage, byte limit and actual whole-backing digest. Both return the canonical manifest, original native sidecars and backing byte total. The selected entry also exports `restoreRpcBinary`, which validates the manifest and native integrity before returning runtime protocol data. The light entry retains synchronous capture and the first native digest before loading the full codec; it introduces no second operation name.
+
+For cold receive paths, import `normalizeRuntimeEnvelope` or `normalizeStreamPayload` from `@migaia/rpc-contract/runtime/lazy` and await the result. Scalar runtime messages do not load the full stream parser. The ordinary `./runtime` and `./stream` entries keep their existing synchronous contracts. Package-internal code imports its light implementation file directly.
 
 For a capture point that precedes later preparation, call `captureRpcBinaryData` from `./binary/capture` and retain its opaque resource. Its `prepare()` completes the captured graph through the sole canonical codec; it exposes no mutable capture DTO or trusted/completion flags. Inline bytes are captured at construction; native storage deliberately retains the original backing identities.
 
@@ -73,11 +75,52 @@ export function projectFailure(error: Error, report: (failure: unknown) => void)
 
 Populate summaries with the application's registered code and stable message for exact Error references. A summary normally projects only the original five error fields and omits cause/data/route; `preserveSerializedError: true` preserves that node's ordinary bounded chain. Original stack handling remains unchanged. Summary maps are read at the original summary selection point; route maps are read after the fixed error fields, so reentrant updates remain visible.
 
-Restoration writes a validated route to the supplied actual route map at the original registration point and also keeps Contract's own generic roundtrip metadata. Neither API exposes metadata registrars. `RpcContractErrorDiagnostic.frameLimitExceeded` is immutable source/code/message data for failure classification, not an error factory.
+Restoration writes a validated route to the supplied actual route map at the original registration point and also keeps Contract's own generic roundtrip metadata. Neither API exposes metadata registrars. Classify a physical quota failure with `RPC_CONTRACT_SOURCE` and `RpcContractErrorCode.frameLimitExceeded`; no diagnostic text table is public.
 
-## Protocol error classification
+## Public errors for protocol implementers and adapter authors
 
-`classifyRpcContractError(error)` classifies only the exact error raised by this Contract instance. Protocol implementers and diagnostic UIs can use its immutable code/text policy to present a controlled violation without traversing a hostile local cause. It reads no error getters; foreign values and copied errors return `undefined`. It grants no transport, replay or codec authority. `serializeRpcError` applies the same policy to Contract errors. For errors owned by Core/Remote, use the ordinary Core error operations so their private redaction and forwarding routes remain available.
+Protocol implementers use `@migaia/rpc-contract/errors` for the language-neutral error tree. Adapter authors use the ordinary Core error operations and family guards described in the Core USEGUIDE, so Core's private presentation and forwarding-route metadata remain available. Neither audience constructs Core-owned failures by copying identity fields.
+
+The stable semantic sources keep their pre-split strings. Import the source and code table from the public owner and branch on both fields. Human-readable messages, `*ErrorText` and `*Diagnostic` tables are private presentation. Their removal is a breaking change of the renamed packages; message text is not a recovery or retry contract.
+
+| Public owner | Source constant | Code table | Third-party use |
+| --- | --- | --- | --- |
+| `@migaia/rpc-contract` / `./errors` | `RPC_CONTRACT_SOURCE` (`@migaia/rpc/contract`) | `RpcContractErrorCode` | Reject an invalid envelope, frame, handshake or error tree with the matching protocol failure. |
+| `@migaia/rpc-core` | `RPC_CORE_ERROR_SOURCE` (`@migaia/rpc/core`) | `RpcCoreErrorCode` | Classify Core operation failures; use the Core family guards across realms or module copies. |
+| `@migaia/rpc-core/remote` | `RPC_REMOTE_ERROR_SOURCE` (`@migaia/rpc/remote`) | `RpcRemoteLayerErrorCode` | Reconcile a Remote closed generation or an unknown result before another business call. |
+| `@migaia/rpc-process` | `RPC_PROCESS_ERROR_SOURCE` (`@migaia/rpc/process`) | `RpcProcessErrorCode` | Report native launch, connection and Process lifecycle failures. |
+| `@migaia/rpc-threads` | `RPC_THREAD_ERROR_SOURCE` (`@migaia/rpc/threads`) | `RpcThreadErrorCode` | Report an unavailable native Worker resource sample without inventing a measurement. |
+| `@migaia/rpc-bridge-jsonrpc` / `@migaia/rpc-contract/framing/jsonrpc` | `JSONRPC_BRIDGE_ERROR_SOURCE` (`@migaia/rpc/bridge/jsonrpc`) | `JsonRpcBridgeErrorCode` | Close or recreate the actual foreign-language connection after a framing, profile or handshake failure. |
+
+`IRpcSerializedError` is the public schema: required `source`, `code`, `name`, `message`, and `stack`; optional `cause`, `errors`, portable `data`, bounded node `route`, and `truncated: true`. Import the matching language-neutral JSON schema from `@migaia/rpc-contract/schema/wire-error` with a JSON import attribute, or resolve that ordinary subpath to read the unchanged shipped artifact. `serializeRpcError` creates a bounded immutable tree and requires a `report` sink for failures it omits. `normalizeRpcSerializedError` validates received trees; `deserializeRpcError` preserves the transferred stack and native error family. `reachRpcError` traverses local causes and aggregate entries with identity deduplication. `RpcWireErrorField`, `RpcWireErrorViolation`, `RpcWireErrorUnknownFieldMode`, `RpcWireErrorFallback`, `RpcWireErrorLimit` and `RpcErrorReachLimit` let foreign implementations follow the same grammar, field order, fallback and limits. A restored diagnostic identity does not grant lifecycle, replay or retry rights.
+
+`toJsonRpcError(wire, integerCode)` puts the validated tree under `RpcJsonRpcWireError.dataKey`. The foreign protocol owns that safe integer code. `fromJsonRpcError` restores the extension, or represents an ordinary foreign JSON-RPC error using `RpcJsonRpcWireError.foreignSource` and the integer's string form. These operations do not change JSON-RPC transport or cancellation behavior.
+
+Third-party adapters attach their own source and codes through `@migaia/utils/error`. Keep those declarations with the adapter; never claim a Core source. Core retains the original object, or keeps it reachable as `cause`, along its existing failure path.
+
+```ts
+import { attachErrorIdentity } from '@migaia/utils/error'
+import { serializeRpcError, toJsonRpcError } from '@migaia/rpc-contract/errors'
+
+/** The application owns this adapter identity and its diagnostic wording. */
+const ADAPTER_SOURCE = '@example/electron-carrier'
+/** A failed native write is distinct from any Core timeout or terminal decision. */
+const AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const
+/** This adapter's message never quotes native payload bytes. */
+const AdapterErrorText = { writeFailed: 'adapter write failed' } as const
+
+/** Project the original native cause using this adapter's own registered identity. */
+export function writeFailure(cause: unknown, report: (failure: unknown) => void) {
+  const error = attachErrorIdentity(new Error(AdapterErrorText.writeFailed, { cause }), {
+    source: ADAPTER_SOURCE,
+    code: AdapterErrorCode.writeFailed
+  })
+  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) })
+  return { error, wire, jsonrpc: toJsonRpcError(wire, -32000) }
+}
+```
+
+`classifyRpcContractError(error)` additionally serves custom error projectors that must query the disclosure policy of an exact locally raised Contract error without reading any error properties. It reads only the private exact-reference registry and returns an immutable summary; foreign values and copied errors return `undefined`. The code table has no exact-reference policy, while serialization reads the fixed error fields and reports failed getters, so neither replaces this operation. The summary does not mint errors or confer operation authority. For Core/Remote failures, use Core's ordinary wire operations; public family guards are diagnostic classification rather than proof that Core minted an error.
 
 ```ts
 import { classifyRpcContractError, normalizeRpcEnvelope } from '@migaia/rpc-contract'

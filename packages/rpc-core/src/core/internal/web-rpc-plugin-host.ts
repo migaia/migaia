@@ -1,4 +1,10 @@
 import {
+  createRpcError,
+  createRpcLifecycleError,
+  type IRpcCleanupError,
+  RpcCoreErrorCode
+} from '../errors.js'
+import {
   defineHost,
   ERROR_TEXT,
   PluginHostError,
@@ -10,13 +16,13 @@ import {
 } from '@migaia/plugin-host'
 import type { IRpcTransport } from '../transport.js'
 import type { IRpcHookEvent } from '../typing.js'
-import type { IRpcCleanupError } from '../errors.js'
+
 import type { IRpcConstructionControl } from './construction-install.js'
 import type { IRpcPluginConstraint, IRpcPluginCore } from './plugin-contract.js'
 import { translateEndpointDisposalError } from './disposal-translation.js'
 import { preflightNativeRoleClaims, type IRpcNativeRoleClaimSource } from './feature-policy.js'
 import { readWebRpcPortFeature, type IRpcPortFeature } from './port-feature.js'
-import { RpcError, RpcCoreErrorCode, RpcLifecycleError } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcPortValues } from './plugin-shared-keys.js'
 import { openComposition } from '@migaia/plugin-host/composition'
@@ -71,7 +77,7 @@ export function createWebRpcPluginHost(
     (handle as unknown as { getFeature(key: string): unknown }).getFeature(name)
   /** Reads provisional outputs during construction and live handle outputs after publication. */
   const getPort = (key: PropertyKey): unknown => {
-    if (terminal) throw new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+    if (terminal) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     if (typeof key !== 'string') return undefined
     const entry = portFeatures.get(key)
     if (!entry) return undefined
@@ -106,7 +112,7 @@ export function createWebRpcPluginHost(
       publishPortFeatures: (outputs: Readonly<Record<string, IRpcPortFeature>>) => {
         for (const [name, output] of Object.entries(outputs)) {
           if (portFeatures.has(name))
-            throw new RpcError(
+            throw createRpcError(
               RpcCoreErrorCode.capabilityConflict,
               RpcCoreErrorText.endpointModuleDuplicated
             )

@@ -1,7 +1,8 @@
+import { createRpcAbortError, createRpcTimeoutError } from '../core/errors.js'
 import { createAbortController } from '@migaia/lifecycle'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
-import { RpcAbortError, RpcTimeoutError } from '../core/index.js'
+
 import { isForwardedOperation } from '../core/internal/outbound-envelope.js'
 import { createProviderGenerationRetired } from '../core/internal/provider.js'
 import { resolveAbortReason } from '../core/internal/async-control.js'
@@ -59,7 +60,7 @@ export function dispatchRemoteRetry(
         ...(reason === undefined ? {} : { reason })
       })
     const onAbort = (): void => {
-      finish(new RpcAbortError(undefined, undefined, resolveAbortReason(input.signal!)), false)
+      finish(createRpcAbortError(undefined, undefined, resolveAbortReason(input.signal!)), false)
     }
     const remaining = (): number | undefined =>
       input.deadlineAt === undefined
@@ -120,7 +121,7 @@ export function dispatchRemoteRetry(
       }
       const budget = remaining()
       if (budget === 0) {
-        finish(new RpcTimeoutError(), false)
+        finish(createRpcTimeoutError(), false)
         return
       }
       sent = true
@@ -149,11 +150,11 @@ export function dispatchRemoteRetry(
     input.signal?.addEventListener('abort', onAbort, { once: true })
     const budget = remaining()
     if (budget === 0) {
-      finish(new RpcTimeoutError(), false)
+      finish(createRpcTimeoutError(), false)
       return
     }
     if (budget !== undefined)
-      timer = options.scheduler.schedule(() => finish(new RpcTimeoutError(), false), budget)
+      timer = options.scheduler.schedule(() => finish(createRpcTimeoutError(), false), budget)
     send(input.generation)
   })
 }

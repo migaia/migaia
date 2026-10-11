@@ -1,7 +1,8 @@
+import { createRpcError, RpcCoreErrorCode } from '../errors.js'
 import { registerJsonObjectMiddleware } from '../internal/json-object-port.js'
 import { RpcMiddlewareErrorText } from './error-text.js'
 import type { IRpcPlugin, IRpcPluginInstallResult, IRpcUuidConfig } from '../typing.js'
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcFirstPartyRoleSchema } from '../internal/plugin-contract.js'
 import { RpcPortName } from '../internal/plugin-shared-keys.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
@@ -27,7 +28,7 @@ function createUuidPlugin(config: IRpcUuidConfig): IRpcPlugin {
     }),
     install: (): IRpcPluginInstallResult => {
       if (!config || typeof config !== 'object' || Array.isArray(config))
-        throw new RpcError(
+        throw createRpcError(
           RpcCoreErrorCode.invalidConfig,
           RpcMiddlewareErrorText.uuidDescriptorIsInvalid
         )
@@ -35,14 +36,14 @@ function createUuidPlugin(config: IRpcUuidConfig): IRpcPlugin {
       try {
         generate = config.generate
       } catch (error) {
-        throw new RpcError(
+        throw createRpcError(
           RpcCoreErrorCode.invalidConfig,
           RpcMiddlewareErrorText.uuidDescriptorIsUnreadable,
           error
         )
       }
       if (generate !== undefined && typeof generate !== 'function')
-        throw new RpcError(
+        throw createRpcError(
           RpcCoreErrorCode.invalidConfig,
           RpcMiddlewareErrorText.uuidGenerateMustBeAFunction
         )

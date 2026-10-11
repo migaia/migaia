@@ -1,6 +1,7 @@
+import { createRpcError, RpcCoreErrorCode } from '../errors.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IRpcFramer } from '@migaia/rpc-contract'
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import { resolveAbortReason } from './async-control.js'
 
@@ -22,7 +23,7 @@ export class RpcCanonicalChunkAttachment {
     framer: Pick<IRpcFramer<unknown, unknown, string, number>, 'close'> | undefined
   ) {
     if (!framer)
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
     kernel.registerOwner('chunk-assembler', framer)
     const close = (): void => {
       if (this.#closed) return

@@ -28,7 +28,6 @@ import { bindJsonRpcWire } from './transport.js'
 
 export type { IJsonRpcBridgeOptions } from './handshake.js'
 export { JsonRpcBridgeErrorCode } from '@migaia/rpc-contract/framing/jsonrpc'
-export { JsonRpcBridgeErrorText } from '@migaia/rpc-contract/framing/jsonrpc'
 
 /** Negotiate one authenticated JSON-RPC peer, then expose its complete gated remote channel. */
 export async function createJsonRpcAdapterChannel(

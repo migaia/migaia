@@ -6,6 +6,8 @@ export const RpcCoreErrorText = {
   runtimeProcessTransferInvalid: 'Runtime process calls do not accept transfer',
   /** A selected binary frame failed the closed manifest grammar before provider publication. */
   runtimeBinaryInvalid: 'Runtime binary manifest is invalid',
+  /** Actual Core ingress quota admission preserves the original Contract-compatible diagnostic. */
+  runtimeIngressFrameLimitExceeded: 'rpc frame limit exceeded',
   /** Stable fence refusal discloses no foreign task, payload or generation identity. */
   providerGenerationMismatch: 'Provider generation does not match the selected task',
   /** D35 runtime keys are unique across methods/bodies; callers must choose a new key for new work. */

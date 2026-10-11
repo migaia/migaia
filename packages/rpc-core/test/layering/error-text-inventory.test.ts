@@ -3,7 +3,7 @@ import { RpcAdapterErrorText } from '../../dist/core/adapters/error-text.js'
 import { RpcMiddlewareErrorText } from '../../dist/core/middleware/error-text.js'
 import { describe, expect, it } from 'vitest'
 import { RpcCoreErrorText } from '../../dist/core/error-text.js'
-import { RpcAbortError, RpcTimeoutError } from '@migaia/rpc-core'
+import { RpcAbortError, RpcTimeoutError } from '../../dist/core/errors.js'
 
 describe('error text inventory', () => {
   it('[A2] preserves every core error text from the pre-migration inventory', () => {

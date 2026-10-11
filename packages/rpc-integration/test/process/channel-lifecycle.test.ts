@@ -11,7 +11,7 @@ import {
   bindProcessByteWire,
   bindProcessMessageTransport
 } from '../../../rpc-core/dist/adapter-owned/process/channel.js'
-import { CHILD_STDERR_REDACTED } from '@migaia/rpc-core/adapter/process-data'
+import { CHILD_STDERR_REDACTED } from '../fixtures/process-diagnostics.js'
 import { attachIpcConnection } from '../../../rpc-core/dist/adapter-owned/process/ipc-connection.js'
 import {
   byteProcessPipeline,

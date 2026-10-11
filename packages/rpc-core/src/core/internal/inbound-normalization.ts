@@ -1,13 +1,14 @@
+import { createRpcProtocolError } from '../errors.js'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
-import { normalizeRuntimeEnvelopeLazy } from '@migaia/rpc-contract/runtime/lazy'
+import { normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime/lazy'
 import { normalizePortable } from '@migaia/rpc-contract/portable'
-import { restoreRpcBinaryLazy } from '@migaia/rpc-contract/binary/lazy'
+import { restoreRpcBinary } from '@migaia/rpc-contract/binary/lazy'
 import type { IRpcEnvelopeOptions, IRpcProtocol } from '@migaia/rpc-contract'
 import type { IRpcEnvelope } from '@migaia/rpc-contract'
 import type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract/runtime'
 import { RpcEnvelopeKind } from '@migaia/rpc-contract/wire'
 import { RpcRuntimeKind } from '@migaia/rpc-contract/wire'
-import { RpcProtocolError } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 
 /** Complete receiver validation proves only exact immutable data, never endpoint authority. */
@@ -59,9 +60,9 @@ export function normalizeInboundRuntimeEnvelope(
   value: unknown
 ): IRpcRuntimeEnvelope | Promise<IRpcRuntimeEnvelope> {
   return retainRuntimeEnvelope(
-    normalizeRuntimeEnvelopeLazy(value, (payload) =>
+    normalizeRuntimeEnvelope(value, (payload) =>
       normalizePortable(payload, 0, new Set<object>(), () => {
-        throw new RpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
+        throw createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
       })
     )
   )
@@ -71,14 +72,14 @@ export function normalizeInboundRuntimeEnvelope(
 export function normalizeInboundRuntimeBinaryEnvelope(
   value: unknown
 ): IRpcRuntimeEnvelope | Promise<IRpcRuntimeEnvelope> {
-  return retainRuntimeEnvelope(normalizeRuntimeEnvelopeLazy(value))
+  return retainRuntimeEnvelope(normalizeRuntimeEnvelope(value))
 }
 
 /** The canonical lazy parser validates all bytes and digests before its exact output is reusable. */
 export async function restoreInboundRuntimeBinary(
-  ...input: Parameters<typeof restoreRpcBinaryLazy>
+  ...input: Parameters<typeof restoreRpcBinary>
 ): Promise<IRpcRuntimeEnvelope> {
-  return rememberPayload(await restoreRpcBinaryLazy(...input))
+  return rememberPayload(await restoreRpcBinary(...input))
 }
 
 /** Queries receiver data identity without granting insertion or any transport/provider authority. */

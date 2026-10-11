@@ -1,3 +1,4 @@
+import { createRpcError, createRpcLifecycleError, tagRpcError } from '../errors.js'
 import { RpcOutboundAdmission } from '../internal/outbound-gate.js'
 import { registerJsonObjectFeature } from '../internal/json-object-port.js'
 import { carryNativeReplayTransport } from '../internal/native-replay.js'
@@ -14,7 +15,7 @@ import type { IRpcEnvelope, IRpcRuntimeEnvelope } from '@migaia/rpc-contract'
 import { RpcRuntimeKind, RpcRuntimeOperation } from '@migaia/rpc-contract/framing/v1'
 import { RpcCoreErrorText } from '../error-text.js'
 import { RpcCoreErrorCode } from '../error-code.js'
-import { RpcError, RpcLifecycleError, tagRpcError } from '../errors.js'
+
 import { defineFeature } from '../feature.js'
 import {
   installOutboundGate,
@@ -187,12 +188,12 @@ export function createIpcSendQueueFeature(
       sendNow: () => void | Promise<void>,
       admission?: IIpcSendAdmission
     ): Promise<void> {
-      if (closed) return Promise.reject(new RpcLifecycleError(RpcCoreErrorText.endpointDisposed))
+      if (closed) return Promise.reject(createRpcLifecycleError(RpcCoreErrorText.endpointDisposed))
       const sendClass = classify(envelope)
       const pending = sendClass === IpcSendClass.data ? pendingData : pendingControl
       const capacity = sendClass === IpcSendClass.data ? maxData : maxControl
       if (pending >= capacity) {
-        const error = new RpcError(
+        const error = createRpcError(
           RpcCoreErrorCode.overloaded,
           RpcPluginErrorText.ipcSendOverloaded
         )
@@ -264,7 +265,7 @@ export function createIpcSendQueueFeature(
     close(reason?: unknown): void {
       if (closed) return
       closed = true
-      closeReason = reason ?? new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+      closeReason = reason ?? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
       limiter.close(closeReason)
       for (const cancel of queuedCancellations) cancel(closeReason)
       queuedCancellations.clear()

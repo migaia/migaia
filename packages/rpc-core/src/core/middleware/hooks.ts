@@ -1,7 +1,8 @@
+import { createRpcError, isLocalRpcError, RpcCoreErrorCode, RpcError } from '../errors.js'
 import { registerJsonObjectMiddleware } from '../internal/json-object-port.js'
 import { RpcMiddlewareErrorText } from './error-text.js'
 import type { IRpcHooksConfig, IRpcPlugin, IRpcPluginInstallResult } from '../typing.js'
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcPortName } from '../internal/plugin-shared-keys.js'
 import { RpcFirstPartyRoleSchema } from '../internal/plugin-contract.js'
 import { freezePlugin } from '../internal/plugin-descriptor.js'
@@ -28,7 +29,7 @@ function createHooksPlugin(config: IRpcHooksConfig): IRpcPlugin {
     }),
     install: (): IRpcPluginInstallResult => {
       if (!config || typeof config !== 'object' || Array.isArray(config))
-        throw new RpcError(
+        throw createRpcError(
           RpcCoreErrorCode.invalidConfig,
           RpcMiddlewareErrorText.hooksDescriptorIsInvalid
         )
@@ -38,7 +39,7 @@ function createHooksPlugin(config: IRpcHooksConfig): IRpcPlugin {
         listenerValue = config.listeners
         onHookError = config.onHookError
       } catch (error) {
-        throw new RpcError(
+        throw createRpcError(
           RpcCoreErrorCode.invalidConfig,
           RpcMiddlewareErrorText.hooksDescriptorIsUnreadable,
           error
@@ -52,12 +53,12 @@ function createHooksPlugin(config: IRpcHooksConfig): IRpcPlugin {
               ? [...listenerValue]
               : [listenerValue]
         if (listeners.some((listener) => typeof listener !== 'function'))
-          throw new RpcError(
+          throw createRpcError(
             RpcCoreErrorCode.invalidConfig,
             RpcMiddlewareErrorText.hooksListenersMustContainFunctions
           )
         if (onHookError !== undefined && typeof onHookError !== 'function')
-          throw new RpcError(
+          throw createRpcError(
             RpcCoreErrorCode.invalidConfig,
             RpcMiddlewareErrorText.hooksOnHookErrorMustBeAFunction
           )
@@ -71,8 +72,8 @@ function createHooksPlugin(config: IRpcHooksConfig): IRpcPlugin {
           ports: Object.freeze({ [RpcPortName.hooks]: port })
         }
       } catch (error) {
-        if (error instanceof RpcError) throw error
-        throw new RpcError(
+        if (isLocalRpcError(error, RpcError)) throw error
+        throw createRpcError(
           RpcCoreErrorCode.invalidConfig,
           RpcMiddlewareErrorText.hooksDescriptorIsInvalid,
           error

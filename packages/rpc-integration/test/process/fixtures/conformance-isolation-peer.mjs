@@ -16,7 +16,7 @@ import {
 } from '../../../../rpc-core/dist/adapter-owned/process/plugin/serve.js'
 import { createProcessInstanceFallback } from '../../../../rpc-core/dist/adapter-owned/process/resilience/fallback.js'
 import { createComposedEndpoint } from '@migaia/rpc-core/composed'
-import { codec, framer, abort, connect, ping, RpcTimeoutError } from '@migaia/rpc-core'
+import { codec, framer, abort, connect, ping, isRpcTimeoutError } from '@migaia/rpc-core'
 import { createCanonicalChunkFeature, createStreamFeature } from '@migaia/rpc-core/stream'
 import { createOutboundFeature } from '@migaia/rpc-core/features/outbound'
 import { createProviderFeature } from '@migaia/rpc-core/features/provider'
@@ -162,7 +162,7 @@ function target() {
                     ...context.session,
                     code: context.signal.reason?.code ?? null,
                     message: context.signal.reason?.message ?? null,
-                    localTimeout: context.signal.reason instanceof RpcTimeoutError
+                    localTimeout: isRpcTimeoutError(context.signal.reason)
                   })
                   resolve()
                 },

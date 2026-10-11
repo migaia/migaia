@@ -1,5 +1,6 @@
+import { createRpcError, RpcCoreErrorCode } from '../errors.js'
 import { defineFeature, type IFeature, type IFeatureRecord } from '@migaia/plugin-host'
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 
 /** Deferred original port value published by one middleware registration. */
@@ -33,7 +34,7 @@ export const createWebRpcPortFeatureSet = (
   const featureNames: string[] = []
   for (const candidate of names) {
     if (typeof candidate !== 'string' || candidate.length === 0 || featureNames.includes(candidate))
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
     featureNames.push(candidate)
     features[candidate] = defineFeature<
       IRpcPortFeatureExpose,
@@ -56,7 +57,7 @@ export const createWebRpcPortFeatureSet = (
         const output = Object.freeze({
           get: () => {
             if (!present)
-              throw new RpcError(
+              throw createRpcError(
                 RpcCoreErrorCode.invalidConfig,
                 RpcCoreErrorText.endpointModuleInvalid
               )
@@ -68,7 +69,7 @@ export const createWebRpcPortFeatureSet = (
           output,
           publish: (next) => {
             if (present)
-              throw new RpcError(
+              throw createRpcError(
                 RpcCoreErrorCode.capabilityConflict,
                 RpcCoreErrorText.endpointModuleDuplicated
               )
@@ -82,7 +83,7 @@ export const createWebRpcPortFeatureSet = (
           getPortFeature: (name: string) => {
             const cell = cells.get(name)
             if (!cell)
-              throw new RpcError(
+              throw createRpcError(
                 RpcCoreErrorCode.invalidConfig,
                 RpcCoreErrorText.endpointModuleInvalid
               )
@@ -93,7 +94,7 @@ export const createWebRpcPortFeatureSet = (
         publish: (ports: Readonly<Record<PropertyKey, unknown>>) => {
           for (const [name, cell] of cells) {
             if (!Object.hasOwn(ports, name))
-              throw new RpcError(
+              throw createRpcError(
                 RpcCoreErrorCode.invalidConfig,
                 RpcCoreErrorText.endpointModuleInvalid
               )
@@ -108,6 +109,6 @@ export const createWebRpcPortFeatureSet = (
 /** Reads a resolved port Feature output returned by a PluginHost handle. */
 export const readWebRpcPortFeature = <T>(value: unknown): T => {
   if (!value || typeof value !== 'object' || typeof (value as IRpcPortFeature).get !== 'function')
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
   return (value as IRpcPortFeature<T>).get()
 }

@@ -1,5 +1,5 @@
+import { createRpcError, RpcCoreErrorCode, tagRpcError } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
-import { RpcError, tagRpcError, RpcCoreErrorCode } from '../errors.js'
 
 /** Original endpoint execution capacity; opt-in shared scopes preserve this default. */
 const DEFAULT_MAX_GLOBAL = 256
@@ -64,7 +64,7 @@ export function createProviderAdmissionScope(): IProviderAdmissionScope {
     ) => {
       validateLimits(maxGlobal, maxPerPeer, maxIngress)
       if (maxIngress === undefined || (registry && !registry.matchesFraming(maxIngress)))
-        throw new RpcError(
+        throw createRpcError(
           RpcCoreErrorCode.capabilityUnsupported,
           RpcCoreErrorText.capabilityUnsupported
         )
@@ -86,7 +86,7 @@ export function prepareProviderAdmissionScope(
   /** A fabricated structural handle cannot resolve another scope's registry. */
   const prepare = admissionPreparations.get(scope)?.prepare
   if (!prepare)
-    throw new RpcError(
+    throw createRpcError(
       RpcCoreErrorCode.capabilityUnsupported,
       RpcCoreErrorText.capabilityUnsupported
     )

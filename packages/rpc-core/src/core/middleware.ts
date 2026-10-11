@@ -1,3 +1,4 @@
+import { createRpcConfigurationError, createRpcError, RpcCoreErrorCode } from './errors.js'
 import {
   definePlugin,
   type IDefinedPluginConstraint,
@@ -6,7 +7,7 @@ import {
   type IFeatureOutputs,
   type IPluginConfig
 } from '@migaia/plugin-host'
-import { RpcConfigurationError, RpcError, RpcCoreErrorCode } from './errors.js'
+
 import { RpcCoreErrorText } from './error-text.js'
 import { runConstructionInstall } from './internal/construction-install.js'
 import { assertPluginInstallResult, freezePlugin } from './internal/plugin-descriptor.js'
@@ -203,9 +204,9 @@ export function defineMiddleware<
     return middleware as IRpcNativeMiddleware<TExtension, TPublic, TFeatureExpose, TFeatures>
   }
   if (!descriptorFactory)
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
   if (name.length === 0 || typeof descriptorFactory !== 'function')
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
   const middleware = definePlugin<
     IRpcPluginCore,
     TExtension,
@@ -221,7 +222,7 @@ export function defineMiddleware<
       /** Scope is absent while the synchronous descriptor factory executes. */
       let installScope: IRpcPluginInstallScope | undefined
       const requireInstallScope = (): IRpcPluginInstallScope => {
-        if (!installScope) throw new RpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
+        if (!installScope) throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
         return installScope
       }
       const middlewareCore = {
@@ -335,7 +336,7 @@ function snapshotMiddlewarePolicy(metadata: IRpcPluginMetadata): IRpcPluginMetad
 function assertDeclaredKeys(expected: readonly PropertyKey[], value: object): void {
   const actual = Reflect.ownKeys(value)
   if (actual.length !== expected.length || actual.some((key) => !expected.includes(key)))
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
 }
 
 /**

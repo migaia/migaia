@@ -9,8 +9,7 @@ import {
   type IProcessHandle,
   type IProcessLauncher
 } from '@migaia/supervision/process'
-import { RpcCoreErrorCode } from '@migaia/rpc-core'
-import { tagRpcError } from '@migaia/rpc-core/transport-kit'
+import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-core'
 import { IpcReporterContext } from '@migaia/rpc-core/adapter/diagnostics'
 import { ERROR_SOURCE, RpcProcessErrorCode } from '../error-code.js'
 
@@ -129,10 +128,10 @@ export function createElectronUtilityProcessLauncher(): IProcessLauncher<IElectr
     capabilities: ELECTRON_CAPABILITIES,
     async launch(spec, context) {
       if (spec.bootstrap || spec.stdio.stdin !== 'ignore')
-        throw tagRpcError(
-          new TypeError(RpcProcessErrorText.optionsInvalid),
-          RpcCoreErrorCode.invalidConfig
-        )
+        throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
+          source: RPC_CORE_ERROR_SOURCE,
+          code: RpcCoreErrorCode.invalidConfig
+        })
       /** A variable specifier avoids resolving the optional peer in ordinary imports. */
       let loaded: unknown
       try {
@@ -149,10 +148,10 @@ export function createElectronUtilityProcessLauncher(): IProcessLauncher<IElectr
       }
       const runtime = loaded as IElectronRuntime
       if (!runtime.app?.isReady())
-        throw tagRpcError(
-          new TypeError(RpcProcessErrorText.optionsInvalid),
-          RpcCoreErrorCode.invalidConfig
-        )
+        throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
+          source: RPC_CORE_ERROR_SOURCE,
+          code: RpcCoreErrorCode.invalidConfig
+        })
       /** Utility process receives only explicitly inherited or set environment keys. */
       const env: Record<string, string> = {}
       for (const key of spec.env.inherit) {

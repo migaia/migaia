@@ -1,10 +1,11 @@
+import { RpcError, createRpcError, isLocalRpcError, localRpcErrorCode } from '../../core/errors.js'
 import { normalizePortable } from '@migaia/rpc-contract'
 import { RpcWireLimit } from '@migaia/rpc-contract'
 import { normalizeRuntimeGeneration } from '@migaia/rpc-contract/runtime/metadata'
 import type { IRpcRuntimeGeneration } from '@migaia/rpc-contract'
 import type { IRuntimeMethodEntry } from './catalog.js'
-import { RpcError, RpcCoreErrorCode } from '../../core/index.js'
-import { isRpcErrorInstance } from '../../core/errors.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
+
 import { RemoteCatalogLimit, REMOTE_NAME_PATTERN } from '../contract.js'
 import {
   RuntimeApiErrorText,
@@ -116,7 +117,7 @@ export function runtimeDirectoryDiff(
 
 /** Reject a malformed directory without copying untrusted keys or values into public diagnostics. */
 function invalid(cause?: unknown): never {
-  throw new RpcError(
+  throw createRpcError(
     RpcCoreErrorCode.contractInvalid,
     RuntimeApiErrorText.descriptionInvalid,
     cause
@@ -246,8 +247,8 @@ export function normalizeRuntimeDescription(value: unknown): IRuntimePeerDescrip
     }) as unknown as IRuntimePeerDescription
   } catch (cause) {
     if (
-      isRpcErrorInstance(cause) &&
-      cause.code === RpcCoreErrorCode.contractInvalid &&
+      isLocalRpcError(cause, RpcError) &&
+      localRpcErrorCode(cause) === RpcCoreErrorCode.contractInvalid &&
       cause.message === RuntimeApiErrorText.descriptionInvalid
     )
       throw cause

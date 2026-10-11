@@ -13,6 +13,8 @@ RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不�
 
 包内使用相对路径；跨包调用只使用公开 API。协议工具使用 `@migaia/rpc-contract`，Core/Remote/Testing 使用 `@migaia/rpc-core` 的普通入口。
 
+从包根导入 `JSONRPC_BRIDGE_ERROR_SOURCE` 和 `JsonRpcBridgeErrorCode`，用原 `@migaia/rpc/bridge/jsonrpc` source 与 code 识别 frame/profile/扩展/握手失败。`JsonRpcBridgeErrorText` 已从公开面删除，这是更名后包的破坏性导出变更。外部语言 peer 通过 `@migaia/rpc-contract/errors` 的 `toJsonRpcError`、`fromJsonRpcError` 和 `RpcJsonRpcWireError.dataKey` 保留完整 wire 错误树；JSON-RPC 整数 code 仍由 peer profile 决定。消息与 wire source/code 均不授予 Core 运行时权限。
+
 ## Advanced usage：把真实字节连接接入 Runtime Peer
 
 外部语言服务先在自己的连接上实现 `migaia.hello`、`migaia.describe`、`migaia.invoke` 与 `migaia.cancel`，并在实际 v2 目录公开 `echo`。应用取得真实有序 `heldByteIO`，由自己的认证 issuer 提供 `issuedToken`；`remoteContract` 是该服务现有的本地声明，`localOffer` 是受支持 JSON-RPC profile 的真实本端提案。它们是协议输入，不能给其它 transport 授 owned 或 native 控制权限。

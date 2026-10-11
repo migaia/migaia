@@ -1,3 +1,16 @@
+import {
+  createRpcAbortError,
+  createRpcContractError,
+  createRpcError,
+  createRpcRemoteError,
+  createRpcTimeoutError,
+  isLocalRpcError,
+  localRpcErrorCode,
+  RPC_CORE_ERROR_SOURCE,
+  RpcCoreErrorCode,
+  RpcError,
+  RpcSchemaValidationError
+} from '../errors.js'
 import { deferred, type IDeferred } from '@migaia/utils/promise'
 import {
   checkRpcRuntimeStreamFinish,
@@ -10,15 +23,7 @@ import {
   type IGenerationRequest
 } from '@migaia/lifecycle'
 import type { IRpcProviderController } from './plugin-shared-keys.js'
-import {
-  RpcError,
-  RpcContractError,
-  RpcCoreErrorCode,
-  RpcSchemaValidationError,
-  RpcTimeoutError,
-  RPC_CORE_ERROR_SOURCE
-} from '../errors.js'
-import { RpcAbortError, RpcRemoteError } from '../errors.js'
+
 import type { RequestReplayLedger } from './request-replay-ledger.js'
 import type { IRpcRuntimeEnvelope, IRpcRuntimeGeneration } from '@migaia/rpc-contract'
 import type {
@@ -46,7 +51,6 @@ import {
 } from '@migaia/rpc-contract/framing/v1'
 import { RpcRouteProfile, RpcRouteType } from '@migaia/rpc-contract'
 import { RpcCoreErrorText } from '../error-text.js'
-import { ERROR_SOURCE as RpcCoreErrorSource } from '../error-code.js'
 import {
   normalizePortable,
   RpcStreamEvent,
@@ -67,16 +71,15 @@ import {
   type IProviderRuntimeRelay
 } from './provider.js'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
-import { normalizeRuntimePortable, hasRpcPortableBinary } from '@migaia/rpc-contract/portable'
 import { hasRpcBinaryEnvelope } from '@migaia/rpc-contract/binary/inspect'
-import { prepareRpcBinaryLazy as prepareRpcBinary } from '@migaia/rpc-contract/binary/lazy'
+import { prepareRpcBinary } from '@migaia/rpc-contract/binary/lazy'
 import { RpcBinaryStorage } from '@migaia/rpc-contract/framing/v1'
 import { createRpcBackingDigest } from './authentication-replay.js'
 import { safeRead, safeString, tupleKey, runtimeTaskKey } from './safe-value.js'
 import { RpcMessageKind, RpcProviderRejectionReason } from '../semantic-constants.js'
 import { localErrorWireSummary } from './error-wire-metadata.js'
 import { serializeRpcError, deserializeRpcError } from './error-wire-metadata.js'
-import { RpcContractErrorCode } from '@migaia/rpc-contract'
+import { classifyRpcContractError, RpcContractErrorCode } from '@migaia/rpc-contract'
 import type {
   IRpcIdempotencyClaim,
   IRpcIdempotencyOutcome,
@@ -230,7 +233,7 @@ function runtimeFingerprint(
 function normalizeTransfer(value: readonly unknown[] | undefined): readonly unknown[] | undefined {
   if (value === undefined) return undefined
   if (!Array.isArray(value) || value.length > maxProviderTransferItems)
-    throw new RpcContractError(RpcCoreErrorText.providerTransferMustBeABoundedArray)
+    throw createRpcContractError(RpcCoreErrorText.providerTransferMustBeABoundedArray)
   const snapshot = Array.from(value)
   return Object.freeze(snapshot)
 }
@@ -241,7 +244,7 @@ function normalizeFailure(
   code: string
 ): { readonly message: string; readonly code: string } {
   if (typeof message !== 'string' || typeof code !== 'string')
-    throw new RpcContractError(RpcCoreErrorText.providerFailureMessageAndCodeMustBeStrings)
+    throw createRpcContractError(RpcCoreErrorText.providerFailureMessageAndCodeMustBeStrings)
   return Object.freeze({ message, code })
 }
 
@@ -393,7 +396,7 @@ export class ProviderExecutor<TTargetId extends string> {
       if (contextExpired(this.#expired)) return
       if (id !== undefined) {
         if (typeof id !== 'string' || id.length === 0)
-          throw new RpcContractError(RpcCoreErrorText.dispatchTargetIdMustBeANonEmptyString)
+          throw createRpcContractError(RpcCoreErrorText.dispatchTargetIdMustBeANonEmptyString)
         this.#owner.options.dispatch(id as TId, method, data)
         return
       }
@@ -551,7 +554,7 @@ export class ProviderExecutor<TTargetId extends string> {
           !sameGeneration(this.#envelope.task.targetGeneration, this.#ports.generation) ||
           !sameGeneration(this.#envelope.task.callerGeneration, this.#ports.callerGeneration)
         )
-          throw new RpcError(
+          throw createRpcError(
             RpcCoreErrorCode.providerGenerationMismatch,
             RpcCoreErrorText.providerGenerationMismatch
           )
@@ -559,7 +562,7 @@ export class ProviderExecutor<TTargetId extends string> {
           !this.#admission.acquireMany ||
           (this.#envelope.options.orderKey !== undefined && !this.#admission.enqueueOrder)
         )
-          throw new RpcError(
+          throw createRpcError(
             RpcCoreErrorCode.capabilityUnsupported,
             RpcCoreErrorText.capabilityUnsupported
           )
@@ -575,7 +578,10 @@ export class ProviderExecutor<TTargetId extends string> {
                 )
               : this.#owner.options.registry.getProvider(step.method)
           if (!provider)
-            throw new RpcError(RpcCoreErrorCode.providerNotFound, RpcCoreErrorText.providerNotFound)
+            throw createRpcError(
+              RpcCoreErrorCode.providerNotFound,
+              RpcCoreErrorText.providerNotFound
+            )
           this.#owner.options.validate(step.method, 'params', step.payload)
           readProviderPreflight(provider)?.(runtimeRequestInput(this.#envelope, step).route.route)
         }
@@ -608,7 +614,7 @@ export class ProviderExecutor<TTargetId extends string> {
         )
         await this.#respond(
           this.#failed(
-            new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.requestReplayLedgerIsFull)
+            createRpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.requestReplayLedgerIsFull)
           )
         )
         return
@@ -627,7 +633,7 @@ export class ProviderExecutor<TTargetId extends string> {
         )
         await this.#respond(
           this.#failed(
-            new RpcError(
+            createRpcError(
               RpcCoreErrorCode.overloaded,
               RpcCoreErrorText.providerAdmissionLimitReached
             )
@@ -695,10 +701,10 @@ export class ProviderExecutor<TTargetId extends string> {
           if (pendingAbort.cancelReason) this.#cancelIntent(pendingAbort.cancelReason.value)
         }
       }
-      if (this.#envelope.options.timeoutMs === 0) this.#cancelIntent(new RpcTimeoutError())
+      if (this.#envelope.options.timeoutMs === 0) this.#cancelIntent(createRpcTimeoutError())
       else if (this.#envelope.options.timeoutMs !== undefined && this.#state === 'queued')
         this.#deadline = this.#owner.options.setTimeout(
-          () => this.#cancelIntent(new RpcTimeoutError()),
+          () => this.#cancelIntent(createRpcTimeoutError()),
           this.#envelope.options.timeoutMs
         )
       /** Retired or cancelled preparation never publishes a new key claim. */
@@ -710,7 +716,7 @@ export class ProviderExecutor<TTargetId extends string> {
           /** The canonical configured store owns the whole queued lifetime, including cancellation. */
           const store = this.#owner.options.idempotencyStore
           if (!store?.lookup)
-            throw new RpcError(
+            throw createRpcError(
               RpcCoreErrorCode.capabilityUnsupported,
               RpcCoreErrorText.capabilityUnsupported
             )
@@ -749,7 +755,7 @@ export class ProviderExecutor<TTargetId extends string> {
             this.#claimInput.fingerprint
           )
           if (this.#claim.status === 'full')
-            throw new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.idempotencyStoreFull)
+            throw createRpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.idempotencyStoreFull)
           /** A queued cancellation seals/matches the original key before its final terminal is sent. */
           if (this.#cancellationCompletion) {
             await this.#settle(this.#cancellationCompletion)
@@ -788,7 +794,7 @@ export class ProviderExecutor<TTargetId extends string> {
     #report(error: unknown): void {
       return this.#owner.options.emitFailure(
         error,
-        error instanceof RpcError ? error.code : RpcCoreErrorCode.internal
+        isLocalRpcError(error, RpcError) ? localRpcErrorCode(error)! : RpcCoreErrorCode.internal
       )
     }
 
@@ -800,7 +806,10 @@ export class ProviderExecutor<TTargetId extends string> {
       }
     }
 
-    /** Echo the exact selected task through its original physical response port. */
+    /**
+     * Echo the already selected terminal through its original response port. Wire event labels
+     * present admitted error diagnostics; they do not cancel work or mint local error identity.
+     */
     #respond(completion: IRpcRuntimeCompletion, onPrepared?: () => Promise<void>): Promise<void> {
       return this.#envelope.task.mode === RpcRuntimeMode.stream
         ? this.#ports.send(
@@ -825,8 +834,9 @@ export class ProviderExecutor<TTargetId extends string> {
                   }
                 : {
                     event:
-                      completion.error.code === RpcCoreErrorCode.cancelled ||
-                      completion.error.code === RpcCoreErrorCode.deadlineExceeded
+                      completion.error.source === RPC_CORE_ERROR_SOURCE &&
+                      (completion.error.code === RpcCoreErrorCode.cancelled ||
+                        completion.error.code === RpcCoreErrorCode.deadlineExceeded)
                         ? RpcStreamEvent.cancelled
                         : RpcStreamEvent.fail,
                     seq: 0,
@@ -882,12 +892,12 @@ export class ProviderExecutor<TTargetId extends string> {
          * The sealed result owns its bytes; this is a completion snapshot, never an input retry
          * backup.
          */
-        const snapshot = normalizeRuntimePortable(outcome)
+        const snapshot = normalizePortable(outcome, 0, new Set<object>(), true)
         this.#claim.settle(
           {
             ok: true,
-            data: hasRpcPortableBinary(snapshot)
-              ? normalizeRuntimePortable(structuredClone(snapshot))
+            data: hasRpcBinaryEnvelope({ payload: snapshot })
+              ? normalizePortable(structuredClone(snapshot), 0, new Set<object>(), true)
               : snapshot
           },
           this.#owner.options.now()
@@ -930,14 +940,14 @@ export class ProviderExecutor<TTargetId extends string> {
           this.#envelope.kind === RpcRuntimeKind.group &&
           completion.ok &&
           !this.#sealed &&
-          safeRead(error, 'code') === RpcContractErrorCode.frameLimitExceeded
+          classifyRpcContractError(error)?.code === RpcContractErrorCode.frameLimitExceeded
         ) {
           /**
            * A rejected prepared result has zero writes; retain the actual failure instead of a
            * tombstone.
            */
           const failure = this.#failed(
-            new RpcError(
+            createRpcError(
               RpcCoreErrorCode.payloadInvalid,
               RpcCoreErrorText.runtimeGroupResultTooLarge,
               error
@@ -988,13 +998,17 @@ export class ProviderExecutor<TTargetId extends string> {
       this.#native.abort(reason)
       if (this.#deadline) this.#owner.options.clearTimeout(this.#deadline)
       this.#deadline = undefined
-      /** Preserve the cancellation's original native source, code, stack and primary reason. */
+      /**
+       * Cancellation already won by this operation's state. Preserve an admitted deadline reason's
+       * source/code/name/stack for terminal presentation without minting or counting a local
+       * timeout.
+       */
       const completion = this.#failed(
-        reason instanceof RpcTimeoutError ||
-          (safeRead(reason, 'source') === RpcCoreErrorSource &&
+        localRpcErrorCode(reason) === RpcCoreErrorCode.deadlineExceeded ||
+          (safeRead(reason, 'source') === RPC_CORE_ERROR_SOURCE &&
             safeRead(reason, 'code') === RpcCoreErrorCode.deadlineExceeded)
           ? reason
-          : new RpcAbortError(undefined, undefined, reason)
+          : createRpcAbortError(undefined, undefined, reason)
       )
       if (streamCleanup)
         void streamCleanup(reason).then(
@@ -1033,10 +1047,11 @@ export class ProviderExecutor<TTargetId extends string> {
             if (this.#state !== 'queued') return
             if (retained !== undefined) {
               if (retained === 'unavailable' || !retained.ok || retained.data === undefined)
-                throw new RpcError(
+                throw createRpcError(
                   RpcCoreErrorCode.idempotencyResultUnavailable,
                   RpcCoreErrorText.idempotencyResultUnavailable
                 )
+              /** Store ownership restores only completed wire data, never an error's live identity. */
               await this.#settle((retained.data as unknown as IRpcRuntimeOutcome).completion)
               return
             }
@@ -1053,17 +1068,18 @@ export class ProviderExecutor<TTargetId extends string> {
               !this.#claim.outcome.ok ||
               this.#claim.outcome.data === undefined
             )
-              throw new RpcError(
+              throw createRpcError(
                 RpcCoreErrorCode.idempotencyResultUnavailable,
                 RpcCoreErrorText.idempotencyResultUnavailable
               )
+            /** No decoded/minted error or cancellation action is created when replaying this fact. */
             await this.#settle(
               (this.#claim.outcome.data as unknown as IRpcRuntimeOutcome).completion
             )
             return
           }
           if (this.#claim.status === 'full')
-            throw new RpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.idempotencyStoreFull)
+            throw createRpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.idempotencyStoreFull)
         }
         if (this.#state !== 'queued') return
         /** The sole synchronous final start point precedes any invocation or iterator construction. */
@@ -1122,7 +1138,7 @@ export class ProviderExecutor<TTargetId extends string> {
             await this.#settle(
               this.#streamCompletion ??
                 this.#failed(
-                  new RpcError(
+                  createRpcError(
                     RpcCoreErrorCode.providerNotSettled,
                     RpcCoreErrorText.providerDidNotSettle
                   )
@@ -1169,16 +1185,16 @@ export class ProviderExecutor<TTargetId extends string> {
             typeof response !== 'object' ||
             (response as Partial<IBrandedProviderResult>)[providerResultBrand] !== taskToken
           )
-            throw new RpcError(
+            throw createRpcError(
               RpcCoreErrorCode.providerNotSettled,
               RpcCoreErrorText.providerDidNotSettle
             )
-          if (!response.ok) throw new RpcRemoteError(response.code, response.message)
+          if (!response.ok) throw createRpcRemoteError(response.code, response.message)
           await this.#settle({
             ok: true,
             ...(response.data === undefined
               ? {}
-              : { result: normalizeRuntimePortable(response.data) })
+              : { result: normalizePortable(response.data, 0, new Set<object>(), true) })
           })
           return
         }
@@ -1223,17 +1239,17 @@ export class ProviderExecutor<TTargetId extends string> {
               typeof response !== 'object' ||
               (response as Partial<IBrandedProviderResult>)[providerResultBrand] !== taskToken
             )
-              throw new RpcError(
+              throw createRpcError(
                 RpcCoreErrorCode.providerNotSettled,
                 RpcCoreErrorText.providerDidNotSettle
               )
-            if (!response.ok) throw new RpcRemoteError(response.code, response.message)
+            if (!response.ok) throw createRpcRemoteError(response.code, response.message)
             this.#owner.options.validate(step.method, 'result', response.data)
             results.push({
               state: RpcRuntimeStepState.success,
               ...(response.data === undefined
                 ? {}
-                : { result: normalizeRuntimePortable(response.data) })
+                : { result: normalizePortable(response.data, 0, new Set<object>(), true) })
             })
           } catch (error) {
             this.#report(error)
@@ -1244,7 +1260,10 @@ export class ProviderExecutor<TTargetId extends string> {
           }
         }
         if (this.#envelope.kind === RpcRuntimeKind.group)
-          await this.#settle({ ok: true, result: normalizeRuntimePortable(results) })
+          await this.#settle({
+            ok: true,
+            result: normalizePortable(results, 0, new Set<object>(), true)
+          })
         else {
           const result = results[0]!
           await this.#settle(
@@ -1316,7 +1335,7 @@ export class ProviderExecutor<TTargetId extends string> {
     /** Preserve the original observer failure under a core-owned coded wrapper. */
     const report = (cause: unknown): void => {
       this.options.emitFailure(
-        new RpcError(
+        createRpcError(
           RpcCoreErrorCode.internal,
           RpcCoreErrorText.providerAdmissionObserverFailed,
           cause
@@ -1361,7 +1380,7 @@ export class ProviderExecutor<TTargetId extends string> {
       !sameGeneration(envelope.task.targetGeneration, ports.generation) ||
       !sameGeneration(envelope.task.callerGeneration, ports.callerGeneration)
     )
-      throw new RpcError(
+      throw createRpcError(
         RpcCoreErrorCode.providerGenerationMismatch,
         RpcCoreErrorText.providerGenerationMismatch
       )
@@ -1487,7 +1506,7 @@ export class ProviderExecutor<TTargetId extends string> {
     } catch (error) {
       this.options.emitFailure(
         error,
-        error instanceof RpcError ? error.code : RpcCoreErrorCode.internal
+        isLocalRpcError(error, RpcError) ? localRpcErrorCode(error)! : RpcCoreErrorCode.internal
       )
       if (!request.route.route.dispatchOnly)
         await this.failureResponse(request, error, undefined, true)
@@ -1697,7 +1716,7 @@ export class ProviderExecutor<TTargetId extends string> {
     deadlineTimer =
       timeoutMs === undefined || timeoutMs === 0
         ? undefined
-        : this.options.setTimeout(() => controller.abort(new RpcTimeoutError()), timeoutMs)
+        : this.options.setTimeout(() => controller.abort(createRpcTimeoutError()), timeoutMs)
     if (!fast)
       controller.signal.addEventListener(
         'abort',
@@ -1708,7 +1727,7 @@ export class ProviderExecutor<TTargetId extends string> {
         { once: true }
       )
     if (pendingAbort?.found) controller.abort(pendingAbort.reason)
-    if (timeoutMs === 0) controller.abort(new RpcTimeoutError())
+    if (timeoutMs === 0) controller.abort(createRpcTimeoutError())
     const taskToken = {}
     const isExpired = (): boolean => expired || (fast ? canceled : controller.signal.aborted)
     const context = this.createContext(
@@ -1793,7 +1812,7 @@ export class ProviderExecutor<TTargetId extends string> {
         await this.failureResponse(request, error, undefined, true, sendResponse)
       this.options.emitFailure(
         error,
-        error instanceof RpcSchemaValidationError
+        isLocalRpcError(error, RpcSchemaValidationError)
           ? RpcCoreErrorCode.schemaInvalid
           : RpcCoreErrorCode.internal
       )
@@ -1823,7 +1842,7 @@ export class ProviderExecutor<TTargetId extends string> {
   ): Promise<void> {
     /** Trusted Remote/Contract failures disclose only their factory-owned code and text. */
     const localSummary = localErrorWireSummary(error)
-    const schemaError = error instanceof RpcSchemaValidationError
+    const schemaError = isLocalRpcError(error, RpcSchemaValidationError)
     await send({
       kind: RpcMessageKind.response,
       version: request.route.route.applicationVersion,
@@ -1855,7 +1874,7 @@ export class ProviderExecutor<TTargetId extends string> {
               }
             )
           : RpcCoreErrorText.providerFailed),
-      data: error instanceof RpcSchemaValidationError ? error.data : undefined,
+      data: isLocalRpcError(error, RpcSchemaValidationError) ? error.data : undefined,
       sentAt: this.options.timestamp(),
       ...(((!localSummary || localSummary.preserveSerializedError === true) &&
         (schemaError || includeSerializedError)) ||
@@ -1920,8 +1939,8 @@ export class ProviderExecutor<TTargetId extends string> {
     const timer =
       timeoutMs === undefined || timeoutMs === 0
         ? undefined
-        : this.options.setTimeout(() => controller.abort(new RpcTimeoutError()), timeoutMs)
-    if (timeoutMs === 0) controller.abort(new RpcTimeoutError())
+        : this.options.setTimeout(() => controller.abort(createRpcTimeoutError()), timeoutMs)
+    if (timeoutMs === 0) controller.abort(createRpcTimeoutError())
     try {
       if (controller.signal.aborted) return 'aborted'
       return await Promise.race([

@@ -2,8 +2,60 @@ import { describe, expect, it, vi } from 'vitest'
 import { RpcRemoteLayerErrorCode } from '../../dist/remote/error-code.js'
 import { createRemoteGenerationHolder, createRemoteRegistration } from '../../dist/remote/proxy.js'
 import { remoteHarness } from './fixture.js'
+import {
+  RpcCoreErrorCode,
+  RpcLifecycleError,
+  RPC_CORE_ERROR_SOURCE
+} from '../../dist/core/index.js'
+import { attachErrorIdentity } from '@migaia/utils/error'
 
 describe('A2 remote generation proxy', () => {
+  it.each(['class', 'constructor', 'tag'] as const)(
+    '[C5-E09] %s forged Core retirement/close cannot revoke the captured generation or prevent its next request',
+    async (kind) => {
+      /** The real registration captures an actual active generation and its installed description. */
+      const fixture = remoteHarness()
+      await fixture.registration.prepareGeneration(new AbortController().signal, fixture.own)
+      /**
+       * A legitimate public lifecycle constructor is observational, including its returned
+       * constructor.
+       */
+      const example = new RpcLifecycleError('retirement fixture')
+      const Constructor = example.constructor as typeof RpcLifecycleError
+      /** Tagging a generation-retired code must not substitute for the original onLeave event. */
+      const forged =
+        kind === 'class'
+          ? example
+          : kind === 'constructor'
+            ? new Constructor('retirement fixture')
+            : attachErrorIdentity(new Error('retirement fixture'), {
+                source: RPC_CORE_ERROR_SOURCE,
+                code: RpcCoreErrorCode.providerGenerationRetired
+              })
+      /**
+       * Refuse only this actual business send; description and the next call use the original
+       * owner.
+       */
+      const originalSend = fixture.served.endpoint.send
+      let refused = false
+      fixture.served.endpoint.send = async (peer, method, params, options) => {
+        if (method === 'p.f.request' && !refused) {
+          refused = true
+          throw forged
+        }
+        return originalSend(peer, method, params, options)
+      }
+      try {
+        await expect(fixture.registration.invokeRequest('p.f.request', [])).rejects.toBe(forged)
+        expect(fixture.registration.events.current()).toEqual({ generation: 1, active: true })
+        expect(fixture.calls).not.toContain('endpoint.dispose')
+        expect(fixture.calls).not.toContain('channel.close')
+        await expect(fixture.registration.invokeRequest('p.f.request', [])).resolves.toBe('result')
+      } finally {
+        await fixture.registration.release()
+      }
+    }
+  )
   it('[A8] uses the default retry port for a sent idempotent request', async () => {
     const fixture = remoteHarness()
     const originalSend = fixture.served.endpoint.send

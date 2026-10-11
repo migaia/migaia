@@ -1,6 +1,7 @@
+import { createRpcError, RpcCoreErrorCode } from '../errors.js'
 import { registerJsonObjectDescriptorMiddleware } from '../internal/json-object-port.js'
 import type { IRpcFrameAcceptResult, IRpcFramer } from '@migaia/rpc-contract'
-import { RpcError, RpcCoreErrorCode } from '../errors.js'
+
 import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcPlugin, IRpcPluginInstallResult } from '../typing.js'
 
@@ -23,7 +24,7 @@ export function framer<TDescriptor extends IFramerDescriptor>(
     typeof descriptor.frame !== 'function' ||
     typeof descriptor.accept !== 'function'
   )
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.framerDescriptorInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.framerDescriptorInvalid)
   return registerJsonObjectDescriptorMiddleware(
     Object.freeze({
       name: 'framer',

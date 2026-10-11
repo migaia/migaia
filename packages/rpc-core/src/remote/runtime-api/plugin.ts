@@ -1,3 +1,4 @@
+import { createRpcError } from '../../core/errors.js'
 import { runtimeUnavailable, runtimeErrorIdentity } from './overview.js'
 import {
   definePlugin,
@@ -10,7 +11,7 @@ import {
 import { defaultRpcId } from '../../core/internal/id.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
-import { RpcCoreErrorCode, RpcError } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
 import {
   createRuntimeOutlet,
   readRuntimeOutletConnection,
@@ -91,7 +92,7 @@ export type IRuntimePluginOptions<
 
 /** An absent ordinary exposed method keeps the existing runtime whitelist error. */
 function unavailableExposedMethod(): never {
-  throw new RpcError(RpcCoreErrorCode.providerNotFound, RuntimeApiErrorText.methodUnavailable)
+  throw createRpcError(RpcCoreErrorCode.providerNotFound, RuntimeApiErrorText.methodUnavailable)
 }
 
 /** Original catalog serving rejects unavailable or unadopted outputs with the same remote code. */
@@ -161,7 +162,7 @@ function exposedProvide(
           (entry) => selectedMethod === undefined || selectedMethod === entry.name
         ) ?? []
       if (selectedMethod !== undefined && methods.length === 0)
-        throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.featureInvalid)
+        throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.featureInvalid)
       for (const entry of methods) {
         /** A whole-plus-method union owns exactly one entry and retains no prepared Peer. */
         const fullName = `${name}.${entry.name}`
@@ -184,7 +185,7 @@ function exposedProvide(
                   cause instanceof PluginHostError &&
                   cause.code === PluginHostErrorCode.pluginNotInstalled
                 )
-                  throw new RpcError(
+                  throw createRpcError(
                     RpcCoreErrorCode.targetUnknown,
                     RuntimeApiErrorText.targetUnknown,
                     cause
@@ -193,7 +194,7 @@ function exposedProvide(
               }
               const current = resolve(name)
               if (!current)
-                throw new RpcError(
+                throw createRpcError(
                   RpcCoreErrorCode.targetUnknown,
                   RuntimeApiErrorText.targetUnknown
                 )
@@ -224,12 +225,12 @@ function exposedProvide(
           !descriptor.enumerable ||
           !('value' in descriptor)
         )
-          throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.featureInvalid)
+          throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.featureInvalid)
         if (typeof descriptor.value !== 'function') continue
         /** A same-Feature overlap is a union; a distinct Feature remains an ambiguous public method. */
         const fullName = `${name}.${key}`
         if (owners.has(fullName) && owners.get(fullName) !== feature)
-          throw new RpcError(
+          throw createRpcError(
             RpcCoreErrorCode.capabilityConflict,
             RuntimeApiErrorText.featureConflict
           )
@@ -240,7 +241,7 @@ function exposedProvide(
       }
     }
     if (!found)
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.featureInvalid)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.featureInvalid)
     provide[name] = group
   }
   for (const group of Object.values(provide)) Object.freeze(group)
@@ -277,7 +278,7 @@ function exposedCatalogMethods(
         /** BC3 folds the Feature segment while retaining the declared method's owner. */
         const fullName = `${name}.${key}`
         if (owners.has(fullName) && owners.get(fullName) !== feature)
-          throw new RpcError(
+          throw createRpcError(
             RpcCoreErrorCode.capabilityConflict,
             RuntimeApiErrorText.featureConflict
           )
@@ -304,7 +305,7 @@ function exposedCatalogMethods(
       }
     }
     if (!found)
-      throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.featureInvalid)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.featureInvalid)
   }
   return Object.freeze([...methods.values()])
 }
@@ -323,7 +324,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
   /** Registration name is copied before installation; caller mutation cannot change publication. */
   const name = options.name
   if (typeof name !== 'string' || !name || !Object.hasOwn(RuntimePluginKey, slotResource.key))
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.pluginNameInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.pluginNameInvalid)
   /** The whitelist is snapshotted before physical source effects, and defaults to empty. */
   const input = options.expose ?? []
   if (
@@ -331,7 +332,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
     input.some((value) => typeof value !== 'string' || !value) ||
     new Set(input).size !== input.length
   )
-    throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.exposeInvalid)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.exposeInvalid)
   /** The immutable whitelist owns only names, never caller-owned objects or Host fields. */
   const expose = Object.freeze([...input])
   /** Own methods share the Peer descriptor builder and compile before source effects. */
@@ -364,7 +365,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
         for (const key of Object.values(RuntimePluginKey)) {
           const current = readRuntimeOutletConnection(integration.readSharedExtension(key), target)
           if (current === null)
-            throw new RpcError(
+            throw createRpcError(
               RpcCoreErrorCode.capabilityConflict,
               RuntimeApiErrorText.targetAmbiguous
             )
@@ -380,7 +381,10 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
       let controls: readonly IRuntimeMethodEntry[] = []
       if (expose.includes(RuntimePluginExpose.host)) {
         if (!options.host || !options.catalog || typeof options.resolvePlugin !== 'function')
-          throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.hostControlInvalid)
+          throw createRpcError(
+            RpcCoreErrorCode.invalidConfig,
+            RuntimeApiErrorText.hostControlInvalid
+          )
         if (!integration.matchesHost(options.host))
           throw createRemoteLayerError(RpcRemoteLayerErrorCode.hostNotAdopted)
         /**

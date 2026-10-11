@@ -20,11 +20,19 @@ export type * from './typing.js'
 export * from './transport-constants.js'
 export {
   RpcCoreErrorCode,
+  RpcLifecycleError,
+  isRpcError,
+  isRpcErrorInstance,
+  isRpcRemoteError,
+  isRpcTimeoutError,
+  RPC_CORE_ERROR_SOURCE
+} from './errors.js'
+/** Diagnostic classes describe failures; only Core's private factories mint operation identity. */
+export type {
   RpcError,
   RpcSchemaValidationError,
   RpcConfigurationError,
   RpcConstructionError,
-  RpcLifecycleError,
   RpcSerializationError,
   RpcProtocolError,
   RpcContractError,
@@ -34,10 +42,10 @@ export {
   RpcRemoteError,
   RpcAbortError,
   RpcTimeoutError,
-  isRpcError,
-  RPC_CORE_ERROR_SOURCE
+  IRpcCoreErrorCode,
+  IRpcError,
+  IRpcCleanupError
 } from './errors.js'
-export type { IRpcCoreErrorCode, IRpcError, IRpcCleanupError } from './errors.js'
 export { serializeRpcError, deserializeRpcError } from './internal/error-wire-metadata.js'
 export type { IRpcTransport, IRpcSendOptions, IRpcTransportTopology } from './transport.js'
 export {

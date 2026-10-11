@@ -16,8 +16,11 @@ export {
 } from './contract.js'
 export { RemoteMethodName } from './constants.js'
 export { RuntimePluginKey } from './runtime-api/constants.js'
-export { RpcRemoteLayerErrorCode } from './error-code.js'
-export { RpcRemoteLayerErrorText } from './error-text.js'
+export {
+  ERROR_SOURCE as RPC_REMOTE_ERROR_SOURCE,
+  RpcRemoteLayerErrorCode,
+  type IRpcRemoteLayerErrorCode
+} from './error-code.js'
 export { createRemoteRetryPort } from './retry.js'
 export {
   createRemotePlugin,

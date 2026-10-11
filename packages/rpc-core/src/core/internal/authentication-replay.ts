@@ -1,5 +1,11 @@
+import {
+  createRpcAuthenticationError,
+  createRpcConfigurationError,
+  RpcAuthenticationError,
+  RpcConfigurationError
+} from '../errors.js'
 import type { IRpcAuthenticationCapability, IRpcAuthenticationContext } from '../typing.js'
-import { RpcAuthenticationError, RpcConfigurationError } from '../errors.js'
+
 import { RpcMiddlewareErrorText } from '../middleware/error-text.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import { RpcEnvelopeKind, RpcRouteType, type IRpcEnvelope } from '@migaia/rpc-contract'
@@ -124,7 +130,7 @@ export function admitAuthenticationCounter(
   } else {
     const distance = state.high - sequence
     if (distance >= 64n || (state.bits[0]! & (1n << distance)) !== 0n)
-      throw new RpcAuthenticationError(RpcMiddlewareErrorText.authenticationFrameReplayed)
+      throw createRpcAuthenticationError(RpcMiddlewareErrorText.authenticationFrameReplayed)
     state.bits[0] = state.bits[0]! | (1n << distance)
   }
 }
@@ -134,7 +140,7 @@ export function authenticationChallengeRejection(
   reason: RpcAuthenticationRejectionReason
 ): RpcAuthenticationError {
   /** The original error type/source/code and stack survive reason attachment. */
-  const error = new RpcAuthenticationError(
+  const error = createRpcAuthenticationError(
     reason === RpcAuthenticationRejectionReason.sessionUnknown
       ? RpcCoreErrorText.authenticationSessionUnknown
       : RpcCoreErrorText.authenticationChallengeInvalid
@@ -182,7 +188,7 @@ export function retainAuthenticationChallengeResponse(
  */
 export function authenticationCounterExhaustion(): RpcConfigurationError {
   /** Exact error identity prevents an arbitrary transform error from claiming this exception. */
-  const error = new RpcConfigurationError(RpcMiddlewareErrorText.authenticationCounterExhausted)
+  const error = createRpcConfigurationError(RpcMiddlewareErrorText.authenticationCounterExhausted)
   counterErrors.add(error)
   return error
 }
@@ -226,7 +232,7 @@ export function bindAuthenticationBinaryValidation(
 ): void {
   const binding = contexts.get(context)
   if (!binding?.session)
-    throw new RpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
+    throw createRpcAuthenticationError(RpcMiddlewareErrorText.authenticationReplayBindingInvalid)
   binding.binary = { validate }
 }
 

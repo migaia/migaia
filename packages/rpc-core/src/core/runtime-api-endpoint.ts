@@ -1,3 +1,4 @@
+import { createRpcError, RpcCoreErrorCode } from './errors.js'
 import type { IRpcPortableValue, IRpcRuntimeEnvelope } from '@migaia/rpc-contract'
 import type { IRpcRuntimeStepOutcome } from '@migaia/rpc-contract/v1'
 import {
@@ -22,7 +23,7 @@ import {
   type IRpcStreamCapabilityPort
 } from './features/stream.js'
 import type { IRpcFactoryConfig, IRpcEndpoint, ISendOptions } from './typing.js'
-import { RpcError, RpcCoreErrorCode } from './errors.js'
+
 import { RpcCoreErrorText } from './error-text.js'
 import type { IProviderAdmissionScope, IProviderRegistrationSurface } from './features/provider.js'
 import { RpcCapability } from '@migaia/rpc-contract/wire'
@@ -58,7 +59,10 @@ type IRuntimeEndpointChannel = Readonly<{
 
 /** Reject an unavailable runtime operation at its canonical capability/error owner. */
 export function rejectRuntimeApiCapability(): never {
-  throw new RpcError(RpcCoreErrorCode.capabilityUnsupported, RpcCoreErrorText.capabilityUnsupported)
+  throw createRpcError(
+    RpcCoreErrorCode.capabilityUnsupported,
+    RpcCoreErrorText.capabilityUnsupported
+  )
 }
 
 /** The internal symmetric preset exposes only its existing canonical owner surfaces. */
