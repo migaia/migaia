@@ -94,7 +94,11 @@ The stable semantic sources keep their pre-split strings. Import the source and 
 
 `IRpcSerializedError` is the public schema: required `source`, `code`, `name`, `message`, and `stack`; optional `cause`, `errors`, portable `data`, bounded node `route`, and `truncated: true`. Import the matching language-neutral JSON schema from `@migaia/rpc-contract/schema/wire-error` with a JSON import attribute, or resolve that ordinary subpath to read the unchanged shipped artifact. `serializeRpcError` creates a bounded immutable tree and requires a `report` sink for failures it omits. `normalizeRpcSerializedError` validates received trees; `deserializeRpcError` preserves the transferred stack and native error family. `reachRpcError` traverses local causes and aggregate entries with identity deduplication. `RpcWireErrorField`, `RpcWireErrorViolation`, `RpcWireErrorUnknownFieldMode`, `RpcWireErrorFallback`, `RpcWireErrorLimit` and `RpcErrorReachLimit` let foreign implementations follow the same grammar, field order, fallback and limits. A restored diagnostic identity does not grant lifecycle, replay or retry rights.
 
-`toJsonRpcError(wire, integerCode)` puts the validated tree under `RpcJsonRpcWireError.dataKey`. The foreign protocol owns that safe integer code. `fromJsonRpcError` restores the extension, or represents an ordinary foreign JSON-RPC error using `RpcJsonRpcWireError.foreignSource` and the integer's string form. These operations do not change JSON-RPC transport or cancellation behavior.
+`toJsonRpcError(wire, integerCode)` puts the validated tree under `RpcJsonRpcWireError.dataKey`. The foreign protocol owns that safe integer code.
+
+`fromJsonRpcError` restores the extension, or represents an ordinary foreign JSON-RPC error using `RpcJsonRpcWireError.foreignSource` and the integer's string form.
+
+These operations do not change JSON-RPC transport or cancellation behavior.
 
 Third-party adapters attach their own source and codes through `@migaia/utils/error`. Keep those declarations with the adapter; never claim a Core source. Core retains the original object, or keeps it reachable as `cause`, along its existing failure path.
 

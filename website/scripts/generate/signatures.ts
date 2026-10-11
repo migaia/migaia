@@ -1193,11 +1193,43 @@ function declarationEnd(source: string, start: number, kind: string): number {
   return source.length
 }
 
+/** Resolve declaration artifacts through the same ordinary workspace exports used by consumers. */
+function declarationImportFiles(filePath: string, specifier: string): string[] {
+  if (specifier.startsWith('.')) {
+    /** Relative declaration imports retain the existing emitted ESM-to-declaration mapping. */
+    const target = resolve(join(filePath, '..'), specifier.replace(/\.js$/, '') + '.d.ts')
+    return existsSync(target) ? [target] : []
+  }
+  /** Workspace imports resolve only their public types entry, never a guessed private dist path. */
+  const workspace = /^@migaia\/([^/]+)(?:\/(.*))?$/.exec(specifier)
+  if (!workspace) return []
+  /** The ordinary package name matches its existing workspace directory. */
+  const directory = resolve('..', 'packages', workspace[1])
+  /** The manifest is the authority for root and nested ordinary entry ownership. */
+  const manifestPath = join(directory, 'package.json')
+  if (!existsSync(manifestPath)) return []
+  /** The resolver follows the exact declared subpath before reading any declaration content. */
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  /** A subpath import never falls through to the package's unrelated root declaration. */
+  const key = workspace[2] ? `./${workspace[2]}` : '.'
+  /** Existing declaration-file resolution already handles concrete targets and wildcard artifacts. */
+  const target = manifest.exports?.[key]
+  return declarationFiles(directory, typeof target === 'string' ? target : target?.types)
+}
+
 /** Extracts balanced, source-backed declaration records from a declaration file. */
 function declarationSymbols(filePath: string, visited = new Set<string>()) {
   if (visited.has(filePath)) return []
   visited.add(filePath)
   const source = readFileSync(filePath, 'utf8')
+  /**
+   * Only this RPC migration extends named-import/external chains; other owners retain their
+   * baseline.
+   */
+  const rpcOwner =
+    /(?:^|[\\/])packages[\\/]rpc-(?:contract|core|process|threads|bridge-jsonrpc|browser)[\\/]/.test(
+      filePath
+    )
   const records: Array<Record<string, unknown>> = []
   const declarationPattern =
     /export\s+(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(function|class|const|let|var|type|interface|namespace)\s+([A-Za-z_$][\w$]*)/g
@@ -1258,36 +1290,86 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
       members: kind === 'class' ? classMembers(rawDeclaration) : []
     })
   }
+  /** Named imports can be publicly re-exported without repeating their original from clause. */
+  const importedBindings = new Map<
+    string,
+    { imported: string; specifier: string; typeOnly: boolean }
+  >()
+  for (const imported of source.matchAll(
+    /^import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/gm
+  )) {
+    for (const binding of imported[1].split(',')) {
+      /** Type-only status comes from the actual declaration, not the target's class name. */
+      const typeOnly = /^import\s+type\b/.test(imported[0]) || /^\s*type\s/.test(binding)
+      /** Imported aliases retain the original target symbol and this file's local binding name. */
+      const [original, local = original] = binding
+        .trim()
+        .replace(/^type\s+/, '')
+        .split(/\s+as\s+/)
+      importedBindings.set(local.trim(), {
+        imported: original.trim(),
+        specifier: imported[2],
+        typeOnly
+      })
+    }
+  }
+  /** Both direct and locally imported re-exports are rooted in their real declaration statements. */
   const reexports = [
-    ...source.matchAll(/export\s+(?:type\s+)?(\*|\{([^}]+)\})\s+from\s+['"]([^'"]+)['"]/g)
+    ...source.matchAll(
+      /^export\s+(?:type\s+)?(\*|\{([^}]+)\})(?:\s+from\s+['"]([^'"]+)['"])?\s*;/gm
+    )
   ]
   for (const reexport of reexports) {
-    const specifier = reexport[3]
-    if (!specifier.startsWith('.')) continue
-    const target = resolve(join(filePath, '..'), specifier.replace(/\.js$/, '') + '.d.ts')
-    if (!existsSync(target)) continue
-    const targetRecords = declarationSymbols(target, new Set(visited))
+    /** Existing relative from clauses stay general; this task does not expand other owner APIs. */
+    if (!rpcOwner && (!reexport[3] || !reexport[3].startsWith('.'))) continue
     if (reexport[1] === '*') {
-      records.push(...targetRecords)
+      for (const target of declarationImportFiles(filePath, reexport[3]))
+        records.push(...declarationSymbols(target, new Set(visited)))
       continue
     }
     const bindings = (reexport[2] ?? '').split(',').map((binding) => {
+      /** A type re-export exposes instance shape without exposing its target constructor. */
+      const typeOnly = /^export\s+type\b/.test(reexport[0]) || /^\s*type\s/.test(binding)
       const normalized = binding.trim().replace(/^type\s+/, '')
       const [imported, exported = imported] = normalized.split(/\s+as\s+/)
-      return { imported: imported.trim(), exported: exported.trim() }
+      return { imported: imported.trim(), exported: exported.trim(), typeOnly }
     })
-    for (const binding of bindings) {
-      for (const record of targetRecords.filter(
-        (candidate) => String(candidate.name) === binding.imported
-      )) {
-        const signature = String(record.signature).replace(
-          new RegExp(`\\b${binding.imported}\\b`),
-          binding.exported
+    /** Direct from clauses retain the original single read for their complete named export group. */
+    const directRecords = reexport[3]
+      ? declarationImportFiles(filePath, reexport[3]).flatMap((target) =>
+          declarationSymbols(target, new Set(visited))
         )
+      : undefined
+    for (const binding of bindings) {
+      /** Bare exports follow only a real named import; unrelated local/private names stay absent. */
+      const imported = reexport[3] ? undefined : importedBindings.get(binding.imported)
+      /** The export's from clause or its imported binding names the actual owning entry. */
+      const specifier = reexport[3] ?? imported?.specifier
+      if (!specifier) continue
+      /** Each target is read through its public declaration artifact and the existing cycle guard. */
+      const targetRecords =
+        directRecords ??
+        declarationImportFiles(filePath, specifier).flatMap((target) =>
+          declarationSymbols(target, new Set(visited))
+        )
+      for (const record of targetRecords.filter(
+        (candidate) => String(candidate.name) === (imported?.imported ?? binding.imported)
+      )) {
+        /** Preserve the public type declaration instead of advertising a private class value. */
+        const typeOnlyClass = (binding.typeOnly || imported?.typeOnly) && record.kind === 'class'
+        const signature = typeOnlyClass
+          ? `export type { ${binding.imported}${binding.imported === binding.exported ? '' : ` as ${binding.exported}`} }${reexport[3] ? ` from '${specifier}'` : ''};`
+          : String(record.signature).replace(
+              new RegExp(`\\b${imported?.imported ?? binding.imported}\\b`),
+              binding.exported
+            )
         records.push({
           ...record,
           name: binding.exported,
           signature,
+          ...(typeOnlyClass
+            ? { kind: 'type', core: signature, parameters: [], parameterDetails: [], returns: null }
+            : {}),
           aliasOf: binding.imported
         })
       }
@@ -1475,7 +1557,15 @@ function buildPublicSymbols(directory: string, manifest: Record<string, any>, ex
     const group = groups.get(groupKey) ?? []
     const exportPath = String(candidate.exportPath)
     const sourceSignature = String(candidate.signature)
-    const identity = `${String(candidate.source)}:${String(candidate.name)}:${sourceSignature}`
+    /** A public cross-owner re-export is distinct from its canonical declaration owner's route. */
+    const sourceIdentity = `${String(candidate.source)}:${String(candidate.name)}:${sourceSignature}`
+    /**
+     * Existing own declarations keep their identity; imported workspace records name their real API
+     * owner.
+     */
+    const identity = String(candidate.source).startsWith(`packages/${directory.split('/').at(-1)}/`)
+      ? sourceIdentity
+      : `${packageName}:${sourceIdentity}`
     const details = buildSymbolSections({ ...candidate, identity }, packageName, exportPath)
     group.push({
       ...candidate,

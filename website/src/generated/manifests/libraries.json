@@ -28074,7 +28074,7 @@
     {
       "slug": "utils",
       "description": "Runtime-neutral reusable utility primitives.",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "exports": [
         ".",
         "./bytes",
@@ -29724,6 +29724,16 @@
               ]
             },
             {
+              "id": "object-模块-含对象路径",
+              "heading": "/object 模块（含对象路径）",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createSafeRecord<T>()` 每次创建新的 null-prototype 字典，返回 `Partial<Record<string, T>>`。未可信键名（包括 `proto` 和 `constructor`）作为普通数据键，不会调用 Object.prototype 上的 setter；赋值后字段仍为可写、可枚举、可配置的数据属性。它不读取或复制输入，也不拥有 RPC 的任务或投递 key 格式。"
+                }
+              ]
+            },
+            {
               "id": "快照与探测",
               "heading": "快照与探测",
               "blocks": [
@@ -30254,6 +30264,19 @@
               "blocks": [
                 {
                   "type": "paragraph",
+                  "text": "`isSafeIntegerValue(value)` 从 `/value` 导出，仅接受有限的安全整数 number，不转换字符串、bigint 或 boxed number。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`tryString(value)` 从 `/string` 导出，string 原样通过，其他值只执行一次原生 `String(value)`。它返回 `{ threw: false, value: string }` 或 `{ threw: true, error: unknown }`；失败保留精确原抛出值，不提供 fallback、不调用 reporter、不生成新错误。调用方根据自己的边界选择报告、fallback 或重抛："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { tryString } from '@migaia/utils/string';\n\nconst converted = tryString(value);\nif (converted.threw) throw converted.error;\nconst text = converted.value;"
+                },
+                {
+                  "type": "paragraph",
                   "text": "`isNullish` 只识别 `null | undefined`；`isBlankString` 只识别 trim 后为空的字符串。`isEmptyValue` 组合两者并额外把 `NaN` 判为空；`0`、`0n`、`false`、数组和对象保持有效。`isPrimitive` 覆盖 JavaScript 七类 primitive，不生成额外类型标签。"
                 },
                 {
@@ -30782,11 +30805,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Adapters propagate the original owner errors. Existing Process code/text tables remain ordinary diagnostic data at `@migaia/rpc-core/adapter/diagnostics`; their semantic source stays `@migaia/rpc/process`. Error constructors, trust writers, owned snapshots and physical receipt readers remain private."
+                  "text": "Adapters propagate the original owner errors. `RPC_PROCESS_ERROR_SOURCE` and `RpcProcessErrorCode` remain ordinary diagnostic data at `@migaia/rpc-core/adapter/diagnostics`; their semantic source stays `@migaia/rpc/process`. Process text and stderr diagnostic tables are private. Trust writers, owned snapshots and physical receipt readers remain private."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Native-only detector sites use the shared public diagnostics and attach identity to their own original native error; they do not ask Core to mint arbitrary errors."
+                  "text": "Adapter authors attach their own source/code through `@migaia/utils/error`; they do not ask Core to mint arbitrary operation errors."
                 }
               ]
             },
@@ -30843,6 +30866,28 @@
                 {
                   "type": "paragraph",
                   "text": "自定义载体可从 Core 根入口使用 `serializeRpcError` / `deserializeRpcError`，对持有的错误或 wire 数据编码/恢复，保留 Core/Remote 的原脱敏与 forwarding-route 策略；私有 maps 留 Core，完整 walker 仍唯一归 Contract。"
+                }
+              ]
+            },
+            {
+              "id": "第三方公开错误面",
+              "heading": "第三方公开错误面",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "协议实现者使用 `@migaia/rpc-contract/errors` 的 wire schema、序列化/校验/遍历及 JSON-RPC 映射；适配器作者使用 Core 根入口的 wire 操作和 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError`。六个 source 常量与各 owner 的错误码表公开，原 source 字符串不变。B6 守卫跨 realm/模块副本用于诊断；`isRpcError` 的 code-is-string 检查不能替代它们。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`*ErrorText` / `*Diagnostic` 文本表和 `tagRpcError` 私有；这是更名后包的破坏性导出收敛。错误类仅作类型导出，唯一 `RpcLifecycleError` 运行时类供 Store Worker 等持有自身 dispose 状态的消费方构造诊断，不 mint Core 操作身份。真实 dispose 失败后的 cleanup 展示沿原路径复用原 Error 身份，不决定是否关闭操作。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "已接纳错误的现有字段，包括 caller 取消 reason、store/缓存及解码后的 wire 错误，可沿既有 wire 和 terminal report 展示。mint、cancel、retry、close、计数、retire 与 replay admission 由 owner 私有身份或实际操作状态决定，不能依据这些错误的公开 source/code。普通解码与公开 listener failure helpers 只产生诊断，不登记 Core 控制身份。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "第三方通过 `@migaia/utils/error` 的 `attachErrorIdentity` 抛自己的 source/code；Core 保留原错误或 cause。source/code 表、wire schema/限额、普通 JSON-RPC 映射及短例见 USEGUIDE。"
                 }
               ]
             }
@@ -31658,11 +31703,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Adapters propagate the original owner errors. Existing Process code/text tables remain ordinary diagnostic data at `@migaia/rpc-core/adapter/diagnostics`; their semantic source stays `@migaia/rpc/process`. Error constructors, trust writers, owned snapshots and physical receipt readers remain private."
+                  "text": "Adapters propagate the original owner errors. `RPC_PROCESS_ERROR_SOURCE` and `RpcProcessErrorCode` remain ordinary diagnostic data at `@migaia/rpc-core/adapter/diagnostics`; their semantic source stays `@migaia/rpc/process`. Process text and stderr diagnostic tables are private. Trust writers, owned snapshots and physical receipt readers remain private."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Native-only detector sites use the shared public diagnostics and attach identity to their own original native error; they do not ask Core to mint arbitrary errors."
+                  "text": "Adapter authors attach their own source/code through `@migaia/utils/error`; they do not ask Core to mint arbitrary operation errors."
                 }
               ]
             },
@@ -31719,17 +31764,126 @@
               ]
             },
             {
-              "id": "自定义载体中的错误编码",
-              "heading": "自定义载体中的错误编码",
+              "id": "第三方公开错误面与错误编码",
+              "heading": "第三方公开错误面与错误编码",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "从 `@migaia/rpc-core` 导入 `serializeRpcError` / `deserializeRpcError`，对持有的 Core/Remote 错误及接收的 wire 数据做编码/恢复。Core 只提供自己的脱敏与 forwarding-route 数据；完整 wire walker 仍唯一归 Contract。自定义载体这样保留本地原 cause、线上受控 code/text 及后续 forwarding route，不需要访问任何私有注册器。普通业务错误继续使用既有完整错误链策略。独立协议实现的 Contract 错误分类与编码见 `@migaia/rpc-contract/errors`。"
+                  "text": "协议实现者（自定义载体或 Go/Python/Rust 对端）从 `@migaia/rpc-contract/errors` 使用完整 wire 错误 schema、校验、遍历与 JSON-RPC 映射。运行时适配器作者使用 Core 根入口的 `serializeRpcError` / `deserializeRpcError`，保留 Core/Remote 私有脱敏与 forwarding-route 策略；完整 wire walker 唯一归 Contract。两类集成者都用公开 source/code 和错误族守卫解释诊断，不能据此推定 Core 的内部操作身份。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "六个稳定语义 source 保留分包前字符串，按以下普通公开入口导入："
+                },
+                {
+                  "type": "table",
+                  "headers": ["公开入口", "source 常量与值", "错误码表", "第三方用途"],
+                  "rows": [
+                    [
+                      "`@migaia/rpc-contract` / `@migaia/rpc-contract/errors`",
+                      "`RPC_CONTRACT_SOURCE` = `@migaia/rpc/contract`",
+                      "`RpcContractErrorCode`",
+                      "识别非法 envelope、frame、handshake 与错误树，修复对应协议输入。"
+                    ],
+                    [
+                      "`@migaia/rpc-core`",
+                      "`RPC_CORE_ERROR_SOURCE` = `@migaia/rpc/core`",
+                      "`RpcCoreErrorCode`",
+                      "分类 Endpoint 的配置、取消、deadline、transport 与 provider 诊断。"
+                    ],
+                    [
+                      "`@migaia/rpc-core/remote`",
+                      "`RPC_REMOTE_ERROR_SOURCE` = `@migaia/rpc/remote`",
+                      "`RpcRemoteLayerErrorCode`",
+                      "解释 generation 关闭、启动失败及未知结果，按原 outcome/对账路径恢复。"
+                    ],
+                    [
+                      "`@migaia/rpc-process`；Core 适配器还可用 `@migaia/rpc-core/adapter/diagnostics`",
+                      "`RPC_PROCESS_ERROR_SOURCE` = `@migaia/rpc/process`",
+                      "`RpcProcessErrorCode`",
+                      "分类实际 launch、dial、listen、bootstrap 与资源采样失败。"
+                    ],
+                    [
+                      "`@migaia/rpc-threads`；Core 适配器还可用 `@migaia/rpc-core/adapter/threads`",
+                      "`RPC_THREAD_ERROR_SOURCE` = `@migaia/rpc/threads`",
+                      "`RpcThreadErrorCode`",
+                      "报告真实 Worker 采样失败，保留原 cause 并展示 unavailable。"
+                    ],
+                    [
+                      "`@migaia/rpc-bridge-jsonrpc` / `@migaia/rpc-contract/framing/jsonrpc`",
+                      "`JSONRPC_BRIDGE_ERROR_SOURCE` = `@migaia/rpc/bridge/jsonrpc`",
+                      "`JsonRpcBridgeErrorCode`",
+                      "识别 framing、hello/profile 与扩展协商失败，处理实际连接。"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`RpcCoreErrorText`、`RpcContractErrorText`、`RpcContractErrorDiagnostic`、`RpcProcessErrorText`、`RpcRemoteLayerErrorText`、`JsonRpcBridgeErrorText` 与 Thread 文本表均为私有展示。删除这些已更名包的公开表属于破坏性导出变更；message 字面量不是恢复、重试、终止或关闭契约。Process bootstrap 的环境名、版本、frame 限额和发现超时仍由 `@migaia/rpc-core/adapter/process-data` 普通导出；stderr 文本/配额常量不公开。"
+                }
+              ]
+            },
+            {
+              "id": "跨-realm-模块副本的诊断分类",
+              "heading": "跨 realm / 模块副本的诊断分类",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Core 根入口公开 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError`。它们检查稳定 source、code 和 family 字段，跨 Worker、iframe、vm 或模块副本可用，无需依赖本 realm 的 `instanceof`。`isRpcError` 仅检查 code 是 string，不能替代这三个错误族守卫。输入 getter/Proxy 的读取失败沿原 `safeRead` 边界报告/抛错；对端 wire 输入先完成 Contract 校验。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这些守卫用于展示和消费方诊断；复制字段、模仿 prototype 或普通 wire 解码都不能取得 Core 的私有身份。已接纳错误（包括 caller 的取消 reason、store 中的错误和已恢复 wire 错误）的现有字段可继续用于 wire 和 terminal report 展示。展示不决定控制：mint、cancel、retry、close、计数、generation retirement 与 replay admission 必须依实际操作状态或原 owner 的私有身份，不能信任第三方或解码错误的公开 source/code。`tagRpcError` 与 owner factories 是包内实现；公开 listener failure helpers 只产生诊断，不登记 Core 的私有控制身份。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "错误类名称（例如 `RpcError`、`RpcConfigurationError`、`RpcRemoteError`、`RpcTimeoutError`）仅作 `import type` 与守卫结果类型。唯一运行时类 `RpcLifecycleError` 供 Store Worker 等持有自身 dispose 状态的消费方构造可诊断的 lifecycle 失败；其公开构造器不会 mint Core 私有身份，Core 不凭该类实例关闭操作。在真实 dispose 已失败之后，沿原 cleanup 展示路径复用原 lifecycle Error，保持原对象身份，不改变已发生的关闭状态或 cleanup 执行。适配器自己的资源错误仍使用自己的 source/code。"
+                }
+              ]
+            },
+            {
+              "id": "wire-错误-json-rpc-与接纳后的错误展示",
+              "heading": "Wire 错误、JSON-RPC 与接纳后的错误展示",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`IRpcSerializedError` 的必需字段为 `source`、`code`、`name`、`message`、`stack`；可选字段为 `cause`、`errors`、portable `data`、bounded `route` 和 `truncated: true`。语言中立 JSON schema 从 `@migaia/rpc-contract/schema/wire-error` 的普通子路径读取。Contract 的 `serializeRpcError` 构造有界错误树，`normalizeRpcSerializedError` 验证接收数据，`deserializeRpcError` 保留传输 stack/native error family，`reachRpcError` 按身份去重遍历 cause/AggregateError。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "序列化的 `report` 是必须的诊断 sink，不可静默吞掉投影失败。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`RpcWireErrorField`、`RpcWireErrorViolation`、`RpcWireErrorUnknownFieldMode`、`RpcWireErrorFallback`、`RpcWireErrorLimit` 与 `RpcErrorReachLimit` 公开同一字段顺序、拒绝原因、fallback 与限额。Contract 的 `toJsonRpcError(wire, integerCode)` 把验证后的错误树放入 `RpcJsonRpcWireError.dataKey`；第三方协议拥有 safe integer code。`fromJsonRpcError` 恢复扩展，普通外部 JSON-RPC 错误使用 `RpcJsonRpcWireError.foreignSource` 和整数的 string code；这些映射不改变 transport/cancel 行为。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "普通 wire decoder 只恢复诊断，不注册 Core 的 live control 身份。接纳后的错误字段沿既有 wire、forwarding、缓存失败重放与 terminal report 路径展示，维持既有 source/code/name/message/stack 受控展示和 cause/errors 链策略；这同样适用于 caller 取消 reason 和 store 中已留存的错误。错误字段不能触发 mint、cancel、retry、close、计数、retire 或 replay admission，也不把适配器伪造的诊断字段变成控制身份。展示路径复用原 Error 不证明 Core 创建了它。"
+                }
+              ]
+            },
+            {
+              "id": "适配器抛出自己的错误",
+              "heading": "适配器抛出自己的错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "通过 `@migaia/utils/error` 的 `attachErrorIdentity` 添加适配器拥有的 source/code。Core 沿原失败路径保留该对象，或在包装时通过 `cause` 保留原值；不把业务/依赖错误改成安全重试许可。下面是自定义载体写失败的最小例子，source、code 与文本由适配器维护："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { RpcConfigurationError, serializeRpcError, deserializeRpcError } from '@migaia/rpc-core'\n\nconst local = new RpcConfigurationError(\n  'Carrier configuration is invalid',\n  new Error('Native setup failed')\n)\nconst wire = serializeRpcError(local, { report: ({ error }) => console.error(error) })\nconst received: unknown = JSON.parse(JSON.stringify(wire))\nconst restored = deserializeRpcError(received)\nconsole.log(Reflect.get(restored, 'source'), Reflect.get(restored, 'code'))\nconsole.log(restored.stack === wire.stack)"
+                  "code": "import { attachErrorIdentity } from '@migaia/utils/error'\n\n/** This application owns its carrier identity independently of Core. */\nconst ADAPTER_SOURCE = '@example/custom-carrier'\n/** A native write failure retains the original cause for diagnosis. */\nconst AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const\n/** Presentation text belongs to this adapter, never Core's private text table. */\nconst AdapterErrorText = { writeFailed: 'adapter write failed' } as const\n\n/** Raise the adapter's own failure when its held native writer rejects. */\nexport function raiseAdapterWriteFailure(cause: unknown): never {\n  throw attachErrorIdentity(new Error(AdapterErrorText.writeFailed, { cause }), {\n    source: ADAPTER_SOURCE,\n    code: AdapterErrorCode.writeFailed\n  })\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "对实际收到的异常做 wire 传输时，使用普通 Core 操作；错误族检查只返回诊断分类："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  isRpcTimeoutError,\n  type RpcTimeoutError\n} from '@migaia/rpc-core'\n\n/** Retain Core's presentation and routes while encoding an actual held failure. */\nexport function transferError(error: unknown, report: (failure: unknown) => void) {\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) })\n  const received: unknown = JSON.parse(JSON.stringify(wire))\n  const restored = deserializeRpcError(received)\n  const timeout: RpcTimeoutError | undefined = isRpcTimeoutError(restored) ? restored : undefined\n  return { restored, timeout, stackPreserved: restored.stack === wire.stack }\n}"
                 }
               ]
             }
@@ -31757,6 +31911,7 @@
         "./runtime",
         "./runtime/lazy",
         "./runtime/metadata",
+        "./schema/wire-error",
         "./stream",
         "./v1",
         "./wire"
@@ -31803,7 +31958,7 @@
                     ],
                     [
                       "`./framing/jsonrpc`",
-                      "Content-Length encoding/decoding and canonical JSON-RPC diagnostics"
+                      "Content-Length encoding/decoding and stable JSON-RPC source/code identities"
                     ],
                     [
                       "`./binary`, `./binary/capture`, `./binary/lazy`, `./binary/inspect`",
@@ -31821,11 +31976,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Binary preparation snapshots business data synchronously, retains original native backing identities, and completes through the original codec. The lazy entry keeps the first native digest ahead of cold codec loading. `captureRpcBinaryData` holds captured data in an opaque resource and exposes only its complete `prepare()` operation."
+                  "text": "Binary preparation snapshots business data synchronously, retains original native backing identities, and completes through the original codec. The light `./binary/lazy` entry exports the same `prepareRpcBinary` and `restoreRpcBinary` names and keeps the first native digest ahead of cold codec loading. `./runtime/lazy` likewise exports the canonical normalizer names."
                 },
                 {
                   "type": "paragraph",
-                  "text": "A held `IRpcBinaryDataCodec` provides ordinary encoding and optional JSON-data capture; raw prehash, finish and registration callbacks are internal."
+                  "text": "`captureRpcBinaryData` holds captured data in an opaque resource and exposes only its complete `prepare()` operation. A held `IRpcBinaryDataCodec` provides ordinary encoding and optional JSON-data capture; raw prehash, finish and registration callbacks are internal."
                 },
                 {
                   "type": "paragraph",
@@ -31837,7 +31992,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`classifyRpcContractError` classifies an actual protocol violation for safe code/text presentation without inspecting its cause; copied or foreign errors have no classification. Contract errors use the protocol serializer, while Core/Remote error redaction and routes use the ordinary Core error operations."
+                  "text": "Public source/code tables and wire-error operations support protocol implementers and adapter authors. Human-readable diagnostic tables are private; `normalizeRuntimePortable` and `hasRpcPortableBinary` remain internal pending Serialize phase B. `classifyRpcContractError` queries an actual local violation's disclosure policy without reading error getters; copied or foreign errors have no classification."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Contract errors use the protocol serializer, while Core/Remote error redaction and routes use the ordinary Core error operations. See USEGUIDE for the source table, wire schema and third-party adapter example."
                 }
               ]
             }
@@ -31910,7 +32069,15 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Use `prepareRpcBinary` from `@migaia/rpc-contract/binary`, or `prepareRpcBinaryLazy` from `./binary/lazy`, with a runtime envelope, selected storage, byte limit and actual whole-backing digest. Both return the canonical manifest, original native sidecars and backing byte total. `restoreRpcBinary` and its lazy counterpart validate the manifest and native integrity before returning runtime protocol data."
+                  "text": "Use `prepareRpcBinary` from `@migaia/rpc-contract/binary`, or the same canonical name from `@migaia/rpc-contract/binary/lazy`, with a runtime envelope, selected storage, byte limit and actual whole-backing digest. Both return the canonical manifest, original native sidecars and backing byte total."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The selected entry also exports `restoreRpcBinary`, which validates the manifest and native integrity before returning runtime protocol data. The light entry retains synchronous capture and the first native digest before loading the full codec; it introduces no second operation name."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "For cold receive paths, import `normalizeRuntimeEnvelope` or `normalizeStreamPayload` from `@migaia/rpc-contract/runtime/lazy` and await the result. Scalar runtime messages do not load the full stream parser. The ordinary `./runtime` and `./stream` entries keep their existing synchronous contracts. module-internal code imports its light implementation file directly."
                 },
                 {
                   "type": "paragraph",
@@ -31949,21 +32116,104 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Restoration writes a validated route to the supplied actual route map at the original registration point and also keeps Contract's own generic roundtrip metadata. Neither API exposes metadata registrars. `RpcContractErrorDiagnostic.frameLimitExceeded` is immutable source/code/message data for failure classification, not an error factory."
+                  "text": "Restoration writes a validated route to the supplied actual route map at the original registration point and also keeps Contract's own generic roundtrip metadata. Neither API exposes metadata registrars. Classify a physical quota failure with `RPC_CONTRACT_SOURCE` and `RpcContractErrorCode.frameLimitExceeded`; no diagnostic text table is public."
                 }
               ]
             },
             {
-              "id": "protocol-error-classification",
-              "heading": "Protocol error classification",
+              "id": "public-errors-for-protocol-implementers-and-adapter-authors",
+              "heading": "Public errors for protocol implementers and adapter authors",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`classifyRpcContractError(error)` classifies only the exact error raised by this Contract instance. Protocol implementers and diagnostic UIs can use its immutable code/text policy to present a controlled violation without traversing a hostile local cause. It reads no error getters; foreign values and copied errors return `undefined`. It grants no transport, replay or codec authority."
+                  "text": "Protocol implementers use `@migaia/rpc-contract/errors` for the language-neutral error tree. Adapter authors use the ordinary Core error operations and family guards described in the Core USEGUIDE, so Core's private presentation and forwarding-route metadata remain available. Neither audience constructs Core-owned failures by copying identity fields."
                 },
                 {
                   "type": "paragraph",
-                  "text": "`serializeRpcError` applies the same policy to Contract errors. For errors owned by Core/Remote, use the ordinary Core error operations so their private redaction and forwarding routes remain available."
+                  "text": "The stable semantic sources keep their pre-split strings. Import the source and code table from the public owner and branch on both fields. Human-readable messages, `*ErrorText` and `*Diagnostic` tables are private presentation. Their removal is a breaking change of the renamed module; message text is not a recovery or retry contract."
+                },
+                {
+                  "type": "table",
+                  "headers": ["Public owner", "Source constant", "Code table", "Third-party use"],
+                  "rows": [
+                    [
+                      "`@migaia/rpc-contract` / `./errors`",
+                      "`RPC_CONTRACT_SOURCE` (`@migaia/rpc/contract`)",
+                      "`RpcContractErrorCode`",
+                      "Reject an invalid envelope, frame, handshake or error tree with the matching protocol failure."
+                    ],
+                    [
+                      "`@migaia/rpc-core`",
+                      "`RPC_CORE_ERROR_SOURCE` (`@migaia/rpc/core`)",
+                      "`RpcCoreErrorCode`",
+                      "Classify Core operation failures; use the Core family guards across realms or module copies."
+                    ],
+                    [
+                      "`@migaia/rpc-core/remote`",
+                      "`RPC_REMOTE_ERROR_SOURCE` (`@migaia/rpc/remote`)",
+                      "`RpcRemoteLayerErrorCode`",
+                      "Reconcile a Remote closed generation or an unknown result before another business call."
+                    ],
+                    [
+                      "`@migaia/rpc-process`",
+                      "`RPC_PROCESS_ERROR_SOURCE` (`@migaia/rpc/process`)",
+                      "`RpcProcessErrorCode`",
+                      "Report native launch, connection and Process lifecycle failures."
+                    ],
+                    [
+                      "`@migaia/rpc-threads`",
+                      "`RPC_THREAD_ERROR_SOURCE` (`@migaia/rpc/threads`)",
+                      "`RpcThreadErrorCode`",
+                      "Report an unavailable native Worker resource sample without inventing a measurement."
+                    ],
+                    [
+                      "`@migaia/rpc-bridge-jsonrpc` / `@migaia/rpc-contract/framing/jsonrpc`",
+                      "`JSONRPC_BRIDGE_ERROR_SOURCE` (`@migaia/rpc/bridge/jsonrpc`)",
+                      "`JsonRpcBridgeErrorCode`",
+                      "Close or recreate the actual foreign-language connection after a framing, profile or handshake failure."
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`IRpcSerializedError` is the public schema: required `source`, `code`, `name`, `message`, and `stack`; optional `cause`, `errors`, portable `data`, bounded node `route`, and `truncated: true`. Import the matching language-neutral JSON schema from `@migaia/rpc-contract/schema/wire-error` with a JSON import attribute, or resolve that ordinary subpath to read the unchanged shipped artifact."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`serializeRpcError` creates a bounded immutable tree and requires a `report` sink for failures it omits. `normalizeRpcSerializedError` validates received trees; `deserializeRpcError` preserves the transferred stack and native error family. `reachRpcError` traverses local causes and aggregate entries with identity deduplication."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`RpcWireErrorField`, `RpcWireErrorViolation`, `RpcWireErrorUnknownFieldMode`, `RpcWireErrorFallback`, `RpcWireErrorLimit` and `RpcErrorReachLimit` let foreign implementations follow the same grammar, field order, fallback and limits. A restored diagnostic identity does not grant lifecycle, replay or retry rights."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`toJsonRpcError(wire, integerCode)` puts the validated tree under `RpcJsonRpcWireError.dataKey`. The foreign protocol owns that safe integer code."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`fromJsonRpcError` restores the extension, or represents an ordinary foreign JSON-RPC error using `RpcJsonRpcWireError.foreignSource` and the integer's string form."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "These operations do not change JSON-RPC transport or cancellation behavior."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Third-party adapters attach their own source and codes through `@migaia/utils/error`. Keep those declarations with the adapter; never claim a Core source. Core retains the original object, or keeps it reachable as `cause`, along its existing failure path."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { attachErrorIdentity } from '@migaia/utils/error'\nimport { serializeRpcError, toJsonRpcError } from '@migaia/rpc-contract/errors'\n\n/** The application owns this adapter identity and its diagnostic wording. */\nconst ADAPTER_SOURCE = '@example/electron-carrier'\n/** A failed native write is distinct from any Core timeout or terminal decision. */\nconst AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const\n/** This adapter's message never quotes native payload bytes. */\nconst AdapterErrorText = { writeFailed: 'adapter write failed' } as const\n\n/** Project the original native cause using this adapter's own registered identity. */\nexport function writeFailure(cause: unknown, report: (failure: unknown) => void) {\n  const error = attachErrorIdentity(new Error(AdapterErrorText.writeFailed, { cause }), {\n    source: ADAPTER_SOURCE,\n    code: AdapterErrorCode.writeFailed\n  })\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) })\n  return { error, wire, jsonrpc: toJsonRpcError(wire, -32000) }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`classifyRpcContractError(error)` additionally serves custom error projectors that must query the disclosure policy of an exact locally raised Contract error without reading any error properties. It reads only the private exact-reference registry and returns an immutable summary; foreign values and copied errors return `undefined`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The code table has no exact-reference policy, while serialization reads the fixed error fields and reports failed getters, so neither replaces this operation. The summary does not mint errors or confer operation authority. For Core/Remote failures, use Core's ordinary wire operations; public family guards are diagnostic classification rather than proof that Core minted an error."
                 },
                 {
                   "type": "code",
@@ -32040,6 +32290,10 @@
                 {
                   "type": "paragraph",
                   "text": "包内使用相对路径；跨包调用只使用公开 API。协议工具使用 `@migaia/rpc-contract`，Core/Remote/Testing 使用 `@migaia/rpc-core` 的普通入口。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "从包根导入 `RPC_PROCESS_ERROR_SOURCE` 和 `RpcProcessErrorCode`，按 `(source, code)` 处理 launch、dial、listen 与资源采样失败。source 固定为 `@migaia/rpc/process`；原生 cause 与错误类型沿原路径保留。`RpcProcessErrorText` 已从公开面删除，这是更名后包的破坏性导出变更；消息只用于展示，不作为重试或终止依据。自定义 child bootstrap 继续使用 `@migaia/rpc-core/adapter/process-data` 的环境名、版本、frame 限额与发现超时常量；stderr 文本与配额常量属于私有诊断策略。"
                 }
               ]
             },
@@ -32149,6 +32403,10 @@
                 {
                   "type": "paragraph",
                   "text": "包内使用相对路径；跨包调用只使用公开 API。协议工具使用 `@migaia/rpc-contract`，Core/Remote/Testing 使用 `@migaia/rpc-core` 的普通入口。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "从包根导入 `RPC_THREAD_ERROR_SOURCE` 和 `RpcThreadErrorCode`；source 固定为 `@migaia/rpc/threads`。资源采样失败按 `usageSampleFailed` 报告 unavailable 并保留原 cause，不将显示消息或复制的 source/code 当作 Worker 控制权。Core 的普通错误族守卫处理跨 realm 的 Core 错误，详见 Core USEGUIDE。"
                 }
               ]
             },
@@ -32250,6 +32508,10 @@
                 {
                   "type": "paragraph",
                   "text": "包内使用相对路径；跨包调用只使用公开 API。协议工具使用 `@migaia/rpc-contract`，Core/Remote/Testing 使用 `@migaia/rpc-core` 的普通入口。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "从包根导入 `JSONRPC_BRIDGE_ERROR_SOURCE` 和 `JsonRpcBridgeErrorCode`，用原 `@migaia/rpc/bridge/jsonrpc` source 与 code 识别 frame/profile/扩展/握手失败。`JsonRpcBridgeErrorText` 已从公开面删除，这是更名后包的破坏性导出变更。外部语言 peer 通过 `@migaia/rpc-contract/errors` 的 `toJsonRpcError`、`fromJsonRpcError` 和 `RpcJsonRpcWireError.dataKey` 保留完整 wire 错误树；JSON-RPC 整数 code 仍由 peer profile 决定。消息与 wire source/code 均不授予 Core 运行时权限。"
                 }
               ]
             },

@@ -446,7 +446,7 @@ function transportGuide(input: {
   })
 }
 
-/** Creates a reading guide for one public failure class. */
+/** Describes a public diagnostic type without exposing its owner-only runtime constructor. */
 function errorGuide(input: {
   readonly name: string
   readonly conditionEn: string
@@ -455,21 +455,21 @@ function errorGuide(input: {
   readonly distinctionZh: string
 }): Readonly<Record<IGuideLocale, IApiGuide>> {
   return guide({
-    purposeEn: `${input.name} represents ${input.conditionEn}. Its stable source and code let callers handle the failure without parsing message text, while cause and cleanup fields retain the original error.`,
-    purposeZh: `${input.name} 表示${input.conditionZh}。调用方可以读取稳定的 source 与 code 处理失败，无需解析 message；原始错误仍保留在 cause 或清理结果字段中。`,
-    quickStart: `import type { IRpcEndpoint } from '@migaia/rpc-core'\nimport { ${input.name} } from '@migaia/rpc-core'\n\n// endpoint 已由应用按 transport、connect 和服务端 handler 完成组装。\nexport async function callWorker(endpoint: IRpcEndpoint) {\n  try {\n    await endpoint.send('worker', 'load', [])\n  } catch (error) {\n    if (error instanceof ${input.name}) {\n      console.error(error.code, error.cause)\n    }\n    throw error\n  }\n}\n\n// 服务端返回失败时，错误会沿 endpoint 边界传回这里；上层可在页面或重试层调用 callWorker(endpoint)。`,
+    purposeEn: `${input.name} describes ${input.conditionEn}. Import it as a type to read an actual owner's failure. Source/code and cause are diagnostics; they do not prove execution, authorize retry or change Core operation state.`,
+    purposeZh: `${input.name} 描述${input.conditionZh}。只作 type 导入，读取实际 owner 已产生的失败。source/code 与 cause 属于诊断，不能证明执行结果、授予重试或改变 Core 操作状态。`,
+    quickStart: `import type { ${input.name} } from '@migaia/rpc-core'\n\n/** Read a failure already raised by its owner; no constructor is imported. */\nexport function reportFailure(error: ${input.name}) {\n  console.error(error.source, error.code, error.cause)\n}\n// For unknown values use the public Core family guards before reading diagnostics.\n// Their result is not proof that Core minted the error or that the call may be repeated.`,
     useEn: [
       input.distinctionEn,
-      'Catch it only where the caller can recover, translate, report, or apply a bounded retry policy.'
+      'Read cause and cleanup evidence at the original error boundary without replacing the error.'
     ],
-    useZh: [input.distinctionZh, '只在调用方能够恢复、转换、报告或执行有上限重试的边界捕获。'],
+    useZh: [input.distinctionZh, '在原错误边界读取 cause 与 cleanup 证据，不替换原错误。'],
     avoidEn: [
-      'Branching on message text instead of source, code, name, or native error identity.',
-      'Constructing it to represent a normal endpoint state.'
+      'Importing this type as a value for construction or instanceof checks.',
+      'Using public diagnostic fields to authorize retry, cancellation, terminal or close decisions.'
     ],
     avoidZh: [
-      '不要根据 message 文本分支；应读取 source、code、name 或原生错误类型。',
-      '不要用它表示正常 endpoint 状态。'
+      '把此 type 作为 value 导入进行构造或 instanceof 判断。',
+      '用公开诊断字段授予重试、取消、终止或关闭决定。'
     ]
   })
 }
@@ -1553,9 +1553,9 @@ const webRpcCoreGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IA
 const webRpcErrorGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> = {
   'rpc-contract:errors:classifyRpcContractError': guide({
     purposeEn:
-      'Reads the stable diagnostic code and message for the exact error raised by this protocol instance. A receiver can present an invalid envelope safely without reading hostile error getters or exposing its local cause.',
+      'Queries disclosure code and display message for the exact local Contract error without reading its properties. The immutable summary is presentation policy; message wording is not a public recovery contract.',
     purposeZh:
-      '读取当前协议实例实际产生的错误所对应的稳定 code 与 message。接收方可展示无效 envelope 的受控诊断，不读取错误 getter，也不遍历可能含本地输入的 cause。',
+      '不读取错误属性地查询当前 Contract 实例实际产生错误的披露 code 与展示 message。不可变 summary 是展示策略；message 文本不是公开恢复契约。',
     quickStart: `import { classifyRpcContractError, normalizeRpcEnvelope } from '@migaia/rpc-contract'
 
 try {
@@ -1587,12 +1587,8 @@ try {
       'Encodes a held Core or Remote error as bounded protocol data using its existing presentation and forwarding-route policy. Custom carriers retain the local error and cause while sending the same controlled diagnostic fields as the built-in transport.',
     purposeZh:
       '按原诊断与 forwarding-route 策略，把持有的 Core 或 Remote 错误编码为有界协议数据。自定义载体保留本地错误及 cause，线上使用与内置 transport 相同的受控诊断字段。',
-    quickStart: `import { RpcConfigurationError, serializeRpcError } from '@migaia/rpc-core'
-
-const local = new RpcConfigurationError('Carrier configuration is invalid', new Error('Native setup failed'))
-const wire = serializeRpcError(local, { report: ({ error }) => console.error(error) })
-const message = JSON.stringify({ error: wire })
-console.log(message)`,
+    quickStart:
+      "import { attachErrorIdentity } from '@migaia/utils/error'\nimport { serializeRpcError, deserializeRpcError } from '@migaia/rpc-core'\n\n/** This adapter owns its semantic identity and display wording. */\nconst ADAPTER_SOURCE = '@example/custom-ipc'\n/** A native write failure never claims a Core timeout or cancellation. */\nconst AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const\n/** Keep private native details on cause rather than quoting payload bytes. */\nconst AdapterErrorText = { writeFailed: 'adapter write failed' } as const\n\n/** Project an actual native write failure using this adapter's own identity. */\nexport function projectWriteFailure(cause: unknown) {\n  const original = attachErrorIdentity(new Error(AdapterErrorText.writeFailed, { cause }), {\n    source: ADAPTER_SOURCE, code: AdapterErrorCode.writeFailed\n  })\n  const wire = serializeRpcError(original, { report: ({ error }) => console.error(error) })\n  return { original, wire }\n}\n\n/** Reconstruct received error data without minting Core's private operation identity. */\nexport function receiveFailure(received: unknown) {\n  return deserializeRpcError(received)\n}\n// The serializer keeps Core/Remote disclosure and forwarding routes for actual held errors.\n// A wire source/code/name and a restored error never authorize retry, cancellation or close.",
     useEn: [
       'A custom carrier needs to transmit an actual Core or Remote failure with its existing redaction policy.',
       'A relay must preserve admitted forwarding routes when it re-encodes a received failure.'
@@ -1615,15 +1611,8 @@ console.log(message)`,
       'Validates received error protocol data and restores its native error graph without replacing the transmitted stack. Core retains the admitted route for subsequent forwarding or re-encoding by a custom carrier.',
     purposeZh:
       '校验接收到的错误协议数据并恢复原生错误图，不替换传来的 stack。Core 持有已接纳的 route，供自定义载体随后转发或重新编码同一个错误。',
-    quickStart: `import { RpcConfigurationError, serializeRpcError, deserializeRpcError } from '@migaia/rpc-core'
-
-const sent = serializeRpcError(new RpcConfigurationError('Carrier configuration is invalid'), {
-  report: ({ error }) => console.error(error)
-})
-const received: unknown = JSON.parse(JSON.stringify(sent))
-const restored = deserializeRpcError(received)
-console.log(Reflect.get(restored, 'source'), Reflect.get(restored, 'code'))
-console.log(restored.stack === sent.stack)`,
+    quickStart:
+      "import { attachErrorIdentity } from '@migaia/utils/error'\nimport { serializeRpcError, deserializeRpcError } from '@migaia/rpc-core'\n\n/** This adapter owns its semantic identity and display wording. */\nconst ADAPTER_SOURCE = '@example/custom-ipc'\n/** A native write failure never claims a Core timeout or cancellation. */\nconst AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const\n/** Keep private native details on cause rather than quoting payload bytes. */\nconst AdapterErrorText = { writeFailed: 'adapter write failed' } as const\n\n/** Project an actual native write failure using this adapter's own identity. */\nexport function projectWriteFailure(cause: unknown) {\n  const original = attachErrorIdentity(new Error(AdapterErrorText.writeFailed, { cause }), {\n    source: ADAPTER_SOURCE, code: AdapterErrorCode.writeFailed\n  })\n  const wire = serializeRpcError(original, { report: ({ error }) => console.error(error) })\n  return { original, wire }\n}\n\n/** Reconstruct received error data without minting Core's private operation identity. */\nexport function receiveFailure(received: unknown) {\n  return deserializeRpcError(received)\n}\n// The serializer keeps Core/Remote disclosure and forwarding routes for actual held errors.\n// A wire source/code/name and a restored error never authorize retry, cancellation or close.",
     useEn: [
       'A custom carrier receives error data that must be validated before it becomes a local throwable value.',
       'A relay needs the same restored error and route when it forwards or serializes a failure again.'
@@ -1697,36 +1686,51 @@ console.log(restored.stack === sent.stack)`,
   }),
   'rpc-core:index:isRpcError': guide({
     purposeEn:
-      'Detects the public RPC error shape without same-realm instanceof, making it useful after cross-realm reconstruction.',
+      'Recognizes only an object with a string code. This loose diagnostic shape check does not establish a Core source, error family, private owner identity or execution outcome.',
     purposeZh:
-      '不依赖 same-realm instanceof，按 public RPC error shape 做窄化，因此适用于 cross-realm reconstruction 之后。',
+      '只识别带 string code 的 object。这是宽松诊断 shape 判断，不能确认 Core source、错误族、owner 私有身份或执行结果。',
     quickStart:
-      "import { isRpcError } from '@migaia/rpc-core'\n\nconst error: unknown = { source: '@migaia/rpc/core', code: 'DEADLINE_EXCEEDED' }\nif (isRpcError(error) && error.code === 'DEADLINE_EXCEEDED') {\n  console.log('retrying after remote deadline')\n}",
-    useEn: ['A catch boundary needs machine-readable source/code handling across realms.'],
-    useZh: ['catch boundary 需要跨 realm 的 machine-readable source/code handling。'],
+      "import { isRpcError, serializeRpcError } from '@migaia/rpc-core'\n\n/** Report the caught value without turning its public code into a control decision. */\nexport function reportCodedFailure(error: unknown) {\n  if (isRpcError(error)) {\n    const wire = serializeRpcError(error, { report: ({ error }) => console.error(error) })\n    console.error(wire)\n  }\n}\n// Use isRpcErrorInstance/isRpcRemoteError/isRpcTimeoutError for Core family diagnostics.\n// Reconcile actual execution/outcome before deciding whether a call may be repeated.",
+    useEn: [
+      'A reporting boundary identifies a machine-readable code before selecting its diagnostic sink.',
+      'A received coded value must be distinguished from an uncoded primitive without instanceof.'
+    ],
+    useZh: [
+      '报告边界先识别 machine-readable code，再选择诊断 sink。',
+      '需要不依赖 instanceof 地区分编码值与无 code 的抛出 primitive。'
+    ],
     avoidEn: [
-      'Using it as proof that an untrusted object is safe.',
-      'Replacing AbortError or TimeoutError name checks where those semantics matter.'
+      'Using this result or a public code to authorize retry, cancellation, terminal or close.',
+      'Treating this as a Core family guard or proof that Core minted an untrusted object.'
     ],
     avoidZh: [
-      '把它当作 untrusted object 安全可信的证明。',
-      '在需要 AbortError/TimeoutError semantics 时替代 name check。'
+      '凭此结果或公开 code 授予重试、取消、终止或关闭。',
+      '把此判断当作 Core 错误族守卫，或证明不可信 object 由 Core 产生。'
     ]
   }),
-  'rpc-core:index:WEBRPC_SOURCE': guide({
+  'rpc-core:index:RPC_CORE_ERROR_SOURCE': guide({
     purposeEn:
-      'Exposes the stable source discriminator stamped onto locally produced RPC failures so catch boundaries can distinguish ownership without parsing messages.',
+      'Provides the stable @migaia/rpc/core diagnostic source. Compare it with the public code table on validated received error data; it is not a credential or proof of local Core construction.',
     purposeZh:
-      '公开写入本地 RPC failure 的稳定 source discriminator，让 catch boundary 无需解析 message 即可区分 ownership。',
+      '提供稳定的 @migaia/rpc/core 诊断 source。在已校验的接收错误数据上与公开 code 表一起比较；它不是凭据，也不证明本地 Core 构造身份。',
     quickStart:
-      "import { isRpcError, WEBRPC_SOURCE } from '@migaia/rpc-core'\n\nconst error: unknown = { source: WEBRPC_SOURCE, code: 'REMOTE_FAILURE' }\nif (isRpcError(error) && error.source === WEBRPC_SOURCE) {\n  console.error('RPC failure:', error)\n}",
-    useEn: ['A shared error boundary handles failures from several libraries.'],
-    useZh: ['shared error boundary 需要处理来自多个 library 的 failure。'],
-    avoidEn: [
-      'Treating source as a security credential.',
-      'Hard-coding the same string in several consumers.'
+      "import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-core'\nimport { normalizeRpcSerializedError } from '@migaia/rpc-contract/errors'\n\n/** Classify a received diagnostic tree after the wire grammar accepts it. */\nexport function reportCoreDeadline(received: unknown) {\n  const wire = normalizeRpcSerializedError(received)\n  if (wire.source === RPC_CORE_ERROR_SOURCE && wire.code === RpcCoreErrorCode.deadlineExceeded) {\n    console.error(wire)\n  }\n  return wire\n}\n// The pair reports the failure; actual execution/outcome controls any retry decision.",
+    useEn: [
+      'A shared report sink distinguishes Core diagnostics from application and adapter sources.',
+      'A protocol implementer preserves the historical semantic source across the physical package split.'
     ],
-    avoidZh: ['把 source 当作 security credential。', '在多个 consumer 中硬编码同一个 string。']
+    useZh: [
+      '共享报告 sink 需要区分 Core 与应用、适配器的诊断来源。',
+      '协议实现者在物理分包后继续保留原语义 source。'
+    ],
+    avoidEn: [
+      'Using source/code as a Core private owner identity or execution receipt.',
+      'Automatically retrying a business call from a received deadline code.'
+    ],
+    avoidZh: [
+      '把 source/code 当作 Core 私有 owner 身份或执行回执。',
+      '凭收到的 deadline code 自动重试业务调用。'
+    ]
   }),
   'rpc-core:index:RpcError': errorGuide({
     name: 'RpcError',
@@ -1759,12 +1763,29 @@ console.log(restored.stack === sent.stack)`,
     distinctionZh:
       '以 cause 为 primary failure，以 cleanupErrors 或 cleanupPromise 为 secondary rollback evidence。'
   }),
-  'rpc-core:index:RpcLifecycleError': errorGuide({
-    name: 'RpcLifecycleError',
-    conditionEn: 'use after endpoint disposal or a terminal lifecycle transition',
-    conditionZh: 'endpoint dispose 后继续使用，或发生 terminal lifecycle transition',
-    distinctionEn: 'Create a new endpoint instead of reviving a terminal one.',
-    distinctionZh: '应创建新 endpoint，不能 revive terminal endpoint。'
+  'rpc-core:index:RpcLifecycleError': guide({
+    purposeEn:
+      "Represents failure after disposal of the caller's own resource. StoreWorker uses this public constructor after its real disposePromise starts and retains cleanup failures through cause/cleanupErrors. Construction supplies diagnostics, never Core private operation identity.",
+    purposeZh:
+      '表示调用方自己的资源开始 disposal 后发生的失败。StoreWorker 在真实 disposePromise 开始后使用这个公开构造器，并通过 cause/cleanupErrors 保留清理失败。构造只提供诊断，不产生 Core 操作私有身份。',
+    quickStart:
+      "import { RpcLifecycleError } from '@migaia/rpc-core'\n\n/** The resource owner supplies its actual disposal promise and owned display text. */\nexport function rejectAfterDisposal(disposePromise: Promise<void> | undefined, message: string) {\n  if (disposePromise !== undefined) throw new RpcLifecycleError(message)\n}\n// StoreWorker's workerParser uses this pattern before request/stream dispatch.\n// Construction cannot retire another Core generation or authorize a close.",
+    useEn: [
+      'A real resource owner rejects new work after its own disposal begins, as StoreWorker does.',
+      'That owner preserves the primary cleanup error and resource-specific cleanup entries.'
+    ],
+    useZh: [
+      '真实资源 owner 像 StoreWorker 一样，在自己的 disposal 开始后拒绝新工作。',
+      '该 owner 需要保留原 cleanup 主错误与资源对应的 cleanup entries。'
+    ],
+    avoidEn: [
+      'Constructing an error to claim that Core cancelled, retired or closed an operation.',
+      'Using public fields as evidence that Core minted private lifecycle identity.'
+    ],
+    avoidZh: [
+      '构造错误以声称 Core 已取消、retire 或关闭某个操作。',
+      '用公开字段证明 Core 已产生操作私有生命周期身份。'
+    ]
   }),
   'rpc-core:index:RpcSerializationError': errorGuide({
     name: 'RpcSerializationError',
@@ -1820,17 +1841,328 @@ console.log(restored.stack === sent.stack)`,
     conditionEn: 'caller or owner cancellation with the standard AbortError name',
     conditionZh: 'caller 或 owner cancellation，并公开标准 AbortError name',
     distinctionEn:
-      'Stop dependent work and preserve the reason; do not report expected cancellation as a fault.',
-    distinctionZh: '停止 dependent work 并保留 reason；不要把预期 cancellation 报告成 fault。'
+      'Read the cancellation reason retained by the actual owner; a diagnostic label cannot cancel another operation.',
+    distinctionZh: '读取实际 owner 保留的取消原因；诊断标签不能取消其它操作。'
   }),
   'rpc-core:index:RpcTimeoutError': errorGuide({
     name: 'RpcTimeoutError',
     conditionEn: 'an exceeded call deadline with the standard TimeoutError name',
     conditionZh: 'call deadline 超限，并公开标准 TimeoutError name',
     distinctionEn:
-      'Retry only when the method is repeat-safe and the caller owns a bounded retry policy.',
-    distinctionZh: '只有 method 可安全重复且 caller 拥有 bounded retry policy 时才能重试。'
+      'Report the deadline and reconcile actual execution/outcome before any independent retry policy runs.',
+    distinctionZh: '报告 deadline，并在独立重试策略运行前核对真实 execution/outcome。'
   })
+}
+
+/** Documents actual source/code catalogs for protocol diagnostics without granting operation rights. */
+function errorIdentityGuide(input: {
+  readonly source: string
+  readonly codeTable: string
+  readonly importPath: string
+  readonly member: string
+  readonly purposeEn: string
+  readonly purposeZh: string
+  readonly useEn: readonly string[]
+  readonly useZh: readonly string[]
+}): Readonly<Record<IGuideLocale, IApiGuide>> {
+  return guide({
+    purposeEn: input.purposeEn,
+    purposeZh: input.purposeZh,
+    quickStart: `import { ${input.source}, ${input.codeTable} } from '${input.importPath}'
+import { normalizeRpcSerializedError } from '@migaia/rpc-contract/errors'
+
+/** Report the actual received error tree after accepting the closed wire grammar. */
+export function reportReceivedFailure(received: unknown) {
+  const wire = normalizeRpcSerializedError(received)
+  if (wire.source === ${input.source} && wire.code === ${input.codeTable}.${input.member}) {
+    console.error(wire)
+  }
+  return wire
+}
+// The pair classifies diagnostics; actual execution/outcome and owned resources decide controls.
+// After admission the same fields may preserve wire/terminal report wording; they do not change control.
+// Third-party adapters attach their own source/code through @migaia/utils/error.`,
+    useEn: input.useEn,
+    useZh: input.useZh,
+    avoidEn: [
+      'Parsing display text instead of the documented semantic source/code pair.',
+      'Treating copied source/code fields as a retry, cancellation, terminal or close permission.'
+    ],
+    avoidZh: [
+      '解析展示文本，而不是读取已定义的语义 source/code。',
+      '把复制的 source/code 字段当作重试、取消、终止或关闭权限。'
+    ]
+  })
+}
+
+/** Explains one B6 family predicate as cross-realm diagnosis rather than local owner identity. */
+function errorFamilyGuide(input: {
+  readonly name: string
+  readonly purposeEn: string
+  readonly purposeZh: string
+  readonly useEn: readonly string[]
+  readonly useZh: readonly string[]
+}): Readonly<Record<IGuideLocale, IApiGuide>> {
+  return guide({
+    purposeEn: input.purposeEn,
+    purposeZh: input.purposeZh,
+    quickStart: `import { ${input.name}, serializeRpcError } from '@migaia/rpc-core'
+
+/** The reporting boundary classifies a caught value without changing an operation. */
+export function reportFamilyFailure(error: unknown) {
+  if (!${input.name}(error)) return false
+  const wire = serializeRpcError(error, { report: ({ error }) => console.error(error) })
+  console.error(wire)
+  return true
+}
+// This public predicate works across realms and module copies without instanceof.
+// Public fields may be copied; a match does not prove Core minted private control identity.
+// An admitted reason may retain source/code for wire or terminal presentation without gaining control.
+// Reconcile actual execution/outcome before any independent retry decision.`,
+    useEn: input.useEn,
+    useZh: input.useZh,
+    avoidEn: [
+      'Using family classification to cancel, terminate, close or retire an owned generation.',
+      'Equating a received cached cancellation label with Core private live-operation identity.'
+    ],
+    avoidZh: [
+      '用错误族分类取消、终止、关闭或 retire 持有的 generation。',
+      '把收到的缓存取消标签等同于 Core 操作私有身份。'
+    ]
+  })
+}
+
+/** Ordinary public error catalogs have concrete protocol-implementer and adapter-author uses. */
+/** Each semantic source/code pair shares one maintained diagnostic use case. */
+const rpcErrorCatalogGuides = {
+  contract: errorIdentityGuide({
+    importPath: '@migaia/rpc-contract/errors',
+    source: 'RPC_CONTRACT_SOURCE',
+    codeTable: 'RpcContractErrorCode',
+    member: 'frameLimitExceeded',
+    purposeEn:
+      'Identifies Contract protocol violations with the unchanged @migaia/rpc/contract source and public code table. A frame quota diagnostic does not itself alter the carrier or replay state.',
+    purposeZh:
+      '用不变的 @migaia/rpc/contract source 与公开 code 表识别 Contract 协议违例。frame 配额诊断本身不改变载体或 replay 状态。',
+    useEn: [
+      'An independent protocol receiver reports an invalid envelope, frame, handshake or error tree.',
+      'A foreign runtime preserves the same semantic code while implementing the shipped wire-error schema.'
+    ],
+    useZh: [
+      '独立协议接收端需要报告无效 envelope、frame、handshake 或错误树。',
+      '外部 runtime 实现随包交付的 wire-error schema，并保留相同语义 code。'
+    ]
+  }),
+  core: errorIdentityGuide({
+    importPath: '@migaia/rpc-core',
+    source: 'RPC_CORE_ERROR_SOURCE',
+    codeTable: 'RpcCoreErrorCode',
+    member: 'deadlineExceeded',
+    purposeEn:
+      'Lists the semantic Core failures that custom adapters may report. A deadline code describes a failure; only the actual logical call outcome can establish whether execution occurred.',
+    purposeZh:
+      '列出自定义适配器可报告的 Core 语义失败。deadline code 描述失败；只有实际逻辑调用的 outcome 能确定是否发生执行。',
+    useEn: [
+      'An adapter author classifies a Core failure for reporting without constructing Core private identity.',
+      'A caller retains source/code and cause while independently reconciling a lost result.'
+    ],
+    useZh: [
+      '适配器作者需要分类 Core 失败以报告，不构造 Core 私有身份。',
+      '调用方独立核对丢失结果时，保留 source/code 与 cause。'
+    ]
+  }),
+  remote: errorIdentityGuide({
+    importPath: '@migaia/rpc-core/remote',
+    source: 'RPC_REMOTE_ERROR_SOURCE',
+    codeTable: 'RpcRemoteLayerErrorCode',
+    member: 'resultUnknown',
+    purposeEn:
+      'Identifies Remote layer failures with the stable @migaia/rpc/remote source. REMOTE_RESULT_UNKNOWN reports a lost result rather than proof that a non-idempotent method did not execute.',
+    purposeZh:
+      '用稳定的 @migaia/rpc/remote source 识别 Remote 层失败。REMOTE_RESULT_UNKNOWN 表示结果丢失，不证明非幂等方法没有执行。',
+    useEn: [
+      'A Runtime caller reports an unavailable generation or an unknown result before reconciliation.',
+      'A custom diagnostic sink distinguishes Remote contract failures from Core and native transport failures.'
+    ],
+    useZh: [
+      'Runtime 调用方在对账前报告 generation 不可用或结果未知。',
+      '自定义诊断 sink 需要区分 Remote contract、Core 与原生 transport 失败。'
+    ]
+  }),
+  process: errorIdentityGuide({
+    importPath: '@migaia/rpc-process',
+    source: 'RPC_PROCESS_ERROR_SOURCE',
+    codeTable: 'RpcProcessErrorCode',
+    member: 'usageSampleFailed',
+    purposeEn:
+      'Identifies actual Process launch, connection, lifecycle and sampling failures with the stable @migaia/rpc/process source. Native details remain reachable through the original cause.',
+    purposeZh:
+      '用稳定的 @migaia/rpc/process source 识别实际 Process 启动、连接、生命周期与采样失败。原生详情沿原 cause 保持可达。',
+    useEn: [
+      'A process adapter reports native launch or socket errors without depending on private display text.',
+      'A resource view reports sampling unavailable without fabricating CPU or RSS values.'
+    ],
+    useZh: [
+      '进程适配器不依赖私有展示文本地报告原生启动或 socket 错误。',
+      '资源视图报告采样 unavailable，不伪造 CPU 或 RSS 数值。'
+    ]
+  }),
+  threads: errorIdentityGuide({
+    importPath: '@migaia/rpc-threads',
+    source: 'RPC_THREAD_ERROR_SOURCE',
+    codeTable: 'RpcThreadErrorCode',
+    member: 'usageSampleFailed',
+    purposeEn:
+      'Identifies the native Worker sampling failure with the stable @migaia/rpc/threads source and THREAD_USAGE_SAMPLE_FAILED code. This diagnostic grants no Worker stop or replacement authority.',
+    purposeZh:
+      '用稳定的 @migaia/rpc/threads source 与 THREAD_USAGE_SAMPLE_FAILED code 识别原生 Worker 采样失败。此诊断不授予 Worker stop 或 replacement 权限。',
+    useEn: [
+      'A thread adapter reports an unsupported or failed real Worker resource sample.',
+      'An application retains the original sampling cause while showing the measurement unavailable.'
+    ],
+    useZh: [
+      '线程适配器需要报告不支持或失败的真实 Worker 资源采样。',
+      '应用保留原采样 cause，同时显示测量 unavailable。'
+    ]
+  }),
+  jsonrpc: errorIdentityGuide({
+    importPath: '@migaia/rpc-bridge-jsonrpc',
+    source: 'JSONRPC_BRIDGE_ERROR_SOURCE',
+    codeTable: 'JsonRpcBridgeErrorCode',
+    member: 'frameInvalid',
+    purposeEn:
+      'Identifies framing, profile, extension and hello-deadline failures with the stable @migaia/rpc/bridge/jsonrpc source. The JSON-RPC integer code policy remains with the foreign peer profile.',
+    purposeZh:
+      '用稳定的 @migaia/rpc/bridge/jsonrpc source 识别 framing、profile、扩展与 hello deadline 失败。JSON-RPC 整数 code 策略仍归外部 peer profile。',
+    useEn: [
+      'A foreign-language carrier reports Content-Length or UTF-8 rejection without parsing messages.',
+      'A peer maps its actual wire error tree through toJsonRpcError/fromJsonRpcError while preserving semantic identity.'
+    ],
+    useZh: [
+      '外部语言载体不解析 message 文本地报告 Content-Length 或 UTF-8 拒绝。',
+      'peer 用 toJsonRpcError/fromJsonRpcError 映射实际 wire 错误树，保留语义身份。'
+    ]
+  }),
+  processAdapter: errorIdentityGuide({
+    importPath: '@migaia/rpc-core/adapter/diagnostics',
+    source: 'RPC_PROCESS_ERROR_SOURCE',
+    codeTable: 'RpcProcessErrorCode',
+    member: 'usageSampleFailed',
+    purposeEn:
+      'Identifies actual Process launch, connection, lifecycle and sampling failures with the stable @migaia/rpc/process source. Native details remain reachable through the original cause.',
+    purposeZh:
+      '用稳定的 @migaia/rpc/process source 识别实际 Process 启动、连接、生命周期与采样失败。原生详情沿原 cause 保持可达。',
+    useEn: [
+      'A process adapter reports native launch or socket errors without depending on private display text.',
+      'A resource view reports sampling unavailable without fabricating CPU or RSS values.'
+    ],
+    useZh: [
+      '进程适配器不依赖私有展示文本地报告原生启动或 socket 错误。',
+      '资源视图报告采样 unavailable，不伪造 CPU 或 RSS 数值。'
+    ]
+  }),
+  threadsAdapter: errorIdentityGuide({
+    importPath: '@migaia/rpc-core/adapter/threads',
+    source: 'RPC_THREAD_ERROR_SOURCE',
+    codeTable: 'RpcThreadErrorCode',
+    member: 'usageSampleFailed',
+    purposeEn:
+      'Identifies the native Worker sampling failure with the stable @migaia/rpc/threads source and THREAD_USAGE_SAMPLE_FAILED code. This diagnostic grants no Worker stop or replacement authority.',
+    purposeZh:
+      '用稳定的 @migaia/rpc/threads source 与 THREAD_USAGE_SAMPLE_FAILED code 识别原生 Worker 采样失败。此诊断不授予 Worker stop 或 replacement 权限。',
+    useEn: [
+      'A thread adapter reports an unsupported or failed real Worker resource sample.',
+      'An application retains the original sampling cause while showing the measurement unavailable.'
+    ],
+    useZh: [
+      '线程适配器需要报告不支持或失败的真实 Worker 资源采样。',
+      '应用保留原采样 cause，同时显示测量 unavailable。'
+    ]
+  }),
+  jsonrpcAdapter: errorIdentityGuide({
+    importPath: '@migaia/rpc-contract/framing/jsonrpc',
+    source: 'JSONRPC_BRIDGE_ERROR_SOURCE',
+    codeTable: 'JsonRpcBridgeErrorCode',
+    member: 'frameInvalid',
+    purposeEn:
+      'Identifies framing, profile, extension and hello-deadline failures with the stable @migaia/rpc/bridge/jsonrpc source. The JSON-RPC integer code policy remains with the foreign peer profile.',
+    purposeZh:
+      '用稳定的 @migaia/rpc/bridge/jsonrpc source 识别 framing、profile、扩展与 hello deadline 失败。JSON-RPC 整数 code 策略仍归外部 peer profile。',
+    useEn: [
+      'A foreign-language carrier reports Content-Length or UTF-8 rejection without parsing messages.',
+      'A peer maps its actual wire error tree through toJsonRpcError/fromJsonRpcError while preserving semantic identity.'
+    ],
+    useZh: [
+      '外部语言载体不解析 message 文本地报告 Content-Length 或 UTF-8 拒绝。',
+      'peer 用 toJsonRpcError/fromJsonRpcError 映射实际 wire 错误树，保留语义身份。'
+    ]
+  })
+}
+
+/** Concrete source/code and family guides for the ordinary third-party error surface. */
+const rpcPublicErrorGuides = {
+  'rpc-contract:errors:RPC_CONTRACT_SOURCE': rpcErrorCatalogGuides.contract,
+  'rpc-contract:errors:RpcContractErrorCode': rpcErrorCatalogGuides.contract,
+  'rpc-core:index:RpcCoreErrorCode': rpcErrorCatalogGuides.core,
+  'rpc-core:remote:RPC_REMOTE_ERROR_SOURCE': rpcErrorCatalogGuides.remote,
+  'rpc-core:remote:RpcRemoteLayerErrorCode': rpcErrorCatalogGuides.remote,
+  'rpc-process:index:RPC_PROCESS_ERROR_SOURCE': rpcErrorCatalogGuides.process,
+  'rpc-process:index:RpcProcessErrorCode': rpcErrorCatalogGuides.process,
+  'rpc-threads:index:RPC_THREAD_ERROR_SOURCE': rpcErrorCatalogGuides.threads,
+  'rpc-threads:index:RpcThreadErrorCode': rpcErrorCatalogGuides.threads,
+  'rpc-bridge-jsonrpc:index:JSONRPC_BRIDGE_ERROR_SOURCE': rpcErrorCatalogGuides.jsonrpc,
+  'rpc-bridge-jsonrpc:index:JsonRpcBridgeErrorCode': rpcErrorCatalogGuides.jsonrpc,
+  'rpc-core:index:isRpcErrorInstance': errorFamilyGuide({
+    name: 'isRpcErrorInstance',
+    purposeEn:
+      'Recognizes a Core diagnostic error family by its stable source, known code and family name across realms or module copies. Unlike isRpcError, it checks the family; it still cannot attest private local construction.',
+    purposeZh:
+      '跨 realm 或模块副本，用稳定 source、已知 code 与族 name 识别 Core 诊断错误族。比 isRpcError 多检查错误族，但仍不能证明本地私有构造身份。',
+    useEn: [
+      'An adapter classifies a received or cross-realm Core failure for a diagnostic sink.',
+      'A consumer reads the public RpcError type without importing a runtime constructor.'
+    ],
+    useZh: [
+      '适配器需要为诊断 sink 分类接收或跨 realm 的 Core 失败。',
+      '消费方需要读取公开 RpcError type，不导入运行时构造器。'
+    ]
+  }),
+  'rpc-core:index:isRpcRemoteError': errorFamilyGuide({
+    name: 'isRpcRemoteError',
+    purposeEn:
+      'Recognizes the RpcRemoteError diagnostic family across realms using Core source, its family name and the remote string code domain. The remote business code is preserved; a match does not prove delivery or execution state.',
+    purposeZh:
+      '跨 realm 用 Core source、RpcRemoteError 族 name 与远端 string code 域识别诊断族。保留远端业务 code；匹配不证明送达或执行状态。',
+    useEn: [
+      'A caller reports the provider business code and cause after receiving a remote failure.',
+      'A relay distinguishes the remote error family while preserving its unrestricted business code.'
+    ],
+    useZh: [
+      '调用方收到远端失败后需要报告 provider 业务 code 与 cause。',
+      'relay 需要区分远端错误族，同时保留其不受限业务 code。'
+    ]
+  }),
+  'rpc-core:index:isRpcTimeoutError': errorFamilyGuide({
+    name: 'isRpcTimeoutError',
+    purposeEn:
+      'Recognizes the coded TimeoutError diagnostic family across realms or copies. A timeout description does not prove that the provider failed to execute, and cannot mint a local timer or cancellation identity.',
+    purposeZh:
+      '跨 realm 或副本识别编码 TimeoutError 诊断族。超时描述不证明 provider 未执行，也不能产生本地 timer 或取消身份。',
+    useEn: [
+      'A reporting boundary records a deadline failure without relying on same-realm instanceof.',
+      'A caller diagnoses a timeout while separately consulting actual execution/outcome facts.'
+    ],
+    useZh: [
+      '报告边界不依赖同 realm instanceof 地记录 deadline 失败。',
+      '调用方诊断超时时，独立查询真实 execution/outcome 事实。'
+    ]
+  }),
+  'rpc-core:adapter-diagnostics:RPC_PROCESS_ERROR_SOURCE': rpcErrorCatalogGuides.processAdapter,
+  'rpc-core:adapter-diagnostics:RpcProcessErrorCode': rpcErrorCatalogGuides.processAdapter,
+  'rpc-core:adapter-threads:RPC_THREAD_ERROR_SOURCE': rpcErrorCatalogGuides.threadsAdapter,
+  'rpc-core:adapter-threads:RpcThreadErrorCode': rpcErrorCatalogGuides.threadsAdapter,
+  'rpc-contract:framing-jsonrpc:JSONRPC_BRIDGE_ERROR_SOURCE': rpcErrorCatalogGuides.jsonrpcAdapter,
+  'rpc-contract:framing-jsonrpc:JsonRpcBridgeErrorCode': rpcErrorCatalogGuides.jsonrpcAdapter
 }
 
 /** Stable protocol discriminants used by adapters, diagnostics, and tests. */
@@ -1935,7 +2267,7 @@ const webRpcConstantGuides: Readonly<Record<string, Readonly<Record<IGuideLocale
 const rpcProtocolGuideContexts = {
   binary: {
     quickStart:
-      "import { captureRpcBinaryData, prepareRpcBinary, RpcBinaryStorage } from '@migaia/rpc-contract/binary'\nimport { prepareRpcBinaryLazy } from '@migaia/rpc-contract/binary/lazy'\nimport type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract/runtime'\n\n/** Capture at the application's chosen point, then finish that same snapshot later. */\nexport async function captureOutgoing(envelope: IRpcRuntimeEnvelope) {\n  const captured = captureRpcBinaryData(envelope, RpcBinaryStorage.inline, 1_048_576)\n  return await captured.prepare()\n}\n\n/** Choose eager or cold preparation for a different outgoing envelope. */\nexport async function prepareOutgoing(envelope: IRpcRuntimeEnvelope, cold: boolean) {\n  return cold\n    ? await prepareRpcBinaryLazy(envelope, RpcBinaryStorage.inline, 1_048_576)\n    : await prepareRpcBinary(envelope, RpcBinaryStorage.inline, 1_048_576)\n}\n// The carrier sends manifest and sidecars from the returned preparation result.\n// Native storage additionally needs the authentication owner's whole-backing digest.",
+      "import { captureRpcBinaryData, prepareRpcBinary, RpcBinaryStorage } from '@migaia/rpc-contract/binary'\nimport { prepareRpcBinary as prepareColdRpcBinary, restoreRpcBinary } from '@migaia/rpc-contract/binary/lazy'\nimport type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract/runtime'\n\n/** Capture at the application's chosen point, then finish that same snapshot later. */\nexport async function captureOutgoing(envelope: IRpcRuntimeEnvelope) {\n  const captured = captureRpcBinaryData(envelope, RpcBinaryStorage.inline, 1_048_576)\n  return await captured.prepare()\n}\n\n/** The eager entry prepares this actual outgoing envelope. */\nexport async function prepareOutgoing(envelope: IRpcRuntimeEnvelope) {\n  return await prepareRpcBinary(envelope, RpcBinaryStorage.inline, 1_048_576)\n}\n\n/** A carrier that chooses the light entry uses the same canonical operation name. */\nexport async function prepareColdOutgoing(envelope: IRpcRuntimeEnvelope) {\n  return await prepareColdRpcBinary(envelope, RpcBinaryStorage.inline, 1_048_576)\n}\n/** Restore an actual received inline manifest at the receiver's existing asynchronous stage. */\nexport async function restoreIncoming(manifest: unknown) {\n  return await restoreRpcBinary(manifest, RpcBinaryStorage.inline, [])\n}\n// The carrier sends manifest and sidecars from the returned preparation result.\n// Native storage additionally needs the authentication owner's whole-backing digest.",
     useEn: [
       'An independent carrier needs the canonical manifest and actual binary backing accounting.',
       'The application must preserve the existing capture point before cold loading or asynchronous preparation.'
@@ -1975,7 +2307,7 @@ const rpcProtocolGuideContexts = {
   },
   errors: {
     quickStart:
-      "import {\n  deserializeRpcError, fromJsonRpcError, normalizeRpcSerializedError,\n  reachRpcError, serializeRpcError, toJsonRpcError\n} from '@migaia/rpc-contract/errors'\n\n/** Encode the caller's real failure; its reporting policy owns serialization diagnostics. */\nexport function encodeFailure(error: unknown, report: (error: unknown) => void, jsonRpcCode: number) {\n  const options = { report: ({ error: failure }: { error: unknown }) => report(failure) }\n  const reachable = [...reachRpcError(error, options)]\n  const wire = serializeRpcError(error, options)\n  const jsonRpc = toJsonRpcError(wire, jsonRpcCode)\n  return { reachable, wire, jsonRpc }\n}\n\n/** Validate an untrusted response before reconstructing its native error graph. */\nexport function receiveFailure(jsonRpc: unknown) {\n  const wire = normalizeRpcSerializedError(fromJsonRpcError(jsonRpc))\n  return deserializeRpcError(wire)\n}\n// The JSON-RPC adapter owns jsonRpcCode; Contract does not invent an integer code policy.\n// Core/Remote errors use the corresponding Core error operations for their private metadata.",
+      "import {\n  deserializeRpcError, fromJsonRpcError, normalizeRpcSerializedError,\n  reachRpcError, serializeRpcError, toJsonRpcError,\n  RpcJsonRpcWireError, RpcWireErrorField, RpcWireErrorLimit\n} from '@migaia/rpc-contract/errors'\nimport wireErrorSchema from '@migaia/rpc-contract/schema/wire-error' with { type: 'json' }\n\n/** Foreign protocol implementations reuse the same shipped grammar and error extension. */\nexport const errorProtocol = {\n  schema: wireErrorSchema, fieldOrder: RpcWireErrorField,\n  limits: RpcWireErrorLimit, jsonRpcDataKey: RpcJsonRpcWireError.dataKey\n}\n\n/** Encode the caller's real failure; its reporting policy owns serialization diagnostics. */\nexport function encodeFailure(error: unknown, report: (error: unknown) => void, jsonRpcCode: number) {\n  const options = { report: ({ error: failure }: { error: unknown }) => report(failure) }\n  const reachable = [...reachRpcError(error, options)]\n  const wire = serializeRpcError(error, options)\n  const jsonRpc = toJsonRpcError(wire, jsonRpcCode)\n  return { reachable, wire, jsonRpc }\n}\n\n/** Validate an untrusted response before reconstructing its native error graph. */\nexport function receiveFailure(jsonRpc: unknown) {\n  const wire = normalizeRpcSerializedError(fromJsonRpcError(jsonRpc))\n  return deserializeRpcError(wire)\n}\n// The JSON-RPC adapter owns jsonRpcCode; Contract does not invent an integer code policy.\n// Core/Remote errors use the corresponding Core error operations for their private metadata.",
     useEn: [
       'A custom protocol implementation must carry the actual bounded error chain across a language boundary.',
       'A diagnostic consumer needs the original local failure identities or validated remote reconstruction.'
@@ -2115,7 +2447,7 @@ const rpcProtocolGuideContexts = {
   },
   portableValues: {
     quickStart:
-      "import { hasRpcPortableBinary, normalizePortable, normalizeRuntimePortable } from '@migaia/rpc-contract/portable'\n\n/** Use the profile actually negotiated by the carrier, then retain the canonical snapshot. */\nexport function snapshotBusinessValue(value: unknown, nativeProfile: boolean) {\n  const snapshot = nativeProfile ? normalizeRuntimePortable(value) : normalizePortable(value)\n  return { snapshot, hasBinary: hasRpcPortableBinary(snapshot) }\n}\n// The binary proof belongs to this snapshot; a copied object is not a substitute.\n// This operation owns data normalization, not channel authentication or buffer transfer rights.",
+      "import { normalizePortable } from '@migaia/rpc-contract/portable'\nimport { normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime'\nimport { hasRpcBinaryEnvelope } from '@migaia/rpc-contract/binary/inspect'\n\n/** Admit one business value for the legacy portable wire grammar. */\nexport function snapshotBusinessValue(value: unknown) {\n  return normalizePortable(value)\n}\n\n/** A runtime protocol receiver validates its actual envelope before selecting a binary profile. */\nexport function inspectRuntimeEnvelope(decoded: unknown) {\n  const envelope = normalizeRuntimeEnvelope(decoded)\n  return { envelope, hasBinary: hasRpcBinaryEnvelope(envelope) }\n}\n// Retain the canonical snapshot; a copied record cannot substitute for its binary proof.\n// This data operation does not authorize transfer or negotiate channel capabilities.",
     useEn: [
       'An independent protocol implementation admits an actual business value at its supported profile boundary.',
       'The caller needs the canonical snapshot and its already retained binary proof.'
@@ -2155,7 +2487,7 @@ const rpcProtocolGuideContexts = {
   },
   lazyParsing: {
     quickStart:
-      "import { normalizeRuntimeEnvelopeLazy, normalizeStreamPayloadLazy } from '@migaia/rpc-contract/runtime/lazy'\n\n/** Await only at a receiver's existing asynchronous continuation. */\nexport async function receiveRuntimeEnvelope(decoded: unknown) {\n  return await normalizeRuntimeEnvelopeLazy(decoded)\n}\n\n/** An independent stream receiver shares the same canonical cold parser. */\nexport async function receiveStreamPayload(decoded: unknown) {\n  return await normalizeStreamPayloadLazy(decoded)\n}\n// Scalar envelope branches retain synchronous results; a cold stream branch may return a Promise.\n// The caller propagates the original parser failure and retains its actual stream state.",
+      "import { normalizeRuntimeEnvelope, normalizeStreamPayload } from '@migaia/rpc-contract/runtime/lazy'\n\n/** Await only at a receiver's existing asynchronous continuation. */\nexport async function receiveRuntimeEnvelope(decoded: unknown) {\n  return await normalizeRuntimeEnvelope(decoded)\n}\n\n/** An independent stream receiver shares the same canonical cold parser. */\nexport async function receiveStreamPayload(decoded: unknown) {\n  return await normalizeStreamPayload(decoded)\n}\n// Scalar envelope branches retain synchronous results; a cold stream branch may return a Promise.\n// The caller propagates the original parser failure and retains its actual stream state.",
     useEn: [
       'An existing asynchronous receiver wants the canonical parser without loading every stream branch eagerly.',
       'The carrier preserves its original decode continuation and error cause when cold loading is required.'
@@ -2220,6 +2552,30 @@ const rpcProtocolGuideContexts = {
  * case.
  */
 const rpcProtocolToolkitGuides = {
+  'rpc-contract:v1:normalizeRpcEnvelope': guide({
+    purposeEn:
+      'Validates an actual received protocol-1 envelope and returns its canonical snapshot. The receiver still owns authentication, routing and execution; Contract failures retain their native type, source/code and original cause.',
+    purposeZh:
+      '验证实际收到的 protocol-1 envelope，返回规范快照。鉴权、路由与执行仍归接收端；Contract 失败保留原生类型、source/code 与原 cause。',
+    quickStart:
+      "import { normalizeRpcEnvelope } from '@migaia/rpc-contract/v1'\nimport { classifyRpcContractError } from '@migaia/rpc-contract/errors'\n\n/** Admit real decoded protocol input before the receiver dispatches it. */\nexport function admitEnvelope(decoded: unknown) {\n  try {\n    return normalizeRpcEnvelope(decoded)\n  } catch (error) {\n    const summary = classifyRpcContractError(error)\n    if (summary) console.error(summary.code, summary.message)\n    throw error\n  }\n}\n// Diagnostic projection preserves the original failure and grants no channel or execution rights.",
+    useEn: [
+      'An independent protocol-1 receiver validates the closed envelope grammar before dispatch.',
+      'A custom carrier needs the canonical snapshot and the original coded validation failure.'
+    ],
+    useZh: [
+      '独立 protocol-1 接收方需要在 dispatch 前验证封闭 envelope grammar。',
+      '自定义载体需要规范快照与原编码校验失败。'
+    ],
+    avoidEn: [
+      'Using normalization to claim authentication, replay admission or provider execution.',
+      'Passing an unsupported runtime-envelope union through the protocol-1 validator.'
+    ],
+    avoidZh: [
+      '用归一化声称已鉴权、接纳 replay 或执行 provider。',
+      '把不受支持的 runtime-envelope union 交给 protocol-1 validator。'
+    ]
+  }),
   'rpc-contract:binary:captureRpcBinaryData': guide({
     ...rpcProtocolGuideContexts.binary,
     purposeEn:
@@ -2233,6 +2589,15 @@ const rpcProtocolToolkitGuides = {
       'Prepares a runtime envelope with the selected storage profile and actual codec, returning its canonical manifest, ordered native sidecars and complete backing-byte count. The caller supplies a whole-backing digest for native storage.',
     purposeZh:
       '按实际 storage profile 与持有的 codec 准备 runtime envelope，返回规范 manifest、按序 native sidecar 和完整 backing 字节数。native storage 的完整 backing 摘要由原鉴权 owner 提供。'
+  }),
+  'rpc-contract:binary:restoreRpcBinary': guide({
+    ...rpcProtocolGuideContexts.binary,
+    purposeEn:
+      'Restores a received canonical binary manifest using the already loaded codec. Native storage verifies the actual whole-backing digest and preserves backing identities; this protocol data operation does not authenticate or authorize a transport.',
+    purposeZh:
+      '用已加载的规范 codec 恢复收到的 binary manifest。native storage 校验实际完整 backing 摘要并保留 backing 身份；此协议数据操作不负责鉴权或授予 transport 权限。',
+    quickStart:
+      "import { restoreRpcBinary, RpcBinaryStorage, type IRpcBinaryDigest } from '@migaia/rpc-contract/binary'\n\n/** Restore the actual inline metadata after its carrier admits and authenticates the frame. */\nexport async function restoreInline(manifest: unknown) {\n  return await restoreRpcBinary(manifest, RpcBinaryStorage.inline, [])\n}\n\n/** The carrier supplies the real native sidecars and its actual whole-backing SHA-256 digest. */\nexport async function restoreNative(\n  manifest: unknown, sidecars: readonly ArrayBuffer[], digest: IRpcBinaryDigest\n) {\n  return await restoreRpcBinary(manifest, RpcBinaryStorage.native, sidecars, undefined, digest)\n}\n// Retain the actual backing references; restoration does not create transfer or execution rights."
   }),
   'rpc-contract:binary-inspect:assertRpcNativeBinaryFrameSize': guide({
     ...rpcProtocolGuideContexts.nativeInspection,
@@ -2283,12 +2648,19 @@ const rpcProtocolToolkitGuides = {
     purposeZh:
       '读取受支持的、由非共享 ArrayBuffer 支持的 Uint8Array，返回真实 backing、offset 与可见长度。这是数据检查操作，不授予内存所有权转移权限，也不支持其它 view 域。'
   }),
-  'rpc-contract:binary-lazy:prepareRpcBinaryLazy': guide({
+  'rpc-contract:binary-lazy:prepareRpcBinary': guide({
     ...rpcProtocolGuideContexts.binary,
     purposeEn:
       'Prepares the same canonical binary representation while allowing cold codec loading. It retains the synchronous capture point and the first native digest boundary before asynchronous completion.',
     purposeZh:
       '在允许冷加载 codec 的同时准备同一规范二进制表示；异步完成前保留原同步捕获点与第一次 native digest 边界。返回真实 manifest、sidecar 与 backing 计量，不重走业务图。'
+  }),
+  'rpc-contract:binary-lazy:restoreRpcBinary': guide({
+    ...rpcProtocolGuideContexts.binary,
+    purposeEn:
+      'Restores an actual received binary manifest through the canonical decoder after cold loading. It preserves the original asynchronous integrity stage and transferred backing identities; the carrier still owns authentication, admission and closure.',
+    purposeZh:
+      '冷加载后通过规范 decoder 恢复实际收到的 binary manifest，保留原异步完整性阶段与传来的 backing 身份。载体继续拥有鉴权、准入和关闭；数据恢复不授予运行时权限。'
   }),
   'rpc-contract:errors:deserializeRpcError': guide({
     ...rpcProtocolGuideContexts.errors,
@@ -2430,13 +2802,7 @@ const rpcProtocolToolkitGuides = {
     purposeZh:
       '把收到的首通道 handshake 文本或 bytes 验证为封闭 hello/accept/reject union。非法语法或字段只保留有界诊断摘要；归一化本身不赋予已鉴权 peer 身份。'
   }),
-  'rpc-contract:portable:hasRpcPortableBinary': guide({
-    ...rpcProtocolGuideContexts.portableValues,
-    purposeEn:
-      'Reads the binary proof associated with a canonical portable snapshot. It returns a boolean without a second graph walk, so callers branch on the snapshot produced by the existing normalizer rather than copied containers.',
-    purposeZh:
-      '读取规范 portable snapshot 关联的二进制证明，无第二次图遍历地返回布尔结果。调用者应对既有 normalizer 产生的原快照分支，不能用复制容器替代该证明。'
-  }),
+
   'rpc-contract:portable:normalizePortable': guide({
     ...rpcProtocolGuideContexts.portableValues,
     purposeEn:
@@ -2444,13 +2810,7 @@ const rpcProtocolToolkitGuides = {
     purposeZh:
       '按既有 wire profile、递归上限与普通字段读取点验证并快照 portable value，返回规范 wire-compatible 数据。不可支持的值或循环保持原生失败；不是为载体增加新 codec。'
   }),
-  'rpc-contract:portable:normalizeRuntimePortable': guide({
-    ...rpcProtocolGuideContexts.portableValues,
-    purposeEn:
-      'Normalizes a business value using the negotiated native runtime profile while retaining supported native values. The same canonical graph owner and validation rules remain in charge; it does not transfer buffers or acquire channel trust.',
-    purposeZh:
-      '按已协商 native runtime profile 归一化业务值并保留支持的 native value，仍由同一规范图 owner 与校验规则负责。返回快照，不转移 buffer，也不取得通道信任。'
-  }),
+
   'rpc-contract:runtime:normalizeRuntimeEnvelope': guide({
     ...rpcProtocolGuideContexts.runtimeData,
     purposeEn:
@@ -2493,14 +2853,14 @@ const rpcProtocolToolkitGuides = {
     purposeZh:
       '在保留原 protection output 值类别的同时附加固定 parser selector，返回供既有接收端使用的 carrier 数据。不会创建 batch、replay、codec 或执行授信事实。'
   }),
-  'rpc-contract:runtime-lazy:normalizeRuntimeEnvelopeLazy': guide({
+  'rpc-contract:runtime-lazy:normalizeRuntimeEnvelope': guide({
     ...rpcProtocolGuideContexts.lazyParsing,
     purposeEn:
       'Normalizes the same complete runtime-envelope union while letting only its actual stream branch cold-load the canonical parser. It returns the existing synchronous value or a Promise at that cold boundary; rejection retains the original cause.',
     purposeZh:
       '归一化同一完整 runtime envelope union，仅让实际 stream 分支冷加载规范 parser。返回既有同步值，或在该冷边界返回 Promise；拒绝保留原 cause，不为普通 scalar 分支制造异步加载。'
   }),
-  'rpc-contract:runtime-lazy:normalizeStreamPayloadLazy': guide({
+  'rpc-contract:runtime-lazy:normalizeStreamPayload': guide({
     ...rpcProtocolGuideContexts.lazyParsing,
     purposeEn:
       "Shares the canonical stream payload parser through the receiver's existing asynchronous continuation. It returns the canonical payload or a cold-load Promise and keeps the original parsing error and actual stream-owner state separate.",
@@ -2584,5 +2944,6 @@ export const rpcApiGuides = {
   ...rpcContractGuides,
   ...webRpcCoreGuides,
   ...webRpcErrorGuides,
+  ...rpcPublicErrorGuides,
   ...webRpcConstantGuides
 } as const

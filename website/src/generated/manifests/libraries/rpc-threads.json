@@ -62,6 +62,10 @@
               {
                 "type": "paragraph",
                 "text": "包内使用相对路径；跨包调用只使用公开 API。协议工具使用 `@migaia/rpc-contract`，Core/Remote/Testing 使用 `@migaia/rpc-core` 的普通入口。"
+              },
+              {
+                "type": "paragraph",
+                "text": "从包根导入 `RPC_THREAD_ERROR_SOURCE` 和 `RpcThreadErrorCode`；source 固定为 `@migaia/rpc/threads`。资源采样失败按 `usageSampleFailed` 报告 unavailable 并保留原 cause，不将显示消息或复制的 source/code 当作 Worker 控制权。Core 的普通错误族守卫处理跨 realm 的 Core 错误，详见 Core USEGUIDE。"
               }
             ]
           },
@@ -509,6 +513,1364 @@
           "fragment": "rpc-threads-index--createWebThreadChannel"
         },
         {
+          "name": "IRpcThreadErrorCode",
+          "kind": "type",
+          "signature": "export type IRpcThreadErrorCode = (typeof RpcThreadErrorCode)[keyof typeof RpcThreadErrorCode];",
+          "declarationLine": 8,
+          "source": "packages/rpc-core/dist/adapter-owned/threads/error-code.d.ts",
+          "purpose": "IRpcThreadErrorCode is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcThreadErrorCode.",
+          "advanced": "No additional advanced behavior is declared for IRpcThreadErrorCode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcThreadErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcThreadErrorCode.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcThreadErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcThreadErrorCode = (typeof RpcThreadErrorCode)[keyof typeof RpcThreadErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcThreadErrorCode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcThreadErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IRpcThreadErrorCode is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcThreadErrorCode from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcThreadErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcThreadErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcThreadErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcThreadErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/error-code.d.ts:IRpcThreadErrorCode:export type IRpcThreadErrorCode = (typeof RpcThreadErrorCode)[keyof typeof RpcThreadErrorCode];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IRpcThreadErrorCode"
+        },
+        {
+          "name": "IRuntimeConnectionDetail",
+          "kind": "type",
+          "signature": "export type IRuntimeConnectionDetail = Readonly<{ identity: IRuntimePeerIdentity | IRuntimeUnavailable; /** Accepted remote identity is distinct from the local supervisor's physical attempt number. */ generation: IRpcRuntimeGeneration | IRuntimeUnavailable; kind: RuntimeSourceKind; direction: RuntimeConnectionDirection; carrier: string; connection: Readonly<{ status: string | IRuntimeUnavailable; }>; unit: IRuntimeUnavailable | Readonly<{ kind: string; state: string; generation: number; degraded: readonly string[]; }>; health: IRuntimeUnavailable | IRuntimeMetric<Readonly<{ state: string; failures: number; }>>; restartCount: IRuntimeUnavailable | IRuntimeMetric; methods: readonly string[]; counters: IRuntimeUnavailable | IRuntimeCounters; resources: IRuntimeUnavailable | IRuntimeResources; recent: readonly IRuntimeRecent[]; lastExit: IRuntimeUnavailable | Readonly<{ generation: number; reason: string; code: number | IRuntimeUnavailable; signal: string | IRuntimeUnavailable; error?: Readonly<{ source?: string; code?: string; }>; observedAt?: number; }>; }>;",
+          "declarationLine": 84,
+          "source": "packages/rpc-core/dist/remote/runtime-api/overview.d.ts",
+          "purpose": "Connection state and unit state remain separate owner facts.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeConnectionDetail.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeConnectionDetail.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeConnectionDetail."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeConnectionDetail.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeConnectionDetail",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeConnectionDetail = Readonly<{ identity: IRuntimePeerIdentity | IRuntimeUnavailable; /** Accepted remote identity is distinct from the local supervisor's physical attempt number. */ generation: IRpcRuntimeGeneration | IRuntimeUnavailable; kind: RuntimeSourceKind; direction: RuntimeConnectionDirection; carrier: string; connection: Readonly<{ status: string | IRuntimeUnavailable; }>; unit: IRuntimeUnavailable | Readonly<{ kind: string; state: string; generation: number; degraded: readonly string[]; }>; health: IRuntimeUnavailable | IRuntimeMetric<Readonly<{ state: string; failures: number; }>>; restartCount: IRuntimeUnavailable | IRuntimeMetric; methods: readonly string[]; counters: IRuntimeUnavailable | IRuntimeCounters; resources: IRuntimeUnavailable | IRuntimeResources; recent: readonly IRuntimeRecent[]; lastExit: IRuntimeUnavailable | Readonly<{ generation: number; reason: string; code: number | IRuntimeUnavailable; signal: string | IRuntimeUnavailable; error?: Readonly<{ source?: string; code?: string; }>; observedAt?: number; }>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeConnectionDetail when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeConnectionDetail does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Connection state and unit state remain separate owner facts."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeConnectionDetail from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeConnectionDetail when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeConnectionDetail does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeConnectionDetail."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeConnectionDetail."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/remote/runtime-api/overview.d.ts:IRuntimeConnectionDetail:export type IRuntimeConnectionDetail = Readonly<{ identity: IRuntimePeerIdentity | IRuntimeUnavailable; /** Accepted remote identity is distinct from the local supervisor's physical attempt number. */ generation: IRpcRuntimeGeneration | IRuntimeUnavailable; kind: RuntimeSourceKind; direction: RuntimeConnectionDirection; carrier: string; connection: Readonly<{ status: string | IRuntimeUnavailable; }>; unit: IRuntimeUnavailable | Readonly<{ kind: string; state: string; generation: number; degraded: readonly string[]; }>; health: IRuntimeUnavailable | IRuntimeMetric<Readonly<{ state: string; failures: number; }>>; restartCount: IRuntimeUnavailable | IRuntimeMetric; methods: readonly string[]; counters: IRuntimeUnavailable | IRuntimeCounters; resources: IRuntimeUnavailable | IRuntimeResources; recent: readonly IRuntimeRecent[]; lastExit: IRuntimeUnavailable | Readonly<{ generation: number; reason: string; code: number | IRuntimeUnavailable; signal: string | IRuntimeUnavailable; error?: Readonly<{ source?: string; code?: string; }>; observedAt?: number; }>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IRuntimeConnectionDetail"
+        },
+        {
+          "name": "IRuntimeDetail",
+          "kind": "type",
+          "signature": "export type IRuntimeDetail = Readonly<{ identity: IRuntimePeerIdentity; self: IRuntimePeerIdentity; methods: readonly string[]; provide: readonly string[]; connections: readonly IRuntimeConnectionDetail[]; unit: IRuntimeUnavailable; health: IRuntimeUnavailable; restartCount: IRuntimeUnavailable; counters: IRuntimeUnavailable | IRuntimeCounters; resources: IRuntimeUnavailable; recent: readonly IRuntimeRecent[]; }>;",
+          "declarationLine": 122,
+          "source": "packages/rpc-core/dist/remote/runtime-api/overview.d.ts",
+          "purpose": "Local detail keeps its own identity distinct from every remote execution unit.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeDetail.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeDetail.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeDetail."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeDetail.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeDetail",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeDetail = Readonly<{ identity: IRuntimePeerIdentity; self: IRuntimePeerIdentity; methods: readonly string[]; provide: readonly string[]; connections: readonly IRuntimeConnectionDetail[]; unit: IRuntimeUnavailable; health: IRuntimeUnavailable; restartCount: IRuntimeUnavailable; counters: IRuntimeUnavailable | IRuntimeCounters; resources: IRuntimeUnavailable; recent: readonly IRuntimeRecent[]; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeDetail when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeDetail does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Local detail keeps its own identity distinct from every remote execution unit."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeDetail from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeDetail when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeDetail does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeDetail."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeDetail."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/remote/runtime-api/overview.d.ts:IRuntimeDetail:export type IRuntimeDetail = Readonly<{ identity: IRuntimePeerIdentity; self: IRuntimePeerIdentity; methods: readonly string[]; provide: readonly string[]; connections: readonly IRuntimeConnectionDetail[]; unit: IRuntimeUnavailable; health: IRuntimeUnavailable; restartCount: IRuntimeUnavailable; counters: IRuntimeUnavailable | IRuntimeCounters; resources: IRuntimeUnavailable; recent: readonly IRuntimeRecent[]; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IRuntimeDetail"
+        },
+        {
+          "name": "IRuntimeDynamicSurface",
+          "kind": "type",
+          "signature": "export type IRuntimeDynamicSurface = Readonly<Record<string, (payload?: unknown) => import('@migaia/rpc-contract').IRpcPortableValue | undefined>>;",
+          "declarationLine": 23,
+          "source": "packages/rpc-core/dist/remote/runtime-api/typing.d.ts",
+          "purpose": "Explicit dynamic invocation is opt-in and still checked against the accepted runtime catalog.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeDynamicSurface.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeDynamicSurface.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeDynamicSurface."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeDynamicSurface.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeDynamicSurface",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeDynamicSurface = Readonly<Record<string, (payload?: unknown) => import('@migaia/rpc-contract').IRpcPortableValue | undefined>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeDynamicSurface when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeDynamicSurface does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Explicit dynamic invocation is opt-in and still checked against the accepted runtime catalog."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeDynamicSurface from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeDynamicSurface when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeDynamicSurface does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeDynamicSurface."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeDynamicSurface."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/remote/runtime-api/typing.d.ts:IRuntimeDynamicSurface:export type IRuntimeDynamicSurface = Readonly<Record<string, (payload?: unknown) => import('@migaia/rpc-contract').IRpcPortableValue | undefined>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IRuntimeDynamicSurface"
+        },
+        {
+          "name": "IRuntimeEvent",
+          "kind": "type",
+          "signature": "export type IRuntimeEvent = Readonly<{ type: RuntimeEventName; name: string; instanceId: string | IRuntimeUnavailable; generation: number | IRuntimeUnavailable; timestamp: number | IRuntimeUnavailable; clock: string; reason?: string; code?: number | IRuntimeUnavailable; signal?: string | IRuntimeUnavailable; error?: Readonly<{ source?: string; code?: string; }>; count?: number; degraded?: readonly string[]; }>;",
+          "declarationLine": 4,
+          "source": "packages/rpc-core/dist/remote/runtime-api/events.d.ts",
+          "purpose": "Lifecycle facts contain only the original identity, time and explicitly safe native fields.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeEvent.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeEvent.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeEvent."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeEvent.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeEvent",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeEvent = Readonly<{ type: RuntimeEventName; name: string; instanceId: string | IRuntimeUnavailable; generation: number | IRuntimeUnavailable; timestamp: number | IRuntimeUnavailable; clock: string; reason?: string; code?: number | IRuntimeUnavailable; signal?: string | IRuntimeUnavailable; error?: Readonly<{ source?: string; code?: string; }>; count?: number; degraded?: readonly string[]; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeEvent when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeEvent does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Lifecycle facts contain only the original identity, time and explicitly safe native fields."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeEvent from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeEvent when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeEvent does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeEvent."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeEvent."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/remote/runtime-api/events.d.ts:IRuntimeEvent:export type IRuntimeEvent = Readonly<{ type: RuntimeEventName; name: string; instanceId: string | IRuntimeUnavailable; generation: number | IRuntimeUnavailable; timestamp: number | IRuntimeUnavailable; clock: string; reason?: string; code?: number | IRuntimeUnavailable; signal?: string | IRuntimeUnavailable; error?: Readonly<{ source?: string; code?: string; }>; count?: number; degraded?: readonly string[]; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IRuntimeEvent"
+        },
+        {
+          "name": "IRuntimeListFilter",
+          "kind": "type",
+          "signature": "export type IRuntimeListFilter = Readonly<{ state?: SupervisorState; name?: Readonly<{ exact: string; prefix?: never; }> | Readonly<{ prefix: string; exact?: never; }>; kind?: RuntimeSourceKind; direction?: RuntimeConnectionDirection; }>;",
+          "declarationLine": 42,
+          "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
+          "purpose": "Filters keep local source selection distinct from the connection's remote direction.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListFilter.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeListFilter.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeListFilter."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeListFilter.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeListFilter",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeListFilter = Readonly<{ state?: SupervisorState; name?: Readonly<{ exact: string; prefix?: never; }> | Readonly<{ prefix: string; exact?: never; }>; kind?: RuntimeSourceKind; direction?: RuntimeConnectionDirection; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeListFilter when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeListFilter does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Filters keep local source selection distinct from the connection's remote direction."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeListFilter from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeListFilter when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeListFilter does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListFilter."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeListFilter."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/remote/runtime-api/outlet.d.ts:IRuntimeListFilter:export type IRuntimeListFilter = Readonly<{ state?: SupervisorState; name?: Readonly<{ exact: string; prefix?: never; }> | Readonly<{ prefix: string; exact?: never; }>; kind?: RuntimeSourceKind; direction?: RuntimeConnectionDirection; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IRuntimeListFilter"
+        },
+        {
+          "name": "IRuntimeListOptions",
+          "kind": "type",
+          "signature": "export type IRuntimeListOptions = IRuntimeQueryOptions & Readonly<{ filter?: IRuntimeListFilter; }>;",
+          "declarationLine": 55,
+          "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
+          "purpose": "Formatting never changes which canonical registration records the filter selects.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListOptions.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeListOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeListOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeListOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeListOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeListOptions = IRuntimeQueryOptions & Readonly<{ filter?: IRuntimeListFilter; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeListOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeListOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Formatting never changes which canonical registration records the filter selects."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeListOptions from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeListOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeListOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeListOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/remote/runtime-api/outlet.d.ts:IRuntimeListOptions:export type IRuntimeListOptions = IRuntimeQueryOptions & Readonly<{ filter?: IRuntimeListFilter; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IRuntimeListOptions"
+        },
+        {
+          "name": "IRuntimeOverview",
+          "kind": "type",
+          "signature": "export type IRuntimeOverview = Readonly<{ self: IRuntimePeerIdentity; connections: readonly IRuntimeConnectionDetail[]; }>;",
+          "declarationLine": 136,
+          "source": "packages/rpc-core/dist/remote/runtime-api/overview.d.ts",
+          "purpose": "Host summaries use the canonical Host identity and genuine contributed connection records.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeOverview.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeOverview.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeOverview."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeOverview.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeOverview",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeOverview = Readonly<{ self: IRuntimePeerIdentity; connections: readonly IRuntimeConnectionDetail[]; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeOverview when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeOverview does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Host summaries use the canonical Host identity and genuine contributed connection records."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeOverview from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeOverview when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeOverview does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeOverview."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeOverview."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/remote/runtime-api/overview.d.ts:IRuntimeOverview:export type IRuntimeOverview = Readonly<{ self: IRuntimePeerIdentity; connections: readonly IRuntimeConnectionDetail[]; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IRuntimeOverview"
+        },
+        {
+          "name": "IRuntimeQueryOptions",
+          "kind": "type",
+          "signature": "export type IRuntimeQueryOptions = Readonly<{ format?: ISerializeTextFormat; }>;",
+          "declarationLine": 7,
+          "source": "packages/rpc-core/dist/remote/runtime-api/overview.d.ts",
+          "purpose": "Formatting is a local cold-query option, never application or wire configuration.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeQueryOptions.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeQueryOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeQueryOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeQueryOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeQueryOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeQueryOptions = Readonly<{ format?: ISerializeTextFormat; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeQueryOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeQueryOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Formatting is a local cold-query option, never application or wire configuration."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeQueryOptions from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeQueryOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeQueryOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeQueryOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeQueryOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/remote/runtime-api/overview.d.ts:IRuntimeQueryOptions:export type IRuntimeQueryOptions = Readonly<{ format?: ISerializeTextFormat; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IRuntimeQueryOptions"
+        },
+        {
+          "name": "IRuntimeRecent",
+          "kind": "type",
+          "signature": "export type IRuntimeRecent = Readonly<{ generation: number; timestamp: number; clock: string; kind: string; identity?: IRuntimePeerIdentity; source?: string; code?: string; }>;",
+          "declarationLine": 74,
+          "source": "packages/rpc-core/dist/remote/runtime-api/overview.d.ts",
+          "purpose": "Only original registration departures enter the bounded public history.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeRecent.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeRecent.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeRecent."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeRecent.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeRecent",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeRecent = Readonly<{ generation: number; timestamp: number; clock: string; kind: string; identity?: IRuntimePeerIdentity; source?: string; code?: string; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeRecent when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeRecent does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Only original registration departures enter the bounded public history."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeRecent from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeRecent when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeRecent does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeRecent."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeRecent."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/remote/runtime-api/overview.d.ts:IRuntimeRecent:export type IRuntimeRecent = Readonly<{ generation: number; timestamp: number; clock: string; kind: string; identity?: IRuntimePeerIdentity; source?: string; code?: string; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IRuntimeRecent"
+        },
+        {
+          "name": "IRuntimeSurface",
+          "kind": "type",
+          "signature": "export type IRuntimeSurface<THost, TPlugin> = TPlugin extends IRuntimePluginTyping<any, infer P, any, infer E extends readonly string[], any> ? IRuntimeFlatten<P> & IRuntimeSelected<IRuntimeRegistry<THost>, E[number]> : Record<never, never>;",
+          "declarationLine": 71,
+          "source": "packages/rpc-core/dist/remote/runtime-api/typing.d.ts",
+          "purpose": "Surface composition includes own provide and only explicitly exposed local/forward methods.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeSurface.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeSurface.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeSurface."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeSurface.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeSurface",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeSurface<THost, TPlugin> = TPlugin extends IRuntimePluginTyping<any, infer P, any, infer E extends readonly string[], any> ? IRuntimeFlatten<P> & IRuntimeSelected<IRuntimeRegistry<THost>, E[number]> : Record<never, never>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeSurface when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeSurface does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Surface composition includes own provide and only explicitly exposed local/forward methods."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeSurface from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeSurface when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeSurface does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeSurface."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeSurface."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/remote/runtime-api/typing.d.ts:IRuntimeSurface:export type IRuntimeSurface<THost, TPlugin> = TPlugin extends IRuntimePluginTyping<any, infer P, any, infer E extends readonly string[], any> ? IRuntimeFlatten<P> & IRuntimeSelected<IRuntimeRegistry<THost>, E[number]> : Record<never, never>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IRuntimeSurface"
+        },
+        {
+          "name": "IRuntimeThreadStopOptions",
+          "kind": "type",
+          "signature": "export type IRuntimeThreadStopOptions = Readonly<{ graceMs?: number; }>;",
+          "declarationLine": 84,
+          "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
+          "purpose": "Threads have no OS signal and never terminate their shared PID.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeThreadStopOptions.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeThreadStopOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeThreadStopOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeThreadStopOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeThreadStopOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeThreadStopOptions = Readonly<{ graceMs?: number; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeThreadStopOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeThreadStopOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Threads have no OS signal and never terminate their shared PID."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeThreadStopOptions from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeThreadStopOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeThreadStopOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeThreadStopOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeThreadStopOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/remote/runtime-api/outlet.d.ts:IRuntimeThreadStopOptions:export type IRuntimeThreadStopOptions = Readonly<{ graceMs?: number; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IRuntimeThreadStopOptions"
+        },
+        {
+          "name": "IRuntimeTypedPeer",
+          "kind": "type",
+          "signature": "export type IRuntimeTypedPeer<TRemote = Record<never, never>, S = IRuntimeFlatten<TRemote>, K = (typeof import('./constants.js').RuntimePluginKey)['thread']> = Pick<IRuntimePeerHandle, 'self' | 'describe' | 'close' | 'outcome'> & Readonly<{ group<Steps extends readonly IRuntimeGroupStep<S>[]>(steps: Steps, options?: IRuntimeFamilyGroupOptions<K>): Promise<readonly IRpcRuntimeStepOutcome[]>; request<M extends Extract<IRuntimeScalarKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): Promise<IRuntimeResult<S[M]>>; notify<M extends Extract<IRuntimeScalarKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): Promise<void>; stream<M extends Extract<IRuntimeStreamKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): AsyncIterableIterator<IRuntimeYield<S[M]>>; }>;",
+          "declarationLine": 99,
+          "source": "packages/rpc-core/dist/remote/runtime-api/typing.d.ts",
+          "purpose": "Public Peer calls require an explicit remote surface; no generic means no callable methods.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeTypedPeer.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeTypedPeer.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeTypedPeer."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeTypedPeer.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeTypedPeer",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeTypedPeer<TRemote = Record<never, never>, S = IRuntimeFlatten<TRemote>, K = (typeof import('./constants.js').RuntimePluginKey)['thread']> = Pick<IRuntimePeerHandle, 'self' | 'describe' | 'close' | 'outcome'> & Readonly<{ group<Steps extends readonly IRuntimeGroupStep<S>[]>(steps: Steps, options?: IRuntimeFamilyGroupOptions<K>): Promise<readonly IRpcRuntimeStepOutcome[]>; request<M extends Extract<IRuntimeScalarKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): Promise<IRuntimeResult<S[M]>>; notify<M extends Extract<IRuntimeScalarKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): Promise<void>; stream<M extends Extract<IRuntimeStreamKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): AsyncIterableIterator<IRuntimeYield<S[M]>>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeTypedPeer when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeTypedPeer does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Public Peer calls require an explicit remote surface; no generic means no callable methods."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeTypedPeer from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeTypedPeer when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeTypedPeer does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeTypedPeer."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeTypedPeer."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/remote/runtime-api/typing.d.ts:IRuntimeTypedPeer:export type IRuntimeTypedPeer<TRemote = Record<never, never>, S = IRuntimeFlatten<TRemote>, K = (typeof import('./constants.js').RuntimePluginKey)['thread']> = Pick<IRuntimePeerHandle, 'self' | 'describe' | 'close' | 'outcome'> & Readonly<{ group<Steps extends readonly IRuntimeGroupStep<S>[]>(steps: Steps, options?: IRuntimeFamilyGroupOptions<K>): Promise<readonly IRpcRuntimeStepOutcome[]>; request<M extends Extract<IRuntimeScalarKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): Promise<IRuntimeResult<S[M]>>; notify<M extends Extract<IRuntimeScalarKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): Promise<void>; stream<M extends Extract<IRuntimeStreamKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): AsyncIterableIterator<IRuntimeYield<S[M]>>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IRuntimeTypedPeer"
+        },
+        {
+          "name": "IRuntimeUnavailable",
+          "kind": "type",
+          "signature": "export type IRuntimeUnavailable = Readonly<{ status: 'unavailable'; reason: string; }>;",
+          "declarationLine": 21,
+          "source": "packages/rpc-core/dist/remote/runtime-api/overview.d.ts",
+          "purpose": "Missing facts are explicit instead of invented zero, null or healthy values.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeUnavailable.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeUnavailable.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeUnavailable."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeUnavailable.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeUnavailable",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeUnavailable = Readonly<{ status: 'unavailable'; reason: string; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeUnavailable when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeUnavailable does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Missing facts are explicit instead of invented zero, null or healthy values."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeUnavailable from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeUnavailable when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeUnavailable does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeUnavailable."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeUnavailable."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/remote/runtime-api/overview.d.ts:IRuntimeUnavailable:export type IRuntimeUnavailable = Readonly<{ status: 'unavailable'; reason: string; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IRuntimeUnavailable"
+        },
+        {
+          "name": "IThreadBootstrapData",
+          "kind": "type",
+          "signature": "export type IThreadBootstrapData = Readonly<{ peerId: string; data?: IRpcPortableValue; }>;",
+          "declarationLine": 8,
+          "source": "packages/rpc-core/dist/adapter-owned/threads/bootstrap.d.ts",
+          "purpose": "Private addressing is separate from portable business data and carries no RPC handshake.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadBootstrapData.",
+          "advanced": "No additional advanced behavior is declared for IThreadBootstrapData.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IThreadBootstrapData."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadBootstrapData.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IThreadBootstrapData",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IThreadBootstrapData = Readonly<{ peerId: string; data?: IRpcPortableValue; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IThreadBootstrapData when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IThreadBootstrapData does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Private addressing is separate from portable business data and carries no RPC handshake."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IThreadBootstrapData from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IThreadBootstrapData when its type contract and declared inputs match the result you need. Choose a different public symbol when IThreadBootstrapData does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadBootstrapData."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IThreadBootstrapData."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/bootstrap.d.ts:IThreadBootstrapData:export type IThreadBootstrapData = Readonly<{ peerId: string; data?: IRpcPortableValue; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IThreadBootstrapData"
+        },
+        {
+          "name": "IThreadChannelFactory",
+          "kind": "type",
+          "signature": "export type IThreadChannelFactory<THandle extends IThreadHandle> = Readonly<{ open(handle: THandle, signal: IAbortSignal): Promise<IRemoteChannel>; }>;",
+          "declarationLine": 12,
+          "source": "packages/rpc-core/dist/adapter-owned/threads/types.d.ts",
+          "purpose": "A launcher handle opens one independently owned remote generation.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadChannelFactory.",
+          "advanced": "No additional advanced behavior is declared for IThreadChannelFactory.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IThreadChannelFactory."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadChannelFactory.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IThreadChannelFactory",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IThreadChannelFactory<THandle extends IThreadHandle> = Readonly<{ open(handle: THandle, signal: IAbortSignal): Promise<IRemoteChannel>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IThreadChannelFactory when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IThreadChannelFactory does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A launcher handle opens one independently owned remote generation."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IThreadChannelFactory from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IThreadChannelFactory when its type contract and declared inputs match the result you need. Choose a different public symbol when IThreadChannelFactory does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadChannelFactory."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IThreadChannelFactory."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/types.d.ts:IThreadChannelFactory:export type IThreadChannelFactory<THandle extends IThreadHandle> = Readonly<{ open(handle: THandle, signal: IAbortSignal): Promise<IRemoteChannel>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IThreadChannelFactory"
+        },
+        {
+          "name": "IThreadChannelOptions",
+          "kind": "type",
+          "signature": "export type IThreadChannelOptions = Readonly<{ scheduler: IScheduler; capabilities?: readonly string[]; }>;",
+          "declarationLine": 7,
+          "source": "packages/rpc-core/dist/adapter-owned/threads/types.d.ts",
+          "purpose": "Message channels retain the scheduler identity and static capability declaration.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadChannelOptions.",
+          "advanced": "No additional advanced behavior is declared for IThreadChannelOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IThreadChannelOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadChannelOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IThreadChannelOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IThreadChannelOptions = Readonly<{ scheduler: IScheduler; capabilities?: readonly string[]; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IThreadChannelOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IThreadChannelOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Message channels retain the scheduler identity and static capability declaration."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IThreadChannelOptions from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IThreadChannelOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IThreadChannelOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadChannelOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IThreadChannelOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/types.d.ts:IThreadChannelOptions:export type IThreadChannelOptions = Readonly<{ scheduler: IScheduler; capabilities?: readonly string[]; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IThreadChannelOptions"
+        },
+        {
+          "name": "IThreadCommonOptions",
+          "kind": "type",
+          "signature": "export type IThreadCommonOptions<THandle extends IThreadHandle> = Readonly<{ spec: IThreadSpec; launcher: IThreadSupervisorOptions<THandle>['launcher']; budget: IThreadSupervisorOptions<THandle>['budget']; scheduler: IScheduler; channelFactory: IThreadChannelFactory<THandle>; endpointFactory: IRemoteEndpointFactory; report(error: unknown): void; health?: IThreadSupervisorOptions<THandle>['health']; supervisor?: Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>; keyFactory?: () => string; retryPort?: IRemoteRetryPort; }>;",
+          "declarationLine": 22,
+          "source": "packages/rpc-core/dist/adapter-owned/threads/types.d.ts",
+          "purpose": "Facades add no restart policy and transfer every selected supervisor option unchanged.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadCommonOptions.",
+          "advanced": "No additional advanced behavior is declared for IThreadCommonOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IThreadCommonOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadCommonOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IThreadCommonOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IThreadCommonOptions<THandle extends IThreadHandle> = Readonly<{ spec: IThreadSpec; launcher: IThreadSupervisorOptions<THandle>['launcher']; budget: IThreadSupervisorOptions<THandle>['budget']; scheduler: IScheduler; channelFactory: IThreadChannelFactory<THandle>; endpointFactory: IRemoteEndpointFactory; report(error: unknown): void; health?: IThreadSupervisorOptions<THandle>['health']; supervisor?: Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>; keyFactory?: () => string; retryPort?: IRemoteRetryPort; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IThreadCommonOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IThreadCommonOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Facades add no restart policy and transfer every selected supervisor option unchanged."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IThreadCommonOptions from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IThreadCommonOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IThreadCommonOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadCommonOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IThreadCommonOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/types.d.ts:IThreadCommonOptions:export type IThreadCommonOptions<THandle extends IThreadHandle> = Readonly<{ spec: IThreadSpec; launcher: IThreadSupervisorOptions<THandle>['launcher']; budget: IThreadSupervisorOptions<THandle>['budget']; scheduler: IScheduler; channelFactory: IThreadChannelFactory<THandle>; endpointFactory: IRemoteEndpointFactory; report(error: unknown): void; health?: IThreadSupervisorOptions<THandle>['health']; supervisor?: Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>; keyFactory?: () => string; retryPort?: IRemoteRetryPort; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IThreadCommonOptions"
+        },
+        {
+          "name": "IThreadPluginOptions",
+          "kind": "type",
+          "signature": "export type IThreadPluginOptions<THandle extends IThreadHandle> = IThreadCommonOptions<THandle> & Readonly<{ name: string; contract: IRemoteContract; host: IRemotePluginHostPort; }>;",
+          "declarationLine": 36,
+          "source": "packages/rpc-core/dist/adapter-owned/threads/types.d.ts",
+          "purpose": "PluginHost definitions expose only the declared remote Plugin contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadPluginOptions.",
+          "advanced": "No additional advanced behavior is declared for IThreadPluginOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IThreadPluginOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadPluginOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IThreadPluginOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IThreadPluginOptions<THandle extends IThreadHandle> = IThreadCommonOptions<THandle> & Readonly<{ name: string; contract: IRemoteContract; host: IRemotePluginHostPort; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IThreadPluginOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IThreadPluginOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "PluginHost definitions expose only the declared remote Plugin contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IThreadPluginOptions from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IThreadPluginOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IThreadPluginOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadPluginOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IThreadPluginOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/types.d.ts:IThreadPluginOptions:export type IThreadPluginOptions<THandle extends IThreadHandle> = IThreadCommonOptions<THandle> & Readonly<{ name: string; contract: IRemoteContract; host: IRemotePluginHostPort; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IThreadPluginOptions"
+        },
+        {
+          "name": "IThreadWebPort",
+          "kind": "type",
+          "signature": "export type IThreadWebPort = { postMessage(message: unknown, transfer?: readonly unknown[]): void; addEventListener(type: string, listener: (event: any) => void): void; removeEventListener(type: string, listener: (event: any) => void): void; };",
+          "declarationLine": 16,
+          "source": "packages/rpc-core/dist/adapter-owned/threads/types.d.ts",
+          "purpose": "Structural EventTarget surface also admits a worker-global scope on the service side.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadWebPort.",
+          "advanced": "No additional advanced behavior is declared for IThreadWebPort.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IThreadWebPort."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadWebPort.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IThreadWebPort",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IThreadWebPort = { postMessage(message: unknown, transfer?: readonly unknown[]): void; addEventListener(type: string, listener: (event: any) => void): void; removeEventListener(type: string, listener: (event: any) => void): void; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IThreadWebPort when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IThreadWebPort does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Structural EventTarget surface also admits a worker-global scope on the service side."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IThreadWebPort from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IThreadWebPort when its type contract and declared inputs match the result you need. Choose a different public symbol when IThreadWebPort does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadWebPort."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IThreadWebPort."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/types.d.ts:IThreadWebPort:export type IThreadWebPort = { postMessage(message: unknown, transfer?: readonly unknown[]): void; addEventListener(type: string, listener: (event: any) => void): void; removeEventListener(type: string, listener: (event: any) => void): void; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--IThreadWebPort"
+        },
+        {
+          "name": "readThreadBootstrap",
+          "kind": "function",
+          "signature": "export declare function readThreadBootstrap(value: unknown): IThreadBootstrapData;",
+          "declarationLine": 39,
+          "source": "packages/rpc-core/dist/adapter-owned/threads/bootstrap.d.ts",
+          "purpose": "Read Node workerData or Web bootstrap without leaking its wrapper into business configuration.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for readThreadBootstrap.",
+          "advanced": "No additional advanced behavior is declared for readThreadBootstrap.",
+          "parameters": ["value: unknown"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            }
+          ],
+          "returns": "IThreadBootstrapData",
+          "errors": ["No documented errors are declared for readThreadBootstrap."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readThreadBootstrap.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "readThreadBootstrap",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function readThreadBootstrap(value: unknown): IThreadBootstrapData;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IThreadBootstrapData"],
+          "whenToUse": "Use readThreadBootstrap when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when readThreadBootstrap does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Read Node workerData or Web bootstrap without leaking its wrapper into business configuration."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import readThreadBootstrap from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use readThreadBootstrap when its function contract and declared inputs match the result you need. Choose a different public symbol when readThreadBootstrap does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for readThreadBootstrap."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for readThreadBootstrap."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/bootstrap.d.ts:readThreadBootstrap:export declare function readThreadBootstrap(value: unknown): IThreadBootstrapData;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--readThreadBootstrap"
+        },
+        {
           "name": "receiveThreadData",
           "kind": "function",
           "signature": "export declare function receiveThreadData(port: IThreadWebPort, prepare: (data: IRpcPortableValue | undefined, peerId: string) => PromiseLike<void> | void): Promise<IRpcPortableValue | undefined>;",
@@ -598,6 +1960,199 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-threads-index--receiveThreadData"
+        },
+        {
+          "name": "RPC_THREAD_ERROR_SOURCE",
+          "kind": "const",
+          "signature": "export declare const RPC_THREAD_ERROR_SOURCE = \"@migaia/rpc/threads\";",
+          "declarationLine": 2,
+          "source": "packages/rpc-core/dist/adapter-owned/threads/error-code.d.ts",
+          "purpose": "Native isolate resource failures belong to the thread adapter, independently of core RPC.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RPC_THREAD_ERROR_SOURCE.",
+          "advanced": "No additional advanced behavior is declared for RPC_THREAD_ERROR_SOURCE.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for RPC_THREAD_ERROR_SOURCE."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RPC_THREAD_ERROR_SOURCE.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "ERROR_SOURCE",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const RPC_THREAD_ERROR_SOURCE = \"@migaia/rpc/threads\";"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use RPC_THREAD_ERROR_SOURCE when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when RPC_THREAD_ERROR_SOURCE does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native isolate resource failures belong to the thread adapter, independently of core RPC."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RPC_THREAD_ERROR_SOURCE from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RPC_THREAD_ERROR_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when RPC_THREAD_ERROR_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RPC_THREAD_ERROR_SOURCE."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for RPC_THREAD_ERROR_SOURCE."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/error-code.d.ts:RPC_THREAD_ERROR_SOURCE:export declare const RPC_THREAD_ERROR_SOURCE = \"@migaia/rpc/threads\";",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-threads-index--RPC_THREAD_ERROR_SOURCE"
+        },
+        {
+          "name": "RpcThreadErrorCode",
+          "kind": "const",
+          "signature": "export declare const RpcThreadErrorCode: { /** D23: native Worker sampling failed; retain its cause and display unavailable. */ readonly usageSampleFailed: \"THREAD_USAGE_SAMPLE_FAILED\"; };",
+          "declarationLine": 4,
+          "source": "packages/rpc-core/dist/adapter-owned/threads/error-code.d.ts",
+          "purpose": "Cold resource queries report failures without changing execution lifecycle.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcThreadErrorCode.",
+          "advanced": "No additional advanced behavior is declared for RpcThreadErrorCode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for RpcThreadErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcThreadErrorCode.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "RpcThreadErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const RpcThreadErrorCode: { /** D23: native Worker sampling failed; retain its cause and display unavailable. */ readonly usageSampleFailed: \"THREAD_USAGE_SAMPLE_FAILED\"; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use RpcThreadErrorCode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when RpcThreadErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Cold resource queries report failures without changing execution lifecycle."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RpcThreadErrorCode from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RpcThreadErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when RpcThreadErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcThreadErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for RpcThreadErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/error-code.d.ts:RpcThreadErrorCode:export declare const RpcThreadErrorCode: { /** D23: native Worker sampling failed; retain its cause and display unavailable. */ readonly usageSampleFailed: \"THREAD_USAGE_SAMPLE_FAILED\"; };",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-threads-index--RpcThreadErrorCode"
+        },
+        {
+          "name": "RuntimeEventName",
+          "kind": "const",
+          "signature": "export declare const RuntimeEventName: { readonly ready: \"ready\"; readonly exit: \"exit\"; readonly degraded: \"degraded\"; readonly restart: \"restart\"; readonly liquidated: \"liquidated\"; };\nexport type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];",
+          "declarationLine": 146,
+          "source": "packages/rpc-core/dist/remote/runtime-api/constants.d.ts",
+          "purpose": "Passive management events come only from original lifecycle and successful liquidation facts.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RuntimeEventName.",
+          "advanced": "No additional advanced behavior is declared for RuntimeEventName.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for RuntimeEventName."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RuntimeEventName.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "RuntimeEventName",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const RuntimeEventName: { readonly ready: \"ready\"; readonly exit: \"exit\"; readonly degraded: \"degraded\"; readonly restart: \"restart\"; readonly liquidated: \"liquidated\"; };",
+            "export type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];"
+          ],
+          "overloadParameterDetails": [[], []],
+          "overloadReturns": [],
+          "whenToUse": "Use RuntimeEventName when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when RuntimeEventName does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Passive management events come only from original lifecycle and successful liquidation facts."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RuntimeEventName from @migaia/rpc-threads, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RuntimeEventName when its const contract and declared inputs match the result you need. Choose a different public symbol when RuntimeEventName does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RuntimeEventName."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for RuntimeEventName."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/remote/runtime-api/constants.d.ts:RuntimeEventName:export declare const RuntimeEventName: { readonly ready: \"ready\"; readonly exit: \"exit\"; readonly degraded: \"degraded\"; readonly restart: \"restart\"; readonly liquidated: \"liquidated\"; };\nexport type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-index--RuntimeEventName"
         }
       ],
       "aliases": []
@@ -775,6 +2330,134 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-threads-adapters/browser--createBrowserThreadLauncher"
+        },
+        {
+          "name": "IWebThreadHandle",
+          "kind": "type",
+          "signature": "export type IWebThreadHandle = IThreadHandle & Readonly<{ port: IThreadWebPort; prepared: Promise<void | readonly string[]>; }>;",
+          "declarationLine": 7,
+          "source": "packages/rpc-core/dist/adapter-owned/threads/web-launcher.d.ts",
+          "purpose": "Web handles expose preparation but never counterfeit an unsupported actual-exit receipt.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWebThreadHandle.",
+          "advanced": "No additional advanced behavior is declared for IWebThreadHandle.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IWebThreadHandle."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWebThreadHandle.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IWebThreadHandle",
+          "exportPath": "./adapters/browser",
+          "overloadSignatures": [
+            "export type IWebThreadHandle = IThreadHandle & Readonly<{ port: IThreadWebPort; prepared: Promise<void | readonly string[]>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IWebThreadHandle when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IWebThreadHandle does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Web handles expose preparation but never counterfeit an unsupported actual-exit receipt."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IWebThreadHandle from @migaia/rpc-threads/adapters/browser, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IWebThreadHandle when its type contract and declared inputs match the result you need. Choose a different public symbol when IWebThreadHandle does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWebThreadHandle."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IWebThreadHandle."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/web-launcher.d.ts:IWebThreadHandle:export type IWebThreadHandle = IThreadHandle & Readonly<{ port: IThreadWebPort; prepared: Promise<void | readonly string[]>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-adapters/browser--IWebThreadHandle"
+        },
+        {
+          "name": "IWebThreadLauncherOptions",
+          "kind": "type",
+          "signature": "export type IWebThreadLauncherOptions = Readonly<{ Worker?: new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker; report(error: unknown): void; runtimeApi?: IRuntimePeerSourceContext; }>;",
+          "declarationLine": 20,
+          "source": "packages/rpc-core/dist/adapter-owned/threads/web-launcher.d.ts",
+          "purpose": "Platform runtime injection does not strengthen unsupported lifecycle capabilities.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWebThreadLauncherOptions.",
+          "advanced": "No additional advanced behavior is declared for IWebThreadLauncherOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IWebThreadLauncherOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWebThreadLauncherOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IWebThreadLauncherOptions",
+          "exportPath": "./adapters/browser",
+          "overloadSignatures": [
+            "export type IWebThreadLauncherOptions = Readonly<{ Worker?: new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker; report(error: unknown): void; runtimeApi?: IRuntimePeerSourceContext; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IWebThreadLauncherOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IWebThreadLauncherOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Platform runtime injection does not strengthen unsupported lifecycle capabilities."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IWebThreadLauncherOptions from @migaia/rpc-threads/adapters/browser, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IWebThreadLauncherOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IWebThreadLauncherOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWebThreadLauncherOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IWebThreadLauncherOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/web-launcher.d.ts:IWebThreadLauncherOptions:export type IWebThreadLauncherOptions = Readonly<{ Worker?: new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker; report(error: unknown): void; runtimeApi?: IRuntimePeerSourceContext; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-adapters/browser--IWebThreadLauncherOptions"
         }
       ],
       "aliases": []
@@ -954,7 +2637,28 @@
           "fragment": "rpc-threads-adapters/bun--createBunThreadLauncher"
         }
       ],
-      "aliases": []
+      "aliases": [
+        {
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/web-launcher.d.ts:IWebThreadHandle:export type IWebThreadHandle = IThreadHandle & Readonly<{ port: IThreadWebPort; prepared: Promise<void | readonly string[]>; }>;",
+          "name": "IWebThreadHandle",
+          "signature": "export type IWebThreadHandle = IThreadHandle & Readonly<{ port: IThreadWebPort; prepared: Promise<void | readonly string[]>; }>;",
+          "source": "packages/rpc-core/dist/adapter-owned/threads/web-launcher.d.ts",
+          "exportPath": "./adapters/bun",
+          "ownerExportPath": "./adapters/browser",
+          "ownerModule": "adapters/browser",
+          "ownerFragment": "rpc-threads-adapters/browser--IWebThreadHandle"
+        },
+        {
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/web-launcher.d.ts:IWebThreadLauncherOptions:export type IWebThreadLauncherOptions = Readonly<{ Worker?: new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker; report(error: unknown): void; runtimeApi?: IRuntimePeerSourceContext; }>;",
+          "name": "IWebThreadLauncherOptions",
+          "signature": "export type IWebThreadLauncherOptions = Readonly<{ Worker?: new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker; report(error: unknown): void; runtimeApi?: IRuntimePeerSourceContext; }>;",
+          "source": "packages/rpc-core/dist/adapter-owned/threads/web-launcher.d.ts",
+          "exportPath": "./adapters/bun",
+          "ownerExportPath": "./adapters/browser",
+          "ownerModule": "adapters/browser",
+          "ownerFragment": "rpc-threads-adapters/browser--IWebThreadLauncherOptions"
+        }
+      ]
     },
     {
       "id": "rpc-threads:adapters/deno",
@@ -1131,7 +2835,28 @@
           "fragment": "rpc-threads-adapters/deno--createDenoThreadLauncher"
         }
       ],
-      "aliases": []
+      "aliases": [
+        {
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/web-launcher.d.ts:IWebThreadHandle:export type IWebThreadHandle = IThreadHandle & Readonly<{ port: IThreadWebPort; prepared: Promise<void | readonly string[]>; }>;",
+          "name": "IWebThreadHandle",
+          "signature": "export type IWebThreadHandle = IThreadHandle & Readonly<{ port: IThreadWebPort; prepared: Promise<void | readonly string[]>; }>;",
+          "source": "packages/rpc-core/dist/adapter-owned/threads/web-launcher.d.ts",
+          "exportPath": "./adapters/deno",
+          "ownerExportPath": "./adapters/browser",
+          "ownerModule": "adapters/browser",
+          "ownerFragment": "rpc-threads-adapters/browser--IWebThreadHandle"
+        },
+        {
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/web-launcher.d.ts:IWebThreadLauncherOptions:export type IWebThreadLauncherOptions = Readonly<{ Worker?: new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker; report(error: unknown): void; runtimeApi?: IRuntimePeerSourceContext; }>;",
+          "name": "IWebThreadLauncherOptions",
+          "signature": "export type IWebThreadLauncherOptions = Readonly<{ Worker?: new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker; report(error: unknown): void; runtimeApi?: IRuntimePeerSourceContext; }>;",
+          "source": "packages/rpc-core/dist/adapter-owned/threads/web-launcher.d.ts",
+          "exportPath": "./adapters/deno",
+          "ownerExportPath": "./adapters/browser",
+          "ownerModule": "adapters/browser",
+          "ownerFragment": "rpc-threads-adapters/browser--IWebThreadLauncherOptions"
+        }
+      ]
     },
     {
       "id": "rpc-threads:adapters/electron-main",
@@ -1294,6 +3019,70 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-threads-adapters/electron-main--createElectronMainThreadLauncher"
+        },
+        {
+          "name": "INodeThreadHandle",
+          "kind": "type",
+          "signature": "export type INodeThreadHandle = IThreadHandle & Readonly<{ port: INodeMessagePortLike; }>;",
+          "declarationLine": 9,
+          "source": "packages/rpc-core/dist/adapter-owned/threads/node-launcher.d.ts",
+          "purpose": "A public handle owns execution and messaging; startup records remain module-private.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for INodeThreadHandle.",
+          "advanced": "No additional advanced behavior is declared for INodeThreadHandle.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for INodeThreadHandle."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for INodeThreadHandle.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "INodeThreadHandle",
+          "exportPath": "./adapters/electron-main",
+          "overloadSignatures": [
+            "export type INodeThreadHandle = IThreadHandle & Readonly<{ port: INodeMessagePortLike; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use INodeThreadHandle when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when INodeThreadHandle does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A public handle owns execution and messaging; startup records remain module-private."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import INodeThreadHandle from @migaia/rpc-threads/adapters/electron-main, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use INodeThreadHandle when its type contract and declared inputs match the result you need. Choose a different public symbol when INodeThreadHandle does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for INodeThreadHandle."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for INodeThreadHandle."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/node-launcher.d.ts:INodeThreadHandle:export type INodeThreadHandle = IThreadHandle & Readonly<{ port: INodeMessagePortLike; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-threads-adapters/electron-main--INodeThreadHandle"
         }
       ],
       "aliases": []
@@ -1475,7 +3264,28 @@
           "fragment": "rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher"
         }
       ],
-      "aliases": []
+      "aliases": [
+        {
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/web-launcher.d.ts:IWebThreadHandle:export type IWebThreadHandle = IThreadHandle & Readonly<{ port: IThreadWebPort; prepared: Promise<void | readonly string[]>; }>;",
+          "name": "IWebThreadHandle",
+          "signature": "export type IWebThreadHandle = IThreadHandle & Readonly<{ port: IThreadWebPort; prepared: Promise<void | readonly string[]>; }>;",
+          "source": "packages/rpc-core/dist/adapter-owned/threads/web-launcher.d.ts",
+          "exportPath": "./adapters/electron-renderer",
+          "ownerExportPath": "./adapters/browser",
+          "ownerModule": "adapters/browser",
+          "ownerFragment": "rpc-threads-adapters/browser--IWebThreadHandle"
+        },
+        {
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/web-launcher.d.ts:IWebThreadLauncherOptions:export type IWebThreadLauncherOptions = Readonly<{ Worker?: new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker; report(error: unknown): void; runtimeApi?: IRuntimePeerSourceContext; }>;",
+          "name": "IWebThreadLauncherOptions",
+          "signature": "export type IWebThreadLauncherOptions = Readonly<{ Worker?: new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker; report(error: unknown): void; runtimeApi?: IRuntimePeerSourceContext; }>;",
+          "source": "packages/rpc-core/dist/adapter-owned/threads/web-launcher.d.ts",
+          "exportPath": "./adapters/electron-renderer",
+          "ownerExportPath": "./adapters/browser",
+          "ownerModule": "adapters/browser",
+          "ownerFragment": "rpc-threads-adapters/browser--IWebThreadLauncherOptions"
+        }
+      ]
     },
     {
       "id": "rpc-threads:adapters/node",
@@ -1658,7 +3468,18 @@
           "fragment": "rpc-threads-adapters/node--createNodeThreadLauncher"
         }
       ],
-      "aliases": []
+      "aliases": [
+        {
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/adapter-owned/threads/node-launcher.d.ts:INodeThreadHandle:export type INodeThreadHandle = IThreadHandle & Readonly<{ port: INodeMessagePortLike; }>;",
+          "name": "INodeThreadHandle",
+          "signature": "export type INodeThreadHandle = IThreadHandle & Readonly<{ port: INodeMessagePortLike; }>;",
+          "source": "packages/rpc-core/dist/adapter-owned/threads/node-launcher.d.ts",
+          "exportPath": "./adapters/node",
+          "ownerExportPath": "./adapters/electron-main",
+          "ownerModule": "adapters/electron-main",
+          "ownerFragment": "rpc-threads-adapters/electron-main--INodeThreadHandle"
+        }
+      ]
     }
   ]
 }

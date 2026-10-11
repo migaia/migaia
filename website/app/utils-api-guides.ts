@@ -136,8 +136,137 @@ const controlUtilsApiGuides: Readonly<
   'utils:value:isPrimitive': utilsGuide({ purposeEn: 'Narrows JavaScript primitive values, including symbol and bigint, while excluding objects and functions.', purposeZh: '窄化 JavaScript primitive value，包括 symbol 与 bigint，同时排除 object 与 function。', quickStart: "import { isPrimitive } from '@migaia/utils'\n\nconst value: unknown = 42\nif (isPrimitive(value)) console.log(value) // scalar 通过 guard 后可按 primitive 处理", useEn: 'A codec, snapshot, or branch handles scalar identity separately from object graphs.', useZh: 'codec、snapshot 或 branch 需要把 scalar identity 与 object graph 分开处理。', avoidEn: 'Only JSON scalar values are accepted, because symbol, bigint, and undefined require separate policy.', avoidZh: '只接受 JSON scalar value；symbol、bigint 与 undefined 需要独立 policy。' })
 }
 
+/** Builds the four K290 guides from their concrete semantic cases without fallback content. */
+function safeValueGuide(input: {
+  readonly purposeEn: string
+  readonly purposeZh: string
+  readonly quickStart: string
+  readonly useEn: readonly string[]
+  readonly useZh: readonly string[]
+  readonly avoidEn: readonly string[]
+  readonly avoidZh: readonly string[]
+}): Readonly<Record<IGuideLocale, IApiGuide>> {
+  return {
+    en: {
+      purpose: input.purposeEn,
+      quickStart: input.quickStart,
+      scenarios: input.useEn,
+      avoidWhen: input.avoidEn,
+      options: []
+    },
+    zh: {
+      purpose: input.purposeZh,
+      quickStart: input.quickStart,
+      scenarios: input.useZh,
+      avoidWhen: input.avoidZh,
+      options: []
+    }
+  }
+}
+
+/** Concrete ordinary safe-value capabilities added while moving shared RPC mechanics into Utils. */
+const safeValueUtilsApiGuides = {
+  'utils:object:createSafeRecord': safeValueGuide({
+    purposeEn:
+      'Creates a fresh mutable null-prototype dictionary. Untrusted string keys become own data entries instead of invoking inherited prototype setters; it does not clone values, freeze records or define a domain key format.',
+    purposeZh:
+      '创建新的可变 null-prototype dictionary。不可信 string key 写成自有数据，不调用继承的 prototype setter；不克隆 value、不冻结 record，也不定义业务 key 格式。',
+    quickStart:
+      "import { createSafeRecord } from '@migaia/utils/object'\n\n/** This caller owns the dictionary and each admitted value. */\nconst counts = createSafeRecord<number>()\ncounts['__proto__'] = 1\ncounts.visits = 3\nconsole.log(Object.getPrototypeOf(counts)) // null\nconsole.log(Object.hasOwn(counts, '__proto__'), counts.visits) // true, 3\n// Missing entries remain undefined; check membership separately when undefined is meaningful.",
+    useEn: [
+      'A protocol or configuration reader accumulates admitted data under external string keys.',
+      'A caller needs a fresh dictionary without Object.prototype methods or setters.'
+    ],
+    useZh: [
+      '协议或配置读取方需要按外部 string key 收集已接纳数据。',
+      '调用方需要不带 Object.prototype 方法或 setter 的新 dictionary。'
+    ],
+    avoidEn: [
+      'A Map, immutable snapshot or independently validated domain object is required.',
+      'Treating a null prototype as proof that stored values were normalized or that keys have domain authority.'
+    ],
+    avoidZh: [
+      '需求是 Map、不可变快照或经过独立校验的业务对象。',
+      '把 null prototype 当作 value 已归一化或 key 具有业务权限的证明。'
+    ]
+  }),
+  'utils:value:isSafeIntegerValue': safeValueGuide({
+    purposeEn:
+      'Narrows only primitive finite safe integers without coercion. Zero, negative integers and negative zero are accepted; fractions, non-finite values, numeric strings and boxed numbers are rejected. Positivity and domain ranges remain caller policy.',
+    purposeZh:
+      '不做强制转换，只窄化 primitive finite safe integer。接受 zero、负整数与 negative zero；拒绝小数、非有限数、numeric string 与 boxed number。正值和业务范围由调用方决定。',
+    quickStart:
+      "import { isSafeIntegerValue } from '@migaia/utils/value'\n\n/** These boundary inputs show the exact primitive-integer domain. */\nconst values: readonly unknown[] = [0, -2, 1.5, '2', Number.MAX_SAFE_INTEGER + 1]\nfor (const value of values) console.log(value, isSafeIntegerValue(value))\n// true, true, false, false, false\n// Apply a separate owner range check when the actual field requires a nonnegative count.",
+    useEn: [
+      'An identifier or count field must reject coercion before arithmetic or indexing.',
+      'Several owners need the same safe-integer type guard while keeping their own ranges.'
+    ],
+    useZh: [
+      'identifier 或 count 字段在算术或索引前需要拒绝强制转换。',
+      '多个 owner 需要相同 safe-integer type guard，同时保留各自范围。'
+    ],
+    avoidEn: [
+      'The domain accepts bigint, decimal fractions or explicitly parsed numeric text.',
+      'Assuming this predicate also proves positivity or an owner-specific maximum.'
+    ],
+    avoidZh: [
+      '业务域接受 bigint、小数或经过显式解析的 numeric text。',
+      '假设此 predicate 同时证明正值或 owner 特有的最大值。'
+    ]
+  }),
+  'utils:string:tryString': safeValueGuide({
+    purposeEn:
+      'Converts once with String semantics and leaves existing strings unchanged. Coercion may run user code; a failure is returned with the exact original thrown value. The caller chooses fallback, reporting or rethrow, including its own nullish policy.',
+    purposeZh:
+      '按 String 语义转换一次，已有 string 原样返回。强制转换可执行用户代码；失败结果保留原抛出值的精确身份。fallback、报告、重抛与 nullish 策略由调用方选择。',
+    quickStart:
+      "import { tryString } from '@migaia/utils/string'\n\n/** This display boundary owns its fallback and reports the original conversion failure. */\nexport function displayLabel(value: unknown, fallback: string, report: (error: unknown) => void) {\n  const converted = tryString(value)\n  if (converted.threw) {\n    report(converted.error)\n    return fallback\n  }\n  return converted.value\n}\nconsole.log(tryString(undefined)) // { threw: false, value: 'undefined' }\nconsole.log(tryString(Symbol('task'))) // { threw: false, value: 'Symbol(task)' }\n// This utility adds no implicit nullish fallback and never replaces the failed coercion's error.",
+    useEn: [
+      'A display or diagnostic boundary must keep a hostile conversion failure observable.',
+      'A caller needs exactly one conversion while choosing its own fallback and error policy.'
+    ],
+    useZh: [
+      '展示或诊断边界需要让有异常的转换失败仍可观察。',
+      '调用方需要精确一次转换，并自行选择 fallback 与错误策略。'
+    ],
+    avoidEn: [
+      'Conversion must not execute application coercion hooks.',
+      'A codec, validation, redaction or portable snapshot contract is required rather than String conversion.'
+    ],
+    avoidZh: [
+      '转换不得执行应用强制转换 hook。',
+      '需要的是 codec、校验、脱敏或 portable snapshot 契约，而不是 String 转换。'
+    ]
+  }),
+  'utils:string:IStringConversion': safeValueGuide({
+    purposeEn:
+      'Describes the readonly result of tryString. threw:false contains the converted string; threw:true contains the original unknown failure. This type adds no constructor, fallback, reporting or domain error identity.',
+    purposeZh:
+      '描述 tryString 的 readonly 结果。threw:false 携带转换后的 string；threw:true 携带原 unknown 失败。此 type 不提供构造器、fallback、报告或业务错误身份。',
+    quickStart:
+      "import { tryString, type IStringConversion } from '@migaia/utils/string'\n\n/** Keep success and the exact conversion failure distinct in this caller's return contract. */\nexport function convertLabel(value: unknown): IStringConversion {\n  return tryString(value)\n}\n\n/** A reporting owner decides how to handle the original failure branch. */\nexport function readConverted(result: IStringConversion, report: (error: unknown) => void) {\n  if (result.threw) {\n    report(result.error)\n    return undefined\n  }\n  return result.value\n}",
+    useEn: [
+      'A caller exposes conversion success and failure without collapsing them into undefined.',
+      'The reporting layer narrows the discriminator before reading value or the original error.'
+    ],
+    useZh: [
+      '调用方需要区分转换成功与失败，不把它们合并为 undefined。',
+      '报告层在读取 value 或原 error 前先窄化 discriminator。'
+    ],
+    avoidEn: [
+      'Using this type as a runtime validator or error factory.',
+      'Reading value on the failure branch or discarding error before the owner reports it.'
+    ],
+    avoidZh: [
+      '把此 type 当作运行时校验器或错误工厂。',
+      '在失败分支读取 value，或在 owner 报告前丢弃 error。'
+    ]
+  })
+}
+
 export const utilsApiGuides = {
   ...foundationalUtilsApiGuides,
   ...dataUtilsApiGuides,
-  ...controlUtilsApiGuides
+  ...controlUtilsApiGuides,
+  ...safeValueUtilsApiGuides
 } as const

@@ -202,7 +202,7 @@
     {
       "slug": "utils",
       "description": "Runtime-neutral reusable utility primitives.",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "exports": [
         ".",
         "./bytes",
@@ -282,6 +282,7 @@
         "./runtime",
         "./runtime/lazy",
         "./runtime/metadata",
+        "./schema/wire-error",
         "./stream",
         "./v1",
         "./wire"
