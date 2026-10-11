@@ -103,11 +103,12 @@ ship-dry-run:
 	@$(MAKE) ship-pack-check
 	@echo "==> ship dry-run passed; no release mutations performed"
 
-# Full local CI preserves release-package ownership and adds repository gates
-# serially. Website tests remain an explicit known failure; all other failures
-# stay blocking. No release mutation or registry authentication runs.
+# Build every workspace in pnpm's dependency-topological order before release
+# validation reads package outputs. Repository gates retain their own exit codes;
+# no release mutation or registry authentication runs.
 ci:
 	@$(CI_REPORT) \
+	run_gate required workspace/build pnpm -r run build; \
 	run_gate required dependencies-check $(CI_MAKE) dependencies-check; \
 	run_gate required release-plan-check $(CI_MAKE) release-plan-check; \
 	run_gate required ship-ci $(CI_MAKE) ship-ci; \
