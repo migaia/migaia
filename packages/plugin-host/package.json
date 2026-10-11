@@ -36,7 +36,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "lint": "oxlint src test bench vite.bench.config.ts",
-    "test": "pnpm run build && vitest run",
+    "test": "(node ../../scripts/dist-stamp.mjs assert || pnpm run build) && vitest run",
     "bench:mutation": "pnpm run build && vitest run --config vite.bench.config.ts",
     "test:packed": "pnpm run build && node test/packed-smoke.mjs",
     "test:coverage": "pnpm run build && vitest run --coverage",

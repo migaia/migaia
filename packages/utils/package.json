@@ -72,7 +72,7 @@
     "lint": "oxlint src test",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
-    "test": "pnpm run build && vitest run",
+    "test": "(node ../../scripts/dist-stamp.mjs assert || pnpm run build) && vitest run",
     "test:packed": "pnpm run build && node test/packed-export-smoke.mjs",
     "bench:collector": "pnpm run build && node test/collector-performance.mjs",
     "build": "node ../../scripts/dist-stamp.mjs clean && vite build && tsc -p tsconfig.json --emitDeclarationOnly && node ../../scripts/dist-stamp.mjs write",
