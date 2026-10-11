@@ -14,6 +14,8 @@ const testOwners = [
 ]
 /** Runtime coverage belongs to exactly the six final Source owners; integration has no runtime API. */
 const runtimeOwners = testOwners.filter((owner) => owner !== 'rpc-integration')
+/** Preserve the existing test discovery origin while each owner supplies its TS transformer. */
+const familyDirectory = fileURLToPath(new URL('.', import.meta.url))
 /** Timing-sensitive conformance and parity suites belong to their exclusive standalone gates. */
 const excluded = [
   ...configDefaults.exclude,
@@ -29,15 +31,17 @@ export default defineConfig(
       maxWorkers: 2,
       exclude: excluded,
       projects: [
-        {
-          extends: true,
+        ...testOwners.map((owner) => ({
+          root: fileURLToPath(new URL('../' + owner, import.meta.url)),
+          extends: true as const,
           test: {
-            name: 'family-unit',
-            include: testOwners.map((owner) => '../' + owner + '/test/**/*.{test,spec}.ts'),
+            name: 'family-unit-' + owner,
+            dir: familyDirectory,
+            include: ['../' + owner + '/test/**/*.{test,spec}.ts'],
             exclude: [...excluded, '**/test/runtime-api/single-frame.test.ts'],
             sequence: { groupOrder: 0 }
           }
-        },
+        })),
         {
           extends: true,
           test: {
