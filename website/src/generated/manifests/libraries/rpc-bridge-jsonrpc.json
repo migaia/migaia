@@ -114,12 +114,90 @@
       "architecturePath": "/en/architecture/rpc-bridge-jsonrpc",
       "symbols": [
         {
+          "name": "createJsonRpcAdapterChannel",
+          "kind": "function",
+          "signature": "export declare function createJsonRpcAdapterChannel(options: IJsonRpcBridgeOptions): Promise<IRemoteChannel>;",
+          "declarationLine": 4,
+          "source": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/channel.d.ts",
+          "purpose": "Negotiate one authenticated JSON-RPC peer, then expose its complete Core-constructed channel.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createJsonRpcAdapterChannel.",
+          "advanced": "No additional advanced behavior is declared for createJsonRpcAdapterChannel.",
+          "parameters": ["options: IJsonRpcBridgeOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IJsonRpcBridgeOptions",
+              "optional": false
+            }
+          ],
+          "returns": "Promise<IRemoteChannel>",
+          "errors": ["No documented errors are declared for createJsonRpcAdapterChannel."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createJsonRpcAdapterChannel.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "createJsonRpcAdapterChannel",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createJsonRpcAdapterChannel(options: IJsonRpcBridgeOptions): Promise<IRemoteChannel>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IJsonRpcBridgeOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["Promise<IRemoteChannel>"],
+          "whenToUse": "Use createJsonRpcAdapterChannel when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createJsonRpcAdapterChannel does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Negotiate one authenticated JSON-RPC peer, then expose its complete Core-constructed channel."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createJsonRpcAdapterChannel from @migaia/rpc-bridge-jsonrpc, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createJsonRpcAdapterChannel when its function contract and declared inputs match the result you need. Choose a different public symbol when createJsonRpcAdapterChannel does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createJsonRpcAdapterChannel."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createJsonRpcAdapterChannel."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/channel.d.ts:createJsonRpcAdapterChannel:export declare function createJsonRpcAdapterChannel(options: IJsonRpcBridgeOptions): Promise<IRemoteChannel>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-bridge-jsonrpc-index--createJsonRpcAdapterChannel"
+        },
+        {
           "name": "createJsonRpcRemoteChannel",
           "kind": "function",
           "signature": "export declare function createJsonRpcRemoteChannel(options: IJsonRpcBridgeOptions): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>;",
-          "declarationLine": 7,
+          "declarationLine": 9,
           "source": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/index.d.ts",
-          "purpose": "Construct the foreign-language channel and retain the Core owner's exact Promise.",
+          "purpose": "Construct the foreign-language channel and retain the adapter owner's exact Promise.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createJsonRpcRemoteChannel.",
           "advanced": "No additional advanced behavior is declared for createJsonRpcRemoteChannel.",
           "parameters": ["options: IJsonRpcBridgeOptions"],
@@ -159,7 +237,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Construct the foreign-language channel and retain the Core owner's exact Promise."
+              "content": "Construct the foreign-language channel and retain the adapter owner's exact Promise."
             },
             {
               "id": "getting-started",
@@ -263,7 +341,7 @@
           "kind": "type",
           "signature": "export type IJsonRpcBridgeOptions = Readonly<{ byte: IProcessByteChannel; peerId: string; target: Readonly<{ kind: 'plugin'; contract: IRemoteContract; }> | Readonly<{ kind: 'host'; catalog: IRemoteHostCatalog; }>; offer: Omit<IRpcHandshakeOffer, 'auth' | 'codecs'>; token: string; scheduler: IScheduler; wallClock: IWallClock; ipc: IProcessCommonOptions['ipc']; signal?: AbortSignal; handshakeTimeoutMs?: number; report(error: unknown): void; }>;",
           "declarationLine": 6,
-          "source": "packages/rpc-core/dist/adapter-owned/jsonrpc/handshake.d.ts",
+          "source": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/handshake.d.ts",
           "purpose": "Caller owns launch, authentication issuance, clocks and the physical byte connection.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IJsonRpcBridgeOptions.",
           "advanced": "No additional advanced behavior is declared for IJsonRpcBridgeOptions.",
@@ -316,7 +394,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "@migaia/rpc-bridge-jsonrpc:packages/rpc-core/dist/adapter-owned/jsonrpc/handshake.d.ts:IJsonRpcBridgeOptions:export type IJsonRpcBridgeOptions = Readonly<{ byte: IProcessByteChannel; peerId: string; target: Readonly<{ kind: 'plugin'; contract: IRemoteContract; }> | Readonly<{ kind: 'host'; catalog: IRemoteHostCatalog; }>; offer: Omit<IRpcHandshakeOffer, 'auth' | 'codecs'>; token: string; scheduler: IScheduler; wallClock: IWallClock; ipc: IProcessCommonOptions['ipc']; signal?: AbortSignal; handshakeTimeoutMs?: number; report(error: unknown): void; }>;",
+          "identity": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/handshake.d.ts:IJsonRpcBridgeOptions:export type IJsonRpcBridgeOptions = Readonly<{ byte: IProcessByteChannel; peerId: string; target: Readonly<{ kind: 'plugin'; contract: IRemoteContract; }> | Readonly<{ kind: 'host'; catalog: IRemoteHostCatalog; }>; offer: Omit<IRpcHandshakeOffer, 'auth' | 'codecs'>; token: string; scheduler: IScheduler; wallClock: IWallClock; ipc: IProcessCommonOptions['ipc']; signal?: AbortSignal; handshakeTimeoutMs?: number; report(error: unknown): void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -327,7 +405,7 @@
           "kind": "type",
           "signature": "export type IProcessByteChannel = Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "declarationLine": 15,
-          "source": "packages/rpc-core/dist/adapter-owned/process/types.d.ts",
+          "source": "packages/rpc-process/dist/process/types.d.ts",
           "purpose": "Byte channels expose one ordered, backpressured physical stream.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessByteChannel.",
           "advanced": "No additional advanced behavior is declared for IProcessByteChannel.",
@@ -380,7 +458,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "@migaia/rpc-bridge-jsonrpc:packages/rpc-core/dist/adapter-owned/process/types.d.ts:IProcessByteChannel:export type IProcessByteChannel = Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "identity": "@migaia/rpc-bridge-jsonrpc:packages/rpc-process/dist/process/types.d.ts:IProcessByteChannel:export type IProcessByteChannel = Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
