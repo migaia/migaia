@@ -312,6 +312,7 @@
       ".": [
         "JSONRPC_BRIDGE_ERROR_SOURCE",
         "JsonRpcBridgeErrorCode",
+        "createJsonRpcAdapterChannel",
         "createJsonRpcRemoteChannel"
       ]
     },
@@ -537,6 +538,8 @@
         "normalizeRuntimeGeneration",
         "normalizeRuntimeSteps",
         "readRuntimeCarrier",
+        "rpcByteRuntimeBootstrap",
+        "rpcMessageCapabilityControl",
         "runtimeOperationCapabilities",
         "wrapRuntimeCarrier"
       ],
@@ -762,80 +765,70 @@
         "createWebWorkerTransport"
       ],
       "./adapter": [
-        "createAdapterChannel",
-        "receiveAdapterBootstrap"
-      ],
-      "./adapter/node": [
-        "createAdapterChildStdio",
-        "createAdapterProcessStdio",
-        "createAdapterSocketByteIO"
-      ],
-      "./adapter/diagnostics": [
         "IpcReporterContext",
-        "RPC_PROCESS_ERROR_SOURCE",
-        "RpcProcessErrorCode"
-      ],
-      "./adapter/process-data": [
+        "adapterContractRequiresStream",
+        "createAdapterBindingDrain",
+        "createAdapterConfigurationError",
+        "createAdapterConfigurationTypeError",
+        "createAdapterId",
+        "createAdapterPlugin",
+        "createAdapterSourceConfigurationError",
+        "createAdapterTransportError",
+        "createEventEmitterMessageResource",
+        "createEventTargetMessageResource",
+        "createRuntimeByteConnection",
+        "createRuntimeEventByteIO",
+        "createRuntimeMessageConnection",
+        "createRuntimeProviderGovernor",
+        "createRuntimeProviderScope",
+        "holdAdapterLaunch",
+        "holdAdapterObjectChannel",
+        "holdAdapterRegistration",
+        "materializeAdapterJson",
+        "normalizeAdapterDescription",
+        "prepareAdapterPeer",
+        "readAdapterAbortReason",
+        "readRuntimeByteBootstrap",
+        "validateAdapterPeerMethods",
+        "validateAdapterPeerTimeout"
+      ]
+    },
+    "@migaia/rpc-process": {
+      ".": [
         "PROCESS_HANDSHAKE_MAX_FRAME_BYTES",
         "PROCESS_RUNTIME_API_BOOTSTRAP_KIND",
         "PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS",
         "PROCESS_RUNTIME_API_BOOTSTRAP_VERSION",
         "PROCESS_RUNTIME_API_ENV",
         "PROCESS_RUNTIME_API_ENV_VERSION",
-        "PROCESS_RUNTIME_API_FINGERPRINT_PREFIX"
-      ],
-      "./adapter/web-streams": [
-        "createAdapterWebByteIO"
-      ],
-      "./adapter/process": [
-        "ProcessPluginWire",
-        "createAdapterProcessLaunch",
-        "createAdapterProcessPeer",
-        "createAdapterProcessPlugin",
-        "createNativeProcessOffer",
-        "createProcessResilience",
-        "parseProcessPluginDescriptor"
-      ],
-      "./adapter/process/node": [
-        "createAdapterNodeProcessLaunch"
-      ],
-      "./adapter/threads": [
-        "AdapterNodeThreadParentChannel",
-        "RPC_THREAD_ERROR_SOURCE",
-        "RpcThreadErrorCode",
-        "createAdapterNodeThreadChannel",
-        "createAdapterNodeThreadChannelFactory",
-        "createAdapterNodeThreadLauncher",
-        "createAdapterNodeThreadPeer",
-        "createAdapterWebThreadChannel",
-        "createAdapterWebThreadChannelFactory",
-        "createAdapterWebThreadLauncher",
-        "createThreadPeer",
-        "createThreadPlugin",
-        "readThreadBootstrap",
-        "receiveThreadData"
-      ],
-      "./adapter/jsonrpc": [
-        "createJsonRpcAdapterChannel"
-      ]
-    },
-    "@migaia/rpc-process": {
-      ".": [
+        "PROCESS_RUNTIME_API_FINGERPRINT_PREFIX",
         "ProcessPluginWire",
         "RPC_PROCESS_ERROR_SOURCE",
         "RpcProcessErrorCode",
+        "createAdapterChannel",
+        "createAdapterProcessLaunch",
+        "createAdapterProcessPeer",
+        "createAdapterProcessPlugin",
+        "createAdapterWebByteIO",
         "createNativeProcessOffer",
+        "createProcessChannelClosedError",
         "createProcessPeer",
         "createProcessPlugin",
         "createProcessResilience",
         "createProcessTransport",
-        "parseProcessPluginDescriptor"
+        "openProcessObjectChannel",
+        "parseProcessPluginDescriptor",
+        "receiveAdapterBootstrap"
       ],
       "./adapters/node-child-process": [
+        "createAdapterChildStdio",
+        "createAdapterNodeProcessLaunch",
+        "createAdapterProcessStdio",
         "createNodeProcessLauncher",
         "openProcessStdioChannel"
       ],
       "./adapters/node-socket": [
+        "createAdapterSocketByteIO",
         "dialProcessByteChannel",
         "listenProcessByteChannel"
       ],
@@ -864,12 +857,17 @@
     },
     "@migaia/rpc-threads": {
       ".": [
+        "AdapterNodeThreadParentChannel",
         "RPC_THREAD_ERROR_SOURCE",
         "RpcThreadErrorCode",
+        "createAdapterNodeThreadLauncher",
+        "createAdapterNodeThreadPeer",
         "createNodeThreadChannel",
         "createThreadPeer",
         "createThreadPlugin",
         "createWebThreadChannel",
+        "createWebThreadChannelFactory",
+        "createWebThreadLauncher",
         "readThreadBootstrap",
         "receiveThreadData"
       ],
