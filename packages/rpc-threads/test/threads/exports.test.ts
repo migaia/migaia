@@ -36,13 +36,15 @@ describe('threads public exports', () => {
     expect(runtime.createThreadPeer).toBeTypeOf('function')
     expect(runtime.createThreadPlugin).toBeTypeOf('function')
   })
-  it('[A8] exports all platform factories with no new dependencies and no platform root imports', async () => {
+  it('[A8] exports all platform factories through existing public foundations without platform root imports', async () => {
     const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
     const base = JSON.parse(
       readFileSync(resolve(root, 'test/threads/fixtures/base-manifest.json'), 'utf8')
     )
     expect(manifest.dependencies).toEqual({
-      '@migaia/supervision': base.dependencies['@migaia/supervision']
+      '@migaia/supervision': base.dependencies['@migaia/supervision'],
+      '@migaia/utils': 'workspace:^',
+      '@migaia/lifecycle': 'workspace:^'
     })
     expect(manifest.peerDependencies).toEqual({
       '@migaia/rpc-contract': manifest.version,

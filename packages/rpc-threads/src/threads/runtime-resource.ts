@@ -1,4 +1,4 @@
-import type { IThreadRuntimeResource } from '@migaia/rpc-core/adapter/threads'
+import type { IThreadRuntimeResource } from './runtime-types.js'
 
 /** Native acquisition stays optional and preserves the launcher's original dynamic import. */
 export const threadRuntimeResource: IThreadRuntimeResource = {

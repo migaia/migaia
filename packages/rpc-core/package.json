@@ -130,10 +130,6 @@
       "types": "./dist/adapter-process-node.d.ts",
       "default": "./dist/adapter-process-node.js"
     },
-    "./adapter/threads": {
-      "types": "./dist/adapter-thread.d.ts",
-      "default": "./dist/adapter-thread.js"
-    },
     "./adapter/jsonrpc": {
       "types": "./dist/adapter-jsonrpc.d.ts",
       "default": "./dist/adapter-jsonrpc.js"

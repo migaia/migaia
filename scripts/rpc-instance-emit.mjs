@@ -123,24 +123,7 @@ export const RPC_RESOURCE_POINTS = {
     'adapter-owned/process/resilience/fallback.ts': ['createProcessInstanceFallback'],
     'adapter-owned/process/resilience/terminal.ts': ['createProcessTerminalRegistration'],
     'adapter-owned/jsonrpc/index.ts': ['createJsonRpcAdapterChannel'],
-    'adapter-owned/jsonrpc/transport.ts': ['bindJsonRpcWire'],
-    'adapter-owned/threads/channel.ts': [
-      'createAdapterNodeThreadChannel',
-      'createAdapterWebThreadChannel'
-    ],
-    'adapter-owned/threads/peer.ts': ['createThreadPeer'],
-    'adapter-owned/threads/plugin.ts': ['createThreadPlugin'],
-    'adapter-owned/threads/node-peer.ts': ['createAdapterNodeThreadPeer'],
-    'adapter-owned/threads/node-launcher.ts': [
-      'createAdapterNodeThreadLauncher',
-      'createAdapterNodeThreadChannelFactory'
-    ],
-    'adapter-owned/threads/web-launcher.ts': [
-      'createAdapterWebThreadLauncher',
-      'createAdapterWebThreadChannelFactory'
-    ],
-    'adapter-owned/threads/bootstrap.ts': ['receiveThreadData'],
-    'adapter-owned/threads/node-parent.ts': ['AdapterNodeThreadParentChannel']
+    'adapter-owned/jsonrpc/transport.ts': ['bindJsonRpcWire']
   },
   '@migaia/rpc-process': {
     'process/handshake.ts': ['createProcessTransport'],
@@ -157,6 +140,16 @@ export const RPC_RESOURCE_POINTS = {
     'process/adapters/windows-job.ts': ['createWindowsJobProcessLauncher']
   },
   '@migaia/rpc-threads': {
+    'threads/node-peer.ts': ['createAdapterNodeThreadPeer'],
+    'threads/node-launcher.ts': [
+      'createAdapterNodeThreadLauncher',
+      'createAdapterNodeThreadChannelFactory'
+    ],
+    'threads/web-launcher.ts': [
+      'createAdapterWebThreadLauncher',
+      'createAdapterWebThreadChannelFactory'
+    ],
+    'threads/node-parent.ts': ['AdapterNodeThreadParentChannel'],
     'threads/channel.ts': ['createNodeThreadChannel', 'createWebThreadChannel'],
     'threads/bootstrap.ts': ['receiveThreadData'],
     'threads/peer.ts': ['createThreadPeer'],

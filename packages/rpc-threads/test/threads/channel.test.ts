@@ -149,7 +149,7 @@ describe('thread channel ownership and portable boundary', () => {
       removeEventListener = pair.left.removeEventListener
       terminate = vi.fn()
     }
-    let service: ReturnType<typeof createWebThreadChannel> | undefined
+    let service: Awaited<ReturnType<typeof createWebThreadChannel>> | undefined
     const receive = receiveThreadData(pair.right, (data) => {
       expect(data).toEqual({ value: 7 })
       service = createWebThreadChannel(pair.right, 'parent', { scheduler: systemScheduler })

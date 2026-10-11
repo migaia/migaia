@@ -525,14 +525,9 @@ returned handle exposes `identity`, `port`, `exited`, `terminate`, `sampleUsage`
 `open` operation; preparation and receive-handoff callbacks remain private.
 
 ```ts
-import { createAdapterNodeThreadLauncher } from '@migaia/rpc-core/adapter/threads'
+import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'
 
-const launcher = createAdapterNodeThreadLauncher({
-  load: () => import('node:worker_threads'),
-  get pid() {
-    return process.pid
-  }
-})
+const launcher = createNodeThreadLauncher()
 const handle = await launcher.launch(threadSpec, { signal })
 const channel = await handle.open(signal, { scheduler })
 ```
@@ -591,7 +586,7 @@ Core-private initializer; there is no public lifetime registrar or target transp
 | `@migaia/rpc-core` | `RPC_CORE_ERROR_SOURCE` = `@migaia/rpc/core` | `RpcCoreErrorCode` | 分类 Endpoint 的配置、取消、deadline、transport 与 provider 诊断。 |
 | `@migaia/rpc-core/remote` | `RPC_REMOTE_ERROR_SOURCE` = `@migaia/rpc/remote` | `RpcRemoteLayerErrorCode` | 解释 generation 关闭、启动失败及未知结果，按原 outcome/对账路径恢复。 |
 | `@migaia/rpc-process`；Core 适配器还可用 `@migaia/rpc-core/adapter/diagnostics` | `RPC_PROCESS_ERROR_SOURCE` = `@migaia/rpc/process` | `RpcProcessErrorCode` | 分类实际 launch、dial、listen、bootstrap 与资源采样失败。 |
-| `@migaia/rpc-threads`；Core 适配器还可用 `@migaia/rpc-core/adapter/threads` | `RPC_THREAD_ERROR_SOURCE` = `@migaia/rpc/threads` | `RpcThreadErrorCode` | 报告真实 Worker 采样失败，保留原 cause 并展示 unavailable。 |
+| `@migaia/rpc-threads` | `RPC_THREAD_ERROR_SOURCE` = `@migaia/rpc/threads` | `RpcThreadErrorCode` | 报告真实 Worker 采样失败，保留原 cause 并展示 unavailable。 |
 | `@migaia/rpc-bridge-jsonrpc` / `@migaia/rpc-contract/framing/jsonrpc` | `JSONRPC_BRIDGE_ERROR_SOURCE` = `@migaia/rpc/bridge/jsonrpc` | `JsonRpcBridgeErrorCode` | 识别 framing、hello/profile 与扩展协商失败，处理实际连接。 |
 
 `RpcCoreErrorText`、`RpcContractErrorText`、`RpcContractErrorDiagnostic`、`RpcProcessErrorText`、`RpcRemoteLayerErrorText`、`JsonRpcBridgeErrorText` 与 Thread 文本表均为私有展示。删除这些已更名包的公开表属于破坏性导出变更；message 字面量不是恢复、重试、终止或关闭契约。Process bootstrap 的环境名、版本、frame 限额和发现超时仍由 `@migaia/rpc-core/adapter/process-data` 普通导出；stderr 文本/配额常量不公开。
@@ -649,6 +644,11 @@ import {
 export function transferError(error: unknown, report: (failure: unknown) => void) {
   const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) })
   const received: unknown = JSON.parse(JSON.stringify(wire))
+  const restored = deserializeRpcError(received)
+  const timeout: RpcTimeoutError | undefined = isRpcTimeoutError(restored) ? restored : undefined
+  return { restored, timeout, stackPreserved: restored.stack === wire.stack }
+}
+```
 
 
 ## 运行时 adapter API：持有资源，Core 生成能力事实
@@ -742,8 +742,3 @@ Node 子端的 rawInitialResource 是实际 native launch input 的 read 操作�
 `@migaia/rpc-process` 的 `createProcessChannelClosedError(cause?)` 创建原生 Process CHANNEL_CLOSED 错误，保留原 source、code、message 和 cause。`openProcessObjectChannel(connection, commonOptions)` 操作 Core 已构造的对象连接，使用 Process 的规范 expected-string 诊断、platform 及 stderr 安装/释放策略；它不登记能力或接受外部 agreement。JSON-RPC bridge 通过这两个公开操作复用原 Process 诊断与生命周期归属。
 
 process message 的有意变更仅涉及扩展 runtime/binary 能力：旧 staticAgreement 可直接启用其声明；新路径仅直接启用固定基础 profile，扩展项由 Core 从实际 capability ACK 求交。沿用相同 ACK reader/intersection 以及 handshakeTimeoutMs/default；没有 ACK 或超时则返回固定 profile，agreement.capabilities 反映实际启用项，格式错误或伪造 ACK 使用原错误码拒绝。固定 legacy ping profile 保持零握手。
-  const restored = deserializeRpcError(received)
-  const timeout: RpcTimeoutError | undefined = isRpcTimeoutError(restored) ? restored : undefined
-  return { restored, timeout, stackPreserved: restored.stack === wire.stack }
-}
-```

@@ -1,20 +1,11 @@
-import { identityCodecV1 } from '@migaia/serialize/codec'
-import { messageFramerV1 } from '@migaia/rpc-contract/framing'
-import { RpcCapability } from '@migaia/rpc-contract'
-
-/** Both ends share this static identity pipeline; no hello is sent on message channels. */
-export const THREAD_CHANNEL_PROFILE = Object.freeze({
-  codec: identityCodecV1.id,
-  capabilities: Object.freeze([RpcCapability.stream, RpcCapability.batch]),
-  pipeline: Object.freeze({ codec: identityCodecV1, framer: messageFramerV1 })
-})
+import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 
 /** Private bootstrap records are consumed before core owns the message listener. */
 export const ThreadBootstrap = {
-  data: 'migaia.thread.data',
-  acknowledged: 'migaia.thread.data.ack',
+  data: rpcMessageCapabilityControl.data,
+  acknowledged: rpcMessageCapabilityControl.ready,
   /** Independent runtime ACK carries the child's actual offer rather than endpoint readiness. */
-  runtimeAcknowledged: 'migaia.thread.runtime.ack'
+  runtimeAcknowledged: rpcMessageCapabilityControl.acknowledgement
 } as const
 
 /** Native lifecycle event names belong to launcher adapters, never RPC transport policy. */
@@ -34,7 +25,7 @@ export const THREAD_FINGERPRINT_PREFIX = 'rpc-thread-'
 export const THREAD_HEAP_ERROR_CODE = 'ERR_WORKER_OUT_OF_MEMORY'
 
 /** Private runtime bootstrap and capability ACK use the same independently validated version. */
-export const THREAD_RUNTIME_API_VERSION = 1
+export const THREAD_RUNTIME_API_VERSION = rpcMessageCapabilityControl.version
 
 /** A dedicated Worker without the launcher's private bootstrap must not retain capture forever. */
-export const THREAD_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS = 10_000
+export const THREAD_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS = rpcMessageCapabilityControl.timeoutMs

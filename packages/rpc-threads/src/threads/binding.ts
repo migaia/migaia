@@ -1,11 +1,11 @@
-import { createRemoteBindingDrain } from '../../remote/internal/binding-drain.js'
+import { createAdapterBindingDrain } from '@migaia/rpc-core/adapter'
 import {
   createThreadSupervisor,
   type IThreadHandle,
   type IThreadSpec
 } from '@migaia/supervision/threads'
-import { defaultRpcId } from '../../core/internal/id.js'
-import type { IRemoteBinding, IRemoteChannel, IRemoteServeEndpoint } from '../../remote/index.js'
+import { createAdapterId } from '@migaia/rpc-core/adapter'
+import type { IRemoteBinding, IRemoteChannel, IRemoteServeEndpoint } from '@migaia/rpc-core/remote'
 import { portableThreadSpec } from './error.js'
 import type { IThreadCommonOptions } from './types.js'
 
@@ -21,11 +21,11 @@ export function createThreadBinding<THandle extends IThreadHandle>(
   /** Admission snapshots data before constructing any lifecycle owner. */
   const spec = portableThreadSpec(options.spec)
   /** Native shutdown and business drain share the original remote endpoint owner. */
-  const drain = createRemoteBindingDrain(options.scheduler, options.report)
+  const drain = createAdapterBindingDrain(options.scheduler, options.report)
   /** Every caller-selected policy and the exact health port stay with supervision. */
   const supervisor = createThreadSupervisor({
     ...options.supervisor,
-    id: options.supervisor?.id ?? defaultRpcId(),
+    id: options.supervisor?.id ?? createAdapterId(),
     launcher: options.launcher,
     spec,
     budget: options.budget,

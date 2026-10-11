@@ -1,14 +1,14 @@
 import {
   createAdapterWebThreadLauncher,
   createAdapterWebThreadChannelFactory
-} from '@migaia/rpc-core/adapter/threads'
+} from '../web-launcher.js'
 import type { IThreadChannelOptions } from '../types.js'
-import type { IWebThreadLauncherOptions } from '@migaia/rpc-core/adapter/threads'
+import type { IWebThreadLauncherOptions } from '../web-launcher.js'
 export type {
   IWebThreadHandle,
   IWebThreadWorker,
   IWebThreadLauncherOptions
-} from '@migaia/rpc-core/adapter/threads'
+} from '../web-launcher.js'
 
 /** Create the complete Worker execution resource with this runtime's actual constructor. */
 export function createWebThreadLauncher(options: IWebThreadLauncherOptions) {

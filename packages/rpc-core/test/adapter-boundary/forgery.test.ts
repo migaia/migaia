@@ -1,4 +1,5 @@
 import { MessageChannel } from 'node:worker_threads'
+import { createRequire } from 'node:module'
 import { describe, expect, it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { identityCodecV1 } from '@migaia/serialize/codec'
@@ -8,7 +9,6 @@ import { RpcBinaryProfile } from '@migaia/rpc-contract/wire'
 import * as core from '../../dist/core/index.js'
 import * as adapter from '../../dist/adapter.js'
 import * as jsonrpc from '../../dist/adapter-jsonrpc.js'
-import * as threads from '../../dist/adapter-thread.js'
 import * as remote from '../../dist/remote/index.js'
 import * as provider from '../../dist/core/features/provider.js'
 import { createClientEndpoint } from '../../dist/core/client.js'
@@ -26,6 +26,15 @@ import {
   type ProviderRegistry
 } from '../../dist/core/internal/provider.js'
 
+/** Resolve the moved public adapter entry through the existing integration fixture's dependencies. */
+const adapterRequire = createRequire(
+  new URL('../../../rpc-integration/package.json', import.meta.url)
+)
+/** Only the declared adapter entry is loaded; no Core reverse production dependency is introduced. */
+const threads = (await import(
+  adapterRequire.resolve('@migaia/rpc-threads')
+)) as typeof import('../../../rpc-threads/dist/threads/index.js')
+
 /** Every assertion observes only public construction and private read-only facts, never a writer. */
 const publicEntries = [core, adapter, jsonrpc, threads, remote, provider]
 
@@ -36,14 +45,14 @@ function expectPrivateWriter(name: string): void {
 
 /** Reuse one real native resource shape; cleanup releases both the Core channel and actual ports. */
 async function withHeldChannel(
-  check: (channel: ReturnType<threads.AdapterNodeThreadParentChannel['open']>) => Promise<void>
+  check: (channel: remote.IRuntimePeerSourceResult) => Promise<void>
 ): Promise<void> {
   /** Genuine postMessage and native lifetime observations come from these two held ports. */
   const ports = new MessageChannel()
   /** The complete constructor retains raw I/O; the open operation constructs its own transport. */
   const parent = new threads.AdapterNodeThreadParentChannel(ports.port1)
   /** No transport is supplied as a qualification target. */
-  const channel = parent.open('boundary-peer', { scheduler: systemScheduler })
+  const channel = await parent.open('boundary-peer', { scheduler: systemScheduler })
   try {
     await check(channel)
   } finally {
@@ -250,7 +259,7 @@ describe('C3 public adapter resource boundaries', () => {
      * These raw-resource operations construct their own channel identities, with no private writer
      * call.
      */
-    const channels = [
+    const channels = await Promise.all([
       new threads.AdapterNodeThreadParentChannel(ports.port1).open('boundary-right', {
         scheduler: systemScheduler,
         capabilities
@@ -259,7 +268,7 @@ describe('C3 public adapter resource boundaries', () => {
         scheduler: systemScheduler,
         capabilities
       })
-    ] as const
+    ] as const)
     try {
       /** Concurrent preparation reaches the real bilateral describe and generation owners. */
       const preparing = [

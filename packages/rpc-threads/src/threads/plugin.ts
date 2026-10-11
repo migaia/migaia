@@ -1,22 +1,32 @@
-import { createThreadPlugin as createAdapterThreadPlugin } from '@migaia/rpc-core/adapter/threads'
 import { threadRuntimeResource } from './runtime-resource.js'
+import type { IThreadRuntimeResource } from './runtime-types.js'
 import type {
   IRuntimePluginTyping,
   IRuntimeExpose,
   IRuntimeRegistry
 } from '@migaia/rpc-core/remote'
 import type { IThreadHandle } from '@migaia/supervision/threads'
-import type { IRemotePluginDefinition } from '@migaia/rpc-core/remote'
+import { createRemotePlugin, type IRemotePluginDefinition } from '@migaia/rpc-core/remote'
+import { createThreadBinding } from './binding.js'
 import type { IThreadPluginOptions } from './types.js'
 import { createRuntimePlugin, type IRuntimePluginOptions } from '@migaia/rpc-core/remote'
-import type { IRuntimeThreadPeerOptions } from '@migaia/rpc-core/adapter/threads'
+import { RuntimePluginKey } from '@migaia/rpc-core/remote'
+import { createThreadPeer } from './peer.js'
+import type { IRuntimeThreadPeerOptions } from './runtime-peer.js'
+
+/** This physical owner alone retains the stable family token for its actual Host slot operation. */
+const threadRuntimeSlotFamily = Object.freeze({})
+
+/** Capture the canonical namespace once; descriptive resource fields cannot retarget this operation. */
+const threadRuntimeSlotKey = RuntimePluginKey.thread
 
 /** Symmetric Plugin options share the Peer source grammar and default to an empty Feature exposure. */
 export type IRuntimeThreadPluginOptions = IRuntimePluginOptions<IRuntimeThreadPeerOptions['spawn']>
 
 /** Combine one owned supervisor with remote's single Plugin assembly and retry owner. */
 export function createThreadPlugin<THandle extends IThreadHandle>(
-  options: IThreadPluginOptions<THandle>
+  options: IThreadPluginOptions<THandle>,
+  runtime?: IThreadRuntimeResource
 ): IRemotePluginDefinition
 /** Install a symmetric connection into the original canonical thread slot. */
 export function createThreadPlugin<
@@ -35,12 +45,37 @@ export function createThreadPlugin<
       provide?: TProvide
       expose?: TExpose &
         (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[])
-    }>
+    }>,
+  runtime?: IThreadRuntimeResource
 ): ReturnType<typeof createRuntimePlugin> &
   IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>
-/** Native construction returns the complete Core-owned Plugin definition directly. */
+/** Legacy declarations remain only until the registered C7 consumer migration removes this branch. */
 export function createThreadPlugin<THandle extends IThreadHandle>(
-  options: IThreadPluginOptions<THandle> | IRuntimeThreadPluginOptions
+  options: IThreadPluginOptions<THandle> | IRuntimeThreadPluginOptions,
+  runtime: IThreadRuntimeResource = threadRuntimeResource
 ): IRemotePluginDefinition | ReturnType<typeof createRuntimePlugin> {
-  return createAdapterThreadPlugin(options as IRuntimeThreadPluginOptions, threadRuntimeResource)
+  if (!('spec' in options))
+    return createRuntimePlugin(
+      options,
+      {
+        key: threadRuntimeSlotKey,
+        acquire: (integration, create) =>
+          integration.acquireSharedSlot(threadRuntimeSlotKey, threadRuntimeSlotFamily, create)
+      },
+      (peerOptions) =>
+        createThreadPeer(peerOptions as IRuntimeThreadPeerOptions, runtime) as ReturnType<
+          NonNullable<Parameters<typeof createRuntimePlugin>[2]>
+        >
+    )
+  return createRemotePlugin({
+    name: options.name,
+    contract: options.contract,
+    host: options.host,
+    binding: createThreadBinding(options),
+    endpointFactory: options.endpointFactory,
+    report: options.report,
+    keyFactory: options.keyFactory,
+    callDeadlineCapMs: options.spec.limits?.callWallTimeMs,
+    ...(options.retryPort === undefined ? {} : { retryPort: options.retryPort })
+  })
 }
