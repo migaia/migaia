@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { Readable } from 'node:stream'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createElectronUtilityProcessLauncher } from '../../src/process/adapters/electron-utility-process.js'
 
 /** Mock only Electron's runtime boundary; the adapter code remains real. */
@@ -58,6 +58,14 @@ function spec() {
     stdio: { stdin: 'ignore' as const, stdout: 'drain' as const, stderr: 'drain' as const }
   }
 }
+
+/** Restore only the case-owned Electron boundary, environment keys, and native observer spies. */
+afterEach(() => {
+  runtime.ready = true
+  runtime.fork = undefined
+  vi.unstubAllEnvs()
+  vi.restoreAllMocks()
+})
 
 describe('Electron utility process boundary without a platform fixture', () => {
   it('[A9] routes message and output events while keeping tree termination unsupported', async () => {
@@ -189,5 +197,78 @@ describe('Electron utility process boundary without a platform fixture', () => {
       cause: failure
     })
     expect(earlyError.killed).toBe(1)
+  })
+
+  /** Ignored streams and an unsubscribed observer must have no output or late close effects. */
+  it('[A9] preserves ignored streams, environment selection, and close-observer ownership', async () => {
+    /** Only explicit inherited keys may enter the native constructor. */
+    vi.stubEnv('MIGAIA_FIXTURE_PRESENT', 'ambient')
+    vi.stubEnv('MIGAIA_FIXTURE_MISSING', undefined)
+    /** Ignored native streams are absent rather than fake drained outputs. */
+    const fake = child()
+    Object.assign(fake.process, { stdout: null, stderr: null })
+    /** Capture exact native stdio and environment selection before acquisition. */
+    const forks: unknown[][] = []
+    /** Publish spawn only after the real launcher has installed its startup event observers. */
+    runtime.fork = (...args) => {
+      forks.push(args)
+      queueMicrotask(() => fake.process.emit('spawn'))
+      return fake.process
+    }
+    /** An ignored stream must never dispatch an output callback. */
+    const output = vi.fn()
+    /** The actual native handle owns one exit observer independently from channel observers. */
+    const handle = await createElectronUtilityProcessLauncher().launch(
+      {
+        ...spec(),
+        env: {
+          inherit: ['MIGAIA_FIXTURE_PRESENT', 'MIGAIA_FIXTURE_MISSING'],
+          set: { MIGAIA_FIXTURE_PRESENT: 'selected' }
+        },
+        stdio: { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' }
+      },
+      { signal: new AbortController().signal, output }
+    )
+    expect(forks).toEqual([
+      [
+        'child.js',
+        ['arg'],
+        {
+          cwd: undefined,
+          env: { MIGAIA_FIXTURE_PRESENT: 'selected' },
+          stdio: ['ignore', 'ignore', 'ignore']
+        }
+      ]
+    ])
+    /** Removing a channel observer must leave the native exit promise observer intact. */
+    const nativeObservers = fake.process.listenerCount('exit')
+    /** No channel event is allowed after its exact unsubscribe operation. */
+    const closed = vi.fn()
+    /** This disposer removes only the observer registered by this subscription. */
+    const leave = handle.channel.onClose(closed)
+    expect(fake.process.listenerCount('exit')).toBe(nativeObservers + 1)
+    leave()
+    expect(fake.process.listenerCount('exit')).toBe(nativeObservers)
+    handle.terminate('graceful')
+    expect(await handle.exited).toEqual({ code: 0, signal: null })
+    expect(closed).not.toHaveBeenCalled()
+    expect(output).not.toHaveBeenCalled()
+    expect(fake.killed).toBe(1)
+    await handle.channel.close()
+  })
+
+  /** Unsupported stdin policy rejects before the optional native fork boundary is invoked. */
+  it('[A9] rejects unsupported channel stdin before optional runtime acquisition', async () => {
+    /** Native fork is unreachable when this adapter's declared stdin capability is violated. */
+    const fork = vi.fn()
+    runtime.fork = fork
+    /** This invalid input is independent from the separately forbidden bootstrap field. */
+    const rejected = createElectronUtilityProcessLauncher().launch(
+      { ...spec(), stdio: { stdin: 'channel', stdout: 'ignore', stderr: 'ignore' } },
+      { signal: new AbortController().signal, output: () => undefined }
+    )
+    await expect(rejected).rejects.toBeInstanceOf(TypeError)
+    await expect(rejected).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+    expect(fork).not.toHaveBeenCalled()
   })
 })
