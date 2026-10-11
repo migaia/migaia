@@ -69,8 +69,8 @@ const familyOwners = Object.freeze([
 /** The six package configs exclude these family-only suites; their failures belong to root gates. */
 const familyOnlyTestFile =
   /\/test\/(?:process\/conformance[^/]*\.test\.ts|bridge\/conformance-faults\.test\.ts|merge\/suite-parity\.test\.ts)$/
-/** The measured plugin-host acceptance suite must never compete with another package check. */
-const exclusivePackages = Object.freeze(['plugin-host'])
+/** Timing ratios and CPU-bound string checks retain the quiet execution of the former serial CI. */
+const exclusivePackages = Object.freeze(['utils', 'plugin-host'])
 /** Shared inputs invalidate every package gate; pnpm still owns all package dependency selection. */
 const sharedInputPaths = new Set([
   'package.json',
@@ -376,15 +376,17 @@ const finishPackage = async (result, runtime) => {
     const packed = gate === 'test:packed' ? packedCommands[result.name] : null
     if (packed) {
       if (manifest.scripts[gate] !== packed[0]) throw new Error(text.packedChanged(result.name))
+      /** Pnpm preserves the original script PATH for compilers launched from temporary consumers. */
+      const command = packed[1] === 'node' ? 'pnpm' : packed[1]
       /** The storage-web narrow packed run must not overwrite the full unit's coverage reports. */
-      const args = packed.slice(2)
+      const args = packed[1] === 'node' ? ['exec', ...packed.slice(1)] : packed.slice(2)
       if (result.name === 'storage-web')
         args.push(
           `--maxWorkers=${runtime.workers}`,
           `--coverage.reportsDirectory=${join(runtime.reportRoot, 'storage-web-packed')}`
         )
       result.gates.push(
-        await runGate(`${result.name}/${gate}`, 'required', packed[1], args, {
+        await runGate(`${result.name}/${gate}`, 'required', command, args, {
           cwd: join(repositoryRoot, 'packages', result.name),
           env: runtime.env
         })
