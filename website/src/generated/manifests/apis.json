@@ -110467,7 +110467,7 @@
         {
           "name": "AdapterNodeThreadParentChannel",
           "kind": "class",
-          "signature": "export declare class AdapterNodeThreadParentChannel {\n  #private;\n  /** Retain the actual held parentPort through the same operation available to third-party adapters. */ constructor(\n    native: IThreadParentPort,\n  );\n  /** Open only this original resource; expanded local proposals wait for actual peer ACK. */ open(\n    peerId: string,\n    options: IThreadChannelOptions,\n  ):\n    | import('@migaia/rpc-core/remote').IRuntimePeerSourceResult\n    | Promise<import('@migaia/rpc-core/remote').IRuntimePeerSourceResult>;\n}",
+          "signature": "export declare class AdapterNodeThreadParentChannel {\n  #private;\n  /** Retain the actual held parentPort through the same operation available to third-party adapters. */ constructor(\n    native: IThreadParentPort,\n  );\n  /** Borrow this held parent resource through the synchronous fixed Thread profile. */ open(\n    peerId: string,\n    options: IThreadChannelOptions,\n  ): import('@migaia/rpc-core/remote').IRuntimePeerSourceResult;\n}",
           "declarationLine": 4,
           "source": "packages/rpc-threads/dist/threads/node-parent.d.ts",
           "purpose": "Borrow the actual parent message resource without installing listeners before first opening.",
@@ -110489,8 +110489,8 @@
             {
               "name": "open",
               "kind": "method",
-              "signature": "open(peerId: string, options: IThreadChannelOptions): import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult | Promise<import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult>;",
-              "description": "Open only this original resource; expanded local proposals wait for actual peer ACK.",
+              "signature": "open(peerId: string, options: IThreadChannelOptions): import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult;",
+              "description": "Borrow this held parent resource through the synchronous fixed Thread profile.",
               "parameterDetails": [
                 {
                   "name": "peerId",
@@ -110503,13 +110503,13 @@
                   "optional": false
                 }
               ],
-              "returns": "import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult | Promise<import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult>"
+              "returns": "import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult"
             }
           ],
           "aliasOf": "AdapterNodeThreadParentChannel",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare class AdapterNodeThreadParentChannel { #private; /** Retain the actual held parentPort through the same operation available to third-party adapters. */ constructor(native: IThreadParentPort); /** Open only this original resource; expanded local proposals wait for actual peer ACK. */ open(peerId: string, options: IThreadChannelOptions): import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult | Promise<import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult>; }"
+            "export declare class AdapterNodeThreadParentChannel { #private; /** Retain the actual held parentPort through the same operation available to third-party adapters. */ constructor(native: IThreadParentPort); /** Borrow this held parent resource through the synchronous fixed Thread profile. */ open(peerId: string, options: IThreadChannelOptions): import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult; }"
           ],
           "overloadParameterDetails": [
             [
@@ -110556,7 +110556,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/node-parent.d.ts:AdapterNodeThreadParentChannel:export declare class AdapterNodeThreadParentChannel { #private; /** Retain the actual held parentPort through the same operation available to third-party adapters. */ constructor(native: IThreadParentPort); /** Open only this original resource; expanded local proposals wait for actual peer ACK. */ open(peerId: string, options: IThreadChannelOptions): import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult | Promise<import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult>; }",
+          "identity": "packages/rpc-threads/dist/threads/node-parent.d.ts:AdapterNodeThreadParentChannel:export declare class AdapterNodeThreadParentChannel { #private; /** Retain the actual held parentPort through the same operation available to third-party adapters. */ constructor(native: IThreadParentPort); /** Borrow this held parent resource through the synchronous fixed Thread profile. */ open(peerId: string, options: IThreadChannelOptions): import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult; }",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -110758,17 +110758,15 @@
         {
           "name": "createNodeThreadChannel",
           "kind": "function",
-          "signature": "export declare function createNodeThreadChannel(\n  port: INodeMessagePortLike,\n  peerId: string,\n  options: IThreadChannelOptions & Readonly<{ capabilities?: undefined }>,\n): IRuntimePeerSourceResult;\nexport declare function createNodeThreadChannel(\n  port: INodeMessagePortLike,\n  peerId: string,\n  options: IThreadChannelOptions & Readonly<{ capabilities: readonly string[] }>,\n): Promise<IRuntimePeerSourceResult>;\nexport declare function createNodeThreadChannel(\n  port: INodeMessagePortLike,\n  peerId: string,\n  options: IThreadChannelOptions,\n): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;",
+          "signature": "export declare function createNodeThreadChannel(\n  port: INodeMessagePortLike,\n  peerId: string,\n  options: IThreadChannelOptions,\n): IRuntimePeerSourceResult;",
           "declarationLine": 15,
           "source": "packages/rpc-threads/dist/threads/channel.d.ts",
-          "purpose": "Default borrowed message channels preserve their original synchronous API and zero hello. Explicit capability configuration crosses the intentional same-version ACK readiness boundary.",
+          "purpose": "Borrow the supplied EventEmitter port with the original zero-handshake fixed profile.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createNodeThreadChannel.",
           "advanced": "No additional advanced behavior is declared for createNodeThreadChannel.",
           "parameters": [
             "port: INodeMessagePortLike",
             "peerId: string",
-            "options: IThreadChannelOptions & Readonly<{ capabilities?: undefined; }>",
-            "options: IThreadChannelOptions & Readonly<{ capabilities: readonly string[]; }>",
             "options: IThreadChannelOptions"
           ],
           "parameterDetails": [
@@ -110784,21 +110782,11 @@
             },
             {
               "name": "options",
-              "type": "IThreadChannelOptions & Readonly<{ capabilities?: undefined; }>",
-              "optional": false
-            },
-            {
-              "name": "options",
-              "type": "IThreadChannelOptions & Readonly<{ capabilities: readonly string[]; }>",
-              "optional": false
-            },
-            {
-              "name": "options",
               "type": "IThreadChannelOptions",
               "optional": false
             }
           ],
-          "returns": "IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult> | IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>",
+          "returns": "IRuntimePeerSourceResult",
           "errors": ["No documented errors are declared for createNodeThreadChannel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeThreadChannel.",
           "examples": [],
@@ -110806,45 +110794,9 @@
           "aliasOf": "createNodeThreadChannel",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities?: undefined; }>): IRuntimePeerSourceResult;",
-            "export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities: readonly string[]; }>): Promise<IRuntimePeerSourceResult>;",
-            "export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;"
+            "export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult;"
           ],
           "overloadParameterDetails": [
-            [
-              {
-                "name": "port",
-                "type": "INodeMessagePortLike",
-                "optional": false
-              },
-              {
-                "name": "peerId",
-                "type": "string",
-                "optional": false
-              },
-              {
-                "name": "options",
-                "type": "IThreadChannelOptions & Readonly<{ capabilities?: undefined; }>",
-                "optional": false
-              }
-            ],
-            [
-              {
-                "name": "port",
-                "type": "INodeMessagePortLike",
-                "optional": false
-              },
-              {
-                "name": "peerId",
-                "type": "string",
-                "optional": false
-              },
-              {
-                "name": "options",
-                "type": "IThreadChannelOptions & Readonly<{ capabilities: readonly string[]; }>",
-                "optional": false
-              }
-            ],
             [
               {
                 "name": "port",
@@ -110863,18 +110815,14 @@
               }
             ]
           ],
-          "overloadReturns": [
-            "IRuntimePeerSourceResult",
-            "Promise<IRuntimePeerSourceResult>",
-            "IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>"
-          ],
+          "overloadReturns": ["IRuntimePeerSourceResult"],
           "whenToUse": "Use createNodeThreadChannel when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createNodeThreadChannel does not match the required inputs or return contract.",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Default borrowed message channels preserve their original synchronous API and zero hello. Explicit capability configuration crosses the intentional same-version ACK readiness boundary."
+              "content": "Borrow the supplied EventEmitter port with the original zero-handshake fixed profile."
             },
             {
               "id": "getting-started",
@@ -110903,9 +110851,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/channel.d.ts:createNodeThreadChannel:export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities?: undefined; }>): IRuntimePeerSourceResult;\nexport declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities: readonly string[]; }>): Promise<IRuntimePeerSourceResult>;\nexport declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;",
+          "identity": "packages/rpc-threads/dist/threads/channel.d.ts:createNodeThreadChannel:export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-threads-index--createNodeThreadChannel"
         },
@@ -111006,35 +110954,21 @@
         {
           "name": "createThreadPlugin",
           "kind": "function",
-          "signature": "export declare function createThreadPlugin<THandle extends IThreadHandle>(\n  options: IThreadPluginOptions<THandle>,\n  runtime?: IThreadRuntimeResource,\n): IRemotePluginDefinition;\nexport declare function createThreadPlugin<\n  TRemote = Record<never, never>,\n  const TProvide extends import('@migaia/rpc-core/remote').IRuntimePeerProvide = Record<\n    never,\n    never\n  >,\n  const TName extends string = string,\n  const TExpose extends readonly string[] = readonly [],\n  THost = unknown,\n>(\n  options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> &\n    Readonly<{\n      name: TName;\n      provide?: TProvide;\n      expose?: TExpose &\n        (unknown extends THost\n          ? unknown\n          : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]);\n    }>,\n  runtime?: IThreadRuntimeResource,\n): ReturnType<typeof createRuntimePlugin> &\n  IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>;",
-          "declarationLine": 11,
+          "signature": "export declare function createThreadPlugin<\n  TRemote = Record<never, never>,\n  const TProvide extends import('@migaia/rpc-core/remote').IRuntimePeerProvide = Record<\n    never,\n    never\n  >,\n  const TName extends string = string,\n  const TExpose extends readonly string[] = readonly [],\n  THost = unknown,\n>(\n  options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> &\n    Readonly<{\n      name: TName;\n      provide?: TProvide;\n      expose?: TExpose &\n        (unknown extends THost\n          ? unknown\n          : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]);\n    }>,\n  runtime?: IThreadRuntimeResource,\n): ReturnType<typeof createRuntimePlugin> &\n  IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>;",
+          "declarationLine": 8,
           "source": "packages/rpc-threads/dist/threads/plugin.d.ts",
-          "purpose": "Combine one owned supervisor with remote's single Plugin assembly and retry owner. Install a symmetric connection into the original canonical thread slot.",
+          "purpose": "Install a symmetric connection into the original canonical thread slot.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createThreadPlugin.",
           "advanced": "No additional advanced behavior is declared for createThreadPlugin.",
-          "parameters": [
-            "options: IThreadPluginOptions<THandle>",
-            "runtime: IThreadRuntimeResource (optional)",
-            "'@migaia/rpc-core/remote': unknown"
-          ],
+          "parameters": ["'@migaia/rpc-core/remote': unknown"],
           "parameterDetails": [
-            {
-              "name": "options",
-              "type": "IThreadPluginOptions<THandle>",
-              "optional": false
-            },
-            {
-              "name": "runtime",
-              "type": "IThreadRuntimeResource",
-              "optional": true
-            },
             {
               "name": "'@migaia/rpc-core/remote'",
               "type": "unknown",
               "optional": false
             }
           ],
-          "returns": "IRemotePluginDefinition | .IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>, runtime?: IThreadRuntimeResource): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>",
+          "returns": ".IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>, runtime?: IThreadRuntimeResource): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>",
           "errors": ["No documented errors are declared for createThreadPlugin."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createThreadPlugin.",
           "examples": [],
@@ -111042,22 +110976,9 @@
           "aliasOf": "createThreadPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function createThreadPlugin<THandle extends IThreadHandle>(options: IThreadPluginOptions<THandle>, runtime?: IThreadRuntimeResource): IRemotePluginDefinition;",
             "export declare function createThreadPlugin<TRemote = Record<never, never>, const TProvide extends import('@migaia/rpc-core/remote').IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>, runtime?: IThreadRuntimeResource): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>;"
           ],
           "overloadParameterDetails": [
-            [
-              {
-                "name": "options",
-                "type": "IThreadPluginOptions<THandle>",
-                "optional": false
-              },
-              {
-                "name": "runtime",
-                "type": "IThreadRuntimeResource",
-                "optional": true
-              }
-            ],
             [
               {
                 "name": "'@migaia/rpc-core/remote'",
@@ -111067,7 +110988,6 @@
             ]
           ],
           "overloadReturns": [
-            "IRemotePluginDefinition",
             ".IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>, runtime?: IThreadRuntimeResource): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>"
           ],
           "whenToUse": "Use createThreadPlugin when its function contract and declared inputs match the result you need.",
@@ -111076,7 +110996,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Combine one owned supervisor with remote's single Plugin assembly and retry owner. Install a symmetric connection into the original canonical thread slot."
+              "content": "Install a symmetric connection into the original canonical thread slot."
             },
             {
               "id": "getting-started",
@@ -111105,26 +111025,24 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/plugin.d.ts:createThreadPlugin:export declare function createThreadPlugin<THandle extends IThreadHandle>(options: IThreadPluginOptions<THandle>, runtime?: IThreadRuntimeResource): IRemotePluginDefinition;\nexport declare function createThreadPlugin<TRemote = Record<never, never>, const TProvide extends import('@migaia/rpc-core/remote').IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>, runtime?: IThreadRuntimeResource): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>;",
+          "identity": "packages/rpc-threads/dist/threads/plugin.d.ts:createThreadPlugin:export declare function createThreadPlugin<TRemote = Record<never, never>, const TProvide extends import('@migaia/rpc-core/remote').IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>, runtime?: IThreadRuntimeResource): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 38,
           "configuration": [],
           "fragment": "rpc-threads-index--createThreadPlugin"
         },
         {
           "name": "createWebThreadChannel",
           "kind": "function",
-          "signature": "export declare function createWebThreadChannel(\n  port: IThreadWebPort,\n  peerId: string,\n  options: IThreadChannelOptions & Readonly<{ capabilities?: undefined }>,\n): IRuntimePeerSourceResult;\nexport declare function createWebThreadChannel(\n  port: IThreadWebPort,\n  peerId: string,\n  options: IThreadChannelOptions & Readonly<{ capabilities: readonly string[] }>,\n): Promise<IRuntimePeerSourceResult>;\nexport declare function createWebThreadChannel(\n  port: IThreadWebPort,\n  peerId: string,\n  options: IThreadChannelOptions,\n): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;",
-          "declarationLine": 24,
+          "signature": "export declare function createWebThreadChannel(\n  port: IThreadWebPort,\n  peerId: string,\n  options: IThreadChannelOptions,\n): IRuntimePeerSourceResult;",
+          "declarationLine": 17,
           "source": "packages/rpc-threads/dist/threads/channel.d.ts",
-          "purpose": "Default EventTarget channel construction remains synchronous and borrows native lifecycle. Expanded local proposals await the peer's independent raw capability declaration.",
+          "purpose": "Borrow the supplied EventTarget port with the original zero-handshake fixed profile.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWebThreadChannel.",
           "advanced": "No additional advanced behavior is declared for createWebThreadChannel.",
           "parameters": [
             "port: IThreadWebPort",
             "peerId: string",
-            "options: IThreadChannelOptions & Readonly<{ capabilities?: undefined; }>",
-            "options: IThreadChannelOptions & Readonly<{ capabilities: readonly string[]; }>",
             "options: IThreadChannelOptions"
           ],
           "parameterDetails": [
@@ -111140,21 +111058,11 @@
             },
             {
               "name": "options",
-              "type": "IThreadChannelOptions & Readonly<{ capabilities?: undefined; }>",
-              "optional": false
-            },
-            {
-              "name": "options",
-              "type": "IThreadChannelOptions & Readonly<{ capabilities: readonly string[]; }>",
-              "optional": false
-            },
-            {
-              "name": "options",
               "type": "IThreadChannelOptions",
               "optional": false
             }
           ],
-          "returns": "IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult> | IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>",
+          "returns": "IRuntimePeerSourceResult",
           "errors": ["No documented errors are declared for createWebThreadChannel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWebThreadChannel.",
           "examples": [],
@@ -111162,45 +111070,9 @@
           "aliasOf": "createWebThreadChannel",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities?: undefined; }>): IRuntimePeerSourceResult;",
-            "export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities: readonly string[]; }>): Promise<IRuntimePeerSourceResult>;",
-            "export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;"
+            "export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult;"
           ],
           "overloadParameterDetails": [
-            [
-              {
-                "name": "port",
-                "type": "IThreadWebPort",
-                "optional": false
-              },
-              {
-                "name": "peerId",
-                "type": "string",
-                "optional": false
-              },
-              {
-                "name": "options",
-                "type": "IThreadChannelOptions & Readonly<{ capabilities?: undefined; }>",
-                "optional": false
-              }
-            ],
-            [
-              {
-                "name": "port",
-                "type": "IThreadWebPort",
-                "optional": false
-              },
-              {
-                "name": "peerId",
-                "type": "string",
-                "optional": false
-              },
-              {
-                "name": "options",
-                "type": "IThreadChannelOptions & Readonly<{ capabilities: readonly string[]; }>",
-                "optional": false
-              }
-            ],
             [
               {
                 "name": "port",
@@ -111219,18 +111091,14 @@
               }
             ]
           ],
-          "overloadReturns": [
-            "IRuntimePeerSourceResult",
-            "Promise<IRuntimePeerSourceResult>",
-            "IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>"
-          ],
+          "overloadReturns": ["IRuntimePeerSourceResult"],
           "whenToUse": "Use createWebThreadChannel when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createWebThreadChannel does not match the required inputs or return contract.",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Default EventTarget channel construction remains synchronous and borrows native lifecycle. Expanded local proposals await the peer's independent raw capability declaration."
+              "content": "Borrow the supplied EventTarget port with the original zero-handshake fixed profile."
             },
             {
               "id": "getting-started",
@@ -111259,9 +111127,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/channel.d.ts:createWebThreadChannel:export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities?: undefined; }>): IRuntimePeerSourceResult;\nexport declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities: readonly string[]; }>): Promise<IRuntimePeerSourceResult>;\nexport declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;",
+          "identity": "packages/rpc-threads/dist/threads/channel.d.ts:createWebThreadChannel:export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-threads-index--createWebThreadChannel"
         },
@@ -112257,7 +112125,7 @@
           "name": "IRuntimeThreadPeerOptions",
           "kind": "type",
           "signature": "export type IRuntimeThreadPeerOptions<THandle extends IThreadHandle = IThreadHandle> =\n  Omit<IRuntimePeerOptions, 'spawn'> &\n    Readonly<{ spawn?: IRuntimePeerSource | IRuntimeThreadSpawn<THandle> }>;",
-          "declarationLine": 10,
+          "declarationLine": 23,
           "source": "packages/rpc-threads/dist/threads/runtime-peer.d.ts",
           "purpose": "Source callbacks remain only for the serial migration; deployed sources use original platform specs.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeThreadPeerOptions.",
@@ -112321,7 +112189,7 @@
           "name": "IRuntimeThreadPluginOptions",
           "kind": "type",
           "signature": "export type IRuntimeThreadPluginOptions = IRuntimePluginOptions<\n  IRuntimeThreadPeerOptions['spawn']\n>;",
-          "declarationLine": 9,
+          "declarationLine": 6,
           "source": "packages/rpc-threads/dist/threads/plugin.d.ts",
           "purpose": "Symmetric Plugin options share the Peer source grammar and default to an empty Feature exposure.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeThreadPluginOptions.",
@@ -112377,15 +112245,15 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-threads/dist/threads/plugin.d.ts:IRuntimeThreadPluginOptions:export type IRuntimeThreadPluginOptions = IRuntimePluginOptions<IRuntimeThreadPeerOptions['spawn']>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-threads-index--IRuntimeThreadPluginOptions"
         },
         {
           "name": "IRuntimeThreadSpawn",
           "kind": "type",
-          "signature": "export type IRuntimeThreadSpawn<THandle extends IThreadHandle = IThreadHandle> = Omit<\n  IThreadCommonOptions<THandle>,\n  'endpointFactory'\n>;",
-          "declarationLine": 5,
+          "signature": "export type IRuntimeThreadSpawn<THandle extends IThreadHandle = IThreadHandle> =\n  Readonly<{\n    spec: IThreadSpec;\n    launcher: IThreadSupervisorOptions<THandle>['launcher'];\n    budget: IThreadSupervisorOptions<THandle>['budget'];\n    scheduler: IScheduler;\n    channelFactory: IThreadChannelFactory<THandle>;\n    report(error: unknown): void;\n    health?: IThreadSupervisorOptions<THandle>['health'];\n    supervisor?: Partial<\n      Pick<\n        IThreadSupervisorOptions<THandle>,\n        | 'id'\n        | 'ready'\n        | 'startupTimeoutMs'\n        | 'restart'\n        | 'terminalPolicy'\n        | 'stop'\n        | 'isolation'\n      >\n    >;\n    keyFactory?: () => string;\n    retryPort?: IRemoteRetryPort;\n  }>;",
+          "declarationLine": 7,
           "source": "packages/rpc-threads/dist/threads/runtime-peer.d.ts",
           "purpose": "Existing thread deployment owns its original supervisor, budget, launcher and channel factory.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeThreadSpawn.",
@@ -112400,7 +112268,7 @@
           "aliasOf": "IRuntimeThreadSpawn",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRuntimeThreadSpawn<THandle extends IThreadHandle = IThreadHandle> = Omit<IThreadCommonOptions<THandle>, 'endpointFactory'>;"
+            "export type IRuntimeThreadSpawn<THandle extends IThreadHandle = IThreadHandle> = Readonly<{ spec: IThreadSpec; launcher: IThreadSupervisorOptions<THandle>['launcher']; budget: IThreadSupervisorOptions<THandle>['budget']; scheduler: IScheduler; channelFactory: IThreadChannelFactory<THandle>; report(error: unknown): void; health?: IThreadSupervisorOptions<THandle>['health']; supervisor?: Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>; keyFactory?: () => string; retryPort?: IRemoteRetryPort; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -112439,7 +112307,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/runtime-peer.d.ts:IRuntimeThreadSpawn:export type IRuntimeThreadSpawn<THandle extends IThreadHandle = IThreadHandle> = Omit<IThreadCommonOptions<THandle>, 'endpointFactory'>;",
+          "identity": "packages/rpc-threads/dist/threads/runtime-peer.d.ts:IRuntimeThreadSpawn:export type IRuntimeThreadSpawn<THandle extends IThreadHandle = IThreadHandle> = Readonly<{ spec: IThreadSpec; launcher: IThreadSupervisorOptions<THandle>['launcher']; budget: IThreadSupervisorOptions<THandle>['budget']; scheduler: IScheduler; channelFactory: IThreadChannelFactory<THandle>; report(error: unknown): void; health?: IThreadSupervisorOptions<THandle>['health']; supervisor?: Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>; keyFactory?: () => string; retryPort?: IRemoteRetryPort; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -112705,7 +112573,7 @@
           "name": "IThreadChannelFactory",
           "kind": "type",
           "signature": "export type IThreadChannelFactory<THandle extends IThreadHandle> = Readonly<{\n  open(handle: THandle, signal: IAbortSignal): Promise<IRemoteChannel>;\n}>;",
-          "declarationLine": 12,
+          "declarationLine": 11,
           "source": "packages/rpc-threads/dist/threads/types.d.ts",
           "purpose": "A launcher handle opens one independently owned remote generation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadChannelFactory.",
@@ -112769,7 +112637,7 @@
           "name": "IThreadChannelOptions",
           "kind": "type",
           "signature": "export type IThreadChannelOptions = Readonly<{\n  scheduler: IScheduler;\n  capabilities?: readonly string[];\n}>;",
-          "declarationLine": 7,
+          "declarationLine": 6,
           "source": "packages/rpc-threads/dist/threads/types.d.ts",
           "purpose": "Message channels retain the scheduler identity and static capability declaration.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadChannelOptions.",
@@ -112828,70 +112696,6 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-threads-index--IThreadChannelOptions"
-        },
-        {
-          "name": "IThreadCommonOptions",
-          "kind": "type",
-          "signature": "export type IThreadCommonOptions<THandle extends IThreadHandle> = Readonly<{\n  spec: IThreadSpec;\n  launcher: IThreadSupervisorOptions<THandle>['launcher'];\n  budget: IThreadSupervisorOptions<THandle>['budget'];\n  scheduler: IScheduler;\n  channelFactory: IThreadChannelFactory<THandle>;\n  endpointFactory: IRemoteEndpointFactory;\n  report(error: unknown): void;\n  health?: IThreadSupervisorOptions<THandle>['health'];\n  supervisor?: Partial<\n    Pick<\n      IThreadSupervisorOptions<THandle>,\n      | 'id'\n      | 'ready'\n      | 'startupTimeoutMs'\n      | 'restart'\n      | 'terminalPolicy'\n      | 'stop'\n      | 'isolation'\n    >\n  >;\n  keyFactory?: () => string;\n  retryPort?: IRemoteRetryPort;\n}>;",
-          "declarationLine": 22,
-          "source": "packages/rpc-threads/dist/threads/types.d.ts",
-          "purpose": "Facades add no restart policy and transfer every selected supervisor option unchanged.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadCommonOptions.",
-          "advanced": "No additional advanced behavior is declared for IThreadCommonOptions.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IThreadCommonOptions."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadCommonOptions.",
-          "examples": [],
-          "members": [],
-          "aliasOf": "IThreadCommonOptions",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IThreadCommonOptions<THandle extends IThreadHandle> = Readonly<{ spec: IThreadSpec; launcher: IThreadSupervisorOptions<THandle>['launcher']; budget: IThreadSupervisorOptions<THandle>['budget']; scheduler: IScheduler; channelFactory: IThreadChannelFactory<THandle>; endpointFactory: IRemoteEndpointFactory; report(error: unknown): void; health?: IThreadSupervisorOptions<THandle>['health']; supervisor?: Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>; keyFactory?: () => string; retryPort?: IRemoteRetryPort; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IThreadCommonOptions when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IThreadCommonOptions does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Facades add no restart policy and transfer every selected supervisor option unchanged."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IThreadCommonOptions from @migaia/rpc-threads, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IThreadCommonOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IThreadCommonOptions does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadCommonOptions."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IThreadCommonOptions."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/types.d.ts:IThreadCommonOptions:export type IThreadCommonOptions<THandle extends IThreadHandle> = Readonly<{ spec: IThreadSpec; launcher: IThreadSupervisorOptions<THandle>['launcher']; budget: IThreadSupervisorOptions<THandle>['budget']; scheduler: IScheduler; channelFactory: IThreadChannelFactory<THandle>; endpointFactory: IRemoteEndpointFactory; report(error: unknown): void; health?: IThreadSupervisorOptions<THandle>['health']; supervisor?: Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>; keyFactory?: () => string; retryPort?: IRemoteRetryPort; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-threads-index--IThreadCommonOptions"
         },
         {
           "name": "IThreadNativeRuntimeModule",
@@ -113150,70 +112954,6 @@
           "fragment": "rpc-threads-index--IThreadParentPort"
         },
         {
-          "name": "IThreadPluginOptions",
-          "kind": "type",
-          "signature": "export type IThreadPluginOptions<THandle extends IThreadHandle> =\n  IThreadCommonOptions<THandle> &\n    Readonly<{ name: string; contract: IRemoteContract; host: IRemotePluginHostPort }>;",
-          "declarationLine": 36,
-          "source": "packages/rpc-threads/dist/threads/types.d.ts",
-          "purpose": "PluginHost definitions expose only the declared remote Plugin contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadPluginOptions.",
-          "advanced": "No additional advanced behavior is declared for IThreadPluginOptions.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IThreadPluginOptions."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadPluginOptions.",
-          "examples": [],
-          "members": [],
-          "aliasOf": "IThreadPluginOptions",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IThreadPluginOptions<THandle extends IThreadHandle> = IThreadCommonOptions<THandle> & Readonly<{ name: string; contract: IRemoteContract; host: IRemotePluginHostPort; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IThreadPluginOptions when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IThreadPluginOptions does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "PluginHost definitions expose only the declared remote Plugin contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IThreadPluginOptions from @migaia/rpc-threads, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IThreadPluginOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IThreadPluginOptions does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadPluginOptions."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IThreadPluginOptions."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/types.d.ts:IThreadPluginOptions:export type IThreadPluginOptions<THandle extends IThreadHandle> = IThreadCommonOptions<THandle> & Readonly<{ name: string; contract: IRemoteContract; host: IRemotePluginHostPort; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-threads-index--IThreadPluginOptions"
-        },
-        {
           "name": "IThreadRuntimeResource",
           "kind": "type",
           "signature": "export type IThreadRuntimeResource = Readonly<{\n  load(): Promise<IThreadNativeRuntimeModule>;\n  readonly pid: number;\n}>;",
@@ -113281,7 +113021,7 @@
           "name": "IThreadWebPort",
           "kind": "type",
           "signature": "export type IThreadWebPort = {\n  postMessage(message: unknown, transfer?: readonly unknown[]): void;\n  addEventListener(type: string, listener: (event: any) => void): void;\n  removeEventListener(type: string, listener: (event: any) => void): void;\n};",
-          "declarationLine": 16,
+          "declarationLine": 15,
           "source": "packages/rpc-threads/dist/threads/types.d.ts",
           "purpose": "Structural EventTarget surface also admits a worker-global scope on the service side.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadWebPort.",

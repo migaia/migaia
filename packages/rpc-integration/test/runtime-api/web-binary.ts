@@ -61,8 +61,9 @@ export async function runWebBinaryQualification(
   const peer = await createThreadPeer<IRuntimeDynamicSurface>({
     self: { name: 'binary-web-parent', instanceId: 'binary-web-parent' },
     report,
-    spawn: async () => {
-      const launcher = createLauncher({ report })
+    spawn: async (context) => {
+      /** This custom authenticated assembly offers its actual implemented profile at launch. */
+      const launcher = createLauncher({ report, runtimeApi: { ...context, capabilities } })
       handle = await launcher.launch(
         {
           entry: new URL('./fixtures/web-binary-worker.ts', import.meta.url).href,

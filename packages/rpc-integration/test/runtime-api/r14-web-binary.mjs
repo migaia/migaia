@@ -43,8 +43,9 @@ export async function runWebBinaryQualification(createLauncher, createChannels, 
   const peer = await createThreadPeer({
     self: { name: 'binary-web-parent', instanceId: 'binary-web-parent' },
     report,
-    spawn: async () => {
-      const launcher = createLauncher({ report })
+    spawn: async (context) => {
+      /** This custom authenticated assembly offers its actual implemented profile at launch. */
+      const launcher = createLauncher({ report, runtimeApi: { ...context, capabilities } })
       handle = await launcher.launch(
         {
           entry: new URL('./fixtures/r14-web-binary-worker.mjs', import.meta.url).href,

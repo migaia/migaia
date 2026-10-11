@@ -3444,9 +3444,9 @@ const runtimeCompletionApiGuides = {
   }),
   'rpc-threads:index:createNodeThreadChannel': createStorageContractGuide({
     purposeEn:
-      'Constructs a complete borrowed remote channel from the actual held Node-style MessagePort I/O, the accepted peer id and scheduler. It retains the original raw message path and static capability declaration; channel.close removes this connection without claiming termination of the Worker execution.',
+      'Synchronously constructs a borrowed remote channel from the actual held Node-style MessagePort I/O, the accepted peer id and scheduler. It keeps the fixed Thread capability profile without bootstrap or expanded capability ACK; capabilities can only narrow that profile. channel.close releases this connection without terminating the Worker.',
     purposeZh:
-      '从实际持有的Node-style MessagePort I/O、已采纳 peer id 与 scheduler 构造完整借用 remote channel。它保留原 raw message 路径与 static capability 声明；channel.close 释放这条连接，不取得 Worker execution 的终止权。',
+      '从实际持有的Node-style MessagePort I/O、已采纳 peer id 与 scheduler 同步构造借用 remote channel。它使用固定 Thread 能力集，不执行 bootstrap 或扩展能力 ACK；capabilities 只能收窄固定能力集。channel.close 释放本连接，不终止 Worker。',
     quickStart:
       "import { createNodeThreadChannel } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** The caller supplies the actual port and the identity admitted for that port. */\nexport async function inspectNodeThreadChannel(port: Parameters<typeof createNodeThreadChannel>[0], peerId: string) {\n  const channel = await createNodeThreadChannel(port, peerId, { scheduler: systemScheduler })\n  try { console.log(channel.peerId, channel.agreement) }\n  finally { await channel.close() }\n}",
     scenariosEn: [
@@ -3468,9 +3468,9 @@ const runtimeCompletionApiGuides = {
   }),
   'rpc-threads:index:createWebThreadChannel': createStorageContractGuide({
     purposeEn:
-      'Constructs a complete borrowed remote channel from the actual held EventTarget message I/O, the accepted peer id and scheduler. It retains the original raw message path and static capability declaration; channel.close removes this connection without claiming termination of the Worker execution.',
+      'Synchronously constructs a borrowed remote channel from the actual held EventTarget message I/O, the accepted peer id and scheduler. It keeps the fixed Thread capability profile without bootstrap or expanded capability ACK; capabilities can only narrow that profile. channel.close releases this connection without terminating the Worker.',
     purposeZh:
-      '从实际持有的EventTarget message I/O、已采纳 peer id 与 scheduler 构造完整借用 remote channel。它保留原 raw message 路径与 static capability 声明；channel.close 释放这条连接，不取得 Worker execution 的终止权。',
+      '从实际持有的EventTarget message I/O、已采纳 peer id 与 scheduler 同步构造借用 remote channel。它使用固定 Thread 能力集，不执行 bootstrap 或扩展能力 ACK；capabilities 只能收窄固定能力集。channel.close 释放本连接，不终止 Worker。',
     quickStart:
       "import { createWebThreadChannel } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** The caller supplies the actual port and the identity admitted for that port. */\nexport async function inspectWebThreadChannel(port: Parameters<typeof createWebThreadChannel>[0], peerId: string) {\n  const channel = await createWebThreadChannel(port, peerId, { scheduler: systemScheduler })\n  try { console.log(channel.peerId, channel.agreement) }\n  finally { await channel.close() }\n}",
     scenariosEn: [
@@ -3636,9 +3636,9 @@ const runtimeCompletionApiGuides = {
   }),
   'rpc-threads:index:createThreadPlugin': createStorageContractGuide({
     purposeEn:
-      'Creates the thread Plugin definition using the actual runtime resource and either symmetric or advanced thread options. Host installation shares the canonical thread slot, supervision and Remote retry owner; resources activate and publish at the original install commit and release through that Host scope.',
+      'Creates the thread Plugin definition using the actual runtime resource and symmetric options: name, provide/expose and spawn/connect/listen. The legacy { spec, contract, host, ... } option branch is removed. Host installation shares the canonical thread slot, supervision and Remote retry owner; resources activate and publish at the original install commit and release through that Host scope.',
     purposeZh:
-      '使用实际 runtime resource 及对称或高级 thread options 创建 Plugin definition。Host 安装共享规范 thread slot、supervision 与 Remote retry owner；资源在原 install commit 激活和发布，通过同一 Host scope 释放。',
+      '使用实际 runtime resource 与对称 options 创建 Plugin definition：name、provide/expose 和 spawn/connect/listen。旧的 { spec, contract, host, ... } options 分支已删除。Host 安装共享规范 thread slot、supervision 与 Remote retry owner；资源在原 install commit 激活和发布，通过同一 Host scope 释放。',
     quickStart:
       "import { createThreadPlugin } from '@migaia/rpc-threads'\n\n/** Install this definition through the actual Host operation owned by the deployment. */\nexport async function installCustomThreadPlugin(\n  options: Parameters<typeof createThreadPlugin>[0],\n  runtime: Parameters<typeof createThreadPlugin>[1],\n  install: (plugin: ReturnType<typeof createThreadPlugin>) => PromiseLike<void>\n) {\n  const plugin = createThreadPlugin(options, runtime)\n  await install(plugin)\n}",
     scenariosEn: [

@@ -52,83 +52,47 @@ export function openThreadMessageResource(
       )
 }
 
-/** Construct a Node-style channel from the raw port or its original complete held resource. */
+/** Construct a synchronous borrowed Node channel with the fixed Thread capability profile. */
 export function constructNodeThreadChannel(
   port: INodeMessagePortLike,
   peerId: string,
-  options: IThreadChannelOptions,
-  resource?: IAdapterMessageResource
-) {
-  return openThreadMessageResource(
-    resource ?? createEventEmitterMessageResource(port),
+  options: IThreadChannelOptions
+): IRuntimePeerSourceResult {
+  return createEventEmitterMessageResource(port).openStatic({
     peerId,
-    options
-  )
+    scheduler: options.scheduler,
+    enabled: options.capabilities
+  })
 }
 
-/** Construct an EventTarget channel with the same Core-owned static or ACK startup operation. */
+/** Construct a synchronous borrowed Web channel without runtime bootstrap or capability ACK. */
 export function constructWebThreadChannel(
   port: IThreadWebPort,
   peerId: string,
-  options: IThreadChannelOptions,
-  resource?: IAdapterMessageResource
-) {
-  return openThreadMessageResource(
-    resource ?? createEventTargetMessageResource(port),
+  options: IThreadChannelOptions
+): IRuntimePeerSourceResult {
+  return createEventTargetMessageResource(port).openStatic({
     peerId,
-    options
-  )
+    scheduler: options.scheduler,
+    enabled: options.capabilities
+  })
 }
 
-/** Default borrowed message channels preserve their original synchronous API and zero hello. */
-export function createNodeThreadChannel(
-  port: INodeMessagePortLike,
-  peerId: string,
-  options: IThreadChannelOptions & Readonly<{ capabilities?: undefined }>
-): IRuntimePeerSourceResult
-/** Explicit capability configuration crosses the intentional same-version ACK readiness boundary. */
-export function createNodeThreadChannel(
-  port: INodeMessagePortLike,
-  peerId: string,
-  options: IThreadChannelOptions & Readonly<{ capabilities: readonly string[] }>
-): Promise<IRuntimePeerSourceResult>
+/** Borrow the supplied EventEmitter port with the original zero-handshake fixed profile. */
 export function createNodeThreadChannel(
   port: INodeMessagePortLike,
   peerId: string,
   options: IThreadChannelOptions
-): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>
-/** Retain a complete channel over the exact supplied EventEmitter resource. */
-export function createNodeThreadChannel(
-  port: INodeMessagePortLike,
-  peerId: string,
-  options: IThreadChannelOptions
-) {
+): IRuntimePeerSourceResult {
   return constructNodeThreadChannel(port, peerId, options)
 }
 
-/** Default EventTarget channel construction remains synchronous and borrows native lifecycle. */
-export function createWebThreadChannel(
-  port: IThreadWebPort,
-  peerId: string,
-  options: IThreadChannelOptions & Readonly<{ capabilities?: undefined }>
-): IRuntimePeerSourceResult
-/** Expanded local proposals await the peer's independent raw capability declaration. */
-export function createWebThreadChannel(
-  port: IThreadWebPort,
-  peerId: string,
-  options: IThreadChannelOptions & Readonly<{ capabilities: readonly string[] }>
-): Promise<IRuntimePeerSourceResult>
+/** Borrow the supplied EventTarget port with the original zero-handshake fixed profile. */
 export function createWebThreadChannel(
   port: IThreadWebPort,
   peerId: string,
   options: IThreadChannelOptions
-): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>
-/** Retain the whole Core construction result without replacing its Promise. */
-export function createWebThreadChannel(
-  port: IThreadWebPort,
-  peerId: string,
-  options: IThreadChannelOptions
-) {
+): IRuntimePeerSourceResult {
   return constructWebThreadChannel(port, peerId, options)
 }
 

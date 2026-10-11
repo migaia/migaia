@@ -3,7 +3,8 @@ import { createHmac } from 'node:crypto'
 import { readThreadBootstrap } from '@migaia/rpc-threads'
 import { createRuntimePeer } from '@migaia/rpc-core/remote'
 import { createRuntimeApiEndpoint } from '@migaia/rpc-core'
-import { createNodeThreadChannel } from '@migaia/rpc-threads'
+import { createEventEmitterMessageResource } from '@migaia/rpc-core/adapter'
+import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { codec, framer, connect, abort, timeout, authentication } from '@migaia/rpc-core'
 import fixture from './managed-binary-key.json' with { type: 'json' }
@@ -13,14 +14,19 @@ const { peerId, data } = readThreadBootstrap(workerData)
 /** Shared test-only material signs the actual original bound metadata rather than a fake auth layer. */
 const signature = (value) =>
   createHmac('sha256', fixture.key).update(JSON.stringify(value)).digest('hex')
+/** Core consumes the actual initial message so the custom endpoint acknowledges the runtime offer. */
+const resource = createEventEmitterMessageResource(parentPort)
+await resource.receiveInitial({ direction: 'inbound', read: () => workerData })
 /** The true Worker uses the same canonical Peer and original authenticated endpoint composition. */
 let prepared
 prepared = createRuntimePeer({
   self: { name: 'managed-binary-child', instanceId: peerId },
   connect: async () =>
-    createNodeThreadChannel(parentPort, data.parentId, {
+    resource.open({
+      peerId: data.parentId,
       scheduler: systemScheduler,
-      capabilities: data.capabilities
+      offer: data.capabilities,
+      control: rpcMessageCapabilityControl
     }),
   endpointFactory: async (channel) => {
     const endpoint = createRuntimeApiEndpoint(

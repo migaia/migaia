@@ -28,7 +28,7 @@ import {
   type INodeThreadHandle
 } from '../../src/threads/adapters/node.js'
 import { createThreadPlugin } from '../../src/threads/plugin.js'
-import type { IThreadCommonOptions } from '../../src/threads/types.js'
+import type { IRuntimeThreadSpawn } from '../../src/threads/runtime-peer.js'
 
 /** Capture native runtime objects only at the fixture construction boundary. */
 const nativeWorkers = vi.hoisted(() => new Map<number, import('node:worker_threads').Worker>())
@@ -132,9 +132,13 @@ export type IFixtureFeature = {
   bad(params: unknown[]): Promise<unknown>
   stream(params: unknown[], options?: { timeoutMs?: number }): AsyncIterableIterator<unknown>
 }
+/** Fixture endpoint injection remains separate from the production runtime source shape. */
+export type IFixtureOptions = IRuntimeThreadSpawn<IThreadHandle> &
+  Readonly<{ endpointFactory?: IRemoteEndpointFactory }>
+
 /** Record native generations and outbound frames without adding a retry or lifecycle policy. */
 export function nativeFixture(
-  overrides: Partial<IThreadCommonOptions<IThreadHandle>> = {},
+  overrides: Partial<IFixtureOptions> = {},
   data: Record<string, unknown> = {}
 ) {
   /** Local Host owns the installed remote definition. */

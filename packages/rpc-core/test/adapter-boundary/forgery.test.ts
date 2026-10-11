@@ -6,6 +6,7 @@ import { identityCodecV1 } from '@migaia/serialize/codec'
 import { RpcCapability, rpcProtocolV1, type IRpcEnvelope } from '@migaia/rpc-contract'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { RpcBinaryProfile } from '@migaia/rpc-contract/wire'
+import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import * as core from '../../dist/core/index.js'
 import * as adapter from '../../dist/adapter.js'
 import * as remote from '../../dist/remote/index.js'
@@ -281,13 +282,17 @@ describe('C3 public adapter resource boundaries', () => {
      * call.
      */
     const channels = await Promise.all([
-      new threads.AdapterNodeThreadParentChannel(ports.port1).open('boundary-right', {
+      adapter.createEventEmitterMessageResource(ports.port1).open({
+        peerId: 'boundary-right',
         scheduler: systemScheduler,
-        capabilities
+        offer: capabilities,
+        control: rpcMessageCapabilityControl
       }),
-      new threads.AdapterNodeThreadParentChannel(ports.port2).open('boundary-left', {
+      adapter.createEventEmitterMessageResource(ports.port2).open({
+        peerId: 'boundary-left',
         scheduler: systemScheduler,
-        capabilities
+        offer: capabilities,
+        control: rpcMessageCapabilityControl
       })
     ] as const)
     try {

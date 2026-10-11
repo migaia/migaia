@@ -1,17 +1,7 @@
 import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import type {
-  IThreadHandle,
-  IThreadSupervisorOptions,
-  IThreadSpec
-} from '@migaia/supervision/threads'
-import type {
-  IRemoteChannel,
-  IRemoteEndpointFactory,
-  IRemoteRetryPort,
-  IRemotePluginHostPort
-} from '@migaia/rpc-core/remote'
-import type { IRemoteContract } from '@migaia/rpc-core/remote'
+import type { IThreadHandle } from '@migaia/supervision/threads'
+import type { IRemoteChannel } from '@migaia/rpc-core/remote'
 
 /** Message channels retain the scheduler identity and static capability declaration. */
 export type IThreadChannelOptions = Readonly<{
@@ -28,25 +18,3 @@ export type IThreadWebPort = {
   addEventListener(type: string, listener: (event: any) => void): void
   removeEventListener(type: string, listener: (event: any) => void): void
 }
-/** Facades add no restart policy and transfer every selected supervisor option unchanged. */
-export type IThreadCommonOptions<THandle extends IThreadHandle> = Readonly<{
-  spec: IThreadSpec
-  launcher: IThreadSupervisorOptions<THandle>['launcher']
-  budget: IThreadSupervisorOptions<THandle>['budget']
-  scheduler: IScheduler
-  channelFactory: IThreadChannelFactory<THandle>
-  endpointFactory: IRemoteEndpointFactory
-  report(error: unknown): void
-  health?: IThreadSupervisorOptions<THandle>['health']
-  supervisor?: Partial<
-    Pick<
-      IThreadSupervisorOptions<THandle>,
-      'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'
-    >
-  >
-  keyFactory?: () => string
-  retryPort?: IRemoteRetryPort
-}>
-/** PluginHost definitions expose only the declared remote Plugin contract. */
-export type IThreadPluginOptions<THandle extends IThreadHandle> = IThreadCommonOptions<THandle> &
-  Readonly<{ name: string; contract: IRemoteContract; host: IRemotePluginHostPort }>
