@@ -4,6 +4,7 @@ import {
   RuntimeRecordSchema,
   validateRuntimeRouteFields,
   isRuntimeCallMode,
+  isRuntimeMode,
   array,
   identifier,
   task,
@@ -54,7 +55,11 @@ function completion(
       (value, pointer) => {
         const item = readRecord(value, RuntimeRecordSchema.stepOutcome, pointer)
         if (failed) {
-          if (item.state !== RpcRuntimeStepState.notExecuted || Object.keys(item).length !== 1)
+          if (
+            item.state !== RpcRuntimeStepState.notExecuted ||
+            Object.hasOwn(item, F.result) ||
+            Object.hasOwn(item, F.error)
+          )
             invalid(pointer)
         } else if (item.state === RpcRuntimeStepState.failure) {
           if (!Object.hasOwn(item, F.error) || Object.hasOwn(item, F.result)) invalid(pointer)
@@ -94,7 +99,10 @@ export function normalizeRuntimeEnvelope(
   const input = readRecord(value, RuntimeRecordSchema.envelope, '')
   if (
     input.profile !== RpcRuntimeProfile ||
-    !Object.values(RpcRuntimeKind).includes(input.kind as never)
+    (input.kind !== RpcRuntimeKind.call &&
+      input.kind !== RpcRuntimeKind.group &&
+      input.kind !== RpcRuntimeKind.control &&
+      input.kind !== RpcRuntimeKind.outcome)
   )
     invalid('')
   /** The original route validator owns all reused domains, including optional signed forward routes. */
@@ -110,13 +118,10 @@ export function normalizeRuntimeEnvelope(
     route: Object.freeze(route),
     task: selected
   }
-  /** Only this variant's extra properties may survive the common snapshot. */
-  let fields: readonly string[]
   if (input.kind === RpcRuntimeKind.call || input.kind === RpcRuntimeKind.group) {
     const group = input.kind === RpcRuntimeKind.group
     if (group ? selected.mode !== RpcRuntimeMode.group : !isRuntimeCallMode(selected.mode))
       invalid('/task/mode')
-    fields = group ? [F.options, F.steps] : [F.options, F.payload]
     result.options = options(input.options, selected.mode, readRecord)
     if (group) {
       result.steps = steps(input.steps, portable, readRecord)
@@ -129,11 +134,9 @@ export function normalizeRuntimeEnvelope(
       invalid('/task/mode')
     result.operation = input.operation
     if (input.operation === RpcRuntimeOperation.cancel) {
-      fields = [F.operation, F.reason]
       if (Object.hasOwn(input, F.reason)) result.reason = normalizeRpcSerializedError(input.reason)
     } else if (input.operation === RpcRuntimeOperation.terminal) {
       if (selected.mode === RpcRuntimeMode.stream) invalid('/operation')
-      fields = [F.operation, F.completion]
       result.completion = completion(input.completion, selected.mode, portable, readRecord)
       /**
        * A failed query carries the exact error; successful queries require the outcome result
@@ -146,7 +149,6 @@ export function normalizeRuntimeEnvelope(
         invalid('/completion/ok')
     } else if (input.operation === RpcRuntimeOperation.stream) {
       if (selected.mode !== RpcRuntimeMode.stream) invalid('/task/mode')
-      fields = [F.operation, F.stream]
       const stream = readRecord(input.stream, RuntimeRecordSchema.stream, '/stream')
       if (stream.event === RpcStreamEvent.cancel) invalid('/stream/event')
       if (stream.event === RpcRuntimeFinish) {
@@ -167,7 +169,7 @@ export function normalizeRuntimeEnvelope(
           return normalized.then((payload) => {
             result.stream = payload
             if (stream.event === RpcStreamEvent.open && stream.seq !== 0) invalid('/stream/seq')
-            return finishRuntimeEnvelope(input, result, fields)
+            return finishRuntimeEnvelope(input, result)
           })
         result.stream = normalized
         if (stream.event === RpcStreamEvent.open && stream.seq !== 0) invalid('/stream/seq')
@@ -177,17 +179,24 @@ export function normalizeRuntimeEnvelope(
     if (selected.mode !== RpcRuntimeMode.outcome) invalid('/task/mode')
     result.operation = input.operation
     if (input.operation === RpcRuntimeOperation.lookup) {
-      fields = [F.operation, F.idempotencyKey]
       if (!isRouteFieldValid(RpcRouteField.idempotencyKey, input.idempotencyKey))
         invalid('/idempotencyKey')
       result.idempotencyKey = input.idempotencyKey
     } else if (input.operation === RpcRuntimeOperation.result) {
-      fields = [F.operation, F.state, F.store, F.outcome]
-      if (!Object.values(RpcRuntimeOutcomeState).includes(input.state as never)) invalid('/state')
+      if (
+        input.state !== RpcRuntimeOutcomeState.pending &&
+        input.state !== RpcRuntimeOutcomeState.done &&
+        input.state !== RpcRuntimeOutcomeState.unknown
+      )
+        invalid('/state')
       const store = readRecord(input.store, RuntimeRecordSchema.store, '/store')
       if (
-        !Object.values(RpcRuntimeStoreKind).includes(store.kind as never) ||
-        !Object.values(RpcRuntimeStoreContinuity).includes(store.continuity as never)
+        (store.kind !== RpcRuntimeStoreKind.memory &&
+          store.kind !== RpcRuntimeStoreKind.external &&
+          store.kind !== RpcRuntimeStoreKind.unavailable) ||
+        (store.continuity !== RpcRuntimeStoreContinuity.retained &&
+          store.continuity !== RpcRuntimeStoreContinuity.lost &&
+          store.continuity !== RpcRuntimeStoreContinuity.unavailable)
       )
         invalid('/store')
       if (store.kind === RpcRuntimeStoreKind.unavailable) {
@@ -201,10 +210,7 @@ export function normalizeRuntimeEnvelope(
       result.store = Object.freeze(store)
       if (input.state === RpcRuntimeOutcomeState.done) {
         const outcome = readRecord(input.outcome, RuntimeRecordSchema.outcome, '/outcome')
-        if (
-          outcome.mode === RpcRuntimeMode.outcome ||
-          !Object.values(RpcRuntimeMode).includes(outcome.mode as never)
-        )
+        if (outcome.mode === RpcRuntimeMode.outcome || !isRuntimeMode(outcome.mode))
           invalid('/outcome/mode')
         result.outcome = Object.freeze({
           mode: outcome.mode,
@@ -219,7 +225,7 @@ export function normalizeRuntimeEnvelope(
       } else if (Object.hasOwn(input, F.outcome)) invalid('/outcome')
     } else invalid('/operation')
   }
-  return finishRuntimeEnvelope(input, result, fields)
+  return finishRuntimeEnvelope(input, result)
 }
 
 /**
@@ -228,14 +234,56 @@ export function normalizeRuntimeEnvelope(
  */
 function finishRuntimeEnvelope(
   input: Record<string, unknown>,
-  result: Record<string, unknown>,
-  fields: readonly string[]
+  result: Record<string, unknown>
 ): IRpcRuntimeEnvelope {
-  for (const field of Object.keys(input))
-    if (
-      ![F.profile, F.kind, F.id, F.route, F.task].includes(field as never) &&
-      !fields.includes(field)
-    )
-      invalid(`/${field}`)
+  for (const field in input) {
+    if (!Object.hasOwn(input, field)) continue
+    switch (field) {
+      case F.profile:
+      case F.kind:
+      case F.id:
+      case F.route:
+      case F.task:
+        continue
+      case F.options:
+        if (input.kind === RpcRuntimeKind.call || input.kind === RpcRuntimeKind.group) continue
+        break
+      case F.payload:
+        if (input.kind === RpcRuntimeKind.call) continue
+        break
+      case F.steps:
+        if (input.kind === RpcRuntimeKind.group) continue
+        break
+      case F.operation:
+        if (input.kind === RpcRuntimeKind.control || input.kind === RpcRuntimeKind.outcome) continue
+        break
+      case F.reason:
+        if (input.kind === RpcRuntimeKind.control && input.operation === RpcRuntimeOperation.cancel)
+          continue
+        break
+      case F.completion:
+        if (
+          input.kind === RpcRuntimeKind.control &&
+          input.operation === RpcRuntimeOperation.terminal
+        )
+          continue
+        break
+      case F.stream:
+        if (input.kind === RpcRuntimeKind.control && input.operation === RpcRuntimeOperation.stream)
+          continue
+        break
+      case F.idempotencyKey:
+        if (input.kind === RpcRuntimeKind.outcome && input.operation === RpcRuntimeOperation.lookup)
+          continue
+        break
+      case F.state:
+      case F.store:
+      case F.outcome:
+        if (input.kind === RpcRuntimeKind.outcome && input.operation === RpcRuntimeOperation.result)
+          continue
+        break
+    }
+    invalid(`/${field}`)
+  }
   return Object.freeze(result) as IRpcRuntimeEnvelope
 }

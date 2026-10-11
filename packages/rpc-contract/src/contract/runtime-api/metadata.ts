@@ -31,7 +31,6 @@ export type IRpcRuntimeCallHeader = Readonly<{
 /** One closed record shape preserves the original required-field failure order. */
 export type IRuntimeRecordSchema = Readonly<{
   required: readonly string[]
-  optional: readonly string[]
   allows(key: string): boolean
 }>
 
@@ -47,19 +46,6 @@ export const RuntimeRecordSchema = {
   /** The envelope prefix is required before selecting any semantic variant. */
   envelope: {
     required: [F.profile, F.kind, F.id, F.route, F.task],
-    optional: [
-      F.payload,
-      F.options,
-      F.steps,
-      F.operation,
-      F.reason,
-      F.stream,
-      F.completion,
-      F.idempotencyKey,
-      F.state,
-      F.store,
-      F.outcome
-    ],
     /** The shared union later rejects fields belonging to another variant. */
     allows(key: string): boolean {
       switch (key) {
@@ -94,7 +80,6 @@ export const RuntimeRecordSchema = {
       RpcRouteField.receiverId,
       RpcRouteField.sentAt
     ],
-    optional: [RpcRouteField.forwardRoute],
     /** Only the existing signed route vocabulary enters semantic route validation. */
     allows(key: string): boolean {
       switch (key) {
@@ -113,7 +98,6 @@ export const RuntimeRecordSchema = {
   /** Both generation kinds use the same closed numeric-counter shape. */
   generation: {
     required: [F.kind, F.value, F.providerId],
-    optional: [],
     /** Generation domain checks run after all structural required-field checks. */
     allows(key: string): boolean {
       switch (key) {
@@ -129,7 +113,6 @@ export const RuntimeRecordSchema = {
   /** Task method presence is decided by the existing mode parser after shape admission. */
   task: {
     required: [F.mode, F.callerId, F.callerGeneration, F.targetGeneration],
-    optional: [F.method],
     /** The exact caller/target generation tuple remains the only task identity grammar. */
     allows(key: string): boolean {
       switch (key) {
@@ -147,7 +130,6 @@ export const RuntimeRecordSchema = {
   /** A group step carries one required method and an optional portable payload. */
   step: {
     required: [F.method],
-    optional: [F.payload],
     /** Step payload admission stays in the selected portable-value owner. */
     allows(key: string): boolean {
       switch (key) {
@@ -162,7 +144,6 @@ export const RuntimeRecordSchema = {
   /** Wire options exclude local signals and false deadlines before policy validation. */
   options: {
     required: [],
-    optional: [F.orderKey, F.cancel, F.timeoutMs, F.idempotencyKey],
     /** Existing option validators retain cancellation and idempotency ordering. */
     allows(key: string): boolean {
       switch (key) {
@@ -179,7 +160,6 @@ export const RuntimeRecordSchema = {
   /** Completion success/error exclusivity remains a semantic decision. */
   completion: {
     required: [F.ok],
-    optional: [F.result, F.error],
     /** Only the original terminal data fields enter completion projection. */
     allows(key: string): boolean {
       switch (key) {
@@ -195,7 +175,6 @@ export const RuntimeRecordSchema = {
   /** A group member's state is required before validating its result/error combination. */
   stepOutcome: {
     required: [F.state],
-    optional: [F.result, F.error],
     /** The group parser still owns failed/not-executed suffix ordering. */
     allows(key: string): boolean {
       switch (key) {
@@ -211,7 +190,6 @@ export const RuntimeRecordSchema = {
   /** Stream event and sequence retain their original required-field ordering. */
   stream: {
     required: [F.event, F.seq],
-    optional: [F.value, F.error, F.reason],
     /** Stream values/errors remain subject to their existing parser. */
     allows(key: string): boolean {
       switch (key) {
@@ -229,7 +207,6 @@ export const RuntimeRecordSchema = {
   /** Store availability/continuity describes admitted state rather than new authority. */
   store: {
     required: [F.kind, F.continuity],
-    optional: [F.epoch],
     /** Epoch requirements are decided only after the original store domain checks. */
     allows(key: string): boolean {
       switch (key) {
@@ -245,7 +222,6 @@ export const RuntimeRecordSchema = {
   /** A retained outcome carries its original mode, target generation and completion. */
   outcome: {
     required: [F.mode, F.targetGeneration, F.completion],
-    optional: [],
     /** Cached wire data receives the same outcome semantic validation as live terminals. */
     allows(key: string): boolean {
       switch (key) {
@@ -260,13 +236,41 @@ export const RuntimeRecordSchema = {
   }
 } as const satisfies Readonly<Record<string, IRuntimeRecordSchema>>
 
-/** Delegate live values to the unchanged descriptor reader and its original native error boundary. */
+/** Snapshot live own data once, retaining descriptor rejection and the original native error cause. */
 export function readStrictRecord(
   value: unknown,
   schema: IRuntimeRecordSchema,
   pointer: string
 ): Record<string, unknown> {
-  return record(value, schema.required, schema.optional, pointer)
+  if (!value || typeof value !== 'object' || Array.isArray(value)) invalid(pointer)
+  try {
+    /** Only portable ordinary records can be metadata, never arbitrary owner objects. */
+    const prototype = Object.getPrototypeOf(value)
+    if (prototype !== Object.prototype && prototype !== null) invalid(pointer)
+    /** Descriptor reads reject getters without invoking them. */
+    const descriptors = Object.getOwnPropertyDescriptors(value)
+    /** Define own data directly on the ordinary result, bypassing inherited setters. */
+    const result: Record<string, unknown> = {}
+    for (const key of Reflect.ownKeys(descriptors)) {
+      if (typeof key !== 'string' || !schema.allows(key)) invalid(pointer)
+      /** Non-enumerable and accessor properties cannot disappear during the wire round trip. */
+      const descriptor = descriptors[key]!
+      if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value'))
+        invalid(`${pointer}/${key}`)
+      descriptor.writable = true
+      descriptor.configurable = true
+      Object.defineProperty(result, key, descriptor)
+    }
+    for (const key of schema.required) if (!Object.hasOwn(result, key)) invalid(`${pointer}/${key}`)
+    return result
+  } catch (cause) {
+    if (
+      cause instanceof TypeError &&
+      Reflect.get(cause, 'code') === RpcContractErrorCode.invalidEnvelope
+    )
+      throw cause
+    invalid(pointer, cause)
+  }
 }
 
 /**
@@ -318,6 +322,11 @@ export function isRuntimeCallMode(mode: unknown): boolean {
     mode === RpcRuntimeMode.notify ||
     mode === RpcRuntimeMode.stream
   )
+}
+
+/** The closed mode domain adds only atomic groups and read-only outcomes to call modes. */
+export function isRuntimeMode(mode: unknown): mode is RpcRuntimeMode {
+  return isRuntimeCallMode(mode) || mode === RpcRuntimeMode.group || mode === RpcRuntimeMode.outcome
 }
 
 /**
@@ -384,43 +393,6 @@ export function steps(
   return steps
 }
 
-/** Snapshot own data fields once; accessors and unknown fields never reach authentication metadata. */
-export function record(
-  value: unknown,
-  required: readonly string[],
-  optional: readonly string[],
-  pointer: string
-): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) invalid(pointer)
-  try {
-    /** Only portable ordinary records can be metadata, never arbitrary owner objects. */
-    const prototype = Object.getPrototypeOf(value)
-    if (prototype !== Object.prototype && prototype !== null) invalid(pointer)
-    /** Descriptor reads reject getters without invoking them. */
-    const descriptors = Object.getOwnPropertyDescriptors(value)
-    /** Each admitted field is copied into a fresh null-prototype data record. */
-    const result: Record<string, unknown> = Object.create(null)
-    for (const key of Reflect.ownKeys(descriptors)) {
-      if (typeof key !== 'string' || (!required.includes(key) && !optional.includes(key)))
-        invalid(pointer)
-      /** Non-enumerable and accessor properties cannot disappear during the wire round trip. */
-      const descriptor = descriptors[key]!
-      if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value'))
-        invalid(`${pointer}/${key}`)
-      result[key] = descriptor.value
-    }
-    for (const key of required) if (!Object.hasOwn(result, key)) invalid(`${pointer}/${key}`)
-    return { ...result }
-  } catch (cause) {
-    if (
-      cause instanceof TypeError &&
-      Reflect.get(cause, 'code') === RpcContractErrorCode.invalidEnvelope
-    )
-      throw cause
-    invalid(pointer, cause)
-  }
-}
-
 /** Dense arrays contain only own data indexes; sparse or extra-field shapes are not wire grammar. */
 export function array<T>(
   value: unknown,
@@ -467,7 +439,8 @@ export function generation(
 ): IRpcRuntimeGeneration {
   const generation = readRecord(value, RuntimeRecordSchema.generation, '/generation')
   if (
-    !Object.values(RpcRuntimeGenerationKind).includes(generation.kind as never) ||
+    (generation.kind !== RpcRuntimeGenerationKind.restart &&
+      generation.kind !== RpcRuntimeGenerationKind.session) ||
     !Number.isSafeInteger(generation.value) ||
     (generation.value as number) < 0
   )
@@ -488,7 +461,7 @@ export function task(
   readRecord: IRuntimeRecordReader = readStrictRecord
 ): IRpcRuntimeTask {
   const input = readRecord(value, RuntimeRecordSchema.task, '/task')
-  if (!Object.values(RpcRuntimeMode).includes(input.mode as never)) invalid('/task/mode')
+  if (!isRuntimeMode(input.mode)) invalid('/task/mode')
   const callsMethod = isRuntimeCallMode(input.mode)
   if (callsMethod !== Object.hasOwn(input, F.method)) invalid('/task/method')
   return Object.freeze({
