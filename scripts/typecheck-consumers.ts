@@ -12,6 +12,7 @@ import {
 } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { assertFresh, DistStampErrorCode } from './dist-stamp.mjs'
 
 const scriptDirectory = resolve(fileURLToPath(new URL('.', import.meta.url)))
 const repositoryRoot = resolve(scriptDirectory, '..')
@@ -61,10 +62,16 @@ function runPnpm(args) {
 }
 
 /**
- * Builds declaration files before package-export resolution is tested. Consumer typechecking must
- * exercise the same dist files shipped to users.
+ * Reuses fresh declaration files before package-export resolution is tested, rebuilding only stale
+ * output. Consumer typechecking exercises the same dist files shipped to users.
  */
 function buildCheckedPackages() {
+  try {
+    assertFresh(packageChecks.map(({ root }) => root))
+    return
+  } catch (error) {
+    if (error?.code !== DistStampErrorCode.stale) throw error
+  }
   runPnpm(['--filter', './packages/event-subscriber', 'run', 'build'])
   for (const name of rpcPackages) runPnpm(['--filter', `./packages/${name}`, 'run', 'build'])
 }

@@ -13,7 +13,12 @@ import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { assertAllFresh, isStampable, workspacePackages } from './dist-stamp.mjs'
+import {
+  assertAllFresh,
+  DistStampErrorCode,
+  isStampable,
+  workspacePackages
+} from './dist-stamp.mjs'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const baselinePath = join(repositoryRoot, 'coverage-baseline.json')
@@ -535,8 +540,13 @@ export const main = () => {
     else assertBaselineResetPreconditions()
   }
   const { coveragePackages, deletedCoveragePackages } = assertInventory()
-  buildWorkspaceOutput()
-  assertAllFresh()
+  try {
+    assertAllFresh()
+  } catch (error) {
+    if (error?.code !== DistStampErrorCode.stale) throw error
+    buildWorkspaceOutput()
+    assertAllFresh()
+  }
   const existing =
     !updateBaseline && existsSync(baselinePath)
       ? JSON.parse(readFileSync(baselinePath, 'utf8'))
