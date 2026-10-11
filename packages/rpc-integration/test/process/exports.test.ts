@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import familyConfig from '../../vitest.family.config.js'
 
 /** The package manifest is checked as a shipped consumer would resolve it. */
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-process')
@@ -106,6 +107,22 @@ describe('process package layering and exports', () => {
     )
     expect(streamFraming).not.toMatch(/(?:from\s*|import\s*\()['"](?:node:|bun:|electron|koffi)/)
     const vitestConfig = readFileSync(join(packageRoot, 'vitest.config.ts'), 'utf8')
-    expect(vitestConfig).toContain('src/process/adapters/**')
+    expect(vitestConfig).toContain('src/**/*.ts')
+    expect(familyConfig.test?.coverage?.include).toEqual(
+      [
+        '../rpc-contract/src/**/*.{ts,tsx}',
+        '../rpc-contract/dist/**/*.js',
+        '../rpc-core/src/**/*.{ts,tsx}',
+        '../rpc-core/dist/**/*.js',
+        '../rpc-process/src/**/*.{ts,tsx}',
+        '../rpc-process/dist/**/*.js',
+        '../rpc-threads/src/**/*.{ts,tsx}',
+        '../rpc-threads/dist/**/*.js',
+        '../rpc-bridge-jsonrpc/src/**/*.{ts,tsx}',
+        '../rpc-bridge-jsonrpc/dist/**/*.js',
+        '../rpc-browser/src/**/*.{ts,tsx}',
+        '../rpc-browser/dist/**/*.js'
+      ].map((pattern) => resolve(packageRoot, '../rpc-integration', pattern))
+    )
   })
 })
