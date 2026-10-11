@@ -92,7 +92,8 @@ export { createRuntimeEventByteIO } from './runtime-adapter/byte/event-byte-io.j
 export type {
   IRuntimeEventByteReader,
   IRuntimeEventByteWriter,
-  IRuntimeBytePhysicalResource
+  IRuntimeBytePhysicalResource,
+  IRuntimeByteViewFactory
 } from './runtime-adapter/byte/event-byte-io.js'
 /** Held whole-message I/O expands its fixed V1 profile only through actual bounded ACK reception. */
 export { createRuntimeMessageConnection } from './runtime-adapter/message/connection.js'

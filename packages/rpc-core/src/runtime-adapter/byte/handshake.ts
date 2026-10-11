@@ -25,6 +25,7 @@ import { bindRuntimeByteWire, deferRuntimeByteReceive, type IRuntimeByteWire } f
 import { createRuntimeDiagnosticError } from './diagnostics.js'
 import { attachIpcConnection } from './ipc-connection.js'
 import { createRuntimeBytePipeline } from './pipeline.js'
+import { readRuntimeByteViewFactory } from './event-byte-io.js'
 import { retainRuntimeConnectionIdentity } from './connection-identity.js'
 import type {
   IRuntimeByteIO,
@@ -214,7 +215,10 @@ export async function createRuntimeByteConnection(
         peerId,
         scheduler,
         agreement: publicAgreement(agreement),
-        pipeline: createRuntimeBytePipeline(options.expectedStringText),
+        pipeline: createRuntimeBytePipeline(
+          options.expectedStringText,
+          readRuntimeByteViewFactory(channel)
+        ),
         features: ipc.features,
         ...(wire.activateReceive ? { activateReceive: wire.activateReceive } : {}),
         log: ipc.log,

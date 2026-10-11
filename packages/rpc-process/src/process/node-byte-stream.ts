@@ -1,4 +1,5 @@
 import type { Readable, Writable } from 'node:stream'
+import { Buffer } from 'node:buffer'
 import { createRuntimeEventByteIO } from '@migaia/rpc-core/adapter'
 import { ProcessChannelDiagnostics } from './diagnostics.js'
 
@@ -8,6 +9,7 @@ export function nodeByteStream(readable: Readable, writable: Writable, destroy: 
     readable,
     writable,
     { close: destroy },
-    ProcessChannelDiagnostics.closed
+    ProcessChannelDiagnostics.closed,
+    Buffer
   )
 }

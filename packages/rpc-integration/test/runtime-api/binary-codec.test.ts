@@ -10,11 +10,13 @@ import {
 } from '@migaia/rpc-contract/binary'
 import { RpcBinaryStorage } from '@migaia/rpc-contract/wire'
 import { Buffer } from 'node:buffer'
+import { PassThrough } from 'node:stream'
+import { createNativeProcessOffer, createProcessTransport } from '@migaia/rpc-process'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { asCodecValue } from '@migaia/serialize/codec'
 import { rpcProtocolV1 } from '@migaia/rpc-contract'
 import { bindRpcFrameIngress } from '@migaia/rpc-contract/framing'
-import { remoteProcessJsonCodec } from '../../../rpc-core/dist/adapter-owned/process/pipeline.js'
+import { remoteProcessJsonCodec } from '../fixtures/process-diagnostics.js'
 import { remoteProcessStringFramer } from '@migaia/rpc-contract/framing'
 import {
   proveFastComponents,
@@ -25,7 +27,7 @@ import {
   readOwnedJsonSnapshot,
   RpcOwnedBinaryAlphabet
 } from '../../../rpc-core/dist/core/internal/outbound-owned-codec.js'
-import '../../../rpc-core/dist/adapter-owned/process/node-byte-stream.js'
+import { nodeByteStream } from '../../../rpc-process/dist/process/node-byte-stream.js'
 import type { IRpcSelectedComponents } from '../../../rpc-core/dist/core/internal/endpoint-options.js'
 
 /** Original task/route vectors supply the complete normative metadata rather than a fake endpoint. */
@@ -35,22 +37,76 @@ const envelope = (payload: unknown) => normalizeRuntimeEnvelope({ ...vectors.val
 const digest = async (backing: ArrayBuffer) =>
   createHash('sha256').update(new Uint8Array(backing)).digest('hex')
 
+/** Obtain the production native codec from actual held streams and the public Process handshake. */
+async function createNativeProcessCodec() {
+  /** Independent physical directions retain the original ordered, backpressured byte operations. */
+  const forward = new PassThrough()
+  const reverse = new PassThrough()
+  /** Both actual raw ports borrow the same fixture-owned pair and retire it idempotently. */
+  const destroy = (): void => {
+    forward.destroy()
+    reverse.destroy()
+  }
+  try {
+    /** Only the canonical Node byte constructor holds the native byte-view factory for Core. */
+    const left = nodeByteStream(reverse, forward, destroy)
+    const right = nodeByteStream(forward, reverse, destroy)
+    /** Actual correlated control bytes produce the same complete Process channels as production. */
+    const [channel, peer] = await Promise.all([
+      createProcessTransport(left, {
+        role: 'initiator',
+        peerId: 'a61-native-right',
+        offer: createNativeProcessOffer({ peer: { id: 'a61-native-left', runtime: 'node' } }),
+        ipc: {
+          connectionId: 'a61-native-left',
+          sessionId: 'a61-native-left',
+          log: () => undefined
+        },
+        report: () => undefined
+      }),
+      createProcessTransport(right, {
+        role: 'responder',
+        peerId: 'a61-native-left',
+        offer: createNativeProcessOffer({ peer: { id: 'a61-native-right', runtime: 'node' } }),
+        auth: { mode: 'none' },
+        ipc: {
+          connectionId: 'a61-native-right',
+          sessionId: 'a61-native-right',
+          log: () => undefined
+        },
+        report: () => undefined
+      })
+    ])
+    return {
+      codec: channel.pipeline!.codec,
+      /** Native resource cleanup follows the public channel owner before fixture stream disposal. */
+      async close() {
+        try {
+          await Promise.all([channel.close!(), peer.close!()])
+        } finally {
+          destroy()
+        }
+      }
+    }
+  } catch (error) {
+    destroy()
+    throw error
+  }
+}
+
 for (const size of [64 * 1024, 1024 * 1024]) {
   it(`[A61][A21] ${size} owned inline bytes encode natively once without a second business walk`, async () => {
+    /** The actual public handshake supplies Core's resource-bound production codec. */
+    const fixture = await createNativeProcessCodec()
     /** The same real codec/framer identities select the encoder held by the Node byte adapter. */
     const components: IRpcSelectedComponents = {
       protocol: rpcProtocolV1,
-      codec: remoteProcessJsonCodec as IRpcSelectedComponents['codec'],
+      codec: fixture.codec as IRpcSelectedComponents['codec'],
       framer: remoteProcessStringFramer,
       ingressPrepare: bindRpcFrameIngress(remoteProcessStringFramer.accept),
       shadowed: []
     }
-    proveFastComponents(
-      components,
-      rpcProtocolV1,
-      remoteProcessJsonCodec,
-      remoteProcessStringFramer
-    )
+    proveFastComponents(components, rpcProtocolV1, fixture.codec, remoteProcessStringFramer)
     /** The callable comes from actual adapter admission, not a fixture reimplementation. */
     const encodeInline = readFastInlineEncoder(components)
     assert.ok(encodeInline)
@@ -82,7 +138,7 @@ for (const size of [64 * 1024, 1024 * 1024]) {
         new (class implements IRpcBinaryDataCodec {
           /** Hold the same actual process codec used by the original encoding assertion. */
           encode(value: unknown): unknown {
-            return remoteProcessJsonCodec.encode(value)
+            return fixture.codec.encode(value)
           }
           /** Exact selected-components provenance supplies the unchanged native byte intrinsic. */
           readonly encodeInline = encodeInline
@@ -103,7 +159,7 @@ for (const size of [64 * 1024, 1024 * 1024]) {
         '[A61] same encoded business root'
       )
       /** Compare the actual process codec against the unchanged source JSON codec's wire order. */
-      const encoded = remoteProcessJsonCodec.encode(prepared.manifest)
+      const encoded = fixture.codec.encode(prepared.manifest)
       assert.equal(encoded, defineJsonCodec({ version: 1 }).encode(asCodecValue(prepared.manifest)))
       assert.equal(nativeCalls, 1, '[A61] real native base64 once per binary leaf')
       assert.ok(Buffer.byteLength(encoded as string) <= retained.byteUpperBound)
@@ -121,6 +177,7 @@ for (const size of [64 * 1024, 1024 * 1024]) {
       assert.equal(payload.a, '汉字\ud83d')
     } finally {
       native.mockRestore()
+      await fixture.close()
     }
   })
 }
