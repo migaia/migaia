@@ -4,6 +4,8 @@ import { invalidRpcEnvelope, isIdentifier, isRouteFieldValid } from '../v1/route
 import { RpcRouteField, RpcEnvelopeViolation } from '../wire-constants.js'
 import {
   RpcRuntimeGenerationKind,
+  RpcRuntimeProfile,
+  RpcRuntimeKind,
   RpcRuntimeMode,
   RpcRuntimeCancel,
   RpcRuntimeField as F
@@ -11,10 +13,20 @@ import {
 import type { IRpcPortableValue } from '../types.js'
 import type {
   IRpcRuntimeGeneration,
+  IRpcRuntimeEnvelope,
+  IRpcRuntimeRoute,
   IRpcRuntimeOptions,
   IRpcRuntimeTask,
   IRpcRuntimeStep
 } from './types.js'
+
+/** Typed call fields supplied by Core's existing owned input and held generation resources. */
+export type IRpcRuntimeCallHeader = Readonly<{
+  id: string
+  route: IRpcRuntimeRoute
+  task: IRpcRuntimeTask
+  options: IRpcRuntimeOptions
+}>
 
 /** One closed record shape preserves the original required-field failure order. */
 export type IRuntimeRecordSchema = Readonly<{
@@ -282,6 +294,9 @@ export function readDecodedRecord(
   return result
 }
 
+/** The typed constructor reuses semantic validators on its own fields, without copying metadata. */
+const readConstructedRecord: IRuntimeRecordReader = (value) => value as Record<string, unknown>
+
 /** Validate the original route domains before task/id/options, without changing its snapshot owner. */
 export function validateRuntimeRouteFields(route: Record<string, unknown>): void {
   for (const field of RuntimeRecordSchema.route.required) {
@@ -303,6 +318,36 @@ export function isRuntimeCallMode(mode: unknown): boolean {
     mode === RpcRuntimeMode.notify ||
     mode === RpcRuntimeMode.stream
   )
+}
+
+/**
+ * Construct one typed call using the canonical field validators in their original failure order.
+ * Core supplies its owned header; this operation grants no transport or private snapshot authority.
+ * The portable data operation runs last and defaults to the existing full payload admission. Caller
+ * input objects are never frozen by this constructor.
+ */
+export function createRuntimeCallEnvelope(
+  header: IRpcRuntimeCallHeader,
+  payload?: IRpcPortableValue,
+  portable: (value: unknown) => IRpcPortableValue = normalizeRuntimePortable
+): Extract<IRpcRuntimeEnvelope, { kind: typeof RpcRuntimeKind.call }> {
+  /** Route copying keeps ordinary descriptors and the original Core-built field order. */
+  const route: Record<string, unknown> = { ...header.route }
+  validateRuntimeRouteFields(route)
+  /** Held generation fields still receive their original domain checks and nested snapshots. */
+  const selected = task(header.task, readConstructedRecord)
+  /** Id validation stays after route/task, while options remain after the call-mode fence. */
+  const result: Record<string, unknown> = {
+    profile: RpcRuntimeProfile,
+    kind: RpcRuntimeKind.call,
+    id: identifier(header.id, '/id'),
+    route: Object.freeze(route),
+    task: selected
+  }
+  if (!isRuntimeCallMode(selected.mode)) invalid('/task/mode')
+  result.options = options({ ...header.options }, selected.mode, readConstructedRecord)
+  if (payload !== undefined) result.payload = portable(payload)
+  return Object.freeze(result) as Extract<IRpcRuntimeEnvelope, { kind: typeof RpcRuntimeKind.call }>
 }
 
 /** Reject closed-profile input with the existing native contract error, preserving its cause. */
