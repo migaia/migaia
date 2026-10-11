@@ -1,0 +1,94 @@
+import { createRpcError } from '../../core/errors.js'
+import {
+  readRuntimePreparationContext,
+  withRuntimePreparationContext
+} from '../../remote/runtime-api/launch-context.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
+import { RuntimeApiErrorText } from '../../remote/runtime-api/constants.js'
+import { readRuntimeDefaultTimeout } from '../../remote/runtime-api/timeout.js'
+import type { IThreadParentPort } from './runtime-resource.js'
+import { AdapterNodeThreadParentChannel } from './node-parent.js'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { bindNativeReplayTransport } from '../../core/internal/native-replay.js'
+import { createRuntimePeer, type IRuntimePeerOptions } from '../../remote/index.js'
+import { createThreadSourcePeer, type IRuntimeThreadPeerOptions } from './runtime-peer.js'
+import {
+  readThreadRuntimeBootstrap,
+  intersectThreadCapabilities,
+  createThreadRuntimeCapabilityOffer
+} from './bootstrap.js'
+import { createNodeThreadBootstrapHandoff } from './receive-handoff.js'
+import { constructNodeThreadChannel } from './channel.js'
+import { ThreadBootstrap, THREAD_RUNTIME_API_VERSION } from './constants.js'
+
+/** Only a genuine parentPort and complete library bootstrap supply an automatic Worker source. */
+export function createAdapterNodeThreadPeer(
+  options: IRuntimeThreadPeerOptions,
+  parentPort: IThreadParentPort | null,
+  workerData: unknown
+) {
+  readRuntimeDefaultTimeout(options)
+  if (!parentPort)
+    return typeof options.spawn === 'object'
+      ? createThreadSourcePeer(options)
+      : createRuntimePeer(options as IRuntimePeerOptions)
+  /** Native object identity is independent of every business/bootstrap field. */
+  const native = parentPort
+  // Holding the real resource stays cold until the canonical channel opens.
+  new AdapterNodeThreadParentChannel(native)
+  /** Bootstrap reader retains the original fingerprint and safe launch name. */
+  const bootstrap = readThreadRuntimeBootstrap(workerData)
+  /** The actual cold handoff is assigned by the existing connect operation before ACK. */
+  const resources = {
+    generation: bootstrap.generation,
+    bootstrap: undefined as ReturnType<typeof createNodeThreadBootstrapHandoff> | undefined
+  }
+  /** Ordinary native options keep the exact original Host preparation context. */
+  const peerOptions: IRuntimePeerOptions = {
+    ...(options as IRuntimePeerOptions),
+    // Keep explicit connect as a competing source for the original canonical rejection.
+    listen: options.listen ?? options.connect,
+    self: options.self ?? bootstrap.self,
+    connect: async (context) => {
+      if (
+        options.self &&
+        (options.self.name !== bootstrap.self.name ||
+          options.self.instanceId !== bootstrap.self.instanceId)
+      )
+        throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
+      /** Cold capture attaches before ACK can cause the parent to send its directory. */
+      const handoff = createNodeThreadBootstrapHandoff(native)
+      resources.bootstrap = handoff
+      try {
+        /** This native child derives only its own compiled offer before the bilateral agreement. */
+        const capabilities = createThreadRuntimeCapabilityOffer(context.capabilities)
+        /** The child offers only its own actual roots, independently of the parent metadata. */
+        native.postMessage({
+          kind: ThreadBootstrap.runtimeAcknowledged,
+          version: THREAD_RUNTIME_API_VERSION,
+          capabilities
+        })
+        /** The wrapper transfers subscriptions while provenance stays on the exact native port. */
+        const channel = constructNodeThreadChannel(
+          handoff.port,
+          bootstrap.parent.instanceId,
+          {
+            scheduler: systemScheduler,
+            capabilities: intersectThreadCapabilities(capabilities, bootstrap.capabilities)
+          },
+          handoff
+        )
+        bindNativeReplayTransport(native, channel.transport)
+        return channel
+      } catch (error) {
+        handoff.close()
+        throw error
+      }
+    }
+  }
+  return withRuntimePreparationContext(
+    peerOptions,
+    readRuntimePreparationContext(options) ?? {},
+    () => createRuntimePeer(peerOptions, resources)
+  )
+}

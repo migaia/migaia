@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ISerializeChunk, ISerializeParser } from '@migaia/serialize'
 import { SerializeChunkKind } from '@migaia/serialize'
-import { RpcRemoteError, type IRpcAbortSignal, type IRpcEndpoint } from '@migaia/rpc/core'
+import { isRpcRemoteError, type IRpcAbortSignal, type IRpcEndpoint } from '@migaia/rpc-core'
 import { WorkerAdapter, createWorkerHandler, workerComputed, workerParser } from '../src/index'
 import * as storeWorker from '../src/index'
 import { toManagedRpcHandler } from '../src/managed-rpc-handler'
@@ -113,7 +113,8 @@ describe('A8/A9 store-worker exports', () => {
         ])
       ).resolves.toEqual(['reply:two', 'reply:three'])
       const received = await adapter.request('failure').catch((error: unknown) => error)
-      expect(received).toBeInstanceOf(RpcRemoteError)
+      expect(received).toBeInstanceOf(Error)
+      expect(isRpcRemoteError(received)).toBe(true)
       expect(received).toMatchObject({
         name: 'RpcRemoteError',
         message: 'Provider failed',
@@ -147,7 +148,8 @@ describe('A8/A9 store-worker exports', () => {
     const adapter = new WorkerAdapter(port)
     try {
       const received = await adapter.request('nested-error').catch((error: unknown) => error)
-      expect(received).toBeInstanceOf(RpcRemoteError)
+      expect(received).toBeInstanceOf(Error)
+      expect(isRpcRemoteError(received)).toBe(true)
       expect(received).toMatchObject({
         name: 'RpcRemoteError',
         message: 'Provider failed',

@@ -1,9 +1,9 @@
-import { normalizePortable, type IRpcPortableValue } from '@migaia/rpc/contract'
-import { abort, connect, createFullOneWayEndpoint, timeout } from '@migaia/rpc/core'
+import { normalizePortable, type IRpcPortableValue } from '@migaia/rpc-contract'
+import { abort, connect, createFullOneWayEndpoint, timeout } from '@migaia/rpc-core'
 import {
   createWebWorkerTransport,
   type IWebWorkerLikePort
-} from '@migaia/rpc/browser/adapters/web-worker'
+} from '@migaia/rpc-core/adapters/web-worker'
 import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
 import { WorkerRpcIdentity } from './worker-constants.js'
 

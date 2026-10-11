@@ -1,0 +1,129 @@
+{
+  "name": "@migaia/rpc-contract",
+  "version": "0.0.7",
+  "private": true,
+  "description": "RPC contract owner.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kimboyeme-maker/migai.git",
+    "directory": "packages/rpc-contract"
+  },
+  "files": [
+    "dist",
+    "schema",
+    "README.md",
+    "USEGUIDE.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/contract/index.d.ts",
+      "default": "./dist/contract/index.js"
+    },
+    "./v1": {
+      "types": "./dist/contract/v1/index.d.ts",
+      "default": "./dist/contract/v1/index.js"
+    },
+    "./framing": {
+      "types": "./dist/contract/framing/index.d.ts",
+      "default": "./dist/contract/framing/index.js"
+    },
+    "./framing/v1": {
+      "types": "./dist/contract/framing/v1.d.ts",
+      "default": "./dist/contract/framing/v1.js"
+    },
+    "./framing/stream": {
+      "types": "./dist/contract/framing/stream-index.d.ts",
+      "default": "./dist/contract/framing/stream-index.js"
+    },
+    "./wire": {
+      "types": "./dist/contract/wire-index.d.ts",
+      "default": "./dist/contract/wire-index.js"
+    },
+    "./portable": {
+      "types": "./dist/contract/portable-index.d.ts",
+      "default": "./dist/contract/portable-index.js"
+    },
+    "./errors": {
+      "types": "./dist/contract/error-index.d.ts",
+      "default": "./dist/contract/error-index.js"
+    },
+    "./schema/wire-error": {
+      "default": "./schema/wire-error.schema.json"
+    },
+    "./handshake": {
+      "types": "./dist/contract/handshake-index.d.ts",
+      "default": "./dist/contract/handshake-index.js"
+    },
+    "./runtime": {
+      "types": "./dist/contract/runtime-api/index.d.ts",
+      "default": "./dist/contract/runtime-api/index.js"
+    },
+    "./runtime/metadata": {
+      "types": "./dist/contract/runtime-api/metadata-index.d.ts",
+      "default": "./dist/contract/runtime-api/metadata-index.js"
+    },
+    "./runtime/lazy": {
+      "types": "./dist/contract/runtime-api/lazy-index.d.ts",
+      "default": "./dist/contract/runtime-api/lazy-index.js"
+    },
+    "./binary/inspect": {
+      "types": "./dist/contract/binary-inspect-index.d.ts",
+      "default": "./dist/contract/binary-inspect-index.js"
+    },
+    "./framing/jsonrpc": {
+      "types": "./dist/contract/framing/jsonrpc.d.ts",
+      "default": "./dist/contract/framing/jsonrpc.js"
+    },
+    "./binary": {
+      "types": "./dist/contract/binary-index.d.ts",
+      "default": "./dist/contract/binary-index.js"
+    },
+    "./binary/lazy": {
+      "types": "./dist/contract/binary-lazy-index.d.ts",
+      "default": "./dist/contract/binary-lazy-index.js"
+    },
+    "./binary/capture": {
+      "types": "./dist/contract/binary-capture-index.d.ts",
+      "default": "./dist/contract/binary-capture-index.js"
+    },
+    "./stream": {
+      "types": "./dist/contract/stream-index.d.ts",
+      "default": "./dist/contract/stream-index.js"
+    }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "build": "node ../../scripts/dist-stamp.mjs clean && node ../../scripts/dist-stamp.mjs build-rpc && node ../../scripts/dist-stamp.mjs write",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
+    "fmt": "oxfmt src test vitest.config.ts",
+    "lint": "oxlint src test vitest.config.ts",
+    "test": "vitest run --coverage",
+    "typecheck:contract": "tsc --noEmit -p tsconfig.contract.json"
+  },
+  "dependencies": {
+    "@migaia/utils": "workspace:^"
+  },
+  "peerDependencies": {},
+  "peerDependenciesMeta": {},
+  "devDependencies": {
+    "@types/node": "24.13.2",
+    "cborg": "6.1.1",
+    "elysia": "1.4.30",
+    "msgpackr": "2.1.0",
+    "protobufjs": "8.8.0",
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

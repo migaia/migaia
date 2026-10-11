@@ -1,0 +1,45 @@
+import {
+  prepareRpcBinaryLazy as prepareCanonicalBinaryLazy,
+  restoreRpcBinaryLazy
+} from './binary-lazy.js'
+import { rejectRpcBinaryPreparation } from './binary-capture.js'
+import type { IRpcBinaryDigest, IRpcPreparedBinary } from './binary-capture.js'
+import { binaryPreparationData } from './binary-data-codec.js'
+import type { IRpcBinaryDataCodec } from './binary-data-codec.js'
+import { RpcBinaryStorage } from './binary-constants.js'
+import { RpcBatchPhysical } from '../wire-constants.js'
+import type { IRpcRuntimeEnvelope } from './types.js'
+
+export { restoreRpcBinaryLazy }
+export type { IRpcBinaryDataCodec } from './binary-data-codec.js'
+export type {
+  IRpcBinaryBacking,
+  IRpcBinaryDigest,
+  IRpcBinaryManifest,
+  IRpcPreparedBinary
+} from './binary-capture.js'
+export { RpcBinaryProfile, RpcBinaryStorage, RpcNativeBinaryKind } from './binary-constants.js'
+
+/** Preserve canonical synchronous capture and first native digest before cold codec loading. */
+export function prepareRpcBinaryLazy(
+  message: IRpcRuntimeEnvelope,
+  storage: RpcBinaryStorage,
+  limit = RpcBatchPhysical.maxBytes,
+  digest?: IRpcBinaryDigest,
+  codec?: IRpcBinaryDataCodec
+): Promise<IRpcPreparedBinary> {
+  try {
+    /** A held codec supplies ordinary data operations, never prehash/finish coordination callbacks. */
+    const data = binaryPreparationData(codec, limit)
+    return prepareCanonicalBinaryLazy(
+      message,
+      storage,
+      limit,
+      digest,
+      data.beforeDigest,
+      data.encoding
+    )
+  } catch (cause) {
+    return rejectRpcBinaryPreparation(cause)
+  }
+}

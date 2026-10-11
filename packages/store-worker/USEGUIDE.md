@@ -22,7 +22,7 @@
 
 ## 1. 核心概念详解
 
-`@migaia/store-worker` 本身不实现任何通信协议——协议编解码、超时、取消、来源校验全部来自 `@migaia/rpc/core`，这个包只是把 RPC core 的 `createEndpoint()`/`createWebWorkerTransport()` 按 Store 的两个具体场景（通用计算卸载、序列化编解码卸载）预先接好线。理解这个包，本质上是理解它怎么"抄近路"用 RPC core：
+`@migaia/store-worker` 本身不实现任何通信协议——协议编解码、超时、取消、来源校验全部来自 `@migaia/rpc-core`，这个包只是把 RPC core 的 `createEndpoint()`/`createWebWorkerTransport()` 按 Store 的两个具体场景（通用计算卸载、序列化编解码卸载）预先接好线。理解这个包，本质上是理解它怎么"抄近路"用 RPC core：
 
 ### 1.1 主线程 ↔ Worker 是固定拓扑
 
@@ -140,7 +140,7 @@ await handler.dispose(); // 先 close()，再等底层端点初始化并 dispose
 
 - **`handler(message)`**：`disposed === true` 时直接返回 `Promise<void>`（resolve），不会处理也不会报错——这是有意的静默丢弃：`close()`/`dispose()` 之后 Worker 可能还会因为消息队列里的残留消息被再调用一次，不应该因此抛错。
 - **`pendingCount`**：每次调用 `handler(message)` admission 时 +1，等待 endpoint 并同步交付消息后 -1。它是 inbound dispatch 指标，**不代表 provider compute 已完成**，也不能作为 `Worker.terminate()` 的 quiescence 门禁；真正的 provider drain/cleanup 由 Web RPC endpoint 拥有，终止前必须等待 `handler.dispose()` 完成。
-- **`close()` vs `dispose()`**：`close()` 同步标记 `disposed = true`，只负责"停止接受新消息"，不触发任何用户清理；`dispose()` 是唯一异步释放入口，内部先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`，清理失败时会把错误 reject 出来（错误形态与 `@migaia/rpc/core` 的 `endpoint.dispose()` 一致，是 `RpcLifecycleError`，`cleanupErrors` 字段列出具体哪个资源没清理干净）。两者都是幂等的——`close()` 重复调用是无操作；`dispose()` 多次调用复用同一个 Promise，不会重复触发清理。
+- **`close()` vs `dispose()`**：`close()` 同步标记 `disposed = true`，只负责"停止接受新消息"，不触发任何用户清理；`dispose()` 是唯一异步释放入口，内部先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`，清理失败时会把错误 reject 出来（错误形态与 `@migaia/rpc-core` 的 `endpoint.dispose()` 一致，是 `RpcLifecycleError`，`cleanupErrors` 字段列出具体哪个资源没清理干净）。两者都是幂等的——`close()` 重复调用是无操作；`dispose()` 多次调用复用同一个 Promise，不会重复触发清理。
 
 ---
 
@@ -366,7 +366,7 @@ type IByteOwnership = 'copy' | 'transfer';
 
 ### 8.1 通用 RPC 错误
 
-`WorkerAdapter.request()`、`workerComputed` 内部、`createSerializeWorkerHandler` 之外的路径，抛出的错误都是标准 `@migaia/rpc/core` 的 `RpcError`（`PROVIDER_NOT_FOUND`、`DEADLINE_EXCEEDED`、`TRANSPORT`、`CANCELLED` 等），完整错误码表见 [`@migaia/rpc/core` 的 USEGUIDE](../rpc/USEGUIDE.md#8-错误处理)。判断时按 `error.code` 分支，不要依赖 `error.message` 或具体子类。
+`WorkerAdapter.request()`、`workerComputed` 内部、`createSerializeWorkerHandler` 之外的路径，抛出的错误都是标准 `@migaia/rpc/core` 的 `RpcError`（`PROVIDER_NOT_FOUND`、`DEADLINE_EXCEEDED`、`TRANSPORT`、`CANCELLED` 等），完整错误码表见 [`@migaia/rpc-core` 的 USEGUIDE](../rpc-core/USEGUIDE.md#逐错误码处理与重试)。判断时按 `error.code` 分支，不要依赖 `error.message` 或具体子类。
 
 ### 8.2 `workerParser` 的 abort 特殊处理
 
@@ -510,7 +510,7 @@ registry.dispose(); // 连带 dispose workerParser 的端点,并 terminate worke
 
 ---
 
-如果本文没有回答你的问题,`@migaia/rpc/core` 的 [USEGUIDE.md](../rpc/USEGUIDE.md) 覆盖了协议层(超时、取消、错误码、生命周期)的完整细节;`@migaia/resource`、`@migaia/serialize` 各自的文档覆盖 `Resource`/序列化注册表本身的行为。
+如果本文没有回答你的问题,`@migaia/rpc-core` 的 [USEGUIDE.md](../rpc-core/USEGUIDE.md) 覆盖了协议层(超时、取消、错误码、生命周期)的完整细节;`@migaia/resource`、`@migaia/serialize` 各自的文档覆盖 `Resource`/序列化注册表本身的行为。
 
 ## 13. 构建、格式化与测试
 

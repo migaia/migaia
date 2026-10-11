@@ -57,6 +57,22 @@ export const NON_V8_PACKAGES = Object.freeze({
   wasm: 'Rust and wasm-bindgen coverage is owned by the package wasm runner'
 })
 
+/** One coverage unit replaces the deleted umbrella owner; tests remain in their real packages. */
+export const RPC_COVERAGE_FAMILY = Object.freeze({
+  unit: 'rpc-family',
+  runner: 'rpc-integration',
+  config: 'vitest.family.config.ts',
+  deletedOwners: Object.freeze(['rpc']),
+  runtimeOwners: Object.freeze([
+    'rpc-contract',
+    'rpc-core',
+    'rpc-process',
+    'rpc-threads',
+    'rpc-bridge-jsonrpc',
+    'rpc-browser'
+  ])
+})
+
 /** Read one package manifest without allowing package code to become an owner. */
 export const readPackageManifest = (packageName) => {
   const manifestPath = join(repositoryRoot, 'packages', packageName, 'package.json')
@@ -85,7 +101,20 @@ export const discoverTestOwners = () => {
 export const assertInventory = () => {
   const owners = discoverTestOwners()
   const nonV8 = Object.keys(NON_V8_PACKAGES).sort()
-  const coveragePackages = owners.filter((packageName) => !nonV8.includes(packageName))
+  /** All seven real test owners must be present before they can share one capture. */
+  const familyOwners = [...RPC_COVERAGE_FAMILY.runtimeOwners, RPC_COVERAGE_FAMILY.runner]
+  const missingFamilyOwners = familyOwners.filter((packageName) => !owners.includes(packageName))
+  if (missingFamilyOwners.length)
+    throw new Error(`RPC family test owner is absent: ${missingFamilyOwners.join(', ')}`)
+  const coveragePackages = [
+    ...owners.filter(
+      (packageName) =>
+        !nonV8.includes(packageName) &&
+        !familyOwners.includes(packageName) &&
+        !RPC_COVERAGE_FAMILY.deletedOwners.includes(packageName)
+    ),
+    RPC_COVERAGE_FAMILY.unit
+  ].sort()
   const missingDisposition = nonV8.filter((packageName) => !owners.includes(packageName))
   if (missingDisposition.length > 0) {
     throw new Error(
@@ -94,7 +123,31 @@ export const assertInventory = () => {
   }
   if (coveragePackages.length === 0)
     throw new Error('package test inventory has no TypeScript coverage owners')
-  return { owners, coveragePackages, nonV8 }
+  return {
+    owners,
+    coveragePackages,
+    nonV8,
+    deletedCoveragePackages: RPC_COVERAGE_FAMILY.deletedOwners
+  }
+}
+
+/**
+ * Project the last signed umbrella totals into the new unit for read-only comparison. No file keys
+ * or metric counts are rewritten, and every unrelated owner stays exact.
+ *
+ * @param {Record<string, unknown>} packages Signed package metrics.
+ * @returns {Record<string, unknown>} Comparison-only inventory.
+ * @throws {Error} Both old and new family units would create an ambiguous signed inventory.
+ */
+export const comparableCoveragePackages = (packages) => {
+  const current = { ...packages }
+  if (Object.hasOwn(current, 'rpc')) {
+    if (Object.hasOwn(current, RPC_COVERAGE_FAMILY.unit))
+      throw new Error('coverage baseline contains both deleted rpc and rpc-family owners')
+    current[RPC_COVERAGE_FAMILY.unit] = current.rpc
+    delete current.rpc
+  }
+  return current
 }
 
 /** Reject package inventory changes that would silently omit an owner. */
@@ -330,33 +383,32 @@ export const assertBaselineResetPreconditions = () => {
  * wasm-pack package) are not built here, matching their own test scripts.
  */
 export const buildWorkspaceOutput = () => {
-  /** pnpm filters naming each stampable package; pnpm orders them topologically. */
+  /** Pnpm filters naming each stampable package; pnpm orders them topologically. */
   const filters = [...workspacePackages().entries()]
     .filter(([, directory]) => isStampable(directory))
     .flatMap(([name]) => ['--filter', `./packages/${name}`])
   run('pnpm', ['-r', ...filters, 'run', 'build'])
 }
 
-/** Capture one package report against output already built and asserted fresh by `main`. */
-const capturePackage = (packageName, reportRoot) => {
-  const packageReport = join(reportRoot, packageName)
-  try {
-    run('pnpm', [
-      '--dir',
-      `packages/${packageName}`,
-      'exec',
-      'vitest',
-      'run',
-      'test',
-      '--coverage',
-      '--coverage.reporter=json-summary',
-      '--coverage.reporter=json',
-      `--coverage.reportsDirectory=${packageReport}`,
-      '--coverage.include=src/**/*.{ts,tsx}'
-    ])
-  } catch (error) {
-    throw new Error(`coverage capture failed for ${packageName}`, { cause: error })
-  }
+/**
+ * Read the existing V8 reports without remapping or cloning their runtime source identities.
+ *
+ * @param {string} packageName Actual package or declared RPC family coverage unit.
+ * @param {string} packageReport Absolute directory containing the two V8 report files.
+ * @returns {{
+ *   metrics: Record<string, { covered: number; total: number; pct: number }>
+ *   files: Record<
+ *     string,
+ *     {
+ *       metrics: Record<string, { covered: number; total: number; pct: number }>
+ *       branchMap: unknown
+ *     }
+ *   >
+ * }}
+ *   Original totals and per-file maps.
+ * @throws {Error} The family report contains non-owner output or omits a real runtime owner.
+ */
+export const readCoverageReport = (packageName, packageReport) => {
   const summary = JSON.parse(readFileSync(join(packageReport, 'coverage-summary.json'), 'utf8'))
   const detail = JSON.parse(readFileSync(join(packageReport, 'coverage-final.json'), 'utf8'))
   const files = Object.fromEntries(
@@ -371,7 +423,76 @@ const capturePackage = (packageName, reportRoot) => {
         }
       ])
   )
+  if (packageName === RPC_COVERAGE_FAMILY.unit) {
+    /** Source-map output must identify real owner files, never duplicated emitted JavaScript. */
+    const sourceFiles = Object.keys(files).map(normalizeCoveragePath)
+    for (const path of sourceFiles) {
+      const owner = path.split('/')[1]
+      if (
+        !RPC_COVERAGE_FAMILY.runtimeOwners.includes(owner) ||
+        !path.startsWith(`packages/${owner}/src/`) ||
+        !existsSync(resolve(repositoryRoot, path))
+      )
+        throw new Error(`RPC family coverage has no real runtime Source owner: ${path}`)
+    }
+    for (const owner of RPC_COVERAGE_FAMILY.runtimeOwners)
+      if (!sourceFiles.some((path) => path.startsWith(`packages/${owner}/src/`)))
+        throw new Error(`RPC family coverage omitted a Source owner: ${owner}`)
+  }
   return { metrics: summaryMetrics(summary), files }
+}
+
+/**
+ * Capture one coverage unit against output already built and asserted fresh by `main`.
+ *
+ * @param {string} packageName Actual package or the declared RPC family unit.
+ * @param {string} reportRoot Absolute raw capture root.
+ * @returns {ReturnType<typeof readCoverageReport>} Original V8 totals and file records.
+ * @throws {Error} The existing test command or its coverage thresholds fail.
+ */
+export const capturePackage = (packageName, reportRoot) => {
+  const packageReport = join(reportRoot, packageName)
+  /** The family uses its single existing config; all other package commands remain unchanged. */
+  const family = packageName === RPC_COVERAGE_FAMILY.unit
+  const args = family
+    ? [
+        '--dir',
+        `packages/${RPC_COVERAGE_FAMILY.runner}`,
+        'exec',
+        'vitest',
+        'run',
+        '--config',
+        RPC_COVERAGE_FAMILY.config,
+        '--coverage',
+        '--coverage.reporter=json-summary',
+        '--coverage.reporter=json',
+        `--coverage.reportsDirectory=${packageReport}`
+      ]
+    : [
+        '--dir',
+        `packages/${packageName}`,
+        'exec',
+        'vitest',
+        'run',
+        'test',
+        '--coverage',
+        '--coverage.reporter=json-summary',
+        '--coverage.reporter=json',
+        `--coverage.reportsDirectory=${packageReport}`,
+        '--coverage.include=src/**/*.{ts,tsx}'
+      ]
+  try {
+    const output = run('pnpm', args)
+    writeFileSync(join(reportRoot, `${packageName}-capture.log`), output)
+  } catch (error) {
+    /** Preserve native stderr/stdout so a threshold failure cannot be called baseline drift. */
+    writeFileSync(
+      join(reportRoot, `${packageName}-capture.log`),
+      `${error.stdout ?? ''}${error.stderr ?? ''}`
+    )
+    throw new Error(`coverage capture failed for ${packageName}`, { cause: error })
+  }
+  return readCoverageReport(packageName, packageReport)
 }
 
 /** Normalize a V8 detail path into repository-relative custody storage. */
@@ -413,7 +534,7 @@ export const main = () => {
     if (hasCandidateSha256) assertCandidateInputSha256(candidateSha256)
     else assertBaselineResetPreconditions()
   }
-  const { coveragePackages } = assertInventory()
+  const { coveragePackages, deletedCoveragePackages } = assertInventory()
   buildWorkspaceOutput()
   assertAllFresh()
   const existing =
@@ -422,14 +543,20 @@ export const main = () => {
       : null
   if (existing) {
     assertExclusions(existing.exclusions)
-    assertPackageReportsComplete(coveragePackages, existing.packages)
   }
   const reportRoot = mkdtempSync(join(tmpdir(), 'migai-coverage-custody-'))
+  /** Failed comparison retains all raw captures; no partial result can replace the signed baseline. */
+  let verified = false
   try {
     const packages = {}
     const files = {}
     const coverageDetails = {}
-    for (const packageName of coveragePackages) {
+    /** Capture the family before signed-baseline comparison, then every unchanged other owner. */
+    const captureOrder = [
+      RPC_COVERAGE_FAMILY.unit,
+      ...coveragePackages.filter((packageName) => packageName !== RPC_COVERAGE_FAMILY.unit)
+    ]
+    for (const packageName of captureOrder) {
       const report = capturePackage(packageName, reportRoot)
       packages[packageName] = report.metrics
       assertCompleteMetrics(report.metrics, packageName)
@@ -437,10 +564,6 @@ export const main = () => {
         const relativePath = normalizeCoveragePath(sourcePath)
         files[relativePath] = entry.metrics
         coverageDetails[relativePath] = { ...entry.metrics, branchMap: entry.branchMap }
-      }
-      if (existing?.packages?.[packageName]) {
-        assertCompleteMetrics(existing.packages[packageName], packageName)
-        assertMonotonic(report.metrics, existing.packages[packageName], packageName)
       }
     }
 
@@ -454,9 +577,6 @@ export const main = () => {
         metrics
       ])
     )
-    if (existing) assertChangedFilesCovered(filesRequiringCoverage, detail, existing.files)
-    else assertChangedFilesPresent(filesRequiringCoverage, detail)
-
     const result = {
       version: 1,
       generatedBy: 'scripts/coverage-custody.mjs',
@@ -464,8 +584,38 @@ export const main = () => {
       files,
       exclusions: NON_V8_PACKAGES,
       changedRuntimeFiles: changedFiles,
-      deletedRuntimeFiles: deletedFiles
+      deletedRuntimeFiles: deletedFiles,
+      deletedCoveragePackages,
+      baselineInventoryDrift: existing
+        ? {
+            missing: coveragePackages.filter((name) => !Object.hasOwn(existing.packages, name)),
+            unexpected: Object.keys(existing.packages).filter(
+              (name) => !coveragePackages.includes(name)
+            )
+          }
+        : { missing: [], unexpected: [] }
     }
+    /** Raw capture remains inspectable even when unchanged monotonic/baseline rules reject it. */
+    writeFileSync(join(reportRoot, 'coverage-custody-report.json'), serializeBaseline(result))
+    console.log(JSON.stringify({ capture: reportRoot, family: packages[RPC_COVERAGE_FAMILY.unit] }))
+    if (existing) {
+      /** Old umbrella totals may be compared, but cannot count as a signed family inventory. */
+      const baselinePackages = comparableCoveragePackages(existing.packages)
+      assertCompleteMetrics(baselinePackages[RPC_COVERAGE_FAMILY.unit], RPC_COVERAGE_FAMILY.unit)
+      assertMonotonic(
+        packages[RPC_COVERAGE_FAMILY.unit],
+        baselinePackages[RPC_COVERAGE_FAMILY.unit],
+        RPC_COVERAGE_FAMILY.unit
+      )
+      assertPackageReportsComplete(coveragePackages, existing.packages)
+      for (const packageName of coveragePackages.filter(
+        (name) => name !== RPC_COVERAGE_FAMILY.unit
+      )) {
+        assertCompleteMetrics(baselinePackages[packageName], packageName)
+        assertMonotonic(packages[packageName], baselinePackages[packageName], packageName)
+      }
+      assertChangedFilesCovered(filesRequiringCoverage, detail, existing.files)
+    } else assertChangedFilesPresent(filesRequiringCoverage, detail)
     if (updateBaseline) {
       if (hasCandidateSha256) assertCandidateInputSha256(candidateSha256)
       assertAllFresh()
@@ -478,8 +628,10 @@ export const main = () => {
         baseline: updateBaseline
       })
     )
+    verified = true
   } finally {
-    rmSync(reportRoot, { recursive: true, force: true })
+    if (verified) rmSync(reportRoot, { recursive: true, force: true })
+    else console.error(`coverage custody raw capture retained: ${reportRoot}`)
   }
 }
 

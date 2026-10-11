@@ -283,7 +283,7 @@ const GUIDE_STARTERS = [
     bodyZh: '选择后端、记录、事务、编解码与 live query。'
   },
   {
-    library: 'rpc',
+    library: 'rpc-core',
     titleEn: 'Connect browser runtimes',
     titleZh: '连接浏览器运行时',
     bodyEn: 'Create endpoints across windows, workers, channels, and transports.',
@@ -348,7 +348,7 @@ const ARCHITECTURE_FAMILIES = [
     titleZh: 'Browser 与平台',
     bodyEn: 'Browser storage, cross-runtime communication, and WebAssembly boundaries.',
     bodyZh: '浏览器存储、跨运行时通信以及 WebAssembly 边界。',
-    libraries: ['storage-contract', 'storage-web', 'rpc', 'wasm']
+    libraries: ['storage-contract', 'storage-web', 'rpc-core', 'wasm']
   },
   {
     titleEn: 'Other foundations',
@@ -721,21 +721,27 @@ function LibraryModuleLinks({
   ])
   /** Complete middleware-plugin links are separated from general root APIs for reader clarity. */
   const middlewarePluginLinks =
-    librarySlug === 'rpc'
-      ? apiLinks.filter((link) => link.module === 'core' && webRpcMiddlewareNames.has(link.name))
+    librarySlug === 'rpc-core'
+      ? apiLinks.filter((link) => link.module === 'index' && webRpcMiddlewareNames.has(link.name))
       : []
   /** Primary RPC entry points must not be buried under generated module names. */
   const primaryEntries =
-    librarySlug === 'rpc'
+    librarySlug === 'rpc-core'
       ? ([
-          ['createProcessPeer', 'process', 'createProcessPeer'],
-          ['createProcessPlugin', 'process', 'createProcessPlugin'],
-          ['createThreadPeer', 'threads', 'createThreadPeer'],
-          ['createThreadPlugin', 'threads', 'createThreadPlugin'],
-          ['createEndpoint', 'core', 'createEndpoint'],
-          ['createComposedEndpoint', 'core/composed', 'createComposedEndpoint']
+          ['createEndpoint', 'index', 'createEndpoint'],
+          ['createComposedEndpoint', 'composed', 'createComposedEndpoint']
         ] as const)
-      : []
+      : librarySlug === 'rpc-process'
+        ? ([
+            ['createProcessPeer', 'index', 'createProcessPeer'],
+            ['createProcessPlugin', 'index', 'createProcessPlugin']
+          ] as const)
+        : librarySlug === 'rpc-threads'
+          ? ([
+              ['createThreadPeer', 'index', 'createThreadPeer'],
+              ['createThreadPlugin', 'index', 'createThreadPlugin']
+            ] as const)
+          : []
   /** Navigation links are the complete lightweight inventory for every public runtime entry. */
   const rootApis = libraryApis.filter(
     (candidate) =>
@@ -815,10 +821,10 @@ function LibraryModuleLinks({
               </Link>
             ))}
           </div>
-          <Link to={`/${locale}/guides/rpc/endpoint-composition`}>
+          <Link to={`/${locale}/guides/rpc-core/endpoint-composition`}>
             {locale === 'zh' ? '如何选择 Endpoint →' : 'How to choose an Endpoint →'}
           </Link>
-          <Link to={`/${locale}/guides/rpc/transports-and-security`}>
+          <Link to={`/${locale}/guides/rpc-core/transports-and-security`}>
             {locale === 'zh' ? 'Transport 选择与完整案例' : 'Transport selection and examples'}
           </Link>
         </div>
@@ -1064,17 +1070,38 @@ function ModuleOverview({
   const typingSymbols = moduleSymbols.filter(
     (symbol) => symbol.kind === 'type' || symbol.kind === 'interface'
   )
+  /** The wire-error entry is an actual JSON resource, so it has no callable declarations. */
+  const isWireErrorSchema = api.library === 'rpc-contract' && api.module === 'schema/wire-error'
   return (
     <>
       <ModuleGuidance locale={locale} library={library} api={api} />
       <section className="section-block compact" id="api-index">
         <p className="eyebrow">{locale === 'zh' ? 'API 参考' : 'API reference'}</p>
-        <h2>{locale === 'zh' ? '选择一个入口' : 'Choose an entry point'}</h2>
+        <h2>
+          {isWireErrorSchema
+            ? 'JSON Schema'
+            : locale === 'zh'
+              ? '选择一个入口'
+              : 'Choose an entry point'}
+        </h2>
         <p>
-          {locale === 'zh'
-            ? '先按目标选择 API；每组依据维护文档中的真实使用频率从高到低排列。签名、参数、例子和相关类型只在对应页面展开。'
-            : 'Choose by outcome first. Each group is ordered by use frequency in maintained documentation. Signatures, examples, and related types expand on the API page.'}
+          {isWireErrorSchema
+            ? locale === 'zh'
+              ? '协议实现者可导入此 schema 校验 wire 错误树。错误图的编码、规范化与 JSON-RPC 映射使用 errors 入口的公开操作。'
+              : 'Protocol implementers import this schema to validate wire error trees. Use the public errors entry for encoding, normalization, and JSON-RPC mapping.'
+            : locale === 'zh'
+              ? '先按目标选择 API；每组依据维护文档中的真实使用频率从高到低排列。签名、参数、例子和相关类型只在对应页面展开。'
+              : 'Choose by outcome first. Each group is ordered by use frequency in maintained documentation. Signatures, examples, and related types expand on the API page.'}
         </p>
+        {isWireErrorSchema ? (
+          <pre>
+            <code>
+              {
+                "import wireErrorSchema from '@migaia/rpc-contract/schema/wire-error' with { type: 'json' }"
+              }
+            </code>
+          </pre>
+        ) : null}
         {runtimeSymbolGroups(operationSymbols).map((group) => (
           <section className="api-reference-group" key={group.key}>
             <h3>{symbolGroupLabel(locale, group.key)}</h3>
@@ -1288,7 +1315,7 @@ const webRpcTransportChoices = [
     'Node.js worker_threads 的 MessagePort'
   ],
   ['createWindowMessageTransport', 'browser/adapters/window', '窗口、iframe 或弹窗之间通信'],
-  ['createWebWorkerTransport', 'browser/adapters/web-worker', '页面与 Dedicated Worker 通信'],
+  ['createWebWorkerTransport', 'core/adapters/web-worker', '页面与 Dedicated Worker 通信'],
   [
     'createSharedWorkerTransport',
     'browser/adapters/shared-worker',
@@ -1317,7 +1344,7 @@ function ParameterGuide({
   readonly fieldName: string
   readonly locale: ILocale
 }) {
-  if (api.library !== 'rpc' || fieldName !== 'transport') return null
+  if (api.library !== 'rpc-core' || fieldName !== 'transport') return null
   return (
     <div className="parameter-guide" data-parameter-guide="rpc-transport">
       <h4>{locale === 'zh' ? '如何选择 transport' : 'Choosing a transport'}</h4>
@@ -2531,7 +2558,13 @@ const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
   tray: '组合条目定义、适配器与 Host 安装流程。',
   utils: '提供取消、并发、错误、集合、字符串等通用基础工具。',
   wasm: '管理 WebAssembly 初始化、内存所有权、值转换与清理。',
-  rpc: '用四个 Peer/Plugin 工厂连接进程和线程，以显式 provide/expose 共享方法；core/browser 提供自定义连接、编解码和安全边界。'
+  'rpc-core':
+    '用四个 Peer/Plugin 工厂连接进程和线程，以显式 provide/expose 共享方法；core/browser 提供自定义连接、编解码和安全边界。',
+  'rpc-contract': '提供平台无关的 RPC envelope、握手、framing、二进制数据与错误链协议工具。',
+  'rpc-process': '连接实际进程的字节或消息通道，提供进程 Peer、Plugin 与平台启动入口。',
+  'rpc-threads': '连接实际 Worker 或线程，提供线程 Peer、Plugin 与原生执行资源适配器。',
+  'rpc-bridge-jsonrpc': '把外部语言的 JSON-RPC peer 接到实际有序字节通道，保留协商和错误链。',
+  'rpc-browser': '提供 Window、共享 Worker、ServiceWorker、广播与浏览器网络通道适配器。'
 } as const satisfies Readonly<Record<string, string>>
 
 /** Architecture-page summaries explain the pain, core capability, and governing design up front. */
@@ -2587,7 +2620,18 @@ const LIBRARY_ARCHITECTURE_LEDES_ZH = {
   utils:
     '用于多个包共同需要、且不应绑定 Store、DOM 或具体运行时的基础能力，包括取消、并发、错误、集合、对象路径、字节与字符串处理。每个子路径拥有独立契约和错误语义，调用方应按能力导入；它不是无边界的杂物箱。',
   wasm: '用于统一 WebAssembly 模块初始化、实例复用、线性内存分配、JS/WASM 值转换和确定性释放。它把平台加载与内存所有权封装在明确边界内，避免每个消费者重复处理指针、视图失效和清理；没有 WASM 模块时无需使用。',
-  rpc: '用于进程、Worker、Window 或 MessagePort 两端进行类型安全的双向调用。四个 Peer/Plugin 工厂根据真实 provide/expose 自动生成 v2 目录，复用原连接、鉴权、重放窗口、deadline 与 drain owner；业务不用复制手写消息协议。spawn 拥有执行单元，connect/listen 只借用连接，批量帧接收是握手基线，未支持的可选能力显式拒绝。事务与业务回滚仍由调用方负责。'
+  'rpc-core':
+    '用于进程、Worker、Window 或 MessagePort 两端进行类型安全的双向调用。四个 Peer/Plugin 工厂根据真实 provide/expose 自动生成 v2 目录，复用原连接、鉴权、重放窗口、deadline 与 drain owner；业务不用复制手写消息协议。spawn 拥有执行单元，connect/listen 只借用连接，批量帧接收是握手基线，未支持的可选能力显式拒绝。事务与业务回滚仍由调用方负责。',
+  'rpc-contract':
+    '用于独立协议实现或自定义载体需要共享 RPC 数据规则的场景。它提供 envelope 校验、握手协商、帧编码与解析、二进制数据准备和错误链转换，使不同实现按同一套 wire 契约交换数据；平台连接与原生执行资源由适配器持有。',
+  'rpc-process':
+    '用于父子进程或已有进程连接需要双向 RPC 的场景。应用通过 Peer 或 Plugin 共享实际方法，再按平台选择启动器与字节或消息通道；spawn 持有实际执行单元，connect/listen 保留借用连接的边界，关闭和失败清理沿原资源 owner 执行。',
+  'rpc-threads':
+    '用于把业务方法放入 Worker 或线程执行，同时保留双向调用和原生资源生命周期的场景。适配器取得实际线程 handle 与消息端口，Peer 或 Plugin 共享方法，并通过原监督器处理启动、退出、替换和关闭；平台未提供的能力保持明确不可用。',
+  'rpc-bridge-jsonrpc':
+    '用于与 Python、Go、Rust 等外部语言 peer 进行 JSON-RPC 调用的场景。桥接器使用 Process 提供的实际有序字节通道，完成原握手、帧解析、请求相关与取消规则，并传递有界错误链；业务按已协商的能力调用，不为对端缺失的模式增加隐式降级。',
+  'rpc-browser':
+    '用于 Window、共享 Worker、ServiceWorker、BroadcastChannel、WebTransport 或 RTCDataChannel 两端需要 RPC 的场景。各适配器持有实际浏览器通道及其监听器，保留来源校验、传输能力与关闭边界；Endpoint 和协议工具由 Core、Contract 复用，应用按实际通道选择适配器。'
 } as const satisfies Readonly<Record<string, string>>
 
 /** Missing English package descriptions are explicit instead of slogan fallbacks. */
@@ -2608,7 +2652,7 @@ const LIBRARY_REFERENCE_ALIASES = {
   'Storage Host': 'storage-web',
   Tray: 'tray',
   WASM: 'wasm',
-  RPC: 'rpc'
+  RPC: 'rpc-core'
 } as const satisfies Readonly<Record<string, string>>
 
 /** Resolves an explicit package reference only when it points outside the current library. */
@@ -2718,7 +2762,7 @@ function groupGuideApiLinks(
   library: string,
   locale: ILocale
 ): readonly IGuideApiGroup[] {
-  if (library === 'rpc') return groupWebRpcGuideApiLinks(apiLinks, locale)
+  if (library === 'rpc-core') return groupWebRpcGuideApiLinks(apiLinks, locale)
   if (library === 'storage-web') return groupStorageWebApiLinks(apiLinks, locale)
   /** Ordered module buckets keep generated public export order stable in navigation. */
   const groups = new Map<string, IGuideApiLink[]>()
@@ -2831,26 +2875,28 @@ function groupWebRpcGuideApiLinks(
       label: locale === 'zh' ? 'API' : 'APIs',
       matches: (link: IGuideApiLink) =>
         !middlewareNames.has(link.name) &&
-        !link.module.startsWith('core/features/') &&
-        !link.module.includes('/adapters/') &&
-        link.module !== 'core/transport-constants' &&
+        !link.module.startsWith('features/') &&
+        !link.module.startsWith('adapters/') &&
+        !link.module.startsWith('adapter/') &&
+        link.module !== 'transport-constants' &&
         !isErrorEntry(link)
     },
     {
       key: 'plugins',
       label: locale === 'zh' ? '插件' : 'Plugins',
       matches: (link: IGuideApiLink) =>
-        middlewareNames.has(link.name) || link.module.startsWith('core/features/')
+        middlewareNames.has(link.name) || link.module.startsWith('features/')
     },
     {
       key: 'contracts',
       label: locale === 'zh' ? '规范' : 'Specifications',
-      matches: (link: IGuideApiLink) => link.module === 'core/transport-constants'
+      matches: (link: IGuideApiLink) => link.module === 'transport-constants'
     },
     {
       key: 'adapters',
       label: locale === 'zh' ? '宿主适配器' : 'Host adapters',
-      matches: (link: IGuideApiLink) => link.module.includes('/adapters/')
+      matches: (link: IGuideApiLink) =>
+        link.module.startsWith('adapters/') || link.module.startsWith('adapter/')
     },
     {
       key: 'errors',

@@ -1,6 +1,11 @@
 /** JavaScript primitive values; functions remain callable objects and are intentionally excluded. */
 export type IPrimitive = undefined | null | string | number | bigint | boolean | symbol
 
+/** Narrows finite safe integers without converting strings, boxed numbers, or other values. */
+export function isSafeIntegerValue(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value)
+}
+
 /** Narrows null and undefined without treating other falsy business values as absent. */
 export const isNullish = (value: unknown): value is null | undefined =>
   value === null || value === undefined

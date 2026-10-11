@@ -1,0 +1,456 @@
+import { spawnSync } from 'node:child_process'
+import { existsSync, globSync, readFileSync, readdirSync } from 'node:fs'
+import { dirname, join, relative, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
+import { describe, expect, it } from 'vitest'
+import legacyTitles from '../fixtures/legacy-test-titles.json'
+
+/** Root used by migrated Vitest suite and source-literal scan. */
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+/** All six runtime owners and the private integration owner participate in the same oracle. */
+const testOwners = [
+  'rpc-contract',
+  'rpc-core',
+  'rpc-process',
+  'rpc-threads',
+  'rpc-bridge-jsonrpc',
+  'rpc-browser',
+  'rpc-integration'
+] as const
+/** Exact file ownership from the package migration; CI never depends on ignored local scratch files. */
+const migratedFiles: Readonly<Record<string, string>> = {
+  'packages/rpc-contract/test/acceptance.test.ts':
+    'packages/rpc-contract/test/contract/acceptance.test.ts',
+  'packages/rpc-contract/test/contract.test.ts':
+    'packages/rpc-contract/test/contract/contract.test.ts',
+  'packages/rpc-contract/test/error-identity.test.ts':
+    'packages/rpc-contract/test/contract/error-identity.test.ts',
+  'packages/rpc-contract/test/types.test.ts': 'packages/rpc-contract/test/contract/types.test.ts',
+  'packages/web-rpc/test/adapters/broadcast-channel.test.ts':
+    'packages/rpc-browser/test/browser/adapters/broadcast-channel.test.ts',
+  'packages/web-rpc/test/adapters/memory.test.ts':
+    'packages/rpc-core/test/core/adapters/memory.test.ts',
+  'packages/web-rpc/test/adapters/message-port.test.ts':
+    'packages/rpc-core/test/core/adapters/message-port.test.ts',
+  'packages/web-rpc/test/adapters/rtc-data-channel.test.ts':
+    'packages/rpc-browser/test/browser/adapters/rtc-data-channel.test.ts',
+  'packages/web-rpc/test/adapters/web-transport.test.ts':
+    'packages/rpc-browser/test/browser/adapters/web-transport.test.ts',
+  'packages/web-rpc/test/adapters/window-source-proof.test.ts':
+    'packages/rpc-browser/test/browser/adapters/window-source-proof.test.ts',
+  'packages/web-rpc/test/adapters/worker-lifecycle.test.ts':
+    'packages/rpc-browser/test/browser/adapters/worker-lifecycle.test.ts',
+  'packages/web-rpc/test/adapters/worker-metadata.test.ts':
+    'packages/rpc-browser/test/browser/adapters/worker-metadata.test.ts',
+  'packages/web-rpc/test/architecture.test.ts': 'packages/rpc-core/test/core/architecture.test.ts',
+  'packages/web-rpc/test/attachment-normalization.test.ts':
+    'packages/rpc-core/test/core/attachment-normalization.test.ts',
+  'packages/web-rpc/test/authentication.integration.test.ts':
+    'packages/rpc-core/test/core/authentication.integration.test.ts',
+  'packages/web-rpc/test/composed-fanout-contract.test.ts':
+    'packages/rpc-core/test/core/composed-fanout-contract.test.ts',
+  'packages/web-rpc/test/composed-ping-parity.test.ts':
+    'packages/rpc-core/test/core/composed-ping-parity.test.ts',
+  'packages/web-rpc/test/composed-receiver-identity.test.ts':
+    'packages/rpc-core/test/core/composed-receiver-identity.test.ts',
+  'packages/web-rpc/test/composed-remote-cancellation.test.ts':
+    'packages/rpc-core/test/core/composed-remote-cancellation.test.ts',
+  'packages/web-rpc/test/composed-variation-capability.test.ts':
+    'packages/rpc-core/test/core/composed-variation-capability.test.ts',
+  'packages/web-rpc/test/construction-hooks.test.ts':
+    'packages/rpc-core/test/core/construction-hooks.test.ts',
+  'packages/web-rpc/test/contract-endpoint.test.ts':
+    'packages/rpc-core/test/core/contract-endpoint.test.ts',
+  'packages/web-rpc/test/custom-feature.test.ts':
+    'packages/rpc-core/test/core/custom-feature.test.ts',
+  'packages/web-rpc/test/discovery-attachment-boundaries.test.ts':
+    'packages/rpc-core/test/core/discovery-attachment-boundaries.test.ts',
+  'packages/web-rpc/test/discovery-semantic-coverage.test.ts':
+    'packages/rpc-core/test/core/discovery-semantic-coverage.test.ts',
+  'packages/web-rpc/test/duplicate-owner-contract.test.ts':
+    'packages/rpc-core/test/core/duplicate-owner-contract.test.ts',
+  'packages/web-rpc/test/endpoint-kernel.test.ts':
+    'packages/rpc-core/test/core/endpoint-kernel.test.ts',
+  'packages/web-rpc/test/endpoint.observer.test.ts':
+    'packages/rpc-core/test/core/endpoint.observer.test.ts',
+  'packages/web-rpc/test/errors.test.ts': 'packages/rpc-core/test/core/errors.test.ts',
+  'packages/web-rpc/test/event-subscriber-compat.test.ts':
+    'packages/rpc-core/test/core/event-subscriber-compat.test.ts',
+  'packages/web-rpc/test/hardening-regressions.spec.ts':
+    'packages/rpc-core/test/core/hardening-regressions.spec.ts',
+  'packages/web-rpc/test/internal-ownership-boundaries.test.ts':
+    'packages/rpc-core/test/core/internal-ownership-boundaries.test.ts',
+  'packages/web-rpc/test/internal/async-control.test.ts':
+    'packages/rpc-core/test/core/internal/async-control.test.ts',
+  'packages/web-rpc/test/internal/chunk.test.ts':
+    'packages/rpc-core/test/core/internal/chunk.test.ts',
+  'packages/web-rpc/test/internal/contract.test.ts':
+    'packages/rpc-core/test/core/internal/contract.test.ts',
+  'packages/web-rpc/test/internal/discovery-registry.test.ts':
+    'packages/rpc-core/test/core/internal/discovery-registry.test.ts',
+  'packages/web-rpc/test/internal/hooks.test.ts':
+    'packages/rpc-core/test/core/internal/hooks.test.ts',
+  'packages/web-rpc/test/internal/id.test.ts': 'packages/rpc-core/test/core/internal/id.test.ts',
+  'packages/web-rpc/test/internal/identity.test.ts':
+    'packages/rpc-core/test/core/internal/identity.test.ts',
+  'packages/web-rpc/test/internal/listener-safety.test.ts':
+    'packages/rpc-core/test/core/internal/listener-safety.test.ts',
+  'packages/web-rpc/test/internal/message-listener-hub.test.ts':
+    'packages/rpc-core/test/core/internal/message-listener-hub.test.ts',
+  'packages/web-rpc/test/internal/operation-scope.test.ts':
+    'packages/rpc-core/test/core/internal/operation-scope.test.ts',
+  'packages/web-rpc/test/internal/outbound-sender.test.ts':
+    'packages/rpc-core/test/core/internal/outbound-sender.test.ts',
+  'packages/web-rpc/test/internal/peers.test.ts':
+    'packages/rpc-core/test/core/internal/peers.test.ts',
+  'packages/web-rpc/test/internal/pending.test.ts':
+    'packages/rpc-core/test/core/internal/pending.test.ts',
+  'packages/web-rpc/test/internal/provider-admission.test.ts':
+    'packages/rpc-core/test/core/internal/provider-admission.test.ts',
+  'packages/web-rpc/test/internal/provider-executor-result.test.ts':
+    'packages/rpc-core/test/core/internal/provider-executor-result.test.ts',
+  'packages/web-rpc/test/internal/provider.test.ts':
+    'packages/rpc-core/test/core/internal/provider.test.ts',
+  'packages/web-rpc/test/internal/replay.test.ts':
+    'packages/rpc-core/test/core/internal/replay.test.ts',
+  'packages/web-rpc/test/internal/request-replay-ledger.test.ts':
+    'packages/rpc-core/test/core/internal/request-replay-ledger.test.ts',
+  'packages/web-rpc/test/internal/resource-scope.test.ts':
+    'packages/rpc-core/test/core/internal/resource-scope.test.ts',
+  'packages/web-rpc/test/internal/safe-value.test.ts':
+    'packages/rpc-core/test/core/internal/safe-value.test.ts',
+  'packages/web-rpc/test/internal/settlement.test.ts':
+    'packages/rpc-core/test/core/internal/settlement.test.ts',
+  'packages/web-rpc/test/internal/web-rpc-plugin-host.test.ts':
+    'packages/rpc-core/test/core/internal/web-rpc-plugin-host.test.ts',
+  'packages/web-rpc/test/middleware-ports.test.ts':
+    'packages/rpc-core/test/core/middleware-ports.test.ts',
+  'packages/web-rpc/test/middleware/abort.test.ts':
+    'packages/rpc-core/test/core/middleware/abort.test.ts',
+  'packages/web-rpc/test/middleware/authentication.test.ts':
+    'packages/rpc-core/test/core/middleware/authentication.test.ts',
+  'packages/web-rpc/test/middleware/chunk.test.ts':
+    'packages/rpc-core/test/core/middleware/chunk.test.ts',
+  'packages/web-rpc/test/middleware/connect.test.ts':
+    'packages/rpc-core/test/core/middleware/connect.test.ts',
+  'packages/web-rpc/test/middleware/contract.test.ts':
+    'packages/rpc-core/test/core/middleware/contract.test.ts',
+  'packages/web-rpc/test/middleware/feature.test.ts':
+    'packages/rpc-core/test/core/middleware/feature.test.ts',
+  'packages/web-rpc/test/middleware/hooks.test.ts':
+    'packages/rpc-core/test/core/middleware/hooks.test.ts',
+  'packages/web-rpc/test/middleware/middleware.test.ts':
+    'packages/rpc-core/test/core/middleware/middleware.test.ts',
+  'packages/web-rpc/test/middleware/ping.test.ts':
+    'packages/rpc-core/test/core/middleware/ping.test.ts',
+  'packages/web-rpc/test/middleware/protocol.test.ts':
+    'packages/rpc-core/test/core/middleware/protocol.test.ts',
+  'packages/web-rpc/test/middleware/timeout.test.ts':
+    'packages/rpc-core/test/core/middleware/timeout.test.ts',
+  'packages/web-rpc/test/middleware/uuid.test.ts':
+    'packages/rpc-core/test/core/middleware/uuid.test.ts',
+  'packages/web-rpc/test/plugin-host/projection.test.ts':
+    'packages/rpc-core/test/core/plugin-host/projection.test.ts',
+  'packages/web-rpc/test/plugin-host/topology-adapter.test.ts':
+    'packages/rpc-core/test/core/plugin-host/topology-adapter.test.ts',
+  'packages/web-rpc/test/property.test.ts': 'packages/rpc-core/test/core/property.test.ts',
+  'packages/web-rpc/test/provider-event-delegate.test.ts':
+    'packages/rpc-core/test/core/provider-event-delegate.test.ts',
+  'packages/web-rpc/test/provider-production-seam.test.ts':
+    'packages/rpc-core/test/core/provider-production-seam.test.ts',
+  'packages/web-rpc/test/root-disposal.test.ts':
+    'packages/rpc-core/test/core/root-disposal.test.ts',
+  'packages/web-rpc/test/storage-v2-t53-event-trace.test.ts':
+    'packages/rpc-core/test/core/storage-v2-t53-event-trace.test.ts',
+  'packages/web-rpc/test/time-port.test.ts': 'packages/rpc-core/test/core/time-port.test.ts',
+  'packages/web-rpc/test/topology-rollback.test.ts':
+    'packages/rpc-core/test/core/topology-rollback.test.ts',
+  'packages/web-rpc/test/transaction-contract.test.ts':
+    'packages/rpc-core/test/core/transaction-contract.test.ts',
+  'packages/web-rpc/test/tree-shaking/continuation-b01.red.test.ts':
+    'packages/rpc-core/test/core/tree-shaking/continuation-b01.red.test.ts',
+  'packages/web-rpc/test/tree-shaking/core-retained-causal.test.ts':
+    'packages/rpc-core/test/core/tree-shaking/core-retained-causal.test.ts',
+  'packages/web-rpc/test/tree-shaking/retained-allocation-attribution.test.ts':
+    'packages/rpc-core/test/core/tree-shaking/retained-allocation-attribution.test.ts',
+  'packages/web-rpc/test/tree-shaking/slim-attachment-hardening.test.ts':
+    'packages/rpc-core/test/core/tree-shaking/slim-attachment-hardening.test.ts',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts':
+    'packages/rpc-core/test/core/tree-shaking/static-composition-contracts.test.ts',
+  'packages/web-rpc/test/type-contract.test.ts':
+    'packages/rpc-core/test/core/type-contract.test.ts',
+  'packages/web-rpc/test/wire.test.ts': 'packages/rpc-core/test/core/wire.test.ts',
+  'packages/web-rpc/test/worker-deterministic.test.ts':
+    'packages/rpc-core/test/core/worker-deterministic.test.ts'
+}
+/** Repository-relative result names distinguish matching titles in different package owners. */
+const repositoryRoot = resolve(packageRoot, '../..')
+/** Only retired historical custody suites may disappear from default test titles. */
+const retiredSuites = new Set([
+  'approved-migration-candidate.test.ts',
+  'provenance.test.ts',
+  'delivery-successor-transaction.test.ts',
+  'intended-cost-custody.test.ts',
+  'error-serialization.test.ts'
+])
+/** Exact historical titles retired by rpc-layering R5 after deleting unused control code. */
+const retiredLayeringTitles = new Set([
+  'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry purges expired unordered aborts before applying its hard cap',
+  'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry deduplicates control tasks before they reach the wire owner',
+  'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry keeps variation admission in the control owner',
+  'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry does not consume variation quota when replay capacity is full',
+  'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry requires a boolean lease decision and skips tombstones when retain rejects',
+  'packages/web-rpc/test/internal/async-control.test.ts::async control removes abort listeners when delay completes',
+  'packages/web-rpc/test/internal/async-control.test.ts::async control rolls back earlier delay listeners when a later registration fails',
+  'packages/web-rpc/test/internal/async-control.test.ts::async control observes delay listener cleanup failures without replacing the result',
+  'packages/web-rpc/test/internal-ownership-boundaries.test.ts::internal ownership boundary semantics keeps control and variation admission duplicate-safe and expiry-aware'
+])
+
+/** Map each non-retired frozen title to its required current file and test name. */
+function migratedTitle(title: string): string | undefined {
+  const [file, name] = title.split('::')
+  if (retiredSuites.has(file.split('/').at(-1) ?? '') || retiredLayeringTitles.has(title))
+    return undefined
+  /** The required owner is fixed by migration, never inferred from any matching report title. */
+  const path = migratedFiles[file]
+  expect(path, file).toBeDefined()
+  const mappedName = name
+    .replace(
+      'publishes only runtime-neutral root/framing exports and dependencies',
+      'publishes only runtime-neutral contract/framing exports with an explicit dependency allowlist'
+    )
+    .replace('tagWebRpcError keeps', 'tagRpcError keeps')
+    .replace('38 unique codes', '22 unique codes')
+    .replace('22 unique codes', '23 unique codes')
+    .replace('23 unique codes', '24 unique codes')
+    .replace('24 unique codes', '25 unique codes')
+    .replace('25 unique codes', '26 unique codes')
+    .replace('26 unique codes', '31 unique codes')
+    .replace(
+      'does not let a hostile code getter escape',
+      'reports a hostile code getter as PROPERTY_READ_FAILED with the original cause'
+    )
+    .replace(
+      'uses the canonical UNKNOWN code for untagged and cyclic errors alike',
+      'uses the canonical UNKNOWN code for untagged errors and marks cyclic edges truncated'
+    )
+    .replace('a WebRpcLifecycleError', 'a RpcLifecycleError')
+    .replace('real WebRpcPluginHost Promise', 'real RpcPluginHost Promise')
+  return `${path}::${mappedName}`
+}
+
+/** Collect source files for a literal scan, excluding historical data snapshots. */
+function testSources(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name)
+    if (entry.isDirectory()) return entry.name === 'fixtures' ? [] : testSources(path)
+    return /\.(?:ts|mts|mjs|js)$/.test(entry.name) ? [path] : []
+  })
+}
+
+/**
+ * Retain each static literal's context so expected-absence data is not mistaken for an active
+ * reader.
+ */
+function stringsIn(file: string): ts.StringLiteralLike[] {
+  const parsed = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true)
+  const values: ts.StringLiteralLike[] = []
+  /** Visit each descendant once and retain literal content, not surrounding syntax. */
+  function visit(node: ts.Node): void {
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) values.push(node)
+    ts.forEachChild(node, visit)
+  }
+  visit(parsed)
+  return values
+}
+
+/** These expressions actually resolve a module or filesystem location; comparison tables do not. */
+function isReaderLiteral(node: ts.StringLiteralLike): boolean {
+  /** Immediate syntax distinguishes a real resolver argument from a historical comparison value. */
+  const parent = node.parent
+  if (ts.isImportDeclaration(parent) || ts.isExportDeclaration(parent)) return true
+  if (ts.isLiteralTypeNode(parent) && ts.isImportTypeNode(parent.parent)) return true
+  if (ts.isNewExpression(parent))
+    return parent.expression.getText() === 'URL' && parent.arguments?.[0] === node
+  if (!ts.isCallExpression(parent) || parent.arguments[0] !== node) return false
+  return /^(?:import|require|readFileSync|import\.meta\.glob|vi\.(?:mock|doMock|unmock|doUnmock))$/.test(
+    parent.expression.getText()
+  )
+}
+
+/** Explicit negative export/source assertions retain their historical absent-key inputs. */
+function expectsAbsence(node: ts.StringLiteralLike): boolean {
+  for (let parent: ts.Node | undefined = node.parent; parent; parent = parent.parent) {
+    if (ts.isCallExpression(parent)) {
+      /** Negative assertion syntax keeps its exact absent source/export key meaningful. */
+      const expression = parent.expression.getText()
+      if (
+        expression.includes('.not.') ||
+        expression.includes('.rejects.') ||
+        expression.endsWith('.toThrow') ||
+        expression.endsWith('.toBeUndefined')
+      )
+        return true
+      if (
+        /\.(?:toBe|toEqual)$/.test(expression) &&
+        parent.arguments[0]?.kind === ts.SyntaxKind.FalseKeyword
+      )
+        return true
+    }
+    if (ts.isStatement(parent)) return false
+  }
+  return false
+}
+
+/** Exact current files may use either emitted .js specifiers or their TypeScript source targets. */
+function readerExists(path: string): boolean {
+  /** A Vite source glob must select real files rather than a nonexistent wildcard pathname. */
+  const wildcard = path.search(/[?*{]/)
+  if (wildcard !== -1) return globSync(path).length > 0
+  return existsSync(path) || existsSync(path.replace(/\.js$/, '.ts'))
+}
+
+describe('A7 migrated suite parity', () => {
+  it('keeps every non-retired legacy file and title passed', () => {
+    /** Frozen expectations choose exact owner files, including every current concern in those files. */
+    const expected = [...legacyTitles.contract, ...legacyTitles.core]
+      .map(migratedTitle)
+      .filter((title): title is string => title !== undefined)
+    /**
+     * One child pool runs each actual legacy file once rather than repeating the whole new SDK
+     * suite.
+     */
+    const files = [
+      ...new Set(expected.map((title) => resolve(repositoryRoot, title.split('::')[0])))
+    ]
+    const run = spawnSync(
+      'pnpm',
+      [
+        'exec',
+        'vitest',
+        'run',
+        '--config',
+        join(packageRoot, 'vitest.suite-parity.config.ts'),
+        '--reporter=json',
+        '--coverage.enabled=false',
+        ...files
+      ],
+      {
+        cwd: repositoryRoot,
+        encoding: 'utf8',
+        maxBuffer: 64 * 1024 * 1024,
+        env: { ...process.env, CI: '1', RPC_SUITE_PARITY_COLLECT: '1' }
+      }
+    )
+    const report = JSON.parse(
+      run.stdout.slice(run.stdout.indexOf('{'), run.stdout.lastIndexOf('}') + 1)
+    ) as {
+      testResults: {
+        name: string
+        message?: string
+        assertionResults: { fullName: string; status: string; failureMessages?: string[] }[]
+      }[]
+    }
+    /** Preserve the actual nested failure rather than only the last passing report rows. */
+    const failures = report.testResults.flatMap((file) =>
+      file.assertionResults
+        .filter((item) => item.status === 'failed')
+        .map((item) => ({
+          file: file.name,
+          title: item.fullName,
+          failures: item.failureMessages
+        }))
+    )
+    expect(run.status, `${JSON.stringify(failures)}\n${run.stderr}`).toBe(0)
+    const actual = new Map<string, string>(
+      report.testResults.flatMap((file) =>
+        file.assertionResults.map(
+          (test) =>
+            [`${relative(repositoryRoot, file.name)}::${test.fullName}`, test.status] as const
+        )
+      )
+    )
+    for (const title of expected) expect(actual.get(title), title).toBe('passed')
+    // The single child collects exact current legacy files across all seven owners; package gates remain separate.
+  }, 300_000)
+
+  it('contains no stale source or export-key literals in migrated tests', () => {
+    /**
+     * Actual owner manifests are the closed public-entry oracle, including the new adapter
+     * subpaths.
+     */
+    const exportsByOwner = new Map<string, Record<string, unknown>>(
+      testOwners.map((owner) => [
+        owner,
+        (
+          JSON.parse(
+            readFileSync(join(repositoryRoot, 'packages', owner, 'package.json'), 'utf8')
+          ) as {
+            exports?: Record<string, unknown>
+          }
+        ).exports ?? {}
+      ])
+    )
+    /** Keep every active obsolete reader visible, qualified by its actual test owner. */
+    const stale: string[] = []
+    for (const owner of testOwners) {
+      for (const file of testSources(join(repositoryRoot, 'packages', owner, 'test'))) {
+        for (const node of stringsIn(file)) {
+          /** Literal spelling is kept exact for owner lookup and the eventual failure report. */
+          const literal = node.text
+          if (expectsAbsence(node)) continue
+          /** Only real module/filesystem consumers must resolve relative paths and public exports. */
+          const reader = isReaderLiteral(node)
+          /** Public package names select their exact manifest rather than any other owner's key. */
+          const bare = /^@migaia\/(rpc(?:-[a-z-]+)?)(\/.*)?$/.exec(literal)
+          /**
+           * Package-local source readers now include ordinary adapter entries and their private
+           * owners.
+           */
+          const sourcePath = /^(?:\.\.?\/)*src\//.test(literal)
+          /** The removed physical package roots remain invalid independently of a matching basename. */
+          const oldSource = /packages\/(?:rpc|web-rpc)\/src\//.test(literal)
+          /** A former flat source import is valid only when it resolves a real local helper. */
+          const flatSource =
+            /^\.\/(?:internal|adapters|features|middleware|wire|transport-constants|client|provider|full)(?:\/|$)/.test(
+              literal
+            )
+          /**
+           * Positive export-object assertions belong to this exact owner; ordinary payload keys do
+           * not.
+           */
+          let exportKey = false
+          if (
+            ts.isPropertyAssignment(node.parent) &&
+            node.parent.name === node &&
+            literal.startsWith('./')
+          ) {
+            for (let parent: ts.Node | undefined = node.parent; parent; parent = parent.parent) {
+              if (
+                ts.isCallExpression(parent) &&
+                /\.exports\).*\.(?:toMatchObject|toEqual)$/.test(parent.expression.getText())
+              ) {
+                exportKey = true
+                break
+              }
+              if (ts.isStatement(parent)) break
+            }
+          }
+          if (
+            (reader &&
+              bare &&
+              !Object.hasOwn(exportsByOwner.get(bare[1]) ?? {}, bare[2] ? '.' + bare[2] : '.')) ||
+            oldSource ||
+            (reader &&
+              (sourcePath || flatSource) &&
+              !readerExists(resolve(dirname(file), literal))) ||
+            (exportKey && !Object.hasOwn(exportsByOwner.get(owner)!, literal))
+          )
+            stale.push(`${relative(repositoryRoot, file)}: ${literal}`)
+        }
+      }
+    }
+    expect(stale).toEqual([])
+  })
+})
