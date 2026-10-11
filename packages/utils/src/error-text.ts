@@ -20,6 +20,9 @@ export const UtilsErrorText = {
   schedulerRunaway: '[utils] manual scheduler exceeded the 10000-task advance guard',
   errorIdentityConflict: (field: string) =>
     `[utils] error identity conflicts with existing ${field}`,
+  /** Stable text for rejected cross-realm error trees, retaining the failing pointer and rule. */
+  errorChainInvalid: (pointer: string, violation: string) =>
+    `[utils] invalid error chain at ${pointer}: ${violation}`,
   cleanupFailed: '[utils] asynchronous operation cleanup failed',
   cloneUnsupported: '[utils] immutable snapshot is unsupported for this value',
   invalidEncoding: (encoding: string, offset: number) =>

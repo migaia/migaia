@@ -287,3 +287,16 @@ function isAggregateErrorLike(value: unknown): value is AggregateError {
 
 export { UtilsErrorCode }
 export type { IUtilsErrorCode }
+
+export {
+  serializeErrorChain,
+  deserializeErrorChain,
+  normalizeSerializedErrorChain,
+  reachErrorChain,
+  sanitizeErrorText
+} from './error-chain.js'
+export type {
+  IErrorChainStrategy,
+  ISerializedErrorChain,
+  IErrorChainData
+} from './error-chain-types.js'

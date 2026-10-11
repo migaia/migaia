@@ -6,9 +6,11 @@ const reviewed = (...modules: readonly string[]): readonly string[] =>
   Object.freeze([...modules].sort())
 
 /**
- * C5 final exact fresh-built five-consumer sets: 130/188/195/200/199 modules, with no inventory
- * slack. Real owner paths, edges and bundle hashes are retained in c5-tree-final-retained.json; the
- * full C4 predecessor sets and per-module changes remain in c5-tree-final-attribution.json.
+ * K289 exact five-consumer sets retain C5's 130/188/195/200/199 module counts with no slack. Only
+ * the Utils error-core chunk identity changes; all other retained owner paths remain exact. Fresh
+ * predecessor/current inventories, source/map/artifact hashes, emitted regions and derived binding
+ * changes are recorded in docs/rpc/scratch/k289/repin/comparison.json. C5's preceding custody stays
+ * in docs/rpc/scratch/package-split/c5-tree-final-attribution.json.
  */
 export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, readonly string[]>> =
   Object.freeze({
@@ -138,7 +140,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/serialize/dist/codecs/identity.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
-      'workspace:packages/utils/dist/error-B4iC5cDy.js',
+      'workspace:packages/utils/dist/error-tLXBvoy2.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/string.js',
@@ -326,7 +328,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/serialize/dist/codecs/identity.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
-      'workspace:packages/utils/dist/error-B4iC5cDy.js',
+      'workspace:packages/utils/dist/error-tLXBvoy2.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/object.js',
@@ -523,7 +525,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/serialize/dist/codecs/identity.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
-      'workspace:packages/utils/dist/error-B4iC5cDy.js',
+      'workspace:packages/utils/dist/error-tLXBvoy2.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/object.js',
@@ -725,7 +727,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/serialize/dist/codecs/identity.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
-      'workspace:packages/utils/dist/error-B4iC5cDy.js',
+      'workspace:packages/utils/dist/error-tLXBvoy2.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/object.js',
@@ -926,7 +928,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/serialize/dist/codecs/identity.js',
       'workspace:packages/utils/dist/bytes.js',
       'workspace:packages/utils/dist/config.js',
-      'workspace:packages/utils/dist/error-B4iC5cDy.js',
+      'workspace:packages/utils/dist/error-tLXBvoy2.js',
       'workspace:packages/utils/dist/function.js',
       'workspace:packages/utils/dist/object-path.js',
       'workspace:packages/utils/dist/object.js',
