@@ -29,7 +29,7 @@ import {
   retainForwardOptions,
   readForwardRoute
 } from './outbound-envelope.js'
-import { hasFastEndpoint, hasFastComponents } from './fast-path.js'
+import { hasFastEndpoint, hasFastComponents, hasDecodedRuntimeMetadata } from './fast-path.js'
 import {
   hasBatchAgreement,
   batchPayloadLimit,
@@ -46,8 +46,10 @@ import {
 import {
   normalizeInboundRpcEnvelope,
   normalizeInboundRuntimeEnvelope,
-  normalizeInboundRuntimeBinaryEnvelope,
-  restoreInboundRuntimeBinary
+  normalizeInboundDecodedRuntimeEnvelope,
+  normalizeInboundDecodedRuntimeBinaryEnvelope,
+  restoreInboundRuntimeBinary,
+  restoreInboundDecodedRuntimeBinary
 } from './inbound-normalization.js'
 import { RpcMiddlewareErrorText } from '../middleware/error-text.js'
 import { RpcBinaryProfile, RpcBinaryStorage } from '@migaia/rpc-contract/framing/v1'
@@ -526,6 +528,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   readonly #components: import('./endpoint-options.js').IRpcSelectedComponents
   /** Private receive components are captured once after ordinary construction admission. */
   readonly #runtimeComponents: import('./endpoint-options.js').IRpcSelectedComponents
+  /** The receive owner selects decoded metadata only from its held decoder and actual clone carrier. */
+  readonly #decodedMetadata: boolean
   /** Optional inbound/outbound protection capability. */
   readonly #authentication: IRpcAuthenticationCapability | undefined
   /** Source-less physical channels share the endpoint's authentication partition. */
@@ -659,6 +663,10 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         releaseJsonObjectSelection(this.#components)
       )
     this.#authentication = prepared.options.authentication
+    this.#decodedMetadata = hasDecodedRuntimeMetadata(
+      this.#runtimeComponents,
+      hasCloneTransferCarrier(kernel.transport) && this.#authentication === undefined
+    )
     this.#hookErrorReporter = prepared.options.hooks?.onHookError
     this.#abortEnabled = prepared.options.features?.abort === true
     const timeout = prepared.options.timeout ?? {}
@@ -902,7 +910,11 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                   if (accepted.status !== 'complete')
                     throw createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
                   const manifest = this.#runtimeComponents.codec.decode(accepted.value)
-                  restoredBinary = await restoreInboundRuntimeBinary(
+                  restoredBinary = await (
+                    this.#decodedMetadata
+                      ? restoreInboundDecodedRuntimeBinary
+                      : restoreInboundRuntimeBinary
+                  )(
                     manifest,
                     RpcBinaryStorage.native,
                     nativeBinary.sidecars,
@@ -1082,13 +1094,10 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     if (restoredBinary) envelope = restoredBinary
     else if (binary) {
       try {
-        const normalized = normalizeInboundRuntimeBinaryEnvelope(
-          await restoreInboundRuntimeBinary(
-            decoded,
-            RpcBinaryStorage.inline,
-            [],
-            this.#physicalLimit
-          )
+        const normalized = normalizeInboundDecodedRuntimeBinaryEnvelope(
+          await (
+            this.#decodedMetadata ? restoreInboundDecodedRuntimeBinary : restoreInboundRuntimeBinary
+          )(decoded, RpcBinaryStorage.inline, [], this.#physicalLimit)
         )
         envelope = normalized instanceof Promise ? await normalized : normalized
         if (normalized instanceof Promise) {
@@ -1099,7 +1108,9 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         throw createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid, cause)
       }
     } else {
-      const normalized = normalizeInboundRuntimeEnvelope(decoded)
+      const normalized = this.#decodedMetadata
+        ? normalizeInboundDecodedRuntimeEnvelope(decoded)
+        : normalizeInboundRuntimeEnvelope(decoded)
       if (normalized instanceof Promise) {
         envelope = await normalized
         this.kernel.assertActive(generation)

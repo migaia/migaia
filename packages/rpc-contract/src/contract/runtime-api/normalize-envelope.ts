@@ -1,12 +1,16 @@
 import {
   invalid,
-  record,
+  readStrictRecord,
+  RuntimeRecordSchema,
+  validateRuntimeRouteFields,
+  isRuntimeCallMode,
   array,
   identifier,
   task,
   options,
-  normalizeRuntimeSteps,
-  normalizeRuntimeGeneration
+  steps,
+  generation,
+  type IRuntimeRecordReader
 } from './metadata.js'
 export { normalizeRuntimeSteps, normalizeRuntimeGeneration } from './metadata.js'
 import { normalizeRpcSerializedError } from '../error.js'
@@ -33,9 +37,10 @@ import type { IRpcRuntimeEnvelope, IRpcRuntimeTask, IRpcRuntimeCompletion } from
 function completion(
   value: unknown,
   mode: IRpcRuntimeTask['mode'],
-  portable: (value: unknown) => IRpcPortableValue
+  portable: (value: unknown) => IRpcPortableValue,
+  readRecord: IRuntimeRecordReader
 ): IRpcRuntimeCompletion {
-  const input = record(value, [F.ok], [F.result, F.error], '/completion')
+  const input = readRecord(value, RuntimeRecordSchema.completion, '/completion')
   if (input.ok === false) {
     if (!Object.hasOwn(input, F.error) || Object.hasOwn(input, F.result)) invalid('/completion')
     return Object.freeze({ ok: false, error: normalizeRpcSerializedError(input.error) })
@@ -47,7 +52,7 @@ function completion(
     const outcomes = array(
       input.result,
       (value, pointer) => {
-        const item = record(value, [F.state], [F.result, F.error], pointer)
+        const item = readRecord(value, RuntimeRecordSchema.stepOutcome, pointer)
         if (failed) {
           if (item.state !== RpcRuntimeStepState.notExecuted || Object.keys(item).length !== 1)
             invalid(pointer)
@@ -79,63 +84,24 @@ export function normalizeRuntimeEnvelope(
   normalizeStreamPayload: (
     value: unknown,
     portable: (value: unknown) => IRpcPortableValue
-  ) => IRpcStreamPayload | Promise<IRpcStreamPayload>
+  ) => IRpcStreamPayload | Promise<IRpcStreamPayload>,
+  readRecord: IRuntimeRecordReader = readStrictRecord
 ): IRpcRuntimeEnvelope | Promise<IRpcRuntimeEnvelope> {
   /**
    * First snapshot establishes the discriminator while retaining every field for its closed
    * variant.
    */
-  const input = record(
-    value,
-    [F.profile, F.kind, F.id, F.route, F.task],
-    [
-      F.payload,
-      F.options,
-      F.steps,
-      F.operation,
-      F.reason,
-      F.stream,
-      F.completion,
-      F.idempotencyKey,
-      F.state,
-      F.store,
-      F.outcome
-    ],
-    ''
-  )
+  const input = readRecord(value, RuntimeRecordSchema.envelope, '')
   if (
     input.profile !== RpcRuntimeProfile ||
     !Object.values(RpcRuntimeKind).includes(input.kind as never)
   )
     invalid('')
   /** The original route validator owns all reused domains, including optional signed forward routes. */
-  const route = record(
-    input.route,
-    [
-      RpcRouteField.applicationVersion,
-      RpcRouteField.senderId,
-      RpcRouteField.targetId,
-      RpcRouteField.receiverId,
-      RpcRouteField.sentAt
-    ],
-    [RpcRouteField.forwardRoute],
-    '/route'
-  )
-  for (const field of [
-    RpcRouteField.applicationVersion,
-    RpcRouteField.senderId,
-    RpcRouteField.targetId,
-    RpcRouteField.receiverId
-  ])
-    identifier(route[field], `/route/${field}`)
-  if (!Number.isSafeInteger(route.sentAt) || (route.sentAt as number) < 0) invalid('/route/sentAt')
-  if (Object.hasOwn(route, RpcRouteField.forwardRoute)) {
-    if (!isRouteFieldValid(RpcRouteField.forwardRoute, route.forwardRoute))
-      invalid('/route/forwardRoute')
-    route.forwardRoute = Object.freeze([...(route.forwardRoute as string[])])
-  }
+  const route = readRecord(input.route, RuntimeRecordSchema.route, '/route')
+  validateRuntimeRouteFields(route)
   /** This selected task is the one tuple carried by every normalized result. */
-  const selected = task(input.task)
+  const selected = task(input.task, readRecord)
   /** The common prefix is rebuilt from admitted data only. */
   const result: Record<string, unknown> = {
     profile: RpcRuntimeProfile,
@@ -148,18 +114,12 @@ export function normalizeRuntimeEnvelope(
   let fields: readonly string[]
   if (input.kind === RpcRuntimeKind.call || input.kind === RpcRuntimeKind.group) {
     const group = input.kind === RpcRuntimeKind.group
-    if (
-      group
-        ? selected.mode !== RpcRuntimeMode.group
-        : ![RpcRuntimeMode.request, RpcRuntimeMode.notify, RpcRuntimeMode.stream].includes(
-            selected.mode as never
-          )
-    )
+    if (group ? selected.mode !== RpcRuntimeMode.group : !isRuntimeCallMode(selected.mode))
       invalid('/task/mode')
     fields = group ? [F.options, F.steps] : [F.options, F.payload]
-    result.options = options(input.options, selected.mode)
+    result.options = options(input.options, selected.mode, readRecord)
     if (group) {
-      result.steps = normalizeRuntimeSteps(input.steps, portable)
+      result.steps = steps(input.steps, portable, readRecord)
     } else if (Object.hasOwn(input, F.payload)) result.payload = portable(input.payload)
   } else if (input.kind === RpcRuntimeKind.control) {
     if (
@@ -174,7 +134,7 @@ export function normalizeRuntimeEnvelope(
     } else if (input.operation === RpcRuntimeOperation.terminal) {
       if (selected.mode === RpcRuntimeMode.stream) invalid('/operation')
       fields = [F.operation, F.completion]
-      result.completion = completion(input.completion, selected.mode, portable)
+      result.completion = completion(input.completion, selected.mode, portable, readRecord)
       /**
        * A failed query carries the exact error; successful queries require the outcome result
        * union.
@@ -187,7 +147,7 @@ export function normalizeRuntimeEnvelope(
     } else if (input.operation === RpcRuntimeOperation.stream) {
       if (selected.mode !== RpcRuntimeMode.stream) invalid('/task/mode')
       fields = [F.operation, F.stream]
-      const stream = record(input.stream, [F.event, F.seq], [F.value, F.error, F.reason], '/stream')
+      const stream = readRecord(input.stream, RuntimeRecordSchema.stream, '/stream')
       if (stream.event === RpcStreamEvent.cancel) invalid('/stream/event')
       if (stream.event === RpcRuntimeFinish) {
         if (
@@ -224,7 +184,7 @@ export function normalizeRuntimeEnvelope(
     } else if (input.operation === RpcRuntimeOperation.result) {
       fields = [F.operation, F.state, F.store, F.outcome]
       if (!Object.values(RpcRuntimeOutcomeState).includes(input.state as never)) invalid('/state')
-      const store = record(input.store, [F.kind, F.continuity], [F.epoch], '/store')
+      const store = readRecord(input.store, RuntimeRecordSchema.store, '/store')
       if (
         !Object.values(RpcRuntimeStoreKind).includes(store.kind as never) ||
         !Object.values(RpcRuntimeStoreContinuity).includes(store.continuity as never)
@@ -240,12 +200,7 @@ export function normalizeRuntimeEnvelope(
       result.state = input.state
       result.store = Object.freeze(store)
       if (input.state === RpcRuntimeOutcomeState.done) {
-        const outcome = record(
-          input.outcome,
-          [F.mode, F.targetGeneration, F.completion],
-          [],
-          '/outcome'
-        )
+        const outcome = readRecord(input.outcome, RuntimeRecordSchema.outcome, '/outcome')
         if (
           outcome.mode === RpcRuntimeMode.outcome ||
           !Object.values(RpcRuntimeMode).includes(outcome.mode as never)
@@ -253,11 +208,12 @@ export function normalizeRuntimeEnvelope(
           invalid('/outcome/mode')
         result.outcome = Object.freeze({
           mode: outcome.mode,
-          targetGeneration: normalizeRuntimeGeneration(outcome.targetGeneration),
+          targetGeneration: generation(outcome.targetGeneration, readRecord),
           completion: completion(
             outcome.completion,
             outcome.mode as IRpcRuntimeTask['mode'],
-            portable
+            portable,
+            readRecord
           )
         })
       } else if (Object.hasOwn(input, F.outcome)) invalid('/outcome')

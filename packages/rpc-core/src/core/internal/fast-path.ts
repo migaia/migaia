@@ -7,11 +7,18 @@ import type { IRpcEndpointOptions, IRpcSelectedComponents } from './endpoint-opt
 import type { IEndpointMiddlewareSnapshot } from './endpoint-bootstrap.js'
 
 /** Only foundational factory identities authorize omission of generic encode/framing fanout. */
-const codecs = new WeakSet<object>([identityCodecV1])
+const codecs = new WeakMap<object, ((value: unknown) => unknown) | undefined>([
+  [identityCodecV1, identityCodecV1.decode]
+])
 /** Arbitrary frozen descriptors with matching metadata remain on the complete frame path. */
 const framers = new WeakSet<object>([messageFramerV1])
+/** Codec provenance stays separate from permission to omit protocol/framer fanout. */
+type IFastComponentProof = Readonly<{
+  fast: boolean
+  decode: ((value: unknown) => unknown) | undefined
+}>
 /** Proof transfers from original identities to the single immutable component snapshot. */
-const components = new WeakSet<object>()
+const components = new WeakMap<object, IFastComponentProof>()
 /** Actual native encoder resources belong to canonical codec identities, never metadata flags. */
 const inlineEncoders = new WeakMap<object, (bytes: Uint8Array) => string>()
 /** Final component admission retains the encoder held by its exact original codec owner. */
@@ -22,9 +29,10 @@ const endpoints = new WeakSet<object>()
 /** Registers the exact foundational codec without adding a public option or descriptor property. */
 export function registerFastCodec<T extends object>(
   codec: T,
-  inlineEncoder?: (bytes: Uint8Array) => string
+  inlineEncoder?: (bytes: Uint8Array) => string,
+  decodedMetadata?: (value: unknown) => unknown
 ): T {
-  codecs.add(codec)
+  codecs.set(codec, decodedMetadata ?? codecs.get(codec))
   if (inlineEncoder) inlineEncoders.set(codec, inlineEncoder)
   return codec
 }
@@ -42,19 +50,17 @@ export function proveFastComponents(
   codec: unknown,
   framer: unknown
 ): void {
-  if (
-    protocol === rpcProtocolV1 &&
-    typeof codec === 'object' &&
-    codec !== null &&
-    codecs.has(codec) &&
-    typeof framer === 'object' &&
-    framer !== null &&
-    framers.has(framer)
-  ) {
-    components.add(snapshot)
+  if (typeof codec === 'object' && codec !== null && codecs.has(codec)) {
+    /** A JSON decoder creates data even when a custom protocol/framer must keep full processing. */
+    const fast =
+      protocol === rpcProtocolV1 &&
+      typeof framer === 'object' &&
+      framer !== null &&
+      framers.has(framer)
+    components.set(snapshot, { fast, decode: codecs.get(codec) })
     /** An absent resource retains the existing pure encoder rather than inventing a host claim. */
     const encoder = inlineEncoders.get(codec)
-    if (encoder) componentInlineEncoders.set(snapshot, encoder)
+    if (fast && encoder) componentInlineEncoders.set(snapshot, encoder)
   }
 }
 
@@ -69,7 +75,7 @@ export function proveFastEndpoint(
   if (
     customScheduler ||
     !firstPartyFeatures ||
-    !components.has(snapshot) ||
+    !hasFastComponents(snapshot) ||
     options.authentication ||
     options.uuid?.generate ||
     options.contract ||
@@ -100,7 +106,22 @@ export function hasFastEndpoint(options: object): boolean {
 
 /** Batch grouping reuses component provenance even when authentication requires the full path. */
 export function hasFastComponents(snapshot: object): boolean {
-  return components.has(snapshot)
+  return components.get(snapshot)?.fast === true
+}
+
+/**
+ * The selected original decoder proves JSON data by construction. Identity decoding requires the
+ * receive owner to hold the actual native clone carrier and exclude live authentication transforms.
+ * Descriptor labels, copied methods and caller options cannot transfer either factory proof.
+ */
+export function hasDecodedRuntimeMetadata(snapshot: object, cloned: boolean): boolean {
+  /** The held operation came from the canonical codec factory before descriptor snapshots. */
+  const proof = components.get(snapshot)
+  /** Identity cannot sanitize a custom framer's live result, even after a native clone boundary. */
+  const decode = proof?.decode
+  return (
+    decode !== undefined && (decode !== identityCodecV1.decode || (cloned && proof?.fast === true))
+  )
 }
 
 /** Read only the actual encoder retained during canonical component admission. */

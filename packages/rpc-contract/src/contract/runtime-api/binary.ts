@@ -44,7 +44,7 @@ import {
 import { RpcBatchPhysical } from '../wire-constants.js'
 import { compareRpcFieldNames } from '../v1/route.js'
 import type { IRpcPortableValue } from '../types.js'
-import { normalizeRuntimeEnvelope } from './normalize.js'
+import { normalizeRuntimeEnvelope, normalizeRuntimeEnvelopeDecoded } from './normalize.js'
 import type { IRpcRuntimeEnvelope } from './types.js'
 import {
   RpcBinaryProfile,
@@ -146,12 +146,41 @@ export async function finishRpcBinaryCapture(
  * committed by the original authentication owner; no replay or provider state exists in this
  * codec.
  */
-export async function restoreRpcBinary(
+export function restoreRpcBinary(
   value: unknown,
   storage: RpcBinaryStorage,
   sidecarInput: unknown = [],
   limit = RpcBatchPhysical.maxBytes,
   digest?: IRpcBinaryDigest
+): Promise<IRpcRuntimeEnvelope> {
+  return restoreBinary(value, storage, sidecarInput, limit, digest, normalizeRuntimeEnvelope)
+}
+
+/**
+ * A receive owner selects this entry only for its actual canonical JSON/native clone decoder
+ * output.
+ */
+export function restoreRpcBinaryDecoded(
+  value: unknown,
+  storage: RpcBinaryStorage,
+  sidecarInput: unknown = [],
+  limit = RpcBatchPhysical.maxBytes,
+  digest?: IRpcBinaryDigest
+): Promise<IRpcRuntimeEnvelope> {
+  return restoreBinary(value, storage, sidecarInput, limit, digest, normalizeRuntimeEnvelopeDecoded)
+}
+
+/**
+ * Both entries share the original digest, error and Promise boundary; only metadata admission
+ * differs.
+ */
+async function restoreBinary(
+  value: unknown,
+  storage: RpcBinaryStorage,
+  sidecarInput: unknown,
+  limit: number,
+  digest: IRpcBinaryDigest | undefined,
+  normalizeEnvelope: typeof normalizeRuntimeEnvelope
 ): Promise<IRpcRuntimeEnvelope> {
   try {
     /** Manifest storage/profile and every field are closed before native buffers are read or hashed. */
@@ -272,7 +301,7 @@ export async function restoreRpcBinary(
      * All headers, mode-specific slots, errors and stored outcome members retain original
      * validation.
      */
-    const envelope = normalizeRuntimeEnvelope(manifest.envelope, decode)
+    const envelope = normalizeEnvelope(manifest.envelope, decode)
     if (used.size !== sidecars.length) invalid()
     if (storage === RpcBinaryStorage.native && !digest) invalid()
     for (let index = 0; index < sidecars.length; index++)

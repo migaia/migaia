@@ -1,8 +1,11 @@
 import { createRpcProtocolError } from '../errors.js'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
-import { normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime/lazy'
+import {
+  normalizeRuntimeEnvelope,
+  normalizeRuntimeEnvelopeDecoded
+} from '@migaia/rpc-contract/runtime/lazy'
 import { normalizePortable } from '@migaia/rpc-contract/portable'
-import { restoreRpcBinary } from '@migaia/rpc-contract/binary/lazy'
+import { restoreRpcBinary, restoreRpcBinaryDecoded } from '@migaia/rpc-contract/binary/lazy'
 import type { IRpcEnvelopeOptions, IRpcProtocol } from '@migaia/rpc-contract'
 import type { IRpcEnvelope } from '@migaia/rpc-contract'
 import type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract/runtime'
@@ -68,6 +71,19 @@ export function normalizeInboundRuntimeEnvelope(
   )
 }
 
+/** Only the receive owner's canonical JSON/native clone decoder selects this data-record parser. */
+export function normalizeInboundDecodedRuntimeEnvelope(
+  value: unknown
+): IRpcRuntimeEnvelope | Promise<IRpcRuntimeEnvelope> {
+  return retainRuntimeEnvelope(
+    normalizeRuntimeEnvelopeDecoded(value, (payload) =>
+      normalizePortable(payload, 0, new Set<object>(), () => {
+        throw createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
+      })
+    )
+  )
+}
+
 /** Inline restoration keeps the original subsequent portable validation and records that output. */
 export function normalizeInboundRuntimeBinaryEnvelope(
   value: unknown
@@ -75,11 +91,28 @@ export function normalizeInboundRuntimeBinaryEnvelope(
   return retainRuntimeEnvelope(normalizeRuntimeEnvelope(value))
 }
 
+/**
+ * A successful binary restore already owns frozen metadata; retain the original lazy stream
+ * boundary.
+ */
+export function normalizeInboundDecodedRuntimeBinaryEnvelope(
+  value: IRpcRuntimeEnvelope
+): IRpcRuntimeEnvelope | Promise<IRpcRuntimeEnvelope> {
+  return retainRuntimeEnvelope(normalizeRuntimeEnvelopeDecoded(value))
+}
+
 /** The canonical lazy parser validates all bytes and digests before its exact output is reusable. */
 export async function restoreInboundRuntimeBinary(
   ...input: Parameters<typeof restoreRpcBinary>
 ): Promise<IRpcRuntimeEnvelope> {
   return rememberPayload(await restoreRpcBinary(...input))
+}
+
+/** The actual codec receive owner selects decoded admission while retaining the same await boundary. */
+export async function restoreInboundDecodedRuntimeBinary(
+  ...input: Parameters<typeof restoreRpcBinaryDecoded>
+): Promise<IRpcRuntimeEnvelope> {
+  return rememberPayload(await restoreRpcBinaryDecoded(...input))
 }
 
 /** Queries receiver data identity without granting insertion or any transport/provider authority. */
