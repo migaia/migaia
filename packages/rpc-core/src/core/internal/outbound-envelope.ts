@@ -12,7 +12,11 @@ import type {
 } from '@migaia/rpc-contract/runtime'
 import type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract'
 import { normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime'
-import { normalizeRuntimeSteps } from '@migaia/rpc-contract/runtime/metadata'
+import {
+  createRuntimeCallEnvelope,
+  normalizeRuntimeSteps,
+  type IRpcRuntimeCallHeader
+} from '@migaia/rpc-contract/runtime/metadata'
 import { RpcRuntimeProfile, RpcRuntimeKind, RpcRuntimeMode } from '@migaia/rpc-contract/framing/v1'
 import { normalizePortable } from '@migaia/rpc-contract'
 import {
@@ -353,6 +357,37 @@ export function createRuntimeRequestOutboundEnvelope(
   }) as IRpcRuntimeEnvelope
   new OutboundSnapshot(complete, runtimeSnapshot)
   return complete
+}
+
+/**
+ * Construct the original caller owner's closed header without admitting its own records again.
+ * Contract still validates held metadata domains at this point; only an exact private logical input
+ * can supply its already-normalized payload without another portable walk.
+ */
+export function createOwnedRuntimeRequestOutboundEnvelope(
+  header: IRpcRuntimeCallHeader,
+  input: IRuntimeRequestInput
+): IRpcRuntimeEnvelope {
+  /** A foreign input cannot turn this typed construction operation into payload admission proof. */
+  if (!isRuntimeRequestInput(input) || header.task.method !== input.method)
+    return createRuntimeOutboundEnvelope({
+      profile: RpcRuntimeProfile,
+      kind: RpcRuntimeKind.call,
+      ...header,
+      ...(input.payload === undefined ? {} : { payload: input.payload })
+    })
+  /** This constructor snapshots/finalizes metadata while reusing only the original owned payload. */
+  const envelope = createRuntimeCallEnvelope(header, input.payload, reuseRuntimeRequestPayload)
+  new OutboundSnapshot(envelope, runtimeSnapshot)
+  return envelope
+}
+
+/**
+ * The private logical-input proof above owns portable admission; this operation adds no second
+ * walk.
+ */
+function reuseRuntimeRequestPayload(value: unknown): IRpcPortableValue {
+  return value as IRpcPortableValue
 }
 
 /** Only package-created runtime snapshots reuse admission; caller freezing and inbound data cannot. */

@@ -23,6 +23,7 @@ import {
   createOutboundEnvelope,
   createRuntimeOutboundEnvelope,
   createRuntimeRequestOutboundEnvelope,
+  createOwnedRuntimeRequestOutboundEnvelope,
   isRuntimeRequestInput,
   readRuntimeRequestInput,
   retainRuntimeRequestInput,
@@ -37,7 +38,10 @@ import {
   hasCloneTransferCarrier
 } from './batch-frame.js'
 import { readRuntimeCarrier } from '@migaia/rpc-contract/runtime'
-import { normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime/lazy'
+import {
+  createRuntimeCallEnvelope,
+  type IRpcRuntimeCallHeader
+} from '@migaia/rpc-contract/runtime/metadata'
 import {
   readRpcNativeBinary,
   assertRpcNativeBinaryFrameSize,
@@ -345,7 +349,12 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
             : { payload: input.payload })
       }
       this.#envelope = preparedInput
-        ? createRuntimeRequestOutboundEnvelope(message, input as { method: string })
+        ? message.kind === RpcRuntimeKind.call
+          ? createOwnedRuntimeRequestOutboundEnvelope(
+              message as IRpcRuntimeCallHeader,
+              input as { method: string }
+            )
+          : createRuntimeRequestOutboundEnvelope(message, input as { method: string })
         : createRuntimeOutboundEnvelope(message)
       this.#register()
     }
@@ -1309,22 +1318,22 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   ): Promise<IRpcRuntimeEnvelope> {
     /** The accepted original binding supplies the actual physical receiver. */
     const receiver = await this.resolveReceiver(targetId)
-    return normalizeRuntimeEnvelope({
-      profile: RpcRuntimeProfile,
-      kind: RpcRuntimeKind.call,
-      id,
-      task,
-      options,
-      route: {
-        applicationVersion: this.#version,
-        senderId: this.id,
-        targetId,
-        receiverId: receiver.receiverId,
-        sentAt: this.kernel.time.timestamp(),
-        ...(forwardRoute === undefined ? {} : { forwardRoute })
+    return createRuntimeCallEnvelope(
+      {
+        id,
+        task,
+        options,
+        route: {
+          applicationVersion: this.#version,
+          senderId: this.id,
+          targetId,
+          receiverId: receiver.receiverId,
+          sentAt: this.kernel.time.timestamp(),
+          ...(forwardRoute === undefined ? {} : { forwardRoute })
+        }
       },
-      ...(payload === undefined ? {} : { payload })
-    })
+      payload
+    )
   }
 
   /** Stream replies use the same exact authenticated binding fence as original request pending. */
