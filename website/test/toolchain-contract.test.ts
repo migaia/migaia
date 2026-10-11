@@ -452,8 +452,8 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
         .map((symbol) => ({ api, symbol }))
     )
 
-  /** Three ordinary error operations extend the actual six-package runtime inventory. */
-  assert.equal(runtimeSymbols.length, 314)
+  /** C5's ordinary error surface retains exactly the current six-package runtime inventory. */
+  assert.equal(runtimeSymbols.length, 313)
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)

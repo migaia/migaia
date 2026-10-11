@@ -918,7 +918,14 @@ test('SITE-T-A05/A10 closes every generated route and API body artifact', () => 
       const output = join(buildRoot, artifactPath(modulePath))
       const html = readFileSync(output, 'utf8')
       if (api.symbols.length === 0) {
-        assert.match(html, locale === 'zh' ? /重新导出的符号/ : /Re-exported symbols/)
+        if (api.library === 'rpc-contract' && api.module === 'schema/wire-error') {
+          assert.match(html, /JSON Schema/)
+          assert.ok(
+            renderedText(html).includes(
+              "import wireErrorSchema from '@migaia/rpc-contract/schema/wire-error' with { type: 'json' }"
+            )
+          )
+        } else assert.match(html, locale === 'zh' ? /重新导出的符号/ : /Re-exported symbols/)
         continue
       }
       for (const symbol of api.symbols) {

@@ -1070,17 +1070,38 @@ function ModuleOverview({
   const typingSymbols = moduleSymbols.filter(
     (symbol) => symbol.kind === 'type' || symbol.kind === 'interface'
   )
+  /** The wire-error entry is an actual JSON resource, so it has no callable declarations. */
+  const isWireErrorSchema = api.library === 'rpc-contract' && api.module === 'schema/wire-error'
   return (
     <>
       <ModuleGuidance locale={locale} library={library} api={api} />
       <section className="section-block compact" id="api-index">
         <p className="eyebrow">{locale === 'zh' ? 'API 参考' : 'API reference'}</p>
-        <h2>{locale === 'zh' ? '选择一个入口' : 'Choose an entry point'}</h2>
+        <h2>
+          {isWireErrorSchema
+            ? 'JSON Schema'
+            : locale === 'zh'
+              ? '选择一个入口'
+              : 'Choose an entry point'}
+        </h2>
         <p>
-          {locale === 'zh'
-            ? '先按目标选择 API；每组依据维护文档中的真实使用频率从高到低排列。签名、参数、例子和相关类型只在对应页面展开。'
-            : 'Choose by outcome first. Each group is ordered by use frequency in maintained documentation. Signatures, examples, and related types expand on the API page.'}
+          {isWireErrorSchema
+            ? locale === 'zh'
+              ? '协议实现者可导入此 schema 校验 wire 错误树。错误图的编码、规范化与 JSON-RPC 映射使用 errors 入口的公开操作。'
+              : 'Protocol implementers import this schema to validate wire error trees. Use the public errors entry for encoding, normalization, and JSON-RPC mapping.'
+            : locale === 'zh'
+              ? '先按目标选择 API；每组依据维护文档中的真实使用频率从高到低排列。签名、参数、例子和相关类型只在对应页面展开。'
+              : 'Choose by outcome first. Each group is ordered by use frequency in maintained documentation. Signatures, examples, and related types expand on the API page.'}
         </p>
+        {isWireErrorSchema ? (
+          <pre>
+            <code>
+              {
+                "import wireErrorSchema from '@migaia/rpc-contract/schema/wire-error' with { type: 'json' }"
+              }
+            </code>
+          </pre>
+        ) : null}
         {runtimeSymbolGroups(operationSymbols).map((group) => (
           <section className="api-reference-group" key={group.key}>
             <h3>{symbolGroupLabel(locale, group.key)}</h3>
