@@ -21,6 +21,7 @@ PUBLISH_TARGETS := $(addsuffix -publish,$(PUBLISHABLE_PACKAGES))
 # Foreign peers reuse the installed conformance toolchains; CI never installs them.
 CONFORMANCE_TOOLCHAINS := python3 rustc cargo go
 CI_ALLOW_MISSING_TOOLCHAINS ?= 0
+CI_BASE ?= origin/main
 # Indirection keeps `make -n ci` from executing a whole multi-command recipe
 # merely because it contains a recursive make invocation.
 CI_MAKE = $(MAKE) --no-print-directory
@@ -81,7 +82,7 @@ endef
 	store-ship store-ship-dry-run store-ship-preflight store-ship-ci store-ship-pack-check \
 	store-ship-cd store-release-plan-check \
 	dependencies-check check-package release-check git-release-check git-publish-check auth-check patch publish \
-	coverage-custody-report ci ci-fast ci-conformance ci-website-test ci-website-check fmt-check \
+	coverage-custody-report ci ci-affected ci-fast ci-conformance ci-website-test ci-website-check fmt-check \
 	perf-guard long-test
 
 # Ship has one visible direction: prove the whole plan, prove every package,
@@ -108,6 +109,11 @@ ship-dry-run:
 # no release mutation or registry authentication runs.
 ci:
 	@CI_ALLOW_MISSING_TOOLCHAINS=$(CI_ALLOW_MISSING_TOOLCHAINS) node scripts/ci-run.mjs ci \
+		--release "$(RELEASE_PACKAGES)" --store "$(STORE_RELEASE_PACKAGES)"
+
+# Daily package selection retains full registry and custody rules; shared inputs widen to full CI.
+ci-affected:
+	@CI_ALLOW_MISSING_TOOLCHAINS=$(CI_ALLOW_MISSING_TOOLCHAINS) CI_BASE="$(CI_BASE)" node scripts/ci-run.mjs affected \
 		--release "$(RELEASE_PACKAGES)" --store "$(STORE_RELEASE_PACKAGES)"
 
 # Daily checks run format before lint and types, without tests or builds.
