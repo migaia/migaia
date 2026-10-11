@@ -34,7 +34,7 @@ describe('Node rendezvous sockets', () => {
   it.skipIf(process.platform === 'win32')(
     '[A4/A10] reclaims only the same service and inode after a crashed listener',
     async () => {
-      const directory = await mkdtemp(resolve(import.meta.dirname, 'owner-'))
+      const directory = await mkdtemp(join(tmpdir(), 'owner-'))
       const path = join(directory, 's')
       /** The child exits without Node's normal unlink so the owner record is truly stale. */
       const code = `const fs=require('node:fs');const net=require('node:net');const path=process.argv[1];net.createServer().listen(path,()=>{const s=fs.lstatSync(path);fs.writeFileSync(path+'.owner.json',JSON.stringify({serviceId:'service-a',path,dev:s.dev,ino:s.ino,uid:s.uid,gid:s.gid}),{mode:0o600});process.stdout.write('ready')})`
@@ -97,7 +97,7 @@ describe('Node rendezvous sockets', () => {
   )
 
   it('[A4/A10] records a private Unix socket owner and refuses a foreign path', async () => {
-    const directory = await mkdtemp(resolve(import.meta.dirname, 'owner-'))
+    const directory = await mkdtemp(join(tmpdir(), 'owner-'))
     const path = join(directory, 's')
     try {
       const listener = await listenProcessByteChannel({
