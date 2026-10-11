@@ -180,46 +180,46 @@
     },
     "rpc-family": {
       "lines": {
-        "covered": 14001,
-        "total": 15417,
+        "covered": 13994,
+        "total": 15409,
         "pct": 90.81
       },
       "statements": {
-        "covered": 17868,
-        "total": 20255,
+        "covered": 17853,
+        "total": 20237,
         "pct": 88.21
       },
       "functions": {
-        "covered": 5036,
-        "total": 5733,
-        "pct": 87.84
+        "covered": 5056,
+        "total": 5755,
+        "pct": 87.85
       },
       "branches": {
-        "covered": 13014,
-        "total": 15289,
-        "pct": 85.12
+        "covered": 12975,
+        "total": 15248,
+        "pct": 85.09
       }
     },
     "serialize": {
       "lines": {
-        "covered": 1310,
-        "total": 1426,
-        "pct": 91.86
+        "covered": 1453,
+        "total": 1572,
+        "pct": 92.43
       },
       "statements": {
-        "covered": 1427,
-        "total": 1579,
-        "pct": 90.37
+        "covered": 1575,
+        "total": 1730,
+        "pct": 91.04
       },
       "functions": {
-        "covered": 215,
-        "total": 219,
-        "pct": 98.17
+        "covered": 221,
+        "total": 225,
+        "pct": 98.22
       },
       "branches": {
-        "covered": 832,
-        "total": 1003,
-        "pct": 82.95
+        "covered": 876,
+        "total": 1052,
+        "pct": 83.26
       }
     },
     "storage-contract": {
@@ -5110,24 +5110,46 @@
     },
     "packages/rpc-contract/src/contract/normalize.ts": {
       "lines": {
-        "covered": 107,
-        "total": 113,
-        "pct": 94.69
+        "covered": 4,
+        "total": 4,
+        "pct": 100
       },
       "statements": {
-        "covered": 142,
-        "total": 150,
-        "pct": 94.66
+        "covered": 6,
+        "total": 6,
+        "pct": 100
       },
       "functions": {
-        "covered": 19,
-        "total": 20,
-        "pct": 95
+        "covered": 4,
+        "total": 4,
+        "pct": 100
       },
       "branches": {
-        "covered": 126,
-        "total": 135,
-        "pct": 93.33
+        "covered": 6,
+        "total": 6,
+        "pct": 100
+      }
+    },
+    "packages/rpc-contract/src/contract/portable-binary.ts": {
+      "lines": {
+        "covered": 8,
+        "total": 8,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 8,
+        "total": 8,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 9,
+        "total": 10,
+        "pct": 90
+      },
+      "branches": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
       }
     },
     "packages/rpc-contract/src/contract/portable-index.ts": {
@@ -5150,6 +5172,28 @@
         "covered": 0,
         "total": 0,
         "pct": 100
+      }
+    },
+    "packages/rpc-contract/src/contract/portable-strategy.ts": {
+      "lines": {
+        "covered": 88,
+        "total": 93,
+        "pct": 94.62
+      },
+      "statements": {
+        "covered": 113,
+        "total": 118,
+        "pct": 95.76
+      },
+      "functions": {
+        "covered": 26,
+        "total": 28,
+        "pct": 92.85
+      },
+      "branches": {
+        "covered": 78,
+        "total": 85,
+        "pct": 91.76
       }
     },
     "packages/rpc-contract/src/contract/protocol.ts": {
@@ -12018,13 +12062,13 @@
     },
     "packages/serialize/src/base64.ts": {
       "lines": {
-        "covered": 12,
-        "total": 12,
+        "covered": 14,
+        "total": 14,
         "pct": 100
       },
       "statements": {
-        "covered": 14,
-        "total": 14,
+        "covered": 16,
+        "total": 16,
         "pct": 100
       },
       "functions": {
@@ -12033,8 +12077,8 @@
         "pct": 100
       },
       "branches": {
-        "covered": 10,
-        "total": 10,
+        "covered": 16,
+        "total": 16,
         "pct": 100
       }
     },
@@ -12392,24 +12436,24 @@
     },
     "packages/serialize/src/portable.ts": {
       "lines": {
-        "covered": 133,
-        "total": 136,
-        "pct": 97.79
+        "covered": 274,
+        "total": 280,
+        "pct": 97.85
       },
       "statements": {
-        "covered": 155,
-        "total": 159,
-        "pct": 97.48
+        "covered": 301,
+        "total": 308,
+        "pct": 97.72
       },
       "functions": {
-        "covered": 31,
-        "total": 31,
+        "covered": 37,
+        "total": 37,
         "pct": 100
       },
       "branches": {
-        "covered": 116,
-        "total": 122,
-        "pct": 95.08
+        "covered": 154,
+        "total": 165,
+        "pct": 93.33
       }
     },
     "packages/serialize/src/registry.ts": {
