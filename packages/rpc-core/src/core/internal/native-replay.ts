@@ -22,14 +22,15 @@ export function registerLazyNativeReplayOwner(
   if (!owners.has(resource) && !initializers.has(resource)) initializers.set(resource, initialize)
 }
 
-/** Bind a physical owner once; constructed carrier composition retains that original receipt. */
-export function bindNativeReplayTransport(resource: object, transport: object): void {
-  /** A Core-created raw carrier already retains its physical owner's once-per-lifetime receipt. */
-  const associated = transports.get(resource)
-  if (associated) {
-    transports.set(transport, associated)
-    return
-  }
+/** Raw byte ports retain physical ownership without becoming claimable endpoint transports. */
+export function carryNativeReplayResource(source: object, target: object): void {
+  /** Both identities share the actual reader's once-per-lifetime registration and receipt. */
+  const registration = owners.get(source)
+  if (registration && !owners.has(target)) owners.set(target, registration)
+}
+
+/** Bind a physical owner once; only a final constructed transport can claim its receipt. */
+export function bindNativeReplayTransport(resource: object, transport: IRpcTransport): void {
   /** Only a deep adapter's registered initializer may produce physical provenance. */
   const initialize = initializers.get(resource)
   if (!owners.has(resource) && initialize) {

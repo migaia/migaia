@@ -20,26 +20,37 @@ import {
 } from '@migaia/rpc-contract/framing'
 import type { IRpcFramer } from '@migaia/rpc-contract'
 import { asRuntimeString } from './diagnostics.js'
+import type { IRuntimeByteViewFactory } from './event-byte-io.js'
 
 /** The source codec remains the sole owner of JSON serialization and portable values. */
 const jsonCodec = defineJsonCodec({ version: 1 })
 
-/** Exact diagnostic text selects one canonical descriptor shared by all matching carriers. */
-const pipelines = new Map<
-  string,
-  Readonly<{
-    codec: ICodec<unknown, unknown>
-    framer: IRpcFramer<unknown, unknown, string, number>
-  }>
->()
-
-/** Core constructs and signs the selected codec itself; caller text grants no codec proof. */
-export function createRuntimeBytePipeline(expectedString: string): Readonly<{
+/** Byte framing and JSON codec identities remain one immutable canonical component pair. */
+type IRuntimeBytePipeline = Readonly<{
   codec: ICodec<unknown, unknown>
   framer: IRpcFramer<unknown, unknown, string, number>
-}> {
+}>
+
+/** Exact diagnostic text shares generic descriptors without any later native resource upgrade. */
+const pipelines = new Map<string, IRuntimeBytePipeline>()
+/** Each actual byte-view resource owns separate canonical descriptors for its diagnostic text. */
+const byteViewPipelines = new WeakMap<IRuntimeByteViewFactory, Map<string, IRuntimeBytePipeline>>()
+
+/** Core constructs and signs the selected codec itself; caller text grants no codec proof. */
+export function createRuntimeBytePipeline(
+  expectedString: string,
+  byteViewFactory?: IRuntimeByteViewFactory
+): IRuntimeBytePipeline {
+  /** Resource identity selects only descriptors Core constructed over those held operations. */
+  let cache = pipelines
+  if (byteViewFactory) {
+    /** One native resource shares its original descriptors across actual connection replacements. */
+    const retained = byteViewPipelines.get(byteViewFactory)
+    cache = retained ?? new Map<string, IRuntimeBytePipeline>()
+    if (!retained) byteViewPipelines.set(byteViewFactory, cache)
+  }
   /** Sharing retains the original cross-carrier descriptor identity for the same public errors. */
-  const existing = pipelines.get(expectedString)
+  const existing = cache.get(expectedString)
   if (existing) return existing
   /** Remote's unknown-typed port validates input before delegating to the source codec. */
   const codec: ICodec<unknown, unknown> = Object.freeze({
@@ -80,23 +91,25 @@ export function createRuntimeBytePipeline(expectedString: string): Readonly<{
   const nativeBase64 = Reflect.get(Uint8Array.prototype, 'toBase64') as unknown
   registerFastCodec(
     codec,
-    typeof nativeBase64 === 'function'
+    byteViewFactory
       ? (bytes) =>
-          Reflect.apply(nativeBase64, bytes, [
-            { alphabet: RpcOwnedBinaryAlphabet, omitPadding: true }
-          ]) as string
-      : undefined,
+          byteViewFactory
+            .from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+            .toString(RpcOwnedBinaryAlphabet)
+      : typeof nativeBase64 === 'function'
+        ? (bytes) =>
+            Reflect.apply(nativeBase64, bytes, [
+              { alphabet: RpcOwnedBinaryAlphabet, omitPadding: true }
+            ]) as string
+        : undefined,
     codec.decode
   )
   registerFastFramer(runtimeStringFramer)
 
   /** The byte pipeline keeps negotiated codec and exact string framing paired. */
-  const pipeline: Readonly<{
-    codec: ICodec<unknown, unknown>
-    framer: IRpcFramer<unknown, unknown, string, number>
-  }> = Object.freeze({ codec, framer: runtimeStringFramer })
+  const pipeline: IRuntimeBytePipeline = Object.freeze({ codec, framer: runtimeStringFramer })
 
-  pipelines.set(expectedString, pipeline)
+  cache.set(expectedString, pipeline)
   return pipeline
 }
 

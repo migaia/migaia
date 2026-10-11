@@ -44,19 +44,25 @@ for (const fixture of peers.filter((peer) => peer.language !== 'ts-reference')) 
             },
             { signal: new AbortController().signal, output: () => undefined }
           )
-          const byte = handle.channel!
-          const originalWrite = byte.write
-          Object.assign(byte, {
+          /** Keep the frozen actual carrier intact while observing writes through ordinary raw I/O. */
+          const physical = handle.channel!
+          /** Delegation supplies no copied native lifetime or completed transport proof. */
+          const byte = Object.freeze({
+            kind: 'byte' as const,
             write: async (chunk: Uint8Array) => {
               const text = Buffer.from(chunk).toString('utf8')
               sent.push(JSON.parse(text.slice(text.indexOf('\r\n\r\n') + 4)))
-              await originalWrite(chunk)
+              await physical.write(chunk)
               if (holdNext) {
                 holdNext = false
                 enteredWrite()
                 await heldWrite
               }
-            }
+            },
+            onData: (listener: Parameters<typeof physical.onData>[0]) => physical.onData(listener),
+            onClose: (listener: Parameters<typeof physical.onClose>[0]) =>
+              physical.onClose(listener),
+            close: () => physical.close()
           })
           return createJsonRpcRemoteChannel({
             byte,

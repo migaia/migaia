@@ -1,9 +1,10 @@
 import {
-  bindNativeReplayTransport,
+  carryNativeReplayResource,
   registerNativeReplayOwner
 } from '../../core/internal/native-replay.js'
 import { createRuntimeDiagnosticError } from './diagnostics.js'
 import type { IRuntimeByteIO, IRuntimeDiagnosticError } from './types.js'
+import type { RpcOwnedBinaryAlphabet } from '../../core/internal/outbound-owned-codec.js'
 
 /** The held emitter-style reader supplies actual byte delivery and physical reader observation. */
 export type IRuntimeEventByteReader = Readonly<{
@@ -25,12 +26,30 @@ export type IRuntimeEventByteWriter = Readonly<{
 /** A held cleanup resource preserves the adapter's exact physical close operation. */
 export type IRuntimeBytePhysicalResource = Readonly<{ close(): void }>
 
+/** A held native byte-view constructor performs encoding over the exact visible backing range. */
+export type IRuntimeByteViewFactory = Readonly<{
+  from(
+    backing: ArrayBufferLike,
+    byteOffset: number,
+    byteLength: number
+  ): Readonly<{ toString(alphabet: typeof RpcOwnedBinaryAlphabet): string }>
+}>
+
+/** Only Core's own raw I/O construction associates its actual held byte-view resource. */
+const byteViewFactories = new WeakMap<object, IRuntimeByteViewFactory>()
+
+/** The final byte connection reads a resource from exact raw I/O identity, never public metadata. */
+export function readRuntimeByteViewFactory(channel: IRuntimeByteIO) {
+  return byteViewFactories.get(channel)
+}
+
 /** Construct and observe the byte port itself; no owner predicates or trust labels are inputs. */
 export function createRuntimeEventByteIO(
   reader: IRuntimeEventByteReader,
   writer: IRuntimeEventByteWriter,
   physical: IRuntimeBytePhysicalResource,
-  closedDiagnostic: IRuntimeDiagnosticError
+  closedDiagnostic: IRuntimeDiagnosticError,
+  byteViewFactory?: IRuntimeByteViewFactory
 ): IRuntimeByteIO {
   /** The physical reader stays paused until the original byte owner subscribes. */
   reader.pause()
@@ -99,8 +118,9 @@ export function createRuntimeEventByteIO(
       alive: () => !closed && !reader.destroyed && !writer.destroyed,
       exclusive: () => dataListeners.size <= 1 && reader.listenerCount('data') === 1
     })
-    bindNativeReplayTransport(reader, channel)
+    carryNativeReplayResource(reader, channel)
   }
-  /** This internal receipt carrier cannot acquire a forged public transport surface by mutation. */
-  return Object.freeze(channel)
+  if (byteViewFactory) byteViewFactories.set(channel, byteViewFactory)
+  /** Existing opaque-write observers may decorate this raw I/O without obtaining a receipt. */
+  return channel
 }
