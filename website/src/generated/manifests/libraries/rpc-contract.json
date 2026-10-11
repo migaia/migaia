@@ -3871,9 +3871,9 @@
           "name": "classifyRpcContractError",
           "kind": "function",
           "signature": "export declare function classifyRpcContractError(error: unknown): IRpcErrorWireSummary | undefined;",
-          "declarationLine": 8,
+          "declarationLine": 7,
           "source": "packages/rpc-contract/dist/contract/error.d.ts",
-          "purpose": "Classify an error actually raised by this protocol owner for safe diagnostic presentation. Returns its immutable code/text policy without reading error getters or its private cause. Unrelated values and copied errors have no classification; this grants no channel authority.",
+          "purpose": "Classify only a module-minted error for diagnostic presentation. Its held summary grants no channel authority, and neither copied errors nor wire properties can supply the policy.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for classifyRpcContractError.",
           "advanced": "No additional advanced behavior is declared for classifyRpcContractError.",
           "parameters": ["error: unknown"],
@@ -3912,7 +3912,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Classify an error actually raised by this protocol owner for safe diagnostic presentation. Returns its immutable code/text policy without reading error getters or its private cause. Unrelated values and copied errors have no classification; this grants no channel authority."
+              "content": "Classify only a module-minted error for diagnostic presentation. Its held summary grants no channel authority, and neither copied errors nor wire properties can supply the policy."
             },
             {
               "id": "getting-started",
@@ -4054,9 +4054,9 @@
           "name": "deserializeRpcError",
           "kind": "function",
           "signature": "export declare function deserializeRpcError(value: unknown, options?: IRpcWireErrorOptions, routes?: IRpcErrorWireRouteStore): Error;",
-          "declarationLine": 24,
+          "declarationLine": 23,
           "source": "packages/rpc-contract/dist/contract/error.d.ts",
-          "purpose": "Rebuild a native error graph after validating the entire untrusted tree.",
+          "purpose": "Restore native classes and remote stacks after validating the whole untrusted RPC tree.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for deserializeRpcError.",
           "advanced": "No additional advanced behavior is declared for deserializeRpcError.",
           "parameters": [
@@ -4119,7 +4119,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Rebuild a native error graph after validating the entire untrusted tree."
+              "content": "Restore native classes and remote stacks after validating the whole untrusted RPC tree."
             },
             {
               "id": "getting-started",
@@ -5234,9 +5234,9 @@
           "name": "normalizeRpcSerializedError",
           "kind": "function",
           "signature": "export declare function normalizeRpcSerializedError(value: unknown, options?: IRpcWireErrorOptions): IRpcSerializedError;",
-          "declarationLine": 22,
+          "declarationLine": 21,
           "source": "packages/rpc-contract/dist/contract/error.d.ts",
-          "purpose": "Validate and freeze a fresh wire error tree before any receiver uses its fields.",
+          "purpose": "Validate a fresh frozen wire tree with Contract's exact first-violation policy.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizeRpcSerializedError.",
           "advanced": "No additional advanced behavior is declared for normalizeRpcSerializedError.",
           "parameters": ["value: unknown", "options: IRpcWireErrorOptions (optional)"],
@@ -5283,7 +5283,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Validate and freeze a fresh wire error tree before any receiver uses its fields."
+              "content": "Validate a fresh frozen wire tree with Contract's exact first-violation policy."
             },
             {
               "id": "getting-started",
@@ -5425,9 +5425,9 @@
           "name": "reachRpcError",
           "kind": "function",
           "signature": "export declare function reachRpcError(value: unknown, options: IRpcSerializeErrorOptions): Generator<unknown>;",
-          "declarationLine": 14,
+          "declarationLine": 13,
           "source": "packages/rpc-contract/dist/contract/error.d.ts",
-          "purpose": "Walk the same graph edges without the wire depth limit, deduplicating object identities.",
+          "purpose": "Walk original causes, aggregate entries and cleanup failures with the RPC identity bound.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for reachRpcError.",
           "advanced": "No additional advanced behavior is declared for reachRpcError.",
           "parameters": ["value: unknown", "options: IRpcSerializeErrorOptions"],
@@ -5474,7 +5474,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Walk the same graph edges without the wire depth limit, deduplicating object identities."
+              "content": "Walk original causes, aggregate entries and cleanup failures with the RPC identity bound."
             },
             {
               "id": "getting-started",
@@ -7160,9 +7160,9 @@
           "name": "serializeRpcError",
           "kind": "function",
           "signature": "export declare function serializeRpcError(value: unknown, options: IRpcSerializeErrorOptions, metadata?: IRpcErrorWireMetadata): IRpcSerializedError;",
-          "declarationLine": 12,
+          "declarationLine": 11,
           "source": "packages/rpc-contract/dist/contract/error.d.ts",
-          "purpose": "Projects any thrown value into a bounded, frozen, language-neutral error tree.",
+          "purpose": "Project any thrown value with the unchanged RPC wire, privacy and reporting policy.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for serializeRpcError.",
           "advanced": "No additional advanced behavior is declared for serializeRpcError.",
           "parameters": [
@@ -7226,7 +7226,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Projects any thrown value into a bounded, frozen, language-neutral error tree."
+              "content": "Project any thrown value with the unchanged RPC wire, privacy and reporting policy."
             },
             {
               "id": "getting-started",
@@ -9063,8 +9063,8 @@
           "name": "IJsonRpcBridgeErrorCode",
           "kind": "type",
           "signature": "export type IJsonRpcBridgeErrorCode = (typeof JsonRpcBridgeErrorCode)[keyof typeof JsonRpcBridgeErrorCode];",
-          "declarationLine": 16,
-          "source": "packages/rpc-contract/dist/contract/framing/jsonrpc-error-code.d.ts",
+          "declarationLine": 21,
+          "source": "packages/rpc-contract/dist/contract/framing/jsonrpc/error-code.d.ts",
           "purpose": "IJsonRpcBridgeErrorCode is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IJsonRpcBridgeErrorCode.",
           "advanced": "No additional advanced behavior is declared for IJsonRpcBridgeErrorCode.",
@@ -9117,7 +9117,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-contract/dist/contract/framing/jsonrpc-error-code.d.ts:IJsonRpcBridgeErrorCode:export type IJsonRpcBridgeErrorCode = (typeof JsonRpcBridgeErrorCode)[keyof typeof JsonRpcBridgeErrorCode];",
+          "identity": "packages/rpc-contract/dist/contract/framing/jsonrpc/error-code.d.ts:IJsonRpcBridgeErrorCode:export type IJsonRpcBridgeErrorCode = (typeof JsonRpcBridgeErrorCode)[keyof typeof JsonRpcBridgeErrorCode];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -9190,8 +9190,8 @@
           "name": "JSONRPC_BRIDGE_ERROR_SOURCE",
           "kind": "const",
           "signature": "export declare const JSONRPC_BRIDGE_ERROR_SOURCE = \"@migaia/rpc/bridge/jsonrpc\";",
-          "declarationLine": 2,
-          "source": "packages/rpc-contract/dist/contract/framing/jsonrpc-error-code.d.ts",
+          "declarationLine": 7,
+          "source": "packages/rpc-contract/dist/contract/framing/jsonrpc/error-code.d.ts",
           "purpose": "Dedicated public source separates bridge protocol failures from core and process failures.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for JSONRPC_BRIDGE_ERROR_SOURCE.",
           "advanced": "No additional advanced behavior is declared for JSONRPC_BRIDGE_ERROR_SOURCE.",
@@ -9244,7 +9244,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-contract/dist/contract/framing/jsonrpc-error-code.d.ts:JSONRPC_BRIDGE_ERROR_SOURCE:export declare const JSONRPC_BRIDGE_ERROR_SOURCE = \"@migaia/rpc/bridge/jsonrpc\";",
+          "identity": "packages/rpc-contract/dist/contract/framing/jsonrpc/error-code.d.ts:JSONRPC_BRIDGE_ERROR_SOURCE:export declare const JSONRPC_BRIDGE_ERROR_SOURCE = \"@migaia/rpc/bridge/jsonrpc\";",
           "guidance": [
             {
               "id": "public-errors-for-protocol-implementers-and-adapter-authors",
@@ -9357,8 +9357,8 @@
           "name": "JsonRpcBridgeErrorCode",
           "kind": "const",
           "signature": "export declare const JsonRpcBridgeErrorCode: { /** Invalid headers, body encoding, JSON or truncated EOF closes this byte connection. */ readonly frameInvalid: \"JSONRPC_FRAME_INVALID\"; /** A required method, capability or business wire-error extension is absent. */ readonly extensionMissing: \"JSONRPC_EXTENSION_MISSING\"; /** A profile message or caller option cannot be translated; choose a supported profile. */ readonly profileInvalid: \"JSONRPC_PROFILE_INVALID\"; /** A contract includes generators; use a native channel for streaming methods. */ readonly unsupportedMode: \"JSONRPC_UNSUPPORTED_MODE\"; /** The hello deadline expires; the caller may establish a new connection. */ readonly handshakeTimeout: \"JSONRPC_HANDSHAKE_TIMEOUT\"; };",
-          "declarationLine": 4,
-          "source": "packages/rpc-contract/dist/contract/framing/jsonrpc-error-code.d.ts",
+          "declarationLine": 9,
+          "source": "packages/rpc-contract/dist/contract/framing/jsonrpc/error-code.d.ts",
           "purpose": "Public bridge codes describe one profile failure each; native error types stay intact.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for JsonRpcBridgeErrorCode.",
           "advanced": "No additional advanced behavior is declared for JsonRpcBridgeErrorCode.",
@@ -9411,7 +9411,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-contract/dist/contract/framing/jsonrpc-error-code.d.ts:JsonRpcBridgeErrorCode:export declare const JsonRpcBridgeErrorCode: { /** Invalid headers, body encoding, JSON or truncated EOF closes this byte connection. */ readonly frameInvalid: \"JSONRPC_FRAME_INVALID\"; /** A required method, capability or business wire-error extension is absent. */ readonly extensionMissing: \"JSONRPC_EXTENSION_MISSING\"; /** A profile message or caller option cannot be translated; choose a supported profile. */ readonly profileInvalid: \"JSONRPC_PROFILE_INVALID\"; /** A contract includes generators; use a native channel for streaming methods. */ readonly unsupportedMode: \"JSONRPC_UNSUPPORTED_MODE\"; /** The hello deadline expires; the caller may establish a new connection. */ readonly handshakeTimeout: \"JSONRPC_HANDSHAKE_TIMEOUT\"; };",
+          "identity": "packages/rpc-contract/dist/contract/framing/jsonrpc/error-code.d.ts:JsonRpcBridgeErrorCode:export declare const JsonRpcBridgeErrorCode: { /** Invalid headers, body encoding, JSON or truncated EOF closes this byte connection. */ readonly frameInvalid: \"JSONRPC_FRAME_INVALID\"; /** A required method, capability or business wire-error extension is absent. */ readonly extensionMissing: \"JSONRPC_EXTENSION_MISSING\"; /** A profile message or caller option cannot be translated; choose a supported profile. */ readonly profileInvalid: \"JSONRPC_PROFILE_INVALID\"; /** A contract includes generators; use a native channel for streaming methods. */ readonly unsupportedMode: \"JSONRPC_UNSUPPORTED_MODE\"; /** The hello deadline expires; the caller may establish a new connection. */ readonly handshakeTimeout: \"JSONRPC_HANDSHAKE_TIMEOUT\"; };",
           "guidance": [
             {
               "id": "public-errors-for-protocol-implementers-and-adapter-authors",
