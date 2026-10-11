@@ -12638,6 +12638,134 @@
       "architecturePath": "/en/architecture/rpc-contract",
       "symbols": [
         {
+          "name": "IRpcByteRuntimeBootstrap",
+          "kind": "type",
+          "signature": "export type IRpcByteRuntimeBootstrap = Readonly<{ self: Readonly<{ name: string; instanceId: string; }>; parentInstanceId: string; token: string; generation?: IRpcRuntimeGeneration; }>;",
+          "declarationLine": 3,
+          "source": "packages/rpc-contract/dist/contract/runtime-api/byte-bootstrap.d.ts",
+          "purpose": "Actual launch data contains a private token that consumers must keep out of diagnostics.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcByteRuntimeBootstrap.",
+          "advanced": "No additional advanced behavior is declared for IRpcByteRuntimeBootstrap.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcByteRuntimeBootstrap."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcByteRuntimeBootstrap.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcByteRuntimeBootstrap",
+          "exportPath": "./runtime",
+          "overloadSignatures": [
+            "export type IRpcByteRuntimeBootstrap = Readonly<{ self: Readonly<{ name: string; instanceId: string; }>; parentInstanceId: string; token: string; generation?: IRpcRuntimeGeneration; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcByteRuntimeBootstrap when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcByteRuntimeBootstrap does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Actual launch data contains a private token that consumers must keep out of diagnostics."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcByteRuntimeBootstrap from @migaia/rpc-contract/runtime, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcByteRuntimeBootstrap when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcByteRuntimeBootstrap does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcByteRuntimeBootstrap."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcByteRuntimeBootstrap."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/contract/runtime-api/byte-bootstrap.d.ts:IRpcByteRuntimeBootstrap:export type IRpcByteRuntimeBootstrap = Readonly<{ self: Readonly<{ name: string; instanceId: string; }>; parentInstanceId: string; token: string; generation?: IRpcRuntimeGeneration; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-runtime--IRpcByteRuntimeBootstrap"
+        },
+        {
+          "name": "IRpcMessageCapabilityControl",
+          "kind": "type",
+          "signature": "export type IRpcMessageCapabilityControl = typeof rpcMessageCapabilityControl;",
+          "declarationLine": 79,
+          "source": "packages/rpc-contract/dist/contract/runtime-api/message-control.d.ts",
+          "purpose": "Only this module-owned descriptor may choose the built-in message control grammar.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcMessageCapabilityControl.",
+          "advanced": "No additional advanced behavior is declared for IRpcMessageCapabilityControl.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcMessageCapabilityControl."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcMessageCapabilityControl.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcMessageCapabilityControl",
+          "exportPath": "./runtime",
+          "overloadSignatures": [
+            "export type IRpcMessageCapabilityControl = typeof rpcMessageCapabilityControl;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcMessageCapabilityControl when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcMessageCapabilityControl does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Only this module-owned descriptor may choose the built-in message control grammar."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcMessageCapabilityControl from @migaia/rpc-contract/runtime, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcMessageCapabilityControl when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcMessageCapabilityControl does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcMessageCapabilityControl."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcMessageCapabilityControl."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/contract/runtime-api/message-control.d.ts:IRpcMessageCapabilityControl:export type IRpcMessageCapabilityControl = typeof rpcMessageCapabilityControl;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-runtime--IRpcMessageCapabilityControl"
+        },
+        {
           "name": "IRpcRuntimeCommon",
           "kind": "type",
           "signature": "export type IRpcRuntimeCommon = Readonly<{ profile: 'migaia.rpc.runtime-api/1'; id: string; route: IRpcRuntimeRoute; task: IRpcRuntimeTask; }>;",
@@ -13884,6 +14012,134 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-contract-runtime--readRuntimeCarrier"
+        },
+        {
+          "name": "rpcByteRuntimeBootstrap",
+          "kind": "const",
+          "signature": "export declare const rpcByteRuntimeBootstrap: Readonly<{ kind: \"rpc-runtime-api-bootstrap\"; version: 1; maxBytes: number; read: typeof read; }>;",
+          "declarationLine": 20,
+          "source": "packages/rpc-contract/dist/contract/runtime-api/byte-bootstrap.d.ts",
+          "purpose": "Pure protocol data/parser; Core derives provenance only from its own actual held-I/O receive.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for rpcByteRuntimeBootstrap.",
+          "advanced": "No additional advanced behavior is declared for rpcByteRuntimeBootstrap.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for rpcByteRuntimeBootstrap."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for rpcByteRuntimeBootstrap.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "rpcByteRuntimeBootstrap",
+          "exportPath": "./runtime",
+          "overloadSignatures": [
+            "export declare const rpcByteRuntimeBootstrap: Readonly<{ kind: \"rpc-runtime-api-bootstrap\"; version: 1; maxBytes: number; read: typeof read; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use rpcByteRuntimeBootstrap when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when rpcByteRuntimeBootstrap does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Pure protocol data/parser; Core derives provenance only from its own actual held-I/O receive."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import rpcByteRuntimeBootstrap from @migaia/rpc-contract/runtime, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use rpcByteRuntimeBootstrap when its const contract and declared inputs match the result you need. Choose a different public symbol when rpcByteRuntimeBootstrap does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for rpcByteRuntimeBootstrap."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for rpcByteRuntimeBootstrap."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/contract/runtime-api/byte-bootstrap.d.ts:rpcByteRuntimeBootstrap:export declare const rpcByteRuntimeBootstrap: Readonly<{ kind: \"rpc-runtime-api-bootstrap\"; version: 1; maxBytes: number; read: typeof read; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-runtime--rpcByteRuntimeBootstrap"
+        },
+        {
+          "name": "rpcMessageCapabilityControl",
+          "kind": "const",
+          "signature": "export declare const rpcMessageCapabilityControl: Readonly<{ staticCapabilities: readonly string[]; readOffer: typeof readRuntimeMessageCapabilityOffer; /** Canonical clone carriers offer native storage only alongside their actual portable-binary root. */ localOffer(capabilities: readonly string[]): IRuntimeMessageControlResult<readonly string[]>; readAcknowledgement: typeof readRuntimeMessageAcknowledgement; readData: typeof readRuntimeMessageData; intersect: typeof intersectRuntimeMessageCapabilities; /** Initial launch messages retain the original wrapper and are read as raw control input. */ isInitial(value: unknown): boolean; /** Recognize ACK traffic without turning ordinary application frames into control records. */ isAcknowledgement(value: unknown): boolean; /** Legacy readiness is private control traffic and never contributes a capability proposal. */ isReady(value: unknown): boolean; /** Raw initial input provides the independent peer proposal, never an already accepted result. */ readInitial: typeof readRuntimeMessageInitial; /** Capability ACKs retain their existing versioned wire shape. */ acknowledgement(offer: readonly string[]): { kind: \"migaia.thread.runtime.ack\"; version: 1; capabilities: readonly string[]; }; data: \"migaia.thread.data\"; ready: \"migaia.thread.data.ack\"; version: 1; timeoutMs: 10000; failureText: \"Thread data bootstrap was not acknowledged\"; }>;",
+          "declarationLine": 50,
+          "source": "packages/rpc-contract/dist/contract/runtime-api/message-control.d.ts",
+          "purpose": "The canonical control descriptor supplies grammar, never a completed agreement or receipt.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for rpcMessageCapabilityControl.",
+          "advanced": "No additional advanced behavior is declared for rpcMessageCapabilityControl.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for rpcMessageCapabilityControl."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for rpcMessageCapabilityControl.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "rpcMessageCapabilityControl",
+          "exportPath": "./runtime",
+          "overloadSignatures": [
+            "export declare const rpcMessageCapabilityControl: Readonly<{ staticCapabilities: readonly string[]; readOffer: typeof readRuntimeMessageCapabilityOffer; /** Canonical clone carriers offer native storage only alongside their actual portable-binary root. */ localOffer(capabilities: readonly string[]): IRuntimeMessageControlResult<readonly string[]>; readAcknowledgement: typeof readRuntimeMessageAcknowledgement; readData: typeof readRuntimeMessageData; intersect: typeof intersectRuntimeMessageCapabilities; /** Initial launch messages retain the original wrapper and are read as raw control input. */ isInitial(value: unknown): boolean; /** Recognize ACK traffic without turning ordinary application frames into control records. */ isAcknowledgement(value: unknown): boolean; /** Legacy readiness is private control traffic and never contributes a capability proposal. */ isReady(value: unknown): boolean; /** Raw initial input provides the independent peer proposal, never an already accepted result. */ readInitial: typeof readRuntimeMessageInitial; /** Capability ACKs retain their existing versioned wire shape. */ acknowledgement(offer: readonly string[]): { kind: \"migaia.thread.runtime.ack\"; version: 1; capabilities: readonly string[]; }; data: \"migaia.thread.data\"; ready: \"migaia.thread.data.ack\"; version: 1; timeoutMs: 10000; failureText: \"Thread data bootstrap was not acknowledged\"; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use rpcMessageCapabilityControl when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when rpcMessageCapabilityControl does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The canonical control descriptor supplies grammar, never a completed agreement or receipt."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import rpcMessageCapabilityControl from @migaia/rpc-contract/runtime, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use rpcMessageCapabilityControl when its const contract and declared inputs match the result you need. Choose a different public symbol when rpcMessageCapabilityControl does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for rpcMessageCapabilityControl."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for rpcMessageCapabilityControl."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/contract/runtime-api/message-control.d.ts:rpcMessageCapabilityControl:export declare const rpcMessageCapabilityControl: Readonly<{ staticCapabilities: readonly string[]; readOffer: typeof readRuntimeMessageCapabilityOffer; /** Canonical clone carriers offer native storage only alongside their actual portable-binary root. */ localOffer(capabilities: readonly string[]): IRuntimeMessageControlResult<readonly string[]>; readAcknowledgement: typeof readRuntimeMessageAcknowledgement; readData: typeof readRuntimeMessageData; intersect: typeof intersectRuntimeMessageCapabilities; /** Initial launch messages retain the original wrapper and are read as raw control input. */ isInitial(value: unknown): boolean; /** Recognize ACK traffic without turning ordinary application frames into control records. */ isAcknowledgement(value: unknown): boolean; /** Legacy readiness is private control traffic and never contributes a capability proposal. */ isReady(value: unknown): boolean; /** Raw initial input provides the independent peer proposal, never an already accepted result. */ readInitial: typeof readRuntimeMessageInitial; /** Capability ACKs retain their existing versioned wire shape. */ acknowledgement(offer: readonly string[]): { kind: \"migaia.thread.runtime.ack\"; version: 1; capabilities: readonly string[]; }; data: \"migaia.thread.data\"; ready: \"migaia.thread.data.ack\"; version: 1; timeoutMs: 10000; failureText: \"Thread data bootstrap was not acknowledged\"; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-runtime--rpcMessageCapabilityControl"
         },
         {
           "name": "RpcRuntimeCancel",
