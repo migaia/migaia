@@ -1,8 +1,10 @@
 import { EventEmitter } from 'node:events'
-import { describe, expect, it, vi } from 'vitest'
+import { assert, describe, expect, it, vi } from 'vitest'
 import { PluginHost } from '@migaia/plugin-host'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
+import { deferred } from '@migaia/utils/promise'
 import {
+  acceptRpcHandshake,
   RpcCapability,
   RpcCodecId,
   RpcProtocol,
@@ -17,15 +19,170 @@ import {
   createRuntimeProviderScope,
   createRuntimeProviderGovernor,
   createEventEmitterMessageResource,
+  holdAdapterObjectChannel,
   type IAdapterListenerOwner,
-  type IAdapterListenerService
+  type IAdapterListenerService,
+  type IRuntimeObjectIO,
+  type IRuntimeConnectionOptions
 } from '../../dist/adapter.js'
 import { readAdapterBindingDrain } from '../../dist/runtime-adapter/binding.js'
 import { readRuntimeProviderScope } from '../../dist/runtime-adapter/provider/scope.js'
 import { withRuntimePreparationContext } from '../../dist/remote/runtime-api/launch-context.js'
 import { RemoteMethodName } from '../../dist/remote/constants.js'
+import { RpcPlatform } from '../../dist/core/transport-constants.js'
 import type { IRuntimePeerOptions } from '../../dist/remote/index.js'
 import { remoteHarness, REMOTE_FIXTURE_CONTRACT } from '../remote/fixture.js'
+
+/** Construct held object I/O whose reply still passes the canonical correlated handshake grammar. */
+function objectFixture(codec: string = RpcCodecId.json) {
+  /** Local codec policy is validated before any physical exchange or reader installation. */
+  const offer: IRpcHandshakeOffer = {
+    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],
+    /** Contract requires JSON in every offer while allowing a preferred additional codec label. */
+    codecs: [...new Set([codec, RpcCodecId.json])],
+    capabilities: [],
+    peer: { id: 'local', runtime: 'fixture' }
+  }
+  /** Negotiation consumers wait for this one actual peer reply supplied by the held exchange. */
+  const reply = deferred<string>()
+  /** The physical resource coalesces its own retirement before Core adds diagnostic cleanup. */
+  const closing = Promise.resolve()
+  /** Object-port revocation runs on actual raw closing before terminal subscribers are notified. */
+  const closingObservers = new Set<() => void>()
+  /** Only physical retirement changes the resource's observable terminal state. */
+  let closed = false
+  /** The responder independently processes the actual serialized local hello. */
+  const exchange = vi.fn((hello: string) => {
+    /** Common codec selection comes from canonical admission rather than a caller agreement DTO. */
+    const accepted = acceptRpcHandshake(
+      { ...offer, peer: { id: 'peer', runtime: 'fixture' } },
+      hello
+    )
+    assert(accepted.ok)
+    reply.resolve(accepted.reply)
+    return reply.promise
+  })
+  /** Only successfully accepted capabilities reach this original held activation operation. */
+  const activate = vi.fn()
+  /** Retain the first Core close reason while invoking real registered closing observers. */
+  const close = vi.fn((_reason?: unknown) => {
+    closed = true
+    for (const observer of closingObservers) observer()
+    return closing
+  })
+  /** Structural I/O operations expose held resource behavior without accepting transport proofs. */
+  const io: IRuntimeObjectIO = {
+    exchange,
+    activate,
+    writeText: vi.fn(),
+    writeObject: vi.fn(),
+    subscribeText: () => () => undefined,
+    subscribeObject: () => () => undefined,
+    onTransportError: () => () => undefined,
+    onClosing: (observer) => {
+      closingObservers.add(observer)
+      return () => {
+        closingObservers.delete(observer)
+      }
+    },
+    close,
+    assertOpen: () => {
+      expect(closed).toBe(false)
+    },
+    get closed() {
+      return closed
+    }
+  }
+  /** Public opening intentionally omits scheduler so Core retains its documented system default. */
+  const options: IRuntimeConnectionOptions = {
+    platform: RpcPlatform.memory,
+    expectedStringText: 'fixture requires text',
+    peerId: 'peer',
+    report: vi.fn(),
+    ipc: { connectionId: 'object-fixture', sessionId: 'object-session', log: () => undefined }
+  }
+  return { offer, io, exchange, activate, close, closing, options }
+}
+
+describe('held object channel sequencing and retirement', () => {
+  it('[HC30] refuses exchange/open before admission and retains the first raw close reason', async () => {
+    /** This held resource has no prepared offer or accepted handshake. */
+    const fixture = objectFixture()
+    /** Construction exposes operations while keeping actual I/O cold. */
+    const connection = holdAdapterObjectChannel(fixture.io)
+    expect(() => connection.negotiate()).toThrow(
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
+    )
+    expect(() => connection.open(fixture.options)).toThrow(TypeError)
+    expect(() => connection.open(fixture.options)).toThrow(
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
+    )
+    expect(fixture.exchange).not.toHaveBeenCalled()
+    expect(fixture.activate).not.toHaveBeenCalled()
+    /** Later callers cannot replace the first physical retirement reason. */
+    const reason = { closed: 'first-request' }
+    expect(connection.close(reason)).toBe(fixture.closing)
+    expect(connection.close({ closed: 'later-request' })).toBe(fixture.closing)
+    expect(fixture.close).toHaveBeenNthCalledWith(1, reason)
+    expect(fixture.close).toHaveBeenNthCalledWith(2, reason)
+    await fixture.closing
+  })
+
+  it('[HC31] shares one negotiation Promise and rejects replacing an in-flight local offer', async () => {
+    /** The real peer reply passes the common handshake grammar before activation. */
+    const fixture = objectFixture()
+    /** Only this held connection retains its prepared offer and published negotiation operation. */
+    const connection = holdAdapterObjectChannel(fixture.io)
+    connection.prepare(fixture.offer)
+    /** Repeated consumers join the original exchange while proposal replacement remains forbidden. */
+    const negotiating = connection.negotiate()
+    expect(connection.negotiate()).toBe(negotiating)
+    expect(() => connection.prepare(fixture.offer)).toThrow(
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
+    )
+    await negotiating
+    expect(fixture.exchange).toHaveBeenCalledOnce()
+    expect(fixture.activate).toHaveBeenCalledExactlyOnceWith([])
+    await connection.close()
+  })
+
+  it('[HC32] rejects an accepted non-JSON codec before activating the held object resource', async () => {
+    /** A syntactically valid offered codec can negotiate but cannot supply this JSON object carrier. */
+    const fixture = objectFixture('fixture-codec')
+    /** The actual exchange still passes canonical handshake admission before the carrier rejects it. */
+    const connection = holdAdapterObjectChannel(fixture.io)
+    connection.prepare(fixture.offer)
+    /** Native TypeError/code remain the public carrier configuration refusal. */
+    const negotiating = connection.negotiate()
+    await expect(negotiating).rejects.toBeInstanceOf(TypeError)
+    await expect(negotiating).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+    expect(fixture.exchange).toHaveBeenCalledOnce()
+    expect(fixture.activate).not.toHaveBeenCalled()
+    await connection.close()
+  })
+
+  it('[HC33] reuses its opened channel, default scheduler and diagnostic close Promise', async () => {
+    /** Genuine JSON negotiation supplies the one internally retained accepted agreement. */
+    const fixture = objectFixture()
+    /** The held owner constructs its transport only after the actual peer reply completes. */
+    const connection = holdAdapterObjectChannel(fixture.io)
+    connection.prepare(fixture.offer)
+    await connection.negotiate()
+    /** A repeated open keeps the exact channel and its original scheduler rather than rebuilding it. */
+    const channel = connection.open(fixture.options)
+    expect(connection.open(fixture.options)).toBe(channel)
+    expect(channel.scheduler).toBe(systemScheduler)
+    expect(channel.agreement.codec).toBe(RpcCodecId.json)
+    expect(fixture.activate).toHaveBeenCalledExactlyOnceWith([])
+    /** Diagnostic teardown and all channel facades join the same physical close settlement. */
+    const closing = connection.close('first-close')
+    expect(connection.close('ignored-close')).toBe(closing)
+    expect(channel.close()).toBe(closing)
+    await closing
+    expect(fixture.close).toHaveBeenCalledExactlyOnceWith('first-close')
+    expect(channel.transport.closed).toBe(true)
+  })
+})
 
 /** One accepted raw message channel permits genuine listener preparation without platform launch. */
 async function listenerFixture() {
@@ -634,7 +791,7 @@ describe('adapter registration and provider scope policies', () => {
       const selected = createRuntimeProviderScope(first.idempotency.store)
       /** Selected limits preserve the existing narrowing and invalid-input handoff contract. */
       const limits = { maxGlobal: 3 }
-      /** The original session retains its endpoint and Peer across concurrent preparation consumers. */
+      /** Derive this scope's idempotency policy from the same genuine connection and chosen limits. */
       const session = selected.session(owner.channel, limits)
       expect(session.idempotency.store).toBe(first.idempotency.store)
       expect(session.limits).toBe(limits)
