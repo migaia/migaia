@@ -34,8 +34,8 @@ import type { RpcOutboundAttachment, IRpcRuntimeSendOptions } from './outbound-a
  * flag.
  */
 const forwardedPayloads = new WeakMap<object, unknown>()
-/** Route metadata travels only with the package-minted admitted payload options. */
-const forwardedRoute = Symbol('rpc-forwarded-route')
+/** Only exact package-minted options retain their admitted route, independently of payload proof. */
+const forwardedRoute = new WeakMap<object, readonly string[]>()
 
 /** Carry the already admitted input through the existing Peer, generation and core send owners. */
 export function createForwardOptions(
@@ -45,30 +45,30 @@ export function createForwardOptions(
   Readonly<{
     signal: IRpcContext['signal']
     timeoutMs?: number
-    [forwardedRoute]?: readonly string[]
   }> {
   /** Opt-in relays preserve the final provider's selected semantics; ordinary metadata stays absent. */
   const runtime = readProviderRuntimeOperation(context)
   const options = {
     ...(runtime && 'options' in runtime ? runtime.options : {}),
     signal: context.signal,
-    ...(context.timeoutMs === undefined ? {} : { timeoutMs: context.timeoutMs }),
-    ...(route === undefined ? {} : { [forwardedRoute]: route })
+    ...(context.timeoutMs === undefined ? {} : { timeoutMs: context.timeoutMs })
   }
   forwardedPayloads.set(options, context.data)
+  if (route !== undefined) forwardedRoute.set(options, route)
   return options
 }
 
 /** New-profile headers reuse the exact same canonical private route provenance as ordinary forwards. */
 export function readForwardRoute(options: unknown): readonly string[] | undefined {
-  return typeof options === 'object' && options !== null
-    ? Reflect.get(options, forwardedRoute)
-    : undefined
+  return typeof options === 'object' && options !== null ? forwardedRoute.get(options) : undefined
 }
 
 /** A read-only forwarded query carries only the canonical signed route, with no business payload. */
 export function createForwardQueryOptions(route: readonly string[] | undefined): object {
-  return route === undefined ? {} : { [forwardedRoute]: route }
+  /** Query provenance belongs to this exact options object without granting payload authority. */
+  const options = {}
+  if (route !== undefined) forwardedRoute.set(options, route)
+  return options
 }
 
 /**
@@ -97,11 +97,8 @@ export function isForwardedOperation(options: unknown): boolean {
 export function retainForwardOptions<T extends object>(source: unknown, target: T): T {
   if (typeof source === 'object' && source !== null && forwardedPayloads.has(source))
     forwardedPayloads.set(target, forwardedPayloads.get(source))
-  if (typeof source === 'object' && source !== null && Object.hasOwn(source, forwardedRoute))
-    Object.defineProperty(target, forwardedRoute, {
-      value: Reflect.get(source, forwardedRoute),
-      enumerable: true
-    })
+  if (typeof source === 'object' && source !== null && forwardedRoute.has(source))
+    forwardedRoute.set(target, forwardedRoute.get(source)!)
   return target
 }
 
@@ -301,7 +298,7 @@ export function createOutboundEnvelope(value: unknown, options?: unknown): IRpcE
       (isForwardedPayload(options, data.payload) ||
         readRuntimeRequestInput(options, Reflect.get(value, 'method'), data.payload, 2))
     ) {
-      const route = Reflect.get(options as object, forwardedRoute) as readonly string[] | undefined
+      const route = readForwardRoute(options)
       const header = normalizeRpcEnvelope({
         ...value,
         data: {

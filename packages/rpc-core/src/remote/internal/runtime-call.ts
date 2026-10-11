@@ -489,7 +489,7 @@ export function createRuntimePeerCalls(
         channel.peerId,
         method,
         input.payload,
-        retainRuntimeRequestInput({ ...callOptions }, input)
+        retainRuntimeRequestInput(retainForwardOptions(callOptions, { ...callOptions }), input)
       )
       return routes.get(method)?.forwardedVia || isForwardedPayload(callOptions, payload)
         ? result.catch(restoreForwardError)
