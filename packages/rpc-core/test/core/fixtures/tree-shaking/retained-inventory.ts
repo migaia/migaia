@@ -6,10 +6,9 @@ const reviewed = (...modules: readonly string[]): readonly string[] =>
   Object.freeze([...modules].sort())
 
 /**
- * Portable convergence adds the same seven explicit Contract/serialize owners to each K289 set.
- * Fresh counts are 137/195/202/207/206; main1437c404 retains 130/188/195/200/199. No module slack.
- * Root bytes, module/source/map custody and exact derived-region proofs are preserved in
- * docs/serialize/portable-converge/phase-b/rebase-1437c404/reviewed-repin-comparison.json.
+ * Reviewed retained module sets as of main 9cd4497a (counts 137/195/202/207/206). The A12 check
+ * allows a small number of unreviewed additions per consumer, so ordinary merges do not require a
+ * re-pin; refresh this list when a consumer approaches that allowance.
  */
 export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, readonly string[]>> =
   Object.freeze({
