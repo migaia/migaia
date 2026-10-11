@@ -308,86 +308,36 @@
         "ResourceStatus"
       ]
     },
-    "@migaia/rpc": {
-      "./bridge/jsonrpc": [
+    "@migaia/rpc-bridge-jsonrpc": {
+      ".": [
+        "JSONRPC_BRIDGE_ERROR_SOURCE",
         "JsonRpcBridgeErrorCode",
-        "JsonRpcBridgeErrorText",
         "createJsonRpcRemoteChannel"
+      ]
+    },
+    "@migaia/rpc-browser": {
+      "./adapters/window": [
+        "createWindowMessageTransport"
       ],
-      "./process": [
-        "ProcessPluginWire",
-        "RpcProcessErrorCode",
-        "RpcProcessErrorText",
-        "createNativeProcessOffer",
-        "createProcessPeer",
-        "createProcessPlugin",
-        "createProcessResilience",
-        "createProcessTransport",
-        "parseProcessPluginDescriptor"
+      "./adapters/shared-worker": [
+        "createSharedWorkerTransport"
       ],
-      "./process/adapters/node-child-process": [
-        "createNodeProcessLauncher",
-        "openProcessStdioChannel"
+      "./adapters/service-worker": [
+        "createServiceWorkerTransport"
       ],
-      "./process/adapters/node-socket": [
-        "dialProcessByteChannel",
-        "listenProcessByteChannel"
+      "./adapters/broadcast-channel": [
+        "createBroadcastChannelTransport"
       ],
-      "./process/adapters/bun-spawn": [
-        "createBunProcessLauncher",
-        "openProcessStdioChannel"
+      "./adapters/web-transport": [
+        "createWebTransportDatagramTransport"
       ],
-      "./process/adapters/bun-socket": [
-        "dialProcessByteChannel",
-        "listenProcessByteChannel"
-      ],
-      "./process/adapters/deno-command": [
-        "createDenoProcessLauncher",
-        "openProcessStdioChannel"
-      ],
-      "./process/adapters/deno-socket": [
-        "dialProcessByteChannel",
-        "listenProcessByteChannel"
-      ],
-      "./process/adapters/electron-utility-process": [
-        "createElectronUtilityProcessLauncher"
-      ],
-      "./process/adapters/windows-job": [
-        "createWindowsJobProcessLauncher"
-      ],
-      "./remote": [
-        "DEFAULT_DRAIN_MS",
-        "REMOTE_METHOD_MAX_LENGTH",
-        "REMOTE_METHOD_MODES",
-        "REMOTE_NAME_PATTERN",
-        "REMOTE_SCHEMA_VERSION",
-        "RUNTIME_API_SCHEMA_VERSION",
-        "RemoteMethodMode",
-        "RemoteMethodName",
-        "RpcRemoteLayerErrorCode",
-        "RpcRemoteLayerErrorText",
-        "RuntimeApiMode",
-        "RuntimeConnectionDirection",
-        "RuntimeEventName",
-        "RuntimePluginKey",
-        "RuntimeQueryStatus",
-        "RuntimeSourceKind",
-        "createCoroutineHost",
-        "createCoroutinePlugin",
-        "createManagedRuntimePeer",
-        "createRemoteHost",
-        "createRemotePlugin",
-        "createRemoteRetryPort",
-        "createRuntimePeer",
-        "createRuntimePlugin",
-        "normalizeRemoteContract",
-        "normalizeRemoteControlShape",
-        "normalizeRemoteHostCatalog",
-        "sameRemoteContract",
-        "serveRemoteHost",
-        "serveRemotePlugin"
-      ],
-      "./contract": [
+      "./adapters/rtc-data-channel": [
+        "createRtcDataChannelTransport"
+      ]
+    },
+    "@migaia/rpc-contract": {
+      ".": [
+        "RPC_CONTRACT_SOURCE",
         "RPC_PORTABLE_MAX_DEPTH",
         "RpcBatchPhysical",
         "RpcCapability",
@@ -418,13 +368,13 @@
         "RpcWireErrorViolation",
         "RpcWireLimit",
         "acceptRpcHandshake",
+        "classifyRpcContractError",
         "completeRpcHandshake",
         "createDescriptor",
         "createRpcHello",
         "createRpcUnknownFieldWarner",
         "deserializeRpcError",
         "fromJsonRpcError",
-        "invalidRpcStream",
         "measurePortableStreamValue",
         "normalizePortable",
         "normalizeRpcEnvelope",
@@ -436,43 +386,26 @@
         "serializeRpcError",
         "toJsonRpcError"
       ],
-      "./contract/spi": [
-        "createRpcStreamFrameDecoderWithLimit",
-        "isExcerptFree",
-        "isRpcBinaryIntegrityFailure",
-        "measureRpcNativeBinaryFrame",
-        "normalizeRuntimeEnvelope",
-        "normalizeRuntimeGeneration",
-        "normalizeRuntimeSteps",
-        "prepareRpcBinary",
-        "readRpcNativeBinary",
-        "readRuntimeCarrier",
-        "redactHandshake",
-        "restoreRpcBinary",
-        "rpcBinaryBackingLength",
-        "rpcBinaryView",
-        "runtimeOperationCapabilities",
-        "wrapRuntimeCarrier"
-      ],
-      "./contract/v1": [
+      "./v1": [
         "default",
-        "invalidRpcStream",
         "normalizeRpcEnvelope",
         "normalizeStreamPayload",
         "rpcProtocol"
       ],
-      "./contract/framing": [
+      "./framing": [
         "assertRpcPhysicalFrameSize",
         "bindRpcFrameIngress",
         "createBinaryFramer",
         "createReassembler",
         "createStringFramer",
+        "inspectRpcPhysicalFrame",
         "measureRpcPhysicalFrame",
         "messageFramerV1",
+        "processStringFramer",
         "readRpcBatchMembers",
-        "rejectRpcPhysicalFrameSize"
+        "remoteProcessStringFramer"
       ],
-      "./contract/framing/v1": [
+      "./framing/v1": [
         "RpcBinaryProfile",
         "RpcBinaryStorage",
         "RpcNativeBinaryKind",
@@ -491,34 +424,227 @@
         "RpcRuntimeStreamPrefix",
         "messageFramer"
       ],
-      "./contract/framing/stream": [
+      "./framing/stream": [
         "RPC_STREAM_MAX_FRAME_BYTES",
+        "RpcHandshakeRole",
+        "createRpcBootstrapFrameReceiver",
+        "createRpcHandshakeFrameReceiver",
         "createRpcStreamFrameDecoder",
-        "encodeRpcStreamFrame"
+        "createRpcStreamFrameDecoderWithLimit",
+        "encodeRpcStreamFrame",
+        "encodeRpcStreamTextFrame"
       ],
-      "./core": [
+      "./wire": [
+        "RpcBatchPhysical",
+        "RpcBinaryField",
+        "RpcBinaryProfile",
+        "RpcBinaryStorage",
+        "RpcBinaryTag",
+        "RpcBinaryViolation",
+        "RpcCapability",
+        "RpcCodecId",
+        "RpcControl",
+        "RpcEnvelopeKind",
+        "RpcEnvelopeViolation",
+        "RpcErrorReachLimit",
+        "RpcHandshakeReason",
+        "RpcHandshakeStep",
+        "RpcHandshakeViolation",
+        "RpcJsonRpcWireError",
+        "RpcNativeBinaryKind",
+        "RpcPeerRuntime",
+        "RpcProtocol",
+        "RpcReservedKind",
+        "RpcRouteField",
+        "RpcRouteKey",
+        "RpcRouteProfile",
+        "RpcRouteType",
+        "RpcRuntimeCancel",
+        "RpcRuntimeCarrier",
+        "RpcRuntimeField",
+        "RpcRuntimeFinish",
+        "RpcRuntimeGenerationKind",
+        "RpcRuntimeKind",
+        "RpcRuntimeMode",
+        "RpcRuntimeOperation",
+        "RpcRuntimeOutcomeState",
+        "RpcRuntimeProfile",
+        "RpcRuntimeStepState",
+        "RpcRuntimeStoreContinuity",
+        "RpcRuntimeStoreKind",
+        "RpcRuntimeStreamPrefix",
+        "RpcStreamEvent",
+        "RpcStreamLimit",
+        "RpcStreamViolation",
+        "RpcWireErrorFallback",
+        "RpcWireErrorField",
+        "RpcWireErrorLimit",
+        "RpcWireErrorUnknownFieldMode",
+        "RpcWireErrorViolation",
+        "RpcWireLimit",
+        "measurePortableStreamValue"
+      ],
+      "./portable": [
+        "RPC_PORTABLE_MAX_DEPTH",
+        "normalizePortable"
+      ],
+      "./errors": [
+        "RPC_CONTRACT_SOURCE",
+        "RpcContractErrorCode",
+        "RpcErrorReachLimit",
+        "RpcJsonRpcWireError",
+        "RpcWireErrorFallback",
+        "RpcWireErrorField",
+        "RpcWireErrorLimit",
+        "RpcWireErrorUnknownFieldMode",
+        "RpcWireErrorViolation",
+        "classifyRpcContractError",
+        "deserializeRpcError",
+        "fromJsonRpcError",
+        "normalizeRpcSerializedError",
+        "reachRpcError",
+        "serializeRpcError",
+        "toJsonRpcError"
+      ],
+      "./handshake": [
+        "RpcCapability",
+        "RpcHandshakeReason",
+        "RpcHandshakeStep",
+        "RpcHandshakeViolation",
+        "RpcProtocol",
+        "acceptRpcHandshake",
+        "completeRpcHandshake",
+        "createRpcHello",
+        "normalizeRpcHandshake"
+      ],
+      "./runtime": [
+        "RpcRuntimeCancel",
+        "RpcRuntimeCarrier",
+        "RpcRuntimeField",
+        "RpcRuntimeFinish",
+        "RpcRuntimeGenerationKind",
+        "RpcRuntimeKind",
+        "RpcRuntimeMode",
+        "RpcRuntimeOperation",
+        "RpcRuntimeOutcomeState",
+        "RpcRuntimeProfile",
+        "RpcRuntimeStepState",
+        "RpcRuntimeStoreContinuity",
+        "RpcRuntimeStoreKind",
+        "RpcRuntimeStreamPrefix",
+        "normalizeRuntimeEnvelope",
+        "normalizeRuntimeGeneration",
+        "normalizeRuntimeSteps",
+        "readRuntimeCarrier",
+        "runtimeOperationCapabilities",
+        "wrapRuntimeCarrier"
+      ],
+      "./runtime/metadata": [
+        "normalizeRuntimeGeneration",
+        "normalizeRuntimeSteps"
+      ],
+      "./runtime/lazy": [
+        "normalizeRuntimeEnvelope",
+        "normalizeStreamPayload"
+      ],
+      "./binary/inspect": [
+        "RpcBinaryProfile",
+        "RpcBinaryStorage",
+        "RpcNativeBinaryKind",
+        "assertRpcNativeBinaryFrameSize",
+        "hasRpcBinaryEnvelope",
+        "isRpcBinaryIntegrityFailure",
+        "measureRpcNativeBinaryFrame",
+        "readRpcNativeBinary",
+        "rpcBinaryBackingLength",
+        "rpcBinaryView"
+      ],
+      "./framing/jsonrpc": [
+        "JSONRPC_BRIDGE_ERROR_SOURCE",
+        "JsonRpcBridgeErrorCode",
+        "JsonRpcLimit",
+        "createJsonRpcFrameDecoder",
+        "encodeJsonRpcFrame"
+      ],
+      "./binary": [
+        "RpcBinaryProfile",
+        "RpcBinaryStorage",
+        "RpcNativeBinaryKind",
+        "captureRpcBinaryData",
+        "prepareRpcBinary",
+        "restoreRpcBinary"
+      ],
+      "./binary/lazy": [
+        "RpcBinaryProfile",
+        "RpcBinaryStorage",
+        "RpcNativeBinaryKind",
+        "prepareRpcBinary",
+        "restoreRpcBinary"
+      ],
+      "./binary/capture": [
+        "RpcBinaryStorage",
+        "captureRpcBinaryData"
+      ],
+      "./stream": [
+        "RpcStreamEvent",
+        "RpcStreamLimit",
+        "RpcStreamPointer",
+        "RpcStreamViolation",
+        "checkRpcRuntimeStreamFinish",
+        "checkRpcRuntimeStreamIntent",
+        "checkRpcRuntimeStreamTransition",
+        "checkRpcStreamConsumerCredit",
+        "checkRpcStreamInitialSequence",
+        "checkRpcStreamProducerCredit",
+        "checkRpcStreamProgress",
+        "checkRpcStreamSequence",
+        "measurePortableStreamValue",
+        "normalizeStreamPayload"
+      ]
+    },
+    "@migaia/rpc-core": {
+      "./remote": [
+        "DEFAULT_DRAIN_MS",
+        "REMOTE_METHOD_MAX_LENGTH",
+        "REMOTE_METHOD_MODES",
+        "REMOTE_NAME_PATTERN",
+        "REMOTE_SCHEMA_VERSION",
+        "RPC_REMOTE_ERROR_SOURCE",
+        "RUNTIME_API_SCHEMA_VERSION",
+        "RemoteMethodMode",
+        "RemoteMethodName",
+        "RpcRemoteLayerErrorCode",
+        "RuntimeApiMode",
+        "RuntimeConnectionDirection",
+        "RuntimeEventName",
+        "RuntimePluginKey",
+        "RuntimeQueryStatus",
+        "RuntimeSourceKind",
+        "createCoroutineHost",
+        "createCoroutinePlugin",
+        "createManagedRuntimePeer",
+        "createRemoteHost",
+        "createRemotePlugin",
+        "createRemoteRetryPort",
+        "createRuntimePeer",
+        "createRuntimePlugin",
+        "normalizeRemoteContract",
+        "normalizeRemoteControlShape",
+        "normalizeRemoteHostCatalog",
+        "sameRemoteContract",
+        "serveRemoteHost",
+        "serveRemotePlugin"
+      ],
+      ".": [
         "RPC_CORE_ERROR_SOURCE",
-        "RpcAbortError",
-        "RpcAuthenticationError",
         "RpcCandidateStatus",
-        "RpcChunkError",
-        "RpcConfigurationError",
-        "RpcConstructionError",
-        "RpcContractError",
         "RpcCoreErrorCode",
         "RpcEndpointStatus",
-        "RpcError",
         "RpcLifecycleError",
         "RpcOperation",
         "RpcPlatform",
-        "RpcProtocolError",
         "RpcProviderRejectionReason",
-        "RpcRemoteError",
-        "RpcSchemaValidationError",
-        "RpcSerializationError",
-        "RpcTimeoutError",
         "RpcTransportEncoding",
-        "RpcTransportError",
         "RpcTransportOwnership",
         "RpcTransportTopology",
         "abort",
@@ -534,35 +660,33 @@
         "createRuntimeApiEndpoint",
         "defineFeature",
         "defineMiddleware",
+        "deserializeRpcError",
         "framer",
         "hooks",
         "isRpcError",
+        "isRpcErrorInstance",
+        "isRpcRemoteError",
+        "isRpcTimeoutError",
         "ping",
         "protocol",
+        "serializeRpcError",
         "timeout",
         "uuid"
       ],
-      "./core/spi": [
-        "assertRpcIdempotencyKey",
-        "defaultRpcId",
-        "isRpcErrorInstance",
-        "isRpcRemoteError",
-        "isRpcTimeoutError"
-      ],
-      "./core/composed": [
+      "./composed": [
         "createComposedEndpoint"
       ],
-      "./core/client": [
+      "./client": [
         "createClientEndpoint"
       ],
-      "./core/provider": [
+      "./provider": [
         "createProviderEndpoint"
       ],
-      "./core/full": [
+      "./full": [
         "createFullEndpoint",
         "createFullOneWayEndpoint"
       ],
-      "./core/transport-constants": [
+      "./transport-constants": [
         "RpcCandidateStatus",
         "RpcEndpointStatus",
         "RpcOperation",
@@ -571,7 +695,7 @@
         "RpcTransportOwnership",
         "RpcTransportTopology"
       ],
-      "./core/transport-kit": [
+      "./transport-kit": [
         "RpcPlatform",
         "RpcTransportOwnership",
         "collectListenerCleanupFailures",
@@ -586,69 +710,157 @@
         "releaseListenerRegistration",
         "reportListenerFailure",
         "safeRead",
-        "safeString",
-        "tagRpcError"
+        "safeString"
       ],
-      "./core/features/outbound": [
+      "./features/outbound": [
         "createOutboundFeature"
       ],
-      "./core/features/one-way": [
+      "./features/one-way": [
         "createOneWayFeature"
       ],
-      "./core/features/provider": [
+      "./features/provider": [
         "createProviderAdmissionScope",
         "createProviderFeature"
       ],
-      "./core/features/discovery": [
+      "./features/discovery": [
         "createDiscoveryFeature"
       ],
-      "./core/features/control": [
+      "./features/control": [
         "createControlFeature"
       ],
-      "./core/stream": [
+      "./stream": [
         "createCanonicalChunkFeature",
         "createStreamFeature"
       ],
-      "./core/plugins/flow-control": [
+      "./plugins/flow-control": [
         "IpcLogEventName",
         "IpcSendClass"
       ],
-      "./core/plugins/send-queue": [
+      "./plugins/send-queue": [
         "createIpcSendQueueFeature",
         "createIpcSendQueueTransport"
       ],
-      "./core/plugins/log": [
+      "./plugins/log": [
         "createIpcLogFeature"
       ],
-      "./core/adapters/memory": [
+      "./adapters/memory": [
         "createMemoryTransportPair"
       ],
-      "./core/adapters/message-port": [
+      "./adapters/message-port": [
         "createBrowserMessagePortTransport",
         "createNodeMessagePortTransport"
       ],
-      "./browser/adapters/window": [
-        "createWindowMessageTransport"
+      "./testing": [
+        "createPeerPair"
       ],
-      "./browser/adapters/web-worker": [
+      "./adapters/web-worker": [
         "createWebWorkerTransport"
       ],
-      "./browser/adapters/shared-worker": [
-        "createSharedWorkerTransport"
+      "./adapter": [
+        "createAdapterChannel",
+        "receiveAdapterBootstrap"
       ],
-      "./browser/adapters/service-worker": [
-        "createServiceWorkerTransport"
+      "./adapter/node": [
+        "createAdapterChildStdio",
+        "createAdapterProcessStdio",
+        "createAdapterSocketByteIO"
       ],
-      "./browser/adapters/broadcast-channel": [
-        "createBroadcastChannelTransport"
+      "./adapter/diagnostics": [
+        "IpcReporterContext",
+        "RPC_PROCESS_ERROR_SOURCE",
+        "RpcProcessErrorCode"
       ],
-      "./browser/adapters/web-transport": [
-        "createWebTransportDatagramTransport"
+      "./adapter/process-data": [
+        "PROCESS_HANDSHAKE_MAX_FRAME_BYTES",
+        "PROCESS_RUNTIME_API_BOOTSTRAP_KIND",
+        "PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS",
+        "PROCESS_RUNTIME_API_BOOTSTRAP_VERSION",
+        "PROCESS_RUNTIME_API_ENV",
+        "PROCESS_RUNTIME_API_ENV_VERSION",
+        "PROCESS_RUNTIME_API_FINGERPRINT_PREFIX"
       ],
-      "./browser/adapters/rtc-data-channel": [
-        "createRtcDataChannelTransport"
+      "./adapter/web-streams": [
+        "createAdapterWebByteIO"
       ],
-      "./threads": [
+      "./adapter/process": [
+        "ProcessPluginWire",
+        "createAdapterProcessLaunch",
+        "createAdapterProcessPeer",
+        "createAdapterProcessPlugin",
+        "createNativeProcessOffer",
+        "createProcessResilience",
+        "parseProcessPluginDescriptor"
+      ],
+      "./adapter/process/node": [
+        "createAdapterNodeProcessLaunch"
+      ],
+      "./adapter/threads": [
+        "AdapterNodeThreadParentChannel",
+        "RPC_THREAD_ERROR_SOURCE",
+        "RpcThreadErrorCode",
+        "createAdapterNodeThreadChannel",
+        "createAdapterNodeThreadChannelFactory",
+        "createAdapterNodeThreadLauncher",
+        "createAdapterNodeThreadPeer",
+        "createAdapterWebThreadChannel",
+        "createAdapterWebThreadChannelFactory",
+        "createAdapterWebThreadLauncher",
+        "createThreadPeer",
+        "createThreadPlugin",
+        "readThreadBootstrap",
+        "receiveThreadData"
+      ],
+      "./adapter/jsonrpc": [
+        "createJsonRpcAdapterChannel"
+      ]
+    },
+    "@migaia/rpc-process": {
+      ".": [
+        "ProcessPluginWire",
+        "RPC_PROCESS_ERROR_SOURCE",
+        "RpcProcessErrorCode",
+        "createNativeProcessOffer",
+        "createProcessPeer",
+        "createProcessPlugin",
+        "createProcessResilience",
+        "createProcessTransport",
+        "parseProcessPluginDescriptor"
+      ],
+      "./adapters/node-child-process": [
+        "createNodeProcessLauncher",
+        "openProcessStdioChannel"
+      ],
+      "./adapters/node-socket": [
+        "dialProcessByteChannel",
+        "listenProcessByteChannel"
+      ],
+      "./adapters/bun-spawn": [
+        "createBunProcessLauncher",
+        "openProcessStdioChannel"
+      ],
+      "./adapters/bun-socket": [
+        "dialProcessByteChannel",
+        "listenProcessByteChannel"
+      ],
+      "./adapters/deno-command": [
+        "createDenoProcessLauncher",
+        "openProcessStdioChannel"
+      ],
+      "./adapters/deno-socket": [
+        "dialProcessByteChannel",
+        "listenProcessByteChannel"
+      ],
+      "./adapters/electron-utility-process": [
+        "createElectronUtilityProcessLauncher"
+      ],
+      "./adapters/windows-job": [
+        "createWindowsJobProcessLauncher"
+      ]
+    },
+    "@migaia/rpc-threads": {
+      ".": [
+        "RPC_THREAD_ERROR_SOURCE",
+        "RpcThreadErrorCode",
         "createNodeThreadChannel",
         "createThreadPeer",
         "createThreadPlugin",
@@ -656,35 +868,29 @@
         "readThreadBootstrap",
         "receiveThreadData"
       ],
-      "./threads/adapters/node": [
+      "./adapters/node": [
         "createNodeThreadChannelFactory",
         "createNodeThreadLauncher"
       ],
-      "./threads/adapters/deno": [
+      "./adapters/deno": [
         "createDenoThreadChannelFactory",
         "createDenoThreadLauncher"
       ],
-      "./threads/adapters/bun": [
+      "./adapters/bun": [
         "createBunThreadChannelFactory",
         "createBunThreadLauncher"
       ],
-      "./threads/adapters/electron-main": [
+      "./adapters/electron-main": [
         "createElectronMainThreadChannelFactory",
         "createElectronMainThreadLauncher"
       ],
-      "./threads/adapters/electron-renderer": [
+      "./adapters/electron-renderer": [
         "createElectronRendererThreadChannelFactory",
         "createElectronRendererThreadLauncher"
       ],
-      "./threads/adapters/browser": [
+      "./adapters/browser": [
         "createBrowserThreadChannelFactory",
         "createBrowserThreadLauncher"
-      ],
-      "./remote/spi": [
-        "normalizeRuntimeDescription"
-      ],
-      "./testing": [
-        "createPeerPair"
       ]
     },
     "@migaia/serialize": {
@@ -1276,6 +1482,7 @@
         "createManualScheduler",
         "createNumberFormatter",
         "createPathAccessor",
+        "createSafeRecord",
         "decodeUtf8",
         "deferred",
         "diagnosticSnapshot",
@@ -1297,6 +1504,7 @@
         "isNullish",
         "isPlainObject",
         "isPrimitive",
+        "isSafeIntegerValue",
         "isUint8Array",
         "isUtilsAbortError",
         "isUtilsError",
@@ -1329,6 +1537,7 @@
         "toError",
         "toPromise",
         "tryReadProperty",
+        "tryString",
         "utf8ByteLength",
         "walkErrorCauses",
         "withTimeout"
@@ -1380,6 +1589,7 @@
       ],
       "./object": [
         "createPathAccessor",
+        "createSafeRecord",
         "diagnosticSnapshot",
         "get",
         "identitySnapshot",
@@ -1427,10 +1637,12 @@
         "isBlankString",
         "isEmptyValue",
         "isNullish",
-        "isPrimitive"
+        "isPrimitive",
+        "isSafeIntegerValue"
       ],
       "./string": [
-        "format"
+        "format",
+        "tryString"
       ],
       "./number": [
         "createNumberFormatter",
