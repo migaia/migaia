@@ -433,6 +433,20 @@
                 "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test && pnpm run build"
               }
             ]
+          },
+          {
+            "id": "portable-walker",
+            "heading": "Portable walker",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`createPortableWalker(strategy)`（主入口或 `/codec`）在模块或 owner 作用域创建一次，返回单次融合遍历函数。每次调用返回 `{ value, byteUpperBound, hasBinary }`；字节数是 JSON UTF-8 的保守上界，不是精确长度。"
+              },
+              {
+                "type": "paragraph",
+                "text": "策略类型 `IPortableWalkerStrategy` 决定字段读取/排序、复制或仅校验、原型与冻结、二进制准入及表示、深度和违规错误。serialize 不提供消费方 profile。现有 `toPortableValue`/`assertPortableValue` 是包内默认策略的薄实例；JSON、MessagePack、CBOR 编码使用同一融合遍历，保留原来的排序、字节输出和错误边界。详见 USEGUIDE 的 Portable walker。"
+              }
+            ]
           }
         ]
       },
@@ -1666,6 +1680,80 @@
                 "text": "TOML requires an object root and rejects `null` at every depth and strings containing unpaired surrogates. Keys and strings are quoted; nested collections retain their structure. The emitter returns no partial text on failure."
               }
             ]
+          },
+          {
+            "id": "portable-walker",
+            "heading": "Portable walker",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "从主入口或 `@migaia/serialize/codec` 导入 `createPortableWalker` 和 `IPortableWalkerStrategy`。在模块或 owner 作用域调用工厂一次，复用返回的函数；不要逐请求创建工厂。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createPortableWalker, type IPortableWalkerStrategy } from '@migaia/serialize/codec';\n\n// 策略由使用方定义；以下工厂不会自动选择某个消费方的规则。\nexport function makePortableBoundary(strategy: IPortableWalkerStrategy) {\n  const walk = createPortableWalker(strategy);\n  return (input: unknown) => walk(input);\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "工厂捕获策略回调与深度一次。返回函数签名为 `(value: unknown, active?: Set<object>) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean }>`。`active` 用于现有调用链的活动祖先集合，默认每次新建，遍历结束后不保留图或标记。策略须确保其成功输出符合需要的 portable 契约；`value` 不自动变更为某个协议的类型。"
+              },
+              {
+                "type": "table",
+                "headers": ["策略字段", "契约"],
+                "rows": [
+                  [
+                    "`maxDepth?`",
+                    "根深度为 0；节点深度大于该值才拒绝。省略为不限深度。RPC 策略配置 64；serialize 默认继续不限深度。"
+                  ],
+                  [
+                    "`scalar(value, context)`",
+                    "返回 `{ value, violation? }`。立即拒绝调用 `context.reject`；返回 `violation` 会保留第一个验证失败，完成本次投影后才抛。"
+                  ],
+                  [
+                    "`binary(value, context)`",
+                    "接收对象，返回原子 bytes tag 的 `base64url` 字符串或 `undefined`。策略决定是否接受 native bytes；工具由 serialize 提供。"
+                  ],
+                  [
+                    "`record(value, context)`",
+                    "返回 `{ entries, output?, tag?, hasBinary?, validate? }`，或返回 `undefined` 交给数组回调。`entries` 可以预捕获，也可以按选择的顺序惰性读取。`output` 缺省表示只校验原输入；提供对象表示复制。`tag` 表示原子 bytes tag。"
+                  ],
+                  [
+                    "`array?(value, visit, context)`",
+                    "返回 `{ value, length?, violation? }`。默认沿原 `map` 遍历；策略可改为只校验。传入已捕获 `length` 可避免额外读取原输入。回调通过 `visit` 使用唯一 canonical 遍历器，不能另写递归。"
+                  ],
+                  ["`key?(key, context)`", "在对应子值遍历前执行，可以拒绝保留字段。"],
+                  [
+                    "`finish?(value)`",
+                    "完成输出节点，例如 `Object.freeze`；默认保留值。复制记录的原型由 `record.output` 决定。"
+                  ],
+                  [
+                    "`violation(reason, cause?)`",
+                    "必須抛使用方自己的 coded 原生错误。原失败由 `cause` 参数提供；包装必须保留该对象与原 stack。"
+                  ]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "`context` 提供 `reject(reason, cause?)`、只读的 `isAncestor(value)`、跨 realm 的 `isUint8Array`、`bytesToBase64url`、`isCanonicalBase64url`。字节算法复用既有 runtime-neutral Base64；canonical 检查包括末尾未使用位，不分配解码 backing。通用遍历器产生 `depth`、`cycle`、`access` 原因；其他原因由策略定义。`reject` 保留策略抛出的已分类错误身份；策略原样抛回 `cause` 时，父容器仍可应用其错误边界。回调直接抛出的应用异常经 `violation('access', original)` 处理。"
+              },
+              {
+                "type": "paragraph",
+                "text": "返回的 `byteUpperBound` 使用字符串每 UTF-16 单元最多 6 个 JSON 转义字节、数字最多 32 字节及容器标点估计；原子 bytes tag 计入两个字段和 base64url 文本。不会再次读取或扫描输入图，也不会为了估计字符串大小调用 `JSON.stringify`。`hasBinary` 由本次 bytes/tag 准入和子节点结果融合传播；策略的 `hasBinary` 仅表示已经识别的原子记录。"
+              },
+              {
+                "type": "paragraph",
+                "text": "包内默认投影与断言保留旧消费结果：投影输出普通可变对象，按排序后的键逐项读取并递归，真正 Uint8Array 转为 `$rpc` tag；断言保留原对象，拒绝 native bytes，wire tag 保留既有字符集校验。JSON、MessagePack、CBOR 的融合默认策略完成投影后才抛验证失败，因此较晚发生的投影 getter 异常仍优先，和此前“先投影再断言”一致。"
+              },
+              {
+                "type": "paragraph",
+                "text": "RPC 的 null-prototype/freeze、父字段先捕获、canonical tag、深度 64 和 `(source, code)` 由 Contract 自己的策略定义。本阶段只有 serialize 自有测试夹具配置这些规则；生产 serialize 不内置 RPC 策略。native binary 协商、manifest、全局 binary 标记与协议错误身份不归通用遍历器。"
+              },
+              {
+                "type": "paragraph",
+                "text": "没有新增错误码：serialize 默认仍使用 `INVALID_OPTION`，文案仍为 `serialize codec value is outside the portable profile`。需要保留域错误时，`violation` 可以构造自己的 `TypeError(message, { cause })` 并附加原有 `(source, code)`；不得改写原错误的 stack 或在原因链外丢弃原失败。既有 `base64ToBytes` 的 `INVALID_OPTION`、`invalid base64 input` 和无底层 cause 的消费边界保持不变。"
+              }
+            ]
           }
         ]
       }
@@ -2771,6 +2859,16 @@
           "ownerFragment": "serialize-core--collectStream"
         },
         {
+          "identity": "packages/serialize/dist/portable.d.ts:createPortableWalker:export declare function createPortableWalker(strategy: IPortableWalkerStrategy): (value: unknown, active?: Set<object>) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean; }>;",
+          "name": "createPortableWalker",
+          "signature": "export declare function createPortableWalker(strategy: IPortableWalkerStrategy): (value: unknown, active?: Set<object>) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean; }>;",
+          "source": "packages/serialize/dist/portable.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./codec",
+          "ownerModule": "codec",
+          "ownerFragment": "serialize-codec--createPortableWalker"
+        },
+        {
           "identity": "packages/serialize/dist/errors.d.ts:createSerializeError:export declare function createSerializeError(code: ISerializeErrorCode, message: string, options?: { readonly cause?: unknown; readonly context?: string; readonly errors?: readonly unknown[]; }): ISerializeLifecycleError;",
           "name": "createSerializeError",
           "signature": "export declare function createSerializeError(code: ISerializeErrorCode, message: string, options?: { readonly cause?: unknown; readonly context?: string; readonly errors?: readonly unknown[]; }): ISerializeLifecycleError;",
@@ -2889,6 +2987,16 @@
           "ownerExportPath": "./plugins",
           "ownerModule": "plugins",
           "ownerFragment": "serialize-plugins--IJsonPluginOptions"
+        },
+        {
+          "identity": "packages/serialize/dist/portable.d.ts:IPortableWalkerStrategy:export type IPortableWalkerStrategy = Readonly<{ maxDepth?: number; scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar; binary: (value: object, context: IPortableWalkerContext) => string | undefined; record: (value: object, context: IPortableWalkerContext) => IPortableRecord | undefined; array?: (value: unknown[], visit: (child: unknown) => unknown, context: IPortableWalkerContext) => Readonly<{ value: unknown[]; length?: number; violation?: string; }>; key?: (key: string, context: IPortableWalkerContext) => void; finish?: (value: unknown) => unknown; violation: (reason: string, cause?: unknown) => never; }>;",
+          "name": "IPortableWalkerStrategy",
+          "signature": "export type IPortableWalkerStrategy = Readonly<{ maxDepth?: number; scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar; binary: (value: object, context: IPortableWalkerContext) => string | undefined; record: (value: object, context: IPortableWalkerContext) => IPortableRecord | undefined; array?: (value: unknown[], visit: (child: unknown) => unknown, context: IPortableWalkerContext) => Readonly<{ value: unknown[]; length?: number; violation?: string; }>; key?: (key: string, context: IPortableWalkerContext) => void; finish?: (value: unknown) => unknown; violation: (reason: string, cause?: unknown) => never; }>;",
+          "source": "packages/serialize/dist/portable.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./codec",
+          "ownerModule": "codec",
+          "ownerFragment": "serialize-codec--IPortableWalkerStrategy"
         },
         {
           "identity": "packages/serialize/dist/types.d.ts:isChunkShape:export declare const isChunkShape: (value: unknown) => value is ISerializeChunk;",
@@ -3182,9 +3290,9 @@
           "name": "asCodecValue",
           "kind": "function",
           "signature": "export declare function asCodecValue(value: unknown): ICodecValue;",
-          "declarationLine": 29,
-          "source": "packages/serialize/dist/codec.d.ts",
-          "purpose": "Validate and narrow a decoded format value before it crosses the codec boundary.",
+          "declarationLine": 58,
+          "source": "packages/serialize/dist/portable.d.ts",
+          "purpose": "Validate and narrow a decoded format value while preserving its original identity.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for asCodecValue.",
           "advanced": "No additional advanced behavior is declared for asCodecValue.",
           "parameters": ["value: unknown"],
@@ -3200,6 +3308,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for asCodecValue.",
           "examples": [],
           "members": [],
+          "aliasOf": "asCodecValue",
           "exportPath": "./codec",
           "overloadSignatures": [
             "export declare function asCodecValue(value: unknown): ICodecValue;"
@@ -3220,7 +3329,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Validate and narrow a decoded format value before it crosses the codec boundary."
+              "content": "Validate and narrow a decoded format value while preserving its original identity."
             },
             {
               "id": "getting-started",
@@ -3249,7 +3358,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/codec.d.ts:asCodecValue:export declare function asCodecValue(value: unknown): ICodecValue;",
+          "identity": "packages/serialize/dist/portable.d.ts:asCodecValue:export declare function asCodecValue(value: unknown): ICodecValue;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3259,7 +3368,7 @@
           "name": "assertCodecVersion",
           "kind": "function",
           "signature": "export declare function assertCodecVersion<const TVersion extends number>(version: TVersion): TVersion;",
-          "declarationLine": 33,
+          "declarationLine": 22,
           "source": "packages/serialize/dist/codec.d.ts",
           "purpose": "Validate format version and retain its literal type for factory callers.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertCodecVersion.",
@@ -3336,9 +3445,9 @@
           "name": "assertPortableValue",
           "kind": "function",
           "signature": "export declare function assertPortableValue(value: unknown, active?: Set<object>): void;",
-          "declarationLine": 27,
-          "source": "packages/serialize/dist/codec.d.ts",
-          "purpose": "Assert JSON-compatible portable data without importing the RPC contract module.",
+          "declarationLine": 56,
+          "source": "packages/serialize/dist/portable.d.ts",
+          "purpose": "Assert the legacy decoded portable profile without replacing or freezing caller data.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertPortableValue.",
           "advanced": "No additional advanced behavior is declared for assertPortableValue.",
           "parameters": ["value: unknown", "active: Set<object> (optional)"],
@@ -3359,6 +3468,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertPortableValue.",
           "examples": [],
           "members": [],
+          "aliasOf": "assertPortableValue",
           "exportPath": "./codec",
           "overloadSignatures": [
             "export declare function assertPortableValue(value: unknown, active?: Set<object>): void;"
@@ -3384,7 +3494,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Assert JSON-compatible portable data without importing the RPC contract module."
+              "content": "Assert the legacy decoded portable profile without replacing or freezing caller data."
             },
             {
               "id": "getting-started",
@@ -3413,9 +3523,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/codec.d.ts:assertPortableValue:export declare function assertPortableValue(value: unknown, active?: Set<object>): void;",
+          "identity": "packages/serialize/dist/portable.d.ts:assertPortableValue:export declare function assertPortableValue(value: unknown, active?: Set<object>): void;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 2,
           "configuration": [],
           "fragment": "serialize-codec--assertPortableValue"
         },
@@ -3423,8 +3533,8 @@
           "name": "CodecErrorText",
           "kind": "const",
           "signature": "export declare const CodecErrorText: { readonly invalidVersion: \"serialize codec version must be a positive safe integer\"; readonly invalidSchema: \"serialize protobuf schema descriptor is invalid\"; readonly encodeFailed: \"serialize codec encode failed\"; readonly decodeFailed: \"serialize codec decode failed\"; readonly portableValueInvalid: \"serialize codec value is outside the portable profile\"; };",
-          "declarationLine": 17,
-          "source": "packages/serialize/dist/codec.d.ts",
+          "declarationLine": 2,
+          "source": "packages/serialize/dist/codec-text.d.ts",
           "purpose": "Stable codec diagnostics shared by all format-specific implementations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for CodecErrorText.",
           "advanced": "No additional advanced behavior is declared for CodecErrorText.",
@@ -3435,6 +3545,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for CodecErrorText.",
           "examples": [],
           "members": [],
+          "aliasOf": "CodecErrorText",
           "exportPath": "./codec",
           "overloadSignatures": [
             "export declare const CodecErrorText: { readonly invalidVersion: \"serialize codec version must be a positive safe integer\"; readonly invalidSchema: \"serialize protobuf schema descriptor is invalid\"; readonly encodeFailed: \"serialize codec encode failed\"; readonly decodeFailed: \"serialize codec decode failed\"; readonly portableValueInvalid: \"serialize codec value is outside the portable profile\"; };"
@@ -3476,7 +3587,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/codec.d.ts:CodecErrorText:export declare const CodecErrorText: { readonly invalidVersion: \"serialize codec version must be a positive safe integer\"; readonly invalidSchema: \"serialize protobuf schema descriptor is invalid\"; readonly encodeFailed: \"serialize codec encode failed\"; readonly decodeFailed: \"serialize codec decode failed\"; readonly portableValueInvalid: \"serialize codec value is outside the portable profile\"; };",
+          "identity": "packages/serialize/dist/codec-text.d.ts:CodecErrorText:export declare const CodecErrorText: { readonly invalidVersion: \"serialize codec version must be a positive safe integer\"; readonly invalidSchema: \"serialize protobuf schema descriptor is invalid\"; readonly encodeFailed: \"serialize codec encode failed\"; readonly decodeFailed: \"serialize codec decode failed\"; readonly portableValueInvalid: \"serialize codec value is outside the portable profile\"; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3486,7 +3597,7 @@
           "name": "createCodecError",
           "kind": "function",
           "signature": "export declare function createCodecError(code: (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode], message: string, cause?: unknown): Error;",
-          "declarationLine": 25,
+          "declarationLine": 18,
           "source": "packages/serialize/dist/codec.d.ts",
           "purpose": "Construct a native error with module identity while retaining the original cause.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createCodecError.",
@@ -3582,6 +3693,88 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "serialize-codec--createCodecError"
+        },
+        {
+          "name": "createPortableWalker",
+          "kind": "function",
+          "signature": "export declare function createPortableWalker(strategy: IPortableWalkerStrategy): (value: unknown, active?: Set<object>) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean; }>;",
+          "declarationLine": 50,
+          "source": "packages/serialize/dist/portable.d.ts",
+          "purpose": "Create one specialized portable walker. Strategy callbacks and depth are captured once; callers create this function at module/owner scope. One traversal returns value, JSON UTF-8 byte upper bound and binary presence. No native-binary negotiation, side tables or consumer profiles exist.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createPortableWalker.",
+          "advanced": "No additional advanced behavior is declared for createPortableWalker.",
+          "parameters": ["strategy: IPortableWalkerStrategy"],
+          "parameterDetails": [
+            {
+              "name": "strategy",
+              "type": "IPortableWalkerStrategy",
+              "optional": false
+            }
+          ],
+          "returns": "(value: unknown, active?: Set<object>) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean; }>",
+          "errors": ["No documented errors are declared for createPortableWalker."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createPortableWalker.",
+          "examples": [
+            "import { createPortableWalker, type IPortableWalkerStrategy } from '@migaia/serialize/codec';\n\n// 策略由使用方定义；以下工厂不会自动选择某个消费方的规则。\nexport function makePortableBoundary(strategy: IPortableWalkerStrategy) {\n  const walk = createPortableWalker(strategy);\n  return (input: unknown) => walk(input);\n}"
+          ],
+          "members": [],
+          "aliasOf": "createPortableWalker",
+          "exportPath": "./codec",
+          "overloadSignatures": [
+            "export declare function createPortableWalker(strategy: IPortableWalkerStrategy): (value: unknown, active?: Set<object>) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean; }>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "strategy",
+                "type": "IPortableWalkerStrategy",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "(value: unknown, active?: Set<object>) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean; }>"
+          ],
+          "whenToUse": "Use createPortableWalker when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createPortableWalker does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Create one specialized portable walker. Strategy callbacks and depth are captured once; callers create this function at module/owner scope. One traversal returns value, JSON UTF-8 byte upper bound and binary presence. No native-binary negotiation, side tables or consumer profiles exist."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createPortableWalker from @migaia/serialize/codec, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createPortableWalker when its function contract and declared inputs match the result you need. Choose a different public symbol when createPortableWalker does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createPortableWalker."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createPortableWalker."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/portable.d.ts:createPortableWalker:export declare function createPortableWalker(strategy: IPortableWalkerStrategy): (value: unknown, active?: Set<object>) => Readonly<{ value: unknown; byteUpperBound: number; hasBinary: boolean; }>;",
+          "guidance": [],
+          "usageScore": 20,
+          "configuration": [],
+          "fragment": "serialize-codec--createPortableWalker"
         },
         {
           "name": "ICodec",
@@ -3710,10 +3903,76 @@
           "fragment": "serialize-codec--ICodecValue"
         },
         {
+          "name": "IPortableWalkerStrategy",
+          "kind": "type",
+          "signature": "export type IPortableWalkerStrategy = Readonly<{ maxDepth?: number; scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar; binary: (value: object, context: IPortableWalkerContext) => string | undefined; record: (value: object, context: IPortableWalkerContext) => IPortableRecord | undefined; array?: (value: unknown[], visit: (child: unknown) => unknown, context: IPortableWalkerContext) => Readonly<{ value: unknown[]; length?: number; violation?: string; }>; key?: (key: string, context: IPortableWalkerContext) => void; finish?: (value: unknown) => unknown; violation: (reason: string, cause?: unknown) => never; }>;",
+          "declarationLine": 31,
+          "source": "packages/serialize/dist/portable.d.ts",
+          "purpose": "Policy owned by the caller, resolved once at factory creation. Hooks never recurse themselves. Scalar/array/record validation may return a deferred violation to preserve projection failure priority; immediate violations call context.reject. The violation hook throws the caller's own coded native error and retains the supplied original failure on cause.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPortableWalkerStrategy.",
+          "advanced": "No additional advanced behavior is declared for IPortableWalkerStrategy.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IPortableWalkerStrategy."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPortableWalkerStrategy.",
+          "examples": [
+            "import { createPortableWalker, type IPortableWalkerStrategy } from '@migaia/serialize/codec';\n\n// 策略由使用方定义；以下工厂不会自动选择某个消费方的规则。\nexport function makePortableBoundary(strategy: IPortableWalkerStrategy) {\n  const walk = createPortableWalker(strategy);\n  return (input: unknown) => walk(input);\n}"
+          ],
+          "members": [],
+          "aliasOf": "IPortableWalkerStrategy",
+          "exportPath": "./codec",
+          "overloadSignatures": [
+            "export type IPortableWalkerStrategy = Readonly<{ maxDepth?: number; scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar; binary: (value: object, context: IPortableWalkerContext) => string | undefined; record: (value: object, context: IPortableWalkerContext) => IPortableRecord | undefined; array?: (value: unknown[], visit: (child: unknown) => unknown, context: IPortableWalkerContext) => Readonly<{ value: unknown[]; length?: number; violation?: string; }>; key?: (key: string, context: IPortableWalkerContext) => void; finish?: (value: unknown) => unknown; violation: (reason: string, cause?: unknown) => never; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IPortableWalkerStrategy when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IPortableWalkerStrategy does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Policy owned by the caller, resolved once at factory creation. Hooks never recurse themselves. Scalar/array/record validation may return a deferred violation to preserve projection failure priority; immediate violations call context.reject. The violation hook throws the caller's own coded native error and retains the supplied original failure on cause."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPortableWalkerStrategy from @migaia/serialize/codec, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPortableWalkerStrategy when its type contract and declared inputs match the result you need. Choose a different public symbol when IPortableWalkerStrategy does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPortableWalkerStrategy."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IPortableWalkerStrategy."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/portable.d.ts:IPortableWalkerStrategy:export type IPortableWalkerStrategy = Readonly<{ maxDepth?: number; scalar: (value: unknown, context: IPortableWalkerContext) => IPortableScalar; binary: (value: object, context: IPortableWalkerContext) => string | undefined; record: (value: object, context: IPortableWalkerContext) => IPortableRecord | undefined; array?: (value: unknown[], visit: (child: unknown) => unknown, context: IPortableWalkerContext) => Readonly<{ value: unknown[]; length?: number; violation?: string; }>; key?: (key: string, context: IPortableWalkerContext) => void; finish?: (value: unknown) => unknown; violation: (reason: string, cause?: unknown) => never; }>;",
+          "guidance": [],
+          "usageScore": 20,
+          "configuration": [],
+          "fragment": "serialize-codec--IPortableWalkerStrategy"
+        },
+        {
           "name": "normalizeCodecFailure",
           "kind": "function",
           "signature": "export declare function normalizeCodecFailure(error: unknown, code: (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode], message: string): Error;",
-          "declarationLine": 35,
+          "declarationLine": 24,
           "source": "packages/serialize/dist/codec.d.ts",
           "purpose": "Wraps a format callback while retaining the module error code and original cause.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizeCodecFailure.",
@@ -3814,9 +4073,9 @@
           "name": "toPortableValue",
           "kind": "function",
           "signature": "export declare function toPortableValue(value: unknown, active?: Set<object>): unknown;",
-          "declarationLine": 31,
-          "source": "packages/serialize/dist/codec.d.ts",
-          "purpose": "Converts runtime byte views to the portable tagged representation without host APIs.",
+          "declarationLine": 60,
+          "source": "packages/serialize/dist/portable.d.ts",
+          "purpose": "Preserve the legacy intermediate projection with a thin default walker instance.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for toPortableValue.",
           "advanced": "No additional advanced behavior is declared for toPortableValue.",
           "parameters": ["value: unknown", "active: Set<object> (optional)"],
@@ -3837,6 +4096,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for toPortableValue.",
           "examples": [],
           "members": [],
+          "aliasOf": "toPortableValue",
           "exportPath": "./codec",
           "overloadSignatures": [
             "export declare function toPortableValue(value: unknown, active?: Set<object>): unknown;"
@@ -3862,7 +4122,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Converts runtime byte views to the portable tagged representation without host APIs."
+              "content": "Preserve the legacy intermediate projection with a thin default walker instance."
             },
             {
               "id": "getting-started",
@@ -3891,9 +4151,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/codec.d.ts:toPortableValue:export declare function toPortableValue(value: unknown, active?: Set<object>): unknown;",
+          "identity": "packages/serialize/dist/portable.d.ts:toPortableValue:export declare function toPortableValue(value: unknown, active?: Set<object>): unknown;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 2,
           "configuration": [],
           "fragment": "serialize-codec--toPortableValue"
         }
@@ -4894,9 +5154,9 @@
           "name": "base64ToBytes",
           "kind": "function",
           "signature": "export declare function base64ToBytes(text: string): Uint8Array;",
-          "declarationLine": 11,
+          "declarationLine": 13,
           "source": "packages/serialize/dist/base64.d.ts",
-          "purpose": "base64ToBytes is part of this module's public function contract.",
+          "purpose": "Decode canonical padded base64 while preserving the legacy public diagnostic boundary.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for base64ToBytes.",
           "advanced": "No additional advanced behavior is declared for base64ToBytes.",
           "parameters": ["text: string"],
@@ -4936,7 +5196,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "base64ToBytes is part of this module's public function contract."
+              "content": "Decode canonical padded base64 while preserving the legacy public diagnostic boundary."
             },
             {
               "id": "getting-started",
@@ -5201,7 +5461,7 @@
               ]
             }
           ],
-          "usageScore": 90,
+          "usageScore": 94,
           "configuration": [],
           "fragment": "serialize-core--base64ToBytes"
         },
@@ -5209,9 +5469,9 @@
           "name": "bytesToBase64",
           "kind": "function",
           "signature": "export declare function bytesToBase64(bytes: Uint8Array): string;",
-          "declarationLine": 5,
+          "declarationLine": 6,
           "source": "packages/serialize/dist/base64.d.ts",
-          "purpose": "Shared binary wire helpers used by persistence and SSR codecs. Pure algorithm, no host `btoa`/`atob`.",
+          "purpose": "Encode bytes through the shared runtime-neutral RFC 4648 implementation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for bytesToBase64.",
           "advanced": "No additional advanced behavior is declared for bytesToBase64.",
           "parameters": ["bytes: Uint8Array"],
@@ -5251,7 +5511,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Shared binary wire helpers used by persistence and SSR codecs. Pure algorithm, no host `btoa`/`atob`."
+              "content": "Encode bytes through the shared runtime-neutral RFC 4648 implementation."
             },
             {
               "id": "getting-started",
@@ -5620,7 +5880,7 @@
           "name": "createSerializeError",
           "kind": "function",
           "signature": "export declare function createSerializeError(code: ISerializeErrorCode, message: string, options?: { readonly cause?: unknown; readonly context?: string; readonly errors?: readonly unknown[]; }): ISerializeLifecycleError;",
-          "declarationLine": 93,
+          "declarationLine": 95,
           "source": "packages/serialize/dist/errors.d.ts",
           "purpose": "构造/生命周期错误（`REGISTRY_DISPOSED`/`ENV_UNSUPPORTED`/rollback）：原生 Error + source/code/context/cause/errors。 `errors` 是 rollback 完成后一次性创建的不可变快照（`Object.freeze`），空则省略字段、不替换 `cause`。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSerializeError.",
@@ -5776,7 +6036,7 @@
           "name": "createSerializeRangeError",
           "kind": "function",
           "signature": "export declare function createSerializeRangeError(code: ISerializeErrorCode, message: string, options?: { readonly cause?: unknown; readonly context?: string; }): ISerializeRangeError;",
-          "declarationLine": 104,
+          "declarationLine": 106,
           "source": "packages/serialize/dist/errors.d.ts",
           "purpose": "插件校验失败（空表 / 重复 / 非法 type）：原生 RangeError + `INVALID_OPTION`。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSerializeRangeError.",
@@ -5932,7 +6192,7 @@
           "name": "createSerializeTypeError",
           "kind": "function",
           "signature": "export declare function createSerializeTypeError(code: ISerializeErrorCode, message: string, options?: { readonly cause?: unknown; readonly context?: string; }): ISerializeTypeError;",
-          "declarationLine": 99,
+          "declarationLine": 101,
           "source": "packages/serialize/dist/errors.d.ts",
           "purpose": "参数错误（scheduler 结构非法）：原生 TypeError + `INVALID_OPTION`。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSerializeTypeError.",
@@ -7261,7 +7521,7 @@
           "name": "ISerializeLifecycleError",
           "kind": "type",
           "signature": "export type ISerializeLifecycleError = ISerializeTaggedError<Error> & { readonly errors?: readonly unknown[]; };",
-          "declarationLine": 77,
+          "declarationLine": 79,
           "source": "packages/serialize/dist/errors.d.ts",
           "purpose": "构造/生命周期错误的 tagged 原生 Error（`cause` 继承自 `Error`，另含 `errors`）。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeLifecycleError.",
@@ -7806,7 +8066,7 @@
           "name": "ISerializeRangeError",
           "kind": "type",
           "signature": "export type ISerializeRangeError = ISerializeTaggedError<RangeError>;",
-          "declarationLine": 75,
+          "declarationLine": 77,
           "source": "packages/serialize/dist/errors.d.ts",
           "purpose": "ISerializeRangeError is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeRangeError.",
@@ -8072,7 +8332,7 @@
           "name": "ISerializeTaggedError",
           "kind": "type",
           "signature": "export type ISerializeTaggedError<TError extends Error> = TError & { readonly source: string; readonly code: ISerializeErrorCode; readonly context?: string; };",
-          "declarationLine": 69,
+          "declarationLine": 71,
           "source": "packages/serialize/dist/errors.d.ts",
           "purpose": "结构化 tagged 错误：原生错误类型 `TError` 交叉附加 `source`/`code`/`context?`。运行时仍为 `TError`（`instanceof` 保持真）。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeTaggedError.",
@@ -8194,7 +8454,7 @@
           "name": "ISerializeTypeError",
           "kind": "type",
           "signature": "export type ISerializeTypeError = ISerializeTaggedError<TypeError>;",
-          "declarationLine": 74,
+          "declarationLine": 76,
           "source": "packages/serialize/dist/errors.d.ts",
           "purpose": "ISerializeTypeError is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeTypeError.",
@@ -9592,7 +9852,7 @@
           "name": "streamBase64Chunks",
           "kind": "function",
           "signature": "export declare function streamBase64Chunks(bytes: Uint8Array): Generator<string, void, void>;",
-          "declarationLine": 10,
+          "declarationLine": 11,
           "source": "packages/serialize/dist/base64.d.ts",
           "purpose": "逐片产出 base64 文本，供写入 sink（`WritableStream`、分块上传）的调用方——它永远不需要整份 base64 字符串一次成型。`bytesToBase64` 仍是「最终只要一个字符串」时的正确选择。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for streamBase64Chunks.",
@@ -9672,7 +9932,7 @@
           "name": "tagSerializeError",
           "kind": "function",
           "signature": "export declare function tagSerializeError<E extends Error>(error: E, code: ISerializeErrorCode, context?: string): ISerializeTaggedError<E>;",
-          "declarationLine": 86,
+          "declarationLine": 88,
           "source": "packages/serialize/dist/errors.d.ts",
           "purpose": "只读附加 `source`/`code`（及可选 `context`），返回带字段的原对象：不重建、不替换、不覆盖 stack。 **幂等（方案 A）**：已标记且 `(source, code)` 一致 → 直接返回（`context` 仅在未定义时写入一次）；已标记但 `(source, code)` 不一致 → 抛 TypeError（不得静默改写，避免二次 `defineProperty` 触发 `configurable: false` 抛错）。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for tagSerializeError.",
