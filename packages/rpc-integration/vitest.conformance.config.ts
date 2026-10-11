@@ -6,8 +6,7 @@ export default defineConfig(
   withDistFreshness({
     test: {
       include: [
-        '../rpc-core/test/process/conformance*.test.ts',
-        '../rpc-process/test/process/conformance*.test.ts',
+        'test/process/conformance*.test.ts',
         '../rpc-bridge-jsonrpc/test/bridge/conformance-faults.test.ts'
       ],
       exclude: [...configDefaults.exclude],

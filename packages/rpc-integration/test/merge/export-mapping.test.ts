@@ -10,7 +10,7 @@ import jsonrpcBridgeDelta from '../fixtures/jsonrpc-bridge-export-delta.json'
 import coreRefactorDelta from '../fixtures/core-refactor-export-delta.json'
 
 /** Package root whose manifest and built files define the new public surface. */
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../')
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 /** Physical runtime owner namespace migration; canonical semantic source directories remain intact. */
 function splitEntry(name: string) {
   const current = (coreRefactorDelta.relocations as Record<string, string>)[name] ?? name
@@ -474,7 +474,7 @@ describe('A1 merged public exports', () => {
     const remoteNamespace = await import(pathToFileURL(join(coreRoot, remote.default)).href)
     /** Canonical identity prevents a copied table or wrapper from becoming another vocabulary owner. */
     const runtimeConstants = await import(
-      pathToFileURL(join(coreRoot, 'dist/remote/runtime-api/constants.js')).href
+      pathToFileURL(join(coreRoot, './dist/remote/runtime-api/constants.js')).href
     )
     expect(remoteNamespace.RuntimePluginKey).toBe(runtimeConstants.RuntimePluginKey)
     expect(remoteNamespace.RuntimePluginKey).toEqual({ process: 'process', thread: 'thread' })
@@ -508,12 +508,14 @@ describe('A1 merged public exports', () => {
   })
 
   it('keeps contract protocol and normalizer implementations outside compiled core', () => {
-    expect(existsSync(join(packageRoot, 'rpc-core/dist/core'))).toBe(true)
-    expect(existsSync(join(packageRoot, 'rpc-contract/dist/contract'))).toBe(true)
-    const offenders = compiledCoreFiles(join(packageRoot, 'rpc-core/dist/core')).filter((path) => {
-      const source = readFileSync(path, 'utf8')
-      return /(?:function|const|class)\s+(?:rpcProtocolV1|normalizeRpcEnvelope)\b/.test(source)
-    })
+    expect(existsSync(join(packageRoot, './rpc-core/dist/core'))).toBe(true)
+    expect(existsSync(join(packageRoot, './rpc-contract/dist/contract'))).toBe(true)
+    const offenders = compiledCoreFiles(join(packageRoot, './rpc-core/dist/core')).filter(
+      (path) => {
+        const source = readFileSync(path, 'utf8')
+        return /(?:function|const|class)\s+(?:rpcProtocolV1|normalizeRpcEnvelope)\b/.test(source)
+      }
+    )
     expect(offenders).toEqual([])
   })
 })

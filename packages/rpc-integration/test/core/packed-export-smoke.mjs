@@ -118,7 +118,10 @@ async function main() {
     const typeConfig = join(consumerDirectory, 'tsconfig.json')
     writeFileSync(
       typeContract,
-      readFileSync(resolve(packageDirectory, 'test/core/fixtures/packed/type-contract.ts'), 'utf8'),
+      readFileSync(
+        resolve(integrationDirectory, 'test/core/fixtures/packed/type-contract.ts'),
+        'utf8'
+      ),
       'utf8'
     )
     writeFileSync(
@@ -288,7 +291,7 @@ function assertPackedLegacyRootAliasPerturbation(packedPackage, consumerDirector
   /** Preserved retired owner source used only to perturb the extracted packed package. */
   const fixture = JSON.parse(
     readFileSync(
-      resolve(packageDirectory, 'test/core/fixtures/packed/legacy-chunk-owner.json'),
+      resolve(integrationDirectory, 'test/core/fixtures/packed/legacy-chunk-owner.json'),
       'utf8'
     )
   )

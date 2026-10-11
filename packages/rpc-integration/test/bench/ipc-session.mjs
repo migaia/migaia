@@ -1,0 +1,926 @@
+import { IpcBenchErrorText } from '../../bench/error-text.mjs'
+import '../../bench/observe.mjs'
+import { snapshot, waitForObservation } from '../../bench/observe.mjs'
+import { IpcBenchControl, RuntimeBench } from '../../bench/text.mjs'
+import { createHash } from 'node:crypto'
+import { spawn, execFileSync } from 'node:child_process'
+import { once } from 'node:events'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { openSync, closeSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { parentPort, Worker, MessageChannel } from 'node:worker_threads'
+import { readFileSync, existsSync } from 'node:fs'
+/** Only actual Deno uses its Command/std streams and native Web Worker adapters. */
+const deno = typeof Deno !== 'undefined'
+/** Loader registration finishes before importing the actual production adapter modules. */
+const { createNodeProcessLauncher, openProcessStdioChannel } =
+  await import('@migaia/rpc-process/adapters/node-child-process')
+/** Bare and RPC Deno sides share the same delivered byte carrier, without Node spawn substitution. */
+const denoProcess = deno ? await import('@migaia/rpc-process/adapters/deno-command') : undefined
+/** Both bare and RPC byte sides reuse the exact delivered physical carrier. */
+const { dialProcessByteChannel, listenProcessByteChannel } =
+  await import('@migaia/rpc-process/adapters/node-socket')
+/** Channel scheduling uses the runtime-neutral canonical owner. */
+const { systemScheduler } = await import('@migaia/utils/scheduler')
+import {
+  classification,
+  classify,
+  report,
+  nativeProviderLimits
+} from '../../bench/classification.mjs'
+/** Node and bare Worker memory/CPU snapshots use their original separate control port. */
+let snapshotPort
+/** Bun's native Web Worker exposes its real isolate snapshot outside the measured request window. */
+let snapshotPeer
+/** Each native child has an ordered out-of-band snapshot file sequence. */
+let snapshotSequence = 0
+/** Native peers share SIGUSR2 control; foreign peers have only native PID observations. */
+async function peerSnapshot(peerPid) {
+  if (snapshotPeer) return snapshotPeer()
+  if (snapshotPort)
+    return new Promise((resolve) => {
+      snapshotPort.once('message', resolve)
+      snapshotPort.postMessage('snapshot')
+    })
+  const path = process.env.IPC_BENCH_STEM + '.peer.snapshot-' + snapshotSequence++ + '.json'
+  process.kill(peerPid, 'SIGUSR2')
+  while (!existsSync(path)) await new Promise((resolve) => setTimeout(resolve, 1))
+  return JSON.parse(readFileSync(path, 'utf8'))
+}
+
+/** One entry serves both sides so runtime/carrier/payload stay identical across paired windows. */
+const entry = fileURLToPath(import.meta.url)
+/** Readiness stays out-of-band and outside measurement windows. */
+const readyText = 'IPC_READY\n'
+/** Native proposal uses production grammar and JSON codec. */
+let offer
+/** Load the delivered public Peer graph only on RPC sides; bare RSS must not include it. */
+async function rpcApi() {
+  const processApi = await import('@migaia/rpc-process')
+  const threads = await import('@migaia/rpc-threads')
+  const threadAdapters = await import('@migaia/rpc-threads/adapters/node')
+  const bunAdapters = process.versions.bun
+    ? await import('@migaia/rpc-threads/adapters/bun')
+    : undefined
+  const denoAdapters = deno ? await import('@migaia/rpc-threads/adapters/deno') : undefined
+  /** Capability declarations come from the actual factory source context, never a fixture guess. */
+  offer = (id, capabilities) => ({
+    ...processApi.createNativeProcessOffer({
+      peer: { id, runtime: deno ? 'deno' : process.versions.bun ? 'bun' : 'node' }
+    }),
+    capabilities
+  })
+  return { ...processApi, ...threads, ...threadAdapters, ...bunAdapters, ...denoAdapters }
+}
+/** Fixed benchmark method has no side effect besides returning its portable input. */
+const echoMethod = RuntimeBench.echo
+/** Both public provider factories compile the same nested tree into the original echo wire name. */
+const echoProvide = { bench: { echo: (payload) => payload } }
+
+/**
+ * Wait for a separately started peer, retaining startup failures as preparation errors.
+ *
+ * @param {import('node:child_process').ChildProcess} child Peer process.
+ * @returns {Promise<void>} Ready marker consumed.
+ * @throws {Error} Exit or launch failure before readiness.
+ */
+function waitReady(child) {
+  return new Promise((resolve, reject) => {
+    /** Readiness may span stderr chunks; status contains no business data. */
+    let status = ''
+    child.stderr.on('data', (chunk) => {
+      status += chunk.toString()
+      if (status.includes(readyText)) resolve()
+    })
+    child.once('error', reject)
+    child.once('exit', (code) => reject(new Error(`IPC peer exited before ready: ${code}`)))
+  })
+}
+
+/**
+ * Serve bare socket/stdio frames with one JSON parse and serialization per payload.
+ *
+ * @param {import('@migaia/rpc-process').IProcessByteChannel} raw Owned physical channel.
+ * @returns {Promise<void>} Resolves at physical close.
+ */
+async function serveBare(raw) {
+  /** Sequential sender permits at most one physical reply awaiting a backpressured write. */
+  let buffered = Buffer.alloc(0)
+  /** Writes are FIFO and joined before final teardown. */
+  let writing = Promise.resolve()
+  /** Input budget is exactly the production native physical-frame limit. */
+  const release = raw.onData((chunk) => {
+    buffered = Buffer.concat([buffered, chunk])
+    while (buffered.length >= 4) {
+      const size = buffered.readUInt32BE(0)
+      if (!size || size > 16_777_216) throw new RangeError(IpcBenchErrorText.bareFrame)
+      if (buffered.length < size + 4) break
+      /** The bare baseline includes business JSON work without endpoint or protocol dispatch. */
+      const body = Buffer.from(
+        JSON.stringify(JSON.parse(buffered.subarray(4, size + 4).toString()))
+      )
+      /** Regenerate the physical prefix from the serialized body, including noncanonical input. */
+      const frame = Buffer.alloc(body.length + 4)
+      frame.writeUInt32BE(body.length)
+      frame.set(body, 4)
+      buffered = buffered.subarray(size + 4)
+      writing = writing.then(() => raw.write(frame))
+    }
+  })
+  await new Promise((resolve) => raw.onClose(resolve))
+  release()
+  await writing
+}
+
+/**
+ * Build the public process Peer on the original physical source and provide an exact echo.
+ *
+ * @param {import('@migaia/rpc-core/remote').IRuntimePeerSource} source Original channel negotiation
+ *   receives the actual factory identity and installed capability offer.
+ * @returns {Promise<import('@migaia/rpc-core/remote').IRuntimePeer>} Real public Peer.
+ */
+async function serveRpc(source) {
+  const { createProcessPeer } = await rpcApi()
+  /** The public factory owns the directory, provider and exact accepted endpoint lifecycle. */
+  const runtime = await createProcessPeer({
+    self: { name: 'peer', instanceId: 'peer' },
+    provide: echoProvide,
+    providerLimits: nativeProviderLimits,
+    connect: source,
+    report
+  })
+  return runtime
+}
+
+/**
+ * Create an isolated RPC or bare side without starting a measured window.
+ *
+ * @param {{ carrier: string; side: string; payload: string }} options Frozen unit and side.
+ * @returns {Promise<object>} Owned peer, exchange, readiness and close ports.
+ * @throws {Error} Preparation failure never becomes a ratio assertion.
+ */
+export async function createIpcSession({
+  carrier,
+  side,
+  payload,
+  wire,
+  peerRuntime,
+  topology,
+  direction
+}) {
+  if (topology || direction === RuntimeBench.reverse) {
+    const { createRuntimeSession } = await import('./runtime-session.mjs')
+    return createRuntimeSession(
+      { carrier, side, payload, topology: topology ?? RuntimeBench.reverse },
+      {
+        classification,
+        providerLimits: nativeProviderLimits,
+        report
+      }
+    )
+  }
+  if (wire === 'jsonrpc') return createBridgeIpcSession({ carrier, side, payload, peerRuntime })
+  /** Owned cleanup actions are registered before the next fallible preparation step. */
+  const cleanup = []
+  /** Physical raw channels exist only for byte carriers. */
+  let raw
+  /** Worker carrier shares parent PID; other carriers retain distinct peer PID. */
+  let peerPid
+  /** RPC runtime is the public Peer owner; bare waits for one unchanged byte/message echo. */
+  let runtime
+  /** Stdio ready marker is observed by the launcher before any warmup or PID baseline. */
+  let resolvePeerReady
+  const peerReady = new Promise((resolve) => {
+    resolvePeerReady = resolve
+  })
+  let status = ''
+  /** Input encoding is identical for both paired sides' business value. */
+  const encoded = Buffer.from(JSON.stringify(payload))
+  /** Bare processes never load endpoint/proxy/bridge ownership during preparation or measurement. */
+  const api = side === 'rpc' ? await rpcApi() : undefined
+  try {
+    if (carrier === 'worker') {
+      if (side === 'rpc' && (process.versions.bun || deno)) {
+        runtime = await api.createThreadPeer({
+          self: { name: 'parent', instanceId: 'parent' },
+          providerLimits: nativeProviderLimits,
+          report,
+          spawn: async (context) => {
+            /** Deno cold imports finish before its native runtime can deliver the bootstrap event. */
+            let WorkerConstructor
+            let entry = import.meta.url
+            if (deno) {
+              entry = new URL('../../bench/deno-worker.mjs', import.meta.url).href
+              const worker = new globalThis.Worker(entry, { type: 'module', name: 'peer' })
+              /** Before launcher adoption, failed cold preparation still owns this exact Worker. */
+              cleanup.push(() => worker.terminate())
+              await new Promise((resolve, reject) => {
+                const ready = (event) => {
+                  if (event.data !== IpcBenchControl.ready) return
+                  worker.removeEventListener('message', ready)
+                  resolve()
+                }
+                worker.addEventListener('message', ready)
+                worker.addEventListener('error', (event) => reject(event.error ?? event), {
+                  once: true
+                })
+              })
+              /** Canonical launcher adopts the genuine prestarted native object without a queue. */
+              WorkerConstructor = class {
+                constructor() {
+                  return worker
+                }
+              }
+            }
+            /** The Bun adapter supplies real Web bootstrap and retains unsupported exit semantics. */
+            const launcher = (deno ? api.createDenoThreadLauncher : api.createBunThreadLauncher)({
+              runtimeApi: context,
+              report,
+              ...(WorkerConstructor ? { Worker: WorkerConstructor } : {})
+            })
+            const handle = await launcher.launch(
+              { entry, name: 'peer' },
+              { signal: new AbortController().signal }
+            )
+            cleanup.push(() => handle.terminate())
+            return (deno ? api.createDenoThreadChannelFactory : api.createBunThreadChannelFactory)({
+              scheduler: systemScheduler
+            }).open(handle, new AbortController().signal)
+          }
+        })
+        /** This extra control operation is outside timing and is reported separately from bare OOB. */
+        snapshotPeer = () => runtime.request(IpcBenchControl.snapshot)
+        peerPid = process.pid
+      } else if (deno) {
+        /** Bare native Web Worker keeps the same JSON business echo, with separate control port. */
+        const workerEntry = new URL(import.meta.url)
+        workerEntry.searchParams.set('bare', '1')
+        const worker = new globalThis.Worker(workerEntry.href, { type: 'module' })
+        const controls = new globalThis.MessageChannel()
+        /** All native replies retain FIFO accounting; no Node Worker compatibility events are used. */
+        const waiting = []
+        const ready = new Promise((resolve, reject) => {
+          worker.onerror = (event) => reject(event.error ?? event)
+          worker.onmessage = (event) => {
+            if (event.data === readyText) resolve()
+            else {
+              const waiter = waiting.shift()
+              if (event.data === payload) waiter?.resolve()
+              else waiter?.reject(new Error(IpcBenchErrorText.echo))
+            }
+          }
+        })
+        cleanup.push(() => {
+          controls.port1.close()
+          worker.terminate()
+        })
+        await ready
+        worker.postMessage({ kind: IpcBenchControl.observation, port: controls.port2 }, [
+          controls.port2
+        ])
+        /** Snapshot control never travels through the measured echo port or request path. */
+        snapshotPeer = () =>
+          new Promise((resolve) => {
+            controls.port1.onmessage = (event) => resolve(event.data)
+            controls.port1.postMessage('snapshot')
+          })
+        peerPid = process.pid
+        return {
+          peerPid,
+          peerSnapshot: () => peerSnapshot(peerPid),
+          classification: () => classification,
+          ready: async () => undefined,
+          exchange: () =>
+            new Promise((resolve, reject) => {
+              waiting.push({ resolve, reject })
+              worker.postMessage(payload)
+            }),
+          close: async () => {
+            for (const close of cleanup.reverse()) await close()
+          }
+        }
+      } else {
+        const controls = new MessageChannel()
+        snapshotPort = controls.port1
+        cleanup.push(() => {
+          controls.port1.close()
+        })
+        if (side === 'rpc') {
+          /** The actual library launcher supplies the bootstrap accepted by the automatic child. */
+          const launcher = api.createNodeThreadLauncher()
+          /** Owned Worker execution retains the original supervision lease and close owner. */
+          const { createUnitBudget } = await import('@migaia/supervision')
+          runtime = await api.createThreadPeer({
+            self: { name: 'parent', instanceId: 'parent' },
+            providerLimits: nativeProviderLimits,
+            report,
+            spawn: {
+              spec: {
+                entry,
+                name: 'peer',
+                data: {
+                  side,
+                  carrier,
+                  child: true,
+                  ...(process.env.IPC_BENCH_STEM ? { benchStem: process.env.IPC_BENCH_STEM } : {}),
+                  observation: true
+                }
+              },
+              launcher: {
+                ...launcher,
+                async launch(spec, context) {
+                  /** Preserve the original private launch context and real native handle. */
+                  const handle = await launcher.launch(spec, context)
+                  /** Observation setup completes before the channel factory consumes the child ACK. */
+                  const observed = new Promise((resolve, reject) => {
+                    controls.port1.once('message', (message) =>
+                      message === IpcBenchControl.ready
+                        ? resolve()
+                        : reject(new Error(IpcBenchErrorText.workerObservation))
+                    )
+                  })
+                  try {
+                    handle.port.postMessage(
+                      { kind: IpcBenchControl.observation, port: controls.port2 },
+                      [controls.port2]
+                    )
+                    await Promise.race([
+                      observed,
+                      handle.exited.then(() => {
+                        throw new Error(IpcBenchErrorText.workerObservationExit)
+                      })
+                    ])
+                  } catch (primary) {
+                    handle.terminate()
+                    await handle.exited
+                    throw primary
+                  }
+                  return handle
+                }
+              },
+              budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),
+              scheduler: systemScheduler,
+              channelFactory: api.createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+              report
+            }
+          })
+          peerPid = process.pid
+        } else {
+          const worker = new Worker(entry, {
+            workerData: {
+              side,
+              carrier,
+              child: true,
+              benchPort: controls.port2,
+              benchStem: process.env.IPC_BENCH_STEM
+            },
+            transferList: [controls.port2]
+          })
+          const exited = once(worker, 'exit')
+          cleanup.push(async () => {
+            await worker.terminate()
+            await exited
+          })
+          await new Promise((resolve, reject) => {
+            worker.once('message', (value) =>
+              value === readyText ? resolve() : reject(new Error('Worker readiness invalid'))
+            )
+            worker.once('error', reject)
+          })
+          peerPid = process.pid
+          /** Bare replies settle one FIFO waiter per physical message, including concurrent lanes. */
+          const waiting = []
+          worker.on('message', (value) => {
+            const waiter = waiting.shift()
+            if (value === payload) waiter?.resolve()
+            else waiter?.reject(new Error('Bare worker mismatch'))
+          })
+          return {
+            peerPid,
+            peerSnapshot: () => peerSnapshot(peerPid),
+            classification: () => classification,
+            ready: async () => undefined,
+            exchange: () =>
+              new Promise((resolve, reject) => {
+                waiting.push({ resolve, reject })
+                worker.postMessage(payload, undefined)
+              }),
+            close: async () => {
+              for (const close of cleanup.reverse()) await close()
+            }
+          }
+        }
+      }
+    } else if (carrier === 'stdio-framed') {
+      const handle = await (
+        deno ? denoProcess.createDenoProcessLauncher() : createNodeProcessLauncher()
+      ).launch(
+        {
+          command: deno ? Deno.execPath() : process.execPath,
+          args: [...(deno ? ['run', '-A'] : []), entry, '--child', side, carrier],
+          env: { inherit: ['PATH'], set: { IPC_BENCH_STEM: process.env.IPC_BENCH_STEM + '.peer' } },
+          stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' }
+        },
+        {
+          signal: new AbortController().signal,
+          output: (stream, chunk) => {
+            if (stream !== 'stderr') return
+            /** Child startup failures remain attached to the real side's retained stderr receipt. */
+            const text = Buffer.from(chunk).toString().replaceAll('bench-local', '[REDACTED_AUTH]')
+            process.stderr.write(text)
+            status += text
+            if (status.includes(readyText)) resolvePeerReady()
+          }
+        }
+      )
+      peerPid = handle.identity.pid
+      raw = handle.channel
+      cleanup.push(async () => {
+        await handle.terminate('force')
+        await handle.exited
+      })
+    } else if (carrier === 'socket-framed') {
+      const directory = await mkdtemp(join(tmpdir(), 'rpc-bench-'))
+      cleanup.push(() => rm(directory, { recursive: true, force: true }))
+      const address = join(directory, 'peer.sock')
+      const child = spawn(process.execPath, [entry, '--child', side, carrier, address], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, IPC_BENCH_STEM: process.env.IPC_BENCH_STEM + '.peer' }
+      })
+      const exited = once(child, 'close')
+      cleanup.push(async () => {
+        child.kill()
+        await exited
+      })
+      await waitReady(child)
+      peerPid = child.pid
+      raw = await dialProcessByteChannel({ address })
+    } else throw new Error(IpcBenchErrorText.carrier(carrier))
+    if (raw && side === 'rpc') {
+      runtime = await api.createProcessPeer({
+        self: { name: 'parent', instanceId: 'parent' },
+        providerLimits: nativeProviderLimits,
+        connect: (context) =>
+          api.createProcessTransport(raw, {
+            role: 'initiator',
+            peerId: 'peer',
+            offer: { ...offer('parent', context.capabilities), auth: 'bench-local' },
+            report,
+            ipc: { connectionId: 'bench', sessionId: 'bench', log: () => undefined }
+          }),
+        report
+      })
+    }
+    if (runtime) {
+      cleanup.push(() => runtime.close())
+      await runtime.request(echoMethod, payload)
+      return {
+        facade: runtime,
+        peerPid,
+        peerSnapshot: () => peerSnapshot(peerPid),
+        classification: () => classification,
+        encodedBytes: encoded.length,
+        ready: async () => undefined,
+        exchange: async () => {
+          try {
+            if ((await runtime.request(echoMethod, payload)) !== payload)
+              throw new Error(IpcBenchErrorText.echo)
+          } catch (error) {
+            classification.failures.push(classify(error))
+            throw error
+          }
+        },
+        close: async () => {
+          const failures = []
+          for (const close of cleanup.reverse()) {
+            try {
+              await close()
+            } catch (error) {
+              failures.push(error)
+            }
+          }
+          if (failures.length) throw new AggregateError(failures, IpcBenchErrorText.cleanup)
+        }
+      }
+    }
+    /** Bare side sends exactly the same codec-produced business bytes as RPC input. */
+    const frame = Buffer.alloc(encoded.length + 4)
+    frame.writeUInt32BE(encoded.length)
+    frame.set(encoded, 4)
+    /** Echo buffering belongs to one concurrency-one request; every byte is compared. */
+    let buffer = Buffer.alloc(0)
+    /** Equal-size echoes settle exactly one issued call per complete physical frame. */
+    const waiting = []
+    let failure
+    const release = raw.onData((chunk) => {
+      buffer = Buffer.concat([buffer, chunk])
+      while (buffer.length >= frame.length) {
+        const echoed = buffer.subarray(0, frame.length)
+        buffer = buffer.subarray(frame.length)
+        const waiter = waiting.shift()
+        if (!echoed.equals(frame)) failure = new Error('Bare echo mismatch')
+        if (failure) waiter?.reject(failure)
+        else waiter?.resolve()
+      }
+    })
+    const releaseClose = raw.onClose(() => {
+      failure = new Error('Bare peer closed')
+      for (const waiter of waiting.splice(0)) waiter.reject(failure)
+    })
+    cleanup.push(async () => {
+      release()
+      releaseClose()
+      await raw.close()
+    })
+    return {
+      peerPid,
+      peerSnapshot: () => peerSnapshot(peerPid),
+      classification: () => classification,
+      encodedBytes: encoded.length,
+      ready: async () => {
+        if (carrier === 'stdio-framed') await peerReady
+      },
+      exchange: () =>
+        new Promise((resolve, reject) => {
+          if (failure) {
+            reject(failure)
+            return
+          }
+          waiting.push({ resolve, reject })
+          raw.write(frame).catch(reject)
+        }),
+      close: async () => {
+        for (const close of cleanup.reverse()) await close()
+      }
+    }
+  } catch (primary) {
+    const failures = [primary]
+    for (const close of cleanup.reverse()) {
+      try {
+        await close()
+      } catch (error) {
+        failures.push(error)
+      }
+    }
+    throw failures.length === 1
+      ? primary
+      : new AggregateError(failures, IpcBenchErrorText.preparationCleanup)
+  }
+}
+
+/**
+ * Prepare one independent language peer with an unchanged carrier on bare and RPC sides.
+ *
+ * @param {{ carrier: string; side: string; payload: string; peerRuntime: string }} options Frozen
+ *   peer profile.
+ * @returns {Promise<object>} Physical/RPC echo session with actual peer PID.
+ * @throws {Error} Original launch, negotiation, mismatch or cleanup failure.
+ */
+async function createBridgeIpcSession({ carrier, side, payload, peerRuntime }) {
+  /** Both sides run this exact executable, argument profile and byte framing. */
+  const peerRoot = new URL('../process/peers/', import.meta.url)
+  let command, args, id
+  if (peerRuntime === 'python') {
+    command = 'python3'
+    args = ['-B', fileURLToPath(new URL('python/peer.py', peerRoot)), '--business']
+    id = 'python-peer'
+  } else if (peerRuntime === 'rust' || peerRuntime === 'go') {
+    command = execFileSync(
+      'sh',
+      [fileURLToPath(new URL(`${peerRuntime}/run.sh`, peerRoot)), '--executable'],
+      { encoding: 'utf8' }
+    ).trim()
+    args = ['--business']
+    id = `${peerRuntime}-peer`
+  } else throw new Error(IpcBenchErrorText.bridgeRuntime)
+  /** This is the actual spawned executable, independently hashed from the immutable peer sources. */
+  const executable = command.includes('/')
+    ? command
+    : execFileSync('which', [command], { encoding: 'utf8' }).trim()
+  const foreignExecutable = {
+    path: executable,
+    SHA256: createHash('sha256').update(readFileSync(executable)).digest('hex'),
+    sourceRoot: fileURLToPath(new URL(peerRuntime + '/', peerRoot)),
+    sourceStatus: 'readonly peer source manifest; binary hash distinct from JS loaded modules'
+  }
+  args.push('--jsonrpc', '--auth-fd', '3', ...(side === 'bare' ? ['--bare-jsonrpc'] : []))
+  /** Dedicated FD bootstrap remains outside the byte stream on both paired sides. */
+  const token = randomUUID()
+  const cleanup = []
+  let raw, peerPid, runtime
+  try {
+    if (carrier === 'stdio-content-length') {
+      const { loadFdLauncher } = await import('./fd-fixture-loader.mjs')
+      const handle = await (
+        await loadFdLauncher()
+      ).launch(
+        {
+          command,
+          args: [...args, '--stdio'],
+          env: { inherit: [], set: {} },
+          stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
+          bootstrap: { via: 'fd', fd: 3, payload: new TextEncoder().encode(token) }
+        },
+        { signal: new AbortController().signal, output: () => undefined }
+      )
+      raw = handle.channel
+      peerPid = handle.identity.pid
+      cleanup.push(async () => {
+        await handle.terminate('force')
+        await handle.exited
+      })
+    } else if (carrier === 'socket-content-length') {
+      const directory = await mkdtemp(join(tmpdir(), 'rpc-bench-bridge-'))
+      cleanup.push(() => rm(directory, { recursive: true, force: true }))
+      const address = join(directory, 'peer.sock'),
+        authPath = join(directory, 'auth')
+      writeFileSync(authPath, token, { mode: 0o600 })
+      const fd = openSync(authPath, 'r')
+      const child = spawn(command, [...args, '--listen-unix', address], {
+        stdio: ['ignore', 'pipe', 'pipe', fd]
+      })
+      closeSync(fd)
+      const exited = once(child, 'close')
+      cleanup.push(async () => {
+        child.kill()
+        await exited
+      })
+      await new Promise((resolve, reject) => {
+        let status = ''
+        child.stderr.on('data', (chunk) => {
+          status += chunk.toString()
+          if (status.includes('READY')) resolve()
+        })
+        child.once('error', reject)
+        child.once('exit', (code) => reject(new Error(`Bridge peer exited before ready: ${code}`)))
+      })
+      peerPid = child.pid
+      raw = await dialProcessByteChannel({ address })
+    } else throw new Error(IpcBenchErrorText.bridgeCarrier)
+    cleanup.push(() => raw.close())
+    if (side === 'rpc') {
+      const { createJsonRpcRemoteChannel } = await import('@migaia/rpc-bridge-jsonrpc')
+      const { createProcessPeer } = await import('@migaia/rpc-process')
+      /** Only capabilities with actual mappings in the canonical bridge profile are offered. */
+      const { JSONRPC_ALLOWED_CAPABILITIES } =
+        await import('../../../rpc-core/dist/adapter-owned/jsonrpc/constants.js')
+      /** Contract describes the same request echo already proved by the conformance facade cases. */
+      const contract = {
+        schemaVersion: 1,
+        plugin: 'p',
+        features: {
+          f: {
+            methods: {
+              request: { mode: 'request', idempotent: true },
+              oneWay: { mode: 'one-way', idempotent: false }
+            }
+          }
+        }
+      }
+      runtime = await createProcessPeer({
+        self: { name: 'parent', instanceId: 'parent' },
+        providerLimits: nativeProviderLimits,
+        connect: (context) =>
+          createJsonRpcRemoteChannel({
+            byte: raw,
+            peerId: id,
+            target: { kind: 'plugin', contract },
+            offer: {
+              versions: [{ major: 1, minor: 1 }],
+              capabilities: context.capabilities.filter((value) =>
+                JSONRPC_ALLOWED_CAPABILITIES.includes(value)
+              ),
+              peer: { id: 'parent', runtime: process.versions.bun ? 'bun' : 'node' }
+            },
+            token,
+            scheduler: systemScheduler,
+            wallClock: { timestamp: () => Date.now() },
+            ipc: { connectionId: 'bench', sessionId: 'bench', log: () => undefined },
+            report
+          }),
+        report
+      })
+      cleanup.push(() => runtime.close())
+    }
+    /** The bare peer parses and serializes this JSON payload once without RPC business dispatch. */
+    const body = Buffer.from(JSON.stringify(payload)),
+      frame = Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`), body])
+    let buffered = Buffer.alloc(0)
+    /** Foreign bare replies use the same FIFO accounting and bytes as the sequential baseline. */
+    const waiting = []
+    let failure
+    if (side === 'bare') {
+      const remove = raw.onData((chunk) => {
+        buffered = Buffer.concat([buffered, chunk])
+        while (buffered.length >= frame.length) {
+          const echoed = buffered.subarray(0, frame.length)
+          buffered = buffered.subarray(frame.length)
+          const waiter = waiting.shift()
+          if (!echoed.equals(frame)) failure = new Error('Bare bridge echo mismatch')
+          if (failure) waiter?.reject(failure)
+          else waiter?.resolve()
+        }
+      })
+      const removeClose = raw.onClose((reason) => {
+        failure = reason ?? new Error('Bare bridge peer closed')
+        for (const waiter of waiting.splice(0)) waiter.reject(failure)
+      })
+      cleanup.push(async () => {
+        remove()
+        removeClose()
+      })
+    }
+    const exchange =
+      side === 'rpc'
+        ? async () => {
+            try {
+              if ((await runtime.request('p.f.request', [payload])) !== payload)
+                throw new Error(IpcBenchErrorText.bridgeEcho)
+            } catch (error) {
+              classification.failures.push(classify(error))
+              throw error
+            }
+          }
+        : () =>
+            new Promise((resolve, reject) => {
+              if (failure) {
+                reject(failure)
+                return
+              }
+              waiting.push({ resolve, reject })
+              raw.write(frame).catch(reject)
+            })
+    const close = async () => {
+      const failures = []
+      for (const release of cleanup.reverse()) {
+        try {
+          await release()
+        } catch (error) {
+          failures.push(error)
+        }
+      }
+      if (failures.length) throw new AggregateError(failures, IpcBenchErrorText.bridgeCleanup)
+    }
+    return {
+      ...(runtime ? { facade: runtime } : {}),
+      peerPid,
+      encodedBytes: body.length,
+      ready: exchange,
+      exchange,
+      close,
+      peerSnapshot: async () => ({
+        pid: peerPid,
+        threadId: null,
+        memory: null,
+        loaded: [],
+        reason: 'foreign runtime JS isolate fields not applicable',
+        gcStatus: 'NOT_COLLECTED'
+      }),
+      classification: () => classification,
+      foreignExecutable
+    }
+  } catch (primary) {
+    const failures = [primary]
+    for (const close of cleanup.reverse()) {
+      try {
+        await close()
+      } catch (error) {
+        failures.push(error)
+      }
+    }
+    throw failures.length === 1
+      ? primary
+      : new AggregateError(failures, IpcBenchErrorText.bridgePreparation)
+  }
+}
+
+/** Child entry installs the public protocol or a physical echo before signalling readiness. */
+async function childMain(side, carrier, address) {
+  const api = side === 'rpc' ? await rpcApi() : undefined
+  if (carrier === 'worker') {
+    if (side === 'bare' && deno) {
+      /** Only the cold control message carries a port; business echo retains one parse/stringify. */
+      globalThis.onmessage = (event) => {
+        if (event.data?.kind === IpcBenchControl.observation) {
+          event.data.port.onmessage = () => event.data.port.postMessage(snapshot())
+        } else globalThis.postMessage(JSON.parse(JSON.stringify(event.data)))
+      }
+      globalThis.postMessage(readyText)
+      return
+    }
+    if (side === 'bare')
+      parentPort.on('message', (value) =>
+        parentPort.postMessage(JSON.parse(JSON.stringify(value)), undefined)
+      )
+    else
+      await api.createThreadPeer({
+        provide:
+          process.versions.bun || deno
+            ? { bench: { ...echoProvide.bench, snapshot } }
+            : echoProvide,
+        providerLimits: nativeProviderLimits,
+        report
+      })
+    if (side === 'bare') parentPort.postMessage(readyText, undefined)
+    return
+  }
+  if (carrier === 'socket-framed') {
+    /** Bare listener borrows native socket only; RPC listener authenticates through public adapter. */
+    if (side === 'bare') {
+      const { createServer } = await import('node:net')
+      const { nodeByteStream } =
+        await import('../../../rpc-core/dist/adapter-owned/process/node-byte-stream.js')
+      const server = createServer((socket) => {
+        void serveBare(nodeByteStream(socket, socket, () => socket.destroy())).catch((error) => {
+          process.stderr.write(String(error))
+          socket.destroy(error)
+        })
+      })
+      await new Promise((resolve, reject) => {
+        server.once('error', reject)
+        server.listen(address, resolve)
+      })
+    } else
+      await listenProcessByteChannel({
+        address,
+        serviceId: 'rpc-bench',
+        auth: {
+          mode: 'required',
+          verify: (token) => {
+            if (token !== 'bench-local') throw new Error(IpcBenchErrorText.authentication)
+            return 'bench'
+          }
+        },
+        report,
+        onConnection: async (pending) => {
+          await serveRpc(async (context) => {
+            const admitted = await pending.accept({
+              peerId: 'parent',
+              offer: offer('peer', context.capabilities),
+              report,
+              ipc: { connectionId: 'bench', sessionId: 'bench', log: () => undefined }
+            })
+            return admitted.channel
+          })
+        }
+      })
+    process.stderr.write(readyText)
+    return
+  }
+  const { channel: raw } = await (
+    deno ? denoProcess.openProcessStdioChannel : openProcessStdioChannel
+  )({
+    bootstrap: 'none'
+  })
+  if (side === 'bare') {
+    process.stderr.write(readyText)
+    await serveBare(raw)
+  } else {
+    await serveRpc((context) =>
+      api.createProcessTransport(raw, {
+        role: 'responder',
+        peerId: 'parent',
+        offer: offer('peer', context.capabilities),
+        auth: { mode: 'none' },
+        report,
+        ipc: { connectionId: 'bench', sessionId: 'bench', log: () => undefined }
+      })
+    )
+    process.stderr.write(readyText)
+  }
+}
+
+if (parentPort && !deno) {
+  const { workerData } = await import('node:worker_threads')
+  await waitForObservation()
+  /** The canonical launcher retains portable spec data under its original bootstrap data field. */
+  const input = workerData?.data ?? workerData
+  if (input?.topology) {
+    const { serveRuntimeWorker } = await import('./runtime-session.mjs')
+    await serveRuntimeWorker(input, {
+      classification,
+      providerLimits: nativeProviderLimits,
+      report
+    })
+  } else if (input?.child) await childMain(input.side, input.carrier)
+  else if (process.versions.bun && Bun.isMainThread === false) await childMain('rpc', 'worker')
+} else if (deno && typeof globalThis.postMessage === 'function') {
+  await childMain(new URL(import.meta.url).searchParams.has('bare') ? 'bare' : 'rpc', 'worker')
+} else if (process.versions.bun && Bun.isMainThread === false) {
+  await childMain('rpc', 'worker')
+} else if (process.argv.includes('--runtime-child')) {
+  const { serveRuntimeWorker } = await import('./runtime-session.mjs')
+  await serveRuntimeWorker(
+    { topology: 'relay' },
+    {
+      classification,
+      providerLimits: nativeProviderLimits,
+      report
+    }
+  )
+} else if (process.argv.includes('--child')) {
+  await childMain(...process.argv.slice(process.argv.indexOf('--child') + 1))
+}

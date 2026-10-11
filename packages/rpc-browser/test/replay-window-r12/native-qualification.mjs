@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { nativeSession } from '../../../rpc-core/test/replay-window-r12/native-harness.mjs'
+import { nativeSession } from '../../../rpc-integration/test/replay-window-r12/native-harness.mjs'
 
 /** Both current handshake auth policies qualify through the same private process resource owner. */
 const cases = [

@@ -19,7 +19,7 @@ const cell = JSON.parse(process.env.XRT_CELL ?? '{}'),
 const functional = process.env.XRT_FUNCTIONAL === '1'
 /** The source tree selects diagnostic entry observations independently of timing. */
 const fixtureRoot = new URL(
-  process.env.XRT_FIXTURE_ROOT ?? '../../../rpc-process/test/process/peers/',
+  process.env.XRT_FIXTURE_ROOT ?? '../../test/process/peers/',
   import.meta.url
 )
 /**
@@ -28,12 +28,12 @@ const fixtureRoot = new URL(
  */
 const sourceRoot = process.env.XRT_SOURCE_ROOT
   ? new URL(process.env.XRT_SOURCE_ROOT)
-  : new URL('../../../', import.meta.url)
+  : new URL('../../..', import.meta.url)
 /** Child and parent retain independent real runtime identity and cold source-loading provenance. */
 const child = process.argv.includes('--child'),
   stem = process.env.XRT_STEM
 /** Exact source imports correspond to public package export subpaths. */
-const api = async () => import(new URL('rpc-process/src/process/index.ts', sourceRoot).href)
+const api = async () => import(new URL('./rpc-process/src/process/index.ts', sourceRoot).href)
 /** Each runtime uses its delivered public process and socket adapter. */
 const processAdapter = () =>
   import(
@@ -469,7 +469,7 @@ async function session(physicalSide = side) {
   const connect = foreign
     ? async (context) => {
         const { createJsonRpcRemoteChannel } = await import(
-          new URL('rpc-bridge-jsonrpc/src/bridge/jsonrpc/index.ts', sourceRoot).href
+          new URL('./rpc-bridge-jsonrpc/src/bridge/jsonrpc/index.ts', sourceRoot).href
         )
         return createJsonRpcRemoteChannel({
           byte: raw,

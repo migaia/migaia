@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { nativeSession } from '../../../rpc-core/test/replay-window-r12/native-harness.mjs'
+import { nativeSession } from '../../../rpc-integration/test/replay-window-r12/native-harness.mjs'
 
 /** No request is sent between the peer's actual listener addition and held provider settlement. */
 const results = []

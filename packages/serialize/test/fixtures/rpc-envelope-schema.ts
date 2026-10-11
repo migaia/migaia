@@ -1,8 +1,9 @@
 import { fileDesc, messageDesc } from '@bufbuild/protobuf/codegenv2'
 
 /**
- * Deterministic Buf fixture generated from the normative `rpc-v1.proto` descriptor. Codec tests use
- * it as a schema input without making the generic serialize package own an RPC runtime binding.
+ * Deterministic Buf fixture copied from `packages/rpc-contract/schema/rpc-v1.proto`, the RPC source
+ * of truth. Codec tests use it as a schema input without making the generic serialize package own
+ * an RPC runtime binding.
  */
 export const rpcEnvelopeDescriptorBase64 =
   'ChNtaWdhaWFfcnBjX3YxLnByb3RvEg1taWdhaWEucnBjLnYxIkQKC1JwY0VudmVsb3BlEhAKBGtpbmQYASABKAlCAhAAEg4KAmlkGAIgASgJQgIQABITCgdwYXlsb2FkGAMgASgMQgIQAGIGcHJvdG8z'

@@ -5,5 +5,5 @@
     "noEmit": true,
     "types": ["vite/client", "@playwright/test"]
   },
-  "include": ["src", "e2e", "../rpc-core/test/e2e/fixtures"]
+  "include": ["src", "e2e", "../rpc-integration/test/e2e/fixtures"]
 }

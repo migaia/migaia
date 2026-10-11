@@ -2,16 +2,19 @@ import { RpcContractErrorCode } from '@migaia/rpc-contract'
 import { RPC_CONTRACT_SOURCE, RpcContractErrorText } from '../../../dist/contract/error-text.js'
 
 /**
- * @typedef {{
- *   encode: (value: unknown) => Uint8Array
- *   decode: (bytes: Uint8Array) => { kind: string; id: string; payload: Uint8Array }
- * }} IProtobufCodec
+ * @typedef {Pick<
+ *   import('@migaia/serialize/codec').ICodec<
+ *     import('../../../../serialize/test/fixtures/rpc-envelope-schema.js').IRpcEnvelopeMessage,
+ *     Uint8Array
+ *   >,
+ *   'encode' | 'decode'
+ * >} IProtobufCodec
  */
 /**
- * @typedef {{
- *   encode: (value: Record<string, unknown>) => string
- *   decode: (value: string) => unknown
- * }} IJsonCodec
+ * @typedef {Pick<
+ *   ReturnType<typeof import('@migaia/serialize/codecs/json').defineJsonCodec>,
+ *   'encode' | 'decode'
+ * >} IJsonCodec
  */
 /** @typedef {(value: Record<string, unknown>) => unknown} INormalize */
 /** @typedef {{ protobufCodec: IProtobufCodec; jsonCodec: IJsonCodec; normalize: INormalize }} IRpcProtobufPayloadCodecOptions */
