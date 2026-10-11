@@ -10,8 +10,8 @@ import {
   type IProcessLauncher
 } from '@migaia/supervision/process'
 import { createJsonRpcRemoteChannel, type IJsonRpcBridgeOptions } from '@migaia/rpc-bridge-jsonrpc'
-import type { IProcessPluginEstablish } from '@migaia/rpc-core/adapter/process'
-import { nodeByteStream } from '../../../../rpc-core/dist/adapter-owned/process/node-byte-stream.js'
+import type { IProcessPluginEstablish } from '@migaia/rpc-process'
+import { nodeByteStream } from '../../../../rpc-process/dist/process/node-byte-stream.js'
 import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
 import type { IProcessByteChannel } from '@migaia/rpc-process'
 import type { IIpcLogRecord } from '@migaia/rpc-core/plugins/flow-control'

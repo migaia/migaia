@@ -5,7 +5,7 @@ import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child
 import { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'
 import { createProcessTransport } from '@migaia/rpc-process'
 import { createNativeProcessOffer } from '@migaia/rpc-process'
-import { serveProcessSessions } from '../../../../rpc-core/dist/adapter-owned/process/plugin/serve.js'
+import { serveProcessSessions } from '../../../../rpc-process/dist/process/plugin/serve.js'
 import { createProcessResilience } from '@migaia/rpc-process'
 import { serveRemotePlugin } from '@migaia/rpc-core/remote'
 import { createComposedEndpoint } from '@migaia/rpc-core/composed'

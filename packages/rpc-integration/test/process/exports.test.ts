@@ -8,10 +8,10 @@ import familyConfig from '../../vitest.family.config.js'
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-process')
 /** The common process directory must remain free of platform imports. */
 const processSource = join(packageRoot, 'src/process')
-/** Shared neutral Process operations are owned by Core after the six-package migration. */
-const sharedProcessSource = resolve(packageRoot, '../rpc-core/src/adapter-owned/process')
+/** Generic resource operations stay in Core after Process-specific policy moves to its owner. */
+const sharedProcessSource = resolve(packageRoot, '../rpc-core/src/runtime-adapter')
 /** Only this file owns the physical IPC gate construction. */
-const ipcOwner = join(sharedProcessSource, 'ipc-connection.ts')
+const ipcOwner = join(sharedProcessSource, 'byte/ipc-connection.ts')
 
 /** Recursively collect source files without traversing test fixtures. */
 function sources(directory: string): string[] {
@@ -95,7 +95,8 @@ describe('process package layering and exports', () => {
       const source = readFileSync(file, 'utf8')
       if (
         !file.includes('/adapters/') &&
-        file !== join(sharedProcessSource, 'node-byte-stream.ts')
+        file !== join(processSource, 'node-byte-stream.ts') &&
+        file !== join(processSource, 'node-io.ts')
       ) {
         expect(source, file).not.toMatch(/(?:from\s*|import\s*\()['"](?:node:|bun:|electron|koffi)/)
       }

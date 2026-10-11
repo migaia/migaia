@@ -3,8 +3,8 @@ import { it, vi } from 'vitest'
 import {
   prepareProcessRuntimeBootstrap,
   decodeProcessRuntimeBootstrap
-} from '../../../rpc-core/dist/adapter-owned/process/runtime-bootstrap.js'
-import { createThreadRuntimeBootstrap } from '../../../rpc-core/dist/adapter-owned/threads/bootstrap.js'
+} from '../../../rpc-process/dist/process/runtime-bootstrap.js'
+import { createThreadRuntimeBootstrap } from '../../../rpc-threads/dist/threads/bootstrap.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { fileURLToPath } from 'node:url'

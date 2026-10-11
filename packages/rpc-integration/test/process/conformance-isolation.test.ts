@@ -31,7 +31,7 @@ import { PluginHost } from '@migaia/plugin-host'
 import {
   adoptHostRegistration,
   type IAdoptedHostRegistration
-} from '../../../rpc-core/dist/adapter-owned/process/host/registration.js'
+} from '../../../rpc-process/dist/process/host/registration.js'
 import { systemScheduler, createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { createProcessPlugin } from '@migaia/rpc-process'
 import { endpointFor } from './peers/ts/runtime.js'

@@ -6,7 +6,7 @@ import {
   createRpcIdempotencyStore,
   type IRpcIdempotencyStore
 } from '../../../rpc-core/dist/core/idempotency-store.js'
-import { createProcessListenerPeer } from '../../../rpc-core/dist/adapter-owned/process/runtime-listener.js'
+import { createProcessFixtureListenerPeer as createProcessListenerPeer } from '../fixtures/process-diagnostics.js'
 import { createProcessResilience } from '@migaia/rpc-process'
 import { createNativeProcessOffer } from '@migaia/rpc-process'
 import { createProcessTransport } from '@migaia/rpc-process'

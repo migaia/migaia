@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { createThreadPlugin } from '@migaia/rpc-threads'
-import { type IRuntimeThreadPluginOptions } from '../../../rpc-core/dist/adapter-owned/threads/plugin.js'
+import { type IRuntimeThreadPluginOptions } from '../../../rpc-threads/dist/threads/plugin.js'
 import { runtimeSources, runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
 import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
 import {
@@ -26,8 +26,9 @@ import { createHmac } from 'node:crypto'
 import { observePortableNormalization } from '../../../rpc-contract/test/fixtures/portable-observer.js'
 import {
   byteProcessPipeline,
-  messageProcessPipeline
-} from '../../../rpc-core/dist/adapter-owned/process/pipeline.js'
+  messageProcessPipeline,
+  createProcessFixtureChannel
+} from '../fixtures/process-diagnostics.js'
 import { registerFastCodec } from '../../../rpc-core/dist/core/internal/fast-path.js'
 import { createRuntimeApiEndpoint } from '@migaia/rpc-core'
 import { authentication } from '../../../rpc-core/dist/core/middleware/authentication.js'
@@ -58,8 +59,8 @@ import type { IRpcAbortSignal } from '../../../rpc-core/dist/core/typing.js'
 import { RpcError, RpcCoreErrorCode } from '../../../rpc-core/dist/core/errors.js'
 import { RpcCoreErrorText } from '../../../rpc-core/dist/core/error-text.js'
 import type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract'
-import { createProcessProviderAdmission } from '../../../rpc-core/dist/adapter-owned/process/resilience/provider-admission.js'
-import { normalizeProcessResilienceOptions } from '../../../rpc-core/dist/adapter-owned/process/resilience/session.js'
+import { createProcessProviderAdmission } from '../../../rpc-process/dist/process/resilience/provider-admission.js'
+import { normalizeProcessResilienceOptions } from '../../../rpc-process/dist/process/resilience/session.js'
 import { createRemoteBindingDrain } from '../../../rpc-core/dist/remote/internal/binding-drain.js'
 import {
   readRuntimeLaunchContext,
@@ -353,7 +354,7 @@ it.each(['quota', 'drain'] as const)(
               }
             }
           },
-          runtimeSources(capabilities, capabilities)
+          governedRuntimeSources(capabilities, scheduler)
         )
       )
       /** Borrow the genuine shared Host class; a custom endpoint cannot replace its ownership. */
@@ -438,7 +439,7 @@ it.each(['quota', 'drain'] as const)(
             provide: { baseline: () => 7 },
             endpointFactory: prepareSelectedEndpoint
           },
-          runtimeSources(capabilities, capabilities)
+          governedRuntimeSources(capabilities, scheduler)
         )
       )
       offset = 60_000
@@ -1338,6 +1339,48 @@ function owner() {
   return runtimeTestHost({
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
+}
+
+/** Keep the existing memory I/O while both genuine Core channel owners observe the bilateral ACK. */
+function governedRuntimeSources(
+  capabilities: readonly string[],
+  scheduler: typeof systemScheduler
+): ReturnType<typeof runtimeSources> {
+  /** Only the pair's raw send/subscription operations are reused; its structural source is not run. */
+  const carrier = runtimeSources(capabilities, capabilities)
+  /** Each side supplies its own actual public source context before either writes startup control. */
+  const offers: (Parameters<(typeof carrier.sources)[number]>[0] | undefined)[] = []
+  /** The original fixture's cold two-source barrier keeps both actual peer identities available. */
+  let accept!: () => void
+  /** The peer source calls join once, before Core installs both physical message readers. */
+  const ready = new Promise<void>((resolve) => {
+    accept = resolve
+  })
+  /** Both ends construct through the same public Core operation; no transport registrar is called. */
+  const source =
+    (index: number): (typeof carrier.sources)[number] =>
+    async (context) => {
+      offers[index] = context
+      if (offers[0] && offers[1]) accept()
+      await ready
+      /** The held memory side delivers real messages asynchronously to the opposite Core reader. */
+      const transport = carrier.transports[index]!
+      /** Core consumes the peer ACK before constructing the final transport or exposing business. */
+      const channel = await createProcessFixtureChannel(
+        {
+          kind: 'message',
+          send: (message) => transport.send(message),
+          onMessage: (listener) => transport.subscribe((message) => listener(message.data)),
+          onClose: (listener) => transport.onTransportError!(listener),
+          /** The original carrier pair remains alive until both Hosts finish their normal teardown. */
+          close: () => undefined
+        },
+        { peerId: offers[1 - index]!.self.instanceId, scheduler, capabilities }
+      )
+      /** Preserve the reference fixture's narrow type signature, returning the exact Core object. */
+      return channel as Awaited<ReturnType<(typeof carrier.sources)[number]>>
+    }
+  return { ...carrier, sources: [source(0), source(1)] as const }
 }
 
 /** Join two actual Plugin registrations; no substitute dispatcher resolves business methods. */

@@ -1,8 +1,8 @@
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it } from 'vitest'
 import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '../../../rpc-core/dist/adapter-owned/process/offer.js'
-import { createConnectProcessBinding } from '../../../rpc-core/dist/adapter-owned/process/plugin/binding.js'
+import { createNativeProcessOffer } from '../../../rpc-process/dist/process/offer.js'
+import { createConnectProcessBinding } from '../../../rpc-process/dist/process/plugin/binding.js'
 import type { IProcessByteChannel } from '@migaia/rpc-process'
 
 /** Two physical ports exchange framed handshake bytes without a platform socket. */

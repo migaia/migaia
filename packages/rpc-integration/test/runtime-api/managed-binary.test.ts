@@ -4,7 +4,7 @@ import { createHmac } from 'node:crypto'
 import { it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadBinding } from '../../../rpc-core/dist/adapter-owned/threads/binding.js'
+import { createThreadBinding } from '../../../rpc-threads/dist/threads/binding.js'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory,

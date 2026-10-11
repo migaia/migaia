@@ -1,8 +1,5 @@
 import { parentPort, workerData } from 'node:worker_threads'
-import {
-  ThreadBootstrap,
-  ThreadEvent
-} from '../../../../rpc-core/dist/adapter-owned/threads/constants.js'
+import { ThreadBootstrap, ThreadEvent } from '../../../../rpc-threads/dist/threads/constants.js'
 
 /** A genuine native child deliberately exercises the existing private startup failure paths. */
 parentPort.on(ThreadEvent.message, () => {

@@ -3,14 +3,15 @@ import { createUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
-import { serveProcessSessions } from '../../../rpc-core/dist/adapter-owned/process/plugin/serve.js'
+import { serveProcessSessions } from '../../../rpc-process/dist/process/plugin/serve.js'
 import { createProcessResilience } from '@migaia/rpc-process'
 import type { IProcessServeChildIngress, IProcessServeListenerIngress } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '../../../rpc-core/dist/adapter-owned/process/offer.js'
+import { createNativeProcessOffer } from '../../../rpc-process/dist/process/offer.js'
 import { createProcessPlugin } from '@migaia/rpc-process'
-import { createProcessSessionManager } from '../../../rpc-core/dist/adapter-owned/process/resilience/session.js'
+import { createProcessSessionManager } from '../../../rpc-process/dist/process/resilience/session.js'
 import type { IProcessMessageChannel } from '@migaia/rpc-process'
 import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-core/test/remote/fixture.js'
+import { createProcessFixtureChannel } from '../fixtures/process-diagnostics.js'
 
 describe('process resilience session ownership', () => {
   it('[A3] drains a real PluginHost unUse before disposing the process endpoint', async () => {
@@ -209,12 +210,17 @@ describe('unpublished process service rollback', () => {
         throw cleanup
       })
       const channelClose = vi.spyOn(fixture.channel, 'close')
-      /** Neither native health nor physical transport interpretation is the subject of this oracle. */
-      const channel = {
-        ...fixture.channel,
-        agreement: { ...fixture.channel.agreement, capabilities: [] },
-        transport: { ...fixture.channel.transport, subscribe: () => () => undefined }
-      }
+      /** Core owns the exact channel; its held physical close calls the original observed resource. */
+      const channel = await createProcessFixtureChannel(
+        {
+          kind: 'message',
+          send: () => undefined,
+          onMessage: () => () => undefined,
+          onClose: () => () => undefined,
+          close: () => fixture.channel.close!()
+        },
+        { peerId: fixture.channel.peerId, scheduler }
+      )
       const raw: IProcessMessageChannel = {
         kind: 'message',
         send: () => undefined,

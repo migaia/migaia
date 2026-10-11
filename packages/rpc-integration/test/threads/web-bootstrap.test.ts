@@ -4,7 +4,7 @@ import {
   createBrowserThreadLauncher,
   createBrowserThreadChannelFactory
 } from '@migaia/rpc-threads/adapters/browser'
-import { ThreadBootstrap } from '../../../rpc-core/dist/adapter-owned/threads/constants.js'
+import { ThreadBootstrap } from '../../../rpc-threads/dist/threads/constants.js'
 
 /** A real launcher owns acknowledgement and failure handling on this controllable Worker port. */
 function webFixture() {

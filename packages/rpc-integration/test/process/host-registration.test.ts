@@ -8,8 +8,8 @@ import { createLifecycleScope } from '@migaia/lifecycle'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createProcessResilience } from '@migaia/rpc-process'
 import { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'
-import { createNativeProcessOffer } from '../../../rpc-core/dist/adapter-owned/process/offer.js'
-import { createProcessError } from '../../../rpc-core/dist/adapter-owned/process/error.js'
+import { createNativeProcessOffer } from '../../../rpc-process/dist/process/offer.js'
+import { createProcessError } from '../../../rpc-process/dist/process/error.js'
 import { RpcProcessErrorCode } from '@migaia/rpc-process'
 import type { IProcessRegistrationListener } from '@migaia/rpc-process'
 import { nativeEndpoint } from './fixtures/native-runtime.js'
@@ -19,7 +19,7 @@ import {
   adoptHostRegistration,
   type IAdoptedHostRegistration,
   type IProcessHostAdoptionOptions
-} from '../../../rpc-core/dist/adapter-owned/process/host/registration.js'
+} from '../../../rpc-process/dist/process/host/registration.js'
 
 /** Cold process connection work stays within the existing 5000ms test envelope. */
 const REGISTRATION_CONNECTION_TIMEOUT_MS = 4000

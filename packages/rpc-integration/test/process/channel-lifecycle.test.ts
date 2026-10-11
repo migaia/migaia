@@ -4,19 +4,16 @@ import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { createUnitBudget } from '@migaia/supervision'
 import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { createSpawnProcessBinding } from '../../../rpc-core/dist/adapter-owned/process/plugin/binding.js'
+import { createSpawnProcessBinding } from '../../../rpc-process/dist/process/plugin/binding.js'
 import type { IRemoteChannel } from '@migaia/rpc-core/remote'
 import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
 import {
   bindProcessByteWire,
   bindProcessMessageTransport
-} from '../../../rpc-core/dist/adapter-owned/process/channel.js'
+} from '../fixtures/process-diagnostics.js'
 import { CHILD_STDERR_REDACTED } from '../fixtures/process-diagnostics.js'
-import { attachIpcConnection } from '../../../rpc-core/dist/adapter-owned/process/ipc-connection.js'
-import {
-  byteProcessPipeline,
-  remoteProcessJsonCodec
-} from '../../../rpc-core/dist/adapter-owned/process/pipeline.js'
+import { attachIpcConnection } from '../fixtures/process-diagnostics.js'
+import { byteProcessPipeline, remoteProcessJsonCodec } from '../fixtures/process-diagnostics.js'
 import { remoteProcessStringFramer } from '@migaia/rpc-contract/framing'
 import type { IProcessByteChannel, IProcessMessageChannel } from '@migaia/rpc-process'
 import type { IRpcTransport } from '@migaia/rpc-core'

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { createProcessListenerPeer } from '../../../rpc-core/dist/adapter-owned/process/runtime-listener.js'
+import { createProcessFixtureListenerPeer as createProcessListenerPeer } from '../fixtures/process-diagnostics.js'
 import { createNativeProcessOffer } from '@migaia/rpc-process'
 import { createProcessTransport } from '@migaia/rpc-process'
 import {

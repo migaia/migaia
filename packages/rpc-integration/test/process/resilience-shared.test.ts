@@ -9,16 +9,16 @@ import {
   listenProcessByteChannel
 } from '@migaia/rpc-process/adapters/node-socket'
 import { createProcessTransport } from '@migaia/rpc-process'
-import { createNativeProcessOffer } from '../../../rpc-core/dist/adapter-owned/process/offer.js'
+import { createNativeProcessOffer } from '../../../rpc-process/dist/process/offer.js'
 import {
   createProcessSessionService,
   serveProcessSessions,
   type IProcessSessionServiceOptions
-} from '../../../rpc-core/dist/adapter-owned/process/plugin/serve.js'
+} from '../../../rpc-process/dist/process/plugin/serve.js'
 import { createProcessResilience } from '@migaia/rpc-process'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import type { IProcessServeChildIngress, IProcessServeListenerIngress } from '@migaia/rpc-process'
-import type { IProcessServeEndpointFactory } from '@migaia/rpc-core/adapter/process'
+import type { IProcessServeEndpointFactory } from '@migaia/rpc-process'
 import type { IProcessSessionIdentity } from '@migaia/rpc-process'
 import type { IRemoteServeEndpoint } from '@migaia/rpc-core/remote'
 import { nativeBytePair, nativeEndpoint } from './fixtures/native-runtime.js'

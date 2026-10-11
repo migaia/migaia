@@ -19,7 +19,7 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   serveProcessSessions,
   createProcessSessionService
-} from '../../../../rpc-core/dist/adapter-owned/process/plugin/serve.js'
+} from '../../../../rpc-process/dist/process/plugin/serve.js'
 
 /** Bootstrap ownership starts before asynchronous Host installation, keeping the real pipe alive. */
 const opened = await openProcessStdioChannel({ bootstrap: 'stdin' })

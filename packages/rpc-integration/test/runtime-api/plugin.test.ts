@@ -12,7 +12,7 @@ import type {
   IRuntimePeer
 } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
 import { runtimeSources } from '../../../rpc-core/test/runtime-api/fixture.js'
-import type { IRuntimeThreadPluginOptions } from '../../../rpc-core/dist/adapter-owned/threads/plugin.js'
+import type { IRuntimeThreadPluginOptions } from '../../../rpc-threads/dist/threads/plugin.js'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
 
 /** The baseline's ordinary callable owner also uses a real managed Host and real Feature refs. */

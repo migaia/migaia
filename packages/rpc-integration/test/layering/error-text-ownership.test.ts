@@ -13,9 +13,9 @@ const packageRoots = [
   'rpc-browser'
 ].map((owner) => resolve(import.meta.dirname, '../../..', owner, 'src'))
 
-/** Preserve semantic text-owner labels after neutral adapter bodies moved into Core. */
+/** Text-owner labels follow the actual package-owned source after adapter extraction. */
 function sourceLabel(root: string, path: string): string {
-  return relative(root, path).replace(/^adapter-owned\//u, '')
+  return relative(root, path)
 }
 
 /** Enumerates the package source without depending on a generated manifest. */
@@ -83,11 +83,12 @@ function violations(path: string, text: string): string[] {
       /** These named fields describe wire keys or schema types, not failure text. */
       const nonErrorMessage =
         (path === 'contract/wire-constants.ts' && node.initializer.getText(file) === "'message'") ||
-        (path === 'threads/constants.ts' &&
+        ((path === 'threads/constants.ts' || path === 'runtime-adapter/message/constants.ts') &&
           node.initializer.getText(file) === "'message'" &&
           ts.isObjectLiteralExpression(node.parent) &&
           ts.isVariableDeclaration(declaration) &&
-          declaration.name.getText(file) === 'ThreadEvent') ||
+          declaration.name.getText(file) ===
+            (path === 'threads/constants.ts' ? 'ThreadEvent' : 'MessageResourceEvent')) ||
         (path === 'core/internal/contract.ts' && node.initializer.getText(file) === "'string'") ||
         (path === 'core/internal/discovery-attachment.ts' &&
           node.initializer.getText(file) === "'discovery'") ||

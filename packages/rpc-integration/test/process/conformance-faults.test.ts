@@ -27,7 +27,7 @@ import {
   createSpawnProcessBinding,
   createConnectProcessBinding,
   type IProcessPluginBinding
-} from '../../../rpc-core/dist/adapter-owned/process/plugin/binding.js'
+} from '../../../rpc-process/dist/process/plugin/binding.js'
 import {
   createRpcStreamFrameDecoder,
   encodeRpcStreamFrame,

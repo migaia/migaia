@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createThreadPlugin } from '@migaia/rpc-threads'
-import type { IRuntimeThreadPluginOptions } from '../../../rpc-core/dist/adapter-owned/threads/plugin.js'
+import type { IRuntimeThreadPluginOptions } from '../../../rpc-threads/dist/threads/plugin.js'
 import {
   runtimeSources,
   RUNTIME_API_FIXTURE_BASE_CAPABILITIES
