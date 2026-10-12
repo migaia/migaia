@@ -2563,6 +2563,8 @@ const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
   'rpc-contract': '提供平台无关的 RPC envelope、握手、framing、二进制数据与错误链协议工具。',
   'rpc-process': '连接实际进程的字节或消息通道，提供进程 Peer、Plugin 与平台启动入口。',
   'rpc-threads': '连接实际 Worker 或线程，提供线程 Peer、Plugin 与原生执行资源适配器。',
+  /** Pool references describe the public composition layer and its client-side scheduling role. */
+  'rpc-pool': '以公开线程和进程 Peer 组成池，管理有限 FIFO、成员调用槽与资源回收。',
   'rpc-bridge-jsonrpc': '把外部语言的 JSON-RPC peer 接到实际有序字节通道，保留协商和错误链。',
   'rpc-browser': '提供 Window、共享 Worker、ServiceWorker、广播与浏览器网络通道适配器。'
 } as const satisfies Readonly<Record<string, string>>
@@ -2628,6 +2630,9 @@ const LIBRARY_ARCHITECTURE_LEDES_ZH = {
     '用于父子进程或已有进程连接需要双向 RPC 的场景。应用通过 Peer 或 Plugin 共享实际方法，再按平台选择启动器与字节或消息通道；spawn 持有实际执行单元，connect/listen 保留借用连接的边界，关闭和失败清理沿原资源 owner 执行。',
   'rpc-threads':
     '用于把业务方法放入 Worker 或线程执行，同时保留双向调用和原生资源生命周期的场景。适配器取得实际线程 handle 与消息端口，Peer 或 Plugin 共享方法，并通过原监督器处理启动、退出、替换和关闭；平台未提供的能力保持明确不可用。',
+  /** The pool architecture page explains which scheduling and native resources each layer owns. */
+  'rpc-pool':
+    '用于把多个公开线程或进程 Peer 组成有限并发池。池管理客户端调用槽、有限 FIFO、惰性 stream、扩缩容和闲置成员回收；原 Peer 负责原生启动、崩溃恢复与关闭。stats 记录池内派发，失败的业务调用交给调用方处理。',
   'rpc-bridge-jsonrpc':
     '用于与 Python、Go、Rust 等外部语言 peer 进行 JSON-RPC 调用的场景。桥接器使用 Process 提供的实际有序字节通道，完成原握手、帧解析、请求相关与取消规则，并传递有界错误链；业务按已协商的能力调用，不为对端缺失的模式增加隐式降级。',
   'rpc-browser':
