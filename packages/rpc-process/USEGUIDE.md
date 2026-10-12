@@ -381,7 +381,7 @@ source 均为 `@migaia/rpc/core`。
 | `PROVIDER_NOT_FOUND`  | 对端没有这个方法                         | 检查方法路径与对端版本                                              |
 | `TRANSPORT`           | 物理连接失败                             | 调用可能已送达；先对账再决定是否重发                                |
 
-完整的调用层错误码表见 [rpc-core USEGUIDE](../rpc-core/USEGUIDE.md#逐错误码处理与重试)。
+完整的调用层错误码表见 [rpc-core USEGUIDE](../rpc-core/USEGUIDE.md#10-错误码与处理)。
 
 ### 重试原则
 

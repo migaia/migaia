@@ -140,7 +140,7 @@ try {
 
 - transfer 在消息真正提交到端口时才使 buffer 失效（`byteLength` 变为 0），之后即使调用失败也无法恢复原 buffer；共享同一 backing 的所有视图同时失效。
 - 带 transfer 的调用不会被自动重试，库也不保留输入副本。需要重发时，先确认结果，再重新构造数据。
-- 默认的 `createThreadPeer` 配置不启用 transfer。启用需要自定义 `endpointFactory`，并在中间件中加入 `authentication({ sign, verify })`；组装方式见 [rpc-core USEGUIDE 的二进制章节](../rpc-core/USEGUIDE.md#二进制和-transfer)。
+- 默认的 `createThreadPeer` 配置不启用 transfer。启用需要自定义 `endpointFactory`，并在中间件中加入 `authentication({ sign, verify })`；组装方式见 [rpc-core USEGUIDE 的二进制章节](../rpc-core/USEGUIDE.md#11-二进制转发与重试)。
 
 ## 6. 容量与超时
 
@@ -162,7 +162,7 @@ try {
 | `@migaia/rpc/core`      | `TARGET_UNKNOWN`              | 出口中找不到目标（名字错误，或重启后尚未重新就绪）。                      |
 | `@migaia/rpc/remote`    | `REMOTE_CLOSED`               | 连接或代次已关闭。重新选择目标；已发出的调用先对账。                       |
 
-Worker 中抛出的业务错误会还原原生类型（例如 `RangeError`）、`message` 与 `stack`。完整的调用层错误码表见 [rpc-core USEGUIDE](../rpc-core/USEGUIDE.md#逐错误码处理与重试)。
+Worker 中抛出的业务错误会还原原生类型（例如 `RangeError`）、`message` 与 `stack`。完整的调用层错误码表见 [rpc-core USEGUIDE](../rpc-core/USEGUIDE.md#10-错误码与处理)。
 
 **重试原则**：超时、取消、断线都不能证明 Worker 没有执行。非幂等操作重试前，用 `idempotencyKey` + `outcome(key)` 查询，或按业务规则对账。
 
