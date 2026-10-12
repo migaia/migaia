@@ -1,3 +1,4 @@
+import { BrowserCarrierObservation, BrowserRpcCarrier } from '../probe-detail.js'
 import type { IRpcSendOptions, IRpcTransport } from '@migaia/rpc-core/transport-kit'
 import {
   RpcPlatform,
@@ -61,6 +62,10 @@ export function createServiceWorkerTransport(
   const listenerErrors = new Set<(error: unknown) => void>()
   const transportErrors = new Set<(error: unknown) => void>()
   const secondaryFailures = createListenerFailureState()
+  /** Observation failures use listener reporting so Endpoint never rejects pending business calls. */
+  const observation = new BrowserCarrierObservation(BrowserRpcCarrier.serviceWorker, (error) =>
+    reportListenerFailure(error, listenerErrors, secondaryFailures)
+  )
   const onMessage = (event: MessageEvent<unknown>): void => {
     let data: unknown
     let origin: string | undefined
@@ -74,7 +79,14 @@ export function createServiceWorkerTransport(
       return
     }
     /** A verified cross-realm Client wrapper represents the configured stable peer. */
-    const normalizedSource = sourceProof(source) ? target : source
+    const acceptedSource = sourceProof(source)
+    /** Reuse the existing proof result so observation never repeats hostile identity reads. */
+    const probe = observation.probe
+    if (probe !== undefined) {
+      if (acceptedSource) observation.emit(probe, 1, data, origin)
+      else observation.rejectSource()
+    }
+    const normalizedSource = acceptedSource ? target : source
     listeners.dispatch({ data, origin, source: normalizedSource }, (listener, message) => {
       observeListener(
         () => listener(message),
@@ -90,7 +102,16 @@ export function createServiceWorkerTransport(
     peerId,
     sourceProof,
     send(message, options?: IRpcSendOptions<Transferable>) {
-      target.postMessage(message, options?.transfer)
+      /** Read the caller's transfer choice once, preserving getter failure and native detachment. */
+      const transfer = options?.transfer
+      /** Observe before postMessage can detach an explicitly transferred byte buffer. */
+      const probe = observation.probe
+      if (probe !== undefined) observation.emit(probe, 0, message, undefined, transfer)
+      target.postMessage(message, transfer)
+    },
+    /** Replace the single endpoint probe; disposal is generation-safe and idempotent. */
+    observe(probe) {
+      return observation.observe(probe)
     },
     subscribe(listener) {
       listeners.add(listener, () =>

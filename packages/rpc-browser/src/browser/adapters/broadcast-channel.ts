@@ -1,3 +1,4 @@
+import { BrowserCarrierObservation, BrowserRpcCarrier } from '../probe-detail.js'
 import type { IRpcTransport } from '@migaia/rpc-core/transport-kit'
 import {
   RpcPlatform,
@@ -23,6 +24,10 @@ export function createBroadcastChannelTransport(channel: BroadcastChannel): IRpc
   const listenerErrors = new Set<(error: unknown) => void>()
   const transportErrorWrappers = new Set<EventListener>()
   const secondaryFailures = createListenerFailureState()
+  /** Observation owns no platform resource and reports through the existing carrier channel. */
+  const observation = new BrowserCarrierObservation(BrowserRpcCarrier.broadcastChannel, (error) =>
+    reportListenerFailure(error, listenerErrors, secondaryFailures)
+  )
   const onMessage = (event: MessageEvent<unknown>): void => {
     let data: unknown
     let origin: string | undefined
@@ -35,6 +40,9 @@ export function createBroadcastChannelTransport(channel: BroadcastChannel): IRpc
       reportListenerFailure(error, listenerErrors, secondaryFailures)
       return
     }
+    /** Exclusive or native-origin traffic is already admitted by this carrier. */
+    const probe = observation.probe
+    if (probe !== undefined) observation.emit(probe, 1, data, origin)
     listeners.dispatch({ data, origin, source }, (listener, message) => {
       observeListener(
         () => listener(message),
@@ -48,7 +56,14 @@ export function createBroadcastChannelTransport(channel: BroadcastChannel): IRpc
     topology: 'broadcast',
     ownership: RpcTransportOwnership.borrowed,
     send(message) {
+      /** Broadcast sends have no transfer list and retain captured content by reference. */
+      const probe = observation.probe
+      if (probe !== undefined) observation.emit(probe, 0, message)
       channel.postMessage(message)
+    },
+    /** Replace the single endpoint probe; disposal is generation-safe and idempotent. */
+    observe(probe) {
+      return observation.observe(probe)
     },
     subscribe(listener) {
       listeners.add(listener, () =>

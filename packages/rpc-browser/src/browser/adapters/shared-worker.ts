@@ -1,3 +1,4 @@
+import { BrowserCarrierObservation, BrowserRpcCarrier } from '../probe-detail.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { BrowserRpcErrorText } from '../error-text.js'
 import type { IRpcSendOptions, IRpcTransport } from '@migaia/rpc-core/transport-kit'
@@ -40,6 +41,10 @@ export function createSharedWorkerTransport(
   const listenerErrors = new Set<(error: unknown) => void>()
   const transportErrors = new Set<(error: unknown) => void>()
   const secondaryFailures = createListenerFailureState()
+  /** Observation failures use listener reporting so Endpoint never rejects pending business calls. */
+  const observation = new BrowserCarrierObservation(BrowserRpcCarrier.sharedWorker, (error) =>
+    reportListenerFailure(error, listenerErrors, secondaryFailures)
+  )
   const onMessage = (event: MessageEvent<unknown> | Event): void => {
     let data: unknown
     let origin: string | undefined
@@ -53,6 +58,9 @@ export function createSharedWorkerTransport(
       reportListenerFailure(error, transportErrors, secondaryFailures)
       return
     }
+    /** Exclusive or native-origin traffic is already admitted by this carrier. */
+    const probe = observation.probe
+    if (probe !== undefined) observation.emit(probe, 1, data, origin)
     listeners.dispatch({ data, origin, source }, (listener, message) => {
       observeListener(
         () => listener(message),
@@ -76,7 +84,16 @@ export function createSharedWorkerTransport(
     topology: 'exclusive',
     ownership: RpcTransportOwnership.borrowed,
     send(message, options?: IRpcSendOptions<Transferable>) {
-      port.postMessage(message, options?.transfer)
+      /** Read the caller's transfer choice once, preserving getter failure and native detachment. */
+      const transfer = options?.transfer
+      /** Observe before postMessage can detach an explicitly transferred byte buffer. */
+      const probe = observation.probe
+      if (probe !== undefined) observation.emit(probe, 0, message, undefined, transfer)
+      port.postMessage(message, transfer)
+    },
+    /** Replace the single endpoint probe; disposal is generation-safe and idempotent. */
+    observe(probe) {
+      return observation.observe(probe)
     },
     subscribe(listener) {
       listeners.add(listener, () =>
