@@ -44,7 +44,20 @@ import { readRuntimePreparationContext } from './launch-context.js'
 import { readRuntimeDefaultTimeout, prepareRuntimeCallTimeout } from './timeout.js'
 import type { IRuntimeCallOptions, IRuntimeTypedPeer } from './typing.js'
 import { defaultRpcId } from '../../core/internal/id.js'
-import { createRuntimeEventPublisher, type IRuntimeEventPublisher } from './events.js'
+import {
+  createRuntimeEventPublisher,
+  RuntimeProbeLifecycle,
+  type IRuntimeEventPublisher
+} from './events.js'
+import {
+  bindInstalledProbe,
+  createProbeEmitter,
+  readInstalledProbe,
+  validateProbes
+} from '../../core/internal/probe-emitter.js'
+import { RpcProbeStage } from '../../core/probe/constants.js'
+import { RuntimeEventName } from './constants.js'
+import { deferred } from '@migaia/utils/promise'
 import { isProviderAdmissionScopeOwner } from '../../core/internal/provider-admission.js'
 import type { IProviderAdmissionScope } from '../../core/features/provider.js'
 import { createAuthenticationNonce } from '../../core/index.js'
@@ -143,7 +156,7 @@ export type IRuntimePeerOptions = Pick<
     providerLimits?: IRpcProviderLimits
     /** Existing per-frame credentials enable signed native transfer without a custom endpoint. */
     authentication?: IRpcAuthenticationConfig
-    /** Passed through factory options unchanged; observation activates only after probe-core lands. */
+    /** Installs an endpoint-local synchronous observer without changing pipeline selection. */
     probe?: IRpcProbe | readonly IRpcProbe[]
     /** Only request/stream inherit this positive default in their original timeout scope. */
     defaultTimeoutMs?: number
@@ -327,6 +340,8 @@ export async function createRuntimePeer(
   options: IRuntimePeerOptions,
   resources?: IRuntimePeerResources
 ): Promise<IRuntimePeer> {
+  if (options.probe !== undefined)
+    validateProbes(Array.isArray(options.probe) ? options.probe : [options.probe as IRpcProbe])
   /** Invoke only the native rejection policy retained by this exact preparation context. */
   const restrictTransfer = readRuntimePreparationContext(options)?.restrictTransfer
   /** Native source metadata stays with the same private preparation owner. */
@@ -784,23 +799,55 @@ export async function createRuntimePeer(
     /** Close retains one Promise identity, including failure and concurrent provider reentry. */
     let closing: Promise<void> | undefined
     /** This subscriber projection owns no connection or generation facts beyond the actual Peer. */
-    const events = createRuntimeEventPublisher()
+    /** Existing channel identity reaches the same endpoint emitter without adding a middleware. */
+    const probe = readInstalledProbe(channel.transport)
+    const events = createRuntimeEventPublisher(probe)
+    if (probe && (probe.mask & (1 << RpcProbeStage.peer)) !== 0) {
+      probe.peer(RuntimeProbeLifecycle.handshake, channel.peerId, undefined)
+      probe.peer(RuntimeProbeLifecycle.directory, channel.peerId, undefined)
+      probe.peer(RuntimeEventName.ready, channel.peerId, undefined)
+    }
     /** Both explicit and scoped cleanup retain the same original close Promise. */
-    const close = (): Promise<void> =>
-      (closing ??= (async () => {
-        events.close()
+    const close = (): Promise<void> => {
+      if (closing) return closing
+      /** Publish the existing close completion before synchronous observers can reenter close. */
+      const completion = deferred<void>()
+      closing = completion.promise
+      if (probe && (probe.mask & (1 << RpcProbeStage.peer)) !== 0)
+        probe.peer(RuntimeProbeLifecycle.closing, channel.peerId, undefined)
+      events.close()
+      /** Channel cleanup keeps the original primary failure and its original asynchronous boundary. */
+      const finishChannel = (primary: unknown, failed: boolean): void => {
+        /** The original channel can return a Promise or finish synchronously. */
+        let result: void | Promise<void>
         try {
-          await ready.dispose()
-        } catch (failure) {
-          try {
-            await channel.close?.()
-          } catch (cleanup) {
-            report(cleanup)
-          }
-          throw failure
+          result = channel.close?.()
+        } catch (cleanup) {
+          if (failed) report(cleanup)
+          completion.reject(failed ? primary : cleanup)
+          return
         }
-        await channel.close?.()
-      })())
+        void Promise.resolve(result).then(
+          () => {
+            if (failed) completion.reject(primary)
+            else completion.resolve()
+          },
+          (cleanup) => {
+            if (failed) report(cleanup)
+            completion.reject(failed ? primary : cleanup)
+          }
+        )
+      }
+      try {
+        void ready.dispose().then(
+          () => finishChannel(undefined, false),
+          (failure) => finishChannel(failure, true)
+        )
+      } catch (failure) {
+        finishChannel(failure, true)
+      }
+      return closing
+    }
     /** This exact facade is minted only after both directory and endpoint preparation succeed. */
     const peer: IRuntimePeer = Object.freeze({
       self,
@@ -928,65 +975,90 @@ export async function prepareRuntimePeerEndpoint(
     isCommitted(): boolean
   }>
 ): Promise<IRemoteServeEndpoint> {
-  /** Default diagnostics do not require copying the options that carry Host provenance. */
-  const report = options.report ?? console.error
-  if (options.endpointFactory) {
-    /** Custom roots retain their original signature and must supply the actual borrowed owner. */
-    const endpoint = await options.endpointFactory(channel, signal)
-    if (
-      admission &&
-      !isProviderAdmissionScopeOwner(
-        admission,
-        readEndpointOwner(endpoint.endpoint, EndpointOwnerKey.providerAdmission)
-      )
-    ) {
-      try {
-        await endpoint.endpoint.dispose()
-      } catch (cleanup) {
-        try {
-          report(cleanup)
-        } catch (failure) {
-          hostRethrowReporter(failure, IpcReporterContext)
-        }
-      }
-      rejectRuntimeApiCapability()
-    }
-    return endpoint
+  /** Peer options bind directly to the owned transport, leaving canonical middleware proofs intact. */
+  const probe =
+    options.probe === undefined
+      ? undefined
+      : createProbeEmitter(
+          Array.isArray(options.probe) ? options.probe : [options.probe as IRpcProbe],
+          () => channel.scheduler.now(),
+          prepareRuntimePeerSourceContext(options.self).self.instanceId
+        )
+  /** Failure before kernel acquisition releases all genuine stage subscriptions. */
+  let releaseProbe: (() => void) | undefined
+  if (probe) {
+    probe.peerOwned = true
+    probe.authentication = options.authentication?.encrypt
+      ? 'encrypt-sign'
+      : options.authentication
+        ? 'sign'
+        : 'none'
+    releaseProbe = bindInstalledProbe(channel.transport, probe)
   }
-  /** Only the real channel agreement can install native control and streaming roots. */
-  const nativeControl = channel.agreement.capabilities.includes(RpcCapability.ping)
-  /**
-   * Each selected endpoint keeps the actual scheduler, framing, security Features and provider
-   * limits.
-   */
-  const endpoint = createRuntimeApiEndpoint(
-    {
-      id: prepareRuntimePeerSourceContext(options.self).self.instanceId,
-      scheduler: channel.scheduler,
-      transport: channel.transport,
-      targetIds: [channel.peerId],
-      providerLimits: options.providerLimits,
-      ...policy,
-      middlewares: [
-        codec(channel.pipeline.codec),
-        framer(channel.pipeline.framer),
-        ...(options.authentication ? [authentication(options.authentication)] : []),
-        abort(),
-        timeout(),
-        hooks({ onHookError: report }),
-        ...(nativeControl ? [ping()] : []),
-        connect({ transport: channel.transport })
-      ],
-      features: channel.features
-    },
-    { ...channel, ...(registration ? { hostRegistration: registration } : {}) },
-    admission
-  )
-  await endpoint.ready
-  return {
-    endpoint: endpoint as unknown as IRpcEndpoint,
-    oneWay: endpoint,
-    stream: endpoint.stream
+  try {
+    /** Default diagnostics do not require copying the options that carry Host provenance. */
+    const report = options.report ?? console.error
+    if (options.endpointFactory) {
+      /** Custom roots retain their original signature and must supply the actual borrowed owner. */
+      const endpoint = await options.endpointFactory(channel, signal)
+      if (
+        admission &&
+        !isProviderAdmissionScopeOwner(
+          admission,
+          readEndpointOwner(endpoint.endpoint, EndpointOwnerKey.providerAdmission)
+        )
+      ) {
+        try {
+          await endpoint.endpoint.dispose()
+        } catch (cleanup) {
+          try {
+            report(cleanup)
+          } catch (failure) {
+            hostRethrowReporter(failure, IpcReporterContext)
+          }
+        }
+        rejectRuntimeApiCapability()
+      }
+      return endpoint
+    }
+    /** Only the real channel agreement can install native control and streaming roots. */
+    const nativeControl = channel.agreement.capabilities.includes(RpcCapability.ping)
+    /**
+     * Each selected endpoint keeps the actual scheduler, framing, security Features and provider
+     * limits.
+     */
+    const endpoint = createRuntimeApiEndpoint(
+      {
+        id: prepareRuntimePeerSourceContext(options.self).self.instanceId,
+        scheduler: channel.scheduler,
+        transport: channel.transport,
+        targetIds: [channel.peerId],
+        providerLimits: options.providerLimits,
+        ...policy,
+        middlewares: [
+          codec(channel.pipeline.codec),
+          framer(channel.pipeline.framer),
+          ...(options.authentication ? [authentication(options.authentication)] : []),
+          abort(),
+          timeout(),
+          hooks({ onHookError: report }),
+          ...(nativeControl ? [ping()] : []),
+          connect({ transport: channel.transport })
+        ],
+        features: channel.features
+      },
+      { ...channel, ...(registration ? { hostRegistration: registration } : {}) },
+      admission
+    )
+    await endpoint.ready
+    return {
+      endpoint: endpoint as unknown as IRpcEndpoint,
+      oneWay: endpoint,
+      stream: endpoint.stream
+    }
+  } catch (error) {
+    releaseProbe?.()
+    throw error
   }
 }
 

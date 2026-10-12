@@ -7,18 +7,18 @@ import type { IRpcTransport } from '../../dist/core/transport.js'
 import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
 import { runtimeSources } from '../runtime-api/fixture.js'
 
-describe('inert probe slots A2', () => {
+describe('activated probe slots A4', () => {
   it.each(['absent', 'single', 'array'] as const)(
     'preserves real Peer results with %s probe options',
     async (mode) => {
       /** The existing fixture reaches the genuine Peer assembly and independent channel agreement. */
       const channel = runtimeSources()
-      /** The contract must never call either the sink or the transport observation slot. */
+      /** Installed probes activate observation exactly once on each owned endpoint. */
       const emit = vi.fn(),
         observe = vi.fn(() => vi.fn())
       /** One immutable handle is passed unchanged in either supported option shape. */
       const handle = defineProbe({ stages: ['peer', 'message', 'carrier'], emit })
-      /** The selected public option shape must remain inert on both actual Peer endpoints. */
+      /** Both public option shapes activate the same emitter without changing business values. */
       const probe: IRpcProbe | readonly IRpcProbe[] | undefined =
         mode === 'absent' ? undefined : mode === 'single' ? handle : [handle]
       for (const transport of channel.transports) Object.assign(transport, { observe })
@@ -36,14 +36,24 @@ describe('inert probe slots A2', () => {
       ])
       try {
         expect(await client.request('double', 21)).toBe(42)
-        expect(emit).not.toHaveBeenCalled()
-        expect(observe).not.toHaveBeenCalled()
+        if (mode === 'absent') {
+          expect(emit).not.toHaveBeenCalled()
+          expect(observe).not.toHaveBeenCalled()
+        } else {
+          expect(emit).toHaveBeenCalled()
+          expect(observe).toHaveBeenCalledTimes(2)
+        }
       } finally {
         await Promise.all([client.close(), server.close()])
         channel.close()
       }
-      expect(emit).not.toHaveBeenCalled()
-      expect(observe).not.toHaveBeenCalled()
+      if (mode === 'absent') {
+        expect(emit).not.toHaveBeenCalled()
+        expect(observe).not.toHaveBeenCalled()
+      } else {
+        expect(observe).toHaveBeenCalledTimes(2)
+        for (const receipt of observe.mock.results) expect(receipt.value).toHaveBeenCalledTimes(1)
+      }
     }
   )
 

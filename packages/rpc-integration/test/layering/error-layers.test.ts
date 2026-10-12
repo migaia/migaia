@@ -318,7 +318,7 @@ describe('layered error ownership', () => {
     /** Packed duplicate/version copies prove this exact compiler throw executes before acquisition. */
     coreThrown.add('duplicateModuleInstance')
     expect([...contract.keys()].filter((key) => !contractThrown.has(key))).toEqual([])
-    /** Every existing code still has its throw site; only the registered layer-2 report is pending. */
-    expect([...core.keys()].filter((key) => !coreThrown.has(key))).toEqual(['probeFailed'])
+    /** Probe runtime reports through its installed canonical site; no reserved Core code is pending. */
+    expect([...core.keys()].filter((key) => !coreThrown.has(key))).toEqual([])
   })
 })

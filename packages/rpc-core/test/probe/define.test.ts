@@ -361,13 +361,37 @@ describe('probe contract A1', () => {
     expect(snapshot.content).toEqual({ value: 1 })
   })
 
-  it('refuses endpoint installation until the runtime layer lands', () => {
-    expect(() => probePlugin()).toThrow(TypeError)
-    expect(() => probePlugin()).toThrow(
+  it('compiles endpoint probe plugins and rejects structural handles before installation', () => {
+    /** Runtime installation accepts both an empty supported plugin and genuine compiled handles. */
+    const emit = vi.fn()
+    /** This exact handle is admitted through the contract's private registration, not its shape. */
+    const probe = defineProbe({ stages: ['message'], emit })
+    for (const plugin of [probePlugin(), probePlugin(probe)]) {
+      expect(Object.isFrozen(plugin)).toBe(true)
+      expect(plugin).toMatchObject({
+        name: 'probe',
+        metadata: {
+          claims: {
+            routes: [],
+            provides: [],
+            consumes: [],
+            publicKeys: [],
+            exposedKeys: [],
+            activator: false
+          },
+          sharedProvides: ['probe'],
+          sharedConsumes: ['time']
+        },
+        install: expect.any(Function)
+      })
+    }
+    expect(emit).not.toHaveBeenCalled()
+    /** Matching every public field cannot forge the private probe identity used by installation. */
+    expect(() => probePlugin({ ...probe })).toThrow(
       expect.objectContaining({
         source: '@migaia/rpc/core',
         code: 'INVALID_CONFIG',
-        message: 'probe runtime not installed'
+        name: 'TypeError'
       })
     )
   })
