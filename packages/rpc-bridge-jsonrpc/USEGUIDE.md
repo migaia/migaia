@@ -328,7 +328,7 @@ import { JSONRPC_BRIDGE_ERROR_SOURCE, JsonRpcBridgeErrorCode } from '@migaia/rpc
 
 ### 对端返回的业务错误
 
-对端回复的 wire error 会被还原为 `RpcRemoteError`：顶层 `source` 为 `@migaia/rpc/core`，`code` 与 `message` 来自对端；对端给出的原始 `source` 与 `code` 保留在 `error.cause` 上。对端声明的 source / code 只用于诊断，不会被当作本地库的错误身份。
+通过 `createProcessPeer` 或 `createRuntimePeer` 调用时，对端回复的 wire error 按原始 `name`、`source`、`code`、`message`、`stack` 和原因链恢复。Python 示例中的业务错误因此携带 `source: 'python-service'`、`code: 'BUSINESS'`。这些字段只用于诊断，不会获得本地库的控制身份；不要用对端声明的 source / code 判断本地取消、重试或认证策略。
 
 ### 重试原则
 

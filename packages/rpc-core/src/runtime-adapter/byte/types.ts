@@ -42,7 +42,7 @@ export type IRuntimeConnectionOptions = Readonly<{
   platform: IRpcTransport['platform']
   expectedStringText: string
   peerId: string
-  signal?: AbortSignal
+  signal?: import('../../core/typing.js').IRpcAbortSignal
   handshakeTimeoutMs?: number
   scheduler?: IScheduler
   report(error: unknown): void

@@ -1401,9 +1401,8 @@
           }
         }
       },
-      "schemaValid": false,
-      "semanticValid": false,
-      "field": "descriptor.deployment.spec.bootstrap.via"
+      "schemaValid": true,
+      "semanticValid": true
     },
     {
       "id": "message-has-wire",
