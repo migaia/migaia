@@ -45,6 +45,7 @@ pnpm add @migaia/rpc-core @migaia/rpc-contract
 | `./plugins/log`、`./plugins/send-queue`、`./plugins/flow-control` | IPC 日志、发送队列等可选中间件                                                                                                                                                                 |
 | `./transport-kit`、`./transport-constants`                        | 编写自定义 transport 的工具与常量                                                                                                                                                              |
 | `./adapter`                                                       | `defineMessageAdapter`、`defineByteAdapter`：运行时适配器作者的任务级构造函数（见 USEGUIDE 第 9 节）                                                                                           |
+| `./probe`                                                         | Probe 类型、数值常量与名称表、`defineProbe`、`snapshotProbeEvent`、`rpcProbeSampleKey`；`probePlugin` 当前为占位入口                                                                              |
 
 ## 快速开始
 
@@ -93,6 +94,35 @@ console.log(await client.send<number>('server', 'add', [20, 22])) // 42
 await client.dispose()
 await server.dispose()
 ```
+
+## Probe
+
+`@migaia/rpc-core/probe` 定义同步观察接口。当前交付只包含契约：Peer 接受 `probe` 选项，但在 probe-core 实现合入之前不会产生观察事件；`probePlugin` 当前抛出 `INVALID_CONFIG`（`probe runtime not installed`）。
+
+```ts doc-test=check
+import { defineProbe, RpcProbeStageName } from '@migaia/rpc-core/probe'
+
+/** 调用方已有的对象保留同一身份，定义 Probe 后被冻结。 */
+const host = { name: 'metrics' }
+/** 此 Probe 只读 message 元数据，不捕获业务内容。 */
+const probe = defineProbe({
+  stages: ['message'],
+  sample: 0.25,
+  emit(view) {
+    console.log(RpcProbeStageName[view.stage], view.method, view.durationMs)
+  }
+}, host)
+console.log(probe === host, Object.isFrozen(host), probe.name) // true, true, 'metrics'
+
+/** 平台 Peer 工厂可接收同一个 probe；运行时观察由 probe-core 提供。 */
+export const peerProbeOptions = { probe }
+```
+
+`defineProbe(definition, host)` 直接为 `host` 添加五个 Probe 字段、注册私有状态并冻结该对象，返回 `THost & IRpcProbe`，与 `host` 为同一引用；原有成员保持不变，包括已有的 `emit`。私有状态持有 `definition.emit`，不会用它覆盖 host 的方法。省略 `host` 时沿用独立 handle 形式。`host` 必须是可扩展且未冻结的非 null 对象，不能已有这五个 Probe 字段或已注册为 Probe；验证失败时对象保持原样。
+
+事件 view 仅在 `emit` 调用期间有效。需保留它时显式调用 `snapshotProbeEvent(view)`（SC9c）；快照复制顶层字段，`detail`、`error` 与 `content` 仍保留引用，调用方稍后修改对象时这些引用可见修改。录制 codec 在格式转换边界形成新表示（SC9b）。`methods` 只过滤 `message` 与 `envelope`；其它阶段只按采样过滤。采样使用 `(senderId, messageId)` 的稳定 FNV-1a 32 位键。
+
+`capture` 默认关闭，必须显式列出需要捕获内容的阶段，且定义时为 `stages` 的子集。`protected` 内容也须显式启用，并只在认证保护路径存在时产生。`setStages([])` 暂停；恢复时设置所需阶段，原 `captureMask` 保持不变。host 的公开 `stageMask` 为初始定义值，后续选择保存在私有状态；独立 handle 的 getter 则反映当前值。详细契约见 [USEGUIDE 的 Probe 节](./USEGUIDE.md#13-probe)。
 
 ## 高阶用法：编写适配器
 

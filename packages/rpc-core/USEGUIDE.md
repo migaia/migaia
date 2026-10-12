@@ -16,6 +16,7 @@
 10. [错误码与处理](#10-错误码与处理)
 11. [二进制、转发与重试](#11-二进制转发与重试)
 12. [常见问题](#12-常见问题)
+13. [Probe](#13-probe)
 
 ---
 
@@ -687,3 +688,98 @@ source 均为 `@migaia/rpc/remote`。
 
 **能自己定义新的协议级能力吗？**
 不能。自定义中间件可以做日志、诊断、策略；新的根能力需要在 Core 内实现。
+
+## 13. Probe
+
+`@migaia/rpc-core/probe` 是运行时无关的观察契约入口，导出阶段、方向、kind、outcome 的数值常量与同顺序名称表，以及 `defineProbe`、`snapshotProbeEvent`、`rpcProbeSampleKey` 和 `probePlugin`。
+
+**当前状态：** layer 1 只定义 Probe 与 Peer 的 `probe` 选项、transport 的可选 `observe` 类型。Peer 会接收选项，但 probe-core 实现合入之前不产生观察事件，也不调用 `transport.observe`。`probePlugin` 当前同步抛出 `INVALID_CONFIG`，文字为 `probe runtime not installed`。
+
+### 13.1 定义与交入 Peer
+
+```ts doc-test=check
+import { createRuntimePeer, type IRuntimePeerSource } from '@migaia/rpc-core/remote'
+import { defineProbe, RpcProbeStageName } from '@migaia/rpc-core/probe'
+
+/** 只记录所选方法的元数据，不读取业务 payload。 */
+const probe = defineProbe({
+  stages: ['message', 'envelope', 'frame'],
+  methods: ['math.double'],
+  sample: 0.25,
+  emit(view) {
+    console.log(RpcProbeStageName[view.stage], view.method, view.durationMs)
+  },
+  onError(error) {
+    console.error(error)
+  }
+})
+
+/** connect 来源仍由调用方拥有；probe 不创建任何 transport。 */
+export function createObservedPeer(connect: IRuntimePeerSource) {
+  return createRuntimePeer({ connect, probe })
+}
+```
+
+`probe` 可以是单个 handle 或 readonly 数组。`defineProbe` 在定义时验证选项并编译 `stageMask`、`captureMask`、`methods` 与 `sampleThreshold`；返回对象被冻结，私有状态保留原 `definition.emit` callback。定义失败抛出原生 `TypeError`，带 `@migaia/rpc/core` / `INVALID_CONFIG`。
+
+调用方已有对象需要同时提供其它 API 时，使用 revision 2 的 `defineProbe(definition, host)`。它直接为 `host` 添加 Probe 字段，以该对象的身份注册私有状态，然后冻结 `host`；返回类型为 `THost & IRpcProbe`，不复制或合并到另一个对象。原有成员与引用保持不变，省略 `host` 的形式仍返回独立 handle。
+
+```ts doc-test=check
+import { defineProbe } from '@migaia/rpc-core/probe'
+
+/** 已有对象的额外成员不参与 Core 热路径的状态读取。 */
+const host = { name: 'metrics' }
+/** definition 与 host 直接注册在同一对象身份下，不复制 host。 */
+const probe = defineProbe({
+  stages: ['message'],
+  emit(view) {
+    console.log(view.seq)
+  }
+}, host)
+console.log(probe === host, Object.isFrozen(host), probe.name)
+```
+
+`host` 必须为可扩展、未冻结的非 null 对象，不能已经拥有 `stageMask`、`captureMask`、`methods`、`sampleThreshold`、`setStages`，也不能已经注册为 Probe。所有验证在修改对象之前完成；失败以 `TypeError` / `INVALID_CONFIG` 拒绝，`host` 不变。已有 `host.emit` 允许保留，附加操作不会覆盖它；Probe 私有状态使用 `definition.emit`。后续 emitter 在安装时从私有 WeakMap 读取编译状态，放入自己的固定形状记录；热路径读取该记录，不读取带额外成员的 `host`。
+
+| 配置 | 契约 |
+| --- | --- |
+| `stages` | 定义时必须为非空的已知阶段名称数组 |
+| `capture` | 默认关闭；定义时必须为 `stages` 子集 |
+| `redact` | 处理显式捕获的内容；不会因此开启未选择阶段的 capture |
+| `methods` | 只过滤 `message` 与 `envelope`，其它阶段只按采样过滤 |
+| `sample` | 范围 `(0, 1]`，默认全部；阈值在定义时计算 |
+| `describe`、`emit`、`onError` | 描述、同步事件消费者与错误报告 callback |
+
+`rpcProbeSampleKey(senderId, messageId)` 对二者拼接后的 UTF-8 字节计算 FNV-1a 32 位键。调用方与接收方使用相同标识，所以同一交互的两侧采样决定一致；它不是认证机制或唯一身份。
+
+### 13.2 View 生命周期与内容捕获
+
+每个 emitter 复用固定形状的 `IRpcProbeEventView`。只能在同步 `emit` 中读取它；需要稍后读取时使用快照：
+
+```ts doc-test=check
+import { defineProbe, snapshotProbeEvent, type IRpcProbeEventView } from '@migaia/rpc-core/probe'
+
+/** 此示例选择保留事件；分配发生在消费者，而非 Core 观察点。 */
+const saved: Readonly<IRpcProbeEventView>[] = []
+/** 内容捕获按 frame/protected 显式启用，随后统一脱敏。 */
+const probe = defineProbe({
+  stages: ['frame', 'protected'],
+  capture: ['frame', 'protected'],
+  redact() {
+    return '<redacted>'
+  },
+  emit(view) {
+    // SC9(c)：调用方显式请求顶层事件快照。
+    saved.push(snapshotProbeEvent(view))
+  }
+})
+
+probe.setStages([]) // 暂停，captureMask 保持原值。
+probe.setStages(['frame', 'protected']) // 恢复选定阶段。
+```
+
+`snapshotProbeEvent` 是显式复制请求（SC9c）：复制并冻结顶层字段，保留 `detail`、`error` 与 `content` 的引用和所有权。它防止复用 view 改写快照的顶层元数据，不固定这些引用对象的内容。按照 SC9，普通捕获与存储保留引用；调用方发送后修改 `detail`、错误或未被转移的 content 对象，后续读取仍可见修改。只有实际 transfer 会分离的字节缓冲、真实 codec/序列化边界（SC9b），或显式快照 API 才复制必要数据。未知 `sizeBytes`、未分块的 chunk 字段、非批次的 `members` 与未结算的 `durationMs` 都使用 `-1`。
+
+`protected` 仅在认证保护路径存在时产生；没有该能力的路径不会伪造该阶段。内容捕获包括 protected 内容都必须显式启用。Descriptor 的 `stageMask` 描述 endpoint 能产生且当前已订阅的阶段，不证明所有路径都会经历每个阶段。
+
+`setStages([])` 允许暂停，之后可以设置其它已知阶段。它更新私有状态的阶段选择，保留定义时的 `captureMask`；host 上不可写的 `stageMask` 仍为初始定义值，独立 handle 的 `stageMask` getter 反映当前私有值。非法阶段会抛出 `INVALID_CONFIG` 并保留旧 mask。阶段变更的 emitter 订阅机制由 Core 内部持有，不是公开 handle 方法。
