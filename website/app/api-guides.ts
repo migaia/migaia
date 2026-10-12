@@ -1075,23 +1075,28 @@ const optionTranslations: Readonly<
     en: 'Groups construction.signal and construction.timeoutMs so asynchronous endpoint construction can be cancelled or bounded while installed middleware is still rolled back safely.',
     zh: '组合 construction.signal 与 construction.timeoutMs；在下方分别配置中止信号和构造超时。'
   },
-  'rpc-core:index:authentication:encrypt': {
+  /** The middleware and runtime factories expose the same paired authentication transform. */
+  'rpc-core:*:*:encrypt': {
     en: 'Outbound encryption transform. It must be configured together with decrypt and runs before signing.',
     zh: '发送前执行的加密转换，必须与 decrypt 成对配置，并在签名前完成。'
   },
-  'rpc-core:index:authentication:decrypt': {
+  /** Decryption has the same verification order in middleware and ordinary runtime factories. */
+  'rpc-core:*:*:decrypt': {
     en: 'Inbound decryption transform. It must be configured together with encrypt and runs after signature verification.',
     zh: '接收后的解密转换，必须与 encrypt 成对配置，并且只在验签通过后执行。'
   },
-  'rpc-core:index:authentication:sign': {
+  /** Signing credentials retain their existing authentication semantics on every runtime source. */
+  'rpc-core:*:*:sign': {
     en: 'Outbound signing transform. It must be configured together with verify and runs after encryption.',
     zh: '出站签名转换，必须与 verify 成对配置；签名覆盖已经加密的完整物理帧。'
   },
-  'rpc-core:index:authentication:verify': {
+  /** Every runtime factory delegates inbound signature verification to the authentication owner. */
+  'rpc-core:*:*:verify': {
     en: 'Inbound signature-verification transform. It must be configured together with sign and runs before decryption.',
     zh: '入站验签转换，必须与 sign 成对配置；在解密和业务解析前拒绝伪造或不可信帧。'
   },
-  'rpc-core:index:authentication:encodedType': {
+  /** The same authentication descriptor selects the protected representation for all factories. */
+  'rpc-core:*:*:encodedType': {
     en: 'Encoded representation required by the authentication transforms. It must agree with protocol output and transport requirements.',
     zh: '鉴权转换处理的编码值类型，必须与协议输出、framer 和 transport 要求一致。'
   },

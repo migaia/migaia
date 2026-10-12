@@ -55520,7 +55520,7 @@
           "errors": ["No documented errors are declared for createJsonRpcRemoteChannel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createJsonRpcRemoteChannel.",
           "examples": [
-            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\nimport { createRuntimePeer } from '@migaia/rpc-core/remote'\nimport type { IRemoteContract, IRuntimeTypedPeer } from '@migaia/rpc-core/remote'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { RpcCapability } from '@migaia/rpc-contract'\nimport { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'\n\ntype IPythonApi = {\n  echo: (values: string[]) => string[]\n  math: { add: (pair: [number, number]) => number }\n}\n// 本地声明：桥接只用它做调用前校验（必须没有 stream 方法）。可调用目录以对端 describe 为准。\nconst contract: IRemoteContract = {\n  schemaVersion: 1,\n  plugin: 'python-service',\n  features: { math: { methods: { add: { mode: 'request', idempotent: true } } } }\n}\nconst report = (error: unknown) => console.error(error)\nconst launcher = createNodeProcessLauncher()\nconst token = randomBytes(32).toString('base64url')\nlet handle: Awaited<ReturnType<typeof launcher.launch>> | undefined\n\n// createRuntimePeer 本身不带泛型；用 IRuntimeTypedPeer 标注远端方法类型。\nconst python = (await createRuntimePeer({\n  self: { name: 'node-client', instanceId: 'node-client-1' },\n  connect: async (context) => {\n    handle = await launcher.launch(\n      {\n        command: 'python3',\n        args: [fileURLToPath(new URL('./service.py', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      },\n      { signal: new AbortController().signal, output: () => undefined }\n    )\n    return createJsonRpcRemoteChannel({\n      byte: handle.channel!,\n      peerId: 'python-service',\n      target: { kind: 'plugin', contract },\n      offer: {\n        versions: [{ major: 1, minor: 1 }],\n        peer: { id: context.self.instanceId, runtime: 'node' },\n        capabilities: [RpcCapability.deadline, RpcCapability.trace]\n      },\n      token,\n      scheduler: systemScheduler,\n      wallClock: systemWallClock,\n      ipc: { connectionId: 'python-1', sessionId: 'python-1', log: () => undefined },\n      report\n    })\n  },\n  report\n})) as IRuntimeTypedPeer<IPythonApi>\ntry {\n  console.log(await python.request('echo', ['hello', 'python'])) // ['hello', 'python']\n  console.log(await python.request('math.add', [20, 22])) // 42\n} finally {\n  await python.close() // 关闭本端连接\n  handle?.terminate('force') // 子进程由启动它的 launcher 负责结束\n  await handle?.exited\n}"
+            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport { createProcessPeer } from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\nimport type { IRemoteContract } from '@migaia/rpc-core/remote'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { RpcCapability } from '@migaia/rpc-contract'\nimport { systemWallClock } from '@migaia/utils/scheduler'\n\n/** The standard-library responder receives positional JSON-RPC arguments. */\ntype IPythonApi = { echo(values: string[]): string[]; math: { add(pair: [number, number]): number } }\n/** A local scalar contract is checked before the remote directory becomes callable. */\nconst contract: IRemoteContract = {\n  schemaVersion: 1,\n  plugin: 'python-service',\n  features: { math: { methods: { add: { mode: 'request', idempotent: true } } } }\n}\n/** Record only classified diagnostic messages, never the ephemeral session credential. */\nconst report = (error: unknown) => console.error(error)\n/** One token belongs to this supervised child and is written through its original stdin frame. */\nconst token = randomBytes(32).toString('base64url')\n/** The exact real launcher retains child execution and termination ownership. */\nconst launcher = createNodeProcessLauncher()\n/** Closing the public Peer must release its genuine process budget. */\nconst budget = createUnitBudget({ kind: 'process', maxUnits: 1 })\n/** Public generic construction supplies the remote method type without a Peer cast. */\nconst peer = await createProcessPeer<IPythonApi>({\n  self: { name: 'node-client', instanceId: 'node-client-1' },\n  report,\n  spawn: {\n    kind: 'spawn', channelKind: 'byte', wire: 'jsonrpc', token,\n    supervision: {\n      id: 'python-service', isolation: 'best-effort', restart: { mode: 'never' }, budget,\n      report, launcher,\n      spec: {\n        command: 'python3', args: [fileURLToPath(new URL('./service.py', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as Awaited<ReturnType<typeof launcher.launch>>).channel!,\n    establish: async (raw, prepared) => {\n      if (raw.kind !== 'byte') throw new TypeError('This example requires a byte channel')\n      return createJsonRpcRemoteChannel({\n        byte: raw, peerId: 'python-service', target: { kind: 'plugin', contract },\n        offer: {\n          versions: [{ major: 1, minor: 1 }],\n          peer: { id: 'node-client-1', runtime: 'node' },\n          capabilities: [RpcCapability.deadline, RpcCapability.trace]\n        },\n        token: prepared.token!, scheduler: prepared.scheduler, wallClock: systemWallClock,\n        ipc: { ...prepared.session, log: () => undefined }, signal: prepared.signal,\n        report\n      })\n    }\n  }\n})\ntry {\n  console.log(await peer.request('echo', ['hello', 'python'])) // ['hello', 'python']\n  console.log(await peer.request('math.add', [20, 22])) // 42\n} finally {\n  await peer.close() // 关闭连接、结束监督子进程并释放 budget\n}"
           ],
           "members": [],
           "exportPath": ".",
@@ -55647,7 +55647,7 @@
         {
           "name": "IJsonRpcBridgeOptions",
           "kind": "type",
-          "signature": "export type IJsonRpcBridgeOptions = Readonly<{\n  byte: IProcessByteChannel;\n  peerId: string;\n  target:\n    | Readonly<{ kind: 'plugin'; contract: IRemoteContract }>\n    | Readonly<{ kind: 'host'; catalog: IRemoteHostCatalog }>;\n  offer: Omit<IRpcHandshakeOffer, 'auth' | 'codecs'>;\n  token: string;\n  scheduler: IScheduler;\n  wallClock: IWallClock;\n  ipc: IProcessCommonOptions['ipc'];\n  signal?: AbortSignal;\n  handshakeTimeoutMs?: number;\n  report(error: unknown): void;\n}>;",
+          "signature": "export type IJsonRpcBridgeOptions = Readonly<{\n  byte: IProcessByteChannel;\n  peerId: string;\n  target:\n    | Readonly<{ kind: 'plugin'; contract: IRemoteContract }>\n    | Readonly<{ kind: 'host'; catalog: IRemoteHostCatalog }>;\n  offer: Omit<IRpcHandshakeOffer, 'auth' | 'codecs'>;\n  token: string;\n  scheduler: IScheduler;\n  wallClock: IWallClock;\n  ipc: IProcessCommonOptions['ipc'];\n  signal?: import('@migaia/rpc-core').IRpcAbortSignal;\n  handshakeTimeoutMs?: number;\n  report(error: unknown): void;\n}>;",
           "declarationLine": 6,
           "source": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/handshake.d.ts",
           "purpose": "Caller owns launch, authentication issuance, clocks and the physical byte connection.",
@@ -55663,7 +55663,7 @@
           "aliasOf": "IJsonRpcBridgeOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IJsonRpcBridgeOptions = Readonly<{ byte: IProcessByteChannel; peerId: string; target: Readonly<{ kind: 'plugin'; contract: IRemoteContract; }> | Readonly<{ kind: 'host'; catalog: IRemoteHostCatalog; }>; offer: Omit<IRpcHandshakeOffer, 'auth' | 'codecs'>; token: string; scheduler: IScheduler; wallClock: IWallClock; ipc: IProcessCommonOptions['ipc']; signal?: AbortSignal; handshakeTimeoutMs?: number; report(error: unknown): void; }>;"
+            "export type IJsonRpcBridgeOptions = Readonly<{ byte: IProcessByteChannel; peerId: string; target: Readonly<{ kind: 'plugin'; contract: IRemoteContract; }> | Readonly<{ kind: 'host'; catalog: IRemoteHostCatalog; }>; offer: Omit<IRpcHandshakeOffer, 'auth' | 'codecs'>; token: string; scheduler: IScheduler; wallClock: IWallClock; ipc: IProcessCommonOptions['ipc']; signal?: import('@migaia/rpc-core').IRpcAbortSignal; handshakeTimeoutMs?: number; report(error: unknown): void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -55702,7 +55702,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/handshake.d.ts:IJsonRpcBridgeOptions:export type IJsonRpcBridgeOptions = Readonly<{ byte: IProcessByteChannel; peerId: string; target: Readonly<{ kind: 'plugin'; contract: IRemoteContract; }> | Readonly<{ kind: 'host'; catalog: IRemoteHostCatalog; }>; offer: Omit<IRpcHandshakeOffer, 'auth' | 'codecs'>; token: string; scheduler: IScheduler; wallClock: IWallClock; ipc: IProcessCommonOptions['ipc']; signal?: AbortSignal; handshakeTimeoutMs?: number; report(error: unknown): void; }>;",
+          "identity": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/handshake.d.ts:IJsonRpcBridgeOptions:export type IJsonRpcBridgeOptions = Readonly<{ byte: IProcessByteChannel; peerId: string; target: Readonly<{ kind: 'plugin'; contract: IRemoteContract; }> | Readonly<{ kind: 'host'; catalog: IRemoteHostCatalog; }>; offer: Omit<IRpcHandshakeOffer, 'auth' | 'codecs'>; token: string; scheduler: IScheduler; wallClock: IWallClock; ipc: IProcessCommonOptions['ipc']; signal?: import('@migaia/rpc-core').IRpcAbortSignal; handshakeTimeoutMs?: number; report(error: unknown): void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -87886,7 +87886,7 @@
         {
           "name": "IRuntimeConnectionOptions",
           "kind": "type",
-          "signature": "export type IRuntimeConnectionOptions = Readonly<{\n  platform: IRpcTransport['platform'];\n  expectedStringText: string;\n  peerId: string;\n  signal?: AbortSignal;\n  handshakeTimeoutMs?: number;\n  scheduler?: IScheduler;\n  report(error: unknown): void;\n  ipc: Readonly<{\n    connectionId: string;\n    sessionId: string;\n    maxPendingData?: number;\n    maxPendingControl?: number;\n    log(record: IIpcLogRecord): void | Promise<void>;\n  }>;\n}>;",
+          "signature": "export type IRuntimeConnectionOptions = Readonly<{\n  platform: IRpcTransport['platform'];\n  expectedStringText: string;\n  peerId: string;\n  signal?: import('../../core/typing.js').IRpcAbortSignal;\n  handshakeTimeoutMs?: number;\n  scheduler?: IScheduler;\n  report(error: unknown): void;\n  ipc: Readonly<{\n    connectionId: string;\n    sessionId: string;\n    maxPendingData?: number;\n    maxPendingControl?: number;\n    log(record: IIpcLogRecord): void | Promise<void>;\n  }>;\n}>;",
           "declarationLine": 40,
           "source": "packages/rpc-core/dist/runtime-adapter/byte/types.d.ts",
           "purpose": "Shared ordinary connection inputs; platform is presentation, never provenance.",
@@ -87902,7 +87902,7 @@
           "aliasOf": "IRuntimeConnectionOptions",
           "exportPath": "./adapter",
           "overloadSignatures": [
-            "export type IRuntimeConnectionOptions = Readonly<{ platform: IRpcTransport['platform']; expectedStringText: string; peerId: string; signal?: AbortSignal; handshakeTimeoutMs?: number; scheduler?: IScheduler; report(error: unknown): void; ipc: Readonly<{ connectionId: string; sessionId: string; maxPendingData?: number; maxPendingControl?: number; log(record: IIpcLogRecord): void | Promise<void>; }>; }>;"
+            "export type IRuntimeConnectionOptions = Readonly<{ platform: IRpcTransport['platform']; expectedStringText: string; peerId: string; signal?: import('../../core/typing.js').IRpcAbortSignal; handshakeTimeoutMs?: number; scheduler?: IScheduler; report(error: unknown): void; ipc: Readonly<{ connectionId: string; sessionId: string; maxPendingData?: number; maxPendingControl?: number; log(record: IIpcLogRecord): void | Promise<void>; }>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -87941,7 +87941,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/runtime-adapter/byte/types.d.ts:IRuntimeConnectionOptions:export type IRuntimeConnectionOptions = Readonly<{ platform: IRpcTransport['platform']; expectedStringText: string; peerId: string; signal?: AbortSignal; handshakeTimeoutMs?: number; scheduler?: IScheduler; report(error: unknown): void; ipc: Readonly<{ connectionId: string; sessionId: string; maxPendingData?: number; maxPendingControl?: number; log(record: IIpcLogRecord): void | Promise<void>; }>; }>;",
+          "identity": "packages/rpc-core/dist/runtime-adapter/byte/types.d.ts:IRuntimeConnectionOptions:export type IRuntimeConnectionOptions = Readonly<{ platform: IRpcTransport['platform']; expectedStringText: string; peerId: string; signal?: import('../../core/typing.js').IRpcAbortSignal; handshakeTimeoutMs?: number; scheduler?: IScheduler; report(error: unknown): void; ipc: Readonly<{ connectionId: string; sessionId: string; maxPendingData?: number; maxPendingControl?: number; log(record: IIpcLogRecord): void | Promise<void>; }>; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -88906,11 +88906,83 @@
               "content": "No additional advanced behavior is declared for prepareAdapterPeer."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "encrypt",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "decrypt",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "sign",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "verify",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "encodedType",
+              "type": "'any' | 'string' | 'uint8array'",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/rpc-core/dist/runtime-adapter/peer.d.ts:prepareAdapterPeer:export declare function prepareAdapterPeer(options: IAdapterPeerOptions, defaultName: string, selectedSelf?: IRuntimePeerIdentity): IAdapterPeerPreparation;",
           "guidance": [],
           "usageScore": 18,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "encrypt",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
+            },
+            {
+              "name": "decrypt",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
+            },
+            {
+              "name": "sign",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
+            },
+            {
+              "name": "verify",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
+            },
+            {
+              "name": "encodedType",
+              "type": "'any' | 'string' | 'uint8array'",
+              "optional": true,
+              "description": "`authentication` 的 `encodedType` — 受保护帧的编码类型：`any`、`string` 或 `uint8array`",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication` 的 `encodedType` — 受保护帧的编码类型：`any`、`string` 或 `uint8array`"
+            }
+          ],
           "fragment": "rpc-core-adapter--prepareAdapterPeer"
         },
         {
@@ -92798,7 +92870,7 @@
           "name": "createManagedRuntimePeer",
           "kind": "function",
           "signature": "export declare function createManagedRuntimePeer<TUnit, TSpec>(\n  options: IRuntimePeerOptions &\n    Pick<\n      IRemoteProxyOptions<TUnit, TSpec>,\n      'keyFactory' | 'retryPort' | 'callDeadlineCapMs'\n    >,\n  binding: IRemoteBinding<TUnit, TSpec>,\n  bindEndpoint?: (\n    channel: IRemoteChannel,\n    endpoint: IRemoteServeEndpoint,\n  ) => IRemoteServeEndpoint,\n  preparation?: Readonly<{\n    selfDefaulted?: boolean;\n    connectionOrigin?(): import('./overview.js').IRuntimeConnectionOrigin;\n    restrictTransfer?(options: object | undefined): void;\n    host?: import('@migaia/plugin-host').IPluginRuntimeIntegration;\n    providerAdmission?: import('../../core/features/provider.js').IProviderAdmissionScope;\n    providerAdmissionRegistration?: Readonly<{\n      stagePolicy(maxGlobal?: number, maxPerPeer?: number): void;\n      isCommitted(): boolean;\n    }>;\n    initialSignal?: IAbortSignal;\n    lifecycleSignal?: IAbortSignal;\n    own?(dispose: () => Promise<void>): void;\n    readProvide?(): import('./peer.js').IRuntimePeerProvide;\n    publishPeer?(peer: IRuntimePeer): () => void;\n  }>,\n  beforeRelease?: () => Promise<void>,\n  execution?: import('@migaia/supervision').ISupervisor<unknown, unknown>,\n): Promise<IRuntimePeer>;",
-          "declarationLine": 11,
+          "declarationLine": 13,
           "source": "packages/rpc-core/dist/remote/runtime-api/managed-peer.d.ts",
           "purpose": "Original remote generation and resource owners prepare one platform binding without a v1 contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createManagedRuntimePeer.",
@@ -92911,11 +92983,83 @@
               "content": "No additional advanced behavior is declared for createManagedRuntimePeer."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "encrypt",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "decrypt",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "sign",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "verify",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "encodedType",
+              "type": "'any' | 'string' | 'uint8array'",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/rpc-core/dist/remote/runtime-api/managed-peer.d.ts:createManagedRuntimePeer:export declare function createManagedRuntimePeer<TUnit, TSpec>(options: IRuntimePeerOptions & Pick<IRemoteProxyOptions<TUnit, TSpec>, 'keyFactory' | 'retryPort' | 'callDeadlineCapMs'>, binding: IRemoteBinding<TUnit, TSpec>, bindEndpoint?: (channel: IRemoteChannel, endpoint: IRemoteServeEndpoint) => IRemoteServeEndpoint, preparation?: Readonly<{ selfDefaulted?: boolean; connectionOrigin?(): import('./overview.js').IRuntimeConnectionOrigin; restrictTransfer?(options: object | undefined): void; host?: import('@migaia/plugin-host').IPluginRuntimeIntegration; providerAdmission?: import('../../core/features/provider.js').IProviderAdmissionScope; providerAdmissionRegistration?: Readonly<{ stagePolicy(maxGlobal?: number, maxPerPeer?: number): void; isCommitted(): boolean; }>; initialSignal?: IAbortSignal; lifecycleSignal?: IAbortSignal; own?(dispose: () => Promise<void>): void; readProvide?(): import('./peer.js').IRuntimePeerProvide; publishPeer?(peer: IRuntimePeer): () => void; }>, beforeRelease?: () => Promise<void>, execution?: import('@migaia/supervision').ISupervisor<unknown, unknown>): Promise<IRuntimePeer>;",
           "guidance": [],
           "usageScore": 6,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "encrypt",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
+            },
+            {
+              "name": "decrypt",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
+            },
+            {
+              "name": "sign",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
+            },
+            {
+              "name": "verify",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
+            },
+            {
+              "name": "encodedType",
+              "type": "'any' | 'string' | 'uint8array'",
+              "optional": true,
+              "description": "`authentication` 的 `encodedType` — 受保护帧的编码类型：`any`、`string` 或 `uint8array`",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication` 的 `encodedType` — 受保护帧的编码类型：`any`、`string` 或 `uint8array`"
+            }
+          ],
           "fragment": "rpc-core-remote--createManagedRuntimePeer"
         },
         {
@@ -93155,10 +93299,10 @@
         {
           "name": "createRuntimePeer",
           "kind": "function",
-          "signature": "export declare function createRuntimePeer(\n  options: IRuntimePeerOptions,\n  resources?: IRuntimePeerResources,\n): Promise<IRuntimePeer>;",
-          "declarationLine": 105,
+          "signature": "export declare function createRuntimePeer<TRemote = never>(\n  options: IRuntimePeerOptions,\n  resources?: IRuntimePeerResources,\n): Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>;\nexport declare function createRuntimePeer(\n  options: IRuntimePeerOptions,\n  resources?: IRuntimePeerResources,\n): Promise<IRuntimePeer>;",
+          "declarationLine": 108,
           "source": "packages/rpc-core/dist/remote/runtime-api/peer.d.ts",
-          "purpose": "Construct a symmetric callable endpoint using one canonical provider/outbound/stream closure. Source and method validation precede connection effects; failure closes only resources obtained by this construction, observing secondary cleanup failures while preserving the primary error.",
+          "purpose": "A declared remote surface preserves method and payload types on the original callable facade. The dynamic signature remains last so existing factory consumers and mocks retain its type.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRuntimePeer.",
           "advanced": "No additional advanced behavior is declared for createRuntimePeer.",
           "parameters": [
@@ -93177,7 +93321,7 @@
               "optional": true
             }
           ],
-          "returns": "Promise<IRuntimePeer>",
+          "returns": "Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>> | Promise<IRuntimePeer>",
           "errors": ["No documented errors are declared for createRuntimePeer."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRuntimePeer.",
           "examples": [
@@ -93187,6 +93331,7 @@
           "aliasOf": "createRuntimePeer",
           "exportPath": "./remote",
           "overloadSignatures": [
+            "export declare function createRuntimePeer<TRemote = never>(options: IRuntimePeerOptions, resources?: IRuntimePeerResources): Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>;",
             "export declare function createRuntimePeer(options: IRuntimePeerOptions, resources?: IRuntimePeerResources): Promise<IRuntimePeer>;"
           ],
           "overloadParameterDetails": [
@@ -93201,16 +93346,31 @@
                 "type": "IRuntimePeerResources",
                 "optional": true
               }
+            ],
+            [
+              {
+                "name": "options",
+                "type": "IRuntimePeerOptions",
+                "optional": false
+              },
+              {
+                "name": "resources",
+                "type": "IRuntimePeerResources",
+                "optional": true
+              }
             ]
           ],
-          "overloadReturns": ["Promise<IRuntimePeer>"],
+          "overloadReturns": [
+            "Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>",
+            "Promise<IRuntimePeer>"
+          ],
           "whenToUse": "Use createRuntimePeer when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createRuntimePeer does not match the required inputs or return contract.",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Construct a symmetric callable endpoint using one canonical provider/outbound/stream closure. Source and method validation precede connection effects; failure closes only resources obtained by this construction, observing secondary cleanup failures while preserving the primary error."
+              "content": "A declared remote surface preserves method and payload types on the original callable facade. The dynamic signature remains last so existing factory consumers and mocks retain its type."
             },
             {
               "id": "getting-started",
@@ -93238,11 +93398,83 @@
               "content": "No additional advanced behavior is declared for createRuntimePeer."
             }
           ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/remote/runtime-api/peer.d.ts:createRuntimePeer:export declare function createRuntimePeer(options: IRuntimePeerOptions, resources?: IRuntimePeerResources): Promise<IRuntimePeer>;",
+          "declaredConfiguration": [
+            {
+              "name": "encrypt",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "decrypt",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "sign",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "verify",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "encodedType",
+              "type": "'any' | 'string' | 'uint8array'",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/rpc-core/dist/remote/runtime-api/peer.d.ts:createRuntimePeer:export declare function createRuntimePeer<TRemote = never>(options: IRuntimePeerOptions, resources?: IRuntimePeerResources): Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>;\nexport declare function createRuntimePeer(options: IRuntimePeerOptions, resources?: IRuntimePeerResources): Promise<IRuntimePeer>;",
           "guidance": [],
           "usageScore": 20,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "encrypt",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
+            },
+            {
+              "name": "decrypt",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
+            },
+            {
+              "name": "sign",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
+            },
+            {
+              "name": "verify",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
+            },
+            {
+              "name": "encodedType",
+              "type": "'any' | 'string' | 'uint8array'",
+              "optional": true,
+              "description": "`authentication` 的 `encodedType` — 受保护帧的编码类型：`any`、`string` 或 `uint8array`",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication` 的 `encodedType` — 受保护帧的编码类型：`any`、`string` 或 `uint8array`"
+            }
+          ],
           "fragment": "rpc-core-remote--createRuntimePeer"
         },
         {
@@ -93342,11 +93574,83 @@
               "content": "No additional advanced behavior is declared for createRuntimePlugin."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "encrypt",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "decrypt",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "sign",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "verify",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "encodedType",
+              "type": "'any' | 'string' | 'uint8array'",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/rpc-core/dist/remote/runtime-api/plugin.d.ts:createRuntimePlugin:export declare function createRuntimePlugin<TSpawn, TConnect, TListen>(options: IRuntimePluginOptions<TSpawn, TConnect, TListen>, slotResource: IRuntimePluginSlotResource, createPeer?: (options: IRuntimePeerOptions) => Promise<IRuntimePeer>): IDefinedPluginConstraint<Record<string, never>, never, Record<string, never>>;",
           "guidance": [],
           "usageScore": 8,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "encrypt",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
+            },
+            {
+              "name": "decrypt",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
+            },
+            {
+              "name": "sign",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
+            },
+            {
+              "name": "verify",
+              "type": "IRpcAuthenticationTransform",
+              "optional": true,
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
+            },
+            {
+              "name": "encodedType",
+              "type": "'any' | 'string' | 'uint8array'",
+              "optional": true,
+              "description": "`authentication` 的 `encodedType` — 受保护帧的编码类型：`any`、`string` 或 `uint8array`",
+              "descriptionEn": "",
+              "descriptionZh": "`authentication` 的 `encodedType` — 受保护帧的编码类型：`any`、`string` 或 `uint8array`"
+            }
+          ],
           "fragment": "rpc-core-remote--createRuntimePlugin"
         },
         {
@@ -95783,7 +96087,7 @@
           "name": "IRuntimeListFilter",
           "kind": "type",
           "signature": "export type IRuntimeListFilter = Readonly<{\n  state?: SupervisorState;\n  name?:\n    | Readonly<{ exact: string; prefix?: never }>\n    | Readonly<{ prefix: string; exact?: never }>;\n  kind?: RuntimeSourceKind;\n  direction?: RuntimeConnectionDirection;\n}>;",
-          "declarationLine": 42,
+          "declarationLine": 44,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Filters keep local source selection distinct from the connection's remote direction.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListFilter.",
@@ -95847,7 +96151,7 @@
           "name": "IRuntimeListOptions",
           "kind": "type",
           "signature": "export type IRuntimeListOptions = IRuntimeQueryOptions &\n  Readonly<{ filter?: IRuntimeListFilter }>;",
-          "declarationLine": 55,
+          "declarationLine": 57,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Formatting never changes which canonical registration records the filter selects.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListOptions.",
@@ -95975,7 +96279,7 @@
           "name": "IRuntimePeer",
           "kind": "type",
           "signature": "export type IRuntimePeer = Readonly<{\n  self: IRuntimePeerIdentity;\n  request(\n    method: string,\n    payload?: unknown,\n    options?: IRuntimeCallOptions,\n  ): Promise<IRpcPortableValue | undefined>;\n  notify(\n    method: string,\n    payload?: unknown,\n    options?: IRuntimeCallOptions,\n  ): Promise<void>;\n  stream(\n    method: string,\n    payload?: unknown,\n    options?: IRuntimeCallOptions,\n  ): AsyncIterableIterator<IRpcPortableValue>;\n  group(\n    steps: readonly IRpcRuntimeStep[],\n    options?: Omit<\n      Extract<\n        import('@migaia/rpc-contract').IRpcRuntimeEnvelope,\n        { kind: 'runtime-call' }\n      >['options'],\n      'timeoutMs'\n    > &\n      Pick<\n        import('../../core/index.js').ISendOptions,\n        'timeoutMs' | 'signal' | 'transfer'\n      >,\n  ): Promise<readonly IRpcRuntimeStepOutcome[]>;\n  outcome(idempotencyKey: string): Promise<IRpcRuntimeOutcomeResult>;\n  describe: IRuntimeQuery<IRuntimeDetail>;\n  close(): Promise<void>;\n}>;",
-          "declarationLine": 52,
+          "declarationLine": 54,
           "source": "packages/rpc-core/dist/remote/runtime-api/peer.d.ts",
           "purpose": "Hot calls return the original operation result; only local description queries are asynchronous.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimePeer.",
@@ -96104,7 +96408,7 @@
         {
           "name": "IRuntimePeerOptions",
           "kind": "type",
-          "signature": "export type IRuntimePeerOptions = Pick<\n  IRemoteProxyOptions<object, unknown>,\n  'keyFactory' | 'retryPort'\n> &\n  Readonly<{\n    /** A custom runtime assembly receives only the operations held by this channel view. */ endpointFactory?(\n      channel: IRemoteChannelResources,\n      signal: IAbortSignal,\n    ): Promise<IRemoteServeEndpoint>;\n    self?: IRuntimePeerIdentity;\n    provide?: IRuntimePeerProvide;\n    spawn?: IRuntimePeerSource;\n    connect?: IRuntimePeerSource;\n    listen?: IRuntimePeerSource;\n    providerLimits?: IRpcProviderLimits;\n    /** Only request/stream inherit this positive default in their original timeout scope. */ defaultTimeoutMs?: number;\n    /** Explicit advanced schema, modes and idempotency retain their original contract owner. */ contract?: IRemoteContract;\n    report(error: unknown): void;\n  }>;",
+          "signature": "export type IRuntimePeerOptions = Pick<\n  IRemoteProxyOptions<object, unknown>,\n  'keyFactory' | 'retryPort'\n> &\n  Readonly<{\n    /** A custom runtime assembly receives only the operations held by this channel view. */ endpointFactory?(\n      channel: IRemoteChannelResources,\n      signal: IAbortSignal,\n    ): Promise<IRemoteServeEndpoint>;\n    self?: IRuntimePeerIdentity;\n    provide?: IRuntimePeerProvide;\n    spawn?: IRuntimePeerSource;\n    connect?: IRuntimePeerSource;\n    listen?: IRuntimePeerSource;\n    providerLimits?: IRpcProviderLimits;\n    /** Existing per-frame credentials enable signed native transfer without a custom endpoint. */ authentication?: IRpcAuthenticationConfig;\n    /** Only request/stream inherit this positive default in their original timeout scope. */ defaultTimeoutMs?: number;\n    /** Explicit advanced schema, modes and idempotency retain their original contract owner. */ contract?: IRemoteContract;\n    report(error: unknown): void;\n  }>;",
           "declarationLine": 30,
           "source": "packages/rpc-core/dist/remote/runtime-api/peer.d.ts",
           "purpose": "This internal assembly input is reused by the four platform factories.",
@@ -96122,7 +96426,7 @@
           "aliasOf": "IRuntimePeerOptions",
           "exportPath": "./remote",
           "overloadSignatures": [
-            "export type IRuntimePeerOptions = Pick<IRemoteProxyOptions<object, unknown>, 'keyFactory' | 'retryPort'> & Readonly<{ /** A custom runtime assembly receives only the operations held by this channel view. */ endpointFactory?(channel: IRemoteChannelResources, signal: IAbortSignal): Promise<IRemoteServeEndpoint>; self?: IRuntimePeerIdentity; provide?: IRuntimePeerProvide; spawn?: IRuntimePeerSource; connect?: IRuntimePeerSource; listen?: IRuntimePeerSource; providerLimits?: IRpcProviderLimits; /** Only request/stream inherit this positive default in their original timeout scope. */ defaultTimeoutMs?: number; /** Explicit advanced schema, modes and idempotency retain their original contract owner. */ contract?: IRemoteContract; report(error: unknown): void; }>;"
+            "export type IRuntimePeerOptions = Pick<IRemoteProxyOptions<object, unknown>, 'keyFactory' | 'retryPort'> & Readonly<{ /** A custom runtime assembly receives only the operations held by this channel view. */ endpointFactory?(channel: IRemoteChannelResources, signal: IAbortSignal): Promise<IRemoteServeEndpoint>; self?: IRuntimePeerIdentity; provide?: IRuntimePeerProvide; spawn?: IRuntimePeerSource; connect?: IRuntimePeerSource; listen?: IRuntimePeerSource; providerLimits?: IRpcProviderLimits; /** Existing per-frame credentials enable signed native transfer without a custom endpoint. */ authentication?: IRpcAuthenticationConfig; /** Only request/stream inherit this positive default in their original timeout scope. */ defaultTimeoutMs?: number; /** Explicit advanced schema, modes and idempotency retain their original contract owner. */ contract?: IRemoteContract; report(error: unknown): void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -96161,7 +96465,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/remote/runtime-api/peer.d.ts:IRuntimePeerOptions:export type IRuntimePeerOptions = Pick<IRemoteProxyOptions<object, unknown>, 'keyFactory' | 'retryPort'> & Readonly<{ /** A custom runtime assembly receives only the operations held by this channel view. */ endpointFactory?(channel: IRemoteChannelResources, signal: IAbortSignal): Promise<IRemoteServeEndpoint>; self?: IRuntimePeerIdentity; provide?: IRuntimePeerProvide; spawn?: IRuntimePeerSource; connect?: IRuntimePeerSource; listen?: IRuntimePeerSource; providerLimits?: IRpcProviderLimits; /** Only request/stream inherit this positive default in their original timeout scope. */ defaultTimeoutMs?: number; /** Explicit advanced schema, modes and idempotency retain their original contract owner. */ contract?: IRemoteContract; report(error: unknown): void; }>;",
+          "identity": "packages/rpc-core/dist/remote/runtime-api/peer.d.ts:IRuntimePeerOptions:export type IRuntimePeerOptions = Pick<IRemoteProxyOptions<object, unknown>, 'keyFactory' | 'retryPort'> & Readonly<{ /** A custom runtime assembly receives only the operations held by this channel view. */ endpointFactory?(channel: IRemoteChannelResources, signal: IAbortSignal): Promise<IRemoteServeEndpoint>; self?: IRuntimePeerIdentity; provide?: IRuntimePeerProvide; spawn?: IRuntimePeerSource; connect?: IRuntimePeerSource; listen?: IRuntimePeerSource; providerLimits?: IRpcProviderLimits; /** Existing per-frame credentials enable signed native transfer without a custom endpoint. */ authentication?: IRpcAuthenticationConfig; /** Only request/stream inherit this positive default in their original timeout scope. */ defaultTimeoutMs?: number; /** Explicit advanced schema, modes and idempotency retain their original contract owner. */ contract?: IRemoteContract; report(error: unknown): void; }>;",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -96557,7 +96861,7 @@
           "name": "IRuntimeProcessStopOptions",
           "kind": "type",
           "signature": "export type IRuntimeProcessStopOptions = Readonly<{\n  graceMs?: number;\n  signal?: 'SIGTERM';\n}>;",
-          "declarationLine": 79,
+          "declarationLine": 81,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Process signals are limited to the native graceful operation already owned by the launcher.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeProcessStopOptions.",
@@ -96877,7 +97181,7 @@
           "name": "IRuntimeThreadStopOptions",
           "kind": "type",
           "signature": "export type IRuntimeThreadStopOptions = Readonly<{ graceMs?: number }>;",
-          "declarationLine": 84,
+          "declarationLine": 86,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Threads have no OS signal and never terminate their shared PID.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeThreadStopOptions.",
@@ -101723,7 +102027,7 @@
           "errors": ["No documented errors are declared for createNativeProcessOffer."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNativeProcessOffer.",
           "examples": [
-            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\nimport { RpcCapability } from '@migaia/rpc-contract'\n\nconst report = (error: unknown) => console.error(error)\n// 与客户端事先约定的共享凭据；生产中从密钥管理读取，不要硬编码。\nconst expectedToken = process.env.MATH_TOKEN!\nlet sequence = 0\n\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    console.log(`listening on ${listener.address}`)\n    return listener\n  },\n  // 握手阶段校验凭据，返回该会话的 principal；抛错即拒绝连接。\n  verify: (auth) => {\n    if (auth !== expectedToken) throw new Error('unknown client')\n    return 'math-client'\n  },\n  // 监听端必须声明 runtime 调用所需的全部能力；客户端由库自动生成同一组提议。\n  offer: createNativeProcessOffer({\n    peer: { id: 'math-server', runtime: 'node' },\n    stream: true,\n    capabilities: [\n      RpcCapability.abort,\n      RpcCapability.runtimeApi,\n      RpcCapability.forwardRoute,\n      RpcCapability.generation,\n      RpcCapability.order,\n      RpcCapability.group,\n      RpcCapability.cancelBeforeStart,\n      RpcCapability.outcome,\n      RpcCapability.deadline,\n      RpcCapability.portableBinary\n    ]\n  }),\n  createConnectionContext: () => ({\n    peerId: `client-${++sequence}`,\n    ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined }\n  })\n}\n\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\nprocess.once('SIGTERM', () => void server.close())"
+            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\nconst report = (error: unknown) => console.error(error)\n// 与客户端事先约定的共享凭据；生产中从密钥管理读取，不要硬编码。\nconst expectedToken = process.env.MATH_TOKEN!\nlet sequence = 0\n\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    console.log(`listening on ${listener.address}`)\n    return listener\n  },\n  // 握手阶段校验凭据，返回该会话的 principal；抛错即拒绝连接。\n  verify: (auth) => {\n    if (auth !== expectedToken) throw new Error('unknown client')\n    return 'math-client'\n  },\n  // 库根据本端已安装的 runtime 能力补全默认提议。\n  offer: createNativeProcessOffer({\n    peer: { id: 'math-server', runtime: 'node' },\n    stream: true\n  }),\n  createConnectionContext: () => ({\n    peerId: `client-${++sequence}`,\n    ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined }\n  })\n}\n\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\nprocess.once('SIGTERM', () => void server.close())"
           ],
           "members": [],
           "aliasOf": "createNativeProcessOffer",
@@ -101778,7 +102082,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-process/dist/process/offer.d.ts:createNativeProcessOffer:export declare function createNativeProcessOffer(options: Readonly<{ peer: IRpcPeerInfo; auth?: IRpcHandshakeOffer['auth']; stream?: boolean; capabilities?: readonly string[]; }>): IRpcHandshakeOffer;",
           "guidance": [],
-          "usageScore": 26,
+          "usageScore": 30,
           "configuration": [],
           "fragment": "rpc-process-index--createNativeProcessOffer"
         },
@@ -101883,7 +102187,7 @@
           "examples": [
             "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: {\n    math: { double: (value: number) => value * 2 },\n    feed: {\n      // async generator 方法可以被对端用 stream() 逐项读取\n      count: async function* (limit: number) {\n        for (let index = 1; index <= limit; index++) yield index\n      }\n    }\n  },\n  report: (error) => console.error(error)\n})",
             "type IServiceApi = {\n  math: { double: (value: number) => number }\n  feed: { count: (limit: number) => AsyncIterableIterator<number> }\n}\nconst service = await createProcessPeer<IServiceApi>({ spawn, report })\nservice.request('math.double', 21) // Promise<number>\nservice.stream('feed.count', 3) // AsyncIterableIterator<number>",
-            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\nimport { RpcCapability } from '@migaia/rpc-contract'\n\nconst report = (error: unknown) => console.error(error)\n// 与客户端事先约定的共享凭据；生产中从密钥管理读取，不要硬编码。\nconst expectedToken = process.env.MATH_TOKEN!\nlet sequence = 0\n\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    console.log(`listening on ${listener.address}`)\n    return listener\n  },\n  // 握手阶段校验凭据，返回该会话的 principal；抛错即拒绝连接。\n  verify: (auth) => {\n    if (auth !== expectedToken) throw new Error('unknown client')\n    return 'math-client'\n  },\n  // 监听端必须声明 runtime 调用所需的全部能力；客户端由库自动生成同一组提议。\n  offer: createNativeProcessOffer({\n    peer: { id: 'math-server', runtime: 'node' },\n    stream: true,\n    capabilities: [\n      RpcCapability.abort,\n      RpcCapability.runtimeApi,\n      RpcCapability.forwardRoute,\n      RpcCapability.generation,\n      RpcCapability.order,\n      RpcCapability.group,\n      RpcCapability.cancelBeforeStart,\n      RpcCapability.outcome,\n      RpcCapability.deadline,\n      RpcCapability.portableBinary\n    ]\n  }),\n  createConnectionContext: () => ({\n    peerId: `client-${++sequence}`,\n    ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined }\n  })\n}\n\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\nprocess.once('SIGTERM', () => void server.close())",
+            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\nconst report = (error: unknown) => console.error(error)\n// 与客户端事先约定的共享凭据；生产中从密钥管理读取，不要硬编码。\nconst expectedToken = process.env.MATH_TOKEN!\nlet sequence = 0\n\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    console.log(`listening on ${listener.address}`)\n    return listener\n  },\n  // 握手阶段校验凭据，返回该会话的 principal；抛错即拒绝连接。\n  verify: (auth) => {\n    if (auth !== expectedToken) throw new Error('unknown client')\n    return 'math-client'\n  },\n  // 库根据本端已安装的 runtime 能力补全默认提议。\n  offer: createNativeProcessOffer({\n    peer: { id: 'math-server', runtime: 'node' },\n    stream: true\n  }),\n  createConnectionContext: () => ({\n    peerId: `client-${++sequence}`,\n    ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined }\n  })\n}\n\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\nprocess.once('SIGTERM', () => void server.close())",
             "import { createProcessPeer, createProcessTransport } from '@migaia/rpc-process'\nimport { dialProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double: (value: number) => number } }\nconst report = (error: unknown) => console.error(error)\n\nconst client = await createProcessPeer<IServerApi>({\n  connect: {\n    kind: 'connect',\n    address: process.env.MATH_ADDRESS!,\n    token: process.env.MATH_TOKEN!,\n    dial: (address, signal) => dialProcessByteChannel({ address, signal: signal as AbortSignal }),\n    establish: (raw, prepared) => {\n      if (raw.kind !== 'byte') throw new TypeError('socket connections are byte channels')\n      return createProcessTransport(raw, {\n        role: 'initiator',\n        offer: prepared.offer!,\n        peerId: 'math-server',\n        scheduler: prepared.scheduler,\n        signal: prepared.signal as AbortSignal,\n        ipc: { ...prepared.session, log: () => undefined },\n        report\n      })\n    }\n  },\n  report\n})\ntry {\n  console.log(await client.request('math.double', 21)) // 42\n} finally {\n  // 只关闭本端连接；服务端进程不受影响。\n  await client.close()\n}",
             "// service.ts（子进程入口）\nimport { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: {\n    math: {\n      double: (value: number) => value * 2,\n      sum: (values: number[]) => values.reduce((total, value) => total + value, 0)\n    }\n  },\n  report: (error) => console.error(error)\n})",
             "// main.ts（父进程）\nimport { createProcessPeer } from '@migaia/rpc-process'\nimport { createNodeServiceSpawn } from './spawn-source.js'\n\ntype IServiceApi = {\n  math: { double: (value: number) => number; sum: (values: number[]) => number }\n}\nconst report = (error: unknown) => console.error(error)\n\nconst service = await createProcessPeer<IServiceApi>({\n  spawn: createNodeServiceSpawn(new URL('./service.js', import.meta.url), report),\n  report\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  console.log(await service.request('math.sum', [1, 2, 3])) // 6\n} finally {\n  await service.close() // 结束连接并按监督策略停止子进程\n}"
@@ -102692,7 +102996,7 @@
         {
           "name": "IListenProcessByteChannel",
           "kind": "type",
-          "signature": "export type IListenProcessByteChannel = (\n  options: Readonly<{\n    address: string;\n    /** Stable, non-secret owner for safe recovery of an abandoned Unix socket path. */ serviceId?: string;\n    signal?: AbortSignal;\n    auth: Readonly<{\n      mode: 'required';\n      verify(\n        auth: IRpcPortableValue | undefined,\n        peer: IRpcPeerInfo,\n      ): string | Promise<string>;\n    }>;\n    onConnection(pending: IProcessPendingByteConnection): void | Promise<void>;\n    report(error: unknown): void;\n  }>,\n) => Promise<IProcessByteListener>;",
+          "signature": "export type IListenProcessByteChannel = (\n  options: Readonly<{\n    address: string;\n    /** Stable, non-secret owner for safe recovery of an abandoned Unix socket path. */ serviceId?: string;\n    signal?: import('@migaia/rpc-core').IRpcAbortSignal;\n    auth: Readonly<{\n      mode: 'required';\n      verify(\n        auth: IRpcPortableValue | undefined,\n        peer: IRpcPeerInfo,\n      ): string | Promise<string>;\n    }>;\n    onConnection(pending: IProcessPendingByteConnection): void | Promise<void>;\n    report(error: unknown): void;\n  }>,\n) => Promise<IProcessByteListener>;",
           "declarationLine": 84,
           "source": "packages/rpc-process/dist/process/types.d.ts",
           "purpose": "Platform deep paths implement the same authenticated listener port.",
@@ -102708,7 +103012,7 @@
           "aliasOf": "IListenProcessByteChannel",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IListenProcessByteChannel = (options: Readonly<{ address: string; /** Stable, non-secret owner for safe recovery of an abandoned Unix socket path. */ serviceId?: string; signal?: AbortSignal; auth: Readonly<{ mode: 'required'; verify(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>; }>; onConnection(pending: IProcessPendingByteConnection): void | Promise<void>; report(error: unknown): void; }>) => Promise<IProcessByteListener>;"
+            "export type IListenProcessByteChannel = (options: Readonly<{ address: string; /** Stable, non-secret owner for safe recovery of an abandoned Unix socket path. */ serviceId?: string; signal?: import('@migaia/rpc-core').IRpcAbortSignal; auth: Readonly<{ mode: 'required'; verify(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>; }>; onConnection(pending: IProcessPendingByteConnection): void | Promise<void>; report(error: unknown): void; }>) => Promise<IProcessByteListener>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -102747,7 +103051,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/types.d.ts:IListenProcessByteChannel:export type IListenProcessByteChannel = (options: Readonly<{ address: string; /** Stable, non-secret owner for safe recovery of an abandoned Unix socket path. */ serviceId?: string; signal?: AbortSignal; auth: Readonly<{ mode: 'required'; verify(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>; }>; onConnection(pending: IProcessPendingByteConnection): void | Promise<void>; report(error: unknown): void; }>) => Promise<IProcessByteListener>;",
+          "identity": "packages/rpc-process/dist/process/types.d.ts:IListenProcessByteChannel:export type IListenProcessByteChannel = (options: Readonly<{ address: string; /** Stable, non-secret owner for safe recovery of an abandoned Unix socket path. */ serviceId?: string; signal?: import('@migaia/rpc-core').IRpcAbortSignal; auth: Readonly<{ mode: 'required'; verify(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>; }>; onConnection(pending: IProcessPendingByteConnection): void | Promise<void>; report(error: unknown): void; }>) => Promise<IProcessByteListener>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -102950,7 +103254,7 @@
         {
           "name": "IProcessCommonOptions",
           "kind": "type",
-          "signature": "export type IProcessCommonOptions = Readonly<{\n  peerId: string;\n  signal?: AbortSignal;\n  handshakeTimeoutMs?: number;\n  scheduler?: IScheduler;\n  report(error: unknown): void;\n  ipc: Readonly<{\n    connectionId: string;\n    sessionId: string;\n    processId?: string;\n    maxPendingData?: number;\n    maxPendingControl?: number;\n    log(record: IIpcLogRecord): void | Promise<void>;\n    stderr?: (listener: (chunk: Uint8Array) => void) => () => void;\n  }>;\n}>;",
+          "signature": "export type IProcessCommonOptions = Readonly<{\n  peerId: string;\n  signal?: import('@migaia/rpc-core').IRpcAbortSignal;\n  handshakeTimeoutMs?: number;\n  scheduler?: IScheduler;\n  report(error: unknown): void;\n  ipc: Readonly<{\n    connectionId: string;\n    sessionId: string;\n    processId?: string;\n    maxPendingData?: number;\n    maxPendingControl?: number;\n    log(record: IIpcLogRecord): void | Promise<void>;\n    stderr?: (listener: (chunk: Uint8Array) => void) => () => void;\n  }>;\n}>;",
           "declarationLine": 23,
           "source": "packages/rpc-process/dist/process/types.d.ts",
           "purpose": "Per-connection identity, diagnostics, and lifecycle ports supplied by the owner.",
@@ -102966,7 +103270,7 @@
           "aliasOf": "IProcessCommonOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IProcessCommonOptions = Readonly<{ peerId: string; signal?: AbortSignal; handshakeTimeoutMs?: number; scheduler?: IScheduler; report(error: unknown): void; ipc: Readonly<{ connectionId: string; sessionId: string; processId?: string; maxPendingData?: number; maxPendingControl?: number; log(record: IIpcLogRecord): void | Promise<void>; stderr?: (listener: (chunk: Uint8Array) => void) => () => void; }>; }>;"
+            "export type IProcessCommonOptions = Readonly<{ peerId: string; signal?: import('@migaia/rpc-core').IRpcAbortSignal; handshakeTimeoutMs?: number; scheduler?: IScheduler; report(error: unknown): void; ipc: Readonly<{ connectionId: string; sessionId: string; processId?: string; maxPendingData?: number; maxPendingControl?: number; log(record: IIpcLogRecord): void | Promise<void>; stderr?: (listener: (chunk: Uint8Array) => void) => () => void; }>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -103005,7 +103309,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/types.d.ts:IProcessCommonOptions:export type IProcessCommonOptions = Readonly<{ peerId: string; signal?: AbortSignal; handshakeTimeoutMs?: number; scheduler?: IScheduler; report(error: unknown): void; ipc: Readonly<{ connectionId: string; sessionId: string; processId?: string; maxPendingData?: number; maxPendingControl?: number; log(record: IIpcLogRecord): void | Promise<void>; stderr?: (listener: (chunk: Uint8Array) => void) => () => void; }>; }>;",
+          "identity": "packages/rpc-process/dist/process/types.d.ts:IProcessCommonOptions:export type IProcessCommonOptions = Readonly<{ peerId: string; signal?: import('@migaia/rpc-core').IRpcAbortSignal; handshakeTimeoutMs?: number; scheduler?: IScheduler; report(error: unknown): void; ipc: Readonly<{ connectionId: string; sessionId: string; processId?: string; maxPendingData?: number; maxPendingControl?: number; log(record: IIpcLogRecord): void | Promise<void>; stderr?: (listener: (chunk: Uint8Array) => void) => () => void; }>; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -104620,7 +104924,7 @@
           "errors": ["No documented errors are declared for IProcessServeListenerIngress."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IProcessServeListenerIngress.",
           "examples": [
-            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\nimport { RpcCapability } from '@migaia/rpc-contract'\n\nconst report = (error: unknown) => console.error(error)\n// 与客户端事先约定的共享凭据；生产中从密钥管理读取，不要硬编码。\nconst expectedToken = process.env.MATH_TOKEN!\nlet sequence = 0\n\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    console.log(`listening on ${listener.address}`)\n    return listener\n  },\n  // 握手阶段校验凭据，返回该会话的 principal；抛错即拒绝连接。\n  verify: (auth) => {\n    if (auth !== expectedToken) throw new Error('unknown client')\n    return 'math-client'\n  },\n  // 监听端必须声明 runtime 调用所需的全部能力；客户端由库自动生成同一组提议。\n  offer: createNativeProcessOffer({\n    peer: { id: 'math-server', runtime: 'node' },\n    stream: true,\n    capabilities: [\n      RpcCapability.abort,\n      RpcCapability.runtimeApi,\n      RpcCapability.forwardRoute,\n      RpcCapability.generation,\n      RpcCapability.order,\n      RpcCapability.group,\n      RpcCapability.cancelBeforeStart,\n      RpcCapability.outcome,\n      RpcCapability.deadline,\n      RpcCapability.portableBinary\n    ]\n  }),\n  createConnectionContext: () => ({\n    peerId: `client-${++sequence}`,\n    ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined }\n  })\n}\n\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\nprocess.once('SIGTERM', () => void server.close())"
+            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\nconst report = (error: unknown) => console.error(error)\n// 与客户端事先约定的共享凭据；生产中从密钥管理读取，不要硬编码。\nconst expectedToken = process.env.MATH_TOKEN!\nlet sequence = 0\n\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    console.log(`listening on ${listener.address}`)\n    return listener\n  },\n  // 握手阶段校验凭据，返回该会话的 principal；抛错即拒绝连接。\n  verify: (auth) => {\n    if (auth !== expectedToken) throw new Error('unknown client')\n    return 'math-client'\n  },\n  // 库根据本端已安装的 runtime 能力补全默认提议。\n  offer: createNativeProcessOffer({\n    peer: { id: 'math-server', runtime: 'node' },\n    stream: true\n  }),\n  createConnectionContext: () => ({\n    peerId: `client-${++sequence}`,\n    ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined }\n  })\n}\n\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\nprocess.once('SIGTERM', () => void server.close())"
           ],
           "members": [],
           "aliasOf": "IProcessServeListenerIngress",
@@ -105123,7 +105427,7 @@
           "name": "IRuntimeListFilter",
           "kind": "type",
           "signature": "export type IRuntimeListFilter = Readonly<{\n  state?: SupervisorState;\n  name?:\n    | Readonly<{ exact: string; prefix?: never }>\n    | Readonly<{ prefix: string; exact?: never }>;\n  kind?: RuntimeSourceKind;\n  direction?: RuntimeConnectionDirection;\n}>;",
-          "declarationLine": 42,
+          "declarationLine": 44,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Filters keep local source selection distinct from the connection's remote direction.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListFilter.",
@@ -105187,7 +105491,7 @@
           "name": "IRuntimeListOptions",
           "kind": "type",
           "signature": "export type IRuntimeListOptions = IRuntimeQueryOptions &\n  Readonly<{ filter?: IRuntimeListFilter }>;",
-          "declarationLine": 55,
+          "declarationLine": 57,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Formatting never changes which canonical registration records the filter selects.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListOptions.",
@@ -105443,7 +105747,7 @@
           "name": "IRuntimeProcessStopOptions",
           "kind": "type",
           "signature": "export type IRuntimeProcessStopOptions = Readonly<{\n  graceMs?: number;\n  signal?: 'SIGTERM';\n}>;",
-          "declarationLine": 79,
+          "declarationLine": 81,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Process signals are limited to the native graceful operation already owned by the launcher.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeProcessStopOptions.",
@@ -107499,7 +107803,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for listenProcessByteChannel.",
           "examples": [
             "import {\n  createProcessPeer,\n  createProcessPlugin,\n  createProcessTransport,\n  createNativeProcessOffer,\n  RpcProcessErrorCode,\n  RPC_PROCESS_ERROR_SOURCE\n} from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport {\n  dialProcessByteChannel,\n  listenProcessByteChannel\n} from '@migaia/rpc-process/adapters/node-socket'",
-            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\nimport { RpcCapability } from '@migaia/rpc-contract'\n\nconst report = (error: unknown) => console.error(error)\n// 与客户端事先约定的共享凭据；生产中从密钥管理读取，不要硬编码。\nconst expectedToken = process.env.MATH_TOKEN!\nlet sequence = 0\n\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    console.log(`listening on ${listener.address}`)\n    return listener\n  },\n  // 握手阶段校验凭据，返回该会话的 principal；抛错即拒绝连接。\n  verify: (auth) => {\n    if (auth !== expectedToken) throw new Error('unknown client')\n    return 'math-client'\n  },\n  // 监听端必须声明 runtime 调用所需的全部能力；客户端由库自动生成同一组提议。\n  offer: createNativeProcessOffer({\n    peer: { id: 'math-server', runtime: 'node' },\n    stream: true,\n    capabilities: [\n      RpcCapability.abort,\n      RpcCapability.runtimeApi,\n      RpcCapability.forwardRoute,\n      RpcCapability.generation,\n      RpcCapability.order,\n      RpcCapability.group,\n      RpcCapability.cancelBeforeStart,\n      RpcCapability.outcome,\n      RpcCapability.deadline,\n      RpcCapability.portableBinary\n    ]\n  }),\n  createConnectionContext: () => ({\n    peerId: `client-${++sequence}`,\n    ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined }\n  })\n}\n\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\nprocess.once('SIGTERM', () => void server.close())"
+            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\nconst report = (error: unknown) => console.error(error)\n// 与客户端事先约定的共享凭据；生产中从密钥管理读取，不要硬编码。\nconst expectedToken = process.env.MATH_TOKEN!\nlet sequence = 0\n\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    console.log(`listening on ${listener.address}`)\n    return listener\n  },\n  // 握手阶段校验凭据，返回该会话的 principal；抛错即拒绝连接。\n  verify: (auth) => {\n    if (auth !== expectedToken) throw new Error('unknown client')\n    return 'math-client'\n  },\n  // 库根据本端已安装的 runtime 能力补全默认提议。\n  offer: createNativeProcessOffer({\n    peer: { id: 'math-server', runtime: 'node' },\n    stream: true\n  }),\n  createConnectionContext: () => ({\n    peerId: `client-${++sequence}`,\n    ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined }\n  })\n}\n\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\nprocess.once('SIGTERM', () => void server.close())"
           ],
           "members": [],
           "exportPath": "./adapters/deno-socket",
@@ -108524,7 +108828,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for listenProcessByteChannel.",
           "examples": [
             "import {\n  createProcessPeer,\n  createProcessPlugin,\n  createProcessTransport,\n  createNativeProcessOffer,\n  RpcProcessErrorCode,\n  RPC_PROCESS_ERROR_SOURCE\n} from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport {\n  dialProcessByteChannel,\n  listenProcessByteChannel\n} from '@migaia/rpc-process/adapters/node-socket'",
-            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\nimport { RpcCapability } from '@migaia/rpc-contract'\n\nconst report = (error: unknown) => console.error(error)\n// 与客户端事先约定的共享凭据；生产中从密钥管理读取，不要硬编码。\nconst expectedToken = process.env.MATH_TOKEN!\nlet sequence = 0\n\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    console.log(`listening on ${listener.address}`)\n    return listener\n  },\n  // 握手阶段校验凭据，返回该会话的 principal；抛错即拒绝连接。\n  verify: (auth) => {\n    if (auth !== expectedToken) throw new Error('unknown client')\n    return 'math-client'\n  },\n  // 监听端必须声明 runtime 调用所需的全部能力；客户端由库自动生成同一组提议。\n  offer: createNativeProcessOffer({\n    peer: { id: 'math-server', runtime: 'node' },\n    stream: true,\n    capabilities: [\n      RpcCapability.abort,\n      RpcCapability.runtimeApi,\n      RpcCapability.forwardRoute,\n      RpcCapability.generation,\n      RpcCapability.order,\n      RpcCapability.group,\n      RpcCapability.cancelBeforeStart,\n      RpcCapability.outcome,\n      RpcCapability.deadline,\n      RpcCapability.portableBinary\n    ]\n  }),\n  createConnectionContext: () => ({\n    peerId: `client-${++sequence}`,\n    ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined }\n  })\n}\n\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\nprocess.once('SIGTERM', () => void server.close())"
+            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\nconst report = (error: unknown) => console.error(error)\n// 与客户端事先约定的共享凭据；生产中从密钥管理读取，不要硬编码。\nconst expectedToken = process.env.MATH_TOKEN!\nlet sequence = 0\n\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    console.log(`listening on ${listener.address}`)\n    return listener\n  },\n  // 握手阶段校验凭据，返回该会话的 principal；抛错即拒绝连接。\n  verify: (auth) => {\n    if (auth !== expectedToken) throw new Error('unknown client')\n    return 'math-client'\n  },\n  // 库根据本端已安装的 runtime 能力补全默认提议。\n  offer: createNativeProcessOffer({\n    peer: { id: 'math-server', runtime: 'node' },\n    stream: true\n  }),\n  createConnectionContext: () => ({\n    peerId: `client-${++sequence}`,\n    ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined }\n  })\n}\n\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\nprocess.once('SIGTERM', () => void server.close())"
           ],
           "members": [],
           "exportPath": "./adapters/node-socket",
@@ -108969,15 +109273,16 @@
         {
           "name": "createNodeThreadChannel",
           "kind": "function",
-          "signature": "export declare function createNodeThreadChannel(\n  port: INodeMessagePortLike,\n  peerId: string,\n  options: IThreadChannelOptions,\n): IRuntimePeerSourceResult;",
-          "declarationLine": 15,
+          "signature": "export declare function createNodeThreadChannel(\n  port: INodeMessagePortLike,\n  peerId: string,\n  options: IThreadChannelOptions &\n    Readonly<{\n      capabilities?: readonly (\n        | typeof RpcCapability.stream\n        | typeof RpcCapability.batch\n      )[];\n    }>,\n): IRuntimePeerSourceResult;\nexport declare function createNodeThreadChannel(\n  port: INodeMessagePortLike,\n  peerId: string,\n  options: IThreadChannelOptions,\n): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;",
+          "declarationLine": 16,
           "source": "packages/rpc-threads/dist/threads/channel.d.ts",
-          "purpose": "Borrow the supplied EventEmitter port with the original zero-handshake fixed profile.",
+          "purpose": "Borrow the supplied EventEmitter port synchronously when its policy uses only the fixed profile. Runtime capability proposals use Core's bounded bilateral ACK over the held native port.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createNodeThreadChannel.",
           "advanced": "No additional advanced behavior is declared for createNodeThreadChannel.",
           "parameters": [
             "port: INodeMessagePortLike",
             "peerId: string",
+            "options: IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>",
             "options: IThreadChannelOptions"
           ],
           "parameterDetails": [
@@ -108993,21 +109298,46 @@
             },
             {
               "name": "options",
+              "type": "IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>",
+              "optional": false
+            },
+            {
+              "name": "options",
               "type": "IThreadChannelOptions",
               "optional": false
             }
           ],
-          "returns": "IRuntimePeerSourceResult",
+          "returns": "IRuntimePeerSourceResult | IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>",
           "errors": ["No documented errors are declared for createNodeThreadChannel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeThreadChannel.",
-          "examples": [],
+          "examples": [
+            "import { MessageChannel } from 'node:worker_threads'\nimport { createNodeThreadChannel, createThreadPeer } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst { port1, port2 } = new MessageChannel()\nconst report = (error: unknown) => console.error(error)\nconst [left, right] = await Promise.all([\n  createThreadPeer({\n    self: { name: 'left', instanceId: 'left-1' },\n    provide: { greet: (name: string) => `hello ${name}` },\n    connect: async (context) => createNodeThreadChannel(port1, 'right-1', {\n      scheduler: systemScheduler,\n      capabilities: context.capabilities\n    }),\n    report\n  }),\n  createThreadPeer<{ greet(name: string): string }>({\n    self: { name: 'right', instanceId: 'right-1' },\n    connect: async (context) => createNodeThreadChannel(port2, 'left-1', {\n      scheduler: systemScheduler,\n      capabilities: context.capabilities\n    }),\n    report\n  })\n])\ntry {\n  console.log(await right.request('greet', 'world')) // hello world\n} finally {\n  await Promise.all([left.close(), right.close()])\n  port1.close()\n  port2.close()\n}"
+          ],
           "members": [],
           "aliasOf": "createNodeThreadChannel",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult;"
+            "export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>): IRuntimePeerSourceResult;",
+            "export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;"
           ],
           "overloadParameterDetails": [
+            [
+              {
+                "name": "port",
+                "type": "INodeMessagePortLike",
+                "optional": false
+              },
+              {
+                "name": "peerId",
+                "type": "string",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>",
+                "optional": false
+              }
+            ],
             [
               {
                 "name": "port",
@@ -109026,14 +109356,17 @@
               }
             ]
           ],
-          "overloadReturns": ["IRuntimePeerSourceResult"],
+          "overloadReturns": [
+            "IRuntimePeerSourceResult",
+            "IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>"
+          ],
           "whenToUse": "Use createNodeThreadChannel when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createNodeThreadChannel does not match the required inputs or return contract.",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Borrow the supplied EventEmitter port with the original zero-handshake fixed profile."
+              "content": "Borrow the supplied EventEmitter port synchronously when its policy uses only the fixed profile. Runtime capability proposals use Core's bounded bilateral ACK over the held native port."
             },
             {
               "id": "getting-started",
@@ -109062,9 +109395,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/channel.d.ts:createNodeThreadChannel:export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult;",
+          "identity": "packages/rpc-threads/dist/threads/channel.d.ts:createNodeThreadChannel:export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>): IRuntimePeerSourceResult;\nexport declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;",
           "guidance": [],
-          "usageScore": 8,
+          "usageScore": 26,
           "configuration": [],
           "fragment": "rpc-threads-index--createNodeThreadChannel"
         },
@@ -109098,6 +109431,9 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createThreadPeer.",
           "examples": [
             "// worker.ts\nimport { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: {\n    math: { double: (value: number) => value * 2 },\n    feed: {\n      count: async function* (limit: number) {\n        for (let index = 1; index <= limit; index++) yield index\n      }\n    }\n  },\n  report: (error) => console.error(error)\n})",
+            "import { MessageChannel } from 'node:worker_threads'\nimport { createNodeThreadChannel, createThreadPeer } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst { port1, port2 } = new MessageChannel()\nconst report = (error: unknown) => console.error(error)\nconst [left, right] = await Promise.all([\n  createThreadPeer({\n    self: { name: 'left', instanceId: 'left-1' },\n    provide: { greet: (name: string) => `hello ${name}` },\n    connect: async (context) => createNodeThreadChannel(port1, 'right-1', {\n      scheduler: systemScheduler,\n      capabilities: context.capabilities\n    }),\n    report\n  }),\n  createThreadPeer<{ greet(name: string): string }>({\n    self: { name: 'right', instanceId: 'right-1' },\n    connect: async (context) => createNodeThreadChannel(port2, 'left-1', {\n      scheduler: systemScheduler,\n      capabilities: context.capabilities\n    }),\n    report\n  })\n])\ntry {\n  console.log(await right.request('greet', 'world')) // hello world\n} finally {\n  await Promise.all([left.close(), right.close()])\n  port1.close()\n  port2.close()\n}",
+            "// worker.ts\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { authentication } from './signing.js'\n\nawait createThreadPeer({\n  authentication,\n  provide: {\n    bytes: {\n      inspect: (buffer: ArrayBuffer) => ({\n        length: buffer.byteLength,\n        first: new Uint8Array(buffer)[0]\n      })\n    }\n  },\n  report: (error) => console.error(error)\n})",
+            "// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { authentication } from './signing.js'\n\ntype IBytesApi = {\n  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }\n}\n/** 后台诊断由应用接收，签名凭据不进入日志。 */\nconst report = (error: unknown) => console.error(error)\n/** 标准 Node source 持有 Worker 和一个单位的预算。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)) },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** 普通 factory 使用双方配置的签名资源，无需自定义 Endpoint。 */\nconst worker = await createThreadPeer<IBytesApi>({ spawn, authentication, report })\ntry {\n  const buffer = new Uint8Array([7, 8, 9]).buffer\n  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))\n  // { length: 3, first: 7 }\n  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效\n} finally {\n  await worker.close()\n}",
             "// worker.ts\nimport { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: {\n    math: { double: (value: number) => value * 2 },\n    bytes: {\n      inspect: (buffer: ArrayBuffer) => ({\n        length: buffer.byteLength,\n        first: new Uint8Array(buffer)[0]\n      })\n    }\n  },\n  report: (error) => console.error(error)\n})",
             "// main.ts\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IWorkerApi = {\n  math: { double: (value: number) => number }\n  bytes: { inspect: (buffer: ArrayBuffer) => { length: number; first: number } }\n}\nconst report = (error: unknown) => console.error(error)\n\nconst worker = await createThreadPeer<IWorkerApi>({\n  spawn: {\n    spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n    budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n    scheduler: systemScheduler,\n    launcher: createNodeThreadLauncher(),\n    channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n    report\n  },\n  report\n})\ntry {\n  console.log(await worker.request('math.double', 21)) // 42\n  console.log(await worker.request('bytes.inspect', new Uint8Array([7, 8, 9]).buffer))\n  // { length: 3, first: 7 }\n} finally {\n  await worker.close() // 关闭连接并终止 Worker\n}"
           ],
@@ -109159,7 +109495,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-threads/dist/threads/peer.d.ts:createThreadPeer:export declare function createThreadPeer<TRemote = Record<never, never>>(options: IRuntimeThreadPeerOptions, runtime?: IThreadRuntimeResource): Promise<IRuntimeTypedPeer<TRemote>>;",
           "guidance": [],
-          "usageScore": 50,
+          "usageScore": 102,
           "configuration": [],
           "fragment": "rpc-threads-index--createThreadPeer"
         },
@@ -109246,15 +109582,16 @@
         {
           "name": "createWebThreadChannel",
           "kind": "function",
-          "signature": "export declare function createWebThreadChannel(\n  port: IThreadWebPort,\n  peerId: string,\n  options: IThreadChannelOptions,\n): IRuntimePeerSourceResult;",
-          "declarationLine": 17,
+          "signature": "export declare function createWebThreadChannel(\n  port: IThreadWebPort,\n  peerId: string,\n  options: IThreadChannelOptions &\n    Readonly<{\n      capabilities?: readonly (\n        | typeof RpcCapability.stream\n        | typeof RpcCapability.batch\n      )[];\n    }>,\n): IRuntimePeerSourceResult;\nexport declare function createWebThreadChannel(\n  port: IThreadWebPort,\n  peerId: string,\n  options: IThreadChannelOptions,\n): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;",
+          "declarationLine": 22,
           "source": "packages/rpc-threads/dist/threads/channel.d.ts",
-          "purpose": "Borrow the supplied EventTarget port with the original zero-handshake fixed profile.",
+          "purpose": "Borrow the supplied EventTarget port synchronously when its policy uses only the fixed profile. Runtime capability proposals use Core's same bilateral ACK over the held EventTarget resource.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWebThreadChannel.",
           "advanced": "No additional advanced behavior is declared for createWebThreadChannel.",
           "parameters": [
             "port: IThreadWebPort",
             "peerId: string",
+            "options: IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>",
             "options: IThreadChannelOptions"
           ],
           "parameterDetails": [
@@ -109270,11 +109607,16 @@
             },
             {
               "name": "options",
+              "type": "IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>",
+              "optional": false
+            },
+            {
+              "name": "options",
               "type": "IThreadChannelOptions",
               "optional": false
             }
           ],
-          "returns": "IRuntimePeerSourceResult",
+          "returns": "IRuntimePeerSourceResult | IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>",
           "errors": ["No documented errors are declared for createWebThreadChannel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWebThreadChannel.",
           "examples": [],
@@ -109282,9 +109624,27 @@
           "aliasOf": "createWebThreadChannel",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult;"
+            "export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>): IRuntimePeerSourceResult;",
+            "export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;"
           ],
           "overloadParameterDetails": [
+            [
+              {
+                "name": "port",
+                "type": "IThreadWebPort",
+                "optional": false
+              },
+              {
+                "name": "peerId",
+                "type": "string",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>",
+                "optional": false
+              }
+            ],
             [
               {
                 "name": "port",
@@ -109303,14 +109663,17 @@
               }
             ]
           ],
-          "overloadReturns": ["IRuntimePeerSourceResult"],
+          "overloadReturns": [
+            "IRuntimePeerSourceResult",
+            "IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>"
+          ],
           "whenToUse": "Use createWebThreadChannel when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createWebThreadChannel does not match the required inputs or return contract.",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Borrow the supplied EventTarget port with the original zero-handshake fixed profile."
+              "content": "Borrow the supplied EventTarget port synchronously when its policy uses only the fixed profile. Runtime capability proposals use Core's same bilateral ACK over the held EventTarget resource."
             },
             {
               "id": "getting-started",
@@ -109339,9 +109702,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/channel.d.ts:createWebThreadChannel:export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult;",
+          "identity": "packages/rpc-threads/dist/threads/channel.d.ts:createWebThreadChannel:export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>): IRuntimePeerSourceResult;\nexport declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 8,
           "configuration": [],
           "fragment": "rpc-threads-index--createWebThreadChannel"
         },
@@ -109953,7 +110316,7 @@
           "name": "IRuntimeListFilter",
           "kind": "type",
           "signature": "export type IRuntimeListFilter = Readonly<{\n  state?: SupervisorState;\n  name?:\n    | Readonly<{ exact: string; prefix?: never }>\n    | Readonly<{ prefix: string; exact?: never }>;\n  kind?: RuntimeSourceKind;\n  direction?: RuntimeConnectionDirection;\n}>;",
-          "declarationLine": 42,
+          "declarationLine": 44,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Filters keep local source selection distinct from the connection's remote direction.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListFilter.",
@@ -110017,7 +110380,7 @@
           "name": "IRuntimeListOptions",
           "kind": "type",
           "signature": "export type IRuntimeListOptions = IRuntimeQueryOptions &\n  Readonly<{ filter?: IRuntimeListFilter }>;",
-          "declarationLine": 55,
+          "declarationLine": 57,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Formatting never changes which canonical registration records the filter selects.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListOptions.",
@@ -110529,7 +110892,7 @@
           "name": "IRuntimeThreadStopOptions",
           "kind": "type",
           "signature": "export type IRuntimeThreadStopOptions = Readonly<{ graceMs?: number }>;",
-          "declarationLine": 84,
+          "declarationLine": 86,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Threads have no OS signal and never terminate their shared PID.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeThreadStopOptions.",
@@ -110785,7 +111148,7 @@
           "name": "IThreadChannelFactory",
           "kind": "type",
           "signature": "export type IThreadChannelFactory<THandle extends IThreadHandle> = Readonly<{\n  open(handle: THandle, signal: IAbortSignal): Promise<IRemoteChannel>;\n}>;",
-          "declarationLine": 11,
+          "declarationLine": 15,
           "source": "packages/rpc-threads/dist/threads/types.d.ts",
           "purpose": "A launcher handle opens one independently owned remote generation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadChannelFactory.",
@@ -110848,10 +111211,10 @@
         {
           "name": "IThreadChannelOptions",
           "kind": "type",
-          "signature": "export type IThreadChannelOptions = Readonly<{\n  scheduler: IScheduler;\n  capabilities?: readonly string[];\n}>;",
-          "declarationLine": 6,
+          "signature": "export type IThreadChannelOptions = Readonly<{\n  scheduler: IScheduler;\n  /** Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK. */ capabilities?: readonly string[];\n}>;",
+          "declarationLine": 9,
           "source": "packages/rpc-threads/dist/threads/types.d.ts",
-          "purpose": "Message channels retain the scheduler identity and static capability declaration.",
+          "purpose": "Message channels retain scheduler identity; explicit capabilities are local proposals, never agreements.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadChannelOptions.",
           "advanced": "No additional advanced behavior is declared for IThreadChannelOptions.",
           "parameters": ["This type declaration has no parameters."],
@@ -110864,7 +111227,7 @@
           "aliasOf": "IThreadChannelOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IThreadChannelOptions = Readonly<{ scheduler: IScheduler; capabilities?: readonly string[]; }>;"
+            "export type IThreadChannelOptions = Readonly<{ scheduler: IScheduler; /** Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK. */ capabilities?: readonly string[]; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -110874,7 +111237,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Message channels retain the scheduler identity and static capability declaration."
+              "content": "Message channels retain scheduler identity; explicit capabilities are local proposals, never agreements."
             },
             {
               "id": "getting-started",
@@ -110903,7 +111266,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/types.d.ts:IThreadChannelOptions:export type IThreadChannelOptions = Readonly<{ scheduler: IScheduler; capabilities?: readonly string[]; }>;",
+          "identity": "packages/rpc-threads/dist/threads/types.d.ts:IThreadChannelOptions:export type IThreadChannelOptions = Readonly<{ scheduler: IScheduler; /** Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK. */ capabilities?: readonly string[]; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -111233,7 +111596,7 @@
           "name": "IThreadWebPort",
           "kind": "type",
           "signature": "export type IThreadWebPort = {\n  postMessage(message: unknown, transfer?: readonly unknown[]): void;\n  addEventListener(type: string, listener: (event: any) => void): void;\n  removeEventListener(type: string, listener: (event: any) => void): void;\n};",
-          "declarationLine": 15,
+          "declarationLine": 19,
           "source": "packages/rpc-threads/dist/threads/types.d.ts",
           "purpose": "Structural EventTarget surface also admits a worker-global scope on the service side.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadWebPort.",
@@ -112924,6 +113287,7 @@
           "errors": ["No documented errors are declared for createNodeThreadChannelFactory."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeThreadChannelFactory.",
           "examples": [
+            "// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { authentication } from './signing.js'\n\ntype IBytesApi = {\n  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }\n}\n/** 后台诊断由应用接收，签名凭据不进入日志。 */\nconst report = (error: unknown) => console.error(error)\n/** 标准 Node source 持有 Worker 和一个单位的预算。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)) },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** 普通 factory 使用双方配置的签名资源，无需自定义 Endpoint。 */\nconst worker = await createThreadPeer<IBytesApi>({ spawn, authentication, report })\ntry {\n  const buffer = new Uint8Array([7, 8, 9]).buffer\n  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))\n  // { length: 3, first: 7 }\n  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效\n} finally {\n  await worker.close()\n}",
             "// main.ts\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IWorkerApi = {\n  math: { double: (value: number) => number }\n  bytes: { inspect: (buffer: ArrayBuffer) => { length: number; first: number } }\n}\nconst report = (error: unknown) => console.error(error)\n\nconst worker = await createThreadPeer<IWorkerApi>({\n  spawn: {\n    spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n    budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n    scheduler: systemScheduler,\n    launcher: createNodeThreadLauncher(),\n    channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n    report\n  },\n  report\n})\ntry {\n  console.log(await worker.request('math.double', 21)) // 42\n  console.log(await worker.request('bytes.inspect', new Uint8Array([7, 8, 9]).buffer))\n  // { length: 3, first: 7 }\n} finally {\n  await worker.close() // 关闭连接并终止 Worker\n}"
           ],
           "members": [],
@@ -112980,7 +113344,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-threads/dist/threads/adapters/node.d.ts:createNodeThreadChannelFactory:export declare function createNodeThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"./node.js\").INodeThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
           "guidance": [],
-          "usageScore": 26,
+          "usageScore": 50,
           "configuration": [],
           "fragment": "rpc-threads-adapters/node--createNodeThreadChannelFactory"
         },
@@ -113007,6 +113371,7 @@
           "errors": ["No documented errors are declared for createNodeThreadLauncher."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeThreadLauncher.",
           "examples": [
+            "// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { authentication } from './signing.js'\n\ntype IBytesApi = {\n  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }\n}\n/** 后台诊断由应用接收，签名凭据不进入日志。 */\nconst report = (error: unknown) => console.error(error)\n/** 标准 Node source 持有 Worker 和一个单位的预算。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)) },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** 普通 factory 使用双方配置的签名资源，无需自定义 Endpoint。 */\nconst worker = await createThreadPeer<IBytesApi>({ spawn, authentication, report })\ntry {\n  const buffer = new Uint8Array([7, 8, 9]).buffer\n  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))\n  // { length: 3, first: 7 }\n  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效\n} finally {\n  await worker.close()\n}",
             "import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'\n\nconst launcher = createNodeThreadLauncher()\nconst handle = await launcher.launch(threadSpec, { signal })\nconst channel = await handle.open(signal, { scheduler })",
             "// main.ts\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IWorkerApi = {\n  math: { double: (value: number) => number }\n  bytes: { inspect: (buffer: ArrayBuffer) => { length: number; first: number } }\n}\nconst report = (error: unknown) => console.error(error)\n\nconst worker = await createThreadPeer<IWorkerApi>({\n  spawn: {\n    spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n    budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n    scheduler: systemScheduler,\n    launcher: createNodeThreadLauncher(),\n    channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n    report\n  },\n  report\n})\ntry {\n  console.log(await worker.request('math.double', 21)) // 42\n  console.log(await worker.request('bytes.inspect', new Uint8Array([7, 8, 9]).buffer))\n  // { length: 3, first: 7 }\n} finally {\n  await worker.close() // 关闭连接并终止 Worker\n}"
           ],
@@ -113064,7 +113429,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-threads/dist/threads/adapters/node.d.ts:createNodeThreadLauncher:export declare function createNodeThreadLauncher(options?: Readonly<{ runtimeApi?: IRuntimePeerSourceContext; }>): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"../node-launcher.js\").IAdapterNodeThreadHandle>;",
           "guidance": [],
-          "usageScore": 40,
+          "usageScore": 64,
           "configuration": [],
           "fragment": "rpc-threads-adapters/node--createNodeThreadLauncher"
         }
