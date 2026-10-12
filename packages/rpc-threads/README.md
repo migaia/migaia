@@ -128,13 +128,33 @@ try {
 
 `ArrayBuffer` 与 `Uint8Array` 可以直接作为参数和返回值，默认按值复制，调用后原 buffer 仍可用。双方在 `createThreadPeer` 上配置 `authentication: { sign, verify }` 后，普通 launcher 与 channel factory 就能使用现有的签名原生二进制与 `transfer`；无需自定义 Endpoint。签名函数必须保护完整输入，校验函数必须拒绝伪造签名。Core 在实际端口上确认能力，并由认证中间件建立信任事实。
 
+先保存 [USEGUIDE 第 5 节](./USEGUIDE.md#5-二进制数据与-transfer) 的 `signing.ts` 和 `worker.ts`；双方从各自环境读取同一 `RPC_SIGNING_KEY`，然后运行下面的主线程配置：
+
 ```ts
-// 主线程与 Worker 分别配置相同的签名凭据；spawn 使用上面的普通配置。
-const worker = await createThreadPeer<IWorkerApi>({
-  spawn,
-  authentication: { sign, verify },
+// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。
+import { fileURLToPath } from 'node:url'
+import { createThreadPeer } from '@migaia/rpc-threads'
+import { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'
+import { createUnitBudget } from '@migaia/supervision'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { authentication } from './signing.js'
+
+type IBytesApi = {
+  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }
+}
+/** 后台诊断由应用接收，签名凭据不进入日志。 */
+const report = (error: unknown) => console.error(error)
+/** 标准 Node source 持有 Worker 和一个单位的预算。 */
+const spawn = {
+  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)) },
+  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),
+  scheduler: systemScheduler,
+  launcher: createNodeThreadLauncher(),
+  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
   report
-})
+}
+/** 普通 factory 使用双方配置的签名资源，无需自定义 Endpoint。 */
+const worker = await createThreadPeer<IBytesApi>({ spawn, authentication, report })
 try {
   const buffer = new Uint8Array([7, 8, 9]).buffer
   console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))
