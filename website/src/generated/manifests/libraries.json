@@ -9737,11 +9737,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\nimport { createRuntimePeer } from '@migaia/rpc-core/remote'\nimport type { IRemoteContract, IRuntimeTypedPeer } from '@migaia/rpc-core/remote'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { RpcCapability } from '@migaia/rpc-contract'\nimport { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'\n\ntype IPythonApi = {\n  echo: (values: string[]) => string[]\n  math: { add: (pair: [number, number]) => number }\n}\n// 本地声明：桥接只用它做调用前校验（必须没有 stream 方法）。可调用目录以对端 describe 为准。\nconst contract: IRemoteContract = {\n  schemaVersion: 1,\n  plugin: 'python-service',\n  features: { math: { methods: { add: { mode: 'request', idempotent: true } } } }\n}\nconst report = (error: unknown) => console.error(error)\nconst launcher = createNodeProcessLauncher()\nconst token = randomBytes(32).toString('base64url')\nlet handle: Awaited<ReturnType<typeof launcher.launch>> | undefined\n\n// createRuntimePeer 本身不带泛型；用 IRuntimeTypedPeer 标注远端方法类型。\nconst python = (await createRuntimePeer({\n  self: { name: 'node-client', instanceId: 'node-client-1' },\n  connect: async (context) => {\n    handle = await launcher.launch(\n      {\n        command: 'python3',\n        args: [fileURLToPath(new URL('./service.py', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      },\n      { signal: new AbortController().signal, output: () => undefined }\n    )\n    return createJsonRpcRemoteChannel({\n      byte: handle.channel!,\n      peerId: 'python-service',\n      target: { kind: 'plugin', contract },\n      offer: {\n        versions: [{ major: 1, minor: 1 }],\n        peer: { id: context.self.instanceId, runtime: 'node' },\n        capabilities: [RpcCapability.deadline, RpcCapability.trace]\n      },\n      token,\n      scheduler: systemScheduler,\n      wallClock: systemWallClock,\n      ipc: { connectionId: 'python-1', sessionId: 'python-1', log: () => undefined },\n      report\n    })\n  },\n  report\n})) as IRuntimeTypedPeer<IPythonApi>\ntry {\n  console.log(await python.request('echo', ['hello', 'python'])) // ['hello', 'python']\n  console.log(await python.request('math.add', [20, 22])) // 42\n} finally {\n  await python.close() // 关闭本端连接\n  handle?.terminate('force') // 子进程由启动它的 launcher 负责结束\n  await handle?.exited\n}"
+                  "code": "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport { createProcessPeer } from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\nimport type { IRemoteContract } from '@migaia/rpc-core/remote'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { RpcCapability } from '@migaia/rpc-contract'\nimport { systemWallClock } from '@migaia/utils/scheduler'\n\n/** The standard-library responder receives positional JSON-RPC arguments. */\ntype IPythonApi = { echo(values: string[]): string[]; math: { add(pair: [number, number]): number } }\n/** A local scalar contract is checked before the remote directory becomes callable. */\nconst contract: IRemoteContract = {\n  schemaVersion: 1,\n  plugin: 'python-service',\n  features: { math: { methods: { add: { mode: 'request', idempotent: true } } } }\n}\n/** Record only classified diagnostic messages, never the ephemeral session credential. */\nconst report = (error: unknown) => console.error(error)\n/** One token belongs to this supervised child and is written through its original stdin frame. */\nconst token = randomBytes(32).toString('base64url')\n/** The exact real launcher retains child execution and termination ownership. */\nconst launcher = createNodeProcessLauncher()\n/** Closing the public Peer must release its genuine process budget. */\nconst budget = createUnitBudget({ kind: 'process', maxUnits: 1 })\n/** Public generic construction supplies the remote method type without a Peer cast. */\nconst peer = await createProcessPeer<IPythonApi>({\n  self: { name: 'node-client', instanceId: 'node-client-1' },\n  report,\n  spawn: {\n    kind: 'spawn', channelKind: 'byte', wire: 'jsonrpc', token,\n    supervision: {\n      id: 'python-service', isolation: 'best-effort', restart: { mode: 'never' }, budget,\n      report, launcher,\n      spec: {\n        command: 'python3', args: [fileURLToPath(new URL('./service.py', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as Awaited<ReturnType<typeof launcher.launch>>).channel!,\n    establish: async (raw, prepared) => {\n      if (raw.kind !== 'byte') throw new TypeError('This example requires a byte channel')\n      return createJsonRpcRemoteChannel({\n        byte: raw, peerId: 'python-service', target: { kind: 'plugin', contract },\n        offer: {\n          versions: [{ major: 1, minor: 1 }],\n          peer: { id: 'node-client-1', runtime: 'node' },\n          capabilities: [RpcCapability.deadline, RpcCapability.trace]\n        },\n        token: prepared.token!, scheduler: prepared.scheduler, wallClock: systemWallClock,\n        ipc: { ...prepared.session, log: () => undefined }, signal: prepared.signal,\n        report\n      })\n    }\n  }\n})\ntry {\n  console.log(await peer.request('echo', ['hello', 'python'])) // ['hello', 'python']\n  console.log(await peer.request('math.add', [20, 22])) // 42\n} finally {\n  await peer.close() // 关闭连接、结束监督子进程并释放 budget\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`connect` 来源只拥有这条连接，不拥有子进程，所以示例在 `finally` 中自己结束子进程。"
+                  "text": "`spawn` 保留子进程的监督、退出与 budget 所有权；`peer.close()` 负责关闭连接和子进程。`establish` 收到当前代次的 token、scheduler、session 和取消信号，桥接仍在实际字节连接上完成握手。普通 Core `connect` 来源也可以使用 `createRuntimePeer<IPythonApi>(options)`，无需把返回值断言为 `IRuntimeTypedPeer`。"
                 }
               ]
             },
@@ -9767,7 +9767,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "对端业务方法抛出的错误以 `RpcRemoteError` 呈现，对端给出的 source / code 保留在 `cause` 上。详见 USEGUIDE 第 6 节。"
+                  "text": "通过 Peer 调用时，对端业务错误按原始类型、source / code、stack 和原因链恢复。Python 示例的业务错误携带 `python-service` / `BUSINESS`；这些字段只用于诊断，不获得本地控制身份。详见 USEGUIDE 第 6 节。"
                 }
               ]
             },
@@ -10165,7 +10165,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "对端回复的 wire error 会被还原为 `RpcRemoteError`：顶层 `source` 为 `@migaia/rpc/core`，`code` 与 `message` 来自对端；对端给出的原始 `source` 与 `code` 保留在 `error.cause` 上。对端声明的 source / code 只用于诊断，不会被当作本地库的错误身份。"
+                  "text": "通过 `createProcessPeer` 或 `createRuntimePeer` 调用时，对端回复的 wire error 按原始 `name`、`source`、`code`、`message`、`stack` 和原因链恢复。Python 示例中的业务错误因此携带 `source: 'python-service'`、`code: 'BUSINESS'`。这些字段只用于诊断，不会获得本地库的控制身份；不要用对端声明的 source / code 判断本地取消、重试或认证策略。"
                 }
               ]
             },
@@ -13054,11 +13054,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\nimport { RpcCapability } from '@migaia/rpc-contract'\n\nconst report = (error: unknown) => console.error(error)\n// 与客户端事先约定的共享凭据；生产中从密钥管理读取，不要硬编码。\nconst expectedToken = process.env.MATH_TOKEN!\nlet sequence = 0\n\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    console.log(`listening on ${listener.address}`)\n    return listener\n  },\n  // 握手阶段校验凭据，返回该会话的 principal；抛错即拒绝连接。\n  verify: (auth) => {\n    if (auth !== expectedToken) throw new Error('unknown client')\n    return 'math-client'\n  },\n  // 监听端必须声明 runtime 调用所需的全部能力；客户端由库自动生成同一组提议。\n  offer: createNativeProcessOffer({\n    peer: { id: 'math-server', runtime: 'node' },\n    stream: true,\n    capabilities: [\n      RpcCapability.abort,\n      RpcCapability.runtimeApi,\n      RpcCapability.forwardRoute,\n      RpcCapability.generation,\n      RpcCapability.order,\n      RpcCapability.group,\n      RpcCapability.cancelBeforeStart,\n      RpcCapability.outcome,\n      RpcCapability.deadline,\n      RpcCapability.portableBinary\n    ]\n  }),\n  createConnectionContext: () => ({\n    peerId: `client-${++sequence}`,\n    ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined }\n  })\n}\n\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\nprocess.once('SIGTERM', () => void server.close())"
+                  "code": "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\nconst report = (error: unknown) => console.error(error)\n// 与客户端事先约定的共享凭据；生产中从密钥管理读取，不要硬编码。\nconst expectedToken = process.env.MATH_TOKEN!\nlet sequence = 0\n\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    console.log(`listening on ${listener.address}`)\n    return listener\n  },\n  // 握手阶段校验凭据，返回该会话的 principal；抛错即拒绝连接。\n  verify: (auth) => {\n    if (auth !== expectedToken) throw new Error('unknown client')\n    return 'math-client'\n  },\n  // 库根据本端已安装的 runtime 能力补全默认提议。\n  offer: createNativeProcessOffer({\n    peer: { id: 'math-server', runtime: 'node' },\n    stream: true\n  }),\n  createConnectionContext: () => ({\n    peerId: `client-${++sequence}`,\n    ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined }\n  })\n}\n\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\nprocess.once('SIGTERM', () => void server.close())"
                 },
                 {
                   "type": "paragraph",
-                  "text": "监听端的 `offer` 少了上面这组能力时，客户端握手会以 `@migaia/rpc/contract` / `HANDSHAKE_INCOMPATIBLE` 失败。"
+                  "text": "省略 `createNativeProcessOffer` 的 `capabilities` 时，监听端根据 Core 已安装的能力生成 runtime 提议。显式传入 `capabilities`（包括空数组）仍表示调用方选择的窄提议，库不会拓宽它。"
                 }
               ]
             },
@@ -13584,7 +13584,20 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`ArrayBuffer` 与 `Uint8Array` 可以直接作为参数和返回值，默认按值复制，调用后原 buffer 仍可用。零拷贝转移（`transfer` 选项）需要额外协商原生二进制与签名认证；默认配置下传入 `transfer` 会以 `CAPABILITY_UNSUPPORTED` 拒绝。详见 USEGUIDE 第 5 节。"
+                  "text": "`ArrayBuffer` 与 `Uint8Array` 可以直接作为参数和返回值，默认按值复制，调用后原 buffer 仍可用。双方在 `createThreadPeer` 上配置 `authentication: { sign, verify }` 后，普通 launcher 与 channel factory 就能使用现有的签名原生二进制与 `transfer`；无需自定义 Endpoint。签名函数必须保护完整输入，校验函数必须拒绝伪造签名。Core 在实际端口上确认能力，并由认证中间件建立信任事实。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "先保存 USEGUIDE 第 5 节 的 `signing.ts` 和 `worker.ts`；双方从各自环境读取同一 `RPC_SIGNING_KEY`，然后运行下面的主线程配置："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { authentication } from './signing.js'\n\ntype IBytesApi = {\n  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }\n}\n/** 后台诊断由应用接收，签名凭据不进入日志。 */\nconst report = (error: unknown) => console.error(error)\n/** 标准 Node source 持有 Worker 和一个单位的预算。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)) },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** 普通 factory 使用双方配置的签名资源，无需自定义 Endpoint。 */\nconst worker = await createThreadPeer<IBytesApi>({ spawn, authentication, report })\ntry {\n  const buffer = new Uint8Array([7, 8, 9]).buffer\n  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))\n  // { length: 3, first: 7 }\n  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效\n} finally {\n  await worker.close()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "未配置签名时，`transfer` 仍以 `CAPABILITY_UNSUPPORTED` 拒绝。完整的签名配置与 Worker 示例见 USEGUIDE 第 5 节。"
                 }
               ]
             },
@@ -13764,7 +13777,16 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "只支持 spawn 来源：线程版目前只支持由 launcher 创建的 Worker。借用一个已有的 `MessagePort`（`connect`）无法完成 runtime 调用所需的能力确认，会以 `CAPABILITY_UNSUPPORTED` 或 `INVALID_CONFIG` 拒绝。"
+                  "text": "已有 `MessagePort` 可以作为 `connect` 来源。双方把 Core 提供的 `context.capabilities` 交给 channel；Core 在实际端口上交换 ACK，只有双方都提供的能力才会启用。双方应同时开始连接："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { MessageChannel } from 'node:worker_threads'\nimport { createNodeThreadChannel, createThreadPeer } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst { port1, port2 } = new MessageChannel()\nconst report = (error: unknown) => console.error(error)\nconst [left, right] = await Promise.all([\n  createThreadPeer({\n    self: { name: 'left', instanceId: 'left-1' },\n    provide: { greet: (name: string) => `hello ${name}` },\n    connect: async (context) => createNodeThreadChannel(port1, 'right-1', {\n      scheduler: systemScheduler,\n      capabilities: context.capabilities\n    }),\n    report\n  }),\n  createThreadPeer<{ greet(name: string): string }>({\n    self: { name: 'right', instanceId: 'right-1' },\n    connect: async (context) => createNodeThreadChannel(port2, 'left-1', {\n      scheduler: systemScheduler,\n      capabilities: context.capabilities\n    }),\n    report\n  })\n])\ntry {\n  console.log(await right.request('greet', 'world')) // hello world\n} finally {\n  await Promise.all([left.close(), right.close()])\n  port1.close()\n  port2.close()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`self` 可以省略，Core 会生成本地标识；需要稳定地址时显式设置。`capabilities` 是本地提案，可显式缩小，不能声称已协商或已信任。Peer 关闭只注销借用端口的监听器；端口仍由调用方关闭。不传 `capabilities` 的底层 channel 保留同步、零握手的固定能力配置。"
                 }
               ]
             },
@@ -13787,7 +13809,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "重启后的调用时机：`restart()` 返回时新 Worker 已经启动，但新连接重新出现在出口目录中可能还要稍等片刻。在此之前调用会得到 `@migaia/rpc/core` / `TARGET_UNKNOWN`。重启后若需立即调用，先等待出口的 `ready` 事件，或在重试预算内对 `TARGET_UNKNOWN` 做短暂退避。"
+                  "text": "重启后的调用时机：`restart()` 返回 `ready` 或 `replace()` 返回 `replaced` 时，新代次已经进入出口目录，可以立即调用，无需额外等待 `ready` 事件或退避重试。"
                 },
                 {
                   "type": "paragraph",
@@ -13823,8 +13845,31 @@
                   "items": [
                     "transfer 在消息真正提交到端口时才使 buffer 失效（`byteLength` 变为 0），之后即使调用失败也无法恢复原 buffer；共享同一 backing 的所有视图同时失效。",
                     "带 transfer 的调用不会被自动重试，库也不保留输入副本。需要重发时，先确认结果，再重新构造数据。",
-                    "默认的 `createThreadPeer` 配置不启用 transfer。启用需要自定义 `endpointFactory`，并在中间件中加入 `authentication({ sign, verify })`；组装方式见 rpc-core USEGUIDE 的二进制章节。"
+                    "双方的 `createThreadPeer` 配置 `authentication: { sign, verify }` 即可使用普通 factory；无需自定义 `endpointFactory`。原生二进制 profile 要求签名而不加密，且 `encodedType` 为默认的 `any`。库在实际端口上协商能力，由现有认证中间件建立信任事实。未配置签名时仍拒绝 transfer。"
                   ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下面的 Node 示例用双方已持有的同一 HMAC 密钥签名。`RPC_SIGNING_KEY` 是本地部署配置中的十六进制密钥，两端分别读取；不要经 RPC 发送密钥。先把签名函数放在共享模块："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "// signing.ts\nimport { createHmac, timingSafeEqual } from 'node:crypto'\nimport type { IRpcAuthenticationConfig } from '@migaia/rpc-core'\n\n/** 双方从各自的部署配置读取同一密钥，不把密钥放进消息。 */\nconst key = Buffer.from(process.env.RPC_SIGNING_KEY!, 'hex')\n/** 完整语义输入包含 Core 对原生 backing 计算的完整性摘要。 */\nconst signature = (value: unknown) =>\n  createHmac('sha256', key).update(JSON.stringify(value)).digest()\n\nexport const authentication: IRpcAuthenticationConfig = {\n  sign: (value) => ({ value, signature: signature(value).toString('hex') }),\n  verify: (input) => {\n    const frame = input as { value: unknown; signature: string }\n    const received = Buffer.from(frame.signature, 'hex')\n    const expected = signature(frame.value)\n    if (received.length !== expected.length || !timingSafeEqual(received, expected))\n      throw new TypeError('Invalid RPC signature')\n    return frame.value\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Worker 与主线程分别安装这个普通配置："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "// worker.ts\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { authentication } from './signing.js'\n\nawait createThreadPeer({\n  authentication,\n  provide: {\n    bytes: {\n      inspect: (buffer: ArrayBuffer) => ({\n        length: buffer.byteLength,\n        first: new Uint8Array(buffer)[0]\n      })\n    }\n  },\n  report: (error) => console.error(error)\n})"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { authentication } from './signing.js'\n\ntype IBytesApi = {\n  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }\n}\n/** 后台诊断由应用接收，签名凭据不进入日志。 */\nconst report = (error: unknown) => console.error(error)\n/** 标准 Node source 持有 Worker 和一个单位的预算。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)) },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** 普通 factory 使用双方配置的签名资源，无需自定义 Endpoint。 */\nconst worker = await createThreadPeer<IBytesApi>({ spawn, authentication, report })\ntry {\n  const buffer = new Uint8Array([7, 8, 9]).buffer\n  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))\n  // { length: 3, first: 7 }\n  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效\n} finally {\n  await worker.close()\n}"
                 }
               ]
             },
@@ -13928,7 +13973,7 @@
                     ],
                     [
                       "`createNodeThreadChannel`、`createWebThreadChannel`",
-                      "在一个端口上构造固定基础能力的通道（零握手），用于自定义的底层 Endpoint 组装"
+                      "在借用端口上构造通道；固定基础能力同步返回，扩展 `capabilities` 等待 Core 双边 ACK"
                     ],
                     [
                       "`receiveThreadData`、`readThreadBootstrap`",
@@ -13965,7 +14010,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "能在两个已有的 `MessagePort` 之间直接建立 Peer 吗？ 目前不能（第 3 节末尾）。用 launcher 创建 Worker，或在底层用 `createNodeThreadChannel` 自行组装 Endpoint。"
+                  "text": "能在两个已有的 `MessagePort` 之间直接建立 Peer 吗？ 可以。双方的 `connect` 使用 `createNodeThreadChannel` 或 `createWebThreadChannel`，并传入 `context.capabilities`（第 3 节末尾）。双方同时启动，能力确认由 Core 在实际端口上完成。"
                 },
                 {
                   "type": "paragraph",

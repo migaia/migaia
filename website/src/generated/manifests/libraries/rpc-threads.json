@@ -163,7 +163,20 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`ArrayBuffer` 与 `Uint8Array` 可以直接作为参数和返回值，默认按值复制，调用后原 buffer 仍可用。零拷贝转移（`transfer` 选项）需要额外协商原生二进制与签名认证；默认配置下传入 `transfer` 会以 `CAPABILITY_UNSUPPORTED` 拒绝。详见 USEGUIDE 第 5 节。"
+                "text": "`ArrayBuffer` 与 `Uint8Array` 可以直接作为参数和返回值，默认按值复制，调用后原 buffer 仍可用。双方在 `createThreadPeer` 上配置 `authentication: { sign, verify }` 后，普通 launcher 与 channel factory 就能使用现有的签名原生二进制与 `transfer`；无需自定义 Endpoint。签名函数必须保护完整输入，校验函数必须拒绝伪造签名。Core 在实际端口上确认能力，并由认证中间件建立信任事实。"
+              },
+              {
+                "type": "paragraph",
+                "text": "先保存 USEGUIDE 第 5 节 的 `signing.ts` 和 `worker.ts`；双方从各自环境读取同一 `RPC_SIGNING_KEY`，然后运行下面的主线程配置："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { authentication } from './signing.js'\n\ntype IBytesApi = {\n  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }\n}\n/** 后台诊断由应用接收，签名凭据不进入日志。 */\nconst report = (error: unknown) => console.error(error)\n/** 标准 Node source 持有 Worker 和一个单位的预算。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)) },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** 普通 factory 使用双方配置的签名资源，无需自定义 Endpoint。 */\nconst worker = await createThreadPeer<IBytesApi>({ spawn, authentication, report })\ntry {\n  const buffer = new Uint8Array([7, 8, 9]).buffer\n  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))\n  // { length: 3, first: 7 }\n  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效\n} finally {\n  await worker.close()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "未配置签名时，`transfer` 仍以 `CAPABILITY_UNSUPPORTED` 拒绝。完整的签名配置与 Worker 示例见 USEGUIDE 第 5 节。"
               }
             ]
           },
@@ -343,7 +356,16 @@
               },
               {
                 "type": "paragraph",
-                "text": "只支持 spawn 来源：线程版目前只支持由 launcher 创建的 Worker。借用一个已有的 `MessagePort`（`connect`）无法完成 runtime 调用所需的能力确认，会以 `CAPABILITY_UNSUPPORTED` 或 `INVALID_CONFIG` 拒绝。"
+                "text": "已有 `MessagePort` 可以作为 `connect` 来源。双方把 Core 提供的 `context.capabilities` 交给 channel；Core 在实际端口上交换 ACK，只有双方都提供的能力才会启用。双方应同时开始连接："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { MessageChannel } from 'node:worker_threads'\nimport { createNodeThreadChannel, createThreadPeer } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst { port1, port2 } = new MessageChannel()\nconst report = (error: unknown) => console.error(error)\nconst [left, right] = await Promise.all([\n  createThreadPeer({\n    self: { name: 'left', instanceId: 'left-1' },\n    provide: { greet: (name: string) => `hello ${name}` },\n    connect: async (context) => createNodeThreadChannel(port1, 'right-1', {\n      scheduler: systemScheduler,\n      capabilities: context.capabilities\n    }),\n    report\n  }),\n  createThreadPeer<{ greet(name: string): string }>({\n    self: { name: 'right', instanceId: 'right-1' },\n    connect: async (context) => createNodeThreadChannel(port2, 'left-1', {\n      scheduler: systemScheduler,\n      capabilities: context.capabilities\n    }),\n    report\n  })\n])\ntry {\n  console.log(await right.request('greet', 'world')) // hello world\n} finally {\n  await Promise.all([left.close(), right.close()])\n  port1.close()\n  port2.close()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`self` 可以省略，Core 会生成本地标识；需要稳定地址时显式设置。`capabilities` 是本地提案，可显式缩小，不能声称已协商或已信任。Peer 关闭只注销借用端口的监听器；端口仍由调用方关闭。不传 `capabilities` 的底层 channel 保留同步、零握手的固定能力配置。"
               }
             ]
           },
@@ -366,7 +388,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "重启后的调用时机：`restart()` 返回时新 Worker 已经启动，但新连接重新出现在出口目录中可能还要稍等片刻。在此之前调用会得到 `@migaia/rpc/core` / `TARGET_UNKNOWN`。重启后若需立即调用，先等待出口的 `ready` 事件，或在重试预算内对 `TARGET_UNKNOWN` 做短暂退避。"
+                "text": "重启后的调用时机：`restart()` 返回 `ready` 或 `replace()` 返回 `replaced` 时，新代次已经进入出口目录，可以立即调用，无需额外等待 `ready` 事件或退避重试。"
               },
               {
                 "type": "paragraph",
@@ -402,8 +424,31 @@
                 "items": [
                   "transfer 在消息真正提交到端口时才使 buffer 失效（`byteLength` 变为 0），之后即使调用失败也无法恢复原 buffer；共享同一 backing 的所有视图同时失效。",
                   "带 transfer 的调用不会被自动重试，库也不保留输入副本。需要重发时，先确认结果，再重新构造数据。",
-                  "默认的 `createThreadPeer` 配置不启用 transfer。启用需要自定义 `endpointFactory`，并在中间件中加入 `authentication({ sign, verify })`；组装方式见 rpc-core USEGUIDE 的二进制章节。"
+                  "双方的 `createThreadPeer` 配置 `authentication: { sign, verify }` 即可使用普通 factory；无需自定义 `endpointFactory`。原生二进制 profile 要求签名而不加密，且 `encodedType` 为默认的 `any`。库在实际端口上协商能力，由现有认证中间件建立信任事实。未配置签名时仍拒绝 transfer。"
                 ]
+              },
+              {
+                "type": "paragraph",
+                "text": "下面的 Node 示例用双方已持有的同一 HMAC 密钥签名。`RPC_SIGNING_KEY` 是本地部署配置中的十六进制密钥，两端分别读取；不要经 RPC 发送密钥。先把签名函数放在共享模块："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "// signing.ts\nimport { createHmac, timingSafeEqual } from 'node:crypto'\nimport type { IRpcAuthenticationConfig } from '@migaia/rpc-core'\n\n/** 双方从各自的部署配置读取同一密钥，不把密钥放进消息。 */\nconst key = Buffer.from(process.env.RPC_SIGNING_KEY!, 'hex')\n/** 完整语义输入包含 Core 对原生 backing 计算的完整性摘要。 */\nconst signature = (value: unknown) =>\n  createHmac('sha256', key).update(JSON.stringify(value)).digest()\n\nexport const authentication: IRpcAuthenticationConfig = {\n  sign: (value) => ({ value, signature: signature(value).toString('hex') }),\n  verify: (input) => {\n    const frame = input as { value: unknown; signature: string }\n    const received = Buffer.from(frame.signature, 'hex')\n    const expected = signature(frame.value)\n    if (received.length !== expected.length || !timingSafeEqual(received, expected))\n      throw new TypeError('Invalid RPC signature')\n    return frame.value\n  }\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "Worker 与主线程分别安装这个普通配置："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "// worker.ts\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { authentication } from './signing.js'\n\nawait createThreadPeer({\n  authentication,\n  provide: {\n    bytes: {\n      inspect: (buffer: ArrayBuffer) => ({\n        length: buffer.byteLength,\n        first: new Uint8Array(buffer)[0]\n      })\n    }\n  },\n  report: (error) => console.error(error)\n})"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { authentication } from './signing.js'\n\ntype IBytesApi = {\n  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }\n}\n/** 后台诊断由应用接收，签名凭据不进入日志。 */\nconst report = (error: unknown) => console.error(error)\n/** 标准 Node source 持有 Worker 和一个单位的预算。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)) },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** 普通 factory 使用双方配置的签名资源，无需自定义 Endpoint。 */\nconst worker = await createThreadPeer<IBytesApi>({ spawn, authentication, report })\ntry {\n  const buffer = new Uint8Array([7, 8, 9]).buffer\n  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))\n  // { length: 3, first: 7 }\n  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效\n} finally {\n  await worker.close()\n}"
               }
             ]
           },
@@ -503,7 +548,7 @@
                   ],
                   [
                     "`createNodeThreadChannel`、`createWebThreadChannel`",
-                    "在一个端口上构造固定基础能力的通道（零握手），用于自定义的底层 Endpoint 组装"
+                    "在借用端口上构造通道；固定基础能力同步返回，扩展 `capabilities` 等待 Core 双边 ACK"
                   ],
                   [
                     "`receiveThreadData`、`readThreadBootstrap`",
@@ -540,7 +585,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "能在两个已有的 `MessagePort` 之间直接建立 Peer 吗？ 目前不能（第 3 节末尾）。用 launcher 创建 Worker，或在底层用 `createNodeThreadChannel` 自行组装 Endpoint。"
+                "text": "能在两个已有的 `MessagePort` 之间直接建立 Peer 吗？ 可以。双方的 `connect` 使用 `createNodeThreadChannel` 或 `createWebThreadChannel`，并传入 `context.capabilities`（第 3 节末尾）。双方同时启动，能力确认由 Core 在实际端口上完成。"
               },
               {
                 "type": "paragraph",
@@ -863,15 +908,16 @@
         {
           "name": "createNodeThreadChannel",
           "kind": "function",
-          "signature": "export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult;",
-          "declarationLine": 15,
+          "signature": "export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>): IRuntimePeerSourceResult;\nexport declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;",
+          "declarationLine": 16,
           "source": "packages/rpc-threads/dist/threads/channel.d.ts",
-          "purpose": "Borrow the supplied EventEmitter port with the original zero-handshake fixed profile.",
+          "purpose": "Borrow the supplied EventEmitter port synchronously when its policy uses only the fixed profile. Runtime capability proposals use Core's bounded bilateral ACK over the held native port.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createNodeThreadChannel.",
           "advanced": "No additional advanced behavior is declared for createNodeThreadChannel.",
           "parameters": [
             "port: INodeMessagePortLike",
             "peerId: string",
+            "options: IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>",
             "options: IThreadChannelOptions"
           ],
           "parameterDetails": [
@@ -887,21 +933,46 @@
             },
             {
               "name": "options",
+              "type": "IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>",
+              "optional": false
+            },
+            {
+              "name": "options",
               "type": "IThreadChannelOptions",
               "optional": false
             }
           ],
-          "returns": "IRuntimePeerSourceResult",
+          "returns": "IRuntimePeerSourceResult | IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>",
           "errors": ["No documented errors are declared for createNodeThreadChannel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeThreadChannel.",
-          "examples": [],
+          "examples": [
+            "import { MessageChannel } from 'node:worker_threads'\nimport { createNodeThreadChannel, createThreadPeer } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst { port1, port2 } = new MessageChannel()\nconst report = (error: unknown) => console.error(error)\nconst [left, right] = await Promise.all([\n  createThreadPeer({\n    self: { name: 'left', instanceId: 'left-1' },\n    provide: { greet: (name: string) => `hello ${name}` },\n    connect: async (context) => createNodeThreadChannel(port1, 'right-1', {\n      scheduler: systemScheduler,\n      capabilities: context.capabilities\n    }),\n    report\n  }),\n  createThreadPeer<{ greet(name: string): string }>({\n    self: { name: 'right', instanceId: 'right-1' },\n    connect: async (context) => createNodeThreadChannel(port2, 'left-1', {\n      scheduler: systemScheduler,\n      capabilities: context.capabilities\n    }),\n    report\n  })\n])\ntry {\n  console.log(await right.request('greet', 'world')) // hello world\n} finally {\n  await Promise.all([left.close(), right.close()])\n  port1.close()\n  port2.close()\n}"
+          ],
           "members": [],
           "aliasOf": "createNodeThreadChannel",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult;"
+            "export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>): IRuntimePeerSourceResult;",
+            "export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;"
           ],
           "overloadParameterDetails": [
+            [
+              {
+                "name": "port",
+                "type": "INodeMessagePortLike",
+                "optional": false
+              },
+              {
+                "name": "peerId",
+                "type": "string",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>",
+                "optional": false
+              }
+            ],
             [
               {
                 "name": "port",
@@ -920,14 +991,17 @@
               }
             ]
           ],
-          "overloadReturns": ["IRuntimePeerSourceResult"],
+          "overloadReturns": [
+            "IRuntimePeerSourceResult",
+            "IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>"
+          ],
           "whenToUse": "Use createNodeThreadChannel when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createNodeThreadChannel does not match the required inputs or return contract.",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Borrow the supplied EventEmitter port with the original zero-handshake fixed profile."
+              "content": "Borrow the supplied EventEmitter port synchronously when its policy uses only the fixed profile. Runtime capability proposals use Core's bounded bilateral ACK over the held native port."
             },
             {
               "id": "getting-started",
@@ -956,9 +1030,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/channel.d.ts:createNodeThreadChannel:export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult;",
+          "identity": "packages/rpc-threads/dist/threads/channel.d.ts:createNodeThreadChannel:export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>): IRuntimePeerSourceResult;\nexport declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;",
           "guidance": [],
-          "usageScore": 8,
+          "usageScore": 26,
           "configuration": [],
           "fragment": "rpc-threads-index--createNodeThreadChannel"
         },
@@ -992,6 +1066,9 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createThreadPeer.",
           "examples": [
             "// worker.ts\nimport { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: {\n    math: { double: (value: number) => value * 2 },\n    feed: {\n      count: async function* (limit: number) {\n        for (let index = 1; index <= limit; index++) yield index\n      }\n    }\n  },\n  report: (error) => console.error(error)\n})",
+            "import { MessageChannel } from 'node:worker_threads'\nimport { createNodeThreadChannel, createThreadPeer } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst { port1, port2 } = new MessageChannel()\nconst report = (error: unknown) => console.error(error)\nconst [left, right] = await Promise.all([\n  createThreadPeer({\n    self: { name: 'left', instanceId: 'left-1' },\n    provide: { greet: (name: string) => `hello ${name}` },\n    connect: async (context) => createNodeThreadChannel(port1, 'right-1', {\n      scheduler: systemScheduler,\n      capabilities: context.capabilities\n    }),\n    report\n  }),\n  createThreadPeer<{ greet(name: string): string }>({\n    self: { name: 'right', instanceId: 'right-1' },\n    connect: async (context) => createNodeThreadChannel(port2, 'left-1', {\n      scheduler: systemScheduler,\n      capabilities: context.capabilities\n    }),\n    report\n  })\n])\ntry {\n  console.log(await right.request('greet', 'world')) // hello world\n} finally {\n  await Promise.all([left.close(), right.close()])\n  port1.close()\n  port2.close()\n}",
+            "// worker.ts\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { authentication } from './signing.js'\n\nawait createThreadPeer({\n  authentication,\n  provide: {\n    bytes: {\n      inspect: (buffer: ArrayBuffer) => ({\n        length: buffer.byteLength,\n        first: new Uint8Array(buffer)[0]\n      })\n    }\n  },\n  report: (error) => console.error(error)\n})",
+            "// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { authentication } from './signing.js'\n\ntype IBytesApi = {\n  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }\n}\n/** 后台诊断由应用接收，签名凭据不进入日志。 */\nconst report = (error: unknown) => console.error(error)\n/** 标准 Node source 持有 Worker 和一个单位的预算。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)) },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** 普通 factory 使用双方配置的签名资源，无需自定义 Endpoint。 */\nconst worker = await createThreadPeer<IBytesApi>({ spawn, authentication, report })\ntry {\n  const buffer = new Uint8Array([7, 8, 9]).buffer\n  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))\n  // { length: 3, first: 7 }\n  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效\n} finally {\n  await worker.close()\n}",
             "// worker.ts\nimport { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: {\n    math: { double: (value: number) => value * 2 },\n    bytes: {\n      inspect: (buffer: ArrayBuffer) => ({\n        length: buffer.byteLength,\n        first: new Uint8Array(buffer)[0]\n      })\n    }\n  },\n  report: (error) => console.error(error)\n})",
             "// main.ts\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IWorkerApi = {\n  math: { double: (value: number) => number }\n  bytes: { inspect: (buffer: ArrayBuffer) => { length: number; first: number } }\n}\nconst report = (error: unknown) => console.error(error)\n\nconst worker = await createThreadPeer<IWorkerApi>({\n  spawn: {\n    spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n    budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n    scheduler: systemScheduler,\n    launcher: createNodeThreadLauncher(),\n    channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n    report\n  },\n  report\n})\ntry {\n  console.log(await worker.request('math.double', 21)) // 42\n  console.log(await worker.request('bytes.inspect', new Uint8Array([7, 8, 9]).buffer))\n  // { length: 3, first: 7 }\n} finally {\n  await worker.close() // 关闭连接并终止 Worker\n}"
           ],
@@ -1053,7 +1130,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-threads/dist/threads/peer.d.ts:createThreadPeer:export declare function createThreadPeer<TRemote = Record<never, never>>(options: IRuntimeThreadPeerOptions, runtime?: IThreadRuntimeResource): Promise<IRuntimeTypedPeer<TRemote>>;",
           "guidance": [],
-          "usageScore": 50,
+          "usageScore": 102,
           "configuration": [],
           "fragment": "rpc-threads-index--createThreadPeer"
         },
@@ -1140,15 +1217,16 @@
         {
           "name": "createWebThreadChannel",
           "kind": "function",
-          "signature": "export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult;",
-          "declarationLine": 17,
+          "signature": "export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>): IRuntimePeerSourceResult;\nexport declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;",
+          "declarationLine": 22,
           "source": "packages/rpc-threads/dist/threads/channel.d.ts",
-          "purpose": "Borrow the supplied EventTarget port with the original zero-handshake fixed profile.",
+          "purpose": "Borrow the supplied EventTarget port synchronously when its policy uses only the fixed profile. Runtime capability proposals use Core's same bilateral ACK over the held EventTarget resource.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWebThreadChannel.",
           "advanced": "No additional advanced behavior is declared for createWebThreadChannel.",
           "parameters": [
             "port: IThreadWebPort",
             "peerId: string",
+            "options: IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>",
             "options: IThreadChannelOptions"
           ],
           "parameterDetails": [
@@ -1164,11 +1242,16 @@
             },
             {
               "name": "options",
+              "type": "IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>",
+              "optional": false
+            },
+            {
+              "name": "options",
               "type": "IThreadChannelOptions",
               "optional": false
             }
           ],
-          "returns": "IRuntimePeerSourceResult",
+          "returns": "IRuntimePeerSourceResult | IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>",
           "errors": ["No documented errors are declared for createWebThreadChannel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWebThreadChannel.",
           "examples": [],
@@ -1176,9 +1259,27 @@
           "aliasOf": "createWebThreadChannel",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult;"
+            "export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>): IRuntimePeerSourceResult;",
+            "export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;"
           ],
           "overloadParameterDetails": [
+            [
+              {
+                "name": "port",
+                "type": "IThreadWebPort",
+                "optional": false
+              },
+              {
+                "name": "peerId",
+                "type": "string",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>",
+                "optional": false
+              }
+            ],
             [
               {
                 "name": "port",
@@ -1197,14 +1298,17 @@
               }
             ]
           ],
-          "overloadReturns": ["IRuntimePeerSourceResult"],
+          "overloadReturns": [
+            "IRuntimePeerSourceResult",
+            "IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>"
+          ],
           "whenToUse": "Use createWebThreadChannel when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createWebThreadChannel does not match the required inputs or return contract.",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Borrow the supplied EventTarget port with the original zero-handshake fixed profile."
+              "content": "Borrow the supplied EventTarget port synchronously when its policy uses only the fixed profile. Runtime capability proposals use Core's same bilateral ACK over the held EventTarget resource."
             },
             {
               "id": "getting-started",
@@ -1233,9 +1337,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/channel.d.ts:createWebThreadChannel:export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult;",
+          "identity": "packages/rpc-threads/dist/threads/channel.d.ts:createWebThreadChannel:export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>): IRuntimePeerSourceResult;\nexport declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 8,
           "configuration": [],
           "fragment": "rpc-threads-index--createWebThreadChannel"
         },
@@ -1847,7 +1951,7 @@
           "name": "IRuntimeListFilter",
           "kind": "type",
           "signature": "export type IRuntimeListFilter = Readonly<{ state?: SupervisorState; name?: Readonly<{ exact: string; prefix?: never; }> | Readonly<{ prefix: string; exact?: never; }>; kind?: RuntimeSourceKind; direction?: RuntimeConnectionDirection; }>;",
-          "declarationLine": 42,
+          "declarationLine": 44,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Filters keep local source selection distinct from the connection's remote direction.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListFilter.",
@@ -1911,7 +2015,7 @@
           "name": "IRuntimeListOptions",
           "kind": "type",
           "signature": "export type IRuntimeListOptions = IRuntimeQueryOptions & Readonly<{ filter?: IRuntimeListFilter; }>;",
-          "declarationLine": 55,
+          "declarationLine": 57,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Formatting never changes which canonical registration records the filter selects.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListOptions.",
@@ -2423,7 +2527,7 @@
           "name": "IRuntimeThreadStopOptions",
           "kind": "type",
           "signature": "export type IRuntimeThreadStopOptions = Readonly<{ graceMs?: number; }>;",
-          "declarationLine": 84,
+          "declarationLine": 86,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Threads have no OS signal and never terminate their shared PID.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeThreadStopOptions.",
@@ -2679,7 +2783,7 @@
           "name": "IThreadChannelFactory",
           "kind": "type",
           "signature": "export type IThreadChannelFactory<THandle extends IThreadHandle> = Readonly<{ open(handle: THandle, signal: IAbortSignal): Promise<IRemoteChannel>; }>;",
-          "declarationLine": 11,
+          "declarationLine": 15,
           "source": "packages/rpc-threads/dist/threads/types.d.ts",
           "purpose": "A launcher handle opens one independently owned remote generation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadChannelFactory.",
@@ -2742,10 +2846,10 @@
         {
           "name": "IThreadChannelOptions",
           "kind": "type",
-          "signature": "export type IThreadChannelOptions = Readonly<{ scheduler: IScheduler; capabilities?: readonly string[]; }>;",
-          "declarationLine": 6,
+          "signature": "export type IThreadChannelOptions = Readonly<{ scheduler: IScheduler; /** Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK. */ capabilities?: readonly string[]; }>;",
+          "declarationLine": 9,
           "source": "packages/rpc-threads/dist/threads/types.d.ts",
-          "purpose": "Message channels retain the scheduler identity and static capability declaration.",
+          "purpose": "Message channels retain scheduler identity; explicit capabilities are local proposals, never agreements.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadChannelOptions.",
           "advanced": "No additional advanced behavior is declared for IThreadChannelOptions.",
           "parameters": ["This type declaration has no parameters."],
@@ -2758,7 +2862,7 @@
           "aliasOf": "IThreadChannelOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IThreadChannelOptions = Readonly<{ scheduler: IScheduler; capabilities?: readonly string[]; }>;"
+            "export type IThreadChannelOptions = Readonly<{ scheduler: IScheduler; /** Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK. */ capabilities?: readonly string[]; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2768,7 +2872,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Message channels retain the scheduler identity and static capability declaration."
+              "content": "Message channels retain scheduler identity; explicit capabilities are local proposals, never agreements."
             },
             {
               "id": "getting-started",
@@ -2797,7 +2901,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-threads/dist/threads/types.d.ts:IThreadChannelOptions:export type IThreadChannelOptions = Readonly<{ scheduler: IScheduler; capabilities?: readonly string[]; }>;",
+          "identity": "packages/rpc-threads/dist/threads/types.d.ts:IThreadChannelOptions:export type IThreadChannelOptions = Readonly<{ scheduler: IScheduler; /** Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK. */ capabilities?: readonly string[]; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3127,7 +3231,7 @@
           "name": "IThreadWebPort",
           "kind": "type",
           "signature": "export type IThreadWebPort = { postMessage(message: unknown, transfer?: readonly unknown[]): void; addEventListener(type: string, listener: (event: any) => void): void; removeEventListener(type: string, listener: (event: any) => void): void; };",
-          "declarationLine": 15,
+          "declarationLine": 19,
           "source": "packages/rpc-threads/dist/threads/types.d.ts",
           "purpose": "Structural EventTarget surface also admits a worker-global scope on the service side.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadWebPort.",
@@ -4818,6 +4922,7 @@
           "errors": ["No documented errors are declared for createNodeThreadChannelFactory."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeThreadChannelFactory.",
           "examples": [
+            "// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { authentication } from './signing.js'\n\ntype IBytesApi = {\n  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }\n}\n/** 后台诊断由应用接收，签名凭据不进入日志。 */\nconst report = (error: unknown) => console.error(error)\n/** 标准 Node source 持有 Worker 和一个单位的预算。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)) },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** 普通 factory 使用双方配置的签名资源，无需自定义 Endpoint。 */\nconst worker = await createThreadPeer<IBytesApi>({ spawn, authentication, report })\ntry {\n  const buffer = new Uint8Array([7, 8, 9]).buffer\n  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))\n  // { length: 3, first: 7 }\n  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效\n} finally {\n  await worker.close()\n}",
             "// main.ts\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IWorkerApi = {\n  math: { double: (value: number) => number }\n  bytes: { inspect: (buffer: ArrayBuffer) => { length: number; first: number } }\n}\nconst report = (error: unknown) => console.error(error)\n\nconst worker = await createThreadPeer<IWorkerApi>({\n  spawn: {\n    spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n    budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n    scheduler: systemScheduler,\n    launcher: createNodeThreadLauncher(),\n    channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n    report\n  },\n  report\n})\ntry {\n  console.log(await worker.request('math.double', 21)) // 42\n  console.log(await worker.request('bytes.inspect', new Uint8Array([7, 8, 9]).buffer))\n  // { length: 3, first: 7 }\n} finally {\n  await worker.close() // 关闭连接并终止 Worker\n}"
           ],
           "members": [],
@@ -4874,7 +4979,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-threads/dist/threads/adapters/node.d.ts:createNodeThreadChannelFactory:export declare function createNodeThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"./node.js\").INodeThreadHandle, signal: import(\"@migaia/lifecycle\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
           "guidance": [],
-          "usageScore": 26,
+          "usageScore": 50,
           "configuration": [],
           "fragment": "rpc-threads-adapters/node--createNodeThreadChannelFactory"
         },
@@ -4901,6 +5006,7 @@
           "errors": ["No documented errors are declared for createNodeThreadLauncher."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeThreadLauncher.",
           "examples": [
+            "// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { authentication } from './signing.js'\n\ntype IBytesApi = {\n  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }\n}\n/** 后台诊断由应用接收，签名凭据不进入日志。 */\nconst report = (error: unknown) => console.error(error)\n/** 标准 Node source 持有 Worker 和一个单位的预算。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)) },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** 普通 factory 使用双方配置的签名资源，无需自定义 Endpoint。 */\nconst worker = await createThreadPeer<IBytesApi>({ spawn, authentication, report })\ntry {\n  const buffer = new Uint8Array([7, 8, 9]).buffer\n  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))\n  // { length: 3, first: 7 }\n  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效\n} finally {\n  await worker.close()\n}",
             "import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'\n\nconst launcher = createNodeThreadLauncher()\nconst handle = await launcher.launch(threadSpec, { signal })\nconst channel = await handle.open(signal, { scheduler })",
             "// main.ts\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IWorkerApi = {\n  math: { double: (value: number) => number }\n  bytes: { inspect: (buffer: ArrayBuffer) => { length: number; first: number } }\n}\nconst report = (error: unknown) => console.error(error)\n\nconst worker = await createThreadPeer<IWorkerApi>({\n  spawn: {\n    spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n    budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n    scheduler: systemScheduler,\n    launcher: createNodeThreadLauncher(),\n    channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n    report\n  },\n  report\n})\ntry {\n  console.log(await worker.request('math.double', 21)) // 42\n  console.log(await worker.request('bytes.inspect', new Uint8Array([7, 8, 9]).buffer))\n  // { length: 3, first: 7 }\n} finally {\n  await worker.close() // 关闭连接并终止 Worker\n}"
           ],
@@ -4958,7 +5064,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-threads/dist/threads/adapters/node.d.ts:createNodeThreadLauncher:export declare function createNodeThreadLauncher(options?: Readonly<{ runtimeApi?: IRuntimePeerSourceContext; }>): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"../node-launcher.js\").IAdapterNodeThreadHandle>;",
           "guidance": [],
-          "usageScore": 40,
+          "usageScore": 64,
           "configuration": [],
           "fragment": "rpc-threads-adapters/node--createNodeThreadLauncher"
         }
