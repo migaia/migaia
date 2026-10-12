@@ -89,6 +89,11 @@ function violations(path: string, text: string): string[] {
           ts.isVariableDeclaration(declaration) &&
           declaration.name.getText(file) ===
             (path === 'threads/constants.ts' ? 'ThreadEvent' : 'MessageResourceEvent')) ||
+        (path === 'browser/peer-text.ts' &&
+          node.initializer.getText(file) === "'message'" &&
+          ts.isObjectLiteralExpression(node.parent) &&
+          ts.isVariableDeclaration(declaration) &&
+          declaration.name.getText(file) === 'BrowserPeerEvent') ||
         (path === 'core/internal/contract.ts' && node.initializer.getText(file) === "'string'") ||
         (path === 'core/internal/discovery-attachment.ts' &&
           node.initializer.getText(file) === "'discovery'") ||

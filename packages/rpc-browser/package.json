@@ -18,6 +18,10 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
     "./adapters/window": {
       "types": "./dist/browser/adapters/window.d.ts",
       "default": "./dist/browser/adapters/window.js"
