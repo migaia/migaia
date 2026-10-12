@@ -228,7 +228,7 @@ async function constructDefinitionPeer<TInput>(
     get providerAdmission() {
       return provenance?.providerAdmission ?? scope?.admission
     },
-    signal: task.preparation.initialSignal,
+    signal: task.preparation.initialSignal ?? options.signal,
     ...(options.governor ? { wrapEndpoint: (endpoint) => governor!.endpoint(endpoint) } : {})
   }
   /** Caller-owned source values and presentation do not enter the accepted private agreement. */
@@ -281,12 +281,22 @@ async function constructDefinitionPeer<TInput>(
         )
         if (launched) ownAdapterMessageClose(resource)
         try {
+          /**
+           * Unknown message addresses come only from this resource's existing initial control
+           * input.
+           */
+          const peerId =
+            options.peerId ??
+            (await resource.exchangeIdentity(
+              sourceContext,
+              provenance?.initialSignal ?? options.signal
+            ))
           const channel = await resource.open({
-            peerId: options.peerId,
+            peerId,
             scheduler,
             offer: sourceContext.capabilities,
             control: rpcMessageCapabilityControl,
-            signal: provenance?.initialSignal
+            signal: provenance?.initialSignal ?? options.signal
           })
           if (options.governor) {
             governor = createRuntimeProviderGovernor(
@@ -305,6 +315,7 @@ async function constructDefinitionPeer<TInput>(
         }
       }
       /** Native byte hello/auth admission is the existing canonical owner, never another handshake. */
+      if (options.peerId === undefined) throw createAdapterSourceConfigurationError()
       const opening =
         original.listen !== undefined
           ? recipe.options.listen

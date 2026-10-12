@@ -179,9 +179,12 @@ export function createEventTargetMessageHandoff(
           )
         native.addEventListener(MessageResourceEvent.messageerror, listener)
         native.addEventListener(MessageResourceEvent.error, failure)
+        /** Carrier failures retain their original cause during the same cold capture operation. */
+        const removeError = native.onError?.(listener)
         return () => {
           native.removeEventListener(MessageResourceEvent.messageerror, listener)
           native.removeEventListener(MessageResourceEvent.error, failure)
+          removeError?.()
         }
       }
     },
@@ -193,6 +196,9 @@ export function createEventTargetMessageHandoff(
   /** After activation, canonical callbacks are installed directly on the original EventTarget. */
   const port: IAdapterEventTargetMessagePort = {
     postMessage: (message, transfer) => native.postMessage(message, transfer),
+    ...(native.onError
+      ? { onError: (listener: (error: unknown) => void) => native.onError!(listener) }
+      : {}),
     addEventListener: (event, listener) => {
       if (event === MessageResourceEvent.message) handoff.subscribe(listener)
       else native.addEventListener(event, listener)

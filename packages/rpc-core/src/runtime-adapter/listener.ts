@@ -1,4 +1,8 @@
 import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IScheduler } from '@migaia/utils/scheduler'
+import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
+import type { IAdapterMessageResource } from './message/types.js'
+import { readAdapterMessagePreparation } from './message/resource.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 import type { IRpcIdempotencyConfig, IRpcProviderLimits } from '../core/index.js'
 import { createRpcError, RpcCoreErrorCode } from '../core/errors.js'
@@ -37,9 +41,15 @@ import { readRuntimeProviderScope } from './provider/scope.js'
 import type { IRuntimeProviderGovernor } from './provider/governor.js'
 import { readRuntimeProviderGovernor } from './provider/governor.js'
 import { createRuntimeEventPublisher, runtimeReadyEvent } from '../remote/runtime-api/events.js'
+import { hostRethrowReporter } from '@migaia/utils/promise'
+import { IpcReporterContext } from './data.js'
 
 /** The original session owner stores this actual callable Peer and closes its same resource. */
 export type IAdapterListenerService = IRemoteServePluginHandle & Readonly<{ peer: IRuntimePeer }>
+
+/** A held message session exposes retirement only from its exact constructed transport. */
+export type IAdapterMessageListenerService = IAdapterListenerService &
+  Readonly<{ closed(): boolean }>
 
 /** Core retains the bare/final endpoint internally across native validation and session adoption. */
 export type IAdapterListenerSession = Readonly<{
@@ -59,6 +69,11 @@ export type IAdapterListenerOwner = Readonly<{
 
 /** Listener operations accept held Core resources and ordinary policies, never preparation claims. */
 export type IAdapterListenerPreparation = Readonly<{
+  /** Raw message resources negotiate and construct their own Peer without accepting caller claims. */
+  messageSession(
+    resource: IAdapterMessageResource,
+    options: Readonly<{ peerId?: string; scheduler: IScheduler; signal?: IAbortSignal }>
+  ): Promise<IAdapterMessageListenerService>
   session(
     channel: IRemoteChannel,
     signal: IAbortSignal,
@@ -210,6 +225,74 @@ export function createAdapterListenerPreparation(
 
   /** Public operations close over genuine state; no method can register an arbitrary peer/context. */
   const listener: IAdapterListenerPreparation = Object.freeze({
+    async messageSession(resource, opening) {
+      if (this !== listener || !readAdapterMessagePreparation(resource)) invalidResource()
+      try {
+        /**
+         * Existing initial input names the remote endpoint without changing the listener's local
+         * identity.
+         */
+        const peerId =
+          opening.peerId ??
+          (await resource.exchangeIdentity(
+            { self: options.self!, capabilities: localOffer },
+            opening.signal
+          ))
+        /** Bilateral message control remains the same bounded owner used by every message adapter. */
+        const channel = await resource.open({
+          ...opening,
+          peerId,
+          offer: localOffer,
+          control: rpcMessageCapabilityControl
+        })
+        /** The listener's genuine preparation alone selects its provider snapshot and native origin. */
+        const peerOptions: IRuntimePeerOptions = {
+          ...options,
+          provide: preparation?.readProvide?.() ?? options.provide
+        }
+        const peer = await withRuntimePreparationContext(
+          peerOptions,
+          {
+            ...preparation,
+            connectionOrigin: () => ({
+              carrier: channel.transport.platform,
+              kind: RuntimeSourceKind.listen,
+              direction: RuntimeConnectionDirection.listen
+            })
+          },
+          () =>
+            createRuntimePeer(peerOptions, {
+              channel,
+              signal: opening.signal,
+              host: preparation?.host,
+              providerAdmission: preparation?.providerAdmission,
+              providerAdmissionRegistration: preparation?.providerAdmissionRegistration
+            })
+        )
+        /**
+         * Exact factory membership grants publication, while live membership stays with the
+         * listener.
+         */
+        const service = Object.freeze({
+          peer,
+          close: peer.close,
+          closed: () => channel.transport.closed === true
+        })
+        ownServices.add(service)
+        return service
+      } catch (primary) {
+        try {
+          await resource.close()
+        } catch (cleanup) {
+          try {
+            report(cleanup)
+          } catch (failure) {
+            hostRethrowReporter(failure, IpcReporterContext)
+          }
+        }
+        throw primary
+      }
+    },
     session(channel, signal, scope, limits, customIdempotency) {
       if (this !== listener) invalidResource()
       return createListenerSession(
