@@ -43,7 +43,7 @@ pnpm add @migaia/rpc-core @migaia/rpc-contract
 | `./features/*`、`./stream`             | 供 `./composed` 选择的功能模块                                                       |
 | `./plugins/log`、`./plugins/send-queue`、`./plugins/flow-control` | IPC 日志、发送队列等可选中间件                          |
 | `./transport-kit`、`./transport-constants` | 编写自定义 transport 的工具与常量                                                |
-| `./adapter`                            | 运行时适配器作者用的构造函数（见 USEGUIDE 第 9 节）                                  |
+| `./adapter`                            | 运行时适配器作者用的构造函数与纯入口解析 `resolveAdapterEntry`（见 USEGUIDE 第 9 节） |
 
 ## 快速开始
 

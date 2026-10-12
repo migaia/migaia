@@ -308,6 +308,16 @@ const sum = await endpoint.send<number>('server', 'add', [20, 22]) // data 必�
 
 ## 9. 高阶用法：为新运行时编写适配器
 
+平台适配器共用 `resolveAdapterEntry`：原生层只提供主入口 URL 与运行参数快照，Core 不读取 Node、Bun 或 Deno 的全局对象。相对路径以主入口目录为基准；显式 `base` 可覆盖基准；URL 始终精确。`true` 在 REPL、eval、测试框架、Electron 或单文件可执行程序中拒绝自派生，要求显式入口。URL 解析错误保留原始 `cause`。
+
+```ts doc-test=run
+import { resolveAdapterEntry, retainAdapterRuntimeFlags } from '@migaia/rpc-core/adapter'
+
+const entry = resolveAdapterEntry('./service.ts', { mainEntry: new URL('file:///app/main.ts') })
+console.log(entry) // file:///app/service.ts
+console.log(retainAdapterRuntimeFlags(['--import', './loader.mjs', '--eval', '1'])) // 保留 loader
+```
+
 `@migaia/rpc-core/adapter` 面向适配器作者：为一种新的运行时或载体（例如 Electron 的某种通道、自定义 IPC）实现与 rpc-process、rpc-threads 同等的能力。
 
 **原则**：适配器只交给 Core 它实际持有的原始资源（字节流、消息端口、启动句柄）。握手、能力协商、信任判断都由 Core 在自己的收发路径上完成。接口不接受"已协商 / 已认证 / 已拥有"之类的声明，也不接受对已有 transport 的登记。

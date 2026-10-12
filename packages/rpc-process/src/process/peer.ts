@@ -5,6 +5,7 @@ import type { IRuntimeTypedPeer, IRuntimeFlatten } from '@migaia/rpc-core/remote
 import { createProcessSourcePeer } from './runtime-peer.js'
 import { createAutomaticProcessPeer } from './automatic-peer.js'
 import type { IProcessByteChannel } from './types.js'
+import { normalizeProcessSources, type IProcessShortSourceOptions } from './short-source.js'
 
 /** Native discovery opens the actual runtime I/O, never returns a constructed/trusted Peer DTO. */
 export type IAdapterProcessRuntimeIO = Readonly<{
@@ -24,12 +25,14 @@ export type IAdapterProcessRuntimeLoader = Readonly<{
  */
 export function createAdapterProcessPeer<TRemote = Record<never, never>>(
   options: IRuntimeProcessPeerOptions,
-  runtime: IAdapterProcessRuntimeLoader
+  runtime: IAdapterProcessRuntimeLoader,
+  forwarded?: IProcessShortSourceOptions
 ): Promise<IRuntimeTypedPeer<TRemote, IRuntimeFlatten<TRemote>, typeof RuntimePluginKey.process>>
 /** Untyped native construction retains its original operation Promise. */
 export function createAdapterProcessPeer(
   options: IRuntimeProcessPeerOptions,
-  runtime: IAdapterProcessRuntimeLoader
+  runtime: IAdapterProcessRuntimeLoader,
+  forwarded?: IProcessShortSourceOptions
 ): Promise<object> {
   /** Local listener addressing is configuration; Core retains genuine default-self/Host provenance. */
   const listener = typeof options.listen === 'object' ? options.listen : undefined
@@ -43,20 +46,26 @@ export function createAdapterProcessPeer(
   ).withoutTransfer()
   /** Native loading retains the original acquisition promise and discovery ordering. */
   const loaded = runtime.load()
-  if (!loaded) return preparation.peer(options as IRuntimePeerOptions)
+  if (!loaded)
+    return preparation.peer({
+      ...options,
+      report: options.report ?? console.error
+    } as IRuntimePeerOptions)
   return loaded.then((module) => {
     validateAdapterPeerTimeout(options)
     /** Discovery still precedes launch/dial/listen effects. */
     const discovery = module.processRuntimeIO.discover()
     if (
       !discovery.marker &&
-      (typeof options.spawn === 'object' ||
-        typeof options.connect === 'object' ||
-        typeof options.listen === 'object')
+      ((options.spawn !== undefined && typeof options.spawn !== 'function') ||
+        (options.connect !== undefined && typeof options.connect !== 'function') ||
+        (options.listen !== undefined && typeof options.listen !== 'function'))
     )
-      return createProcessSourcePeer(options, discovery.runtime, preparation)
+      return normalizeProcessSources(options, discovery.runtime, preparation, forwarded).then(
+        (resolved) => createProcessSourcePeer(resolved, discovery.runtime, preparation)
+      )
     return createAutomaticProcessPeer(
-      options as IRuntimePeerOptions,
+      { ...options, report: options.report ?? console.error } as IRuntimePeerOptions,
       {
         marker: discovery.marker,
         runtime: discovery.runtime,

@@ -36,26 +36,51 @@ export type IRuntimeThreadSpawn<THandle extends IThreadHandle = IThreadHandle> =
   retryPort?: IRemoteRetryPort
 }>
 
+/** Entry-only deployment fills the existing source's launcher, budget and channel defaults. */
+export type IRuntimeThreadShortSpawn<THandle extends IThreadHandle = IThreadHandle> = Readonly<{
+  entry: true | string | URL
+  /** Explicit module URL or URL string changes only relative entry resolution. */
+  base?: string | URL
+  name?: IThreadSpec['name']
+  data?: IThreadSpec['data']
+  limits?: IThreadSpec['limits']
+}> &
+  Partial<Omit<IRuntimeThreadSpawn<THandle>, 'spec'>>
+
 /**
  * Source callbacks remain only for the serial migration; deployed sources use original platform
  * specs.
  */
 export type IRuntimeThreadPeerOptions<THandle extends IThreadHandle = IThreadHandle> = Omit<
   IRuntimePeerOptions,
-  'spawn'
+  'spawn' | 'report'
 > &
-  Readonly<{ spawn?: IRuntimePeerSource | IRuntimeThreadSpawn<THandle> }>
+  Readonly<{
+    report?: (error: unknown) => void
+    spawn?:
+      | IRuntimePeerSource
+      | IRuntimeThreadSpawn<THandle>
+      | IRuntimeThreadShortSpawn<THandle>
+      | true
+      | string
+      | URL
+  }>
 
 /** Construct real owned execution through the same binding and remote generation owner. */
 export function createThreadSourcePeer<THandle extends IThreadHandle>(
-  options: IRuntimeThreadPeerOptions<THandle>
+  options: IRuntimeThreadPeerOptions<THandle>,
+  expanded?: IRuntimeThreadSpawn<THandle>
 ): Promise<IRuntimePeer> {
   /** The opaque Core operation performs the original early timeout admission exactly once. */
   const preparation = prepareAdapterPeer(options, RuntimePluginKey.thread)
-  if (!options.spawn || typeof options.spawn !== 'object' || options.connect || options.listen)
+  if (
+    (!expanded && (!options.spawn || typeof options.spawn !== 'object')) ||
+    options.connect ||
+    options.listen
+  )
     throw createAdapterSourceConfigurationError()
   /** Original source reads remain the managed options fallback after binding selection. */
-  const source = options.spawn
+  const source = expanded ?? (options.spawn as IRuntimeThreadSpawn<THandle>)
   /** Local address is output from Core's original preparation rather than a peer claim. */
   const self = preparation.context.self
   /** Snapshot binding inputs in the original order before constructing its lifecycle owners. */
@@ -100,7 +125,7 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
       provide: options.provide,
       providerLimits: options.providerLimits,
       defaultTimeoutMs: options.defaultTimeoutMs,
-      report: options.report,
+      report: options.report ?? source.report,
       contract: options.contract,
       keyFactory: options.keyFactory ?? source.keyFactory,
       retryPort: options.retryPort ?? source.retryPort,

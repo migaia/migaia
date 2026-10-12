@@ -1,5 +1,6 @@
 export { createThreadPlugin } from './plugin.js'
 export { createThreadPeer } from './peer.js'
+export { isThreadChild } from './child.js'
 export { createNodeThreadChannel, createWebThreadChannel } from './channel.js'
 export { receiveThreadData, readThreadBootstrap } from './bootstrap.js'
 export {
@@ -10,7 +11,11 @@ export {
 export type { IThreadChannelFactory, IThreadChannelOptions, IThreadWebPort } from './types.js'
 export type { IThreadBootstrapData } from './bootstrap.js'
 /** Existing user-level thread source configuration moved from Core's retired thread adapter entry. */
-export type { IRuntimeThreadPeerOptions, IRuntimeThreadSpawn } from './runtime-peer.js'
+export type {
+  IRuntimeThreadPeerOptions,
+  IRuntimeThreadSpawn,
+  IRuntimeThreadShortSpawn
+} from './runtime-peer.js'
 /** Symmetric Plugin configuration belongs to the Thread owner that launches its native resource. */
 export type { IRuntimeThreadPluginOptions } from './plugin.js'
 /** Borrow the original parent port through the same complete Thread channel operation. */

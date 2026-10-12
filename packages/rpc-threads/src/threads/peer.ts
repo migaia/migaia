@@ -5,10 +5,11 @@ import { prepareAdapterPeer, validateAdapterPeerTimeout } from '@migaia/rpc-core
 import type { IRuntimeTypedPeer } from '@migaia/rpc-core/remote'
 import { RuntimePluginKey, type IRuntimePeerOptions } from '@migaia/rpc-core/remote'
 import { createAutomaticWebThreadPeer } from './automatic-peer.js'
-import type { IThreadWebPort } from './types.js'
 import { createThreadSourcePeer, type IRuntimeThreadPeerOptions } from './runtime-peer.js'
+import { threadWebParent } from './child.js'
+import { expandThreadSpawn, isShortThreadSpawn } from './short-spawn.js'
 
-/** Platform-owned context plus validated library bootstrap grants automatic discovery. */
+/** Create one owned or borrowed Worker Peer; entry shorthand uses the existing deployment path. */
 export function createThreadPeer<TRemote = Record<never, never>>(
   options: IRuntimeThreadPeerOptions,
   runtime?: IThreadRuntimeResource
@@ -19,26 +20,12 @@ export function createThreadPeer(
   runtime: IThreadRuntimeResource = threadRuntimeResource
 ): Promise<object> {
   validateAdapterPeerTimeout(options)
-  /** Browser automatic discovery is limited to genuine dedicated Worker globals. */
-  const Scope = Reflect.get(globalThis, 'DedicatedWorkerGlobalScope') as
-    | (new (...args: never[]) => object)
-    | undefined
-  /** Deno supports dedicated module Workers through its own WorkerGlobalScope identity. */
-  const DenoScope = Reflect.get(globalThis, 'Deno')
-    ? (Reflect.get(globalThis, 'WorkerGlobalScope') as
-        | (new (...args: never[]) => object)
-        | undefined)
-    : undefined
-  /** Bun supplies an independent worker-context flag even without WorkerGlobalScope. */
-  const bun = Reflect.get(globalThis, 'Bun') as { isMainThread?: boolean } | undefined
-  if (
-    (typeof Scope === 'function' && globalThis instanceof Scope) ||
-    (typeof DenoScope === 'function' && globalThis instanceof DenoScope) ||
-    (bun?.isMainThread === false && typeof Reflect.get(globalThis, 'postMessage') === 'function')
-  )
-    return createAutomaticWebThreadPeer(
-      options as IRuntimePeerOptions,
-      globalThis as unknown as IThreadWebPort
+  /** The actual Worker global selects automatic discovery; bootstrap still grants the connection. */
+  const parent = threadWebParent()
+  if (parent) return createAutomaticWebThreadPeer(options, parent)
+  if (isShortThreadSpawn(options.spawn))
+    return expandThreadSpawn(options, runtime).then((source) =>
+      createThreadSourcePeer(options, source)
     )
   if (
     (typeof process !== 'undefined' && process.versions?.node !== undefined) ||
@@ -50,5 +37,9 @@ export function createThreadPeer(
   if (typeof options.spawn === 'object') return createThreadSourcePeer(options)
   /** Main-thread borrowed sources use the same Core-generated default address as spawn sources. */
   const preparation = prepareAdapterPeer(options, RuntimePluginKey.thread)
-  return preparation.peer({ ...options, self: preparation.context.self } as IRuntimePeerOptions)
+  return preparation.peer({
+    ...options,
+    self: preparation.context.self,
+    report: options.report ?? console.error
+  } as IRuntimePeerOptions)
 }

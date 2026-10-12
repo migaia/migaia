@@ -40,11 +40,15 @@ const processRuntimeSlotFamily = Object.freeze({})
 const processRuntimeSlotKey = RuntimePluginKey.process
 
 /** Symmetric Plugin options reuse the process Peer source boundary and canonical Feature exposure. */
-export type IRuntimeProcessPluginOptions = IRuntimePluginOptions<
-  IRuntimeProcessPeerOptions['spawn'],
-  IRuntimeProcessPeerOptions['connect'],
-  IRuntimeProcessPeerOptions['listen']
->
+export type IRuntimeProcessPluginOptions = Omit<
+  IRuntimePluginOptions<
+    IRuntimeProcessPeerOptions['spawn'],
+    IRuntimeProcessPeerOptions['connect'],
+    IRuntimeProcessPeerOptions['listen']
+  >,
+  'report'
+> &
+  Pick<IRuntimeProcessPeerOptions, 'report' | 'token' | 'verify' | 'connectTimeoutMs'>
 
 /** Keep failed endpoint admission inside the generation's rollback boundary. */
 function processEndpointFactory<TUnit extends object, TSpec>(
@@ -113,13 +117,18 @@ export function createAdapterProcessPlugin<THandle extends IProcessHandle>(
 ): IProcessPlugin | ReturnType<typeof createRuntimePlugin> {
   if (!('deployment' in options))
     return createRuntimePlugin(
-      options,
+      { ...options, report: options.report ?? console.error },
       {
         key: processRuntimeSlotKey,
         acquire: (integration, create) =>
           integration.acquireSharedSlot(processRuntimeSlotKey, processRuntimeSlotFamily, create)
       },
-      (peerOptions) => createAdapterProcessPeer(peerOptions, runtime)
+      (peerOptions) =>
+        createAdapterProcessPeer(peerOptions, runtime, {
+          token: options.token,
+          verify: options.verify,
+          connectTimeoutMs: options.connectTimeoutMs
+        })
     )
   return assembleProcessPlugin(options)
 }

@@ -17,7 +17,11 @@ const threadRuntimeSlotFamily = Object.freeze({})
 const threadRuntimeSlotKey = RuntimePluginKey.thread
 
 /** Symmetric Plugin options share the Peer source grammar and default to an empty Feature exposure. */
-export type IRuntimeThreadPluginOptions = IRuntimePluginOptions<IRuntimeThreadPeerOptions['spawn']>
+export type IRuntimeThreadPluginOptions = Omit<
+  IRuntimePluginOptions<IRuntimeThreadPeerOptions['spawn']>,
+  'report'
+> &
+  Readonly<{ report?: (error: unknown) => void }>
 
 /** Install a symmetric connection into the original canonical thread slot. */
 export function createThreadPlugin<
@@ -41,7 +45,7 @@ export function createThreadPlugin<
 ): ReturnType<typeof createRuntimePlugin> &
   IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'> {
   return createRuntimePlugin(
-    options,
+    options as IRuntimePluginOptions<IRuntimeThreadPeerOptions['spawn']>,
     {
       key: threadRuntimeSlotKey,
       acquire: (integration, create) =>

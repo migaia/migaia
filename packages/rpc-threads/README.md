@@ -28,7 +28,7 @@ pnpm add @migaia/rpc-threads @migaia/rpc-core @migaia/rpc-contract
 
 | 入口                            | 内容                                                                                   |
 | ------------------------------- | -------------------------------------------------------------------------------------- |
-| `@migaia/rpc-threads`           | `createThreadPeer`、`createThreadPlugin`、错误码 `RpcThreadErrorCode`、高级通道与 launcher 构造函数 |
+| `@migaia/rpc-threads`           | `createThreadPeer`、`createThreadPlugin`、`isThreadChild`、错误码 `RpcThreadErrorCode`、高级通道与 launcher 构造函数 |
 | `./adapters/node`               | `createNodeThreadLauncher`、`createNodeThreadChannelFactory`（Node `worker_threads`）   |
 | `./adapters/bun`                | `createBunThreadLauncher`、`createBunThreadChannelFactory`                             |
 | `./adapters/deno`               | `createDenoThreadLauncher`、`createDenoThreadChannelFactory`                           |
@@ -38,9 +38,9 @@ pnpm add @migaia/rpc-threads @migaia/rpc-core @migaia/rpc-contract
 
 ## 快速开始
 
-Worker 入口只声明自己提供的方法。由库的 launcher 创建时，它会自动连回父线程。
+保存下面两个文件，编译为同目录的 `worker.js` 和 `main.js`，再运行 `main.js`。Worker 入口只声明自己提供的方法；由库创建时，它会自动连回父线程。后台错误默认交给 `console.error`。
 
-```ts
+```ts doc-test=run file=worker.ts
 // worker.ts
 import { createThreadPeer } from '@migaia/rpc-threads'
 
@@ -53,40 +53,23 @@ await createThreadPeer({
         first: new Uint8Array(buffer)[0]
       })
     }
-  },
-  report: (error) => console.error(error)
+  }
 })
 ```
 
-主线程用 `spawn` 来源创建 Worker 并调用：
+主线程只需要 Worker 入口。Node / Bun / Deno 的 launcher、一个 Worker 的预算、调度器和通道由当前运行时的适配器延迟加载：
 
-```ts
+```ts doc-test=run file=main.ts
 // main.ts
-import { fileURLToPath } from 'node:url'
 import { createThreadPeer } from '@migaia/rpc-threads'
-import {
-  createNodeThreadLauncher,
-  createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
-import { createUnitBudget } from '@migaia/supervision'
-import { systemScheduler } from '@migaia/utils/scheduler'
 
 type IWorkerApi = {
   math: { double: (value: number) => number }
   bytes: { inspect: (buffer: ArrayBuffer) => { length: number; first: number } }
 }
-const report = (error: unknown) => console.error(error)
-
+/** 当前文件的相邻模块是 Worker 入口。 */
 const worker = await createThreadPeer<IWorkerApi>({
-  spawn: {
-    spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },
-    budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),
-    scheduler: systemScheduler,
-    launcher: createNodeThreadLauncher(),
-    channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
-    report
-  },
-  report
+  spawn: new URL('./worker.js', import.meta.url)
 })
 try {
   console.log(await worker.request('math.double', 21)) // 42
@@ -97,22 +80,60 @@ try {
 }
 ```
 
-`spawn` 的六个字段各有分工：`spec`（入口与名字）、`budget`（最多同时存在几个 Worker）、`scheduler`（计时与调度）、`launcher`（创建 Worker）、`channelFactory`（在 Worker 端口上建立协议通道）、`report`（接收后台错误）。换平台时只需换 `launcher` 与 `channelFactory`。
+`spawn` 接受 `true`、`URL`、路径字符串，或以 `entry` 为必填字段的短对象；`base`、`name`、`data`、`limits` 与既有 source 的依赖和监督字段都可覆盖。相对字符串按**主入口文件所在目录**解析；显式 `base: import.meta.url` 可改为当前模块，`URL` 始终按原值使用。短形式只展开为既有 source，仍经过相同的监督、握手和关闭路径。字段详情见 [USEGUIDE 第 3 节](./USEGUIDE.md#3-spawn-短形式)，完整配置见[高阶用法](#高阶用法完整-source)。
+
+## 同一个文件作为 Worker
+
+`spawn: true` 会重新执行主入口的全部顶层代码。用 `await isThreadChild()` 分开两支，避免子线程再次创建 Worker：
+
+```ts doc-test=run file=self.ts
+import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
+
+type IMathApi = { double(value: number): number }
+
+if (await isThreadChild()) {
+  await createThreadPeer({ provide: { double: (value: number) => value * 2 } })
+} else {
+  /** 当前主入口的副本提供计算方法。 */
+  const worker = await createThreadPeer<IMathApi>({ spawn: true })
+  try {
+    console.log(await worker.request('double', 21)) // 42
+  } finally {
+    await worker.close()
+  }
+}
+```
+
+`isThreadChild()` 读取既有 launcher bootstrap 标记；它不授权外部 Worker。REPL、`--eval`、打包成单个二进制、Electron、以测试运行器为主入口等没有可用入口的场景，self spawn 以 `INVALID_CONFIG` 拒绝，不猜入口。
+
+`.ts` 入口可直接传入。Node 24 能剥离类型，但不会把 `./x.js` 改为 `./x.ts`；Bun 支持该映射，Node / Deno 应使用编译后的 `.js`，或能处理该映射的 loader。模块解析失败保留原始 `cause`。
+
+浏览器请传明确的 Worker URL；`true` 和裸字符串只用于 Node / Bun / Deno。`spawn: new URL('./worker.js', import.meta.url)` 使用已经构建的模块。Vite / webpack 的 Worker 源码发现依赖字面量 `new Worker(new URL('./worker.ts', import.meta.url))`；库内部的动态构造不能代替这一规则。源码打包需预构建 Worker URL，或使用[自定义 Worker 构造](./USEGUIDE.md#8-高阶用法完整-source-与自定义-worker-构造)。
 
 ## 两种所有权：Peer 与 Plugin
 
 - **`createThreadPeer`**：独立连接，调用方负责 `close()`。
 - **`createThreadPlugin`**：安装进 `@migaia/plugin-host`，由 Host 持有和释放。经 `host.thread.request(target, method, …)` 调用；`list` / `get` / `stop` / `kill` / `restart` / `replace` 也在这个出口上。
 
-```ts
+```ts doc-test=run file=worker.ts
+import { createThreadPeer } from '@migaia/rpc-threads'
+
+await createThreadPeer({
+  provide: { math: { double: (value: number) => value * 2 } }
+})
+```
+
+```ts doc-test=run file=main.ts
 import { defineHost } from '@migaia/plugin-host'
 import { createThreadPlugin } from '@migaia/rpc-threads'
 
+type IWorkerApi = { math: { double(value: number): number } }
+/** Host 接管 Worker 的连接与释放。 */
 const worker = createThreadPlugin<IWorkerApi, Record<never, never>, 'worker'>({
   name: 'worker',
-  spawn, // 与上例相同的 spawn 对象
-  report
+  spawn: new URL('./worker.js', import.meta.url)
 })
+/** 安装线程插件后，thread 出口提供调用与监督操作。 */
 const host = defineHost<Record<string, never>, never, readonly [typeof worker]>({
   host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
 })
@@ -123,6 +144,31 @@ try {
   await host.dispose()
 }
 ```
+
+## 高阶用法：完整 source
+
+原来的完整 source 对象继续有效。需要自定义预算、监督或 runtime 时，显式组合平台 launcher 与 channel factory；两者共用同一个 scheduler。下面导出的对象可直接作为 `createThreadPeer` 或 `createThreadPlugin` 的 `spawn`，入口使用快速开始的 `worker.js`：
+
+```ts
+import { fileURLToPath } from 'node:url'
+import { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'
+import { createUnitBudget } from '@migaia/supervision'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+/** 后台错误由应用统一记录。 */
+const report = (error: unknown) => console.error(error)
+/** Node source 显式持有一个 Worker 的预算与监督依赖。 */
+export const spawn = {
+  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },
+  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),
+  scheduler: systemScheduler,
+  launcher: createNodeThreadLauncher(),
+  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+  report
+}
+```
+
+各平台组合与 Web Worker 终止能力边界见 [USEGUIDE 第 8 节](./USEGUIDE.md#8-高阶用法完整-source-与自定义-worker-构造)。
 
 ## 二进制数据
 

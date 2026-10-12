@@ -77,8 +77,10 @@ export type IRuntimePluginOptions<
   TSpawn = IRuntimePeerSource,
   TConnect = IRuntimePeerSource,
   TListen = IRuntimePeerSource
-> = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> &
+> = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen' | 'report'> &
   Readonly<{
+    /** Missing reporters use console.error for every lifecycle and cleanup diagnostic. */
+    report?: IRuntimePeerOptions['report']
     spawn?: TSpawn
     connect?: TConnect
     listen?: TListen
@@ -319,6 +321,8 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
   slotResource: IRuntimePluginSlotResource,
   createPeer: (options: IRuntimePeerOptions) => Promise<IRuntimePeer> = createRuntimePeer
 ): IDefinedPluginConstraint<Record<string, never>, never, Record<string, never>> {
+  /** Preserve the original options identity while defaulting all captured diagnostic paths. */
+  const report = options.report ?? console.error
   /** Invalid defaults fail during cold Plugin construction, before any installation side effects. */
   const defaultTimeoutMs = readRuntimeDefaultTimeout(options)
   /** Registration name is copied before installation; caller mutation cannot change publication. */
@@ -351,7 +355,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
     keyFactory: options.keyFactory,
     retryPort: options.retryPort,
     endpointFactory: options.endpointFactory,
-    report: options.report
+    report
   })
   return definePlugin({
     name,
@@ -396,7 +400,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
           host: options.host,
           catalog: options.catalog,
           resolvePlugin: options.resolvePlugin,
-          report: options.report
+          report
         })
         /** Reserved callbacks capture this exact immutable adopter owner, never a later binding. */
         const authority = control
@@ -556,7 +560,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
           await peer.close()
         } catch (cleanup) {
           try {
-            options.report(cleanup)
+            report(cleanup)
           } catch (reporterError) {
             hostRethrowReporter(reporterError, IpcReporterContext)
           }
@@ -632,13 +636,13 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
                       signal: event.status?.signal ?? runtimeUnavailable(RuntimeQueryReason.native),
                       ...(event.error === undefined
                         ? {}
-                        : { error: runtimeErrorIdentity(event.error, options.report) })
+                        : { error: runtimeErrorIdentity(event.error, report) })
                     }
                   : event.type === RuntimeEventName.restart
                     ? { count: event.count }
                     : { degraded: Object.freeze([...event.degraded]) })
               }),
-              options.report
+              report
             )
           })
         )

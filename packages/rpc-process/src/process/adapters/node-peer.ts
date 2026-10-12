@@ -1,6 +1,7 @@
 import type { IAdapterProcessRuntimeIO } from '../peer.js'
 import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS } from '../constants.js'
 import { openProcessStdioChannel } from './node-child-process.js'
+import { isProcessChild } from '../child.js'
 
 /** Consumed discovery stays in this actual native process; a second factory sees the same marker. */
 let automaticMarker: string | undefined
@@ -11,6 +12,7 @@ class NativeNodeProcessRuntimeIO implements IAdapterProcessRuntimeIO {
   discover() {
     /** A consumed marker remains local to the same native process and precedes ambient discovery. */
     const marker = automaticMarker ?? process.env[PROCESS_RUNTIME_API_ENV]
+    isProcessChild()
     if (marker !== undefined) {
       automaticMarker = marker
       delete process.env[PROCESS_RUNTIME_API_ENV]

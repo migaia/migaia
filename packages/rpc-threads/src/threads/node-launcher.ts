@@ -50,10 +50,16 @@ let sequence = 0
 /** Launch Node Workers with immediate error/exit listeners and true two-phase termination. */
 export function createAdapterNodeThreadLauncher(
   runtime: IThreadRuntimeResource,
-  options: Readonly<{ runtimeApi?: IRuntimePeerSourceContext }> = {}
+  options: Readonly<{
+    runtimeApi?: IRuntimePeerSourceContext
+    /** Omission retains native inheritance; short different entries supply filtered runtime flags. */
+    execArgv?: readonly string[]
+  }> = {}
 ): IThreadLauncher<IAdapterNodeThreadHandle> {
   /** Only the source's actual compiled offer enters private capability negotiation. */
   const configuredRuntimeApi = options.runtimeApi
+  /** The selected flag list is stable per launcher while each native construction receives a copy. */
+  const configuredExecArgv = options.execArgv
   return {
     capabilities: Object.freeze({
       termination: 'enforced',
@@ -86,6 +92,7 @@ export function createAdapterNodeThreadLauncher(
       const worker = new Worker(absoluteThreadEntry(spec.entry, true), {
         name: spec.name,
         workerData: initialMessage,
+        ...(configuredExecArgv ? { execArgv: [...configuredExecArgv] } : {}),
         ...(spec.limits?.heapBytes === undefined
           ? {}
           : { resourceLimits: { maxOldGenerationSizeMb: spec.limits.heapBytes / 1024 / 1024 } })
