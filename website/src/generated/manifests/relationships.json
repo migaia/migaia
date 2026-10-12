@@ -12572,6 +12572,46 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/docs/rpc-devtools/log",
+      "to": "/en/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-devtools",
+      "to": "/en/docs/rpc-devtools/log",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log/createRpcLogProbe",
+      "to": "/en/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-devtools",
+      "to": "/en/docs/rpc-devtools/log/createRpcLogProbe",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log/IRpcLogProbeOptions",
+      "to": "/en/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-devtools",
+      "to": "/en/docs/rpc-devtools/log/IRpcLogProbeOptions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log/IRpcLogSink",
+      "to": "/en/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-devtools",
+      "to": "/en/docs/rpc-devtools/log/IRpcLogSink",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/docs/rpc-pool",
       "to": "/en/guides/rpc-pool",
       "type": "domain-peer"
@@ -38939,6 +38979,46 @@
     {
       "from": "/zh/guides/rpc-devtools",
       "to": "/zh/docs/rpc-devtools/hub/RpcDevtoolsTargetStatus",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log",
+      "to": "/zh/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools/log",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log/createRpcLogProbe",
+      "to": "/zh/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools/log/createRpcLogProbe",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log/IRpcLogProbeOptions",
+      "to": "/zh/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools/log/IRpcLogProbeOptions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log/IRpcLogSink",
+      "to": "/zh/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools/log/IRpcLogSink",
       "type": "domain-peer"
     },
     {
@@ -129229,6 +129309,226 @@
     {
       "from": "/zh/architecture/rpc-devtools",
       "to": "/zh/docs/rpc-devtools/hub#rpc-devtools-hub--RpcDevtoolsTargetStatus",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log",
+      "to": "/en/guides/rpc-devtools/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/guides/rpc-devtools/getting-started",
+      "to": "/en/docs/rpc-devtools/log",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log",
+      "to": "/en/architecture/rpc-devtools",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-devtools",
+      "to": "/en/docs/rpc-devtools/log",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log",
+      "to": "/en/docs/rpc-devtools/log#rpc-devtools-log--createRpcLogProbe",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log#rpc-devtools-log--createRpcLogProbe",
+      "to": "/en/docs/rpc-devtools/log",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log#rpc-devtools-log--createRpcLogProbe",
+      "to": "/en/guides/rpc-devtools/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-devtools/getting-started",
+      "to": "/en/docs/rpc-devtools/log#rpc-devtools-log--createRpcLogProbe",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log#rpc-devtools-log--createRpcLogProbe",
+      "to": "/en/architecture/rpc-devtools",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-devtools",
+      "to": "/en/docs/rpc-devtools/log#rpc-devtools-log--createRpcLogProbe",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log",
+      "to": "/en/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogProbeOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogProbeOptions",
+      "to": "/en/docs/rpc-devtools/log",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogProbeOptions",
+      "to": "/en/guides/rpc-devtools/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-devtools/getting-started",
+      "to": "/en/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogProbeOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogProbeOptions",
+      "to": "/en/architecture/rpc-devtools",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-devtools",
+      "to": "/en/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogProbeOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log",
+      "to": "/en/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogSink",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogSink",
+      "to": "/en/docs/rpc-devtools/log",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogSink",
+      "to": "/en/guides/rpc-devtools/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-devtools/getting-started",
+      "to": "/en/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogSink",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogSink",
+      "to": "/en/architecture/rpc-devtools",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-devtools",
+      "to": "/en/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogSink",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log",
+      "to": "/zh/guides/rpc-devtools/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools/getting-started",
+      "to": "/zh/docs/rpc-devtools/log",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log",
+      "to": "/zh/architecture/rpc-devtools",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools/log",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log",
+      "to": "/zh/docs/rpc-devtools/log#rpc-devtools-log--createRpcLogProbe",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log#rpc-devtools-log--createRpcLogProbe",
+      "to": "/zh/docs/rpc-devtools/log",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log#rpc-devtools-log--createRpcLogProbe",
+      "to": "/zh/guides/rpc-devtools/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools/getting-started",
+      "to": "/zh/docs/rpc-devtools/log#rpc-devtools-log--createRpcLogProbe",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log#rpc-devtools-log--createRpcLogProbe",
+      "to": "/zh/architecture/rpc-devtools",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools/log#rpc-devtools-log--createRpcLogProbe",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log",
+      "to": "/zh/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogProbeOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogProbeOptions",
+      "to": "/zh/docs/rpc-devtools/log",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogProbeOptions",
+      "to": "/zh/guides/rpc-devtools/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools/getting-started",
+      "to": "/zh/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogProbeOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogProbeOptions",
+      "to": "/zh/architecture/rpc-devtools",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogProbeOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log",
+      "to": "/zh/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogSink",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogSink",
+      "to": "/zh/docs/rpc-devtools/log",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogSink",
+      "to": "/zh/guides/rpc-devtools/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools/getting-started",
+      "to": "/zh/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogSink",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogSink",
+      "to": "/zh/architecture/rpc-devtools",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogSink",
       "type": "architecture-symbol"
     },
     {
