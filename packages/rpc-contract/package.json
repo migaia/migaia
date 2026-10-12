@@ -1,6 +1,6 @@
 {
   "name": "@migaia/rpc-contract",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "private": true,
   "description": "RPC contract owner.",
   "license": "MIT",
@@ -113,7 +113,6 @@
     "@migaia/serialize": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
-  "peerDependencies": {},
   "peerDependenciesMeta": {},
   "devDependencies": {
     "@types/node": "24.13.2",
