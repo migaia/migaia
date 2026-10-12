@@ -15,6 +15,7 @@ import type { IProcessServeListenerIngress } from './plugin/types.js'
 import { reportSafely } from './plugin/binding.js'
 import { createProcessResilience } from './resilience/index.js'
 import type { IProcessResilience } from './resilience/types.js'
+import { resolveNativeProcessRuntimeOffer } from './offer.js'
 
 /** Native ingress keeps its caller-selected governor while Core owns runtime session assembly. */
 export type IRuntimeProcessListen = IProcessServeListenerIngress &
@@ -32,8 +33,10 @@ export async function createProcessListenerPeer(
   /** Direct native listeners obtain the same opaque Core owner as the deployed source path. */
   const prepared =
     preparation ?? prepareAdapterPeer(options, RuntimePluginKey.process).withoutTransfer()
-  /** The canonical local directory is compiled before native bind or quota construction. */
-  const listener = prepared.listener(ingress.offer.capabilities)
+  /** Core's installed local roots fill omitted defaults; explicit caller proposals stay narrow. */
+  const offer = resolveNativeProcessRuntimeOffer(ingress.offer, prepared.context.capabilities)
+  /** The canonical local directory and native handshake share the same actual local proposal. */
+  const listener = prepared.listener(offer.capabilities)
   /** Only this construction closes a default governor it created. */
   const resilience =
     ingress.resilience ??
@@ -49,7 +52,7 @@ export async function createProcessListenerPeer(
   let sessions: IProcessSessionsHandle
   try {
     sessions = await serveProcessSessions(
-      ingress,
+      { ...ingress, offer },
       undefined,
       (session) => session.runtime!.peer(),
       resilience,
