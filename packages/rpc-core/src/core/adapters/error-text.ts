@@ -1,5 +1,14 @@
 /** Stable adapters error text stays with its owner outside the root endpoint graph. */
 export const RpcAdapterErrorText = {
+  /**
+   * Probe callbacks report through the existing TRANSPORT channel without changing message
+   * delivery.
+   */
+  probeFailed: '[rpc] carrier probe failed',
+  /** Worker transport close releases borrowed hooks without terminating the native Worker. */
+  workerCleanupFailed: '[rpc] worker transport cleanup failed',
+  /** A closed borrowed Worker adapter no longer admits sends or subscribers. */
+  workerClosed: '[rpc] worker transport is closed',
   /** Stable aggregate text for browser and Node MessagePort terminal cleanup failures. */
   messagePortCleanupFailed: '[rpc] message port cleanup failed',
   /**
