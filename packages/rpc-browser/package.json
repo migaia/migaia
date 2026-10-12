@@ -1,6 +1,6 @@
 {
   "name": "@migaia/rpc-browser",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "private": true,
   "description": "RPC browser owner.",
   "license": "MIT",
