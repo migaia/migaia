@@ -3,9 +3,13 @@ import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IThreadHandle } from '@migaia/supervision/threads'
 import type { IRemoteChannel } from '@migaia/rpc-core/remote'
 
-/** Message channels retain the scheduler identity and static capability declaration. */
+/**
+ * Message channels retain scheduler identity; explicit capabilities are local proposals, never
+ * agreements.
+ */
 export type IThreadChannelOptions = Readonly<{
   scheduler: IScheduler
+  /** Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK. */
   capabilities?: readonly string[]
 }>
 /** A launcher handle opens one independently owned remote generation. */
