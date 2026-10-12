@@ -1,7 +1,7 @@
 import { IpcBenchErrorText } from '../../bench/error-text.mjs'
 import '../../bench/observe.mjs'
 import { snapshot, waitForObservation } from '../../bench/observe.mjs'
-import { IpcBenchControl, RuntimeBench } from '../../bench/text.mjs'
+import { IpcBenchControl, IpcBenchObservation, RuntimeBench } from '../../bench/text.mjs'
 import { createHash } from 'node:crypto'
 import { spawn, execFileSync } from 'node:child_process'
 import { once } from 'node:events'
@@ -37,15 +37,27 @@ let snapshotPort
 let snapshotPeer
 /** Each native child has an ordered out-of-band snapshot file sequence. */
 let snapshotSequence = 0
-/** Native peers share SIGUSR2 control; foreign peers have only native PID observations. */
-async function peerSnapshot(peerPid) {
+/**
+ * Read one peer boundary through its existing OOB control, optionally retaining a profile heap.
+ *
+ * @param {number} peerPid Actual child PID, or the Worker process PID.
+ * @param {{ heapSnapshot?: 'start' | 'end' }} [options] Profile boundary, outside business
+ *   exchanges.
+ * @returns {Promise<object>} Actual peer isolate snapshot and any native heap file path.
+ */
+async function peerSnapshot(peerPid, options = {}) {
   if (snapshotPeer) return snapshotPeer()
   if (snapshotPort)
     return new Promise((resolve) => {
       snapshotPort.once('message', resolve)
-      snapshotPort.postMessage('snapshot')
+      snapshotPort.postMessage(options.heapSnapshot ? options : 'snapshot')
     })
   const path = process.env.IPC_BENCH_STEM + '.peer.snapshot-' + snapshotSequence++ + '.json'
+  if (process.env[IpcBenchObservation.heapProfileEnvironment] === '1')
+    writeFileSync(
+      process.env.IPC_BENCH_STEM + '.peer.snapshot-request.json',
+      JSON.stringify(options)
+    )
   process.kill(peerPid, 'SIGUSR2')
   while (!existsSync(path)) await new Promise((resolve) => setTimeout(resolve, 1))
   return JSON.parse(readFileSync(path, 'utf8'))
@@ -420,8 +432,30 @@ export async function createIpcSession({
       ).launch(
         {
           command: deno ? Deno.execPath() : process.execPath,
-          args: [...(deno ? ['run', '-A'] : []), entry, '--child', side, carrier],
-          env: { inherit: ['PATH'], set: { IPC_BENCH_STEM: process.env.IPC_BENCH_STEM + '.peer' } },
+          args: [
+            ...(deno ? ['run', '-A'] : []),
+            ...(!deno &&
+            !process.versions.bun &&
+            process.env[IpcBenchObservation.forcePeerGcEnvironment] === '1'
+              ? ['--expose-gc']
+              : []),
+            entry,
+            '--child',
+            side,
+            carrier
+          ],
+          env: {
+            inherit: ['PATH'],
+            set: {
+              IPC_BENCH_STEM: process.env.IPC_BENCH_STEM + '.peer',
+              ...(process.env[IpcBenchObservation.forcePeerGcEnvironment] === '1'
+                ? { [IpcBenchObservation.forcePeerGcEnvironment]: '1' }
+                : {}),
+              ...(process.env[IpcBenchObservation.heapProfileEnvironment] === '1'
+                ? { [IpcBenchObservation.heapProfileEnvironment]: '1' }
+                : {})
+            }
+          },
           stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' }
         },
         {
@@ -480,7 +514,7 @@ export async function createIpcSession({
       return {
         facade: runtime,
         peerPid,
-        peerSnapshot: () => peerSnapshot(peerPid),
+        peerSnapshot: (options) => peerSnapshot(peerPid, options),
         classification: () => classification,
         encodedBytes: encoded.length,
         ready: async () => undefined,
