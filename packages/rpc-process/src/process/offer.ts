@@ -1,8 +1,8 @@
 import type { IRpcHandshakeOffer, IRpcPeerInfo } from '@migaia/rpc-contract'
 import { RpcCapability, RpcCodecId, RpcProtocol } from '@migaia/rpc-contract'
 
-/** Only locally created offers that omit extensions allow a runtime listener to supply defaults. */
-const defaultNativeOffers = new WeakSet<IRpcHandshakeOffer>()
+/** Omitted extensions allow runtime defaults while retaining an explicitly disabled stream policy. */
+const defaultNativeOffers = new WeakMap<IRpcHandshakeOffer, boolean>()
 
 /** Native byte connections advertise only capabilities installed by their endpoint owner. */
 export function createNativeProcessOffer(
@@ -15,7 +15,9 @@ export function createNativeProcessOffer(
 ): IRpcHandshakeOffer {
   /** Default control capabilities are available to native process endpoints. */
   const capabilities: string[] = [RpcCapability.ping, RpcCapability.close, RpcCapability.batch]
-  if (options.stream) capabilities.push(RpcCapability.stream)
+  /** Capture once so stream false remains caller policy when runtime defaults are later supplied. */
+  const stream = options.stream
+  if (stream) capabilities.push(RpcCapability.stream)
   /** Omission selects defaults; an explicit empty list remains an intentionally narrow proposal. */
   const extensions = options.capabilities
   capabilities.push(...(extensions ?? []))
@@ -33,7 +35,7 @@ export function createNativeProcessOffer(
     peer: Object.freeze({ ...options.peer }),
     ...(options.auth === undefined ? {} : { auth: options.auth })
   })
-  if (extensions === undefined) defaultNativeOffers.add(offer)
+  if (extensions === undefined) defaultNativeOffers.set(offer, stream !== false)
   return offer
 }
 
@@ -45,9 +47,15 @@ export function resolveNativeProcessRuntimeOffer(
   offer: IRpcHandshakeOffer,
   capabilities: readonly string[]
 ): IRpcHandshakeOffer {
-  if (!defaultNativeOffers.has(offer)) return offer
+  /** Undefined denotes an explicit extension list; false denies only the default stream capability. */
+  const allowStream = defaultNativeOffers.get(offer)
+  if (allowStream === undefined) return offer
+  /** Core still owns the defaults; filtering preserves the caller's existing explicit stream choice. */
+  const defaults = allowStream
+    ? capabilities
+    : capabilities.filter((capability) => capability !== RpcCapability.stream)
   return Object.freeze({
     ...offer,
-    capabilities: Object.freeze([...new Set([...offer.capabilities, ...capabilities])])
+    capabilities: Object.freeze([...new Set([...offer.capabilities, ...defaults])])
   })
 }

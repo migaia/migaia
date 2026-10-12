@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { RpcCapability } from '@migaia/rpc-contract'
 import {
   createNativeProcessOffer,
   createProcessPeer,
@@ -21,6 +22,8 @@ describe('Process listener runtime capabilities', () => {
       let listener: IProcessByteListener | undefined
       /** Every asynchronous report remains available to the assertion and final cleanup. */
       const reports: unknown[] = []
+      /** The actual completed public handshake proves whether the listener preserved stream policy. */
+      let negotiatedCapabilities: readonly string[] | undefined
       /** Both sides use the owning public peer factories, never a prepared Core context. */
       let client:
         | Awaited<ReturnType<typeof createProcessPeer<{ math: { double(value: number): number } }>>>
@@ -65,9 +68,10 @@ describe('Process listener runtime capabilities', () => {
             supervision: { restart: { mode: 'never' } },
             dial: (address, signal) =>
               dialProcessByteChannel({ address, signal: signal as AbortSignal }),
-            establish: (raw, prepared) => {
+            establish: async (raw, prepared) => {
               if (raw.kind !== 'byte') throw new TypeError('Expected socket byte channel')
-              return createProcessTransport(raw, {
+              /** Record the actual negotiated channel, never an inferred local capability offer. */
+              const channel = await createProcessTransport(raw, {
                 role: 'initiator',
                 peerId: 'fixture-server',
                 offer: prepared.offer!,
@@ -76,10 +80,13 @@ describe('Process listener runtime capabilities', () => {
                 ipc: { ...prepared.session, log: () => undefined },
                 report: (error) => reports.push(error)
               })
+              negotiatedCapabilities = channel.agreement.capabilities
+              return channel
             }
           }
         })
         expect(await client.request('math.double', 21)).toBe(42)
+        expect(negotiatedCapabilities?.includes(RpcCapability.stream)).toBe(stream)
         expect(reports).toEqual([])
       } finally {
         await client?.close()
