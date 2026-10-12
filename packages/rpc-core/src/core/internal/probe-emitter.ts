@@ -60,6 +60,12 @@ export function readInstalledProbe(transport: object): IProbeEmitter | undefined
 }
 /** Associates one existing emitter with its owned transport; release revokes only that identity. */
 export function bindInstalledProbe(transport: object, emitter: IProbeEmitter): () => void {
+  /** A custom endpoint cannot replace a caller's already-owned observer during construction. */
+  const current = installed.get(transport)
+  if (current !== undefined && current !== emitter) {
+    emitter.dispose()
+    throw createRpcError(RpcCoreErrorCode.capabilityConflict, RpcCoreErrorText.endpointOwnerOwned)
+  }
   installed.set(transport, emitter)
   return () => {
     releaseInstalledProbe(transport, emitter)
