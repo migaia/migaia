@@ -1301,6 +1301,8 @@ export function createRemoteGenerationHolder<
   const retained = new Set<Set<() => Promise<void>>>()
   /** Final removal shares one settlement with repeated PluginHost cleanup. */
   let releasePromise: Promise<void> | undefined
+  /** Observer and public command join one preparation of the same native generation. */
+  let pendingRebind: Promise<number> | undefined
   /** Closes one group's disposers in reverse acquisition order. */
   const closeGroup = async (group: Set<() => Promise<void>>): Promise<unknown[]> => {
     const failures: unknown[] = []
@@ -1368,7 +1370,19 @@ export function createRemoteGenerationHolder<
     registration,
     prepareInitial: (signal, rollbackOnFailure = false) =>
       prepare(signal, rollbackOnFailure, false),
-    prepareRebind: (signal) => prepare(signal, true, true),
+    prepareRebind: (signal) => {
+      if (signal.aborted) return Promise.reject(resolveAbortReason(signal))
+      if (releasePromise)
+        return Promise.reject(createRemoteLayerError(RpcRemoteLayerErrorCode.closed))
+      if (pendingRebind) return pendingRebind
+      /** An accepted generation already published its original pointer and outlet receipt. */
+      const current = registration.events.current()
+      if (current.active) return Promise.resolve(current.generation)
+      pendingRebind = prepare(signal, true, true).finally(() => {
+        pendingRebind = undefined
+      })
+      return pendingRebind
+    },
     retainedResourceCount: () => [...retained].reduce((count, group) => count + group.size, 0),
     release: () => {
       if (releasePromise) return releasePromise

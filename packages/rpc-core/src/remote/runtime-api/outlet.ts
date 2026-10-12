@@ -79,9 +79,15 @@ export type IRuntimePluginRegistration = Readonly<{
   name: string
   peer: IRuntimePeer
   execution?: ISupervisor<unknown, unknown>
+  /** Command readiness joins the original holder until its accepted receipt is published. */
+  whenReady?(): Promise<number>
   /** Original safe identity reads select one target before any asynchronous sampler runs. */
   instanceIds(): readonly string[]
 }>
+
+/** Execution commands require the exact committed registration's original supervisor authority. */
+type IRuntimeControlledRegistration = IRuntimePluginRegistration &
+  Readonly<{ execution: ISupervisor<unknown, unknown> }>
 
 /** Filters keep local source selection distinct from the connection's remote direction. */
 export type IRuntimeListFilter = Readonly<{
@@ -231,7 +237,7 @@ export function createRuntimeOutlet(
     return connection as IRuntimePluginConnection
   }
   /** Execution authority is looked up on committed registration metadata before native side effects. */
-  const controlled = (name: string): ISupervisor<unknown, unknown> => {
+  const controlled = (name: string): IRuntimeControlledRegistration => {
     if (typeof name !== 'string' || !name)
       throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.targetInvalid)
     slot.find(name)
@@ -243,10 +249,12 @@ export function createRuntimeOutlet(
         records.length ? RpcCoreErrorCode.capabilityConflict : RpcCoreErrorCode.targetUnknown,
         records.length ? RuntimeApiErrorText.targetAmbiguous : RuntimeApiErrorText.targetUnknown
       )
-    const execution = records[0]!.execution
+    /** Retain the same registration so readiness cannot accidentally join another logical owner. */
+    const record = records[0]!
+    const execution = record.execution
     if (!execution)
       throw createRpcError(RpcCoreErrorCode.capabilityConflict, RuntimeApiErrorText.controlBorrowed)
-    return execution
+    return record as IRuntimeControlledRegistration
   }
   /** Public operations preserve their original callables; private seams belong to this facade only. */
   const facade: IRuntimeOutlet = Object.freeze({
@@ -262,13 +270,29 @@ export function createRuntimeOutlet(
           (kind === RuntimePluginKey.thread || options.signal !== RuntimeProcessSignal.graceful))
       )
         throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.stopInvalid)
-      return controlled(name).stop(
+      return controlled(name).execution.stop(
         options?.graceMs === undefined ? undefined : { graceMs: options.graceMs }
       )
     },
-    kill: (name) => controlled(name).kill(),
-    restart: (name) => controlled(name).restart(),
-    replace: (name, spec) => controlled(name).replace(spec === undefined ? undefined : { spec }),
+    kill: (name) => controlled(name).execution.kill(),
+    restart: (name) => {
+      /** Native readiness precedes channel preparation; join the exact existing resource owner. */
+      const record = controlled(name)
+      return record.execution.restart().then(async (outcome) => {
+        if (outcome.state === 'ready') await record.whenReady?.()
+        return outcome
+      })
+    },
+    replace: (name, spec) => {
+      /** Return the original outcome only after the replacement's outlet receipt is addressable. */
+      const record = controlled(name)
+      return record.execution
+        .replace(spec === undefined ? undefined : { spec })
+        .then(async (outcome) => {
+          if (outcome.kind === 'replaced') await record.whenReady?.()
+          return outcome
+        })
+    },
     request: (target, method, payload, options) =>
       selected(target).peer.request(method, payload, options),
     notify: (target, method, payload, options) =>

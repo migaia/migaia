@@ -12,6 +12,7 @@ import type {
 import {
   createRemoteRuntimeRegistration,
   createRemoteGenerationHolder,
+  type IRemoteGenerationHolder,
   type IRemoteRuntimeRegistration
 } from '../proxy.js'
 import { observeRemoteGenerations } from '../internal/assemble-plugin.js'
@@ -28,12 +29,15 @@ import {
 } from './peer.js'
 
 /** Exact facade provenance points to the original generation owner and duplicates no state. */
-const managedRegistrations = new WeakMap<IRuntimePeer, IRemoteRuntimeRegistration>()
+const managedRegistrations = new WeakMap<
+  IRuntimePeer,
+  IRemoteGenerationHolder<IRemoteRuntimeRegistration>
+>()
 
-/** Plugin publication subscribes to the genuine canonical owner, never a structural Peer. */
-export function readManagedRuntimeRegistration(
+/** Plugin commands and publication share the genuine preparation owner, never a structural Peer. */
+export function readManagedRuntimeHolder(
   peer: IRuntimePeer
-): IRemoteRuntimeRegistration | undefined {
+): IRemoteGenerationHolder<IRemoteRuntimeRegistration> | undefined {
   return managedRegistrations.get(peer)
 }
 
@@ -170,7 +174,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
     describe: runtimeQuery(() => registration.inspectRuntime()),
     close
   })
-  managedRegistrations.set(peer, registration)
+  managedRegistrations.set(peer, holder)
   retainRuntimePeerConnection(peer, () => registration.currentPeer())
   return peer
 }
