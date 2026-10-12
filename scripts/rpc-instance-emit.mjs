@@ -38,6 +38,8 @@ export const RPC_RESOURCE_POINTS = {
     'runtime-adapter/listener.ts': ['createAdapterListenerPreparation'],
     'runtime-adapter/byte/ipc-connection.ts': ['attachIpcConnection'],
     'runtime-adapter/object/connection.ts': ['holdAdapterObjectChannel'],
+    'runtime-adapter/jsonrpc/channel.ts': ['createAdapterJsonRpcChannel'],
+    'runtime-adapter/jsonrpc/transport.ts': ['bindJsonRpcWire'],
     'runtime-adapter/provider/governor.ts': ['createRuntimeProviderGovernor'],
     'runtime-adapter/provider/scope.ts': ['createRuntimeProviderScope'],
     'runtime-adapter/peer.ts': [
@@ -156,8 +158,7 @@ export const RPC_RESOURCE_POINTS = {
   },
   '@migaia/rpc-bridge-jsonrpc': {
     'bridge/jsonrpc/index.ts': ['createJsonRpcRemoteChannel'],
-    'bridge/jsonrpc/channel.ts': ['createJsonRpcAdapterChannel'],
-    'bridge/jsonrpc/transport.ts': ['bindJsonRpcWire']
+    'bridge/jsonrpc/channel.ts': ['createJsonRpcAdapterChannel']
   },
   '@migaia/rpc-browser': {
     'browser/adapters/window.ts': ['createWindowMessageTransport'],

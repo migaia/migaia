@@ -1,6 +1,7 @@
-import { materializeAdapterJson, readAdapterAbortReason } from '@migaia/rpc-core/adapter'
+import { materializeAdapterJson } from '../object/pipeline.js'
+import { readAdapterAbortReason } from '../data.js'
 import { deferred } from '@migaia/utils/promise'
-import { deserializeRpcError, serializeRpcError } from '@migaia/rpc-core'
+import { deserializeRpcError, serializeRpcError } from '../../core/internal/error-wire-metadata.js'
 import { fromJsonRpcError } from '@migaia/rpc-contract'
 import { toJsonRpcError } from '@migaia/rpc-contract/errors'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
@@ -20,18 +21,17 @@ import {
   createListenerFailureState,
   reportListenerFailure,
   drainTerminalListenerFailures
-} from '@migaia/rpc-core/transport-kit'
-import type { IRpcTransport, IRpcSendOptions } from '@migaia/rpc-core'
-import type { IRuntimeObjectIO } from '@migaia/rpc-core/adapter'
-import { createProcessChannelClosedError } from '@migaia/rpc-process'
-import { RemoteMethodName } from '@migaia/rpc-core/remote'
-import { RpcRemoteLayerErrorCode } from '@migaia/rpc-core/remote'
+} from '../../core/internal/listener-safety.js'
+import type { IRpcTransport, IRpcSendOptions } from '../../core/transport.js'
+import type { IRuntimeObjectIO } from '../object/types.js'
+import { RemoteMethodName } from '../../remote/constants.js'
+import { RpcRemoteLayerErrorCode } from '../../remote/error-code.js'
 import { JsonRpcProfile, JsonRpcErrorNumber } from './constants.js'
 import { readRpcBatchMembers } from '@migaia/rpc-contract/framing'
 import { JsonRpcBridgeErrorCode } from '@migaia/rpc-contract/framing/jsonrpc'
 import { createJsonRpcBridgeError } from './error.js'
 import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'
-import { validateJsonRpcDescription, type IJsonRpcBridgeOptions } from './handshake.js'
+import { validateJsonRpcDescription, type IAdapterJsonRpcChannelOptions } from './handshake.js'
 
 /** The factory holds actual wire I/O and the pre-ready correlation; Core constructs the transport. */
 export type IJsonRpcWire = Pick<
@@ -56,7 +56,10 @@ export type IJsonRpcWire = Pick<
 type IJsonRpcInboundMessage = Parameters<Parameters<IRpcTransport['subscribe']>[0]>[0]
 
 /** Bind raw bytes once, translate logical envelopes, and keep all correlation connection-local. */
-export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
+export function bindJsonRpcWire(
+  options: IAdapterJsonRpcChannelOptions,
+  closedError: (cause?: unknown) => Error
+): IJsonRpcWire {
   /** Whole-envelope requests are retained only until response, cancel or connection release. */
   const pending = new Map<string, IRpcRequestEnvelope>()
   /** Authenticated inbound ids belong only to this physical connection and canonical provider. */
@@ -105,7 +108,7 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
     closed = true
     closingObserver?.()
     closingObserver = undefined
-    terminal = reason ?? createProcessChannelClosedError()
+    terminal = reason ?? closedError()
     decoder.close()
     pending.clear()
     incoming.clear()
@@ -173,8 +176,11 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
           /** Late physical rejection is secondary once another event committed closure. */
           const alreadyClosed = closed
           writes.delete(abortWrite)
-          /** IO failure keeps its original instance reachable through the process error cause. */
-          const error = createProcessChannelClosedError(cause)
+          /**
+           * IO failure keeps its original instance reachable through the physical owner's existing
+           * closed-error cause.
+           */
+          const error = closedError(cause)
           reject(error)
           if (alreadyClosed) report(error)
           else fail(error)
@@ -518,9 +524,7 @@ export function bindJsonRpcWire(options: IJsonRpcBridgeOptions): IJsonRpcWire {
           fail(error)
           return
         }
-        void close(
-          reason === undefined ? undefined : createProcessChannelClosedError(reason)
-        ).catch(report)
+        void close(reason === undefined ? undefined : closedError(reason)).catch(report)
       })
     )
     /** Caller cancellation keeps its original reason, particularly before channel publication. */

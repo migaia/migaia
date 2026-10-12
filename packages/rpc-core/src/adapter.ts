@@ -1,4 +1,18 @@
 /** Adapter admission and presentation retain canonical owners without exposing trust writers. */
+/** The one JSON-RPC wire owner accepts only held bytes and local presentation operations. */
+export {
+  createAdapterJsonRpcChannel,
+  createJsonRpcBridgeError,
+  JsonRpcProfile,
+  JsonRpcErrorNumber,
+  JSONRPC_REQUIRED_CAPABILITIES,
+  JSONRPC_ALLOWED_CAPABILITIES,
+  JSONRPC_REQUIRED_METHODS
+} from './runtime-adapter/jsonrpc/index.js'
+export type {
+  IAdapterJsonRpcChannelOptions,
+  IAdapterJsonRpcChannelPresentation
+} from './runtime-adapter/jsonrpc/index.js'
 export {
   createAdapterSourceConfigurationError,
   IpcReporterContext,

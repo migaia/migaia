@@ -1,6 +1,6 @@
 import { createJsonRpcAdapterChannel } from './channel.js'
 import type { IJsonRpcBridgeOptions } from './handshake.js'
-/** The adapter owns the moved raw-byte JSON-RPC operation at its ordinary public entry. */
+/** Bridge retains its original channel entry while Core owns the generic JSON-RPC operation. */
 export { createJsonRpcAdapterChannel } from './channel.js'
 export type { IJsonRpcBridgeOptions } from './handshake.js'
 /** Callers obtain the actual ordered byte resource through the Process package. */
