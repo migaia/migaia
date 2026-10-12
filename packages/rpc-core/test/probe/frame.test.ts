@@ -14,7 +14,7 @@ import {
   type IRpcProbeEventView,
   type IRpcProbeStageName
 } from '../../dist/core/probe/index.js'
-import { createProbeEmitter } from '../../dist/core/internal/probe-emitter.js'
+import { createProbeEmitter, probeSize } from '../../dist/core/internal/probe-emitter.js'
 import { RpcOutboundSender } from '../../dist/core/internal/outbound-sender.js'
 import type { IRpcSelectedComponents } from '../../dist/core/internal/endpoint-options.js'
 import type { IRpcOutboundTransport } from '../../dist/core/internal/outbound-sender.js'
@@ -123,6 +123,36 @@ function observedSender(options: {
 }
 
 describe('probe-core A3 outbound frames', () => {
+  it('counts physical UTF-8 strings while clone-friendly string size stays unknown', async () => {
+    expect(probeSize('ascii', true)).toBe(5)
+    expect(probeSize('é😀\ud800', true)).toBe(9)
+    expect(probeSize('é😀\ud800', false)).toBe(-1)
+    /** Byte views retain their exact selected span independently of string wire representation. */
+    const backing = new ArrayBuffer(8)
+    expect(probeSize(backing, false)).toBe(8)
+    expect(probeSize(new Uint8Array(backing, 2, 3), false)).toBe(3)
+    expect(probeSize(new DataView(backing, 1, 4), true)).toBe(4)
+    for (const encodedType of ['string', 'any'] as const) {
+      /** Owner construction selects the physical representation once for every later stage call. */
+      const events: IRpcProbeEventView[] = []
+      /** This representation includes non-ASCII UTF-8 and a lone surrogate's replacement width. */
+      const fixture = observedSender({
+        events,
+        selected: components(() => 'é😀\ud800'),
+        transport: { platform: 'Memory', encodedType, send: vi.fn() }
+      })
+      await fixture.sender.send(request())
+      expect(
+        events
+          .filter(
+            (event) => event.stage === RpcProbeStage.encoded || event.stage === RpcProbeStage.frame
+          )
+          .map((event) => event.sizeBytes)
+      ).toEqual(encodedType === 'string' ? [9, 9] : [-1, -1])
+      fixture.emitter.dispose()
+    }
+  })
+
   it('observes a real authenticated three-chunk receive before the unchanged provider result', async () => {
     /** Consumer snapshots retain both genuine endpoint timelines without changing the pipeline. */
     const callerEvents: IRpcProbeEventView[] = [],

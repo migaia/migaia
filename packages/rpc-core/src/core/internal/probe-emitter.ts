@@ -532,9 +532,19 @@ class ProbeEmitter {
     this.#view.detail = undefined
   }
 }
-/** Reports only sizes already represented by strings or byte values; objects retain unknown size. */
-export function probeSize(value: unknown): number {
-  if (typeof value === 'string') return utf8ByteLength(value)
+/** The cached detector keeps ASCII wire lengths exact without a JavaScript scalar-counting loop. */
+const nonAsciiString = /[\u0080-\uffff]/
+
+/**
+ * Counts physical UTF-8 strings only for string transports. Clone-friendly string values have no
+ * declared UTF-8 wire representation, so their size stays unknown instead of scanning a logical
+ * payload repeatedly. Byte views and backings retain their exact already-available lengths.
+ */
+export function probeSize(value: unknown, physicalUtf8String: boolean): number {
+  if (typeof value === 'string') {
+    if (!physicalUtf8String) return -1
+    return nonAsciiString.test(value) ? utf8ByteLength(value) : value.length
+  }
   if (isArrayBuffer(value) || ArrayBuffer.isView(value)) return value.byteLength
   return -1
 }
