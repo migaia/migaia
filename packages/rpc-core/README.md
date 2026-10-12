@@ -43,7 +43,7 @@ pnpm add @migaia/rpc-core @migaia/rpc-contract
 | `./features/*`、`./stream`             | 供 `./composed` 选择的功能模块                                                       |
 | `./plugins/log`、`./plugins/send-queue`、`./plugins/flow-control` | IPC 日志、发送队列等可选中间件                          |
 | `./transport-kit`、`./transport-constants` | 编写自定义 transport 的工具与常量                                                |
-| `./adapter`                            | 运行时适配器作者用的构造函数与纯入口解析 `resolveAdapterEntry`（见 USEGUIDE 第 9 节） |
+| `./adapter`                            | `defineMessageAdapter`、`defineByteAdapter`：运行时适配器作者的任务级构造函数（见 USEGUIDE 第 9 节） |
 
 ## 快速开始
 
@@ -92,6 +92,12 @@ console.log(await client.send<number>('server', 'add', [20, 22])) // 42
 await client.dispose()
 await server.dispose()
 ```
+
+## 高阶用法：编写适配器
+
+已有消息端口或有序字节流时，用 `defineMessageAdapter` / `defineByteAdapter` 的 `open` 取得真实资源，再调用定义返回的 `peer` 或 `plugin`。通信、握手、治理和关闭沿用原 Core owner。完整可运行的 MessagePort、Host 与字节流例子见 [USEGUIDE 第 9 节](./USEGUIDE.md#9-高阶用法编写一个适配器)。
+
+`./adapter/internal-advanced` 是仓库内原生 Process、Threads 与 Bridge 的低级接入入口；网站用户 API 索引以这两个任务级定义函数为适配器作者的起点。安装包仍保留原生包需要的实际导出。
 
 ## 调用语义速览
 

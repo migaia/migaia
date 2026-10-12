@@ -12,7 +12,7 @@
 6. [载体：内置 transport 与自定义 transport](#6-载体内置-transport-与自定义-transport)
 7. [按需组装：减小打包体积](#7-按需组装减小打包体积)
 8. [容量、并发与重放窗口](#8-容量并发与重放窗口)
-9. [高阶用法：为新运行时编写适配器](#9-高阶用法为新运行时编写适配器)
+9. [高阶用法：编写一个适配器](#9-高阶用法编写一个适配器)
 10. [错误码与处理](#10-错误码与处理)
 11. [二进制、转发与重试](#11-二进制转发与重试)
 12. [常见问题](#12-常见问题)
@@ -414,7 +414,7 @@ try {
 
 **幂等存储**：`createRpcIdempotencyStore({ retentionMs, maxEntries, maxEntriesPerScope, maxBytes, maxOutcomeBytes })` 创建有界的幂等结果存储，用于 `idempotencyKey` 去重与 `outcome` 查询。默认的内存存储在进程重启后会丢失，`outcome` 此时会报告连续性已中断。
 
-## 9. 编写一个适配器
+## 9. 高阶用法：编写一个适配器
 
 `@migaia/rpc-core/adapter` 提供 `defineMessageAdapter({ open, launch? })` 和 `defineByteAdapter({ open, listen?, dial? })`。定义完成后，用 `adapter.peer(options)` 创建独立 Peer，用 `adapter.plugin(options)` 安装到 Host。`open` 返回真实消息端口或有序字节 I/O；Core 继续完成原来的握手、能力协商、方法目录与收发。
 
