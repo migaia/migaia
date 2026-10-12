@@ -1,5 +1,5 @@
 import { normalizePortable } from '@migaia/rpc-contract'
-import { createAdapterConfigurationTypeError } from '@migaia/rpc-core/adapter'
+import { createAdapterConfigurationTypeError } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IThreadSpec } from '@migaia/supervision/threads'
 import { ThreadErrorText } from './error-text.js'
 

@@ -17,7 +17,10 @@ import {
   DEFAULT_UNHANDLED_LIMIT
 } from './constants.js'
 import type { IProcessResilienceOptions, IProcessSessionIdentity } from './types.js'
-import { createRuntimeProviderScope, type IRuntimeProviderScope } from '@migaia/rpc-core/adapter'
+import {
+  createRuntimeProviderScope,
+  type IRuntimeProviderScope
+} from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IRemoteChannel } from '@migaia/rpc-core/remote'
 
 /** One admitted physical connection is released exactly once after transfer or rollback. */

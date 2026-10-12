@@ -1,4 +1,4 @@
-import { createAdapterTransportError } from '@migaia/rpc-core/adapter'
+import { createAdapterTransportError } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IAbortSignal } from '@migaia/lifecycle'
 import { type IRuntimePeerSourceResult } from '@migaia/rpc-core/remote'
 import type { IThreadHandle, IThreadLauncher } from '@migaia/supervision/threads'
@@ -12,16 +12,16 @@ import {
   createEventTargetMessageResource,
   holdAdapterLaunch,
   type IAdapterMessageResource
-} from '@migaia/rpc-core/adapter'
+} from '@migaia/rpc-core/adapter/internal-advanced'
 import { type IRuntimePeerSourceContext } from '@migaia/rpc-core/remote'
 
 import { THREAD_FINGERPRINT_PREFIX, ThreadBootstrap, ThreadEvent } from './constants.js'
 import { absoluteThreadEntry, portableThreadSpec } from './error.js'
-import { readAdapterAbortReason } from '@migaia/rpc-core/adapter'
+import { readAdapterAbortReason } from '@migaia/rpc-core/adapter/internal-advanced'
 
 import { ThreadErrorText } from './error-text.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { IpcReporterContext } from '@migaia/rpc-core/adapter'
+import { IpcReporterContext } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IThreadChannelFactory, IThreadChannelOptions, IThreadWebPort } from './types.js'
 
 /** Web handles expose preparation but never counterfeit an unsupported actual-exit receipt. */

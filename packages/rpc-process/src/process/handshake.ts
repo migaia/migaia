@@ -2,8 +2,8 @@ import {
   createAdapterConfigurationTypeError,
   createRuntimeByteConnection,
   createRuntimeMessageConnection
-} from '@migaia/rpc-core/adapter'
-import type { IRuntimeByteOptions } from '@migaia/rpc-core/adapter'
+} from '@migaia/rpc-core/adapter/internal-advanced'
+import type { IRuntimeByteOptions } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IRemoteChannel, IRuntimePeerSourceResult } from '@migaia/rpc-core/remote'
 import type {
   IProcessByteChannel,

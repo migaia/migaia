@@ -42,6 +42,8 @@ import { RpcCoreErrorText } from '../../core/error-text.js'
 import { readRuntimePreparationContext } from './launch-context.js'
 import { readRuntimeDefaultTimeout, prepareRuntimeCallTimeout } from './timeout.js'
 import type { IRuntimeCallOptions, IRuntimeTypedPeer } from './typing.js'
+import { defaultRpcId } from '../../core/internal/id.js'
+import { createRuntimeEventPublisher, type IRuntimeEventPublisher } from './events.js'
 import { isProviderAdmissionScopeOwner } from '../../core/internal/provider-admission.js'
 import type { IProviderAdmissionScope } from '../../core/features/provider.js'
 import { createAuthenticationNonce } from '../../core/index.js'
@@ -99,6 +101,7 @@ import {
   RUNTIME_API_CAPABILITIES,
   RUNTIME_API_BASE_CAPABILITIES
 } from './constants.js'
+import { RUNTIME_PEER_DEFAULT_NAME } from './constants.js'
 
 export type { IRuntimePeerProvide, IRuntimePeerMethod } from './catalog.js'
 export type { IRuntimePeerIdentity } from './description.js'
@@ -143,7 +146,8 @@ export type IRuntimePeerOptions = Pick<
     defaultTimeoutMs?: number
     /** Explicit advanced schema, modes and idempotency retain their original contract owner. */
     contract?: IRemoteContract
-    report(error: unknown): void
+    /** Omission reports background failures to console.error through the original owner. */
+    report?(error: unknown): void
   }>
 
 /** Accepted routes are compiled once for both the direct Peer and canonical managed dispatch. */
@@ -180,7 +184,11 @@ export type IRuntimePeer = Readonly<{
   ): Promise<readonly IRpcRuntimeStepOutcome[]>
   outcome(idempotencyKey: string): Promise<IRpcRuntimeOutcomeResult>
   describe: IRuntimeQuery<IRuntimeDetail>
+  /** Subscribe from now on; factory resolution already represents initial accepted readiness. */
+  on: IRuntimeEventPublisher['on']
   close(): Promise<void>
+  /** Scoped cleanup is the exact original close operation, including its Promise identity. */
+  [Symbol.asyncDispose](): Promise<void>
 }>
 
 /** Cold connection data comes from the channel's accepted directory, never local describe data. */
@@ -248,6 +256,8 @@ export function prepareRuntimePeerSourceContext(
   canonicalAssembly = true,
   credentials?: IRpcAuthenticationConfig
 ): IRuntimePeerSourceContext {
+  /** Default identity is minted once before source acquisition; explicit identities stay exact. */
+  configured ??= { name: RUNTIME_PEER_DEFAULT_NAME, instanceId: defaultRpcId() }
   if (
     !configured ||
     typeof configured.name !== 'string' ||
@@ -379,10 +389,12 @@ export async function createRuntimePeer(
   const nativeControl = channel.agreement.capabilities.includes(RpcCapability.ping)
   /** The existing stream capability remains an independent AND requirement. */
   const supportsStream = channel.agreement.capabilities.includes(RpcCapability.stream)
+  /** Default diagnostics are selected once without copying the original options. */
+  const reporter = options.report ?? console.error
   /** Reports remain observable even when a user reporter itself throws. */
   const report = (error: unknown): void => {
     try {
-      options.report(error)
+      reporter(error)
     } catch (failure) {
       hostRethrowReporter(failure, IpcReporterContext)
     }
@@ -768,9 +780,28 @@ export async function createRuntimePeer(
     const ready = endpoint
     /** Close retains one Promise identity, including failure and concurrent provider reentry. */
     let closing: Promise<void> | undefined
+    /** This subscriber projection owns no connection or generation facts beyond the actual Peer. */
+    const events = createRuntimeEventPublisher()
+    /** Both explicit and scoped cleanup retain the same original close Promise. */
+    const close = (): Promise<void> =>
+      (closing ??= (async () => {
+        events.close()
+        try {
+          await ready.dispose()
+        } catch (failure) {
+          try {
+            await channel.close?.()
+          } catch (cleanup) {
+            report(cleanup)
+          }
+          throw failure
+        }
+        await channel.close?.()
+      })())
     /** This exact facade is minted only after both directory and endpoint preparation succeed. */
     const peer: IRuntimePeer = Object.freeze({
       self,
+      on: events.on,
       ...createRuntimePeerCalls({
         restrictTransfer,
         callTimeout,
@@ -806,20 +837,8 @@ export async function createRuntimePeer(
           counters
         )
       }),
-      close: () =>
-        (closing ??= (async () => {
-          try {
-            await ready.dispose()
-          } catch (failure) {
-            try {
-              await channel.close?.()
-            } catch (cleanup) {
-              report(cleanup)
-            }
-            throw failure
-          }
-          await channel.close?.()
-        })())
+      close,
+      [Symbol.asyncDispose]: close
     })
     runtimePeerConnections.set(
       peer,
@@ -906,6 +925,8 @@ export async function prepareRuntimePeerEndpoint(
     isCommitted(): boolean
   }>
 ): Promise<IRemoteServeEndpoint> {
+  /** Default diagnostics do not require copying the options that carry Host provenance. */
+  const report = options.report ?? console.error
   if (options.endpointFactory) {
     /** Custom roots retain their original signature and must supply the actual borrowed owner. */
     const endpoint = await options.endpointFactory(channel, signal)
@@ -920,7 +941,7 @@ export async function prepareRuntimePeerEndpoint(
         await endpoint.endpoint.dispose()
       } catch (cleanup) {
         try {
-          options.report(cleanup)
+          report(cleanup)
         } catch (failure) {
           hostRethrowReporter(failure, IpcReporterContext)
         }
@@ -949,7 +970,7 @@ export async function prepareRuntimePeerEndpoint(
         ...(options.authentication ? [authentication(options.authentication)] : []),
         abort(),
         timeout(),
-        hooks({ onHookError: options.report }),
+        hooks({ onHookError: report }),
         ...(nativeControl ? [ping()] : []),
         connect({ transport: channel.transport })
       ],

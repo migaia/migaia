@@ -1,5 +1,5 @@
 import { createRpcError } from '../../core/errors.js'
-import { runtimeUnavailable, runtimeErrorIdentity } from './overview.js'
+import { runtimeReadyEvent, runtimeSupervisorEvent } from './events.js'
 import {
   definePlugin,
   type IDefinedPluginConstraint,
@@ -19,14 +19,7 @@ import {
   type IRuntimeOutlet,
   type IRuntimePluginConnection
 } from './outlet.js'
-import {
-  RuntimeApiErrorText,
-  RuntimePluginKey,
-  RuntimePluginExpose,
-  RuntimeEventName,
-  RuntimeQueryClock,
-  RuntimeQueryReason
-} from './constants.js'
+import { RuntimeApiErrorText, RuntimePluginKey, RuntimePluginExpose } from './constants.js'
 import {
   createRuntimePeer,
   readRuntimePeerConnection,
@@ -585,17 +578,9 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
       /** Initial accepted readiness is published only after its original Host reservation commits. */
       const ready = (prepared: IRuntimePeer, generation?: number): void => {
         if (!slot.registered().includes(record)) return
-        const accepted = readRuntimePeerConnection(prepared)
         events.publish(
-          Object.freeze({
-            type: RuntimeEventName.ready,
-            name,
-            instanceId: accepted.peerId,
-            generation: generation ?? runtimeUnavailable(RuntimeQueryReason.owner),
-            timestamp: accepted.channel.scheduler.now(),
-            clock: RuntimeQueryClock.scheduler
-          }),
-          accepted.report
+          runtimeReadyEvent(name, prepared, generation),
+          readRuntimePeerConnection(prepared).report
         )
       }
       publishReady = ready
@@ -615,35 +600,9 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
         core.onDispose(
           registration.supervisor.subscribe((event) => {
             if (!slot.registered().includes(record)) return
-            if (
-              event.type !== RuntimeEventName.exit &&
-              event.type !== RuntimeEventName.restart &&
-              event.type !== RuntimeEventName.degraded
-            )
-              return
-            events.publish(
-              Object.freeze({
-                type: event.type,
-                name,
-                generation: event.generation,
-                instanceId: registration.runtimeInstanceId(event.generation),
-                timestamp: event.observedAt ?? runtimeUnavailable(RuntimeQueryReason.owner),
-                clock: RuntimeQueryClock.scheduler,
-                ...(event.type === RuntimeEventName.exit
-                  ? {
-                      reason: event.reason,
-                      code: event.status?.code ?? runtimeUnavailable(RuntimeQueryReason.native),
-                      signal: event.status?.signal ?? runtimeUnavailable(RuntimeQueryReason.native),
-                      ...(event.error === undefined
-                        ? {}
-                        : { error: runtimeErrorIdentity(event.error, report) })
-                    }
-                  : event.type === RuntimeEventName.restart
-                    ? { count: event.count }
-                    : { degraded: Object.freeze([...event.degraded]) })
-              }),
-              report
-            )
+            /** The same projector serves standalone Peers without duplicating native event policy. */
+            const observation = runtimeSupervisorEvent(name, registration, event, report)
+            if (observation) events.publish(observation, report)
           })
         )
       /** Accepted remote metadata is read from the genuine Peer, without reflecting local describe. */

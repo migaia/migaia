@@ -29,6 +29,11 @@ import type {
   IAdapterStaticMessageOptions,
   IAdapterInitialMessageResource
 } from './types.js'
+import {
+  collectListenerCleanupFailures,
+  drainListenerFailures
+} from '../../core/internal/listener-safety.js'
+import { RuntimeAdapterErrorText } from '../byte/error-text.js'
 
 /** The original identity/message component pair remains canonical and has no runtime dependency. */
 const messagePipeline = Object.freeze({ codec: identityCodecV1, framer: messageFramerV1 })
@@ -51,6 +56,8 @@ export type IAdapterMessagePreparation = Readonly<{
   activateReceive(): void
   fail(cause?: unknown): void
   close(): void
+  /** Only Core assemblies register actual governor disposers on this existing channel owner. */
+  ownClose(resource?: Readonly<{ close(): void }>): void
 }>
 
 /** The ordinary resource and its exact channel share Core's private preparation identity. */
@@ -58,6 +65,21 @@ export function readAdapterMessagePreparation(
   value: object
 ): IAdapterMessagePreparation | undefined {
   return preparations.get(value)
+}
+
+/** Attach actual policy cleanup to an exact constructed resource/channel without publishing proof. */
+export function ownAdapterMessageClose(
+  value: object,
+  resource?: Readonly<{ close(): void }>
+): void {
+  /** Exact membership prevents copied channel methods from changing another resource's cleanup. */
+  const prepared = preparations.get(value)
+  if (!prepared)
+    throw tagRpcError(
+      new TypeError(RuntimeAdapterErrorText.connectionRequired),
+      RpcCoreErrorCode.invalidConfig
+    )
+  prepared.ownClose(resource)
 }
 
 /** Preserve original native TypeError, error source, field and cause at control admission. */
@@ -119,6 +141,8 @@ class AdapterMessageResource implements IAdapterMessageResource {
   #opening: Promise<IRuntimePeerSourceResult> | undefined
   /** Concurrent resource shutdown preserves the original Promise and cleanup failure. */
   #closing: Promise<void> | undefined
+  /** SDK governors dispose through this channel's original close owner, never through fake exits. */
+  readonly #ownedCleanup: Array<() => void> = []
 
   /**
    * Hold raw I/O; launched resources capture immediately while borrowed EventEmitter ports stay
@@ -185,7 +209,13 @@ class AdapterMessageResource implements IAdapterMessageResource {
         readyBootstrap: this.#bootstrap.promise,
         activateReceive: () => this.#handoff?.activateReceive(),
         fail: (cause?: unknown) => this.#handoff?.fail(cause),
-        close: () => this.#handoff?.close()
+        close: () => this.#handoff?.close(),
+        ownClose: (resource?: Readonly<{ close(): void }>) => {
+          /** A launched unit uses this same owner's existing termination-once guard. */
+          const dispose = resource ? () => resource.close() : () => this.#terminateLaunch()
+          if (this.#closing || this.#channel?.transport.closed) dispose()
+          else this.#ownedCleanup.push(dispose)
+        }
       },
       {
         rawBootstrap: { get: () => this.#rawBootstrap, enumerable: true },
@@ -334,8 +364,10 @@ class AdapterMessageResource implements IAdapterMessageResource {
       ...(deferredReceive && handoff ? { activateReceive: () => handoff.activateReceive() } : {}),
       close: () =>
         (closing ??= Promise.resolve().then(() => {
-          handoff?.close()
-          return transport.close?.()
+          return this.#closeOwned(() => {
+            handoff?.close()
+            return transport.close?.()
+          })
         }))
     })
     /** A real inbound launch binds this channel to the actual observed parent's stable address. */
@@ -457,10 +489,30 @@ class AdapterMessageResource implements IAdapterMessageResource {
     }
   }
 
+  /** Run actual registered policy/launch disposers through the original close boundary. */
+  #closeOwned(closePhysical: () => void | Promise<void>): void | Promise<void> {
+    if (!this.#ownedCleanup.length) return closePhysical()
+    /** All disposers run before physical close; physical failure retains primary position. */
+    const cleanup = collectListenerCleanupFailures(this.#ownedCleanup)
+    this.#ownedCleanup.length = 0
+    try {
+      return Promise.resolve(closePhysical()).then(
+        () => drainListenerFailures(cleanup),
+        (primary) => drainListenerFailures([primary, ...cleanup])
+      )
+    } catch (primary) {
+      drainListenerFailures([primary, ...cleanup])
+    }
+  }
+
   /** Close only this original messaging resource and retain the same cleanup Promise. */
   close(): Promise<void> {
     if (this.#closing) return this.#closing
     this.#alive = false
+    if (this.#ownedCleanup.length)
+      return (this.#closing =
+        this.#channel?.close?.() ??
+        Promise.resolve().then(() => this.#closeOwned(() => this.#handoff?.close())))
     // The original cold handoff cleanup was synchronous and may preserve a native cleanup throw.
     this.#handoff?.close()
     return (this.#closing = Promise.resolve(this.#channel?.close()))

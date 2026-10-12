@@ -1,7 +1,7 @@
 import {
   createRuntimeProviderGovernor,
   type IRuntimeProviderGovernor
-} from '@migaia/rpc-core/adapter'
+} from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IRpcProviderLimits } from '@migaia/rpc-core'
 import type { IRemoteChannel, IRemoteServeEndpoint } from '@migaia/rpc-core/remote'
 import type { IScheduler } from '@migaia/utils/scheduler'

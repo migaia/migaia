@@ -62,6 +62,9 @@ export const RuntimeApiErrorText = {
  */
 export const RuntimePluginKey = Object.freeze({ process: 'process', thread: 'thread' } as const)
 
+/** Direct Core Peers use this display name; it grants no remote identity or execution authority. */
+export const RUNTIME_PEER_DEFAULT_NAME = 'peer'
+
 /** This explicit whitelist entry alone enables the original reserved Host-control operations. */
 export const RuntimePluginExpose = { host: 'host' } as const
 

@@ -1,4 +1,7 @@
-import { resolveAdapterEntry, retainAdapterRuntimeFlags } from '@migaia/rpc-core/adapter'
+import {
+  resolveAdapterEntry,
+  retainAdapterRuntimeFlags
+} from '@migaia/rpc-core/adapter/internal-advanced'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { invalidThreadConfig } from './error.js'

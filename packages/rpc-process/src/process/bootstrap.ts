@@ -1,7 +1,7 @@
 import {
   readRuntimeByteBootstrap,
   createAdapterConfigurationTypeError
-} from '@migaia/rpc-core/adapter'
+} from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IProcessByteChannel } from './types.js'
 import { ProcessChannelDiagnostics } from './diagnostics.js'

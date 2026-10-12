@@ -9,30 +9,31 @@ import type {
 import {
   resolveAdapterEntry,
   retainAdapterRuntimeFlags,
+  readAdapterAbortReason,
   createAdapterSourceConfigurationError,
   createAdapterJsonRpcChannel,
   JSONRPC_ALLOWED_CAPABILITIES
-} from '@migaia/rpc-core/adapter'
-import type { IAdapterPeerPreparation } from '@migaia/rpc-core/adapter'
+} from '@migaia/rpc-core/adapter/internal-advanced'
+import type { IAdapterPeerPreparation } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IRpcHandshakeOffer } from '@migaia/rpc-contract'
 import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IRemoteContract } from '@migaia/rpc-core/remote'
-import { createProcessTransport } from './handshake.js'
-import { createNativeProcessOffer } from './offer.js'
-import { createProcessChannelClosedError } from './error.js'
-import { openProcessObjectChannel } from './object-channel.js'
-import { RpcProcessErrorCode, ERROR_SOURCE } from './error-code.js'
-import { RpcProcessErrorText } from './error-text.js'
-import { ProcessPluginWire } from './plugin/constants.js'
+import { createProcessTransport } from '../handshake.js'
+import { createNativeProcessOffer } from '../offer.js'
+import { createProcessChannelClosedError } from '../error.js'
+import { openProcessObjectChannel } from '../object-channel.js'
+import { RpcProcessErrorCode, ERROR_SOURCE } from '../error-code.js'
+import { RpcProcessErrorText } from '../error-text.js'
+import { ProcessPluginWire } from '../plugin/constants.js'
 import type {
   IProcessPluginEstablish,
   IProcessServeListenerIngress,
   ISpawnProcessPluginDeployment
-} from './plugin/types.js'
-import type { IProcessByteChannel, IListenProcessByteChannel } from './types.js'
-import type { INodeProcessHandle } from './adapters/node-child-process.js'
-import type { IRuntimeProcessPeerOptions, IRuntimeProcessFullPeerOptions } from './runtime-peer.js'
-import { PROCESS_RUNTIME_API_ENV } from './constants.js'
+} from '../plugin/types.js'
+import type { IProcessByteChannel, IListenProcessByteChannel } from '../types.js'
+import type { INodeProcessHandle } from './node-child-process.js'
+import type { IRuntimeProcessPeerOptions, IRuntimeProcessFullPeerOptions } from '../runtime-peer.js'
+import { PROCESS_RUNTIME_API_ENV } from '../constants.js'
 import {
   PROCESS_CONNECT_TIMEOUT_MS,
   PROCESS_CONNECT_RETRY_MS,
@@ -42,7 +43,7 @@ import {
   PROCESS_LOCAL_DIRECTORY_PREFIX,
   PROCESS_LOCAL_PIPE_PREFIX,
   PROCESS_SHORT_CHILD_NAME
-} from './short-source-constants.js'
+} from '../short-source-constants.js'
 
 /** Ordinary launch configuration overrides defaults without granting launch or handshake authority. */
 export type IProcessShortSpawn = Readonly<{
@@ -184,7 +185,7 @@ async function dialWhenReady(
         function abort() {
           timer.cancel()
           signal.removeEventListener('abort', abort)
-          reject(signal.reason)
+          reject(readAdapterAbortReason(signal))
         }
         signal.addEventListener('abort', abort, { once: true })
         if (signal.aborted) abort()
@@ -227,10 +228,10 @@ export async function normalizeProcessSources(
     /** Lazy deep paths continue to own native launch; connect/listen do not acquire launchers. */
     const native =
       runtime === 'deno'
-        ? await import('./adapters/deno-command.js')
+        ? await import('./deno-command.js')
         : runtime === 'bun'
-          ? await import('./adapters/bun-spawn.js')
-          : await import('./adapters/node-child-process.js')
+          ? await import('./bun-spawn.js')
+          : await import('./node-child-process.js')
     /** All three native runtimes expose the same Node-compatible argument projection when needed. */
     const { default: process } = await import('node:process')
     /** Object short forms contain only ordinary user-selected launch defaults. */
@@ -415,10 +416,10 @@ export async function normalizeProcessSources(
     /** Selected native sockets still use the one original authentication/accept implementation. */
     const socket =
       runtime === 'deno'
-        ? await import('./adapters/deno-socket.js')
+        ? await import('./deno-socket.js')
         : runtime === 'bun'
-          ? await import('./adapters/bun-socket.js')
-          : await import('./adapters/node-socket.js')
+          ? await import('./bun-socket.js')
+          : await import('./node-socket.js')
     /** One local proposal uses Core's genuine self and installed capabilities. */
     const offer = createNativeProcessOffer({
       peer: { id: preparation.context.self.instanceId, runtime },

@@ -7,9 +7,9 @@ import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import {
   createEventEmitterMessageResource,
   createEventTargetMessageResource,
-  type IAdapterEventEmitterMessagePort,
-  type IAdapterLaunchHandle
-} from '../../dist/adapter.js'
+  type IAdapterEventEmitterMessagePort
+} from '../../dist/adapter/internal-advanced.js'
+import type { IAdapterLaunchHandle } from '../../dist/runtime-adapter/message/types.js'
 import { readAdapterMessagePreparation } from '../../dist/runtime-adapter/message/resource.js'
 import {
   createMessageReceiveHandoff,

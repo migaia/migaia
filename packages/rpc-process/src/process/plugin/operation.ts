@@ -11,7 +11,10 @@ import { ReplaceStrategy } from '@migaia/supervision'
 import { SUPERVISION_SOURCE, SupervisionErrorCode, SupervisionErrorText } from '@migaia/supervision'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { normalizeRemoteContract } from '@migaia/rpc-core/remote'
-import { createAdapterPlugin as assembleRemotePluginDefinition } from '@migaia/rpc-core/adapter'
+import {
+  createAdapterPlugin as assembleRemotePluginDefinition,
+  assembleAdapterPlugin
+} from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IRemoteEndpointFactory } from '@migaia/rpc-core/remote'
 import {
   createConnectProcessBinding,
@@ -27,11 +30,12 @@ import type {
   IProcessPluginOptions,
   IProcessPluginReplaceResult
 } from './types.js'
-import { createRuntimePlugin, type IRuntimePluginOptions } from '@migaia/rpc-core/remote'
+import type { createRuntimePlugin, IRuntimePluginOptions } from '@migaia/rpc-core/remote'
 import { RuntimePluginKey } from '@migaia/rpc-core/remote'
 import { createAdapterProcessPeer } from '../peer.js'
 import type { IAdapterProcessRuntimeLoader } from '../peer.js'
 import type { IRuntimeProcessPeerOptions } from '../runtime-peer.js'
+import { processByteAdapter } from '../adapter.js'
 
 /** This physical owner alone retains the stable family token for its actual Host slot operation. */
 const processRuntimeSlotFamily = Object.freeze({})
@@ -116,7 +120,8 @@ export function createAdapterProcessPlugin<THandle extends IProcessHandle>(
   runtime: IAdapterProcessRuntimeLoader
 ): IProcessPlugin | ReturnType<typeof createRuntimePlugin> {
   if (!('deployment' in options))
-    return createRuntimePlugin(
+    return assembleAdapterPlugin(
+      processByteAdapter,
       { ...options, report: options.report ?? console.error },
       {
         key: processRuntimeSlotKey,

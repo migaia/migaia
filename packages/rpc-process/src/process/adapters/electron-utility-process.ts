@@ -10,7 +10,7 @@ import {
   type IProcessLauncher
 } from '@migaia/supervision/process'
 import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-core'
-import { IpcReporterContext } from '@migaia/rpc-core/adapter'
+import { IpcReporterContext } from '@migaia/rpc-core/adapter/internal-advanced'
 import { ERROR_SOURCE, RpcProcessErrorCode } from '../error-code.js'
 
 import { RpcProcessErrorText } from '../error-text.js'

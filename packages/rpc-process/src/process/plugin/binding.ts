@@ -1,9 +1,9 @@
 import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
 import { RpcProcessErrorText } from '../error-text.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { readAdapterAbortReason as resolveAbortReason } from '@migaia/rpc-core/adapter'
-import { createAdapterId as defaultRpcId } from '@migaia/rpc-core/adapter'
-import { IpcReporterContext } from '@migaia/rpc-core/adapter'
+import { readAdapterAbortReason as resolveAbortReason } from '@migaia/rpc-core/adapter/internal-advanced'
+import { createAdapterId as defaultRpcId } from '@migaia/rpc-core/adapter/internal-advanced'
+import { IpcReporterContext } from '@migaia/rpc-core/adapter/internal-advanced'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import {
@@ -34,7 +34,7 @@ import {
   DEFAULT_HEALTH_INTERVAL_MS,
   DEFAULT_HEALTH_TIMEOUT_MS
 } from '../resilience/constants.js'
-import { createAdapterBindingDrain as createRemoteBindingDrain } from '@migaia/rpc-core/adapter'
+import { createAdapterBindingDrain as createRemoteBindingDrain } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IProcessRegistrationSupervisorPort } from '../resilience/types.js'
 import type { IProcessByteChannel, IProcessMessageChannel } from '../types.js'
 import {

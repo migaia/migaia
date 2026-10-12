@@ -1,7 +1,7 @@
 import {
   createEventTargetMessageResource,
   type IAdapterMessageResource
-} from '@migaia/rpc-core/adapter'
+} from '@migaia/rpc-core/adapter/internal-advanced'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { threadRuntimeResource } from './runtime-resource.js'
 import type { IThreadWebPort } from './types.js'

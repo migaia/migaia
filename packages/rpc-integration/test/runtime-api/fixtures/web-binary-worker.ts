@@ -1,5 +1,5 @@
 import { readThreadBootstrap } from '@migaia/rpc-threads'
-import { createEventTargetMessageResource } from '@migaia/rpc-core/adapter'
+import { createEventTargetMessageResource } from '@migaia/rpc-core/adapter/internal-advanced'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { createRuntimePeer } from '@migaia/rpc-core/remote'
 import { systemScheduler } from '@migaia/utils/scheduler'

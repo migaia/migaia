@@ -105,6 +105,10 @@
     "./adapter": {
       "types": "./dist/adapter.d.ts",
       "default": "./dist/adapter.js"
+    },
+    "./adapter/internal-advanced": {
+      "types": "./dist/adapter/internal-advanced.d.ts",
+      "default": "./dist/adapter/internal-advanced.js"
     }
   },
   "publishConfig": {
@@ -130,22 +134,22 @@
     "@migaia/supervision": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
-  "peerDependencies": {
-    "@migaia/rpc-contract": "0.0.7"
-  },
-  "peerDependenciesMeta": {},
   "devDependencies": {
+    "@migaia/capability": "workspace:^",
+    "@migaia/middleware-pipeline": "workspace:^",
+    "@migaia/rpc-contract": "workspace:0.0.7",
     "@types/node": "24.13.2",
     "cborg": "6.1.1",
     "elysia": "1.4.30",
     "msgpackr": "2.1.0",
     "protobufjs": "8.8.0",
     "typescript": "~6.0.2",
-    "vitest": "^4.1.10",
-    "@migaia/rpc-contract": "workspace:0.0.7",
-    "@migaia/capability": "workspace:^",
-    "@migaia/middleware-pipeline": "workspace:^"
+    "vitest": "^4.1.10"
   },
+  "peerDependencies": {
+    "@migaia/rpc-contract": "0.0.7"
+  },
+  "peerDependenciesMeta": {},
   "engines": {
     "node": ">=18"
   }

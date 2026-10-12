@@ -191,7 +191,10 @@ export type IRuntimeTypedPeer<
   TRemote = Record<never, never>,
   S = IRuntimeFlatten<TRemote>,
   K = (typeof import('./constants.js').RuntimePluginKey)['thread']
-> = Pick<IRuntimePeerHandle, 'self' | 'describe' | 'close' | 'outcome'> &
+> = Pick<
+  IRuntimePeerHandle,
+  'self' | 'describe' | 'close' | 'outcome' | 'on' | typeof Symbol.asyncDispose
+> &
   Readonly<{
     group<Steps extends readonly IRuntimeGroupStep<S>[]>(
       steps: Steps,

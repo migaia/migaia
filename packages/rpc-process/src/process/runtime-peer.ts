@@ -1,8 +1,7 @@
 import {
   createAdapterSourceConfigurationError,
   validateAdapterPeerTimeout as readRuntimeDefaultTimeout
-} from '@migaia/rpc-core/adapter'
-import type { IAdapterPeerPreparation } from '@migaia/rpc-core/adapter'
+} from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IProcessHandle } from '@migaia/supervision/process'
 import {
   type IRuntimePeerOptions,
@@ -22,7 +21,8 @@ import type {
 import { createNativeProcessOffer } from './offer.js'
 import { createProcessListenerPeer, type IRuntimeProcessListen } from './runtime-listener.js'
 import { ProcessPluginWire } from './plugin/constants.js'
-import type { IProcessShortSpawn, IProcessShortSourceOptions } from './short-source.js'
+import type { IProcessShortSpawn, IProcessShortSourceOptions } from './adapters/short-source.js'
+import type { IProcessAdapterTask } from './adapter.js'
 
 /**
  * Public deployed sources reuse the original native spawn and borrowed socket-session
@@ -30,9 +30,10 @@ import type { IProcessShortSpawn, IProcessShortSourceOptions } from './short-sou
  */
 export type IRuntimeProcessFullPeerOptions<THandle extends IProcessHandle = IProcessHandle> = Omit<
   IRuntimePeerOptions,
-  'spawn' | 'connect' | 'listen'
+  'spawn' | 'connect' | 'listen' | 'report'
 > &
   Readonly<{
+    report(error: unknown): void
     spawn?: IRuntimePeerSource | ISpawnProcessPluginDeployment<THandle>
     connect?: IRuntimePeerSource | IConnectProcessPluginDeployment
     listen?: IRuntimePeerSource | IRuntimeProcessListen
@@ -61,9 +62,11 @@ export type IRuntimeProcessPeerOptions<THandle extends IProcessHandle = IProcess
 export function createProcessSourcePeer<THandle extends IProcessHandle>(
   options: IRuntimeProcessFullPeerOptions<THandle>,
   runtime: string,
-  preparation: IAdapterPeerPreparation
+  task: IProcessAdapterTask
 ): Promise<IRuntimePeer> {
   readRuntimeDefaultTimeout(options)
+  /** All source branches retain the SDK task's original Core context and preparation identity. */
+  const preparation = task.preparation
   /** Multiple or unsupported source specifications fail before any original launcher or dial starts. */
   const sources = [options.spawn, options.connect, options.listen].filter(
     (source) => source !== undefined
@@ -110,14 +113,14 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
         report: options.report
       },
       listen,
-      preparation
+      task
     )
   /** Distinct unit/spec domains retain their native types while sharing one generation assembly. */
   const managed = <TUnit extends object, TSpec>(
     binding: IProcessPluginBinding<TUnit, TSpec>,
-    execution: Parameters<IAdapterPeerPreparation['managed']>[2]
+    execution: Parameters<IProcessAdapterTask['managed']>[2]
   ) =>
-    preparation.managed(
+    task.managed(
       {
         self,
         provide: options.provide,

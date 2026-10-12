@@ -1,4 +1,4 @@
-import type { IRuntimeConnectionOptions } from '@migaia/rpc-core/adapter'
+import type { IRuntimeConnectionOptions } from '@migaia/rpc-core/adapter/internal-advanced'
 import { RpcPlatform } from '@migaia/rpc-core/transport-constants'
 import { RpcProcessErrorText } from './error-text.js'
 import type { IProcessCommonOptions } from './types.js'

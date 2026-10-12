@@ -1,4 +1,4 @@
-import type { IRuntimeByteDiagnostics } from '@migaia/rpc-core/adapter'
+import type { IRuntimeByteDiagnostics } from '@migaia/rpc-core/adapter/internal-advanced'
 import { ERROR_SOURCE, RpcProcessErrorCode } from './error-code.js'
 import { RpcProcessErrorText } from './error-text.js'
 

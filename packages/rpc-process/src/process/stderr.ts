@@ -2,14 +2,14 @@ import { hostRethrowReporter } from '@migaia/utils/promise'
 import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
 import type { IIpcLogInstallation } from '@migaia/rpc-core/plugins/flow-control'
 import { IpcLogEventName } from '@migaia/rpc-core/plugins/flow-control'
-import { IpcReporterContext } from '@migaia/rpc-core/adapter'
+import { IpcReporterContext } from '@migaia/rpc-core/adapter/internal-advanced'
 import {
   CHILD_STDERR_REDACTED,
   PROCESS_STDERR_EVENT_BUDGET,
   PROCESS_STDERR_INTERVAL_MS
 } from './constants.js'
 import type { IProcessCommonOptions } from './types.js'
-import type { IRuntimeByteConnection } from '@migaia/rpc-core/adapter'
+import type { IRuntimeByteConnection } from '@migaia/rpc-core/adapter/internal-advanced'
 
 /** Project the existing reader into a bounded session log without retaining or delaying bytes. */
 export function attachIpcStderr(

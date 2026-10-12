@@ -2,7 +2,7 @@ import { MessageChannel } from 'node:worker_threads'
 import { describe, expect, it } from 'vitest'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
-import { createEventEmitterMessageResource } from '@migaia/rpc-core/adapter'
+import { createEventEmitterMessageResource } from '@migaia/rpc-core/adapter/internal-advanced'
 import { systemScheduler } from '@migaia/utils/scheduler'
 
 /** Both local proposals travel through the actual two native message ports. */

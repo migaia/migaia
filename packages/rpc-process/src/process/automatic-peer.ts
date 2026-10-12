@@ -1,20 +1,18 @@
 import {
   createAdapterSourceConfigurationError,
-  prepareAdapterPeer,
   validateAdapterPeerTimeout,
   validateAdapterPeerMethods,
   IpcReporterContext
-} from '@migaia/rpc-core/adapter'
+} from '@migaia/rpc-core/adapter/internal-advanced'
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import type { IAdapterPeerPreparation } from '@migaia/rpc-core/adapter'
 import type { IRuntimePeer, IRuntimePeerOptions } from '@migaia/rpc-core/remote'
-import { RuntimePluginKey } from '@migaia/rpc-core/remote'
 import { RpcPlatform } from '@migaia/rpc-core/transport-constants'
 import { PROCESS_RUNTIME_API_ENV_VERSION } from './constants.js'
 import { invalidProcessRuntimeBootstrap } from './runtime-bootstrap.js'
 import { ProcessChannelDiagnostics } from './diagnostics.js'
 import { RpcProcessErrorText } from './error-text.js'
 import type { IProcessByteChannel } from './types.js'
+import { captureProcessTask, type IProcessAdapterTask } from './adapter.js'
 
 /** A process owns one automatic stdio pair; failure never permits another physical reader. */
 let claimed = false
@@ -27,12 +25,15 @@ export async function createAutomaticProcessPeer(
     runtime: string
     open(): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array }>>
   }>,
-  prepared?: IAdapterPeerPreparation
+  prepared?: IProcessAdapterTask
 ): Promise<IRuntimePeer> {
+  /** Cleanup uses the same observable default as the public Peer, without rebuilding provenance. */
+  const report = options.report ?? console.error
   if (prepared) validateAdapterPeerTimeout(options)
   /** The same genuine preparation view preserves the original Host and transfer policy. */
-  const preparation =
-    prepared ?? prepareAdapterPeer(options, RuntimePluginKey.process).withoutTransfer()
+  const task = prepared ?? captureProcessTask(options)
+  /** Only this held task retains the original preparation across native I/O acquisition. */
+  const preparation = task.preparation
   if (platform.marker === undefined) return preparation.peer(options)
   if (platform.marker !== PROCESS_RUNTIME_API_ENV_VERSION || claimed)
     invalidProcessRuntimeBootstrap()
@@ -44,7 +45,7 @@ export async function createAutomaticProcessPeer(
   const opened = await platform.open()
   try {
     if (!opened.bootstrap) invalidProcessRuntimeBootstrap()
-    return preparation.bytePeer(options, opened.channel, {
+    return task.bytePeer(options, opened.channel, {
       runtime: platform.runtime,
       platform: RpcPlatform.process,
       diagnostics: ProcessChannelDiagnostics,
@@ -56,7 +57,7 @@ export async function createAutomaticProcessPeer(
       await opened.channel.close()
     } catch (cleanup) {
       try {
-        options.report(cleanup)
+        report(cleanup)
       } catch (failure) {
         hostRethrowReporter(failure, IpcReporterContext)
       }

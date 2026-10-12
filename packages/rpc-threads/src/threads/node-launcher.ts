@@ -8,10 +8,10 @@ import {
   createEventEmitterMessageResource,
   holdAdapterLaunch,
   type IAdapterMessageResource
-} from '@migaia/rpc-core/adapter'
+} from '@migaia/rpc-core/adapter/internal-advanced'
 import { ThreadLimit } from '@migaia/supervision/threads'
 import type { INodeMessagePortLike } from '@migaia/rpc-core/adapters/message-port'
-import { readAdapterAbortReason } from '@migaia/rpc-core/adapter'
+import { readAdapterAbortReason } from '@migaia/rpc-core/adapter/internal-advanced'
 import { openThreadMessageResource, constructNodeThreadChannel } from './channel.js'
 import { createThreadRuntimeBootstrap, intersectThreadCapabilities } from './bootstrap.js'
 import type { IRuntimePeerSourceContext } from '@migaia/rpc-core/remote'
@@ -142,15 +142,17 @@ export function createAdapterNodeThreadLauncher(
       /** Concurrent supervisor teardown requests terminate at most once. */
       let terminating = false
       /** Launcher provenance belongs to this exact borrowed surface, independent of public shape. */
-      const native: import('@migaia/rpc-core/adapter').IAdapterEventEmitterMessagePort = {
-        postMessage: (message, transfer) =>
-          worker.postMessage(message, transfer as Parameters<typeof worker.postMessage>[1]),
-        on: (event, listener) => worker.on(event === 'close' ? ThreadEvent.exit : event, listener),
-        off: (event, listener) =>
-          worker.off(event === 'close' ? ThreadEvent.exit : event, listener),
-        once: (_event: 'close', listener: () => void) => worker.once(ThreadEvent.exit, listener),
-        listenerCount: (_event: 'message') => worker.listenerCount(ThreadEvent.message)
-      }
+      const native: import('@migaia/rpc-core/adapter/internal-advanced').IAdapterEventEmitterMessagePort =
+        {
+          postMessage: (message, transfer) =>
+            worker.postMessage(message, transfer as Parameters<typeof worker.postMessage>[1]),
+          on: (event, listener) =>
+            worker.on(event === 'close' ? ThreadEvent.exit : event, listener),
+          off: (event, listener) =>
+            worker.off(event === 'close' ? ThreadEvent.exit : event, listener),
+          once: (_event: 'close', listener: () => void) => worker.once(ThreadEvent.exit, listener),
+          listenerCount: (_event: 'message') => worker.listenerCount(ThreadEvent.message)
+        }
       /** The message resource borrows the launcher's actual completion and original raw input. */
       let resource: IAdapterMessageResource | undefined
       /** Concurrent supervisor requests terminate this actual Worker at most once. */

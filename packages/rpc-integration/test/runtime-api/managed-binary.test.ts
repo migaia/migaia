@@ -4,7 +4,10 @@ import { createHmac } from 'node:crypto'
 import { it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createAdapterBindingDrain, createAdapterId } from '@migaia/rpc-core/adapter'
+import {
+  createAdapterBindingDrain,
+  createAdapterId
+} from '@migaia/rpc-core/adapter/internal-advanced'
 import {
   createThreadSupervisor,
   type IThreadHandle,

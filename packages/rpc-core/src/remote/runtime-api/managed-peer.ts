@@ -19,6 +19,7 @@ import { observeRemoteGenerations } from '../internal/assemble-plugin.js'
 import { readRuntimeDefaultTimeout, prepareRuntimeCallTimeout } from './timeout.js'
 import { RpcRuntimeGenerationKind } from '@migaia/rpc-contract/framing/v1'
 import { compileRuntimeMethods } from './catalog.js'
+import { createRuntimeEventPublisher, runtimeReadyEvent, runtimeSupervisorEvent } from './events.js'
 import {
   createRuntimePeer,
   prepareRuntimePeerSourceContext,
@@ -76,6 +77,8 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   beforeRelease?: () => Promise<void>,
   execution?: import('@migaia/supervision').ISupervisor<unknown, unknown>
 ): Promise<IRuntimePeer> {
+  /** All managed diagnostics share one default without copying the genuine options object. */
+  const report = options.report ?? console.error
   /** This private native restriction never grants execution, channel or Host authority. */
   const restrictTransfer = preparation?.restrictTransfer
   /** The original registration receives a logical deadline before applying its launcher cap. */
@@ -91,7 +94,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   const registration = createRemoteRuntimeRegistration({
     binding,
     execution,
-    report: options.report,
+    report: report,
     keyFactory: options.keyFactory,
     retryPort: options.retryPort,
     callDeadlineCapMs: options.callDeadlineCapMs,
@@ -108,7 +111,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
           endpointFactory: options.endpointFactory
             ? (_borrowedChannel, signal) => options.endpointFactory!(channel, signal)
             : undefined,
-          report: options.report
+          report: report
         },
         {
           channel: Object.fromEntries(
@@ -135,7 +138,22 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
     }
   })
   /** Every startup/rebind disposer joins the original holder's exact generation resource group. */
-  const holder = createRemoteGenerationHolder(registration, options.report, true)
+  const holder = createRemoteGenerationHolder(registration, report, true)
+  /**
+   * Passive subscribers reuse actual registration and native observations, without another
+   * lifecycle.
+   */
+  const events = createRuntimeEventPublisher()
+  /** Initial readiness occurs before factory resolution; only later genuine readiness is observable. */
+  const stopReady = registration.onReady((prepared, generation) => {
+    events.publish(runtimeReadyEvent(context.self.name, prepared, generation), report)
+  })
+  /** Native exit, restart and degradation keep exactly the original supervisor's classification. */
+  const stopNative = registration.supervisor.subscribe((event) => {
+    /** One shared projection retains the same classification used by the committed Host outlet. */
+    const observation = runtimeSupervisorEvent(context.self.name, registration, event, report)
+    if (observation) events.publish(observation, report)
+  })
   /** A standalone Peer uses the original lifecycle signal domain without Host mutation metadata. */
   const signal: IAbortSignal = preparation?.initialSignal ?? createAbortController().signal
   /** The original observer is canceled before the canonical holder releases its generation. */
@@ -143,6 +161,9 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   /** Early ownership covers acquired native execution while channel or endpoint preparation waits. */
   const close = (): Promise<void> => {
     stopObserving?.()
+    stopReady()
+    stopNative()
+    events.close()
     return holder.release()
   }
   try {
@@ -152,14 +173,17 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
       holder,
       binding,
       preparation?.lifecycleSignal ?? signal,
-      options.report
+      report
     )
   } catch (primary) {
+    stopReady()
+    stopNative()
+    events.close()
     try {
       await holder.release()
     } catch (cleanup) {
       try {
-        options.report(cleanup)
+        report(cleanup)
       } catch (reporterError) {
         hostRethrowReporter(reporterError, IpcReporterContext)
       }
@@ -171,6 +195,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   /** Calls preserve the original current-generation operation Promise and stream iterator. */
   const peer: IRuntimePeer = Object.freeze({
     self: context.self,
+    on: events.on,
     ...createManagedRuntimeCalls({
       restrictTransfer,
       callTimeout,
@@ -179,7 +204,8 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
       registration
     }),
     describe: runtimeQuery(() => registration.inspectRuntime()),
-    close
+    close,
+    [Symbol.asyncDispose]: close
   })
   managedRegistrations.set(peer, holder)
   retainRuntimePeerConnection(peer, () => registration.currentPeer())

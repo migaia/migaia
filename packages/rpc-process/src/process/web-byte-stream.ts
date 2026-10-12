@@ -94,7 +94,7 @@ export function webByteStream(
   })
 }
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { IpcReporterContext } from '@migaia/rpc-core/adapter'
+import { IpcReporterContext } from '@migaia/rpc-core/adapter/internal-advanced'
 
 /** The moved public Web Streams operation retains the original owned byte pump and close scope. */
 export function createAdapterWebByteIO(

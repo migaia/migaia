@@ -1,4 +1,7 @@
-import type { IAdapterListenerPreparation, IAdapterListenerSession } from '@migaia/rpc-core/adapter'
+import type {
+  IAdapterListenerPreparation,
+  IAdapterListenerSession
+} from '@migaia/rpc-core/adapter/internal-advanced'
 import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
 import { createParentLossGuard } from '@migaia/supervision/process'
 import { attachErrorIdentity } from '@migaia/utils/error'
@@ -11,8 +14,8 @@ import type { IRuntimePeerSourceResult } from '@migaia/rpc-core/remote'
 import { normalizeRemoteContract } from '@migaia/rpc-core/remote'
 import type { IRemoteChannel, IRemoteServeEndpoint } from '@migaia/rpc-core/remote'
 import type { IProcessByteChannel, IProcessByteListener, IProcessMessageChannel } from '../types.js'
-import { createAdapterId as defaultRpcId } from '@migaia/rpc-core/adapter'
-import { createAdapterBindingDrain as createRemoteBindingDrain } from '@migaia/rpc-core/adapter'
+import { createAdapterId as defaultRpcId } from '@migaia/rpc-core/adapter/internal-advanced'
+import { createAdapterBindingDrain as createRemoteBindingDrain } from '@migaia/rpc-core/adapter/internal-advanced'
 import {
   createProcessSessionManager,
   type IProcessConnectionLease,
@@ -26,7 +29,7 @@ import { RpcCapability } from '@migaia/rpc-contract'
 import type { IProcessServeListenerIngress, IProcessServeEndpointFactory } from './types.js'
 import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IRpcProviderLimits } from '@migaia/rpc-core'
-import { readAdapterAbortReason as resolveAbortReason } from '@migaia/rpc-core/adapter'
+import { readAdapterAbortReason as resolveAbortReason } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IProcessSessionIdentity } from '../resilience/types.js'
 import { invalidOption, reportSafely } from './binding.js'
 import { ProcessPluginChannelKind } from './constants.js'

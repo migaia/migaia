@@ -1,4 +1,4 @@
-import { createAdapterJsonRpcChannel } from '@migaia/rpc-core/adapter'
+import { createAdapterJsonRpcChannel } from '@migaia/rpc-core/adapter/internal-advanced'
 import { createProcessChannelClosedError, openProcessObjectChannel } from '@migaia/rpc-process'
 import type { IRemoteChannel } from '@migaia/rpc-core/remote'
 import type { IJsonRpcBridgeOptions } from './handshake.js'

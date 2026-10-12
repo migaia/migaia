@@ -467,7 +467,7 @@ try { console.log(channel.peerId) } finally { await channel.close() }
 | `createAdapterWebByteIO(...)`                         | 包根                            | 把 Web Streams 包装成字节通道                          |
 | `createAdapterProcessLaunch`、`createAdapterProcessPeer`、`createAdapterProcessPlugin` | 包根 | 为自定义运行时组装 launch、Peer 与 Plugin |
 
-这些函数只接收你实际持有的 I/O 资源。握手、能力协商和信任判断都由 `@migaia/rpc-core/adapter` 内部完成，不接受"已认证 / 已协商"之类的外部声明。
+新适配器使用 `@migaia/rpc-core/adapter` 的 `defineByteAdapter` 或 `defineMessageAdapter`，让 Core 从真实 I/O 组装 Peer 与 Plugin；完整示例见 [Core 的“编写一个适配器”](../rpc-core/USEGUIDE.md)。上表的原生资源构造继续适用于自定义运行时，复杂 launch、session 与诊断组合使用 `@migaia/rpc-core/adapter/internal-advanced`。这些操作只读取实际持有的资源，不接受“已认证 / 已协商”的声明。
 
 ## 11. 常见问题
 

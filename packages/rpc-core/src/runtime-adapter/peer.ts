@@ -271,6 +271,8 @@ class AdapterPeerPreparation {
     resource: IAdapterMessageResource,
     context: IRuntimePreparationContext | undefined
   ) {
+    /** Automatic resource cleanup shares the public default without cloning original options. */
+    const report = options.report ?? console.error
     /** Only the exact Core resource can transfer cold capture and actual launch metadata. */
     const preparation = readAdapterMessagePreparation(resource)
     if (!preparation)
@@ -330,7 +332,7 @@ class AdapterPeerPreparation {
         preparation.close()
       } catch (cleanup) {
         try {
-          options.report(cleanup)
+          report(cleanup)
         } catch (failure) {
           hostRethrowReporter(failure, IpcReporterContext)
         }

@@ -1,7 +1,7 @@
 import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
 import { RpcProcessErrorText } from '../error-text.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { readAdapterAbortReason as resolveAbortReason } from '@migaia/rpc-core/adapter'
+import { readAdapterAbortReason as resolveAbortReason } from '@migaia/rpc-core/adapter/internal-advanced'
 import { RpcCapability } from '@migaia/rpc-contract'
 import type { IRemoteChannel, IRemoteServeEndpoint } from '@migaia/rpc-core/remote'
 import {
@@ -13,7 +13,7 @@ import {
   type IProcessConnectionUnit,
   type IProcessPluginBinding
 } from '../plugin/binding.js'
-import { createAdapterBindingDrain as createRemoteBindingDrain } from '@migaia/rpc-core/adapter'
+import { createAdapterBindingDrain as createRemoteBindingDrain } from '@migaia/rpc-core/adapter/internal-advanced'
 import {
   DEFAULT_HEALTH_FAILURE_THRESHOLD,
   DEFAULT_HEALTH_INTERVAL_MS,

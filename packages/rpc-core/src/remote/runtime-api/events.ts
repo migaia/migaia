@@ -5,8 +5,74 @@ import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import { RpcCoreErrorCode } from '../../core/index.js'
 import { createRemoteLayerError } from '../error.js'
 import { RpcRemoteLayerErrorCode } from '../error-code.js'
-import { RuntimeEventName, RuntimeQueryLimit, RuntimeApiErrorText } from './constants.js'
-import type { IRuntimeUnavailable } from './overview.js'
+import {
+  RuntimeEventName,
+  RuntimeQueryLimit,
+  RuntimeApiErrorText,
+  RuntimeQueryClock,
+  RuntimeQueryReason
+} from './constants.js'
+import { runtimeUnavailable, runtimeErrorIdentity, type IRuntimeUnavailable } from './overview.js'
+import { readRuntimePeerConnection, type IRuntimePeer } from './peer.js'
+import type { IRemoteRuntimeRegistration } from '../proxy.js'
+
+/** Event shape comes from the original supervisor, without another native-state definition. */
+type IRuntimeSupervisorEvent = Parameters<
+  Parameters<IRemoteRuntimeRegistration['supervisor']['subscribe']>[0]
+>[0]
+
+/** Project genuine accepted readiness for standalone Peers and committed Host publication alike. */
+export function runtimeReadyEvent(
+  name: string,
+  peer: IRuntimePeer,
+  generation?: number
+): IRuntimeEvent {
+  /** The private connection reader admits only the original constructed Peer. */
+  const accepted = readRuntimePeerConnection(peer)
+  return Object.freeze({
+    type: RuntimeEventName.ready,
+    name,
+    instanceId: accepted.peerId,
+    generation: generation ?? runtimeUnavailable(RuntimeQueryReason.owner),
+    timestamp: accepted.channel.scheduler.now(),
+    clock: RuntimeQueryClock.scheduler
+  })
+}
+
+/** Project actual native observations through one canonical event mapping, never local error codes. */
+export function runtimeSupervisorEvent(
+  name: string,
+  registration: IRemoteRuntimeRegistration,
+  event: IRuntimeSupervisorEvent,
+  report: (error: unknown) => void
+): IRuntimeEvent | undefined {
+  if (
+    event.type !== RuntimeEventName.exit &&
+    event.type !== RuntimeEventName.restart &&
+    event.type !== RuntimeEventName.degraded
+  )
+    return undefined
+  return Object.freeze({
+    type: event.type,
+    name,
+    generation: event.generation,
+    instanceId: registration.runtimeInstanceId(event.generation),
+    timestamp: event.observedAt ?? runtimeUnavailable(RuntimeQueryReason.owner),
+    clock: RuntimeQueryClock.scheduler,
+    ...(event.type === RuntimeEventName.exit
+      ? {
+          reason: event.reason,
+          code: event.status?.code ?? runtimeUnavailable(RuntimeQueryReason.native),
+          signal: event.status?.signal ?? runtimeUnavailable(RuntimeQueryReason.native),
+          ...(event.error === undefined ? {} : { error: runtimeErrorIdentity(event.error, report) })
+        }
+      : event.type === RuntimeEventName.restart
+        ? { count: event.count }
+        : {
+            degraded: Object.freeze([...event.degraded])
+          })
+  })
+}
 
 /** Lifecycle facts contain only the original identity, time and explicitly safe native fields. */
 export type IRuntimeEvent = Readonly<{

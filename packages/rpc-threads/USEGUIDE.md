@@ -430,7 +430,7 @@ export async function openWorkerChannel(
 }
 ```
 
-握手、能力确认和信任判断都在 `@migaia/rpc-core/adapter` 内部完成；这些构造函数只接收你实际持有的 Worker 与端口，不接受"已协商 / 已信任"之类的外部声明。
+新消息适配器使用 `@migaia/rpc-core/adapter` 的 `defineMessageAdapter`，完整示例见 [Core 的“编写一个适配器”](../rpc-core/USEGUIDE.md)。本包也通过该 SDK 从实际端口组装 Peer 与 Plugin。上面的原生构造保留 Worker、启动 bootstrap 和原能力 ACK 的所有权；复杂原生组合使用 `@migaia/rpc-core/adapter/internal-advanced`，不接受“已协商 / 已信任”的声明。
 
 ## 9. 常见问题
 

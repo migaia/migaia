@@ -25,6 +25,12 @@ export const RPC_RESOURCE_POINTS = {
     'contract/framing/jsonrpc.ts': ['encodeJsonRpcFrame', 'createJsonRpcFrameDecoder']
   },
   '@migaia/rpc-core': {
+    'runtime-adapter/definition.ts': [
+      'defineAdapter',
+      'defineMessageAdapter',
+      'defineByteAdapter',
+      'captureAdapterTask'
+    ],
     'runtime-adapter/message/resource.ts': [
       'AdapterMessageResource',
       'createEventEmitterMessageResource',

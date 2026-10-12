@@ -2,7 +2,7 @@ import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { IpcReporterContext } from '@migaia/rpc-core/adapter'
+import { IpcReporterContext } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IRemoteCallGuard } from '@migaia/rpc-core/remote'
 import { ERROR_SOURCE, RpcProcessErrorCode } from '../error-code.js'
 

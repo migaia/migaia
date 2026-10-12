@@ -178,11 +178,7 @@ export const spawn = {
 
 ```ts doc-test=run group=thread-signed-transfer file=readme-main.ts entry=readme-main.ts
 // main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。
-import { fileURLToPath } from 'node:url'
 import { createThreadPeer } from '@migaia/rpc-threads'
-import { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'
-import { createUnitBudget } from '@migaia/supervision'
-import { systemScheduler } from '@migaia/utils/scheduler'
 import { randomBytes } from 'node:crypto'
 
 /** 本地示例生成演示密钥；部署时应由双方配置提供 RPC_SIGNING_KEY。 */
@@ -193,19 +189,11 @@ const { authentication } = await import('./signing.js')
 type IBytesApi = {
   bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }
 }
-/** 后台诊断由应用接收，签名凭据不进入日志。 */
-const report = (error: unknown) => console.error(error)
-/** 标准 Node source 持有 Worker 和一个单位的预算。 */
-const spawn = {
-  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)) },
-  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),
-  scheduler: systemScheduler,
-  launcher: createNodeThreadLauncher(),
-  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
-  report
-}
-/** 普通 factory 使用双方配置的签名资源，无需自定义 Endpoint。 */
-const worker = await createThreadPeer<IBytesApi>({ spawn, authentication, report })
+/** 短 source 保留同一签名与原生 transfer owner，无需重复 Worker wiring。 */
+const worker = await createThreadPeer<IBytesApi>({
+  spawn: new URL('./worker.js', import.meta.url),
+  authentication
+})
 try {
   const buffer = new Uint8Array([7, 8, 9]).buffer
   console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))
