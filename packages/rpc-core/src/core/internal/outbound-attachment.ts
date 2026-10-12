@@ -605,6 +605,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   readonly #runtimeNow = (): number => this.kernel.time.scheduler.now()
   /** Construction captures the endpoint's sole emitter; receive/send never look up a port. */
   readonly #probe: IProbeEmitter | undefined
+  /** Clone-friendly strings have unknown physical size; only string transports imply UTF-8 bytes. */
+  readonly #probeUtf8String: boolean
   /** Id allocation still checks the original replay owner synchronously. */
   readonly #runtimeReserved = (id: string): boolean => this.#replay.hasReservedId(id)
   /** Existing error serializer reporting remains endpoint-owned and receiver-free. */
@@ -713,6 +715,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   ) {
     this.kernel = kernel
     this.#probe = kernel.probe
+    this.#probeUtf8String = kernel.encodedType === 'string'
     this.variations = new RpcVariationCoordinator(
       () => kernel.time.now(),
       () => kernel.time.scheduler.now()
@@ -979,7 +982,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
               this.#probe.protected(
                 RpcProbeDirection.inbound,
                 '',
-                probeSize(frame),
+                probeSize(frame, this.#probeUtf8String),
                 -1,
                 -1,
                 (this.#probe.captureMask & (1 << RpcProbeStage.protected)) !== 0 ? frame : undefined
@@ -1116,7 +1119,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                 this.#probe.encoded(
                   RpcProbeDirection.inbound,
                   restoredBinary.id,
-                  probeSize(frame),
+                  probeSize(frame, this.#probeUtf8String),
                   (this.#probe.captureMask & (1 << RpcProbeStage.encoded)) !== 0
                     ? frame
                     : undefined,
@@ -1145,7 +1148,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                 this.#probe.frame(
                   RpcProbeDirection.inbound,
                   preparedFrame.messageId,
-                  probeSize(preparedFrame.frame),
+                  probeSize(preparedFrame.frame, this.#probeUtf8String),
                   typeof fragment?.index === 'number' ? fragment.index : -1,
                   typeof fragment?.count === 'number' ? fragment.count : -1,
                   (this.#probe.captureMask & (1 << RpcProbeStage.frame)) !== 0
@@ -1169,7 +1172,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                 this.#probe.encoded(
                   RpcProbeDirection.inbound,
                   preparedFrame.messageId,
-                  probeSize(accepted.value),
+                  probeSize(accepted.value, this.#probeUtf8String),
                   (this.#probe.captureMask & (1 << RpcProbeStage.encoded)) !== 0
                     ? accepted.value
                     : undefined
@@ -1186,7 +1189,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
               this.#probe.encoded(
                 RpcProbeDirection.inbound,
                 '',
-                probeSize(frame),
+                probeSize(frame, this.#probeUtf8String),
                 (this.#probe.captureMask & (1 << RpcProbeStage.encoded)) !== 0 ? frame : undefined
               )
             if (carrier)

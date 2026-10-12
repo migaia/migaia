@@ -200,6 +200,8 @@ export class RpcOutboundSender {
   readonly #probe: IProbeEmitter | undefined
   /** Captures the validated transport payload discriminant for every outbound frame. */
   readonly #transportEncodedType: IRpcTransport['encodedType']
+  /** Only an actual string transport gives probe strings a physical UTF-8 byte representation. */
+  readonly #probeUtf8String: boolean
   /** Captures the kernel lifecycle once so every asynchronous send phase shares one generation. */
   readonly #lifecycle: IRpcOutboundLifecycle | undefined
   /** Optional whole-envelope admission keeps plugin capacity outside the core codec pipeline. */
@@ -262,6 +264,7 @@ export class RpcOutboundSender {
     this.authentication = authentication
     this.#probe = probe
     this.#transportEncodedType = transport.encodedType
+    this.#probeUtf8String = this.#transportEncodedType === 'string'
     this.#gate = gate
     this.#reportConfiguration = reportConfiguration
     this.#fast = fast && authentication === undefined
@@ -557,7 +560,7 @@ export class RpcOutboundSender {
       p.encoded(
         RpcProbeDirection.outbound,
         envelope.id,
-        probeSize(encoded),
+        probeSize(encoded, this.#probeUtf8String),
         (p.captureMask & (1 << RpcProbeStage.encoded)) !== 0
           ? this.#probeContent(encoded, transfer)
           : undefined,
@@ -596,7 +599,7 @@ export class RpcOutboundSender {
       p.frame(
         RpcProbeDirection.outbound,
         envelope.id,
-        probeSize(frames[0]),
+        probeSize(frames[0], this.#probeUtf8String),
         -1,
         -1,
         (p.captureMask & (1 << RpcProbeStage.frame)) !== 0
@@ -918,7 +921,7 @@ export class RpcOutboundSender {
         p.encoded(
           RpcProbeDirection.outbound,
           entries[0]!.message.id,
-          probeSize(encoded),
+          probeSize(encoded, this.#probeUtf8String),
           (p.captureMask & (1 << RpcProbeStage.encoded)) !== 0
             ? this.#probeContent(encoded, entries[0]!.transfer)
             : undefined,
@@ -936,7 +939,7 @@ export class RpcOutboundSender {
         p.frame(
           RpcProbeDirection.outbound,
           entries[0]!.message.id,
-          probeSize(value),
+          probeSize(value, this.#probeUtf8String),
           -1,
           -1,
           (p.captureMask & (1 << RpcProbeStage.frame)) !== 0
@@ -1115,7 +1118,7 @@ export class RpcOutboundSender {
       p.encoded(
         RpcProbeDirection.outbound,
         message.id,
-        probeSize(encoded),
+        probeSize(encoded, this.#probeUtf8String),
         (p.captureMask & (1 << RpcProbeStage.encoded)) !== 0
           ? this.#probeContent(encoded, transfer)
           : undefined,
@@ -1180,7 +1183,7 @@ export class RpcOutboundSender {
       p.encoded(
         RpcProbeDirection.outbound,
         message.id,
-        probeSize(encoded),
+        probeSize(encoded, this.#probeUtf8String),
         (p.captureMask & (1 << RpcProbeStage.encoded)) !== 0
           ? this.#probeContent(encoded, transfer)
           : undefined,
@@ -1225,7 +1228,7 @@ export class RpcOutboundSender {
           p.frame(
             RpcProbeDirection.outbound,
             message.id,
-            probeSize(frames[0]),
+            probeSize(frames[0], this.#probeUtf8String),
             -1,
             -1,
             (p.captureMask & (1 << RpcProbeStage.frame)) !== 0
@@ -1504,7 +1507,7 @@ export class RpcOutboundSender {
           p.frame(
             RpcProbeDirection.outbound,
             messageId,
-            probeSize(value),
+            probeSize(value, this.#probeUtf8String),
             index,
             count,
             (p.captureMask & (1 << RpcProbeStage.frame)) !== 0
@@ -1529,7 +1532,7 @@ export class RpcOutboundSender {
           p.frame(
             RpcProbeDirection.outbound,
             messageId,
-            probeSize(value),
+            probeSize(value, this.#probeUtf8String),
             index,
             count,
             (p.captureMask & (1 << RpcProbeStage.frame)) !== 0
@@ -1563,7 +1566,7 @@ export class RpcOutboundSender {
             p.protected(
               RpcProbeDirection.outbound,
               messageId,
-              probeSize(protectedValue),
+              probeSize(protectedValue, this.#probeUtf8String),
               index,
               count,
               (p.captureMask & (1 << RpcProbeStage.protected)) !== 0
