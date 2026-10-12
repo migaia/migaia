@@ -33,6 +33,7 @@
     "@migaia/utils": "workspace:^",
     "@migaia/rpc-contract": "workspace:*",
     "@migaia/rpc-core": "workspace:*",
+    "@migaia/rpc-devtools": "workspace:*",
     "@migaia/rpc-process": "workspace:*",
     "@migaia/rpc-threads": "workspace:*",
     "@migaia/rpc-bridge-jsonrpc": "workspace:*",

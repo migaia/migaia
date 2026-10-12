@@ -363,6 +363,9 @@ importers:
       '@migaia/rpc-core':
         specifier: workspace:*
         version: link:../rpc-core
+      '@migaia/rpc-devtools':
+        specifier: workspace:*
+        version: link:../rpc-devtools
       '@migaia/rpc-process':
         specifier: workspace:*
         version: link:../rpc-process
