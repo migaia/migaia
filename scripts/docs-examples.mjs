@@ -463,7 +463,7 @@ function executeExample(entry) {
 }
 
 /**
- * Check every maintained ts block and execute only explicitly marked package-local groups. Requires
+ * Check every ts block of opted-in documents and execute only explicitly marked groups. Requires
  * packages to be built first; never installs dependencies or mutates package outputs.
  *
  * @returns {Promise<number>} Nonzero for metadata, compilation or execution failures.
@@ -487,12 +487,16 @@ export async function runDocumentationExamples() {
     const examples = packages.flatMap((packageRoot) =>
       ['README.md', 'USEGUIDE.md'].flatMap((name) => {
         const document = join(packageRoot, name)
-        return existsSync(document)
-          ? extractExamples(
-              readFileSync(document, 'utf8'),
-              relative(repositoryRoot, document).split('\\').join('/')
-            )
-          : []
+        if (!existsSync(document)) return []
+        const extracted = extractExamples(
+          readFileSync(document, 'utf8'),
+          relative(repositoryRoot, document).split('\\').join('/')
+        )
+        /**
+         * A document joins the gate only after its maintainers mark at least one block with
+         * `doc-test=`; unmarked documents keep their prose examples outside CI until migrated.
+         */
+        return extracted.some((example) => example.mode !== 'auto') ? extracted : []
       })
     )
     const groups = groupExamples(examples)
