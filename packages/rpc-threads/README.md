@@ -1,6 +1,6 @@
 # `@migaia/rpc-threads`
 
-**Worker 线程 RPC。** 用一套 `request` / `notify` / `stream` 调用 Worker 中的函数，Worker 也能反向调用主线程。支持 Node `worker_threads`、Bun、Deno、浏览器 Web Worker 和 Electron。本包负责创建 Worker、建立消息端口和监督重启；调用语义、超时、取消、错误还原等由 `@migaia/rpc-core` 统一提供，API 与 [`@migaia/rpc-process`](../rpc-process/README.md) 完全一致。
+**Worker 线程 RPC。** 用一套 `request` / `notify` / `stream` 调用 Worker 中的函数，Worker 也能反向调用主线程。支持 Node `worker_threads`、Bun、Deno、浏览器 Web Worker 和 Electron。本包负责创建 Worker、建立消息端口和监督重启；调用语义、超时、取消、错误还原等由 `@migaia/rpc-core` 统一提供，Peer 调用 API 与 [`@migaia/rpc-process`](../rpc-process/README.md)、[`@migaia/rpc-browser`](../rpc-browser/README.md) 一致。
 
 ## 适用与不适用场景
 
@@ -13,7 +13,7 @@
 **不适用：**
 
 - 需要进程级隔离（崩溃互不影响、独立权限）：用 [`@migaia/rpc-process`](../rpc-process/README.md)。
-- 浏览器内跨窗口、iframe、Service Worker、BroadcastChannel：用 [`@migaia/rpc-browser`](../rpc-browser/README.md)。
+- 浏览器内跨窗口、iframe、SharedWorker、可靠有序的 RTCDataChannel：用 [`@migaia/rpc-browser`](../rpc-browser/README.md) 的 `createBrowserPeer`；Service Worker 与 BroadcastChannel 使用该包的 Endpoint transport。
 - 需要 `SharedArrayBuffer` / `Atomics` 共享内存：不在支持范围内，传入会被拒绝。
 
 ## 安装
@@ -26,15 +26,15 @@ pnpm add @migaia/rpc-threads @migaia/rpc-core @migaia/rpc-contract
 
 ## 入口一览
 
-| 入口                            | 内容                                                                                   |
-| ------------------------------- | -------------------------------------------------------------------------------------- |
-| `@migaia/rpc-threads`           | `createThreadPeer`、`createThreadPlugin`、`isThreadChild`、错误码 `RpcThreadErrorCode`、高级通道与 launcher 构造函数 |
-| `./adapters/node`               | `createNodeThreadLauncher`、`createNodeThreadChannelFactory`（Node `worker_threads`）   |
-| `./adapters/bun`                | `createBunThreadLauncher`、`createBunThreadChannelFactory`                             |
-| `./adapters/deno`               | `createDenoThreadLauncher`、`createDenoThreadChannelFactory`                           |
-| `./adapters/browser`            | `createBrowserThreadLauncher`、`createBrowserThreadChannelFactory`（Web Worker）       |
-| `./adapters/electron-main`      | `createElectronMainThreadLauncher`、`createElectronMainThreadChannelFactory`           |
-| `./adapters/electron-renderer`  | `createElectronRendererThreadLauncher`、`createElectronRendererThreadChannelFactory`   |
+| 入口                           | 内容                                                                                                                 |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `@migaia/rpc-threads`          | `createThreadPeer`、`createThreadPlugin`、`isThreadChild`、错误码 `RpcThreadErrorCode`、高级通道与 launcher 构造函数 |
+| `./adapters/node`              | `createNodeThreadLauncher`、`createNodeThreadChannelFactory`（Node `worker_threads`）                                |
+| `./adapters/bun`               | `createBunThreadLauncher`、`createBunThreadChannelFactory`                                                           |
+| `./adapters/deno`              | `createDenoThreadLauncher`、`createDenoThreadChannelFactory`                                                         |
+| `./adapters/browser`           | `createBrowserThreadLauncher`、`createBrowserThreadChannelFactory`（Web Worker）                                     |
+| `./adapters/electron-main`     | `createElectronMainThreadLauncher`、`createElectronMainThreadChannelFactory`                                         |
+| `./adapters/electron-renderer` | `createElectronRendererThreadLauncher`、`createElectronRendererThreadChannelFactory`                                 |
 
 ## 快速开始
 
@@ -151,7 +151,10 @@ try {
 
 ```ts doc-test=check file=source.ts
 import { fileURLToPath } from 'node:url'
-import { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'
+import {
+  createNodeThreadLauncher,
+  createNodeThreadChannelFactory
+} from '@migaia/rpc-threads/adapters/node'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 
@@ -212,11 +215,11 @@ try {
 
 ## 相关包
 
-| 包                                                  | 关系                                         |
-| --------------------------------------------------- | -------------------------------------------- |
-| [`@migaia/rpc-core`](../rpc-core/README.md)         | 调用语义与底层 Endpoint；peer 依赖           |
-| [`@migaia/rpc-contract`](../rpc-contract/README.md) | 协议常量与数据格式；peer 依赖                |
-| [`@migaia/rpc-process`](../rpc-process/README.md)   | 同一套 API 的跨进程版本                      |
-| [`@migaia/supervision`](../supervision/README.md)   | launcher、预算、重启策略                     |
+| 包                                                  | 关系                               |
+| --------------------------------------------------- | ---------------------------------- |
+| [`@migaia/rpc-core`](../rpc-core/README.md)         | 调用语义与底层 Endpoint；peer 依赖 |
+| [`@migaia/rpc-contract`](../rpc-contract/README.md) | 协议常量与数据格式；peer 依赖      |
+| [`@migaia/rpc-process`](../rpc-process/README.md)   | 同一套 API 的跨进程版本            |
+| [`@migaia/supervision`](../supervision/README.md)   | launcher、预算、重启策略           |
 
 完整用法、平台差异、错误码与高级用法见 [USEGUIDE](./USEGUIDE.md)。

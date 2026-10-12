@@ -1469,10 +1469,11 @@ try {
     name: 'createSharedWorkerTransport',
     importPath: '@migaia/rpc-browser/adapters/shared-worker',
     expression: 'createSharedWorkerTransport(worker.port)',
-    boundaryEn: 'a SharedWorker MessagePort with multiplexed peer assumptions',
-    boundaryZh: '具有 multiplexed peer assumption 的 SharedWorker MessagePort',
-    cautionEn: 'Peer identity cannot be established for the shared topology.',
-    cautionZh: '无法为 shared topology 建立 peer identity。'
+    boundaryEn: 'an independent SharedWorker connection port',
+    boundaryZh: '每个页面独立持有的 SharedWorker 连接端口',
+    cautionEn:
+      'Several unrelated logical peers share this one port; use separate connection ports for one-to-one Runtime Peers.',
+    cautionZh: '多个无关 logical peer 共用一个端口；一对一 Runtime Peer 应使用各自独立的连接端口。'
   }),
   'rpc-browser:adapters-service-worker:createServiceWorkerTransport': transportGuide({
     name: 'createServiceWorkerTransport',
@@ -3973,7 +3974,149 @@ await pool.close()`,
   })
 } satisfies Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>>
 
+/** SharedWorker examples use one listener and one independently accepted connection per page. */
+const browserSharedWorkerPeerCode = `import { createBrowserPeer } from '@migaia/rpc-browser'
+
+// shared.worker.ts, running inside the actual SharedWorker:
+const server = await createBrowserPeer({
+  listen: self,
+  provide: { ping: () => 'pong' },
+  report: (error) => console.error(error)
+})
+server.on('ready', (event) => console.log(event.instanceId))
+
+// page.ts, in each page using that worker:
+const worker = new SharedWorker(new URL('./shared.worker.js', import.meta.url), { type: 'module' })
+const shared = await createBrowserPeer<{ ping(): string }>({ connect: { sharedWorker: worker } })
+console.log(await shared.request('ping'))
+await shared.close()
+worker.port.close()`
+
+/** RTC examples require the caller's actual already-open, ordered and reliable DataChannel. */
+const browserRtcPeerCode = `import { createBrowserPeer } from '@migaia/rpc-browser'
+
+/** Signaling and the channel's native lifetime remain owned by the application. */
+export async function callRtc(channel: RTCDataChannel) {
+  const peer = await createBrowserPeer<{ echo(value: string): string }>({
+    connect: { rtcDataChannel: channel }
+  })
+  try {
+    console.log(await peer.request('echo', 'hello'))
+  } finally {
+    await peer.close()
+  }
+}`
+
+/** Both browser error exports share the same diagnostic boundary and retain original causes. */
+const browserPeerErrorGuide = guide({
+  quickStart: `import { RPC_BROWSER_ERROR_SOURCE, RpcBrowserErrorCode } from '@migaia/rpc-browser'
+import { normalizeRpcSerializedError } from '@migaia/rpc-contract/errors'
+
+/** Classify an admitted received diagnostic without granting connection authority. */
+export function reportBrowserFailure(received: unknown) {
+  const wire = normalizeRpcSerializedError(received)
+  if (wire.source === RPC_BROWSER_ERROR_SOURCE) {
+    console.error(wire.code, RpcBrowserErrorCode, wire)
+  }
+  return wire
+}`,
+  purposeEn:
+    'Identifies browser-owned Peer source, explicit-origin, reliable-channel, duplicate-listener and message-decoding failures with the stable @migaia/rpc/browser source and public code table. Native error types and causes survive; Core and Remote keep their call and handshake error identities.',
+  purposeZh:
+    '以稳定的 @migaia/rpc/browser source 和公开 code 表识别浏览器 Peer 的来源配置、显式 origin、可靠频道、重复监听器和消息解码失败。保留原生错误类型与 cause；调用和握手错误仍归 Core / Remote，不因浏览器载体重建错误身份。',
+  useEn: [
+    'A browser application distinguishes invalid carrier selection from a Core request deadline.',
+    'Diagnostics report WINDOW_ORIGIN_REQUIRED, RTC_CHANNEL_UNRELIABLE, LISTENER_ALREADY_BOUND, INVALID_PEER_SOURCE or MESSAGE_DECODE_FAILED without parsing display text.'
+  ],
+  useZh: [
+    '浏览器应用需要区分非法载体选择与 Core 调用 deadline。',
+    '诊断直接报告 WINDOW_ORIGIN_REQUIRED、RTC_CHANNEL_UNRELIABLE、LISTENER_ALREADY_BOUND、INVALID_PEER_SOURCE 或 MESSAGE_DECODE_FAILED，不解析展示文本。'
+  ],
+  avoidEn: [
+    'Treating received source/code fields as evidence that a window, port or channel is trusted.',
+    'Replacing the original error or its cause to rewrite a Core or Remote call failure as a browser error.'
+  ],
+  avoidZh: [
+    '把收到的 source/code 字段当成窗口、端口或频道可信的证据。',
+    '重建错误或替换 cause，把 Core / Remote 调用失败改写为浏览器错误。'
+  ]
+})
+
+/** Browser root exports reuse the same Runtime Peer calls as process and thread packages. */
+const rpcBrowserPeerGuides = {
+  'rpc-browser:index:createBrowserPeer': guide({
+    quickStart: `import { createBrowserPeer } from '@migaia/rpc-browser'
+
+/** The iframe provides calculateTotal through createBrowserPeer({ connect, provide }). */
+type IBillingApi = { calculateTotal(input: { prices: number[]; taxRate: number }): number }
+const iframe = document.querySelector<HTMLIFrameElement>('#billing')!
+const billing = await createBrowserPeer<IBillingApi>({
+  connect: { window: iframe.contentWindow!, origin: 'https://billing.example' }
+})
+try {
+  console.log(await billing.request('calculateTotal', { prices: [12, 30], taxRate: 0.08 }))
+} finally {
+  await billing.close()
+}`,
+    purposeEn:
+      'Creates a typed Runtime Peer over a borrowed window with explicit origin, a SharedWorker connection port, or an open reliable ordered RTCDataChannel. Core owns handshake, method directory, request/notify/stream, group/outcome and logical cleanup; carrier modules load only when selected.',
+    purposeZh:
+      '在显式 origin 的借用窗口、SharedWorker 独立连接端口或已打开的可靠有序 RTCDataChannel 上创建带类型的 Runtime Peer。Core 统一拥有握手、方法目录、request/notify/stream、group/outcome 与逻辑清理；所选载体模块才会延迟加载。',
+    examplesEn: [
+      {
+        id: 'shared-worker-peer',
+        title: 'One SharedWorker serves several pages',
+        description:
+          'Run the worker and page portions in their respective hosts. Each connect event gets a separate Core Peer; ready reports accepted identity, and describe().connections shows listener connections. Closing the listener releases logical Peers while leaving borrowed ports open.',
+        code: browserSharedWorkerPeerCode
+      },
+      {
+        id: 'rtc-peer',
+        title: 'Borrow an ordered reliable RTCDataChannel',
+        description:
+          'Complete signaling and wait for open first. ordered must be true and maxRetransmits/maxPacketLifeTime must both be null. peer.close() detaches the logical connection; the application retains native channel ownership.',
+        code: browserRtcPeerCode
+      }
+    ],
+    examplesZh: [
+      {
+        id: 'shared-worker-peer',
+        title: '一个 SharedWorker 服务多个页面',
+        description:
+          'Worker 与页面片段分别在对应宿主运行。每个 connect 事件获得独立 Core Peer；ready 报告已接纳身份，describe().connections 查询监听器连接。关闭监听器释放逻辑 Peer，借用端口仍保持打开。',
+        code: browserSharedWorkerPeerCode
+      },
+      {
+        id: 'rtc-peer',
+        title: '借用可靠有序的 RTCDataChannel',
+        description:
+          '先完成信令并等待 open。ordered 必须为 true，maxRetransmits/maxPacketLifeTime 都必须为 null。peer.close() 清理逻辑连接；原生频道仍由应用持有和关闭。',
+        code: browserRtcPeerCode
+      }
+    ],
+    useEn: [
+      'A parent page calls an iframe through a fixed window and explicit origin using the same request API as Worker and process Peers.',
+      'A SharedWorker accepts several page ports, or two browsers already hold an open ordered reliable RTCDataChannel.'
+    ],
+    useZh: [
+      '父页面通过固定窗口与显式 origin 调用 iframe，并使用与 Worker、进程 Peer 相同的 request API。',
+      'SharedWorker 接纳多个页面端口，或两个浏览器已持有打开的可靠有序 RTCDataChannel。'
+    ],
+    avoidEn: [
+      'The carrier is BroadcastChannel, an idle-terminable Service Worker, or unreliable WebTransport datagrams; use the existing Endpoint transports.',
+      'The application needs automatic spawning, signaling, restart supervision or immediate detection of window unload or silent port closure; this factory borrows resources and pending calls use Core deadlines.'
+    ],
+    avoidZh: [
+      '载体是 BroadcastChannel、可空闲终止的 Service Worker 或不可靠的 WebTransport datagram；继续使用现有 Endpoint transport。',
+      '需要自动创建载体、信令、重启监督或立即检测窗口卸载/静默端口关闭；工厂借用资源，在途调用按 Core deadline 结束。'
+    ]
+  }),
+  'rpc-browser:index:RPC_BROWSER_ERROR_SOURCE': browserPeerErrorGuide,
+  'rpc-browser:index:RpcBrowserErrorCode': browserPeerErrorGuide
+} satisfies Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>>
+
 export const rpcApiGuides = {
+  ...rpcBrowserPeerGuides,
   ...rpcAdapterGuides,
   ...rpcDxRoadmapGuides,
   ...rpcProtocolToolkitGuides,

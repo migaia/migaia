@@ -3,7 +3,7 @@
   "library": {
     "slug": "rpc-core",
     "description": "RPC core owner.",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "exports": [
       ".",
       "./adapter",
@@ -42,7 +42,7 @@
               {
                 "type": "list",
                 "items": [
-                  "Runtime Peer（`@migaia/rpc-core/remote`）：`request` / `notify` / `stream` / `group` / `outcome`，按方法路径调用，带类型推导。进程、线程、桥接包都在这一层上构建。",
+                  "Runtime Peer（`@migaia/rpc-core/remote`）：`request` / `notify` / `stream` / `group` / `outcome`，按方法路径调用，带类型推导。进程、线程、浏览器、桥接包都在这一层上构建。",
                   "Endpoint（包根）：`createEndpoint` + 中间件，`send` / `provide`，用于在任意载体（iframe、BroadcastChannel、MessagePort 等）上自行组装。"
                 ]
               },
@@ -63,8 +63,12 @@
                   ["调用子进程或本机其它进程", "`@migaia/rpc-process`"],
                   ["调用 Worker 线程", "`@migaia/rpc-threads`"],
                   [
-                    "iframe、标签页、SharedWorker、Service Worker",
-                    "`@migaia/rpc-browser` + 本包的 Endpoint"
+                    "iframe、SharedWorker、可靠有序的 RTCDataChannel",
+                    "`@migaia/rpc-browser` 的 `createBrowserPeer`"
+                  ],
+                  [
+                    "标签页广播、Service Worker、WebTransport datagram",
+                    "`rpc-browser` transport + 本包的 Endpoint"
                   ],
                   ["调用 Python / Go / Rust 服务", "`@migaia/rpc-bridge-jsonrpc`"],
                   ["在单元测试里模拟两个对端", "本包 `./testing` 的 `createPeerPair`"],
@@ -238,7 +242,7 @@
                   ["`@migaia/rpc-contract`", "线上格式与协议工具；peer 依赖"],
                   ["`@migaia/rpc-process`", "跨进程"],
                   ["`@migaia/rpc-threads`", "Worker 线程"],
-                  ["`@migaia/rpc-browser`", "浏览器载体"],
+                  ["`@migaia/rpc-browser`", "浏览器 Runtime Peer 与 Endpoint 载体"],
                   ["`@migaia/rpc-bridge-jsonrpc`", "其它语言"],
                   ["`@migaia/plugin-host`", "`createRuntimePlugin` 安装的宿主"]
                 ]
@@ -10293,7 +10297,7 @@
           "name": "IAdapterDefinition",
           "kind": "type",
           "signature": "export type IAdapterDefinition<TInput, TKey extends 'process' | 'thread' = 'process' | 'thread'> = Readonly<{ peer<TRemote = never>(options: IAdapterDefinitionPeerOptions<TInput>): Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>; plugin<TRemote = Record<never, never>, const TProvide extends IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly []>(options: Omit<IAdapterDefinitionPluginOptions<TInput>, 'provide' | 'name' | 'expose'> & Readonly<{ provide?: TProvide; name: TName; expose?: TExpose; }>): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, TKey>; /** Create the existing shared admission/store scope; callers retain its disposal ownership. */ scope(store?: IRpcIdempotencyStore): IRuntimeProviderScope; }>;",
-          "declarationLine": 53,
+          "declarationLine": 57,
           "source": "packages/rpc-core/dist/runtime-adapter/definition-types.d.ts",
           "purpose": "Two task operations construct actual symmetric Peers and genuine Host Plugins.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAdapterDefinition.",
@@ -10356,8 +10360,8 @@
         {
           "name": "IAdapterDefinitionPeerOptions",
           "kind": "type",
-          "signature": "export type IAdapterDefinitionPeerOptions<TInput> = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> & Readonly<{ spawn?: TInput; connect?: TInput; listen?: TInput; peerId: string; scheduler?: IScheduler; offer?: IRpcHandshakeOffer; auth?: Extract<IRuntimeByteOptions, { role: 'responder'; }>['auth']; ipc?: IRuntimeConnectionOptions['ipc']; /** The canonical per-connection governor owns quotas and idle retirement. */ governor?: IRuntimeProviderPolicy; /** A factory-created scope is borrowed; its caller closes it after all of its peers close. */ scope?: IRuntimeProviderScope; }>;",
-          "declarationLine": 34,
+          "signature": "export type IAdapterDefinitionPeerOptions<TInput> = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> & Readonly<{ spawn?: TInput; connect?: TInput; listen?: TInput; /** Message adapters may omit this address and learn it from the existing raw initial exchange. */ peerId?: string; /** Caller cancellation retires this physical opening and its original directory handshake. */ signal?: IAbortSignal; scheduler?: IScheduler; offer?: IRpcHandshakeOffer; auth?: Extract<IRuntimeByteOptions, { role: 'responder'; }>['auth']; ipc?: IRuntimeConnectionOptions['ipc']; /** The canonical per-connection governor owns quotas and idle retirement. */ governor?: IRuntimeProviderPolicy; /** A factory-created scope is borrowed; its caller closes it after all of its peers close. */ scope?: IRuntimeProviderScope; }>;",
+          "declarationLine": 35,
           "source": "packages/rpc-core/dist/runtime-adapter/definition-types.d.ts",
           "purpose": "Deployment values select physical I/O; credentials and offers remain ordinary local proposals.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAdapterDefinitionPeerOptions.",
@@ -10372,7 +10376,7 @@
           "aliasOf": "IAdapterDefinitionPeerOptions",
           "exportPath": "./adapter",
           "overloadSignatures": [
-            "export type IAdapterDefinitionPeerOptions<TInput> = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> & Readonly<{ spawn?: TInput; connect?: TInput; listen?: TInput; peerId: string; scheduler?: IScheduler; offer?: IRpcHandshakeOffer; auth?: Extract<IRuntimeByteOptions, { role: 'responder'; }>['auth']; ipc?: IRuntimeConnectionOptions['ipc']; /** The canonical per-connection governor owns quotas and idle retirement. */ governor?: IRuntimeProviderPolicy; /** A factory-created scope is borrowed; its caller closes it after all of its peers close. */ scope?: IRuntimeProviderScope; }>;"
+            "export type IAdapterDefinitionPeerOptions<TInput> = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> & Readonly<{ spawn?: TInput; connect?: TInput; listen?: TInput; /** Message adapters may omit this address and learn it from the existing raw initial exchange. */ peerId?: string; /** Caller cancellation retires this physical opening and its original directory handshake. */ signal?: IAbortSignal; scheduler?: IScheduler; offer?: IRpcHandshakeOffer; auth?: Extract<IRuntimeByteOptions, { role: 'responder'; }>['auth']; ipc?: IRuntimeConnectionOptions['ipc']; /** The canonical per-connection governor owns quotas and idle retirement. */ governor?: IRuntimeProviderPolicy; /** A factory-created scope is borrowed; its caller closes it after all of its peers close. */ scope?: IRuntimeProviderScope; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -10411,7 +10415,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/runtime-adapter/definition-types.d.ts:IAdapterDefinitionPeerOptions:export type IAdapterDefinitionPeerOptions<TInput> = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> & Readonly<{ spawn?: TInput; connect?: TInput; listen?: TInput; peerId: string; scheduler?: IScheduler; offer?: IRpcHandshakeOffer; auth?: Extract<IRuntimeByteOptions, { role: 'responder'; }>['auth']; ipc?: IRuntimeConnectionOptions['ipc']; /** The canonical per-connection governor owns quotas and idle retirement. */ governor?: IRuntimeProviderPolicy; /** A factory-created scope is borrowed; its caller closes it after all of its peers close. */ scope?: IRuntimeProviderScope; }>;",
+          "identity": "packages/rpc-core/dist/runtime-adapter/definition-types.d.ts:IAdapterDefinitionPeerOptions:export type IAdapterDefinitionPeerOptions<TInput> = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> & Readonly<{ spawn?: TInput; connect?: TInput; listen?: TInput; /** Message adapters may omit this address and learn it from the existing raw initial exchange. */ peerId?: string; /** Caller cancellation retires this physical opening and its original directory handshake. */ signal?: IAbortSignal; scheduler?: IScheduler; offer?: IRpcHandshakeOffer; auth?: Extract<IRuntimeByteOptions, { role: 'responder'; }>['auth']; ipc?: IRuntimeConnectionOptions['ipc']; /** The canonical per-connection governor owns quotas and idle retirement. */ governor?: IRuntimeProviderPolicy; /** A factory-created scope is borrowed; its caller closes it after all of its peers close. */ scope?: IRuntimeProviderScope; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -10421,7 +10425,7 @@
           "name": "IAdapterDefinitionPluginOptions",
           "kind": "type",
           "signature": "export type IAdapterDefinitionPluginOptions<TInput> = IRuntimePluginOptions<TInput, TInput, TInput> & Pick<IAdapterDefinitionPeerOptions<TInput>, 'peerId' | 'scheduler' | 'offer' | 'auth' | 'ipc' | 'governor' | 'scope'>;",
-          "declarationLine": 51,
+          "declarationLine": 55,
           "source": "packages/rpc-core/dist/runtime-adapter/definition-types.d.ts",
           "purpose": "Plugins use the same physical input grammar and the original Host method whitelist.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAdapterDefinitionPluginOptions.",
@@ -10485,7 +10489,7 @@
           "name": "IByteAdapterOptions",
           "kind": "type",
           "signature": "export type IByteAdapterOptions<TInput> = Readonly<{ open(input: TInput): IRuntimeByteIO | Promise<IRuntimeByteIO>; listen?(input: TInput): IRuntimeByteIO | Promise<IRuntimeByteIO>; dial?(input: TInput): IRuntimeByteIO | Promise<IRuntimeByteIO>; diagnostics?: IRuntimeByteDiagnostics; presentation?: Pick<IRuntimeConnectionOptions, 'platform' | 'expectedStringText'>; }>;",
-          "declarationLine": 26,
+          "declarationLine": 27,
           "source": "packages/rpc-core/dist/runtime-adapter/definition-types.d.ts",
           "purpose": "Byte authors retain physical opening; the existing Core owner performs all native wire control.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IByteAdapterOptions.",
@@ -10549,7 +10553,7 @@
           "name": "IMessageAdapterLaunch",
           "kind": "type",
           "signature": "export type IMessageAdapterLaunch = IAdapterLaunchHandle & Readonly<{ port: IMessageAdapterPort; }>;",
-          "declarationLine": 17,
+          "declarationLine": 18,
           "source": "packages/rpc-core/dist/runtime-adapter/definition-types.d.ts",
           "purpose": "Optional launching returns the same actual port and native lifetime operations held by Core.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMessageAdapterLaunch.",
@@ -10613,7 +10617,7 @@
           "name": "IMessageAdapterOptions",
           "kind": "type",
           "signature": "export type IMessageAdapterOptions<TInput> = Readonly<{ open(input: TInput): IMessageAdapterPort | Promise<IMessageAdapterPort>; launch?(input: TInput, context: IRuntimePeerSourceContext): Promise<IMessageAdapterLaunch>; }>;",
-          "declarationLine": 21,
+          "declarationLine": 22,
           "source": "packages/rpc-core/dist/runtime-adapter/definition-types.d.ts",
           "purpose": "A physical runtime supplies only raw messaging and its optional original launch operation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMessageAdapterOptions.",
@@ -10677,7 +10681,7 @@
           "name": "IMessageAdapterPort",
           "kind": "type",
           "signature": "export type IMessageAdapterPort = IAdapterEventEmitterMessagePort | IAdapterEventTargetMessagePort;",
-          "declarationLine": 15,
+          "declarationLine": 16,
           "source": "packages/rpc-core/dist/runtime-adapter/definition-types.d.ts",
           "purpose": "Authors return actual messaging operations; no accepted channel or trust description is an input.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMessageAdapterPort.",
@@ -10908,7 +10912,7 @@
           "name": "createBrowserMessagePortTransport",
           "kind": "function",
           "signature": "export declare function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = unknown>(port: IBrowserMessagePortLike<TTransfer, TEvent>, options?: IBrowserMessagePortTransportOptions): IRpcTransport<unknown, TTransfer>;",
-          "declarationLine": 27,
+          "declarationLine": 29,
           "source": "packages/rpc-core/dist/core/adapters/message-port.d.ts",
           "purpose": "Wraps a browser MessagePort and owns its terminal lifecycle.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBrowserMessagePortTransport.",
@@ -11014,7 +11018,7 @@
           "name": "createNodeMessagePortTransport",
           "kind": "function",
           "signature": "export declare function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpcTransport;",
-          "declarationLine": 32,
+          "declarationLine": 34,
           "source": "packages/rpc-core/dist/core/adapters/message-port.d.ts",
           "purpose": "Wraps a Node `worker_threads.MessagePort` (or anything with the same shape) as a web-rpc transport.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createNodeMessagePortTransport.",
@@ -11090,7 +11094,7 @@
         {
           "name": "IBrowserMessagePortLike",
           "kind": "type",
-          "signature": "export type IBrowserMessagePortLike<TTransfer = unknown, TEvent = unknown> = { postMessage(message: unknown, transfer?: readonly TTransfer[]): void; start(): void; close(): void; addEventListener(type: 'message' | 'messageerror', listener: (event: TEvent) => void): void; removeEventListener(type: 'message' | 'messageerror', listener: (event: TEvent) => void): void; };",
+          "signature": "export type IBrowserMessagePortLike<TTransfer = unknown, TEvent = unknown> = { postMessage(message: unknown, transfer?: readonly TTransfer[]): void; start(): void; close(): void; addEventListener(type: 'message' | 'messageerror', listener: (event: TEvent) => void): void; removeEventListener(type: 'message' | 'messageerror', listener: (event: TEvent) => void): void; /** Optional physical failure observation preserves an adapter's original terminal error. */ onError?(listener: (error: unknown) => void): () => void; };",
           "declarationLine": 15,
           "source": "packages/rpc-core/dist/core/adapters/message-port.d.ts",
           "purpose": "Browser MessagePort surface with EventTarget lifecycle.",
@@ -11105,7 +11109,7 @@
           "members": [],
           "exportPath": "./adapters/message-port",
           "overloadSignatures": [
-            "export type IBrowserMessagePortLike<TTransfer = unknown, TEvent = unknown> = { postMessage(message: unknown, transfer?: readonly TTransfer[]): void; start(): void; close(): void; addEventListener(type: 'message' | 'messageerror', listener: (event: TEvent) => void): void; removeEventListener(type: 'message' | 'messageerror', listener: (event: TEvent) => void): void; };"
+            "export type IBrowserMessagePortLike<TTransfer = unknown, TEvent = unknown> = { postMessage(message: unknown, transfer?: readonly TTransfer[]): void; start(): void; close(): void; addEventListener(type: 'message' | 'messageerror', listener: (event: TEvent) => void): void; removeEventListener(type: 'message' | 'messageerror', listener: (event: TEvent) => void): void; /** Optional physical failure observation preserves an adapter's original terminal error. */ onError?(listener: (error: unknown) => void): () => void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -11144,7 +11148,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/core/adapters/message-port.d.ts:IBrowserMessagePortLike:export type IBrowserMessagePortLike<TTransfer = unknown, TEvent = unknown> = { postMessage(message: unknown, transfer?: readonly TTransfer[]): void; start(): void; close(): void; addEventListener(type: 'message' | 'messageerror', listener: (event: TEvent) => void): void; removeEventListener(type: 'message' | 'messageerror', listener: (event: TEvent) => void): void; };",
+          "identity": "packages/rpc-core/dist/core/adapters/message-port.d.ts:IBrowserMessagePortLike:export type IBrowserMessagePortLike<TTransfer = unknown, TEvent = unknown> = { postMessage(message: unknown, transfer?: readonly TTransfer[]): void; start(): void; close(): void; addEventListener(type: 'message' | 'messageerror', listener: (event: TEvent) => void): void; removeEventListener(type: 'message' | 'messageerror', listener: (event: TEvent) => void): void; /** Optional physical failure observation preserves an adapter's original terminal error. */ onError?(listener: (error: unknown) => void): () => void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -11154,7 +11158,7 @@
           "name": "IBrowserMessagePortTransportOptions",
           "kind": "type",
           "signature": "export type IBrowserMessagePortTransportOptions = { readonly ownership?: 'owned' | 'borrowed'; };",
-          "declarationLine": 23,
+          "declarationLine": 25,
           "source": "packages/rpc-core/dist/core/adapters/message-port.d.ts",
           "purpose": "Controls whether the browser adapter is allowed to close the supplied port.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IBrowserMessagePortTransportOptions.",

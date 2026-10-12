@@ -3,8 +3,9 @@
   "library": {
     "slug": "rpc-browser",
     "description": "RPC browser owner.",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "exports": [
+      ".",
       "./adapters/broadcast-channel",
       "./adapters/rtc-data-channel",
       "./adapters/service-worker",
@@ -21,7 +22,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "浏览器通信载体适配器。 把浏览器里的各种消息通道包装成 `@migaia/rpc-core` 的 transport，用来在父页面与 iframe、标签页之间、页面与 SharedWorker / Service Worker 之间，以及经 WebRTC 或 WebTransport 进行 RPC 调用。本包只做\"载体\"这一层：消息来源校验、监听器注册与释放。调用、超时、错误处理由 `@migaia/rpc-core` 的 Endpoint 提供。"
+                "text": "浏览器 Runtime Peer 与通信载体。 用 `createBrowserPeer` 在父页面与 iframe、页面与 SharedWorker、可靠有序的 WebRTC DataChannel 之间调用函数。`request` / `notify` / `stream` / `group` / `outcome`、握手、方法目录、错误身份与 `@migaia/rpc-threads`、`@migaia/rpc-process` 共用 Core 的 Runtime Peer。六个 transport 子入口继续支持自行组装 Endpoint。"
               }
             ]
           },
@@ -35,14 +36,38 @@
               },
               {
                 "type": "table",
-                "headers": ["场景", "适配器"],
+                "headers": ["载体", "Runtime Peer", "Endpoint / transport 与原因"],
                 "rows": [
-                  ["父页面 ↔ iframe、页面 ↔ `window.open` 弹窗", "`./adapters/window`"],
-                  ["同源多个标签页之间广播或协作", "`./adapters/broadcast-channel`"],
-                  ["页面 ↔ SharedWorker", "`./adapters/shared-worker`"],
-                  ["页面 ↔ Service Worker", "`./adapters/service-worker`"],
-                  ["两个浏览器之间经 WebRTC DataChannel", "`./adapters/rtc-data-channel`"],
-                  ["浏览器 ↔ 服务器经 WebTransport datagram", "`./adapters/web-transport`"]
+                  [
+                    "`window`：iframe、弹窗",
+                    "`connect: { window, origin }`",
+                    "绑定指定窗口与显式 origin，满足一对一通信。"
+                  ],
+                  [
+                    "`shared-worker`",
+                    "页面 `connect: { sharedWorker }`；Worker `listen`",
+                    "每个连接端口各有一个独立 Peer，Worker 可服务多个页面。"
+                  ],
+                  [
+                    "`rtc-data-channel`",
+                    "`connect: { rtcDataChannel }`",
+                    "只接受可靠、有序的频道；无序或设置重传次数/时间上限会拒绝。"
+                  ],
+                  [
+                    "`service-worker`",
+                    "不支持",
+                    "浏览器可在空闲时终止 Worker，不能承诺持续的 Peer 生命周期；保留 `./adapters/service-worker`。"
+                  ],
+                  [
+                    "`broadcast-channel`",
+                    "不支持",
+                    "同源一对多广播不具备固定的一对一对端；保留 `./adapters/broadcast-channel`。"
+                  ],
+                  [
+                    "`web-transport` datagram",
+                    "不支持",
+                    "datagram 可丢失、乱序；保留 `./adapters/web-transport`。"
+                  ]
                 ]
               },
               {
@@ -69,7 +94,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`@migaia/rpc-core` 是 peer 依赖，版本必须一致（当前 `0.0.7`）。本包没有根入口，每个适配器从各自的子路径导入，不会把用不到的载体打进包里。"
+                "text": "`@migaia/rpc-core` 是 peer 依赖，版本必须一致。根入口导出 `createBrowserPeer`、`IRuntimeBrowserPeerOptions` 与各载体选项类型、`RpcBrowserErrorCode` 与 `RPC_BROWSER_ERROR_SOURCE`。Peer 按所选载体延迟加载 transport；高级用法仍从对应的 `./adapters/*` 子入口导入。"
               }
             ]
           },
@@ -84,7 +109,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "// billing-frame.ts\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst transport = createWindowMessageTransport({\n  target: window.parent,\n  receiver: window,\n  targetOrigin: 'https://shop.example' // 只接受来自、也只发往父页面这个源\n})\nconst billing = await createEndpoint({\n  id: 'billing-frame',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nbilling.provide('calculateTotal', (context) => {\n  const input = context.data as { prices: number[]; taxRate: number }\n  const subtotal = input.prices.reduce((sum, price) => sum + price, 0)\n  return context.success(subtotal * (1 + input.taxRate))\n})\n\nwindow.addEventListener('pagehide', () => void billing.dispose(), { once: true })"
+                "code": "// billing-frame.ts\nimport { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** 当前 iframe 的 Peer 只接受指定父窗口与源；页面关闭时释放本端监听器。 */\nconst billing = await createBrowserPeer({\n  connect: { window: window.parent, origin: 'https://shop.example' },\n  provide: {\n    /** 按总价与税率返回含税金额。 */\n    calculateTotal: (input: { prices: number[]; taxRate: number }) =>\n      input.prices.reduce((sum, price) => sum + price, 0) * (1 + input.taxRate)\n  }\n})\n\nwindow.addEventListener('pagehide', () => void billing.close(), { once: true })"
               },
               {
                 "type": "paragraph",
@@ -93,7 +118,67 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "// parent.ts\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nawait new Promise<void>((resolve) => iframe.addEventListener('load', () => resolve(), { once: true }))\n\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: new URL(iframe.src).origin\n})\nconst billing = await createEndpoint({\n  id: 'checkout-page',\n  targetIds: ['billing-frame'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst total = await billing.send<number>('billing-frame', 'calculateTotal', {\n  prices: [12, 30],\n  taxRate: 0.08\n})\nconsole.log(total) // 45.36\n\nawait billing.dispose()"
+                "code": "// parent.ts\nimport { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** 对端公开的方法形状，决定 request 的方法名、输入与结果类型。 */\ntype IBillingApi = { calculateTotal(input: { prices: number[]; taxRate: number }): number }\n/** 页面中的实际 iframe；调用方固定其对端源。 */\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\n/** 工厂完成表示两端握手与方法目录已就绪。 */\nconst billing = await createBrowserPeer<IBillingApi>({\n  connect: { window: iframe.contentWindow!, origin: 'https://billing.example' }\n})\n\nconsole.log(await billing.request('calculateTotal', { prices: [12, 30], taxRate: 0.08 })) // 45.36\nawait billing.close()"
+              },
+              {
+                "type": "paragraph",
+                "text": "两端都启动工厂后，Core 完成握手与方法目录交换。无需手写 Endpoint、中间件、目标 id 或 `context.success`。`peer.on('ready', listener)` 订阅后续 ready 事件；第一次连接的 ready 已由工厂完成表示。`peerSymbol.asyncDispose` 等同于 `close()`。"
+              }
+            ]
+          },
+          {
+            "id": "sharedworker-一个-worker-服务多个页面",
+            "heading": "SharedWorker：一个 Worker 服务多个页面",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "页面连接已有的 SharedWorker："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** Worker 提供的类型契约。 */\ntype ISharedApi = { ping(): string }\n/** Worker 与端口由页面持有；Peer 只借用端口。 */\nconst worker = new SharedWorker(new URL('./shared.worker.js', import.meta.url), { type: 'module' })\n/** 当前页面有自己的连接与方法目录。 */\nconst shared = await createBrowserPeer<ISharedApi>({ connect: { sharedWorker: worker } })\nconsole.log(await shared.request('ping')) // pong\nawait shared.close()\nworker.port.close()"
+              },
+              {
+                "type": "paragraph",
+                "text": "SharedWorker 模块为每个 `connect` 事件接纳一个独立 Peer："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createBrowserPeer, type IRuntimeBrowserListen } from '@migaia/rpc-browser'\n\n/** 本模块由真实 SharedWorker 宿主加载；声明其 connect 事件形状供 DOM 文档编译器检查。 */\ndeclare const self: IRuntimeBrowserListen\n\n/** Worker 的连接监听器；调用 close() 时停止接纳并关闭已接纳的逻辑 Peer。 */\nconst server = await createBrowserPeer({\n  listen: self,\n  provide: { ping: () => 'pong' },\n  report: (error) => console.error(error)\n})"
+              },
+              {
+                "type": "paragraph",
+                "text": "重复绑定同一个 `listen` scope 会拒绝；先关闭原监听器，再重新绑定。`createBrowserPlugin` 暂不提供：现有 Host 的 thread/process slot 不表达浏览器借用载体，本次仅增加 standalone Peer。"
+              }
+            ]
+          },
+          {
+            "id": "直接使用-endpoint-transport",
+            "heading": "直接使用 Endpoint / transport",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "BroadcastChannel、Service Worker 与 WebTransport datagram 使用这一层。已有 Endpoint 用户也可保留原组合；所有六个 transport 子入口均未移除。"
+              },
+              {
+                "type": "paragraph",
+                "text": "以下保留同一 iframe 业务的直接 Endpoint 实现。iframe 提供方："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "// billing-frame.ts\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst transport = createWindowMessageTransport({\n  target: window.parent,\n  receiver: window,\n  targetOrigin: 'https://shop.example' // 只接受来自、也只发往父页面这个源\n})\nconst billing = await createEndpoint({\n  id: 'billing-frame',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nbilling.provide('calculateTotal', (context) => {\n  const input = context.data as { prices: number[]; taxRate: number }\n  const subtotal = input.prices.reduce((sum, price) => sum + price, 0)\n  return context.success(subtotal * (1 + input.taxRate))\n})\n\nwindow.addEventListener('pagehide', () => void billing.dispose(), { once: true })"
+              },
+              {
+                "type": "paragraph",
+                "text": "父页面调用："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "// parent.ts\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nawait new Promise<void>((resolve) =>\n  iframe.addEventListener('load', () => resolve(), { once: true })\n)\n\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: new URL(iframe.src).origin\n})\nconst billing = await createEndpoint({\n  id: 'checkout-page',\n  targetIds: ['billing-frame'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst total = await billing.send<number>('billing-frame', 'calculateTotal', {\n  prices: [12, 30],\n  taxRate: 0.08\n})\nconsole.log(total) // 45.36\n\nawait billing.dispose()"
               },
               {
                 "type": "paragraph",
@@ -108,7 +193,7 @@
               {
                 "type": "list",
                 "items": [
-                  "必须指定 `targetOrigin`。省略时默认使用当前页面的 origin；跨域 iframe 必须显式写出对方的源。`'*'` 会被拒绝，除非同时设置 `allowUnsafeTargetOrigin: true`（即使这样，接收时仍会校验来源窗口）。",
+                  "Window Peer 必须显式指定 `origin`，没有同源默认值。`'*'` 会被拒绝，除非同时设置 `allowUnsafeTargetOrigin: true`；接收时仍校验来源窗口。直接使用 Window transport 时选项名是 `targetOrigin`，保留既有同源默认行为。",
                   "接收端只接受来自 `target` 那个窗口的消息，其它窗口（包括其它 iframe）发来的同格式消息会被忽略。",
                   "BroadcastChannel 对同源的所有标签页可见，不要用它传输只应发给某一方的敏感数据。"
                 ]
@@ -121,7 +206,15 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "除 WebTransport 外，适配器都借用你传入的窗口、端口或频道，不负责关闭它们。`endpoint.dispose()` 会注销适配器注册的监听器；`BroadcastChannel.close()`、`port.close()`、`RTCDataChannel.close()` 等由创建它们的代码负责。例如在 Node 或测试中使用 BroadcastChannel，不关闭频道会让进程一直存活。WebTransport 适配器会取得 datagram 的写入端，关闭 transport 时一并关闭它。"
+                "text": "Window、SharedWorker 端口、RTCDataChannel 都是借用资源；`peer.close()` 幂等地关闭逻辑连接并注销监听器，不关闭传入窗口、端口或频道。本 API 没有 `spawn`，没有由 Peer 创建的原生载体。SharedWorker 监听器关闭时停止接纳并清理所有已接纳的逻辑 Peer；端口仍由创建者关闭。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Window 导航/卸载和页面静默关闭 SharedWorker 端口没有通用的远端关闭事件。在途调用通过配置的 Core deadline 失败；不能把它当成立即检测断开。用 `defaultTimeoutMs` 指定等待上限；本地 `pagehide` 可主动调用 `close()`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "直接 Endpoint 的 `dispose()` 同样注销监听器。除 WebTransport 外，六个适配器均借用原生资源，创建者负责 `BroadcastChannel.close()`、`port.close()`、`RTCDataChannel.close()`。WebTransport 适配器取得 datagram 写入端，关闭 transport 时一并关闭；会话本身仍由调用方关闭。"
               }
             ]
           },
@@ -131,7 +224,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "本包没有自己的错误码（`RpcBrowserErrorCode` 为空），所有错误都使用 `@migaia/rpc-core` 的身份，例如配置错误为 `@migaia/rpc/core` / `INVALID_CONFIG`，载体失败为 `TRANSPORT`。"
+                "text": "Peer 配置与载体解码错误使用 `RPC_BROWSER_ERROR_SOURCE`（`@migaia/rpc/browser`）及 `RpcBrowserErrorCode`：`WINDOW_ORIGIN_REQUIRED`、`RTC_CHANNEL_UNRELIABLE`、`LISTENER_ALREADY_BOUND`、`INVALID_PEER_SOURCE`、`MESSAGE_DECODE_FAILED`。错误保持原生类型与 cause。握手、调用、取消、超时沿用 Core / Remote 的错误身份；现有 transport 配置错误与载体失败继续使用 Core 的 `INVALID_CONFIG` / `TRANSPORT`。"
               }
             ]
           },
@@ -143,10 +236,7 @@
                 "type": "table",
                 "headers": ["包", "关系"],
                 "rows": [
-                  [
-                    "`@migaia/rpc-core`",
-                    "`createEndpoint`、中间件、MessagePort 与 Dedicated Worker 适配器"
-                  ],
+                  ["`@migaia/rpc-core`", "Runtime Peer、adapter SDK、Endpoint 与调用语义"],
                   ["`@migaia/rpc-threads`", "由库创建并监督的 Web Worker"]
                 ]
               },
@@ -166,7 +256,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "本手册说明每个浏览器载体适配器的参数、来源校验规则与资源所有权。安装与最短示例见 README。Endpoint 的组装、`send` / `provide` 的完整语义与中间件见 rpc-core USEGUIDE。"
+                "text": "本包提供浏览器 Runtime Peer 和六个 Endpoint transport。Peer 的握手、方法目录、调用、取消与错误语义由 Core 实现；浏览器层选择并借用载体。安装与最短 iframe 示例见 README。Endpoint 的 `send` / `provide` 与中间件见 rpc-core USEGUIDE。"
               }
             ]
           },
@@ -176,39 +266,60 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "1. 如何组装：transport + Endpoint 2. window：iframe 与弹窗 3. broadcast-channel：同源标签页 4. shared-worker：页面与 SharedWorker 5. service-worker：页面与 Service Worker 6. 高阶用法：WebRTC 与 WebTransport 7. 选择指南 8. 错误与常见问题"
+                "text": "1. Runtime Peer 的公共 API 2. window：iframe 与弹窗 3. shared-worker：每个页面一个 Peer 4. 高阶用法：rtc-data-channel 可靠有序的 Peer 5. broadcast-channel：同源标签页 6. service-worker：页面与 Service Worker 7. web-transport：不可靠 datagram 8. 直接使用 Endpoint / transport 9. 选择指南 10. 错误与生命周期"
               }
             ]
           },
           {
-            "id": "1-如何组装-transport-endpoint",
-            "heading": "1. 如何组装：transport + Endpoint",
+            "id": "1-runtime-peer-的公共-api",
+            "heading": "1. Runtime Peer 的公共 API",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "每个适配器返回一个 `IRpcTransport`。把它交给 `@migaia/rpc-core` 的 `createEndpoint`，并在 `connect` 中间件里再传一次，用于消息来源校验："
+                "text": "根入口的 `createBrowserPeer<TRemote>()` 返回与进程、线程相同的 Runtime Peer，按远端 API 类型推导方法名、payload 与结果类型。选择一个 `connect` 或 `listen` 来源；不接受已握手、已信任或已拥有的状态，也没有 `spawn`。"
               },
               {
-                "type": "code",
-                "language": "ts",
-                "code": "import { connect, createEndpoint, type IRpcTransport } from '@migaia/rpc-core'\n\n/** 实际载体由调用方持有；返回的 Endpoint 由调用方 dispose。 */\nexport async function openBrowserEndpoint(transport: IRpcTransport) {\n  const endpoint = await createEndpoint({\n    id: 'my-side',\n    targetIds: ['other-side'],\n    transport,\n    middlewares: [connect({ transport })]\n  })\n  endpoint.provide('ping', (context) => context.success('pong'))\n  return endpoint\n}"
-              },
-              {
-                "type": "list",
-                "items": [
-                  "`send(target, method, data, options?)` 的 `data` 是必填参数，不需要参数时传 `null`。",
-                  "提供方用 `context.data` 读取参数，用 `context.success(value)` 返回结果，或 `context.failed(error)` 返回错误。",
-                  "需要版本约定与协议帧时，加入 `contract({ version })` 和 `protocol()` 中间件（README 的 iframe 示例就是这样）。两端的中间件组合必须一致。"
+                "type": "table",
+                "headers": ["API", "语义"],
+                "rows": [
+                  ["`request(method, payload?, options?)`", "等待远端方法结果。"],
+                  ["`notify(method, payload?, options?)`", "只等待发送；完成不代表远端执行成功。"],
+                  [
+                    "`stream(method, payload?, options?)`",
+                    "惰性异步迭代；第一次 `next()` 开始发送，提前退出通知生产者结束。"
+                  ],
+                  [
+                    "`group(steps, options?)`",
+                    "顺序执行 request；失败后剩余步骤不执行，不回滚已完成步骤。"
+                  ],
+                  [
+                    "`outcome(idempotencyKey)`",
+                    "查询有声明的幂等调用结果；结果丢失不能解释为从未执行。"
+                  ],
+                  ["`describe(options?)`", "本地查询身份、已接纳连接与方法目录。"],
+                  ["`on('ready', listener)`", "订阅后续 ready；连接工厂完成已表示首次握手就绪。"],
+                  [
+                    "`close()` / `Symbol.asyncDispose`",
+                    "幂等关闭逻辑连接，释放本端监听器；借用的原生资源仍由调用方关闭。"
+                  ]
                 ]
               },
               {
                 "type": "paragraph",
-                "text": "下面以 BroadcastChannel 为例的完整代码已在 Node 24 中实际运行（Node 内置 BroadcastChannel）："
+                "text": "公共选项类型为 `IRuntimeBrowserPeerOptions`，来源联合为 `IRuntimeBrowserConnect`。Window、SharedWorker、RTC 分别使用 `IRuntimeBrowserWindowConnect`、`IRuntimeBrowserSharedWorkerConnect`、`IRuntimeBrowserRtcConnect` / `IRuntimeBrowserRtcDataChannel`；Worker scope 与事件形状为 `IRuntimeBrowserListen` / `IRuntimeBrowserConnectEvent`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "公共选项包括 `provide`、`defaultTimeoutMs`、`signal` 与 `report`。`provide` 接受业务函数或异步生成器；不需要 `context.success`。`signal` 可取消未完成的握手；监听器保持订阅该 signal，取消时关闭监听器与已接纳的逻辑 Peer。`report` 接收不能从当前操作直接抛出的错误。默认调用 deadline 为 Core 的 30000 ms；工厂 `defaultTimeoutMs` 和单次调用的 `timeoutMs` 可调整等待上限。单次业务调用的取消使用该调用的 `signal`。"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\n// 两个标签页（这里用同一进程里的两个 BroadcastChannel 实例模拟）共享频道名 'cart'。\nconst channelA = new BroadcastChannel('cart')\nconst channelB = new BroadcastChannel('cart')\nconst tabATransport = createBroadcastChannelTransport(channelA)\nconst tabBTransport = createBroadcastChannelTransport(channelB)\n\nconst tabB = await createEndpoint({\n  id: 'tab-b',\n  transport: tabBTransport,\n  middlewares: [connect({ transport: tabBTransport })]\n})\ntabB.provide('cart.count', (context) => context.success(3))\n\nconst tabA = await createEndpoint({\n  id: 'tab-a',\n  targetIds: ['tab-b'],\n  transport: tabATransport,\n  middlewares: [connect({ transport: tabATransport })]\n})\ntry {\n  console.log(await tabA.send<number>('tab-b', 'cart.count', null)) // 3\n} finally {\n  await tabA.dispose()\n  await tabB.dispose()\n  // 适配器借用频道，不负责关闭；由创建它的一方关闭。\n  channelA.close()\n  channelB.close()\n}"
+                "code": "import { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** iframe 已提供这些业务方法；流方法返回逐项结果。 */\ntype IActionApi = {\n  double(value: number): number\n  note(value: string): void\n  count(limit: number): AsyncIterableIterator<number>\n}\n\n/** 在实际 iframe 上演示 request、notify、stream、group 与资源释放。 */\nexport async function useFrame(iframe: HTMLIFrameElement) {\n  /** origin 必须来自应用固定的对端契约。 */\n  const peer = await createBrowserPeer<IActionApi>({\n    connect: { window: iframe.contentWindow!, origin: 'https://billing.example' },\n    defaultTimeoutMs: 5000\n  })\n  try {\n    console.log(await peer.request('double', 21)) // 42\n    await peer.notify('note', 'hello')\n    for await (const value of peer.stream('count', 3)) console.log(value)\n    console.log(\n      await peer.group([\n        { method: 'double', payload: 1 },\n        { method: 'double', payload: 2 }\n      ])\n    )\n    console.log(await peer.describe())\n  } finally {\n    await peer.close()\n  }\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`outcome` 与幂等方法声明沿用 rpc-process 公共 Peer API 的规则。类型只是业务契约，不授予载体身份或来源信任。"
               }
             ]
           },
@@ -219,242 +330,281 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\n/** 页面必须实际包含这个 iframe；本片段由浏览器宿主运行。 */\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: 'https://billing.example'\n})"
+                "code": "import { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** 页面实际持有的 iframe；对端提供 calculateTotal。 */\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\n/** 远端契约决定输入与返回值类型。 */\ntype IBillingApi = { calculateTotal(input: { prices: number[]; taxRate: number }): number }\n/** 只借用指定窗口；Core 在该载体上完成握手。 */\nconst billing = await createBrowserPeer<IBillingApi>({\n  connect: { window: iframe.contentWindow!, origin: 'https://billing.example' }\n})\nconsole.log(await billing.request('calculateTotal', { prices: [12, 30], taxRate: 0.08 }))\nawait billing.close()"
               },
               {
                 "type": "table",
-                "headers": ["选项", "说明"],
+                "headers": ["Window Peer 选项", "说明"],
                 "rows": [
                   [
-                    "`target`",
-                    "对端窗口：`iframe.contentWindow`、`window.parent`、`window.opener` 或 `window.open()` 的返回值"
+                    "`window`",
+                    "`iframe.contentWindow`、`window.parent`、`window.opener` 或 `window.open()` 的真实返回值。"
                   ],
-                  [
-                    "`receiver`",
-                    "监听 `message` 事件的对象。在窗口环境中可省略，默认为当前全局对象"
-                  ],
-                  [
-                    "`targetOrigin`",
-                    "对端的源。省略时默认 `location.origin`（只适用于同源）；跨域必须显式写出"
-                  ],
+                  ["`origin`", "必填的精确对端源；没有同源默认值。"],
+                  ["`receiver`", "接收 `message` 的实际窗口；窗口环境默认使用当前全局对象。"],
                   [
                     "`allowUnsafeTargetOrigin`",
-                    "设为 `true` 才允许 `targetOrigin: '*'`；仅在确实无法得知对端源时使用"
+                    "只有显式 `true` 才允许 `origin: '*'`；仍检查来源窗口。"
                   ]
                 ]
               },
               {
                 "type": "paragraph",
-                "text": "来源校验：只有同时满足\"事件的 `source` 就是 `target` 这个窗口\"和\"事件的 `origin` 等于 `targetOrigin`\"的消息才会被处理。页面中其它 iframe、扩展脚本发来的消息即使格式正确也会被忽略。使用 `'*'` 时仍会校验 `source`。"
+                "text": "Peer 复用现有 Window transport：`event.source` 必须是指定窗口，且 `event.origin` 必须等于指定 origin。错误 origin 或其它窗口的消息会被忽略。没有信任跳过开关。"
               },
               {
                 "type": "paragraph",
-                "text": "时机：父页面要等 iframe 的 `load` 事件之后再创建 Endpoint；iframe 内的代码也需要先完成 `createEndpoint` 和 `provide`，父页面的调用才会被处理。对端尚未就绪时，调用会在超时后失败，可以在业务层重试或先约定一个就绪信号。"
+                "text": "两端都启动 Peer 工厂；握手完成后才能调用。导航或卸载没有通用的远端关闭通知，在途调用按 Core deadline 失败。新页面需建立新 Peer；不能把旧方法目录当成新页面的身份。`close()` 只释放本端，不关闭借用窗口。"
+              },
+              {
+                "type": "paragraph",
+                "text": "直接 Endpoint 仍从 `@migaia/rpc-browser/adapters/window` 导入 `createWindowMessageTransport`，选项名称保留 `target` / `receiver` / `targetOrigin`；其中 `targetOrigin` 的既有同源默认值不适用于 Peer 的 `origin`。"
               }
             ]
           },
           {
-            "id": "3-broadcast-channel-同源标签页",
-            "heading": "3. broadcast-channel：同源标签页",
+            "id": "3-shared-worker-每个页面一个-peer",
+            "heading": "3. shared-worker：每个页面一个 Peer",
             "blocks": [
+              {
+                "type": "paragraph",
+                "text": "页面连接已有 SharedWorker；每个页面有独立端口、握手与方法目录。"
+              },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('cart')\nconst transport = createBroadcastChannelTransport(channel)\n// 尚未交给 Endpoint；创建方负责关闭借用频道。\nchannel.close()"
+                "code": "import { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** 与 Worker 保持一致的业务接口。 */\ntype ISharedApi = {\n  ping(): string\n  note(value: string): void\n  count(limit: number): AsyncIterableIterator<number>\n}\n/** 页面创建原生 Worker，并保留关闭其端口的责任。 */\nconst worker = new SharedWorker(new URL('./shared.worker.js', import.meta.url), { type: 'module' })\n/** 此 Peer 仅代表当前页面的端口。 */\nconst shared = await createBrowserPeer<ISharedApi>({ connect: { sharedWorker: worker } })\ntry {\n  console.log(await shared.request('ping')) // pong\n  await shared.notify('note', 'hello')\n  for await (const value of shared.stream('count', 3)) console.log(value) // 1 2 3\n} finally {\n  await shared.close()\n  worker.port.close()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "Worker 监听 `connect`，每个进入端口由 Core 接纳为独立 Peer。两个页面同时连接时不会共享方法目录或在途调用。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createBrowserPeer, type IRuntimeBrowserListen } from '@migaia/rpc-browser'\n\n/** 本模块运行于真实 SharedWorker；文档编译器以公开 connect scope 形状声明宿主 self。 */\ndeclare const self: IRuntimeBrowserListen\n\n/** 逐项生产计数，供每个页面的 stream 消费。 */\nasync function* count(limit: number) {\n  for (let value = 1; value <= limit; value++) yield value\n}\n/** 借用 SharedWorkerGlobalScope 的 connect 事件，不接管其原生生命周期。 */\nconst server = await createBrowserPeer({\n  listen: self,\n  provide: { ping: () => 'pong', note: (value: string) => console.log(value), count },\n  report: (error) => console.error(error)\n})\nserver.on('ready', (event) => console.log(event.instanceId))"
               },
               {
                 "type": "list",
                 "items": [
-                  "频道名相同的所有同源上下文（标签页、iframe、Worker）都会收到消息。用 Endpoint 的 `id` 与 `targetIds` 区分要调用的对象。",
-                  "同一频道上有多个对端提供同名方法时，用唯一的 `id` 定位调用目标。",
-                  "适配器借用频道，不负责关闭。"
+                  "页面传入的 `sharedWorker` 只需提供实际 `port`；可直接传 `SharedWorker`，或 `{ port }`。Peer 不接受 caller-supplied trusted 状态。",
+                  "`listen` 绑定实际接收 `connect` 的 scope，同一 scope 同时只能有一个监听器。先 `server.close()`，再重新绑定。",
+                  "监听器关闭时停止接纳并关闭已接纳的逻辑 Peer，不关闭借用端口。",
+                  "页面的 `port.close()` 没有通用远端通知；Worker 侧的 pending request 按 Core deadline 失败。",
+                  "`messageerror` 沿用载体错误报告。直接 Endpoint 仍使用 `createSharedWorkerTransport(worker.port)`。"
                 ]
               }
             ]
           },
           {
-            "id": "4-shared-worker-页面与-sharedworker",
-            "heading": "4. shared-worker：页面与 SharedWorker",
+            "id": "4-高阶用法-rtc-data-channel-可靠有序的-peer",
+            "heading": "4. 高阶用法：rtc-data-channel 可靠有序的 Peer",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "页面一侧："
-              },
-              {
-                "type": "code",
-                "language": "ts",
-                "code": "import { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'\n\nconst worker = new SharedWorker(new URL('./shared.worker.js', import.meta.url), { type: 'module' })\nconst transport = createSharedWorkerTransport(worker.port)"
+                "text": "信令（SDP / ICE）和频道创建由应用负责。Peer 只借用已打开的可靠有序频道。"
               },
               {
                 "type": "paragraph",
-                "text": "SharedWorker 一侧，对每个连接进来的页面各创建一个 Endpoint："
+                "text": "Advanced usage: finish signaling and wait for the caller-owned RTCDataChannel to open before creating the Peer. The channel must be ordered and reliable. Core owns the handshake and method directory; `peer.close()` releases the logical connection while the application retains ownership of the native channel."
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'\n\nself.addEventListener('connect', (event) => {\n  const port = (event as MessageEvent).ports[0]!\n  const transport = createSharedWorkerTransport(port)\n  void createEndpoint({\n    id: 'shared-worker', transport, middlewares: [connect({ transport })]\n  }).then((endpoint) => {\n    endpoint.provide('ping', (context) => context.success('pong'))\n  }).catch((error: unknown) => console.error(error))\n})"
+                "code": "import { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** 对端在同一可靠有序频道上提供 echo。 */\ntype IRtcApi = { echo(value: string): string }\n/** 应用先完成信令与 open，再交给 Peer。 */\nexport async function useRtc(channel: RTCDataChannel) {\n  /** 信令与 DataChannel 的所有权留在应用。 */\n  const peer = await createBrowserPeer<IRtcApi>({ connect: { rtcDataChannel: channel } })\n  try {\n    console.log(await peer.request('echo', 'hello'))\n  } finally {\n    await peer.close()\n  }\n}"
               },
               {
-                "type": "list",
-                "items": [
-                  "适配器会在需要时调用 `port.start()`，并监听 `messageerror`（无法反序列化的消息）作为载体错误上报。",
-                  "每个页面与 SharedWorker 之间是独立的端口，对端身份由端口本身区分。"
-                ]
+                "type": "paragraph",
+                "text": "`ordered` 必须为 `true`，`maxRetransmits` 与 `maxPacketLifeTime` 必须均为 `null`（默认可靠配置）。否则以浏览器 `RTC_CHANNEL_UNRELIABLE` 拒绝，不把无序/丢包频道伪装为 Runtime Peer。DataChannel 尚未 `open` 时沿用 transport 的 Core `INVALID_CONFIG`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "RTC transport 以 JSON 字符串收发。接收数据无法解码时报告 `MESSAGE_DECODE_FAILED`，保留原解码错误 cause。`closing` / `close` / `error` 沿用载体失败路径。`peer.close()` 不调用 `channel.close()`；应用负责关闭频道与 RTCPeerConnection。"
+              },
+              {
+                "type": "paragraph",
+                "text": "直接 Endpoint 入口 `@migaia/rpc-browser/adapters/rtc-data-channel` 及 `createRtcDataChannelTransport` 保留。"
               }
             ]
           },
           {
-            "id": "5-service-worker-页面与-service-worker",
-            "heading": "5. service-worker：页面与 Service Worker",
+            "id": "5-broadcast-channel-同源标签页",
+            "heading": "5. broadcast-channel：同源标签页",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "页面一侧（发给当前控制页面的 Service Worker）："
+                "text": "BroadcastChannel 为一对多同源广播，没有固定的一对一对端；不提供 Runtime Peer。继续用 Endpoint 的 id 与 targetIds 定位逻辑目标，频道不应承担敏感数据的独占通道。"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\nconst registration = await navigator.serviceWorker.ready\nconst transport = createServiceWorkerTransport({\n  target: registration.active!,\n  receiver: navigator.serviceWorker\n})"
+                "code": "import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\n/** 尚未交给 Endpoint 的借用频道，由创建者关闭。 */\nconst channel = new BroadcastChannel('cart')\n/** adapter 注册监听器时仍沿用既有来源边界。 */\nconst transport = createBroadcastChannelTransport(channel)\nchannel.close()"
               },
               {
                 "type": "paragraph",
-                "text": "Service Worker 一侧（回复某个具体页面）："
+                "text": "相同频道名的所有同源上下文都会收到消息。多个对端提供同名方法时，使用唯一 Endpoint id 选择目标。完整运行示例见第 8 节。"
+              }
+            ]
+          },
+          {
+            "id": "6-service-worker-页面与-service-worker",
+            "heading": "6. service-worker：页面与 Service Worker",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Service Worker 可能在空闲时被浏览器终止，内存握手与目录随之消失；本次不提供 Runtime Peer。页面仍可使用既有 Endpoint transport，并按业务需要重建连接、持久化状态。"
+              },
+              {
+                "type": "paragraph",
+                "text": "页面一侧发给当前控制页面的 Worker："
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "// service-worker.ts：由浏览器作为 Service Worker 加载。\nimport { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\nself.addEventListener('message', (event) => {\n  /** Service Worker 也可能收到非 Client 来源；这里只为实际页面建立回复通道。 */\n  const source = event.source\n  if (!source || !('id' in source)) return\n  const clientId = source.id\n  void self.clients.get(clientId).then((client) => {\n    if (!client) return\n    const transport = createServiceWorkerTransport({\n      target: client,\n      receiver: self,\n      peerId: client.id\n    })\n    // 把这个实际 Client 的 transport 交给该页面对应的 Endpoint。\n  }).catch((error: unknown) => console.error(error))\n})"
+                "code": "import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\n/** 等待浏览器确认当前注册可用，不由 RPC 创建注册。 */\nconst registration = await navigator.serviceWorker.ready\n/** 发送与接收主体分开；adapter 借用两者。 */\nconst transport = createServiceWorkerTransport({\n  target: registration.active!,\n  receiver: navigator.serviceWorker\n})"
+              },
+              {
+                "type": "paragraph",
+                "text": "Worker 一侧应先从实际 `clients.get(clientId)` 取得 Client，再调用下面的模块函数。使用 transport 的公开宿主形状，片段可在文档的 DOM 编译环境检查；没有模拟或授予 Client 身份。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import {\n  createServiceWorkerTransport,\n  type IServiceWorkerMessageReceiver,\n  type IServiceWorkerMessageTarget\n} from '@migaia/rpc-browser/adapters/service-worker'\n\n/** 宿主从 clients.get() 取得实际 Client 后，借用该 Client 与真实 Worker receiver。 */\nexport function openClientTransport(\n  client: IServiceWorkerMessageTarget & { readonly id: string },\n  receiver: IServiceWorkerMessageReceiver\n) {\n  return createServiceWorkerTransport({ target: client, receiver, peerId: client.id })\n}"
               },
               {
                 "type": "table",
-                "headers": ["选项", "说明"],
+                "headers": ["transport 选项", "说明"],
                 "rows": [
-                  [
-                    "`target`",
-                    "发送目标：页面一侧为 `ServiceWorker`，Service Worker 一侧为某个 `Client`"
-                  ],
-                  [
-                    "`receiver`",
-                    "监听 `message` 的对象：页面一侧为 `navigator.serviceWorker`，Service Worker 一侧为 `self`"
-                  ],
-                  ["`peerId`", "期望的对端 Client id；默认取 `target.id`"]
+                  ["`target`", "页面端为 `ServiceWorker`，Worker 端为实际 `Client`。"],
+                  ["`receiver`", "页面端为 `navigator.serviceWorker`，Worker 端为 `self`。"],
+                  ["`peerId`", "期望的对端 Client id，默认取 `target.id`。"]
                 ]
               },
               {
                 "type": "paragraph",
-                "text": "来源校验：消息的 `source` 必须是 `target` 本身，或其 `id` 等于 `peerId`。其它页面发来的消息会被忽略。"
-              },
-              {
-                "type": "paragraph",
-                "text": "生命周期提示：Service Worker 空闲时可能被浏览器终止，内存中的 Endpoint 随之消失。页面侧的调用会超时；在业务层准备好重建连接，并让需要持久的状态落到 IndexedDB 等存储中。"
+                "text": "消息 source 必须是 target 本身，或其 id 等于 peerId；其它页面会被忽略。Worker 的空闲终止通常只能由调用超时发现。"
               }
             ]
           },
           {
-            "id": "6-高阶用法-webrtc-与-webtransport",
-            "heading": "6. 高阶用法：WebRTC 与 WebTransport",
-            "blocks": [
-              {
-                "type": "paragraph",
-                "text": "点对点与服务器 datagram 载体需要你自行完成信令或会话建立，并且对消息可靠性有额外要求。"
-              }
-            ]
-          },
-          {
-            "id": "6-高阶用法-webrtc-与-webtransport-6-1-rtc-data-channel-webrtc-点对点",
-            "heading": "6. 高阶用法：WebRTC 与 WebTransport · 6.1 rtc-data-channel：WebRTC 点对点",
+            "id": "7-web-transport-不可靠-datagram",
+            "heading": "7. web-transport：不可靠 datagram",
             "blocks": [
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'\n\n/** 已完成信令的真实连接由调用方提供；适配器借用其可靠、有序的 DataChannel。 */\nexport async function openRtcTransport(peerConnection: RTCPeerConnection) {\n  const channel = peerConnection.createDataChannel('rpc', { ordered: true })\n  await new Promise<void>((resolve) => channel.addEventListener('open', () => resolve(), { once: true }))\n  return createRtcDataChannelTransport(channel)\n}"
+                "code": "import { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'\n\n/** 应用创建并持有服务器会话。 */\nconst session = new WebTransport('https://rpc.example:4433/rpc')\nawait session.ready\n/** transport 取得 datagram 写入端，但不接管整个会话。 */\nconst transport = createWebTransportDatagramTransport(session.datagrams)"
               },
               {
-                "type": "list",
-                "items": [
-                  "请使用可靠且有序的 DataChannel（默认配置即是）。RPC 依赖消息不丢失、不乱序。",
-                  "适配器以字符串收发：发送对象时自动 `JSON.stringify`。",
-                  "先等 `open` 再创建 transport：DataChannel 仍处于 `connecting` 时创建会以 `INVALID_CONFIG`（`TypeError`）拒绝。已经 `closed` 的频道创建后立即处于关闭状态，发送以 `TRANSPORT` 失败。",
-                  "`closing` / `close` / `error` 事件会作为载体关闭上报，之后的发送以 `TRANSPORT` 失败。",
-                  "信令（交换 SDP 与 ICE）不在本包范围内。适配器借用 DataChannel，不负责关闭。"
-                ]
+                "type": "paragraph",
+                "text": "不提供 Runtime Peer：datagram 可丢失或乱序，且消息大小受路径 MTU 限制。适合小消息、可容忍丢失的 Endpoint 场景；调用丢失由 deadline 发现。"
+              },
+              {
+                "type": "paragraph",
+                "text": "transport 只接受 `Uint8Array`，Endpoint 需配置输出字节的 codec，否则发送以 `TypeError` 拒绝。关闭 transport 会关闭取得的 datagram 写入端；`session.close()` 仍由应用负责。"
               }
             ]
           },
           {
-            "id": "6-高阶用法-webrtc-与-webtransport-6-2-web-transport-webtransport-datagram",
-            "heading": "6. 高阶用法：WebRTC 与 WebTransport · 6.2 web-transport：WebTransport datagram",
+            "id": "8-直接使用-endpoint-transport",
+            "heading": "8. 直接使用 Endpoint / transport",
             "blocks": [
+              {
+                "type": "paragraph",
+                "text": "每个适配器返回 `IRpcTransport`，交给 `createEndpoint`，并在 `connect` 中间件中再传一次以校验来源。以下完整 BroadcastChannel 示例使用 Node 的两个频道模拟同源标签页。"
+              },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'\n\nconst session = new WebTransport('https://rpc.example:4433/rpc')\nawait session.ready\nconst transport = createWebTransportDatagramTransport(session.datagrams)"
+                "code": "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\n/** 两个同源上下文使用同一频道名；创建者负责关闭频道。 */\nconst channelA = new BroadcastChannel('cart')\n/** 第二个逻辑标签页的独立频道实例。 */\nconst channelB = new BroadcastChannel('cart')\n/** 只借用第一个频道。 */\nconst tabATransport = createBroadcastChannelTransport(channelA)\n/** 只借用第二个频道。 */\nconst tabBTransport = createBroadcastChannelTransport(channelB)\n/** 提供方法的 Endpoint，由示例负责 dispose。 */\nconst tabB = await createEndpoint({\n  id: 'tab-b',\n  transport: tabBTransport,\n  middlewares: [connect({ transport: tabBTransport })]\n})\ntabB.provide('cart.count', (context) => context.success(3))\n/** 调用端固定目标 id，transport 仍为同源广播。 */\nconst tabA = await createEndpoint({\n  id: 'tab-a',\n  targetIds: ['tab-b'],\n  transport: tabATransport,\n  middlewares: [connect({ transport: tabATransport })]\n})\ntry {\n  console.log(await tabA.send<number>('tab-b', 'cart.count', null)) // 3\n} finally {\n  await tabA.dispose()\n  await tabB.dispose()\n  channelA.close()\n  channelB.close()\n}"
               },
               {
-                "type": "list",
-                "items": [
-                  "只接受 `Uint8Array`：Endpoint 必须配置把消息编码为字节的 codec 中间件，否则发送时以 `TypeError` 拒绝。",
-                  "datagram 不可靠：可能丢失、乱序，且单个 datagram 的大小受路径 MTU 限制（通常一千多字节）。丢失的调用只能靠超时发现。只适合小消息、可容忍丢失的场景；需要可靠传输时，请在应用层改用其它载体。",
-                  "适配器取得 `datagrams.writable` 的写入端，关闭 transport 时一并关闭；`WebTransport` 会话本身仍由你关闭。"
-                ]
+                "type": "paragraph",
+                "text": "`send` 的 data 为必填参数，无 payload 时传 `null`。Endpoint 方法通过 `context.data` 读取参数、`context.success` / `context.failed` 返回结果。业务版本和协议帧仍由 `contract({ version })` / `protocol()` 选择；两端组合需一致。Peer 已由 Core 配置其 Runtime 协议，不要求用户复制这些步骤。"
               }
             ]
           },
           {
-            "id": "7-选择指南",
-            "heading": "7. 选择指南",
+            "id": "9-选择指南",
+            "heading": "9. 选择指南",
             "blocks": [
               {
                 "type": "table",
                 "headers": ["需求", "推荐"],
                 "rows": [
-                  ["嵌入第三方页面 / 被第三方嵌入", "`window`，并精确设置 `targetOrigin`"],
-                  ["同一站点多个标签页共享状态或选主", "`broadcast-channel`"],
-                  ["多个标签页共享一个计算或连接", "`shared-worker`"],
-                  ["离线缓存、推送、后台同步", "`service-worker`"],
+                  ["iframe、弹窗、嵌入第三方页面", "Window Peer，显式固定 origin 和实际窗口。"],
                   [
-                    "页面内的后台计算",
-                    "`@migaia/rpc-threads`（由库创建 Worker）或 rpc-core 的 `web-worker` 适配器"
+                    "多个页面共享一个 Worker",
+                    "SharedWorker Peer；Worker listen，每个页面独立连接。"
                   ],
-                  ["浏览器之间直连", "`rtc-data-channel`"],
-                  ["低延迟、可丢包的服务器推送", "`web-transport`"]
+                  ["浏览器之间直连", "完成信令后借用可靠有序的 RTCDataChannel Peer。"],
+                  ["同源多个标签页广播或选主", "BroadcastChannel Endpoint。"],
+                  ["离线缓存、推送、后台同步", "Service Worker Endpoint，应用负责重建与持久化。"],
+                  ["可容忍丢包的服务器 datagram", "WebTransport Endpoint。"],
+                  ["页面内后台计算", "`@migaia/rpc-threads` 的 `createThreadPeer`。"],
+                  ["已有 MessagePort 或 Dedicated Worker", "rpc-core 对应 transport + Endpoint。"]
                 ]
+              },
+              {
+                "type": "paragraph",
+                "text": "`createBrowserPlugin` 暂不提供；没有新增 Host slot、Proxy facade、信令、重连监督或跨源信任快捷方式。六个原 transport 子入口均保留。"
               }
             ]
           },
           {
-            "id": "8-错误与常见问题",
-            "heading": "8. 错误与常见问题",
+            "id": "10-错误与生命周期",
+            "heading": "10. 错误与生命周期",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "本包不定义自己的错误码，错误都带 `@migaia/rpc/core` 的身份："
+                "text": "浏览器 Peer 自身错误的 source 为 `RPC_BROWSER_ERROR_SOURCE`（`@migaia/rpc/browser`），code 从 `RpcBrowserErrorCode` 读取。"
               },
               {
                 "type": "table",
-                "headers": ["code", "何时发生"],
+                "headers": ["Browser code", "场景与处理"],
                 "rows": [
                   [
-                    "`INVALID_CONFIG`",
-                    "参数缺失或非法，例如非窗口环境下没有 `receiver`、`targetOrigin` 为空或未经允许的 `'*'`、DataChannel 尚未 `open`"
+                    "`WINDOW_ORIGIN_REQUIRED`",
+                    "Window Peer 未显式提供非空 origin；填写固定对端源。"
                   ],
                   [
-                    "`TRANSPORT`",
-                    "载体失败：频道已关闭、DataChannel 不是 `open`、WebTransport 已关闭等"
+                    "`RTC_CHANNEL_UNRELIABLE`",
+                    "RTCDataChannel 无序或配置了有限重传；使用默认可靠有序频道。"
+                  ],
+                  [
+                    "`LISTENER_ALREADY_BOUND`",
+                    "同一个 SharedWorker scope 已绑定监听器；关闭原监听器再绑定。"
+                  ],
+                  [
+                    "`INVALID_PEER_SOURCE`",
+                    "connect/listen 来源或选项组合非法；选择一个受支持的真实载体。"
+                  ],
+                  [
+                    "`MESSAGE_DECODE_FAILED`",
+                    "RTC 消息无法解码；排查双方发送的数据，原失败保留在 cause。"
                   ]
                 ]
               },
               {
                 "type": "paragraph",
-                "text": "调用一直超时？ 最常见的原因是来源校验没有通过：检查 `targetOrigin` 是否与对端实际的源一致（协议、域名、端口都要相同），以及 `target` 是否是真正发消息的那个窗口。其次检查对端是否已经完成 `createEndpoint` 与 `provide`。"
+                "text": "Core / Remote 继续拥有握手、目录、调用、取消与超时错误。现有 transport 的非法配置为 Core `INVALID_CONFIG`，物理载体失败为 Core `TRANSPORT`；调用 deadline 使用既有 Core code。不要把远端传回的 source/code 当成本地控制权限。"
               },
               {
                 "type": "paragraph",
-                "text": "页面关闭后需要清理吗？ 在 `pagehide` 中调用 `endpoint.dispose()`，注销监听器并拒绝在途调用。"
+                "text": "关闭与竞争： `close()` 可重复调用；初始化中可用 signal 取消握手并释放已安装的监听器。close 后不再接纳晚到的业务消息。窗口导航/卸载、页面静默关闭 SharedWorker 端口没有可靠的远端关闭事件，pending 调用沿用 Core deadline；未配置有效等待上限时不能承诺及时发现断开。"
               },
               {
                 "type": "paragraph",
-                "text": "能传 `ArrayBuffer` 吗？ window、shared-worker、service-worker 基于结构化克隆，可以传输；rtc-data-channel 以 JSON 字符串传输，二进制需要自行编码（例如 base64）。"
+                "text": "调用一直超时： 检查固定 origin、真实来源窗口、对端是否已经启动 Peer，以及两端实际方法目录。Endpoint 用户还需检查中间件与 provide。"
+              },
+              {
+                "type": "paragraph",
+                "text": "页面退出： 在本地 `pagehide` 中调用 `peer.close()` 或 `endpoint.dispose()`；借用端口与频道仍由创建者关闭。"
+              },
+              {
+                "type": "paragraph",
+                "text": "二进制： Window / SharedWorker / Service Worker transport 使用结构化克隆；RTC 以 JSON 字符串传输，二进制需应用选择合适的编码。Runtime payload 仍受 Core 的公共可移植值契约约束。"
               }
             ]
           }
@@ -463,6 +613,965 @@
     }
   },
   "apis": [
+    {
+      "id": "rpc-browser:index",
+      "library": "rpc-browser",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-browser/getting-started",
+      "architecturePath": "/en/architecture/rpc-browser",
+      "symbols": [
+        {
+          "name": "createBrowserPeer",
+          "kind": "function",
+          "signature": "export declare function createBrowserPeer<TRemote = never>(options: IRuntimeBrowserPeerOptions): Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>;\nexport declare function createBrowserPeer(options: IRuntimeBrowserPeerOptions): Promise<IRuntimePeer>;",
+          "declarationLine": 4,
+          "source": "packages/rpc-browser/dist/browser/peer.d.ts",
+          "purpose": "A declared remote surface retains the same method, payload and generator typing as other Peers. Preserve the same dynamic factory signature used by the canonical Runtime Peer constructor.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBrowserPeer.",
+          "advanced": "No additional advanced behavior is declared for createBrowserPeer.",
+          "parameters": ["options: IRuntimeBrowserPeerOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IRuntimeBrowserPeerOptions",
+              "optional": false
+            }
+          ],
+          "returns": "Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>> | Promise<IRuntimePeer>",
+          "errors": ["No documented errors are declared for createBrowserPeer."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBrowserPeer.",
+          "examples": [
+            "import { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** iframe 已提供这些业务方法；流方法返回逐项结果。 */\ntype IActionApi = {\n  double(value: number): number\n  note(value: string): void\n  count(limit: number): AsyncIterableIterator<number>\n}\n\n/** 在实际 iframe 上演示 request、notify、stream、group 与资源释放。 */\nexport async function useFrame(iframe: HTMLIFrameElement) {\n  /** origin 必须来自应用固定的对端契约。 */\n  const peer = await createBrowserPeer<IActionApi>({\n    connect: { window: iframe.contentWindow!, origin: 'https://billing.example' },\n    defaultTimeoutMs: 5000\n  })\n  try {\n    console.log(await peer.request('double', 21)) // 42\n    await peer.notify('note', 'hello')\n    for await (const value of peer.stream('count', 3)) console.log(value)\n    console.log(\n      await peer.group([\n        { method: 'double', payload: 1 },\n        { method: 'double', payload: 2 }\n      ])\n    )\n    console.log(await peer.describe())\n  } finally {\n    await peer.close()\n  }\n}",
+            "import { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** 页面实际持有的 iframe；对端提供 calculateTotal。 */\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\n/** 远端契约决定输入与返回值类型。 */\ntype IBillingApi = { calculateTotal(input: { prices: number[]; taxRate: number }): number }\n/** 只借用指定窗口；Core 在该载体上完成握手。 */\nconst billing = await createBrowserPeer<IBillingApi>({\n  connect: { window: iframe.contentWindow!, origin: 'https://billing.example' }\n})\nconsole.log(await billing.request('calculateTotal', { prices: [12, 30], taxRate: 0.08 }))\nawait billing.close()",
+            "import { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** 与 Worker 保持一致的业务接口。 */\ntype ISharedApi = {\n  ping(): string\n  note(value: string): void\n  count(limit: number): AsyncIterableIterator<number>\n}\n/** 页面创建原生 Worker，并保留关闭其端口的责任。 */\nconst worker = new SharedWorker(new URL('./shared.worker.js', import.meta.url), { type: 'module' })\n/** 此 Peer 仅代表当前页面的端口。 */\nconst shared = await createBrowserPeer<ISharedApi>({ connect: { sharedWorker: worker } })\ntry {\n  console.log(await shared.request('ping')) // pong\n  await shared.notify('note', 'hello')\n  for await (const value of shared.stream('count', 3)) console.log(value) // 1 2 3\n} finally {\n  await shared.close()\n  worker.port.close()\n}",
+            "import { createBrowserPeer, type IRuntimeBrowserListen } from '@migaia/rpc-browser'\n\n/** 本模块运行于真实 SharedWorker；文档编译器以公开 connect scope 形状声明宿主 self。 */\ndeclare const self: IRuntimeBrowserListen\n\n/** 逐项生产计数，供每个页面的 stream 消费。 */\nasync function* count(limit: number) {\n  for (let value = 1; value <= limit; value++) yield value\n}\n/** 借用 SharedWorkerGlobalScope 的 connect 事件，不接管其原生生命周期。 */\nconst server = await createBrowserPeer({\n  listen: self,\n  provide: { ping: () => 'pong', note: (value: string) => console.log(value), count },\n  report: (error) => console.error(error)\n})\nserver.on('ready', (event) => console.log(event.instanceId))",
+            "import { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** 对端在同一可靠有序频道上提供 echo。 */\ntype IRtcApi = { echo(value: string): string }\n/** 应用先完成信令与 open，再交给 Peer。 */\nexport async function useRtc(channel: RTCDataChannel) {\n  /** 信令与 DataChannel 的所有权留在应用。 */\n  const peer = await createBrowserPeer<IRtcApi>({ connect: { rtcDataChannel: channel } })\n  try {\n    console.log(await peer.request('echo', 'hello'))\n  } finally {\n    await peer.close()\n  }\n}",
+            "// billing-frame.ts\nimport { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** 当前 iframe 的 Peer 只接受指定父窗口与源；页面关闭时释放本端监听器。 */\nconst billing = await createBrowserPeer({\n  connect: { window: window.parent, origin: 'https://shop.example' },\n  provide: {\n    /** 按总价与税率返回含税金额。 */\n    calculateTotal: (input: { prices: number[]; taxRate: number }) =>\n      input.prices.reduce((sum, price) => sum + price, 0) * (1 + input.taxRate)\n  }\n})\n\nwindow.addEventListener('pagehide', () => void billing.close(), { once: true })",
+            "// parent.ts\nimport { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** 对端公开的方法形状，决定 request 的方法名、输入与结果类型。 */\ntype IBillingApi = { calculateTotal(input: { prices: number[]; taxRate: number }): number }\n/** 页面中的实际 iframe；调用方固定其对端源。 */\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\n/** 工厂完成表示两端握手与方法目录已就绪。 */\nconst billing = await createBrowserPeer<IBillingApi>({\n  connect: { window: iframe.contentWindow!, origin: 'https://billing.example' }\n})\n\nconsole.log(await billing.request('calculateTotal', { prices: [12, 30], taxRate: 0.08 })) // 45.36\nawait billing.close()",
+            "import { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** Worker 提供的类型契约。 */\ntype ISharedApi = { ping(): string }\n/** Worker 与端口由页面持有；Peer 只借用端口。 */\nconst worker = new SharedWorker(new URL('./shared.worker.js', import.meta.url), { type: 'module' })\n/** 当前页面有自己的连接与方法目录。 */\nconst shared = await createBrowserPeer<ISharedApi>({ connect: { sharedWorker: worker } })\nconsole.log(await shared.request('ping')) // pong\nawait shared.close()\nworker.port.close()",
+            "import { createBrowserPeer, type IRuntimeBrowserListen } from '@migaia/rpc-browser'\n\n/** 本模块由真实 SharedWorker 宿主加载；声明其 connect 事件形状供 DOM 文档编译器检查。 */\ndeclare const self: IRuntimeBrowserListen\n\n/** Worker 的连接监听器；调用 close() 时停止接纳并关闭已接纳的逻辑 Peer。 */\nconst server = await createBrowserPeer({\n  listen: self,\n  provide: { ping: () => 'pong' },\n  report: (error) => console.error(error)\n})"
+          ],
+          "members": [],
+          "aliasOf": "createBrowserPeer",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createBrowserPeer<TRemote = never>(options: IRuntimeBrowserPeerOptions): Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>;",
+            "export declare function createBrowserPeer(options: IRuntimeBrowserPeerOptions): Promise<IRuntimePeer>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IRuntimeBrowserPeerOptions",
+                "optional": false
+              }
+            ],
+            [
+              {
+                "name": "options",
+                "type": "IRuntimeBrowserPeerOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>",
+            "Promise<IRuntimePeer>"
+          ],
+          "whenToUse": "Use createBrowserPeer when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createBrowserPeer does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A declared remote surface retains the same method, payload and generator typing as other Peers. Preserve the same dynamic factory signature used by the canonical Runtime Peer constructor."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createBrowserPeer from @migaia/rpc-browser, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createBrowserPeer when its function contract and declared inputs match the result you need. Choose a different public symbol when createBrowserPeer does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBrowserPeer."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createBrowserPeer."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/peer.d.ts:createBrowserPeer:export declare function createBrowserPeer<TRemote = never>(options: IRuntimeBrowserPeerOptions): Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>;\nexport declare function createBrowserPeer(options: IRuntimeBrowserPeerOptions): Promise<IRuntimePeer>;",
+          "guidance": [],
+          "usageScore": 100,
+          "configuration": [],
+          "fragment": "rpc-browser-index--createBrowserPeer"
+        },
+        {
+          "name": "IRpcBrowserErrorCode",
+          "kind": "type",
+          "signature": "export type IRpcBrowserErrorCode = (typeof RpcBrowserErrorCode)[keyof typeof RpcBrowserErrorCode];",
+          "declarationLine": 28,
+          "source": "packages/rpc-browser/dist/error-code.d.ts",
+          "purpose": "IRpcBrowserErrorCode is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcBrowserErrorCode.",
+          "advanced": "No additional advanced behavior is declared for IRpcBrowserErrorCode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcBrowserErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcBrowserErrorCode.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcBrowserErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcBrowserErrorCode = (typeof RpcBrowserErrorCode)[keyof typeof RpcBrowserErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcBrowserErrorCode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcBrowserErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IRpcBrowserErrorCode is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcBrowserErrorCode from @migaia/rpc-browser, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcBrowserErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcBrowserErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcBrowserErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcBrowserErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/error-code.d.ts:IRpcBrowserErrorCode:export type IRpcBrowserErrorCode = (typeof RpcBrowserErrorCode)[keyof typeof RpcBrowserErrorCode];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-browser-index--IRpcBrowserErrorCode"
+        },
+        {
+          "name": "IRuntimeBrowserConnect",
+          "kind": "type",
+          "signature": "export type IRuntimeBrowserConnect = IRuntimeBrowserWindowConnect | IRuntimeBrowserSharedWorkerConnect | IRuntimeBrowserRtcConnect;",
+          "declarationLine": 33,
+          "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
+          "purpose": "Only one-to-one ordered reliable carriers can supply a Browser Runtime Peer connection.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserConnect.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeBrowserConnect.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeBrowserConnect."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserConnect.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeBrowserConnect",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeBrowserConnect = IRuntimeBrowserWindowConnect | IRuntimeBrowserSharedWorkerConnect | IRuntimeBrowserRtcConnect;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeBrowserConnect when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeBrowserConnect does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Only one-to-one ordered reliable carriers can supply a Browser Runtime Peer connection."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeBrowserConnect from @migaia/rpc-browser, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeBrowserConnect when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeBrowserConnect does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserConnect."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeBrowserConnect."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserConnect:export type IRuntimeBrowserConnect = IRuntimeBrowserWindowConnect | IRuntimeBrowserSharedWorkerConnect | IRuntimeBrowserRtcConnect;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-browser-index--IRuntimeBrowserConnect"
+        },
+        {
+          "name": "IRuntimeBrowserConnectEvent",
+          "kind": "type",
+          "signature": "export type IRuntimeBrowserConnectEvent = Readonly<{ ports: readonly ISharedWorkerPort[]; }>;",
+          "declarationLine": 35,
+          "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
+          "purpose": "SharedWorker connection events supply actual native ports, never a preaccepted Peer or identity.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserConnectEvent.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeBrowserConnectEvent.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeBrowserConnectEvent."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserConnectEvent.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeBrowserConnectEvent",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeBrowserConnectEvent = Readonly<{ ports: readonly ISharedWorkerPort[]; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeBrowserConnectEvent when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeBrowserConnectEvent does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "SharedWorker connection events supply actual native ports, never a preaccepted Peer or identity."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeBrowserConnectEvent from @migaia/rpc-browser, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeBrowserConnectEvent when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeBrowserConnectEvent does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserConnectEvent."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeBrowserConnectEvent."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserConnectEvent:export type IRuntimeBrowserConnectEvent = Readonly<{ ports: readonly ISharedWorkerPort[]; }>;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-browser-index--IRuntimeBrowserConnectEvent"
+        },
+        {
+          "name": "IRuntimeBrowserListen",
+          "kind": "type",
+          "signature": "export type IRuntimeBrowserListen = Readonly<{ addEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; removeEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; }>;",
+          "declarationLine": 39,
+          "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
+          "purpose": "A worker-side connect scope owns accept notification while each accepted port remains borrowed.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserListen.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeBrowserListen.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeBrowserListen."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserListen.",
+          "examples": [
+            "import { createBrowserPeer, type IRuntimeBrowserListen } from '@migaia/rpc-browser'\n\n/** 本模块运行于真实 SharedWorker；文档编译器以公开 connect scope 形状声明宿主 self。 */\ndeclare const self: IRuntimeBrowserListen\n\n/** 逐项生产计数，供每个页面的 stream 消费。 */\nasync function* count(limit: number) {\n  for (let value = 1; value <= limit; value++) yield value\n}\n/** 借用 SharedWorkerGlobalScope 的 connect 事件，不接管其原生生命周期。 */\nconst server = await createBrowserPeer({\n  listen: self,\n  provide: { ping: () => 'pong', note: (value: string) => console.log(value), count },\n  report: (error) => console.error(error)\n})\nserver.on('ready', (event) => console.log(event.instanceId))",
+            "import { createBrowserPeer, type IRuntimeBrowserListen } from '@migaia/rpc-browser'\n\n/** 本模块由真实 SharedWorker 宿主加载；声明其 connect 事件形状供 DOM 文档编译器检查。 */\ndeclare const self: IRuntimeBrowserListen\n\n/** Worker 的连接监听器；调用 close() 时停止接纳并关闭已接纳的逻辑 Peer。 */\nconst server = await createBrowserPeer({\n  listen: self,\n  provide: { ping: () => 'pong' },\n  report: (error) => console.error(error)\n})"
+          ],
+          "members": [],
+          "aliasOf": "IRuntimeBrowserListen",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeBrowserListen = Readonly<{ addEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; removeEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeBrowserListen when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeBrowserListen does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A worker-side connect scope owns accept notification while each accepted port remains borrowed."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeBrowserListen from @migaia/rpc-browser, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeBrowserListen when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeBrowserListen does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserListen."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeBrowserListen."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserListen:export type IRuntimeBrowserListen = Readonly<{ addEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; removeEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void; }>;",
+          "guidance": [],
+          "usageScore": 28,
+          "configuration": [],
+          "fragment": "rpc-browser-index--IRuntimeBrowserListen"
+        },
+        {
+          "name": "IRuntimeBrowserPeerOptions",
+          "kind": "type",
+          "signature": "export type IRuntimeBrowserPeerOptions = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> & Readonly<{ connect?: IRuntimeBrowserConnect; listen?: IRuntimeBrowserListen; /** * Caller cancellation releases unfinished handshake subscriptions without closing borrowed * carriers. */ signal?: IAdapterDefinitionPeerOptions<unknown>['signal']; }>;",
+          "declarationLine": 44,
+          "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
+          "purpose": "Browser physical sources share the original Runtime Peer provider, timeout and error contracts.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserPeerOptions.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeBrowserPeerOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeBrowserPeerOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserPeerOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeBrowserPeerOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeBrowserPeerOptions = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> & Readonly<{ connect?: IRuntimeBrowserConnect; listen?: IRuntimeBrowserListen; /** * Caller cancellation releases unfinished handshake subscriptions without closing borrowed * carriers. */ signal?: IAdapterDefinitionPeerOptions<unknown>['signal']; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeBrowserPeerOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeBrowserPeerOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Browser physical sources share the original Runtime Peer provider, timeout and error contracts."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeBrowserPeerOptions from @migaia/rpc-browser, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeBrowserPeerOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeBrowserPeerOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserPeerOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeBrowserPeerOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserPeerOptions:export type IRuntimeBrowserPeerOptions = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> & Readonly<{ connect?: IRuntimeBrowserConnect; listen?: IRuntimeBrowserListen; /** * Caller cancellation releases unfinished handshake subscriptions without closing borrowed * carriers. */ signal?: IAdapterDefinitionPeerOptions<unknown>['signal']; }>;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "rpc-browser-index--IRuntimeBrowserPeerOptions"
+        },
+        {
+          "name": "IRuntimeBrowserRtcConnect",
+          "kind": "type",
+          "signature": "export type IRuntimeBrowserRtcConnect = Readonly<{ rtcDataChannel: IRuntimeBrowserRtcDataChannel; }>;",
+          "declarationLine": 29,
+          "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
+          "purpose": "The caller establishes and owns the already-open RTC channel.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserRtcConnect.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeBrowserRtcConnect.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeBrowserRtcConnect."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserRtcConnect.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeBrowserRtcConnect",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeBrowserRtcConnect = Readonly<{ rtcDataChannel: IRuntimeBrowserRtcDataChannel; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeBrowserRtcConnect when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeBrowserRtcConnect does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The caller establishes and owns the already-open RTC channel."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeBrowserRtcConnect from @migaia/rpc-browser, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeBrowserRtcConnect when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeBrowserRtcConnect does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserRtcConnect."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeBrowserRtcConnect."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserRtcConnect:export type IRuntimeBrowserRtcConnect = Readonly<{ rtcDataChannel: IRuntimeBrowserRtcDataChannel; }>;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-browser-index--IRuntimeBrowserRtcConnect"
+        },
+        {
+          "name": "IRuntimeBrowserRtcDataChannel",
+          "kind": "type",
+          "signature": "export type IRuntimeBrowserRtcDataChannel = IRTCDataChannel & Readonly<{ ordered: boolean; maxRetransmits: number | null; maxPacketLifeTime: number | null; }>;",
+          "declarationLine": 23,
+          "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
+          "purpose": "Native RTC settings must expose the ordered reliable configuration required by a Runtime Peer.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserRtcDataChannel.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeBrowserRtcDataChannel.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeBrowserRtcDataChannel."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserRtcDataChannel.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeBrowserRtcDataChannel",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeBrowserRtcDataChannel = IRTCDataChannel & Readonly<{ ordered: boolean; maxRetransmits: number | null; maxPacketLifeTime: number | null; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeBrowserRtcDataChannel when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeBrowserRtcDataChannel does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native RTC settings must expose the ordered reliable configuration required by a Runtime Peer."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeBrowserRtcDataChannel from @migaia/rpc-browser, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeBrowserRtcDataChannel when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeBrowserRtcDataChannel does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserRtcDataChannel."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeBrowserRtcDataChannel."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserRtcDataChannel:export type IRuntimeBrowserRtcDataChannel = IRTCDataChannel & Readonly<{ ordered: boolean; maxRetransmits: number | null; maxPacketLifeTime: number | null; }>;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-browser-index--IRuntimeBrowserRtcDataChannel"
+        },
+        {
+          "name": "IRuntimeBrowserSharedWorkerConnect",
+          "kind": "type",
+          "signature": "export type IRuntimeBrowserSharedWorkerConnect = Readonly<{ sharedWorker: Readonly<{ port: ISharedWorkerPort; }>; }>;",
+          "declarationLine": 17,
+          "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
+          "purpose": "The caller owns the SharedWorker and its concrete page-side messaging port.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserSharedWorkerConnect.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeBrowserSharedWorkerConnect.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeBrowserSharedWorkerConnect."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserSharedWorkerConnect.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeBrowserSharedWorkerConnect",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeBrowserSharedWorkerConnect = Readonly<{ sharedWorker: Readonly<{ port: ISharedWorkerPort; }>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeBrowserSharedWorkerConnect when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeBrowserSharedWorkerConnect does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The caller owns the SharedWorker and its concrete page-side messaging port."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeBrowserSharedWorkerConnect from @migaia/rpc-browser, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeBrowserSharedWorkerConnect when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeBrowserSharedWorkerConnect does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserSharedWorkerConnect."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeBrowserSharedWorkerConnect."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserSharedWorkerConnect:export type IRuntimeBrowserSharedWorkerConnect = Readonly<{ sharedWorker: Readonly<{ port: ISharedWorkerPort; }>; }>;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-browser-index--IRuntimeBrowserSharedWorkerConnect"
+        },
+        {
+          "name": "IRuntimeBrowserWindowConnect",
+          "kind": "type",
+          "signature": "export type IRuntimeBrowserWindowConnect = Readonly<{ window: IWindowMessageTarget; origin: string; receiver?: IWindowMessageReceiver; allowUnsafeTargetOrigin?: boolean; }>;",
+          "declarationLine": 10,
+          "source": "packages/rpc-browser/dist/browser/peer-types.d.ts",
+          "purpose": "Borrowed Window delivery requires an explicit origin and retains the transport's sole wildcard escape.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserWindowConnect.",
+          "advanced": "No additional advanced behavior is declared for IRuntimeBrowserWindowConnect.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRuntimeBrowserWindowConnect."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserWindowConnect.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRuntimeBrowserWindowConnect",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRuntimeBrowserWindowConnect = Readonly<{ window: IWindowMessageTarget; origin: string; receiver?: IWindowMessageReceiver; allowUnsafeTargetOrigin?: boolean; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRuntimeBrowserWindowConnect when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRuntimeBrowserWindowConnect does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Borrowed Window delivery requires an explicit origin and retains the transport's sole wildcard escape."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRuntimeBrowserWindowConnect from @migaia/rpc-browser, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRuntimeBrowserWindowConnect when its type contract and declared inputs match the result you need. Choose a different public symbol when IRuntimeBrowserWindowConnect does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeBrowserWindowConnect."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRuntimeBrowserWindowConnect."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/browser/peer-types.d.ts:IRuntimeBrowserWindowConnect:export type IRuntimeBrowserWindowConnect = Readonly<{ window: IWindowMessageTarget; origin: string; receiver?: IWindowMessageReceiver; allowUnsafeTargetOrigin?: boolean; }>;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-browser-index--IRuntimeBrowserWindowConnect"
+        },
+        {
+          "name": "RPC_BROWSER_ERROR_SOURCE",
+          "kind": "const",
+          "signature": "export declare const RPC_BROWSER_ERROR_SOURCE = \"@migaia/rpc/browser\";",
+          "declarationLine": 5,
+          "source": "packages/rpc-browser/dist/error-code.d.ts",
+          "purpose": "Browser Peer admission and RTC decoding are owned by this module; wire errors retain Core identity.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RPC_BROWSER_ERROR_SOURCE.",
+          "advanced": "No additional advanced behavior is declared for RPC_BROWSER_ERROR_SOURCE.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for RPC_BROWSER_ERROR_SOURCE."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RPC_BROWSER_ERROR_SOURCE.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "ERROR_SOURCE",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const RPC_BROWSER_ERROR_SOURCE = \"@migaia/rpc/browser\";"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use RPC_BROWSER_ERROR_SOURCE when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when RPC_BROWSER_ERROR_SOURCE does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Browser Peer admission and RTC decoding are owned by this module; wire errors retain Core identity."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RPC_BROWSER_ERROR_SOURCE from @migaia/rpc-browser, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RPC_BROWSER_ERROR_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when RPC_BROWSER_ERROR_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RPC_BROWSER_ERROR_SOURCE."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for RPC_BROWSER_ERROR_SOURCE."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/error-code.d.ts:RPC_BROWSER_ERROR_SOURCE:export declare const RPC_BROWSER_ERROR_SOURCE = \"@migaia/rpc/browser\";",
+          "guidance": [
+            {
+              "id": "10-错误与生命周期",
+              "heading": "10. 错误与生命周期",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "浏览器 Peer 自身错误的 source 为 `RPC_BROWSER_ERROR_SOURCE`（`@migaia/rpc/browser`），code 从 `RpcBrowserErrorCode` 读取。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Browser code", "场景与处理"],
+                  "rows": [
+                    [
+                      "`WINDOW_ORIGIN_REQUIRED`",
+                      "Window Peer 未显式提供非空 origin；填写固定对端源。"
+                    ],
+                    [
+                      "`RTC_CHANNEL_UNRELIABLE`",
+                      "RTCDataChannel 无序或配置了有限重传；使用默认可靠有序频道。"
+                    ],
+                    [
+                      "`LISTENER_ALREADY_BOUND`",
+                      "同一个 SharedWorker scope 已绑定监听器；关闭原监听器再绑定。"
+                    ],
+                    [
+                      "`INVALID_PEER_SOURCE`",
+                      "connect/listen 来源或选项组合非法；选择一个受支持的真实载体。"
+                    ],
+                    [
+                      "`MESSAGE_DECODE_FAILED`",
+                      "RTC 消息无法解码；排查双方发送的数据，原失败保留在 cause。"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Core / Remote 继续拥有握手、目录、调用、取消与超时错误。现有 transport 的非法配置为 Core `INVALID_CONFIG`，物理载体失败为 Core `TRANSPORT`；调用 deadline 使用既有 Core code。不要把远端传回的 source/code 当成本地控制权限。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "关闭与竞争： `close()` 可重复调用；初始化中可用 signal 取消握手并释放已安装的监听器。close 后不再接纳晚到的业务消息。窗口导航/卸载、页面静默关闭 SharedWorker 端口没有可靠的远端关闭事件，pending 调用沿用 Core deadline；未配置有效等待上限时不能承诺及时发现断开。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "调用一直超时： 检查固定 origin、真实来源窗口、对端是否已经启动 Peer，以及两端实际方法目录。Endpoint 用户还需检查中间件与 provide。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "页面退出： 在本地 `pagehide` 中调用 `peer.close()` 或 `endpoint.dispose()`；借用端口与频道仍由创建者关闭。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "二进制： Window / SharedWorker / Service Worker transport 使用结构化克隆；RTC 以 JSON 字符串传输，二进制需应用选择合适的编码。Runtime payload 仍受 Core 的公共可移植值契约约束。"
+                }
+              ]
+            },
+            {
+              "id": "错误",
+              "heading": "错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Peer 配置与载体解码错误使用 `RPC_BROWSER_ERROR_SOURCE`（`@migaia/rpc/browser`）及 `RpcBrowserErrorCode`：`WINDOW_ORIGIN_REQUIRED`、`RTC_CHANNEL_UNRELIABLE`、`LISTENER_ALREADY_BOUND`、`INVALID_PEER_SOURCE`、`MESSAGE_DECODE_FAILED`。错误保持原生类型与 cause。握手、调用、取消、超时沿用 Core / Remote 的错误身份；现有 transport 配置错误与载体失败继续使用 Core 的 `INVALID_CONFIG` / `TRANSPORT`。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 8,
+          "configuration": [],
+          "fragment": "rpc-browser-index--RPC_BROWSER_ERROR_SOURCE"
+        },
+        {
+          "name": "RpcBrowserErrorCode",
+          "kind": "const",
+          "signature": "export declare const RpcBrowserErrorCode: { /** * BP-R2 requires a nonempty explicit Window origin; provide the destination origin before * connecting. */ readonly windowOriginRequired: \"WINDOW_ORIGIN_REQUIRED\"; /** BP-R5 requires ordered reliable RTC delivery; use a reliable channel or the Endpoint API. */ readonly rtcChannelUnreliable: \"RTC_CHANNEL_UNRELIABLE\"; /** BP-R3 allows one active listener per SharedWorker scope; close or reuse that listener first. */ readonly listenerAlreadyBound: \"LISTENER_ALREADY_BOUND\"; /** * BP-R1 rejects conflicting or unsupported sources; supply one concrete connect source or listen * scope. */ readonly invalidPeerSource: \"INVALID_PEER_SOURCE\"; /** BP-R5 rejects malformed RTC JSON and retains the decoder cause; correct the remote wire input. */ readonly messageDecodeFailed: \"MESSAGE_DECODE_FAILED\"; };",
+          "declarationLine": 10,
+          "source": "packages/rpc-browser/dist/error-code.d.ts",
+          "purpose": "Browser Peer configuration failures have stable semantic identities independent from Core control.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcBrowserErrorCode.",
+          "advanced": "No additional advanced behavior is declared for RpcBrowserErrorCode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for RpcBrowserErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcBrowserErrorCode.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "RpcBrowserErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const RpcBrowserErrorCode: { /** * BP-R2 requires a nonempty explicit Window origin; provide the destination origin before * connecting. */ readonly windowOriginRequired: \"WINDOW_ORIGIN_REQUIRED\"; /** BP-R5 requires ordered reliable RTC delivery; use a reliable channel or the Endpoint API. */ readonly rtcChannelUnreliable: \"RTC_CHANNEL_UNRELIABLE\"; /** BP-R3 allows one active listener per SharedWorker scope; close or reuse that listener first. */ readonly listenerAlreadyBound: \"LISTENER_ALREADY_BOUND\"; /** * BP-R1 rejects conflicting or unsupported sources; supply one concrete connect source or listen * scope. */ readonly invalidPeerSource: \"INVALID_PEER_SOURCE\"; /** BP-R5 rejects malformed RTC JSON and retains the decoder cause; correct the remote wire input. */ readonly messageDecodeFailed: \"MESSAGE_DECODE_FAILED\"; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use RpcBrowserErrorCode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when RpcBrowserErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Browser Peer configuration failures have stable semantic identities independent from Core control."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RpcBrowserErrorCode from @migaia/rpc-browser, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RpcBrowserErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when RpcBrowserErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcBrowserErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for RpcBrowserErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-browser/dist/error-code.d.ts:RpcBrowserErrorCode:export declare const RpcBrowserErrorCode: { /** * BP-R2 requires a nonempty explicit Window origin; provide the destination origin before * connecting. */ readonly windowOriginRequired: \"WINDOW_ORIGIN_REQUIRED\"; /** BP-R5 requires ordered reliable RTC delivery; use a reliable channel or the Endpoint API. */ readonly rtcChannelUnreliable: \"RTC_CHANNEL_UNRELIABLE\"; /** BP-R3 allows one active listener per SharedWorker scope; close or reuse that listener first. */ readonly listenerAlreadyBound: \"LISTENER_ALREADY_BOUND\"; /** * BP-R1 rejects conflicting or unsupported sources; supply one concrete connect source or listen * scope. */ readonly invalidPeerSource: \"INVALID_PEER_SOURCE\"; /** BP-R5 rejects malformed RTC JSON and retains the decoder cause; correct the remote wire input. */ readonly messageDecodeFailed: \"MESSAGE_DECODE_FAILED\"; };",
+          "guidance": [
+            {
+              "id": "10-错误与生命周期",
+              "heading": "10. 错误与生命周期",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "浏览器 Peer 自身错误的 source 为 `RPC_BROWSER_ERROR_SOURCE`（`@migaia/rpc/browser`），code 从 `RpcBrowserErrorCode` 读取。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Browser code", "场景与处理"],
+                  "rows": [
+                    [
+                      "`WINDOW_ORIGIN_REQUIRED`",
+                      "Window Peer 未显式提供非空 origin；填写固定对端源。"
+                    ],
+                    [
+                      "`RTC_CHANNEL_UNRELIABLE`",
+                      "RTCDataChannel 无序或配置了有限重传；使用默认可靠有序频道。"
+                    ],
+                    [
+                      "`LISTENER_ALREADY_BOUND`",
+                      "同一个 SharedWorker scope 已绑定监听器；关闭原监听器再绑定。"
+                    ],
+                    [
+                      "`INVALID_PEER_SOURCE`",
+                      "connect/listen 来源或选项组合非法；选择一个受支持的真实载体。"
+                    ],
+                    [
+                      "`MESSAGE_DECODE_FAILED`",
+                      "RTC 消息无法解码；排查双方发送的数据，原失败保留在 cause。"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Core / Remote 继续拥有握手、目录、调用、取消与超时错误。现有 transport 的非法配置为 Core `INVALID_CONFIG`，物理载体失败为 Core `TRANSPORT`；调用 deadline 使用既有 Core code。不要把远端传回的 source/code 当成本地控制权限。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "关闭与竞争： `close()` 可重复调用；初始化中可用 signal 取消握手并释放已安装的监听器。close 后不再接纳晚到的业务消息。窗口导航/卸载、页面静默关闭 SharedWorker 端口没有可靠的远端关闭事件，pending 调用沿用 Core deadline；未配置有效等待上限时不能承诺及时发现断开。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "调用一直超时： 检查固定 origin、真实来源窗口、对端是否已经启动 Peer，以及两端实际方法目录。Endpoint 用户还需检查中间件与 provide。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "页面退出： 在本地 `pagehide` 中调用 `peer.close()` 或 `endpoint.dispose()`；借用端口与频道仍由创建者关闭。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "二进制： Window / SharedWorker / Service Worker transport 使用结构化克隆；RTC 以 JSON 字符串传输，二进制需应用选择合适的编码。Runtime payload 仍受 Core 的公共可移植值契约约束。"
+                }
+              ]
+            },
+            {
+              "id": "错误",
+              "heading": "错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Peer 配置与载体解码错误使用 `RPC_BROWSER_ERROR_SOURCE`（`@migaia/rpc/browser`）及 `RpcBrowserErrorCode`：`WINDOW_ORIGIN_REQUIRED`、`RTC_CHANNEL_UNRELIABLE`、`LISTENER_ALREADY_BOUND`、`INVALID_PEER_SOURCE`、`MESSAGE_DECODE_FAILED`。错误保持原生类型与 cause。握手、调用、取消、超时沿用 Core / Remote 的错误身份；现有 transport 配置错误与载体失败继续使用 Core 的 `INVALID_CONFIG` / `TRANSPORT`。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 8,
+          "configuration": [],
+          "fragment": "rpc-browser-index--RpcBrowserErrorCode"
+        }
+      ],
+      "aliases": []
+    },
     {
       "id": "rpc-browser:adapters/broadcast-channel",
       "library": "rpc-browser",
@@ -500,8 +1609,8 @@
           "errors": ["No documented errors are declared for createBroadcastChannelTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBroadcastChannelTransport.",
           "examples": [
-            "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\n// 两个标签页（这里用同一进程里的两个 BroadcastChannel 实例模拟）共享频道名 'cart'。\nconst channelA = new BroadcastChannel('cart')\nconst channelB = new BroadcastChannel('cart')\nconst tabATransport = createBroadcastChannelTransport(channelA)\nconst tabBTransport = createBroadcastChannelTransport(channelB)\n\nconst tabB = await createEndpoint({\n  id: 'tab-b',\n  transport: tabBTransport,\n  middlewares: [connect({ transport: tabBTransport })]\n})\ntabB.provide('cart.count', (context) => context.success(3))\n\nconst tabA = await createEndpoint({\n  id: 'tab-a',\n  targetIds: ['tab-b'],\n  transport: tabATransport,\n  middlewares: [connect({ transport: tabATransport })]\n})\ntry {\n  console.log(await tabA.send<number>('tab-b', 'cart.count', null)) // 3\n} finally {\n  await tabA.dispose()\n  await tabB.dispose()\n  // 适配器借用频道，不负责关闭；由创建它的一方关闭。\n  channelA.close()\n  channelB.close()\n}",
-            "import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('cart')\nconst transport = createBroadcastChannelTransport(channel)\n// 尚未交给 Endpoint；创建方负责关闭借用频道。\nchannel.close()"
+            "import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\n/** 尚未交给 Endpoint 的借用频道，由创建者关闭。 */\nconst channel = new BroadcastChannel('cart')\n/** adapter 注册监听器时仍沿用既有来源边界。 */\nconst transport = createBroadcastChannelTransport(channel)\nchannel.close()",
+            "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\n/** 两个同源上下文使用同一频道名；创建者负责关闭频道。 */\nconst channelA = new BroadcastChannel('cart')\n/** 第二个逻辑标签页的独立频道实例。 */\nconst channelB = new BroadcastChannel('cart')\n/** 只借用第一个频道。 */\nconst tabATransport = createBroadcastChannelTransport(channelA)\n/** 只借用第二个频道。 */\nconst tabBTransport = createBroadcastChannelTransport(channelB)\n/** 提供方法的 Endpoint，由示例负责 dispose。 */\nconst tabB = await createEndpoint({\n  id: 'tab-b',\n  transport: tabBTransport,\n  middlewares: [connect({ transport: tabBTransport })]\n})\ntabB.provide('cart.count', (context) => context.success(3))\n/** 调用端固定目标 id，transport 仍为同源广播。 */\nconst tabA = await createEndpoint({\n  id: 'tab-a',\n  targetIds: ['tab-b'],\n  transport: tabATransport,\n  middlewares: [connect({ transport: tabATransport })]\n})\ntry {\n  console.log(await tabA.send<number>('tab-b', 'cart.count', null)) // 3\n} finally {\n  await tabA.dispose()\n  await tabB.dispose()\n  channelA.close()\n  channelB.close()\n}"
           ],
           "members": [],
           "exportPath": "./adapters/broadcast-channel",
@@ -598,9 +1707,7 @@
           "returns": "IRpcTransport",
           "errors": ["No documented errors are declared for createRtcDataChannelTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRtcDataChannelTransport.",
-          "examples": [
-            "import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'\n\n/** 已完成信令的真实连接由调用方提供；适配器借用其可靠、有序的 DataChannel。 */\nexport async function openRtcTransport(peerConnection: RTCPeerConnection) {\n  const channel = peerConnection.createDataChannel('rpc', { ordered: true })\n  await new Promise<void>((resolve) => channel.addEventListener('open', () => resolve(), { once: true }))\n  return createRtcDataChannelTransport(channel)\n}"
-          ],
+          "examples": [],
           "members": [],
           "exportPath": "./adapters/rtc-data-channel",
           "overloadSignatures": [
@@ -653,7 +1760,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-browser/dist/browser/adapters/rtc-data-channel.d.ts:createRtcDataChannelTransport:export declare function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTransport;",
           "guidance": [],
-          "usageScore": 14,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport"
         },
@@ -760,8 +1867,8 @@
           "errors": ["No documented errors are declared for createServiceWorkerTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createServiceWorkerTransport.",
           "examples": [
-            "import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\nconst registration = await navigator.serviceWorker.ready\nconst transport = createServiceWorkerTransport({\n  target: registration.active!,\n  receiver: navigator.serviceWorker\n})",
-            "// service-worker.ts：由浏览器作为 Service Worker 加载。\nimport { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\nself.addEventListener('message', (event) => {\n  /** Service Worker 也可能收到非 Client 来源；这里只为实际页面建立回复通道。 */\n  const source = event.source\n  if (!source || !('id' in source)) return\n  const clientId = source.id\n  void self.clients.get(clientId).then((client) => {\n    if (!client) return\n    const transport = createServiceWorkerTransport({\n      target: client,\n      receiver: self,\n      peerId: client.id\n    })\n    // 把这个实际 Client 的 transport 交给该页面对应的 Endpoint。\n  }).catch((error: unknown) => console.error(error))\n})"
+            "import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\n/** 等待浏览器确认当前注册可用，不由 RPC 创建注册。 */\nconst registration = await navigator.serviceWorker.ready\n/** 发送与接收主体分开；adapter 借用两者。 */\nconst transport = createServiceWorkerTransport({\n  target: registration.active!,\n  receiver: navigator.serviceWorker\n})",
+            "import {\n  createServiceWorkerTransport,\n  type IServiceWorkerMessageReceiver,\n  type IServiceWorkerMessageTarget\n} from '@migaia/rpc-browser/adapters/service-worker'\n\n/** 宿主从 clients.get() 取得实际 Client 后，借用该 Client 与真实 Worker receiver。 */\nexport function openClientTransport(\n  client: IServiceWorkerMessageTarget & { readonly id: string },\n  receiver: IServiceWorkerMessageReceiver\n) {\n  return createServiceWorkerTransport({ target: client, receiver, peerId: client.id })\n}"
           ],
           "members": [],
           "exportPath": "./adapters/service-worker",
@@ -840,25 +1947,25 @@
               "name": "target",
               "type": "IServiceWorkerMessageTarget",
               "optional": false,
-              "description": "`target` — 发送目标：页面一侧为 `ServiceWorker`，Service Worker 一侧为某个 `Client`",
+              "description": "`target` — 页面端为 `ServiceWorker`，Worker 端为实际 `Client`。",
               "descriptionEn": "ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target.",
-              "descriptionZh": "`target` — 发送目标：页面一侧为 `ServiceWorker`，Service Worker 一侧为某个 `Client`"
+              "descriptionZh": "`target` — 页面端为 `ServiceWorker`，Worker 端为实际 `Client`。"
             },
             {
               "name": "receiver",
               "type": "IServiceWorkerMessageReceiver",
               "optional": false,
-              "description": "`receiver` — 监听 `message` 的对象：页面一侧为 `navigator.serviceWorker`，Service Worker 一侧为 `self`",
+              "description": "`receiver` — 页面端为 `navigator.serviceWorker`，Worker 端为 `self`。",
               "descriptionEn": "Message event owner, usually navigator.serviceWorker in a page or self in the worker.",
-              "descriptionZh": "`receiver` — 监听 `message` 的对象：页面一侧为 `navigator.serviceWorker`，Service Worker 一侧为 `self`"
+              "descriptionZh": "`receiver` — 页面端为 `navigator.serviceWorker`，Worker 端为 `self`。"
             },
             {
               "name": "peerId",
               "type": "string",
               "optional": true,
-              "description": "`peerId` — 期望的对端 Client id；默认取 `target.id`",
+              "description": "`peerId` — 期望的对端 Client id，默认取 `target.id`。",
               "descriptionEn": "Expected remote Client identity; defaults to target.id when that identity is available.",
-              "descriptionZh": "`peerId` — 期望的对端 Client id；默认取 `target.id`"
+              "descriptionZh": "`peerId` — 期望的对端 Client id，默认取 `target.id`。"
             }
           ],
           "fragment": "rpc-browser-adapters/service-worker--createServiceWorkerTransport"
@@ -877,7 +1984,9 @@
           "returns": "No explicit return annotation is declared for this type.",
           "errors": ["No documented errors are declared for IServiceWorkerMessageReceiver."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IServiceWorkerMessageReceiver.",
-          "examples": [],
+          "examples": [
+            "import {\n  createServiceWorkerTransport,\n  type IServiceWorkerMessageReceiver,\n  type IServiceWorkerMessageTarget\n} from '@migaia/rpc-browser/adapters/service-worker'\n\n/** 宿主从 clients.get() 取得实际 Client 后，借用该 Client 与真实 Worker receiver。 */\nexport function openClientTransport(\n  client: IServiceWorkerMessageTarget & { readonly id: string },\n  receiver: IServiceWorkerMessageReceiver\n) {\n  return createServiceWorkerTransport({ target: client, receiver, peerId: client.id })\n}"
+          ],
           "members": [],
           "exportPath": "./adapters/service-worker",
           "overloadSignatures": [
@@ -922,7 +2031,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts:IServiceWorkerMessageReceiver:export type IServiceWorkerMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver"
         },
@@ -940,7 +2049,9 @@
           "returns": "No explicit return annotation is declared for this type.",
           "errors": ["No documented errors are declared for IServiceWorkerMessageTarget."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IServiceWorkerMessageTarget.",
-          "examples": [],
+          "examples": [
+            "import {\n  createServiceWorkerTransport,\n  type IServiceWorkerMessageReceiver,\n  type IServiceWorkerMessageTarget\n} from '@migaia/rpc-browser/adapters/service-worker'\n\n/** 宿主从 clients.get() 取得实际 Client 后，借用该 Client 与真实 Worker receiver。 */\nexport function openClientTransport(\n  client: IServiceWorkerMessageTarget & { readonly id: string },\n  receiver: IServiceWorkerMessageReceiver\n) {\n  return createServiceWorkerTransport({ target: client, receiver, peerId: client.id })\n}"
+          ],
           "members": [],
           "exportPath": "./adapters/service-worker",
           "overloadSignatures": [
@@ -985,7 +2096,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts:IServiceWorkerMessageTarget:export type IServiceWorkerMessageTarget = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; readonly id?: string; };",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget"
         },
@@ -1091,10 +2202,7 @@
           "returns": "IRpcTransport<unknown, Transferable>",
           "errors": ["No documented errors are declared for createSharedWorkerTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createSharedWorkerTransport.",
-          "examples": [
-            "import { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'\n\nconst worker = new SharedWorker(new URL('./shared.worker.js', import.meta.url), { type: 'module' })\nconst transport = createSharedWorkerTransport(worker.port)",
-            "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'\n\nself.addEventListener('connect', (event) => {\n  const port = (event as MessageEvent).ports[0]!\n  const transport = createSharedWorkerTransport(port)\n  void createEndpoint({\n    id: 'shared-worker', transport, middlewares: [connect({ transport })]\n  }).then((endpoint) => {\n    endpoint.provide('ping', (context) => context.success('pong'))\n  }).catch((error: unknown) => console.error(error))\n})"
-          ],
+          "examples": [],
           "members": [],
           "exportPath": "./adapters/shared-worker",
           "overloadSignatures": [
@@ -1147,7 +2255,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-browser/dist/browser/adapters/shared-worker.d.ts:createSharedWorkerTransport:export declare function createSharedWorkerTransport(port: ISharedWorkerPort): IRpcTransport<unknown, Transferable>;",
           "guidance": [],
-          "usageScore": 22,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-browser-adapters/shared-worker--createSharedWorkerTransport"
         },
@@ -1254,7 +2362,7 @@
           "errors": ["No documented errors are declared for createWebTransportDatagramTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWebTransportDatagramTransport.",
           "examples": [
-            "import { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'\n\nconst session = new WebTransport('https://rpc.example:4433/rpc')\nawait session.ready\nconst transport = createWebTransportDatagramTransport(session.datagrams)"
+            "import { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'\n\n/** 应用创建并持有服务器会话。 */\nconst session = new WebTransport('https://rpc.example:4433/rpc')\nawait session.ready\n/** transport 取得 datagram 写入端，但不接管整个会话。 */\nconst transport = createWebTransportDatagramTransport(session.datagrams)"
           ],
           "members": [],
           "exportPath": "./adapters/web-transport",
@@ -1415,9 +2523,8 @@
           "errors": ["No documented errors are declared for createWindowMessageTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWindowMessageTransport.",
           "examples": [
-            "import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\n/** 页面必须实际包含这个 iframe；本片段由浏览器宿主运行。 */\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: 'https://billing.example'\n})",
             "// billing-frame.ts\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst transport = createWindowMessageTransport({\n  target: window.parent,\n  receiver: window,\n  targetOrigin: 'https://shop.example' // 只接受来自、也只发往父页面这个源\n})\nconst billing = await createEndpoint({\n  id: 'billing-frame',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nbilling.provide('calculateTotal', (context) => {\n  const input = context.data as { prices: number[]; taxRate: number }\n  const subtotal = input.prices.reduce((sum, price) => sum + price, 0)\n  return context.success(subtotal * (1 + input.taxRate))\n})\n\nwindow.addEventListener('pagehide', () => void billing.dispose(), { once: true })",
-            "// parent.ts\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nawait new Promise<void>((resolve) => iframe.addEventListener('load', () => resolve(), { once: true }))\n\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: new URL(iframe.src).origin\n})\nconst billing = await createEndpoint({\n  id: 'checkout-page',\n  targetIds: ['billing-frame'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst total = await billing.send<number>('billing-frame', 'calculateTotal', {\n  prices: [12, 30],\n  taxRate: 0.08\n})\nconsole.log(total) // 45.36\n\nawait billing.dispose()"
+            "// parent.ts\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nawait new Promise<void>((resolve) =>\n  iframe.addEventListener('load', () => resolve(), { once: true })\n)\n\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: new URL(iframe.src).origin\n})\nconst billing = await createEndpoint({\n  id: 'checkout-page',\n  targetIds: ['billing-frame'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst total = await billing.send<number>('billing-frame', 'calculateTotal', {\n  prices: [12, 30],\n  taxRate: 0.08\n})\nconsole.log(total) // 45.36\n\nawait billing.dispose()"
           ],
           "members": [],
           "exportPath": "./adapters/window",
@@ -1496,39 +2603,39 @@
           ],
           "identity": "packages/rpc-browser/dist/browser/adapters/window.d.ts:createWindowMessageTransport:export declare function createWindowMessageTransport(options: IWindowMessageTransportOptions): IRpcTransport<unknown, Transferable>;",
           "guidance": [],
-          "usageScore": 28,
+          "usageScore": 18,
           "configuration": [
             {
               "name": "target",
               "type": "IWindowMessageTarget",
               "optional": false,
-              "description": "`target` — 对端窗口：`iframe.contentWindow`、`window.parent`、`window.opener` 或 `window.open()` 的返回值",
+              "description": "直接 Endpoint 仍从 `@migaia/rpc-browser/adapters/window` 导入 `createWindowMessageTransport`，选项名称保留 `target` / `receiver` / `targetOrigin`；其中 `targetOrigin` 的既有同源默认值不适用于 Peer 的 `origin`。",
               "descriptionEn": "Outbound ServiceWorker or Client target. */ export type IServiceWorkerMessageTarget = { postMessage(message: unknown, transfer?: readonly Transferable[]): void readonly id?: string } /** Inbound page or ServiceWorkerGlobalScope event target. */ export type IServiceWorkerMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void } export type IServiceWorkerTransportOptions = { /** ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target.",
-              "descriptionZh": "`target` — 对端窗口：`iframe.contentWindow`、`window.parent`、`window.opener` 或 `window.open()` 的返回值"
+              "descriptionZh": "直接 Endpoint 仍从 `@migaia/rpc-browser/adapters/window` 导入 `createWindowMessageTransport`，选项名称保留 `target` / `receiver` / `targetOrigin`；其中 `targetOrigin` 的既有同源默认值不适用于 Peer 的 `origin`。"
             },
             {
               "name": "receiver",
               "type": "IWindowMessageReceiver",
               "optional": true,
-              "description": "`receiver` — 监听 `message` 事件的对象。在窗口环境中可省略，默认为当前全局对象",
+              "description": "`receiver` — 接收 `message` 的实际窗口；窗口环境默认使用当前全局对象。",
               "descriptionEn": "Message event owner, usually navigator.serviceWorker in a page or self in the worker.",
-              "descriptionZh": "`receiver` — 监听 `message` 事件的对象。在窗口环境中可省略，默认为当前全局对象"
+              "descriptionZh": "`receiver` — 接收 `message` 的实际窗口；窗口环境默认使用当前全局对象。"
             },
             {
               "name": "targetOrigin",
               "type": "string",
               "optional": true,
-              "description": "`targetOrigin` — 对端的源。省略时默认 `location.origin`（只适用于同源）；跨域必须显式写出",
+              "description": "直接 Endpoint 仍从 `@migaia/rpc-browser/adapters/window` 导入 `createWindowMessageTransport`，选项名称保留 `target` / `receiver` / `targetOrigin`；其中 `targetOrigin` 的既有同源默认值不适用于 Peer 的 `origin`。",
               "descriptionEn": "Defaults to current window.location.origin when available.",
-              "descriptionZh": "`targetOrigin` — 对端的源。省略时默认 `location.origin`（只适用于同源）；跨域必须显式写出"
+              "descriptionZh": "直接 Endpoint 仍从 `@migaia/rpc-browser/adapters/window` 导入 `createWindowMessageTransport`，选项名称保留 `target` / `receiver` / `targetOrigin`；其中 `targetOrigin` 的既有同源默认值不适用于 Peer 的 `origin`。"
             },
             {
               "name": "allowUnsafeTargetOrigin",
               "type": "boolean",
               "optional": true,
-              "description": "`allowUnsafeTargetOrigin` — 设为 `true` 才允许 `targetOrigin: '*'`；仅在确实无法得知对端源时使用",
+              "description": "`allowUnsafeTargetOrigin` — 只有显式 `true` 才允许 `origin: '*'`；仍检查来源窗口。",
               "descriptionEn": "Explicit opt-in for wildcard delivery; source identity is still required on receive.",
-              "descriptionZh": "`allowUnsafeTargetOrigin` — 设为 `true` 才允许 `targetOrigin: '*'`；仅在确实无法得知对端源时使用"
+              "descriptionZh": "`allowUnsafeTargetOrigin` — 只有显式 `true` 才允许 `origin: '*'`；仍检查来源窗口。"
             }
           ],
           "fragment": "rpc-browser-adapters/window--createWindowMessageTransport"
