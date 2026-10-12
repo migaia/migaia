@@ -180,13 +180,13 @@
     },
     "rpc-family": {
       "lines": {
-        "covered": 14600,
-        "total": 15919,
-        "pct": 91.71
+        "covered": 14602,
+        "total": 15922,
+        "pct": 91.7
       },
       "statements": {
-        "covered": 16474,
-        "total": 18538,
+        "covered": 16476,
+        "total": 18541,
         "pct": 88.86
       },
       "functions": {
@@ -10390,14 +10390,14 @@
     },
     "packages/rpc-process/src/process/adapters/deno-command.ts": {
       "lines": {
-        "covered": 60,
-        "total": 64,
-        "pct": 93.75
+        "covered": 62,
+        "total": 67,
+        "pct": 92.53
       },
       "statements": {
-        "covered": 66,
-        "total": 70,
-        "pct": 94.28
+        "covered": 68,
+        "total": 73,
+        "pct": 93.15
       },
       "functions": {
         "covered": 13,
