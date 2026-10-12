@@ -9653,7 +9653,7 @@
     {
       "slug": "rpc-bridge-jsonrpc",
       "description": "RPC bridge-jsonrpc owner.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -10208,7 +10208,7 @@
     {
       "slug": "rpc-browser",
       "description": "RPC browser owner.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [
         ".",
         "./adapters/broadcast-channel",
@@ -10823,7 +10823,7 @@
     {
       "slug": "rpc-contract",
       "description": "RPC contract owner.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [
         ".",
         "./binary",
@@ -11528,7 +11528,7 @@
     {
       "slug": "rpc-core",
       "description": "RPC core owner.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [
         ".",
         "./adapter",
@@ -11546,6 +11546,7 @@
         "./plugins/flow-control",
         "./plugins/log",
         "./plugins/send-queue",
+        "./probe",
         "./provider",
         "./remote",
         "./stream",
@@ -11664,6 +11665,10 @@
                     [
                       "`./adapter`",
                       "`defineMessageAdapter`、`defineByteAdapter`：运行时适配器作者的任务级构造函数（见 USEGUIDE 第 9 节）"
+                    ],
+                    [
+                      "`./probe`",
+                      "Probe 类型、数值常量与名称表、`defineProbe`、`snapshotProbeEvent`、`rpcProbeSampleKey`；`probePlugin` 当前为占位入口"
                     ]
                   ]
                 }
@@ -11690,6 +11695,33 @@
                   "type": "code",
                   "language": "ts",
                   "code": "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\n\nconst server = await createEndpoint({\n  id: 'server',\n  transport: right,\n  middlewares: [connect({ transport: right })]\n})\nserver.provide('add', (context) => {\n  const [a, b] = context.data as [number, number]\n  return context.success(a + b)\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['server'],\n  transport: left,\n  middlewares: [connect({ transport: left })]\n})\nconsole.log(await client.send<number>('server', 'add', [20, 22])) // 42\n\nawait client.dispose()\nawait server.dispose()"
+                }
+              ]
+            },
+            {
+              "id": "probe",
+              "heading": "Probe",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/rpc-core/probe` 定义同步观察接口。当前交付只包含契约：Peer 接受 `probe` 选项，但在 probe-core 实现合入之前不会产生观察事件；`probePlugin` 当前抛出 `INVALID_CONFIG`（`probe runtime not installed`）。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineProbe, RpcProbeStageName } from '@migaia/rpc-core/probe'\n\n/** 调用方已有的对象保留同一身份，定义 Probe 后被冻结。 */\nconst host = { name: 'metrics' }\n/** 此 Probe 只读 message 元数据，不捕获业务内容。 */\nconst probe = defineProbe({\n  stages: ['message'],\n  sample: 0.25,\n  emit(view) {\n    console.log(RpcProbeStageName[view.stage], view.method, view.durationMs)\n  }\n}, host)\nconsole.log(probe === host, Object.isFrozen(host), probe.name) // true, true, 'metrics'\n\n/** 平台 Peer 工厂可接收同一个 probe；运行时观察由 probe-core 提供。 */\nexport const peerProbeOptions = { probe }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`defineProbe(definition, host)` 直接为 `host` 添加五个 Probe 字段、注册私有状态并冻结该对象，返回 `THost & IRpcProbe`，与 `host` 为同一引用；原有成员保持不变，包括已有的 `emit`。私有状态持有 `definition.emit`，不会用它覆盖 host 的方法。省略 `host` 时沿用独立 handle 形式。`host` 必须是可扩展且未冻结的非 null 对象，不能已有这五个 Probe 字段或已注册为 Probe；验证失败时对象保持原样。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "事件 view 仅在 `emit` 调用期间有效。需保留它时显式调用 `snapshotProbeEvent(view)`（SC9c）；快照复制顶层字段，`detail`、`error` 与 `content` 仍保留引用，调用方稍后修改对象时这些引用可见修改。录制 codec 在格式转换边界形成新表示（SC9b）。`methods` 只过滤 `message` 与 `envelope`；其它阶段只按采样过滤。采样使用 `(senderId, messageId)` 的稳定 FNV-1a 32 位键。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`capture` 默认关闭，必须显式列出需要捕获内容的阶段，且定义时为 `stages` 的子集。`protected` 内容也须显式启用，并只在认证保护路径存在时产生。`setStages([])` 暂停；恢复时设置所需阶段，原 `captureMask` 保持不变。host 的公开 `stageMask` 为初始定义值，后续选择保存在私有状态；独立 handle 的 getter 则反映当前值。详细契约见 USEGUIDE 的 Probe 节。"
                 }
               ]
             },
@@ -11802,7 +11834,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 两层 API：Runtime Peer 与 Endpoint 2. Runtime Peer 3. Plugin 与 Host 出口 4. Endpoint 5. 中间件 6. 载体：内置 transport 与自定义 transport 7. 按需组装：减小打包体积 8. 容量、并发与重放窗口 9. 高阶用法：编写一个适配器 10. 错误码与处理 11. 二进制、转发与重试 12. 常见问题"
+                  "text": "1. 两层 API：Runtime Peer 与 Endpoint 2. Runtime Peer 3. Plugin 与 Host 出口 4. Endpoint 5. 中间件 6. 载体：内置 transport 与自定义 transport 7. 按需组装：减小打包体积 8. 容量、并发与重放窗口 9. 高阶用法：编写一个适配器 10. 错误码与处理 11. 二进制、转发与重试 12. 常见问题 13. Probe"
                 }
               ]
             },
@@ -12698,6 +12730,239 @@
                   "text": "能自己定义新的协议级能力吗？ 不能。自定义中间件可以做日志、诊断、策略；新的根能力需要在 Core 内实现。"
                 }
               ]
+            },
+            {
+              "id": "13-probe",
+              "heading": "13. Probe",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/rpc-core/probe` 是运行时无关的观察契约入口，导出阶段、方向、kind、outcome 的数值常量与同顺序名称表，以及 `defineProbe`、`snapshotProbeEvent`、`rpcProbeSampleKey` 和 `probePlugin`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "当前状态： layer 1 只定义 Probe 与 Peer 的 `probe` 选项、transport 的可选 `observe` 类型。Peer 会接收选项，但 probe-core 实现合入之前不产生观察事件，也不调用 `transport.observe`。`probePlugin` 当前同步抛出 `INVALID_CONFIG`，文字为 `probe runtime not installed`。"
+                }
+              ]
+            },
+            {
+              "id": "13-1-定义与交入-peer",
+              "heading": "13.1 定义与交入 Peer",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRuntimePeer, type IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { defineProbe, RpcProbeStageName } from '@migaia/rpc-core/probe'\n\n/** 只记录所选方法的元数据，不读取业务 payload。 */\nconst probe = defineProbe({\n  stages: ['message', 'envelope', 'frame'],\n  methods: ['math.double'],\n  sample: 0.25,\n  emit(view) {\n    console.log(RpcProbeStageName[view.stage], view.method, view.durationMs)\n  },\n  onError(error) {\n    console.error(error)\n  }\n})\n\n/** connect 来源仍由调用方拥有；probe 不创建任何 transport。 */\nexport function createObservedPeer(connect: IRuntimePeerSource) {\n  return createRuntimePeer({ connect, probe })\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`probe` 可以是单个 handle 或 readonly 数组。`defineProbe` 在定义时验证选项并编译 `stageMask`、`captureMask`、`methods` 与 `sampleThreshold`；返回对象被冻结，私有状态保留原 `definition.emit` callback。定义失败抛出原生 `TypeError`，带 `@migaia/rpc/core` / `INVALID_CONFIG`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "调用方已有对象需要同时提供其它 API 时，使用 revision 2 的 `defineProbe(definition, host)`。它直接为 `host` 添加 Probe 字段，以该对象的身份注册私有状态，然后冻结 `host`；返回类型为 `THost & IRpcProbe`，不复制或合并到另一个对象。原有成员与引用保持不变，省略 `host` 的形式仍返回独立 handle。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineProbe } from '@migaia/rpc-core/probe'\n\n/** 已有对象的额外成员不参与 Core 热路径的状态读取。 */\nconst host = { name: 'metrics' }\n/** definition 与 host 直接注册在同一对象身份下，不复制 host。 */\nconst probe = defineProbe({\n  stages: ['message'],\n  emit(view) {\n    console.log(view.seq)\n  }\n}, host)\nconsole.log(probe === host, Object.isFrozen(host), probe.name)"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`host` 必须为可扩展、未冻结的非 null 对象，不能已经拥有 `stageMask`、`captureMask`、`methods`、`sampleThreshold`、`setStages`，也不能已经注册为 Probe。所有验证在修改对象之前完成；失败以 `TypeError` / `INVALID_CONFIG` 拒绝，`host` 不变。已有 `host.emit` 允许保留，附加操作不会覆盖它；Probe 私有状态使用 `definition.emit`。后续 emitter 在安装时从私有 WeakMap 读取编译状态，放入自己的固定形状记录；热路径读取该记录，不读取带额外成员的 `host`。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["配置", "契约"],
+                  "rows": [
+                    ["`stages`", "定义时必须为非空的已知阶段名称数组"],
+                    ["`capture`", "默认关闭；定义时必须为 `stages` 子集"],
+                    ["`redact`", "处理显式捕获的内容；不会因此开启未选择阶段的 capture"],
+                    ["`methods`", "只过滤 `message` 与 `envelope`，其它阶段只按采样过滤"],
+                    ["`sample`", "范围 `(0, 1]`，默认全部；阈值在定义时计算"],
+                    ["`describe`、`emit`、`onError`", "描述、同步事件消费者与错误报告 callback"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`rpcProbeSampleKey(senderId, messageId)` 对二者拼接后的 UTF-8 字节计算 FNV-1a 32 位键。调用方与接收方使用相同标识，所以同一交互的两侧采样决定一致；它不是认证机制或唯一身份。"
+                }
+              ]
+            },
+            {
+              "id": "13-2-view-生命周期与内容捕获",
+              "heading": "13.2 View 生命周期与内容捕获",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "每个 emitter 复用固定形状的 `IRpcProbeEventView`。只能在同步 `emit` 中读取它；需要稍后读取时使用快照："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineProbe, snapshotProbeEvent, type IRpcProbeEventView } from '@migaia/rpc-core/probe'\n\n/** 此示例选择保留事件；分配发生在消费者，而非 Core 观察点。 */\nconst saved: Readonly<IRpcProbeEventView>[] = []\n/** 内容捕获按 frame/protected 显式启用，随后统一脱敏。 */\nconst probe = defineProbe({\n  stages: ['frame', 'protected'],\n  capture: ['frame', 'protected'],\n  redact() {\n    return '<redacted>'\n  },\n  emit(view) {\n    // SC9(c)：调用方显式请求顶层事件快照。\n    saved.push(snapshotProbeEvent(view))\n  }\n})\n\nprobe.setStages([]) // 暂停，captureMask 保持原值。\nprobe.setStages(['frame', 'protected']) // 恢复选定阶段。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`snapshotProbeEvent` 是显式复制请求（SC9c）：复制并冻结顶层字段，保留 `detail`、`error` 与 `content` 的引用和所有权。它防止复用 view 改写快照的顶层元数据，不固定这些引用对象的内容。按照 SC9，普通捕获与存储保留引用；调用方发送后修改 `detail`、错误或未被转移的 content 对象，后续读取仍可见修改。只有实际 transfer 会分离的字节缓冲、真实 codec/序列化边界（SC9b），或显式快照 API 才复制必要数据。未知 `sizeBytes`、未分块的 chunk 字段、非批次的 `members` 与未结算的 `durationMs` 都使用 `-1`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`protected` 仅在认证保护路径存在时产生；没有该能力的路径不会伪造该阶段。内容捕获包括 protected 内容都必须显式启用。Descriptor 的 `stageMask` 描述 endpoint 能产生且当前已订阅的阶段，不证明所有路径都会经历每个阶段。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`setStages([])` 允许暂停，之后可以设置其它已知阶段。它更新私有状态的阶段选择，保留定义时的 `captureMask`；host 上不可写的 `stageMask` 仍为初始定义值，独立 handle 的 `stageMask` getter 反映当前私有值。非法阶段会抛出 `INVALID_CONFIG` 并保留旧 mask。阶段变更的 emitter 订阅机制由 Core 内部持有，不是公开 handle 方法。"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "slug": "rpc-devtools",
+      "description": "RPC probe, service and offline record contracts.",
+      "version": "0.0.9",
+      "exports": [".", "./contract", "./hub"],
+      "documentation": {
+        "readme": {
+          "sections": [
+            {
+              "id": "migaia-rpc-devtools",
+              "heading": "@migaia/rpc-devtools",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "RPC 观察工具的契约与录制格式。当前版本为 layer 1：提供 service/record 类型、纯函数 NDJSON codec 和包入口。Collector、hub 与 Core 观察点由后续实现提供。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["入口", "当前能力"],
+                  "rows": [
+                    [
+                      "`@migaia/rpc-devtools`",
+                      "`createRpcDevtools` 的类型占位、错误码与错误 source"
+                    ],
+                    [
+                      "`@migaia/rpc-devtools/contract`",
+                      "service/wire/record 类型、`RpcDevtoolsRecordFormat`、录制 codec、错误码与错误 source"
+                    ],
+                    [
+                      "`@migaia/rpc-devtools/hub`",
+                      "`createRpcDevtoolsHub` 的类型占位、`RpcDevtoolsTargetStatus` 与 hub 类型"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createRpcDevtools()` 与 `createRpcDevtoolsHub()` 当前都会同步抛出 `CLOSED`。这表示对应运行时尚未安装；此阶段不能采集事件、提供远程 service 或连接 hub target。包为 workspace-private，peer 依赖 `@migaia/rpc-core` 与 `@migaia/rpc-contract`，版本保持一致。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "录制格式为 UTF-8 NDJSON：第一行为 `{ format: 'migaia-rpc-devtools', version: 1 }`，后续每行一个事件。Bytes 用 base64 标记保存；错误沿用 RPC 错误 codec 保留 source、code、name、message、stack 与 cause 链。Service wire event 使用已序列化错误；record 输入同时接受原生 Error 与已序列化 wire error，解码输出还原为原生 Error。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "统计契约使用 24 个固定 log2 延迟桶，边界为 `0.0625 ms × 2^k`，`k = 0…23`。分位数在桶内插值，误差上界为该桶宽度。统计计算本身尚未实现。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "完整契约与后续入口说明见 USEGUIDE。"
+                }
+              ]
+            }
+          ]
+        },
+        "guide": {
+          "sections": [
+            {
+              "id": "migaia-rpc-devtools-使用手册",
+              "heading": "@migaia/rpc-devtools 使用手册",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "当前只交付契约、codec 与占位工厂。下列 collector/hub 类型用于后续实现；不能据此认为对应行为已可运行。"
+                }
+              ]
+            },
+            {
+              "id": "1-高阶用法-离线录制编解码",
+              "heading": "1. 高阶用法 · 离线录制编解码",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`RpcDevtoolsRecordFormat` 是固定 header：`format` 为 `migaia-rpc-devtools`，`version` 为 `1`。`encodeRpcDevtoolsRecord(record)` 返回 NDJSON；`decodeRpcDevtoolsRecord(text)` 还原离线 record。Codec 不创建连接，也不写入存储。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [{\n    seq: 1,\n    at: 0,\n    endpointId: 'client',\n    stage: 'message',\n    direction: 'outbound',\n    kind: 'request',\n    method: '读取',\n    content: new Uint8Array([1, 2, 3])\n  }]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Bytes 表示为 `{ \"$bytes\": base64 }`。录制错误使用 `serializeRpcError` / `deserializeRpcError`，保留原始 stack 和 cause 链；解码不重建 stack。`IRpcDevtoolsWireEvent.error` 是 service 传输的序列化错误；`IRpcDevtoolsRecordEvent.error` 的输入接受 `Error | IRpcWireError`，以便直接录制 service 事件。编码原生 Error 时序列化，已序列化错误按 RPC 契约规范化；解码后还原为原生 Error。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "错误格式名、非 1 版本、缺少 header 字段或非法 JSON 会抛出 `RECORD_FORMAT_INVALID`，原始解析或验证失败保留在 `cause`。"
+                }
+              ]
+            },
+            {
+              "id": "2-collector-契约",
+              "heading": "2. Collector 契约",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createRpcDevtools(options)` 的返回类型继承 `IRpcProbe`。revision 2 的 `defineProbe(definition, host)` 可把 Probe 直接附到 collector 自己的对象上，冻结并返回同一引用，避免复制 handle 后丢失身份。选项包括 `stages`、`capture`、`redact`、`methods`、`sample`、`maxEvents`、`maxContentBytes`、`maxInterned`、`exposeContent` 与 `onError`。后续 collector 将提供 `query`、`watch`、`stats`、`describe`、录制、暂停/恢复、清理与 service。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "按照 SC9，采集时保留 `detail`、error 与未实际转移的 content 引用，发送后对这些对象的修改可能反映在后续读取中。`snapshotProbeEvent` 只按显式请求复制顶层事件元数据（SC9c），内部引用仍可变；codec 在编码/解码边界转为独立 wire/text 表示（SC9b）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`watch` 的批次类型是 `{ events, dropped }`。`record().stop()` 返回离线 record；service 的 `record.stop()` 返回编码文本。Service 默认不暴露 content，须由 `exposeContent` 明确启用。`IRpcDevtoolsCounters` 包含环形存储淘汰、内容丢弃、重入丢弃、采样丢弃、暂停/关闭忽略与字符串驻留溢出的计数。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`stats` 按 endpoint 和 method 提供调用、失败、拒绝、超时、取消计数，以及 24 个固定 log2 延迟桶：边界为 `0.0625 ms × 2^k`，`k = 0…23`。p50/p95/p99 在桶内插值，误差上界为所在桶宽度。当前类型声明不执行统计计算。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "此阶段 `createRpcDevtools()` 抛出 `CLOSED`；collector 行为合入后才可使用。"
+                }
+              ]
+            },
+            {
+              "id": "3-hub-契约",
+              "heading": "3. Hub 契约",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createRpcDevtoolsHub(options)` 的选项为 `maxEvents`、`realignMs` 与 `onError`。Hub 类型接收由调用方提供、具有 `request` 与 `stream` 的 target client；它不创建 transport。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`IRpcDevtoolsHub` 声明 target 管理、离线 record 导入、timeline、interactions、stats、事件订阅与关闭。`RpcDevtoolsTargetStatus` 提供 `connecting`、`connected`、`disconnected`、`offline`、`removed`，这些是状态而非错误码。当前 `createRpcDevtoolsHub()` 抛出 `CLOSED`；hub 行为合入后才可使用。"
+                }
+              ]
+            },
+            {
+              "id": "4-错误身份",
+              "heading": "4. 错误身份",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE` 与 `TARGET_UNKNOWN`。Collector/hub 相关错误在本阶段仅有契约定义。"
+                }
+              ]
             }
           ]
         }
@@ -12706,7 +12971,7 @@
     {
       "slug": "rpc-pool",
       "description": "Thread and process pools composed from public RPC peers.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -12878,7 +13143,7 @@
     {
       "slug": "rpc-process",
       "description": "RPC process owner.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [
         ".",
         "./adapters/bun-socket",
@@ -13917,7 +14182,7 @@
     {
       "slug": "rpc-threads",
       "description": "RPC threads owner.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [
         ".",
         "./adapters/browser",

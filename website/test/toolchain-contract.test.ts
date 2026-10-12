@@ -231,9 +231,9 @@ test('SITE-T-A24 generated projections contain no volatile metadata', () => {
   assert.equal(relationshipManifest.version, 1)
   /**
    * Six RPC runtime owners replace the former single package, adding exactly five libraries; the
-   * separate rpc-pool package adds one more.
+   * separate rpc-pool package adds one more, and rpc-devtools adds the observation contracts.
    */
-  assert.equal(libraryManifest.libraries.length, 33)
+  assert.equal(libraryManifest.libraries.length, 34)
   assert.equal(
     libraryManifest.libraries.some((library: { readonly slug: string }) => library.slug === 'docs'),
     false
@@ -446,7 +446,8 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
         'rpc-process',
         'rpc-threads',
         'rpc-bridge-jsonrpc',
-        'rpc-browser'
+        'rpc-browser',
+        'rpc-devtools'
       ].includes(api.library)
     )
     .flatMap((api) =>
@@ -460,8 +461,11 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
    * the low-level adapter exports with defineMessageAdapter / defineByteAdapter and an
    * internal-advanced entry, and the short-source helpers added isProcessChild / isThreadChild.
    * Browser Peer adds createBrowserPeer and its package error source/code catalog at the root.
+   * Probe adds 12 runtime exports; devtools adds eight canonical runtime symbols across its
+   * entries. The contract entry's error-code/source re-exports are alias-only and are not counted
+   * twice.
    */
-  assert.equal(runtimeSymbols.length, 312)
+  assert.equal(runtimeSymbols.length, 332)
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)

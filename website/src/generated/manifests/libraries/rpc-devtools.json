@@ -1,0 +1,2165 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "rpc-devtools",
+    "description": "RPC probe, service and offline record contracts.",
+    "version": "0.0.9",
+    "exports": [".", "./contract", "./hub"],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-rpc-devtools",
+            "heading": "@migaia/rpc-devtools",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "RPC 观察工具的契约与录制格式。当前版本为 layer 1：提供 service/record 类型、纯函数 NDJSON codec 和包入口。Collector、hub 与 Core 观察点由后续实现提供。"
+              },
+              {
+                "type": "table",
+                "headers": ["入口", "当前能力"],
+                "rows": [
+                  ["`@migaia/rpc-devtools`", "`createRpcDevtools` 的类型占位、错误码与错误 source"],
+                  [
+                    "`@migaia/rpc-devtools/contract`",
+                    "service/wire/record 类型、`RpcDevtoolsRecordFormat`、录制 codec、错误码与错误 source"
+                  ],
+                  [
+                    "`@migaia/rpc-devtools/hub`",
+                    "`createRpcDevtoolsHub` 的类型占位、`RpcDevtoolsTargetStatus` 与 hub 类型"
+                  ]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "`createRpcDevtools()` 与 `createRpcDevtoolsHub()` 当前都会同步抛出 `CLOSED`。这表示对应运行时尚未安装；此阶段不能采集事件、提供远程 service 或连接 hub target。包为 workspace-private，peer 依赖 `@migaia/rpc-core` 与 `@migaia/rpc-contract`，版本保持一致。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1"
+              },
+              {
+                "type": "paragraph",
+                "text": "录制格式为 UTF-8 NDJSON：第一行为 `{ format: 'migaia-rpc-devtools', version: 1 }`，后续每行一个事件。Bytes 用 base64 标记保存；错误沿用 RPC 错误 codec 保留 source、code、name、message、stack 与 cause 链。Service wire event 使用已序列化错误；record 输入同时接受原生 Error 与已序列化 wire error，解码输出还原为原生 Error。"
+              },
+              {
+                "type": "paragraph",
+                "text": "统计契约使用 24 个固定 log2 延迟桶，边界为 `0.0625 ms × 2^k`，`k = 0…23`。分位数在桶内插值，误差上界为该桶宽度。统计计算本身尚未实现。"
+              },
+              {
+                "type": "paragraph",
+                "text": "完整契约与后续入口说明见 USEGUIDE。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "migaia-rpc-devtools-使用手册",
+            "heading": "@migaia/rpc-devtools 使用手册",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "当前只交付契约、codec 与占位工厂。下列 collector/hub 类型用于后续实现；不能据此认为对应行为已可运行。"
+              }
+            ]
+          },
+          {
+            "id": "1-高阶用法-离线录制编解码",
+            "heading": "1. 高阶用法 · 离线录制编解码",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`RpcDevtoolsRecordFormat` 是固定 header：`format` 为 `migaia-rpc-devtools`，`version` 为 `1`。`encodeRpcDevtoolsRecord(record)` 返回 NDJSON；`decodeRpcDevtoolsRecord(text)` 还原离线 record。Codec 不创建连接，也不写入存储。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [{\n    seq: 1,\n    at: 0,\n    endpointId: 'client',\n    stage: 'message',\n    direction: 'outbound',\n    kind: 'request',\n    method: '读取',\n    content: new Uint8Array([1, 2, 3])\n  }]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)"
+              },
+              {
+                "type": "paragraph",
+                "text": "Bytes 表示为 `{ \"$bytes\": base64 }`。录制错误使用 `serializeRpcError` / `deserializeRpcError`，保留原始 stack 和 cause 链；解码不重建 stack。`IRpcDevtoolsWireEvent.error` 是 service 传输的序列化错误；`IRpcDevtoolsRecordEvent.error` 的输入接受 `Error | IRpcWireError`，以便直接录制 service 事件。编码原生 Error 时序列化，已序列化错误按 RPC 契约规范化；解码后还原为原生 Error。"
+              },
+              {
+                "type": "paragraph",
+                "text": "错误格式名、非 1 版本、缺少 header 字段或非法 JSON 会抛出 `RECORD_FORMAT_INVALID`，原始解析或验证失败保留在 `cause`。"
+              }
+            ]
+          },
+          {
+            "id": "2-collector-契约",
+            "heading": "2. Collector 契约",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`createRpcDevtools(options)` 的返回类型继承 `IRpcProbe`。revision 2 的 `defineProbe(definition, host)` 可把 Probe 直接附到 collector 自己的对象上，冻结并返回同一引用，避免复制 handle 后丢失身份。选项包括 `stages`、`capture`、`redact`、`methods`、`sample`、`maxEvents`、`maxContentBytes`、`maxInterned`、`exposeContent` 与 `onError`。后续 collector 将提供 `query`、`watch`、`stats`、`describe`、录制、暂停/恢复、清理与 service。"
+              },
+              {
+                "type": "paragraph",
+                "text": "按照 SC9，采集时保留 `detail`、error 与未实际转移的 content 引用，发送后对这些对象的修改可能反映在后续读取中。`snapshotProbeEvent` 只按显式请求复制顶层事件元数据（SC9c），内部引用仍可变；codec 在编码/解码边界转为独立 wire/text 表示（SC9b）。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`watch` 的批次类型是 `{ events, dropped }`。`record().stop()` 返回离线 record；service 的 `record.stop()` 返回编码文本。Service 默认不暴露 content，须由 `exposeContent` 明确启用。`IRpcDevtoolsCounters` 包含环形存储淘汰、内容丢弃、重入丢弃、采样丢弃、暂停/关闭忽略与字符串驻留溢出的计数。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`stats` 按 endpoint 和 method 提供调用、失败、拒绝、超时、取消计数，以及 24 个固定 log2 延迟桶：边界为 `0.0625 ms × 2^k`，`k = 0…23`。p50/p95/p99 在桶内插值，误差上界为所在桶宽度。当前类型声明不执行统计计算。"
+              },
+              {
+                "type": "paragraph",
+                "text": "此阶段 `createRpcDevtools()` 抛出 `CLOSED`；collector 行为合入后才可使用。"
+              }
+            ]
+          },
+          {
+            "id": "3-hub-契约",
+            "heading": "3. Hub 契约",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`createRpcDevtoolsHub(options)` 的选项为 `maxEvents`、`realignMs` 与 `onError`。Hub 类型接收由调用方提供、具有 `request` 与 `stream` 的 target client；它不创建 transport。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`IRpcDevtoolsHub` 声明 target 管理、离线 record 导入、timeline、interactions、stats、事件订阅与关闭。`RpcDevtoolsTargetStatus` 提供 `connecting`、`connected`、`disconnected`、`offline`、`removed`，这些是状态而非错误码。当前 `createRpcDevtoolsHub()` 抛出 `CLOSED`；hub 行为合入后才可使用。"
+              }
+            ]
+          },
+          {
+            "id": "4-错误身份",
+            "heading": "4. 错误身份",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE` 与 `TARGET_UNKNOWN`。Collector/hub 相关错误在本阶段仅有契约定义。"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "rpc-devtools:index",
+      "library": "rpc-devtools",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-devtools/getting-started",
+      "architecturePath": "/en/architecture/rpc-devtools",
+      "symbols": [
+        {
+          "name": "createRpcDevtools",
+          "kind": "function",
+          "signature": "export declare function createRpcDevtools(_options?: IRpcDevtoolsOptions): IRpcDevtools;",
+          "declarationLine": 3,
+          "source": "packages/rpc-devtools/dist/index.d.ts",
+          "purpose": "Layer-1 placeholder: collector construction becomes available when layer 2 replaces this body.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRpcDevtools.",
+          "advanced": "No additional advanced behavior is declared for createRpcDevtools.",
+          "parameters": ["_options: IRpcDevtoolsOptions (optional)"],
+          "parameterDetails": [
+            {
+              "name": "_options",
+              "type": "IRpcDevtoolsOptions",
+              "optional": true
+            }
+          ],
+          "returns": "IRpcDevtools",
+          "errors": ["No documented errors are declared for createRpcDevtools."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRpcDevtools.",
+          "examples": [],
+          "members": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createRpcDevtools(_options?: IRpcDevtoolsOptions): IRpcDevtools;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "_options",
+                "type": "IRpcDevtoolsOptions",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcDevtools"],
+          "whenToUse": "Use createRpcDevtools when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createRpcDevtools does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Layer-1 placeholder: collector construction becomes available when layer 2 replaces this body."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createRpcDevtools from @migaia/rpc-devtools, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createRpcDevtools when its function contract and declared inputs match the result you need. Choose a different public symbol when createRpcDevtools does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRpcDevtools."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createRpcDevtools."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/index.d.ts:createRpcDevtools:export declare function createRpcDevtools(_options?: IRpcDevtoolsOptions): IRpcDevtools;",
+          "guidance": [],
+          "usageScore": 12,
+          "configuration": [],
+          "fragment": "rpc-devtools-index--createRpcDevtools"
+        },
+        {
+          "name": "IRpcDevtools",
+          "kind": "type",
+          "signature": "export type IRpcDevtools = IRpcProbe & Readonly<{ /** Collector-owned ingestion exists before host-form defineProbe attaches the compiled fields. */ emit(view: IRpcProbeEventView): void; query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; stats(): IRpcDevtoolsStats; describe(): IRpcDevtoolsDescribe; record(options?: Readonly<{ maxEvents?: number; }>): Readonly<{ stop(): IRpcDevtoolsRecord; }>; exportRecord(record: IRpcDevtoolsRecord): string; importRecord(text: string): IRpcDevtoolsRecord; pause(): void; resume(): void; clear(): void; close(): void; readonly service: IRuntimePeerProvide; }>;",
+          "declarationLine": 19,
+          "source": "packages/rpc-devtools/dist/collector-types.d.ts",
+          "purpose": "A collector is directly installable as a probe; callers own its serving Peer and its lifetime.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtools.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtools.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtools."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtools.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcDevtools",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcDevtools = IRpcProbe & Readonly<{ /** Collector-owned ingestion exists before host-form defineProbe attaches the compiled fields. */ emit(view: IRpcProbeEventView): void; query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; stats(): IRpcDevtoolsStats; describe(): IRpcDevtoolsDescribe; record(options?: Readonly<{ maxEvents?: number; }>): Readonly<{ stop(): IRpcDevtoolsRecord; }>; exportRecord(record: IRpcDevtoolsRecord): string; importRecord(text: string): IRpcDevtoolsRecord; pause(): void; resume(): void; clear(): void; close(): void; readonly service: IRuntimePeerProvide; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtools when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtools does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A collector is directly installable as a probe; callers own its serving Peer and its lifetime."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtools from @migaia/rpc-devtools, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtools when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtools does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtools."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtools."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/collector-types.d.ts:IRpcDevtools:export type IRpcDevtools = IRpcProbe & Readonly<{ /** Collector-owned ingestion exists before host-form defineProbe attaches the compiled fields. */ emit(view: IRpcProbeEventView): void; query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; stats(): IRpcDevtoolsStats; describe(): IRpcDevtoolsDescribe; record(options?: Readonly<{ maxEvents?: number; }>): Readonly<{ stop(): IRpcDevtoolsRecord; }>; exportRecord(record: IRpcDevtoolsRecord): string; importRecord(text: string): IRpcDevtoolsRecord; pause(): void; resume(): void; clear(): void; close(): void; readonly service: IRuntimePeerProvide; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-index--IRpcDevtools"
+        },
+        {
+          "name": "IRpcDevtoolsOptions",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsOptions = Readonly<{ stages?: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; methods?: readonly string[]; sample?: number; maxEvents?: number; maxContentBytes?: number; maxInterned?: number; exposeContent?: boolean; onError?(error: unknown): void; }>;",
+          "declarationLine": 6,
+          "source": "packages/rpc-devtools/dist/collector-types.d.ts",
+          "purpose": "Collector construction options are frozen now; defaults and ingestion belong to layer 2.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsOptions.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcDevtoolsOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsOptions = Readonly<{ stages?: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; methods?: readonly string[]; sample?: number; maxEvents?: number; maxContentBytes?: number; maxInterned?: number; exposeContent?: boolean; onError?(error: unknown): void; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Collector construction options are frozen now; defaults and ingestion belong to layer 2."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsOptions from @migaia/rpc-devtools, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/collector-types.d.ts:IRpcDevtoolsOptions:export type IRpcDevtoolsOptions = Readonly<{ stages?: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; methods?: readonly string[]; sample?: number; maxEvents?: number; maxContentBytes?: number; maxInterned?: number; exposeContent?: boolean; onError?(error: unknown): void; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-index--IRpcDevtoolsOptions"
+        }
+      ],
+      "aliases": [
+        {
+          "identity": "packages/rpc-devtools/dist/error-code.d.ts:IRpcDevtoolsErrorCode:export type IRpcDevtoolsErrorCode = (typeof RpcDevtoolsErrorCode)[keyof typeof RpcDevtoolsErrorCode];",
+          "name": "IRpcDevtoolsErrorCode",
+          "signature": "export type IRpcDevtoolsErrorCode = (typeof RpcDevtoolsErrorCode)[keyof typeof RpcDevtoolsErrorCode];",
+          "source": "packages/rpc-devtools/dist/error-code.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./contract",
+          "ownerModule": "contract",
+          "ownerFragment": "rpc-devtools-contract--IRpcDevtoolsErrorCode"
+        },
+        {
+          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RPC_DEVTOOLS_SOURCE:export declare const RPC_DEVTOOLS_SOURCE = \"@migaia/rpc/devtools\";",
+          "name": "RPC_DEVTOOLS_SOURCE",
+          "signature": "export declare const RPC_DEVTOOLS_SOURCE = \"@migaia/rpc/devtools\";",
+          "source": "packages/rpc-devtools/dist/error-code.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./contract",
+          "ownerModule": "contract",
+          "ownerFragment": "rpc-devtools-contract--RPC_DEVTOOLS_SOURCE"
+        },
+        {
+          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
+          "name": "RpcDevtoolsErrorCode",
+          "signature": "export declare const RpcDevtoolsErrorCode: { /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
+          "source": "packages/rpc-devtools/dist/error-code.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./contract",
+          "ownerModule": "contract",
+          "ownerFragment": "rpc-devtools-contract--RpcDevtoolsErrorCode"
+        }
+      ]
+    },
+    {
+      "id": "rpc-devtools:contract",
+      "library": "rpc-devtools",
+      "module": "contract",
+      "exportPath": "./contract",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-devtools/getting-started",
+      "architecturePath": "/en/architecture/rpc-devtools",
+      "symbols": [
+        {
+          "name": "decodeRpcDevtoolsRecord",
+          "kind": "function",
+          "signature": "export declare function decodeRpcDevtoolsRecord(text: string): IRpcDevtoolsRecord;",
+          "declarationLine": 11,
+          "source": "packages/rpc-devtools/dist/contract/record-codec.d.ts",
+          "purpose": "Decode the frozen v1 header, byte tags and native error graph without regenerating any stack. Invalid input throws RECORD_FORMAT_INVALID with the original failure on cause.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for decodeRpcDevtoolsRecord.",
+          "advanced": "No additional advanced behavior is declared for decodeRpcDevtoolsRecord.",
+          "parameters": ["text: string"],
+          "parameterDetails": [
+            {
+              "name": "text",
+              "type": "string",
+              "optional": false
+            }
+          ],
+          "returns": "IRpcDevtoolsRecord",
+          "errors": ["No documented errors are declared for decodeRpcDevtoolsRecord."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for decodeRpcDevtoolsRecord.",
+          "examples": [
+            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [{\n    seq: 1,\n    at: 0,\n    endpointId: 'client',\n    stage: 'message',\n    direction: 'outbound',\n    kind: 'request',\n    method: '读取',\n    content: new Uint8Array([1, 2, 3])\n  }]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
+            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1"
+          ],
+          "members": [],
+          "aliasOf": "decodeRpcDevtoolsRecord",
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export declare function decodeRpcDevtoolsRecord(text: string): IRpcDevtoolsRecord;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "text",
+                "type": "string",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcDevtoolsRecord"],
+          "whenToUse": "Use decodeRpcDevtoolsRecord when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when decodeRpcDevtoolsRecord does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Decode the frozen v1 header, byte tags and native error graph without regenerating any stack. Invalid input throws RECORD_FORMAT_INVALID with the original failure on cause."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import decodeRpcDevtoolsRecord from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use decodeRpcDevtoolsRecord when its function contract and declared inputs match the result you need. Choose a different public symbol when decodeRpcDevtoolsRecord does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for decodeRpcDevtoolsRecord."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for decodeRpcDevtoolsRecord."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/contract/record-codec.d.ts:decodeRpcDevtoolsRecord:export declare function decodeRpcDevtoolsRecord(text: string): IRpcDevtoolsRecord;",
+          "guidance": [],
+          "usageScore": 28,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--decodeRpcDevtoolsRecord"
+        },
+        {
+          "name": "encodeRpcDevtoolsRecord",
+          "kind": "function",
+          "signature": "export declare function encodeRpcDevtoolsRecord(record: IRpcDevtoolsRecord): string;",
+          "declarationLine": 6,
+          "source": "packages/rpc-devtools/dist/contract/record-codec.d.ts",
+          "purpose": "Encode an ordered offline record as UTF-8-compatible NDJSON text. Errors delegate to Contract; a serialization failure throws instead of being silently omitted. Neither input nor stack changes.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for encodeRpcDevtoolsRecord.",
+          "advanced": "No additional advanced behavior is declared for encodeRpcDevtoolsRecord.",
+          "parameters": ["record: IRpcDevtoolsRecord"],
+          "parameterDetails": [
+            {
+              "name": "record",
+              "type": "IRpcDevtoolsRecord",
+              "optional": false
+            }
+          ],
+          "returns": "string",
+          "errors": ["No documented errors are declared for encodeRpcDevtoolsRecord."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for encodeRpcDevtoolsRecord.",
+          "examples": [
+            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [{\n    seq: 1,\n    at: 0,\n    endpointId: 'client',\n    stage: 'message',\n    direction: 'outbound',\n    kind: 'request',\n    method: '读取',\n    content: new Uint8Array([1, 2, 3])\n  }]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
+            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1"
+          ],
+          "members": [],
+          "aliasOf": "encodeRpcDevtoolsRecord",
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export declare function encodeRpcDevtoolsRecord(record: IRpcDevtoolsRecord): string;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "record",
+                "type": "IRpcDevtoolsRecord",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["string"],
+          "whenToUse": "Use encodeRpcDevtoolsRecord when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when encodeRpcDevtoolsRecord does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Encode an ordered offline record as UTF-8-compatible NDJSON text. Errors delegate to Contract; a serialization failure throws instead of being silently omitted. Neither input nor stack changes."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import encodeRpcDevtoolsRecord from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use encodeRpcDevtoolsRecord when its function contract and declared inputs match the result you need. Choose a different public symbol when encodeRpcDevtoolsRecord does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for encodeRpcDevtoolsRecord."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for encodeRpcDevtoolsRecord."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/contract/record-codec.d.ts:encodeRpcDevtoolsRecord:export declare function encodeRpcDevtoolsRecord(record: IRpcDevtoolsRecord): string;",
+          "guidance": [],
+          "usageScore": 28,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--encodeRpcDevtoolsRecord"
+        },
+        {
+          "name": "IRpcDevtoolsCounters",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsCounters = Readonly<{ evicted: number; contentDropped: number; droppedReentrant: number; sampledOut: number; ignoredWhilePaused: number; ignoredAfterClose: number; internOverflow: number; }>;",
+          "declarationLine": 13,
+          "source": "packages/rpc-devtools/dist/contract/service.d.ts",
+          "purpose": "Loss counters explain bounded retention, interning and the collector's lifecycle decisions.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsCounters.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsCounters.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsCounters."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsCounters.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsCounters = Readonly<{ evicted: number; contentDropped: number; droppedReentrant: number; sampledOut: number; ignoredWhilePaused: number; ignoredAfterClose: number; internOverflow: number; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsCounters when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsCounters does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Loss counters explain bounded retention, interning and the collector's lifecycle decisions."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsCounters from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsCounters when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsCounters does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsCounters."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsCounters."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsCounters:export type IRpcDevtoolsCounters = Readonly<{ evicted: number; contentDropped: number; droppedReentrant: number; sampledOut: number; ignoredWhilePaused: number; ignoredAfterClose: number; internOverflow: number; }>;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--IRpcDevtoolsCounters"
+        },
+        {
+          "name": "IRpcDevtoolsDescribe",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsDescribe = Readonly<{ version: string; now: number; paused: boolean; descriptors: readonly IRpcProbeDescriptor[]; limits: Readonly<{ maxEvents: number; maxContentBytes: number; }>; counters: IRpcDevtoolsCounters; }>;",
+          "declarationLine": 50,
+          "source": "packages/rpc-devtools/dist/contract/service.d.ts",
+          "purpose": "Describe supplies the target's current clock sample, active descriptors and retention limits.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsDescribe.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsDescribe.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsDescribe."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsDescribe.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsDescribe = Readonly<{ version: string; now: number; paused: boolean; descriptors: readonly IRpcProbeDescriptor[]; limits: Readonly<{ maxEvents: number; maxContentBytes: number; }>; counters: IRpcDevtoolsCounters; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsDescribe when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsDescribe does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Describe supplies the target's current clock sample, active descriptors and retention limits."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsDescribe from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsDescribe when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsDescribe does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsDescribe."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsDescribe."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsDescribe:export type IRpcDevtoolsDescribe = Readonly<{ version: string; now: number; paused: boolean; descriptors: readonly IRpcProbeDescriptor[]; limits: Readonly<{ maxEvents: number; maxContentBytes: number; }>; counters: IRpcDevtoolsCounters; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--IRpcDevtoolsDescribe"
+        },
+        {
+          "name": "IRpcDevtoolsErrorCode",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsErrorCode = (typeof RpcDevtoolsErrorCode)[keyof typeof RpcDevtoolsErrorCode];",
+          "declarationLine": 26,
+          "source": "packages/rpc-devtools/dist/error-code.d.ts",
+          "purpose": "Semantic code union retains the registry's exact value spelling.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsErrorCode.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsErrorCode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsErrorCode.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcDevtoolsErrorCode",
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsErrorCode = (typeof RpcDevtoolsErrorCode)[keyof typeof RpcDevtoolsErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsErrorCode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Semantic code union retains the registry's exact value spelling."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsErrorCode from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/error-code.d.ts:IRpcDevtoolsErrorCode:export type IRpcDevtoolsErrorCode = (typeof RpcDevtoolsErrorCode)[keyof typeof RpcDevtoolsErrorCode];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--IRpcDevtoolsErrorCode"
+        },
+        {
+          "name": "IRpcDevtoolsPage",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsPage = Readonly<{ events: readonly IRpcDevtoolsWireEvent[]; nextSeq: number; counters: IRpcDevtoolsCounters; }>;",
+          "declarationLine": 23,
+          "source": "packages/rpc-devtools/dist/contract/service.d.ts",
+          "purpose": "Pages carry the next sequence cursor and the loss counters observed with that snapshot.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsPage.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsPage.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsPage."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsPage.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsPage = Readonly<{ events: readonly IRpcDevtoolsWireEvent[]; nextSeq: number; counters: IRpcDevtoolsCounters; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsPage when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsPage does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Pages carry the next sequence cursor and the loss counters observed with that snapshot."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsPage from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsPage when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsPage does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsPage."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsPage."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsPage:export type IRpcDevtoolsPage = Readonly<{ events: readonly IRpcDevtoolsWireEvent[]; nextSeq: number; counters: IRpcDevtoolsCounters; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--IRpcDevtoolsPage"
+        },
+        {
+          "name": "IRpcDevtoolsQuery",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsQuery = Readonly<{ afterSeq?: number; limit?: number; stages?: readonly string[]; methods?: readonly string[]; trace?: string; endpointIds?: readonly string[]; }>;",
+          "declarationLine": 4,
+          "source": "packages/rpc-devtools/dist/contract/service.d.ts",
+          "purpose": "Query limits are at most 1,000; filters are applied to one collector's retained sequence.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsQuery.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsQuery.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsQuery."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsQuery.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsQuery = Readonly<{ afterSeq?: number; limit?: number; stages?: readonly string[]; methods?: readonly string[]; trace?: string; endpointIds?: readonly string[]; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsQuery when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsQuery does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Query limits are at most 1,000; filters are applied to one collector's retained sequence."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsQuery from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsQuery when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsQuery does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsQuery."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsQuery."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsQuery:export type IRpcDevtoolsQuery = Readonly<{ afterSeq?: number; limit?: number; stages?: readonly string[]; methods?: readonly string[]; trace?: string; endpointIds?: readonly string[]; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--IRpcDevtoolsQuery"
+        },
+        {
+          "name": "IRpcDevtoolsRecord",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsRecord = Readonly<{ header: IRpcDevtoolsRecordHeader; events: readonly IRpcDevtoolsRecordEvent[]; }>;",
+          "declarationLine": 20,
+          "source": "packages/rpc-devtools/dist/contract/record.d.ts",
+          "purpose": "An offline recording retains order and uses native errors/bytes before and after codec calls.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsRecord.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsRecord.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsRecord."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsRecord.",
+          "examples": [
+            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [{\n    seq: 1,\n    at: 0,\n    endpointId: 'client',\n    stage: 'message',\n    direction: 'outbound',\n    kind: 'request',\n    method: '读取',\n    content: new Uint8Array([1, 2, 3])\n  }]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
+            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1"
+          ],
+          "members": [],
+          "aliasOf": "IRpcDevtoolsRecord",
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsRecord = Readonly<{ header: IRpcDevtoolsRecordHeader; events: readonly IRpcDevtoolsRecordEvent[]; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsRecord when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsRecord does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "An offline recording retains order and uses native errors/bytes before and after codec calls."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsRecord from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsRecord when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsRecord does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsRecord."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsRecord."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/contract/record.d.ts:IRpcDevtoolsRecord:export type IRpcDevtoolsRecord = Readonly<{ header: IRpcDevtoolsRecordHeader; events: readonly IRpcDevtoolsRecordEvent[]; }>;",
+          "guidance": [],
+          "usageScore": 24,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--IRpcDevtoolsRecord"
+        },
+        {
+          "name": "IRpcDevtoolsRecordEvent",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsRecordEvent = Readonly<Omit<IRpcDevtoolsWireEvent, 'error'> & { error?: Error | IRpcWireError; }>;",
+          "declarationLine": 16,
+          "source": "packages/rpc-devtools/dist/contract/record.d.ts",
+          "purpose": "Record inputs accept service wire errors and native errors; decoding restores native errors.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsRecordEvent.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsRecordEvent.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsRecordEvent."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsRecordEvent.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcDevtoolsRecordEvent",
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsRecordEvent = Readonly<Omit<IRpcDevtoolsWireEvent, 'error'> & { error?: Error | IRpcWireError; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsRecordEvent when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsRecordEvent does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Record inputs accept service wire errors and native errors; decoding restores native errors."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsRecordEvent from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsRecordEvent when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsRecordEvent does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsRecordEvent."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsRecordEvent."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/contract/record.d.ts:IRpcDevtoolsRecordEvent:export type IRpcDevtoolsRecordEvent = Readonly<Omit<IRpcDevtoolsWireEvent, 'error'> & { error?: Error | IRpcWireError; }>;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--IRpcDevtoolsRecordEvent"
+        },
+        {
+          "name": "IRpcDevtoolsRecordHeader",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsRecordHeader = Readonly<typeof RpcDevtoolsRecordFormat>;",
+          "declarationLine": 14,
+          "source": "packages/rpc-devtools/dist/contract/record.d.ts",
+          "purpose": "No clock/descriptor metadata is invented; the current SDD defines only the format identity.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsRecordHeader.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsRecordHeader.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsRecordHeader."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsRecordHeader.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcDevtoolsRecordHeader",
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsRecordHeader = Readonly<typeof RpcDevtoolsRecordFormat>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsRecordHeader when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsRecordHeader does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "No clock/descriptor metadata is invented; the current SDD defines only the format identity."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsRecordHeader from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsRecordHeader when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsRecordHeader does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsRecordHeader."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsRecordHeader."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/contract/record.d.ts:IRpcDevtoolsRecordHeader:export type IRpcDevtoolsRecordHeader = Readonly<typeof RpcDevtoolsRecordFormat>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--IRpcDevtoolsRecordHeader"
+        },
+        {
+          "name": "IRpcDevtoolsServiceApi",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsServiceApi = { describe(): IRpcDevtoolsDescribe; query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; stats(): IRpcDevtoolsStats; record: { start(input?: Readonly<{ maxEvents?: number; }>): void; stop(): string; }; clear(): void; pause(): void; resume(): void; };",
+          "declarationLine": 67,
+          "source": "packages/rpc-devtools/dist/contract/service.d.ts",
+          "purpose": "Users attach this nested service object to their existing Peer; it owns no connection.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsServiceApi.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsServiceApi.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsServiceApi."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsServiceApi.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsServiceApi = { describe(): IRpcDevtoolsDescribe; query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; stats(): IRpcDevtoolsStats; record: { start(input?: Readonly<{ maxEvents?: number; }>): void; stop(): string; }; clear(): void; pause(): void; resume(): void; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsServiceApi when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsServiceApi does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Users attach this nested service object to their existing Peer; it owns no connection."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsServiceApi from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsServiceApi when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsServiceApi does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsServiceApi."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsServiceApi."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsServiceApi:export type IRpcDevtoolsServiceApi = { describe(): IRpcDevtoolsDescribe; query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; stats(): IRpcDevtoolsStats; record: { start(input?: Readonly<{ maxEvents?: number; }>): void; stop(): string; }; clear(): void; pause(): void; resume(): void; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--IRpcDevtoolsServiceApi"
+        },
+        {
+          "name": "IRpcDevtoolsStats",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsStats = Readonly<{ since: number; methods: readonly Readonly<{ endpointId: string; method: string; calls: number; failed: number; rejected: number; timedOut: number; aborted: number; latencyBucketsMs: readonly number[]; latencyCounts: readonly number[]; p50Ms: number; p95Ms: number; p99Ms: number; }>[]; }>;",
+          "declarationLine": 32,
+          "source": "packages/rpc-devtools/dist/contract/service.d.ts",
+          "purpose": "Histograms use 24 boundaries, 0.0625 ms × 2^k for k=0…23. Percentiles interpolate within a bucket, with error bounded by its width; ring eviction does not reset these aggregates.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsStats.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsStats.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsStats."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsStats.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsStats = Readonly<{ since: number; methods: readonly Readonly<{ endpointId: string; method: string; calls: number; failed: number; rejected: number; timedOut: number; aborted: number; latencyBucketsMs: readonly number[]; latencyCounts: readonly number[]; p50Ms: number; p95Ms: number; p99Ms: number; }>[]; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsStats when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsStats does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Histograms use 24 boundaries, 0.0625 ms × 2^k for k=0…23. Percentiles interpolate within a bucket, with error bounded by its width; ring eviction does not reset these aggregates."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsStats from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsStats when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsStats does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsStats."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsStats."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsStats:export type IRpcDevtoolsStats = Readonly<{ since: number; methods: readonly Readonly<{ endpointId: string; method: string; calls: number; failed: number; rejected: number; timedOut: number; aborted: number; latencyBucketsMs: readonly number[]; latencyCounts: readonly number[]; p50Ms: number; p95Ms: number; p99Ms: number; }>[]; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--IRpcDevtoolsStats"
+        },
+        {
+          "name": "IRpcDevtoolsWatchBatch",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsWatchBatch = Readonly<{ events: readonly IRpcDevtoolsWireEvent[]; dropped: number; }>;",
+          "declarationLine": 62,
+          "source": "packages/rpc-devtools/dist/contract/service.d.ts",
+          "purpose": "Watch batches account for loss while the consumer was slower than the collector.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsWatchBatch.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsWatchBatch.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsWatchBatch."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsWatchBatch.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsWatchBatch = Readonly<{ events: readonly IRpcDevtoolsWireEvent[]; dropped: number; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsWatchBatch when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsWatchBatch does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Watch batches account for loss while the consumer was slower than the collector."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsWatchBatch from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsWatchBatch when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsWatchBatch does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsWatchBatch."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsWatchBatch."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsWatchBatch:export type IRpcDevtoolsWatchBatch = Readonly<{ events: readonly IRpcDevtoolsWireEvent[]; dropped: number; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--IRpcDevtoolsWatchBatch"
+        },
+        {
+          "name": "IRpcDevtoolsWireEvent",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;",
+          "declarationLine": 5,
+          "source": "packages/rpc-devtools/dist/contract/wire.d.ts",
+          "purpose": "String names appear only at query/export boundaries; the collector retains numeric columns.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsWireEvent.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsWireEvent.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsWireEvent."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsWireEvent.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsWireEvent when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsWireEvent does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "String names appear only at query/export boundaries; the collector retains numeric columns."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsWireEvent from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsWireEvent when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsWireEvent does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsWireEvent."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsWireEvent."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/contract/wire.d.ts:IRpcDevtoolsWireEvent:export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--IRpcDevtoolsWireEvent"
+        },
+        {
+          "name": "IRpcWireError",
+          "kind": "type",
+          "signature": "export type IRpcWireError = IRpcSerializedError;",
+          "declarationLine": 3,
+          "source": "packages/rpc-devtools/dist/contract/wire.d.ts",
+          "purpose": "Service errors use Contract's canonical serialized graph, including stacks and original causes.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcWireError.",
+          "advanced": "No additional advanced behavior is declared for IRpcWireError.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcWireError."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcWireError.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./contract",
+          "overloadSignatures": ["export type IRpcWireError = IRpcSerializedError;"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcWireError when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcWireError does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Service errors use Contract's canonical serialized graph, including stacks and original causes."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcWireError from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcWireError when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcWireError does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcWireError."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcWireError."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/contract/wire.d.ts:IRpcWireError:export type IRpcWireError = IRpcSerializedError;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--IRpcWireError"
+        },
+        {
+          "name": "RPC_DEVTOOLS_SOURCE",
+          "kind": "const",
+          "signature": "export declare const RPC_DEVTOOLS_SOURCE = \"@migaia/rpc/devtools\";",
+          "declarationLine": 2,
+          "source": "packages/rpc-devtools/dist/error-code.d.ts",
+          "purpose": "Registry identity shared by all devtools errors; consumers classify the source/code pair.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RPC_DEVTOOLS_SOURCE.",
+          "advanced": "No additional advanced behavior is declared for RPC_DEVTOOLS_SOURCE.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for RPC_DEVTOOLS_SOURCE."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RPC_DEVTOOLS_SOURCE.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "ERROR_SOURCE",
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export declare const RPC_DEVTOOLS_SOURCE = \"@migaia/rpc/devtools\";"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use RPC_DEVTOOLS_SOURCE when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when RPC_DEVTOOLS_SOURCE does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Registry identity shared by all devtools errors; consumers classify the source/code pair."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RPC_DEVTOOLS_SOURCE from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RPC_DEVTOOLS_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when RPC_DEVTOOLS_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RPC_DEVTOOLS_SOURCE."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for RPC_DEVTOOLS_SOURCE."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RPC_DEVTOOLS_SOURCE:export declare const RPC_DEVTOOLS_SOURCE = \"@migaia/rpc/devtools\";",
+          "guidance": [
+            {
+              "id": "4-错误身份",
+              "heading": "4. 错误身份",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE` 与 `TARGET_UNKNOWN`。Collector/hub 相关错误在本阶段仅有契约定义。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--RPC_DEVTOOLS_SOURCE"
+        },
+        {
+          "name": "RpcDevtoolsErrorCode",
+          "kind": "const",
+          "signature": "export declare const RpcDevtoolsErrorCode: { /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
+          "declarationLine": 4,
+          "source": "packages/rpc-devtools/dist/error-code.d.ts",
+          "purpose": "Public code owner for contract R5/S5 and the collector/hub lifecycle clauses.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcDevtoolsErrorCode.",
+          "advanced": "No additional advanced behavior is declared for RpcDevtoolsErrorCode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for RpcDevtoolsErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcDevtoolsErrorCode.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "RpcDevtoolsErrorCode",
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export declare const RpcDevtoolsErrorCode: { /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use RpcDevtoolsErrorCode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when RpcDevtoolsErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Public code owner for contract R5/S5 and the collector/hub lifecycle clauses."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RpcDevtoolsErrorCode from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RpcDevtoolsErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when RpcDevtoolsErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcDevtoolsErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for RpcDevtoolsErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
+          "guidance": [
+            {
+              "id": "4-错误身份",
+              "heading": "4. 错误身份",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE` 与 `TARGET_UNKNOWN`。Collector/hub 相关错误在本阶段仅有契约定义。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--RpcDevtoolsErrorCode"
+        },
+        {
+          "name": "RpcDevtoolsRecordFormat",
+          "kind": "const",
+          "signature": "export declare const RpcDevtoolsRecordFormat: Readonly<{ readonly format: \"migaia-rpc-devtools\"; readonly version: 1; }>;",
+          "declarationLine": 3,
+          "source": "packages/rpc-devtools/dist/contract/record.d.ts",
+          "purpose": "Header identity freezes the v1 NDJSON grammar for collectors and offline hub imports.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcDevtoolsRecordFormat.",
+          "advanced": "No additional advanced behavior is declared for RpcDevtoolsRecordFormat.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for RpcDevtoolsRecordFormat."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcDevtoolsRecordFormat.",
+          "examples": [
+            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [{\n    seq: 1,\n    at: 0,\n    endpointId: 'client',\n    stage: 'message',\n    direction: 'outbound',\n    kind: 'request',\n    method: '读取',\n    content: new Uint8Array([1, 2, 3])\n  }]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
+            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1"
+          ],
+          "members": [],
+          "aliasOf": "RpcDevtoolsRecordFormat",
+          "exportPath": "./contract",
+          "overloadSignatures": [
+            "export declare const RpcDevtoolsRecordFormat: Readonly<{ readonly format: \"migaia-rpc-devtools\"; readonly version: 1; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use RpcDevtoolsRecordFormat when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when RpcDevtoolsRecordFormat does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Header identity freezes the v1 NDJSON grammar for collectors and offline hub imports."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RpcDevtoolsRecordFormat from @migaia/rpc-devtools/contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RpcDevtoolsRecordFormat when its const contract and declared inputs match the result you need. Choose a different public symbol when RpcDevtoolsRecordFormat does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcDevtoolsRecordFormat."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for RpcDevtoolsRecordFormat."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/contract/record.d.ts:RpcDevtoolsRecordFormat:export declare const RpcDevtoolsRecordFormat: Readonly<{ readonly format: \"migaia-rpc-devtools\"; readonly version: 1; }>;",
+          "guidance": [],
+          "usageScore": 30,
+          "configuration": [],
+          "fragment": "rpc-devtools-contract--RpcDevtoolsRecordFormat"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-devtools:hub",
+      "library": "rpc-devtools",
+      "module": "hub",
+      "exportPath": "./hub",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-devtools/getting-started",
+      "architecturePath": "/en/architecture/rpc-devtools",
+      "symbols": [
+        {
+          "name": "createRpcDevtoolsHub",
+          "kind": "function",
+          "signature": "export declare function createRpcDevtoolsHub(_options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub;",
+          "declarationLine": 3,
+          "source": "packages/rpc-devtools/dist/hub/index.d.ts",
+          "purpose": "Layer-1 placeholder: target aggregation becomes available when layer 2 replaces this body.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRpcDevtoolsHub.",
+          "advanced": "No additional advanced behavior is declared for createRpcDevtoolsHub.",
+          "parameters": ["_options: IRpcDevtoolsHubOptions (optional)"],
+          "parameterDetails": [
+            {
+              "name": "_options",
+              "type": "IRpcDevtoolsHubOptions",
+              "optional": true
+            }
+          ],
+          "returns": "IRpcDevtoolsHub",
+          "errors": ["No documented errors are declared for createRpcDevtoolsHub."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRpcDevtoolsHub.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./hub",
+          "overloadSignatures": [
+            "export declare function createRpcDevtoolsHub(_options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "_options",
+                "type": "IRpcDevtoolsHubOptions",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcDevtoolsHub"],
+          "whenToUse": "Use createRpcDevtoolsHub when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createRpcDevtoolsHub does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Layer-1 placeholder: target aggregation becomes available when layer 2 replaces this body."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createRpcDevtoolsHub from @migaia/rpc-devtools/hub, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createRpcDevtoolsHub when its function contract and declared inputs match the result you need. Choose a different public symbol when createRpcDevtoolsHub does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRpcDevtoolsHub."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createRpcDevtoolsHub."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/hub/index.d.ts:createRpcDevtoolsHub:export declare function createRpcDevtoolsHub(_options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub;",
+          "guidance": [],
+          "usageScore": 12,
+          "configuration": [],
+          "fragment": "rpc-devtools-hub--createRpcDevtoolsHub"
+        },
+        {
+          "name": "IRpcDevtoolsHub",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsHub = Readonly<{ addTarget(name: string, client: IRpcDevtoolsTargetClient): Promise<void>; removeTarget(name: string): Promise<void>; importRecord(name: string, text: string): void; status(name?: string): RpcDevtoolsTargetStatus | ReadonlyMap<string, RpcDevtoolsTargetStatus>; timeline(query?: IRpcDevtoolsTimelineQuery): readonly IRpcDevtoolsTimelineEvent[]; interactions(trace?: string): readonly IRpcDevtoolsInteraction[]; stats(name?: string): Promise<IRpcDevtoolsStats>; on(event: 'status', listener: (name: string, status: RpcDevtoolsTargetStatus) => void): () => void; on(event: 'event', listener: (event: IRpcDevtoolsTimelineEvent) => void): () => void; close(): Promise<void>; }>;",
+          "declarationLine": 53,
+          "source": "packages/rpc-devtools/dist/hub/types.d.ts",
+          "purpose": "Target lifetime, indexing and watch management are implemented by the hub child.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsHub.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsHub.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsHub."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsHub.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./hub",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsHub = Readonly<{ addTarget(name: string, client: IRpcDevtoolsTargetClient): Promise<void>; removeTarget(name: string): Promise<void>; importRecord(name: string, text: string): void; status(name?: string): RpcDevtoolsTargetStatus | ReadonlyMap<string, RpcDevtoolsTargetStatus>; timeline(query?: IRpcDevtoolsTimelineQuery): readonly IRpcDevtoolsTimelineEvent[]; interactions(trace?: string): readonly IRpcDevtoolsInteraction[]; stats(name?: string): Promise<IRpcDevtoolsStats>; on(event: 'status', listener: (name: string, status: RpcDevtoolsTargetStatus) => void): () => void; on(event: 'event', listener: (event: IRpcDevtoolsTimelineEvent) => void): () => void; close(): Promise<void>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsHub when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsHub does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Target lifetime, indexing and watch management are implemented by the hub child."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsHub from @migaia/rpc-devtools/hub, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsHub when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsHub does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsHub."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsHub."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/hub/types.d.ts:IRpcDevtoolsHub:export type IRpcDevtoolsHub = Readonly<{ addTarget(name: string, client: IRpcDevtoolsTargetClient): Promise<void>; removeTarget(name: string): Promise<void>; importRecord(name: string, text: string): void; status(name?: string): RpcDevtoolsTargetStatus | ReadonlyMap<string, RpcDevtoolsTargetStatus>; timeline(query?: IRpcDevtoolsTimelineQuery): readonly IRpcDevtoolsTimelineEvent[]; interactions(trace?: string): readonly IRpcDevtoolsInteraction[]; stats(name?: string): Promise<IRpcDevtoolsStats>; on(event: 'status', listener: (name: string, status: RpcDevtoolsTargetStatus) => void): () => void; on(event: 'event', listener: (event: IRpcDevtoolsTimelineEvent) => void): () => void; close(): Promise<void>; }>;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-devtools-hub--IRpcDevtoolsHub"
+        },
+        {
+          "name": "IRpcDevtoolsHubOptions",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsHubOptions = Readonly<{ maxEvents?: number; realignMs?: number; onError?(error: unknown): void; }>;",
+          "declarationLine": 47,
+          "source": "packages/rpc-devtools/dist/hub/types.d.ts",
+          "purpose": "Options preserve the public hub §4 realignMs spelling; implementation belongs to layer 2.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsHubOptions.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsHubOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsHubOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsHubOptions.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./hub",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsHubOptions = Readonly<{ maxEvents?: number; realignMs?: number; onError?(error: unknown): void; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsHubOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsHubOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Options preserve the public hub §4 realignMs spelling; implementation belongs to layer 2."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsHubOptions from @migaia/rpc-devtools/hub, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsHubOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsHubOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsHubOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsHubOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/hub/types.d.ts:IRpcDevtoolsHubOptions:export type IRpcDevtoolsHubOptions = Readonly<{ maxEvents?: number; realignMs?: number; onError?(error: unknown): void; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-hub--IRpcDevtoolsHubOptions"
+        },
+        {
+          "name": "IRpcDevtoolsInteraction",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsInteraction = Readonly<{ key: string; trace?: string; method?: string; oneSided: boolean; targets: readonly string[]; events: readonly IRpcDevtoolsTimelineEvent[]; }>;",
+          "declarationLine": 28,
+          "source": "packages/rpc-devtools/dist/hub/types.d.ts",
+          "purpose": "Correlation uses explicit trace and sender/message identity, without synthesizing missing sides.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsInteraction.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsInteraction.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsInteraction."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsInteraction.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./hub",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsInteraction = Readonly<{ key: string; trace?: string; method?: string; oneSided: boolean; targets: readonly string[]; events: readonly IRpcDevtoolsTimelineEvent[]; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsInteraction when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsInteraction does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Correlation uses explicit trace and sender/message identity, without synthesizing missing sides."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsInteraction from @migaia/rpc-devtools/hub, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsInteraction when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsInteraction does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsInteraction."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsInteraction."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/hub/types.d.ts:IRpcDevtoolsInteraction:export type IRpcDevtoolsInteraction = Readonly<{ key: string; trace?: string; method?: string; oneSided: boolean; targets: readonly string[]; events: readonly IRpcDevtoolsTimelineEvent[]; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-hub--IRpcDevtoolsInteraction"
+        },
+        {
+          "name": "IRpcDevtoolsTargetClient",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsTargetClient = Readonly<{ request(method: string, payload?: unknown): Promise<unknown>; stream(method: string, payload?: unknown): AsyncIterable<unknown>; }>;",
+          "declarationLine": 14,
+          "source": "packages/rpc-devtools/dist/hub/types.d.ts",
+          "purpose": "Users supply an already connected client; the hub creates no transports or Peers.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsTargetClient.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsTargetClient.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsTargetClient."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsTargetClient.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./hub",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsTargetClient = Readonly<{ request(method: string, payload?: unknown): Promise<unknown>; stream(method: string, payload?: unknown): AsyncIterable<unknown>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsTargetClient when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsTargetClient does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Users supply an already connected client; the hub creates no transports or Peers."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsTargetClient from @migaia/rpc-devtools/hub, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsTargetClient when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsTargetClient does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsTargetClient."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsTargetClient."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/hub/types.d.ts:IRpcDevtoolsTargetClient:export type IRpcDevtoolsTargetClient = Readonly<{ request(method: string, payload?: unknown): Promise<unknown>; stream(method: string, payload?: unknown): AsyncIterable<unknown>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-hub--IRpcDevtoolsTargetClient"
+        },
+        {
+          "name": "IRpcDevtoolsTimelineEvent",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsTimelineEvent = Readonly<{ target: string; alignedAt: number; uncertaintyMs: number | undefined; interaction?: string; trace?: string; event: IRpcDevtoolsWireEvent; }>;",
+          "declarationLine": 19,
+          "source": "packages/rpc-devtools/dist/hub/types.d.ts",
+          "purpose": "Time alignment belongs to the hub; the contained service event remains unchanged.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsTimelineEvent.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsTimelineEvent.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsTimelineEvent."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsTimelineEvent.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./hub",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsTimelineEvent = Readonly<{ target: string; alignedAt: number; uncertaintyMs: number | undefined; interaction?: string; trace?: string; event: IRpcDevtoolsWireEvent; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsTimelineEvent when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsTimelineEvent does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Time alignment belongs to the hub; the contained service event remains unchanged."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsTimelineEvent from @migaia/rpc-devtools/hub, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsTimelineEvent when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsTimelineEvent does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsTimelineEvent."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsTimelineEvent."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/hub/types.d.ts:IRpcDevtoolsTimelineEvent:export type IRpcDevtoolsTimelineEvent = Readonly<{ target: string; alignedAt: number; uncertaintyMs: number | undefined; interaction?: string; trace?: string; event: IRpcDevtoolsWireEvent; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-hub--IRpcDevtoolsTimelineEvent"
+        },
+        {
+          "name": "IRpcDevtoolsTimelineQuery",
+          "kind": "type",
+          "signature": "export type IRpcDevtoolsTimelineQuery = Readonly<{ targets?: readonly string[]; stages?: readonly string[]; trace?: string; method?: string; from?: number; to?: number; limit?: number; }>;",
+          "declarationLine": 37,
+          "source": "packages/rpc-devtools/dist/hub/types.d.ts",
+          "purpose": "Timeline filters select retained target events after alignment.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsTimelineQuery.",
+          "advanced": "No additional advanced behavior is declared for IRpcDevtoolsTimelineQuery.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDevtoolsTimelineQuery."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsTimelineQuery.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./hub",
+          "overloadSignatures": [
+            "export type IRpcDevtoolsTimelineQuery = Readonly<{ targets?: readonly string[]; stages?: readonly string[]; trace?: string; method?: string; from?: number; to?: number; limit?: number; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDevtoolsTimelineQuery when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDevtoolsTimelineQuery does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Timeline filters select retained target events after alignment."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDevtoolsTimelineQuery from @migaia/rpc-devtools/hub, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDevtoolsTimelineQuery when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsTimelineQuery does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsTimelineQuery."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDevtoolsTimelineQuery."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/hub/types.d.ts:IRpcDevtoolsTimelineQuery:export type IRpcDevtoolsTimelineQuery = Readonly<{ targets?: readonly string[]; stages?: readonly string[]; trace?: string; method?: string; from?: number; to?: number; limit?: number; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-hub--IRpcDevtoolsTimelineQuery"
+        },
+        {
+          "name": "RpcDevtoolsTargetStatus",
+          "kind": "const",
+          "signature": "export declare const RpcDevtoolsTargetStatus: { readonly connecting: \"connecting\"; readonly connected: \"connected\"; readonly disconnected: \"disconnected\"; readonly offline: \"offline\"; readonly removed: \"removed\"; };\nexport type RpcDevtoolsTargetStatus = keyof typeof RpcDevtoolsTargetStatus;",
+          "declarationLine": 4,
+          "source": "packages/rpc-devtools/dist/hub/types.d.ts",
+          "purpose": "Target states are events/return values, never thrown error codes (hub R1 and §5). Same-name union shares the status vocabulary's one canonical declaration.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcDevtoolsTargetStatus.",
+          "advanced": "No additional advanced behavior is declared for RpcDevtoolsTargetStatus.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for RpcDevtoolsTargetStatus."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcDevtoolsTargetStatus.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./hub",
+          "overloadSignatures": [
+            "export declare const RpcDevtoolsTargetStatus: { readonly connecting: \"connecting\"; readonly connected: \"connected\"; readonly disconnected: \"disconnected\"; readonly offline: \"offline\"; readonly removed: \"removed\"; };",
+            "export type RpcDevtoolsTargetStatus = keyof typeof RpcDevtoolsTargetStatus;"
+          ],
+          "overloadParameterDetails": [[], []],
+          "overloadReturns": [],
+          "whenToUse": "Use RpcDevtoolsTargetStatus when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when RpcDevtoolsTargetStatus does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Target states are events/return values, never thrown error codes (hub R1 and §5). Same-name union shares the status vocabulary's one canonical declaration."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RpcDevtoolsTargetStatus from @migaia/rpc-devtools/hub, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RpcDevtoolsTargetStatus when its const contract and declared inputs match the result you need. Choose a different public symbol when RpcDevtoolsTargetStatus does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcDevtoolsTargetStatus."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for RpcDevtoolsTargetStatus."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/hub/types.d.ts:RpcDevtoolsTargetStatus:export declare const RpcDevtoolsTargetStatus: { readonly connecting: \"connecting\"; readonly connected: \"connected\"; readonly disconnected: \"disconnected\"; readonly offline: \"offline\"; readonly removed: \"removed\"; };\nexport type RpcDevtoolsTargetStatus = keyof typeof RpcDevtoolsTargetStatus;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "rpc-devtools-hub--RpcDevtoolsTargetStatus"
+        }
+      ],
+      "aliases": []
+    }
+  ]
+}
