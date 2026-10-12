@@ -3,7 +3,11 @@ import { MessageChannel } from 'node:worker_threads'
 import { createHmac } from 'node:crypto'
 import { identityCodecV1 } from '@migaia/serialize/codec'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import { createStringFramer, messageFramerV1 } from '@migaia/rpc-contract/framing'
+import {
+  createStringFramer,
+  messageFramerV1,
+  readRpcBatchMembers
+} from '@migaia/rpc-contract/framing'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createEndpoint, connect, abort, ping } from '../../dist/core/index.js'
 import { codec } from '../../dist/core/middleware/codec.js'
@@ -114,14 +118,35 @@ describe('probe non-interference A6', () => {
         })
       ])
       client = peers[0]
+      /**
+       * Observe the existing physical transport, retaining its original receiver and
+       * implementation.
+       */
+      const sending = vi.spyOn(channel.transports[0], 'send')
+      /** These actual selected component references are the established fast/batch path facts. */
+      const sender = readEndpointOwner<RpcOutboundSender>(
+        readRuntimePeerConnection(client).endpoint,
+        'outbound-pipeline'
+      )!
       try {
+        expect(sender.components.codec.encode).toBe(identityCodecV1.encode)
+        expect(sender.components.framer.frame).toBe(messageFramerV1.frame)
         /** Re-entrancy is isolated from quota saturation before the exact 64-call batch. */
         expect(await client.request('reenter')).toBe(9)
         if (mode === 'reentrant') expect(await nested).toBe(-1)
+        sending.mockClear()
         expect(
           await Promise.all(Array.from({ length: 64 }, (_, value) => client.request('echo', value)))
         ).toEqual(Array.from({ length: 64 }, (_, value) => value))
         expect(calls).toEqual(Array.from({ length: 64 }, (_, value) => value))
+        /**
+         * Genuine batch members prove c64 kept batching rather than producing 64 independent
+         * writes.
+         */
+        const batches = sending.mock.calls.map(([frame]) => readRpcBatchMembers(frame))
+        expect(batches.some((members) => members !== undefined && members.length > 1)).toBe(true)
+        expect(sending.mock.calls.length).toBeLessThan(64)
+        expect(batches.reduce((total, members) => total + (members?.length ?? 1), 0)).toBe(64)
         /**
          * Plain Peer calls retain their original fast lane and remote wrapper with the native
          * cause.
@@ -169,6 +194,7 @@ describe('probe non-interference A6', () => {
         else expect(reports).toEqual([])
       } finally {
         release()
+        sending.mockRestore()
         await Promise.all(peers.map((peer) => peer.close()))
         channel.close()
       }

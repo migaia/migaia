@@ -8,7 +8,11 @@ import {
   rpcProbeSampleKey,
   snapshotProbeEvent
 } from '../../dist/core/probe/index.js'
-import { createProbeEmitter } from '../../dist/core/internal/probe-emitter.js'
+import {
+  createProbeEmitter,
+  bindInstalledProbe,
+  readInstalledProbe
+} from '../../dist/core/internal/probe-emitter.js'
 import type { IRpcProbeEventView } from '../../dist/core/probe/types.js'
 
 it('[A1] isolates throwing subscribers, uses one view, updates stages and skips reentrant sequence', () => {
@@ -209,4 +213,30 @@ it('[A1] reports asynchronous describe, redact and emit failures without interru
     expect((failures[i] as Error).cause).toBe(originals[i])
   }
   emitter.dispose()
+})
+
+it('[A1] one transport retains its canonical observer and rolls back a conflicting installation', () => {
+  /** The actual transport identity is the construction binding key, independent of payload state. */
+  const transport = {}
+  /** First installation retains the one endpoint emitter. */
+  const first = createProbeEmitter(
+    [defineProbe({ stages: ['message'], emit: () => undefined })],
+    () => 0,
+    'first'
+  )
+  /** The second cold observer must release its subscriptions when ownership conflicts. */
+  const second = createProbeEmitter(
+    [defineProbe({ stages: ['message'], emit: () => undefined })],
+    () => 0,
+    'second'
+  )
+  /** This receipt revokes only its exact current owner. */
+  const release = bindInstalledProbe(transport, first)
+  expect(() => bindInstalledProbe(transport, second)).toThrow(
+    expect.objectContaining({ code: 'CAPABILITY_CONFLICT' })
+  )
+  expect(readInstalledProbe(transport)).toBe(first)
+  expect(second.mask).toBe(0)
+  release()
+  expect(readInstalledProbe(transport)).toBeUndefined()
 })
