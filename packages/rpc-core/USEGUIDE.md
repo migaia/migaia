@@ -806,6 +806,8 @@ probe.setStages(['frame', 'protected']) // 恢复选定阶段。
 
 `protected` 仅在认证保护路径存在时产生；没有该能力的路径不会伪造该阶段。内容捕获包括 protected 内容都必须显式启用。Descriptor 的 `stageMask` 描述 endpoint 能产生且当前已订阅的阶段，不证明所有路径都会经历每个阶段。
 
+`sizeBytes` 按当前层的真实表示计数：UTF-8 string transport 与字节 backing/view 返回精确长度。clone transport 的字符串没有物理 UTF-8 字节表示，encoded/frame/protected 的该项为 `-1`；Core 不为 metadata 观察再编码或扫描该字符串，捕获内容仍按引用传递。
+
 `setStages([])` 允许暂停，之后可以设置其它已知阶段。它更新私有状态的阶段选择，保留定义时的 `captureMask`；host 上不可写的 `stageMask` 仍为初始定义值，独立 handle 的 `stageMask` getter 反映当前私有值。非法阶段会抛出 `INVALID_CONFIG` 并保留旧 mask。阶段变更的 emitter 订阅机制由 Core 内部持有，不是公开 handle 方法。
 
 
