@@ -58,6 +58,7 @@ const GateName = Object.freeze({
 const rootTestGates = Object.freeze([
   'test:coverage-custody',
   'test:dist-stamp',
+  'test:release',
   'test:tree-shaking'
 ])
 /** Foreign conformance peers require the same executables as Makefile. */
