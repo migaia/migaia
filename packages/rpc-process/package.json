@@ -1,6 +1,6 @@
 {
   "name": "@migaia/rpc-process",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "private": true,
   "description": "RPC process owner.",
   "license": "MIT",
@@ -76,10 +76,10 @@
     "@migaia/utils": "workspace:^"
   },
   "peerDependencies": {
+    "@migaia/rpc-contract": "workspace:*",
     "@migaia/rpc-core": "workspace:*",
     "electron": "^44.0.0",
-    "koffi": "^3.1.6",
-    "@migaia/rpc-contract": "workspace:*"
+    "koffi": "^3.1.6"
   },
   "peerDependenciesMeta": {
     "electron": {
@@ -90,16 +90,16 @@
     }
   },
   "devDependencies": {
+    "@migaia/rpc-contract": "workspace:*",
+    "@migaia/rpc-core": "workspace:*",
+    "@migaia/serialize": "workspace:^",
     "@types/node": "24.13.2",
     "cborg": "6.1.1",
     "elysia": "1.4.30",
     "msgpackr": "2.1.0",
     "protobufjs": "8.8.0",
     "typescript": "~6.0.2",
-    "vitest": "^4.1.10",
-    "@migaia/rpc-contract": "workspace:*",
-    "@migaia/rpc-core": "workspace:*",
-    "@migaia/serialize": "workspace:^"
+    "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=18"
