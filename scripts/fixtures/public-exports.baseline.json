@@ -317,6 +317,11 @@
       ]
     },
     "@migaia/rpc-browser": {
+      ".": [
+        "RPC_BROWSER_ERROR_SOURCE",
+        "RpcBrowserErrorCode",
+        "createBrowserPeer"
+      ],
       "./adapters/window": [
         "createWindowMessageTransport"
       ],
