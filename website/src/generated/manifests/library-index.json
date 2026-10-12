@@ -4,19 +4,19 @@
     {
       "slug": "capability",
       "description": "Store-neutral capability lifecycle and feature gate.",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "exports": [".", "./graph", "./graph/dependency", "./graph/dynamic", "./graph/topology"]
     },
     {
       "slug": "event-subscriber",
       "description": "Runtime-neutral transient event subscription and fan-out primitives.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [".", "./subscriber"]
     },
     {
       "slug": "lifecycle",
       "description": "Runtime-neutral lifecycle primitives: scopes, generations, quiescence tracking and dispose transactions.",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "exports": [
         ".",
         "./abort",
@@ -31,25 +31,25 @@
     {
       "slug": "logger",
       "description": null,
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [".", "./plugins", "./plugins/file"]
     },
     {
       "slug": "middleware-pipeline",
       "description": "Runtime-neutral sync, async middleware and generator chain executors.",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "exports": ["."]
     },
     {
       "slug": "plugin-host",
       "description": "Runtime-neutral plugin lifecycle, extension and pipeline host for Node.js, Bun, browsers and workers.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [".", "./composition"]
     },
     {
       "slug": "reactive",
       "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "exports": [
         ".",
         "./copy-check",
@@ -65,13 +65,13 @@
     {
       "slug": "resource",
       "description": "Store-neutral cancellable asynchronous reactive resources.",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "exports": ["."]
     },
     {
       "slug": "rpc-bridge-jsonrpc",
       "description": "RPC bridge-jsonrpc owner.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": ["."]
     },
     {
@@ -91,7 +91,7 @@
     {
       "slug": "rpc-contract",
       "description": "RPC contract owner.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [
         ".",
         "./binary",
@@ -146,13 +146,13 @@
     {
       "slug": "rpc-pool",
       "description": "Thread and process pools composed from public RPC peers.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": ["."]
     },
     {
       "slug": "rpc-process",
       "description": "RPC process owner.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [
         ".",
         "./adapters/bun-socket",
@@ -168,7 +168,7 @@
     {
       "slug": "rpc-threads",
       "description": "RPC threads owner.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [
         ".",
         "./adapters/browser",
@@ -182,7 +182,7 @@
     {
       "slug": "serialize",
       "description": "Store-neutral chunked serialization and codec registry.",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "exports": [
         ".",
         "./codec",
@@ -200,13 +200,13 @@
     {
       "slug": "storage-contract",
       "description": "Runtime-neutral storage contract: key-value store, codec, capability, context, key-domain and contract-level error types.",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "exports": ["."]
     },
     {
       "slug": "storage-web",
       "description": "Independent web storage library: localStorage, sessionStorage, cookies, IndexedDB CRUD with entity, schema and serialize extension points.",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "exports": [
         ".",
         "./cookies",
@@ -301,19 +301,19 @@
     {
       "slug": "supervision",
       "description": "Runtime-neutral supervision for execution units and coroutines.",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "exports": [".", "./coroutine", "./process", "./threads"]
     },
     {
       "slug": "tray",
       "description": null,
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": [".", "./adapter", "./host", "./loader", "./runtime"]
     },
     {
       "slug": "utils",
       "description": "Runtime-neutral reusable utility primitives.",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "exports": [
         ".",
         "./bytes",

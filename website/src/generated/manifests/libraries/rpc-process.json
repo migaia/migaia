@@ -3,7 +3,7 @@
   "library": {
     "slug": "rpc-process",
     "description": "RPC process owner.",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "exports": [
       ".",
       "./adapters/bun-socket",

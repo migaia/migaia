@@ -6462,6 +6462,126 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/docs/rpc-browser/adapters/service-worker/IServiceWorkerTransportOptions",
+      "to": "/en/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/service-worker/IServiceWorkerTransportOptions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/shared-worker",
+      "to": "/en/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/shared-worker",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/shared-worker/createSharedWorkerTransport",
+      "to": "/en/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/shared-worker/createSharedWorkerTransport",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/shared-worker/ISharedWorkerPort",
+      "to": "/en/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/shared-worker/ISharedWorkerPort",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/web-transport",
+      "to": "/en/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/web-transport",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/web-transport/createWebTransportDatagramTransport",
+      "to": "/en/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/web-transport/createWebTransportDatagramTransport",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/web-transport/IWebTransportDatagrams",
+      "to": "/en/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/web-transport/IWebTransportDatagrams",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window",
+      "to": "/en/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/window",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window/createWindowMessageTransport",
+      "to": "/en/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/window/createWindowMessageTransport",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window/IWindowMessageReceiver",
+      "to": "/en/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/window/IWindowMessageReceiver",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window/IWindowMessageTarget",
+      "to": "/en/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/window/IWindowMessageTarget",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window/IWindowMessageTransportOptions",
+      "to": "/en/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/window/IWindowMessageTransportOptions",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/docs/rpc-contract",
       "to": "/en/guides/rpc-contract",
       "type": "domain-peer"
@@ -24212,23 +24332,23 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-browser/adapters/service-worker/IServiceWorkerTransportOptions",
+      "from": "/en/guides/rpc-browser",
+      "to": "/en/docs/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-browser",
       "to": "/en/guides/rpc-browser",
       "type": "domain-peer"
     },
     {
-      "from": "/en/guides/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/service-worker/IServiceWorkerTransportOptions",
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser",
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-browser/adapters/shared-worker",
-      "to": "/en/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/shared-worker",
+      "from": "/en/docs/rpc-browser",
+      "to": "/en/guides/rpc-browser/getting-started",
       "type": "domain-peer"
     },
     {
@@ -25992,13 +26112,13 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-browser/adapters/shared-worker/createSharedWorkerTransport",
-      "to": "/en/guides/rpc-browser",
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser",
       "type": "domain-peer"
     },
     {
-      "from": "/en/guides/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/shared-worker/createSharedWorkerTransport",
+      "from": "/en/docs/rpc-browser",
+      "to": "/en/architecture/rpc-browser",
       "type": "domain-peer"
     },
     {
@@ -31932,126 +32052,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-browser/adapters/shared-worker/ISharedWorkerPort",
-      "to": "/en/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/shared-worker/ISharedWorkerPort",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/web-transport",
-      "to": "/en/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/web-transport",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/web-transport/createWebTransportDatagramTransport",
-      "to": "/en/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/web-transport/createWebTransportDatagramTransport",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/web-transport/IWebTransportDatagrams",
-      "to": "/en/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/web-transport/IWebTransportDatagrams",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window",
-      "to": "/en/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/window",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window/createWindowMessageTransport",
-      "to": "/en/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/window/createWindowMessageTransport",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window/IWindowMessageReceiver",
-      "to": "/en/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/window/IWindowMessageReceiver",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window/IWindowMessageTarget",
-      "to": "/en/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/window/IWindowMessageTarget",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window/IWindowMessageTransportOptions",
-      "to": "/en/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/window/IWindowMessageTransportOptions",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-browser",
-      "to": "/en/docs/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/architecture/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
       "from": "/zh/docs/rpc-browser",
       "to": "/zh/guides/rpc-browser",
       "type": "domain-peer"
@@ -32159,6 +32159,246 @@
     {
       "from": "/zh/guides/rpc-browser",
       "to": "/zh/docs/rpc-browser/IRuntimeBrowserSharedWorkerConnect",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/IRuntimeBrowserWindowConnect",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/IRuntimeBrowserWindowConnect",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/RPC_BROWSER_ERROR_SOURCE",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/RPC_BROWSER_ERROR_SOURCE",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/RpcBrowserErrorCode",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/RpcBrowserErrorCode",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/broadcast-channel",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/broadcast-channel",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/broadcast-channel/createBroadcastChannelTransport",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/broadcast-channel/createBroadcastChannelTransport",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel/createRtcDataChannelTransport",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel/createRtcDataChannelTransport",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel/IRTCDataChannel",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel/IRTCDataChannel",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker/createServiceWorkerTransport",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker/createServiceWorkerTransport",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerMessageReceiver",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerMessageReceiver",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerMessageTarget",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerMessageTarget",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerTransportOptions",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerTransportOptions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/shared-worker",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/shared-worker",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/shared-worker/createSharedWorkerTransport",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/shared-worker/createSharedWorkerTransport",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/shared-worker/ISharedWorkerPort",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/shared-worker/ISharedWorkerPort",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/web-transport",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/web-transport",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/web-transport/createWebTransportDatagramTransport",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/web-transport/createWebTransportDatagramTransport",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/web-transport/IWebTransportDatagrams",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/web-transport/IWebTransportDatagrams",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/window",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/window",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/window/createWindowMessageTransport",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/window/createWindowMessageTransport",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/window/IWindowMessageReceiver",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/window/IWindowMessageReceiver",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTarget",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTarget",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTransportOptions",
+      "to": "/zh/guides/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTransportOptions",
       "type": "domain-peer"
     },
     {
@@ -49912,23 +50152,23 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc-browser/IRuntimeBrowserWindowConnect",
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser",
       "to": "/zh/guides/rpc-browser",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/IRuntimeBrowserWindowConnect",
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc-browser/RPC_BROWSER_ERROR_SOURCE",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/RPC_BROWSER_ERROR_SOURCE",
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/guides/rpc-browser/getting-started",
       "type": "domain-peer"
     },
     {
@@ -51692,13 +51932,13 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc-browser/RpcBrowserErrorCode",
-      "to": "/zh/guides/rpc-browser",
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/RpcBrowserErrorCode",
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/architecture/rpc-browser",
       "type": "domain-peer"
     },
     {
@@ -86452,1144 +86692,1904 @@
       "type": "architecture-symbol"
     },
     {
+      "from": "/en/docs/rpc-browser",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser",
+      "to": "/en/architecture/rpc-browser",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "to": "/en/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "to": "/en/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "to": "/en/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "to": "/en/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
+      "to": "/en/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
+      "to": "/en/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
+      "to": "/en/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
+      "to": "/en/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
+      "to": "/en/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
+      "to": "/en/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
+      "to": "/en/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
+      "to": "/en/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "to": "/zh/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "to": "/zh/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "to": "/zh/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "to": "/zh/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
+      "to": "/zh/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
+      "to": "/zh/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
+      "to": "/zh/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
+      "to": "/zh/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
+      "to": "/zh/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
+      "to": "/zh/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
+      "to": "/zh/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
+      "to": "/zh/docs/rpc-browser",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/broadcast-channel",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/broadcast-channel",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/broadcast-channel",
+      "to": "/en/architecture/rpc-browser",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/broadcast-channel",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/broadcast-channel",
+      "to": "/en/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
+      "to": "/en/docs/rpc-browser/adapters/broadcast-channel",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
+      "type": "architecture-symbol"
+    },
+    {
       "from": "/zh/docs/rpc-browser/adapters/broadcast-channel",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "api-guide"
     },
     {
-      "from": "/zh/guides/rpc-browser",
+      "from": "/zh/guides/rpc-browser/getting-started",
       "to": "/zh/docs/rpc-browser/adapters/broadcast-channel",
-      "type": "domain-peer"
+      "type": "guide-api"
     },
     {
-      "from": "/zh/docs/rpc-browser/adapters/broadcast-channel/createBroadcastChannelTransport",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/broadcast-channel",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "api-architecture"
     },
     {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/broadcast-channel/createBroadcastChannelTransport",
-      "type": "domain-peer"
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/broadcast-channel",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/broadcast-channel",
+      "to": "/zh/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
+      "to": "/zh/docs/rpc-browser/adapters/broadcast-channel",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel",
+      "to": "/en/architecture/rpc-browser",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel",
+      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
+      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel",
+      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
+      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
+      "type": "architecture-symbol"
     },
     {
       "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "api-guide"
     },
     {
-      "from": "/zh/guides/rpc-browser",
+      "from": "/zh/guides/rpc-browser/getting-started",
       "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
-      "type": "domain-peer"
+      "type": "guide-api"
     },
     {
-      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel/createRtcDataChannelTransport",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "api-architecture"
     },
     {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel/createRtcDataChannelTransport",
-      "type": "domain-peer"
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
+      "type": "architecture-api"
     },
     {
-      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel/IRTCDataChannel",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
+      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
+      "type": "api-symbol"
     },
     {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel/IRTCDataChannel",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
+      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
+      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
+      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/service-worker",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker",
+      "to": "/en/architecture/rpc-browser",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/service-worker",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker",
+      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
+      "to": "/en/docs/rpc-browser/adapters/service-worker",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker",
+      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
+      "to": "/en/docs/rpc-browser/adapters/service-worker",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker",
+      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
+      "to": "/en/docs/rpc-browser/adapters/service-worker",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker",
+      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
+      "to": "/en/docs/rpc-browser/adapters/service-worker",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
+      "type": "architecture-symbol"
     },
     {
       "from": "/zh/docs/rpc-browser/adapters/service-worker",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "api-guide"
     },
     {
-      "from": "/zh/guides/rpc-browser",
+      "from": "/zh/guides/rpc-browser/getting-started",
       "to": "/zh/docs/rpc-browser/adapters/service-worker",
-      "type": "domain-peer"
+      "type": "guide-api"
     },
     {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker/createServiceWorkerTransport",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/service-worker",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "api-architecture"
     },
     {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker/createServiceWorkerTransport",
-      "type": "domain-peer"
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker",
+      "type": "architecture-api"
     },
     {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerMessageReceiver",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/service-worker",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
+      "type": "api-symbol"
     },
     {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerMessageReceiver",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker",
+      "type": "symbol-api"
     },
     {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerMessageTarget",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
     },
     {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerMessageTarget",
-      "type": "domain-peer"
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
+      "type": "guide-symbol"
     },
     {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerTransportOptions",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
     },
     {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerTransportOptions",
-      "type": "domain-peer"
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/shared-worker",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/shared-worker",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/shared-worker",
+      "to": "/en/architecture/rpc-browser",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/shared-worker",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/shared-worker",
+      "to": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
+      "to": "/en/docs/rpc-browser/adapters/shared-worker",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/shared-worker",
+      "to": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
+      "to": "/en/docs/rpc-browser/adapters/shared-worker",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
+      "type": "architecture-symbol"
     },
     {
       "from": "/zh/docs/rpc-browser/adapters/shared-worker",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "api-guide"
     },
     {
-      "from": "/zh/guides/rpc-browser",
+      "from": "/zh/guides/rpc-browser/getting-started",
       "to": "/zh/docs/rpc-browser/adapters/shared-worker",
-      "type": "domain-peer"
+      "type": "guide-api"
     },
     {
-      "from": "/zh/docs/rpc-browser/adapters/shared-worker/createSharedWorkerTransport",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/shared-worker",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "api-architecture"
     },
     {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/shared-worker/createSharedWorkerTransport",
-      "type": "domain-peer"
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/shared-worker",
+      "type": "architecture-api"
     },
     {
-      "from": "/zh/docs/rpc-browser/adapters/shared-worker/ISharedWorkerPort",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/shared-worker",
+      "to": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
+      "type": "api-symbol"
     },
     {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/shared-worker/ISharedWorkerPort",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
+      "to": "/zh/docs/rpc-browser/adapters/shared-worker",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/shared-worker",
+      "to": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
+      "to": "/zh/docs/rpc-browser/adapters/shared-worker",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/web-transport",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/web-transport",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/web-transport",
+      "to": "/en/architecture/rpc-browser",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/web-transport",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/web-transport",
+      "to": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
+      "to": "/en/docs/rpc-browser/adapters/web-transport",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/web-transport",
+      "to": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
+      "to": "/en/docs/rpc-browser/adapters/web-transport",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
+      "type": "architecture-symbol"
     },
     {
       "from": "/zh/docs/rpc-browser/adapters/web-transport",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "api-guide"
     },
     {
-      "from": "/zh/guides/rpc-browser",
+      "from": "/zh/guides/rpc-browser/getting-started",
       "to": "/zh/docs/rpc-browser/adapters/web-transport",
-      "type": "domain-peer"
+      "type": "guide-api"
     },
     {
-      "from": "/zh/docs/rpc-browser/adapters/web-transport/createWebTransportDatagramTransport",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/web-transport",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "api-architecture"
     },
     {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/web-transport/createWebTransportDatagramTransport",
-      "type": "domain-peer"
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/web-transport",
+      "type": "architecture-api"
     },
     {
-      "from": "/zh/docs/rpc-browser/adapters/web-transport/IWebTransportDatagrams",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/web-transport",
+      "to": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
+      "type": "api-symbol"
     },
     {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/web-transport/IWebTransportDatagrams",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
+      "to": "/zh/docs/rpc-browser/adapters/web-transport",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/web-transport",
+      "to": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
+      "to": "/zh/docs/rpc-browser/adapters/web-transport",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/window",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window",
+      "to": "/en/architecture/rpc-browser",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/window",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window",
+      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
+      "to": "/en/docs/rpc-browser/adapters/window",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window",
+      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
+      "to": "/en/docs/rpc-browser/adapters/window",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window",
+      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
+      "to": "/en/docs/rpc-browser/adapters/window",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window",
+      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
+      "to": "/en/docs/rpc-browser/adapters/window",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
+      "to": "/en/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-browser/getting-started",
+      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
+      "to": "/en/architecture/rpc-browser",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-browser",
+      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
+      "type": "architecture-symbol"
     },
     {
       "from": "/zh/docs/rpc-browser/adapters/window",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "api-guide"
     },
     {
-      "from": "/zh/guides/rpc-browser",
+      "from": "/zh/guides/rpc-browser/getting-started",
       "to": "/zh/docs/rpc-browser/adapters/window",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window/createWindowMessageTransport",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/window/createWindowMessageTransport",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window/IWindowMessageReceiver",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/window/IWindowMessageReceiver",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTarget",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTarget",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTransportOptions",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTransportOptions",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser",
       "type": "guide-api"
     },
     {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/architecture/rpc-browser",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
-      "to": "/en/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
-      "to": "/en/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
-      "to": "/en/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
-      "to": "/en/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
-      "to": "/en/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
-      "to": "/en/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
-      "to": "/en/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
-      "to": "/en/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
-      "to": "/en/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
-      "to": "/en/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
-      "to": "/en/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
-      "to": "/en/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser",
-      "type": "guide-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser",
+      "from": "/zh/docs/rpc-browser/adapters/window",
       "to": "/zh/architecture/rpc-browser",
       "type": "api-architecture"
     },
     {
       "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/window",
       "type": "architecture-api"
     },
     {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "from": "/zh/docs/rpc-browser/adapters/window",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
       "type": "api-symbol"
     },
     {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
-      "to": "/zh/docs/rpc-browser",
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
+      "to": "/zh/docs/rpc-browser/adapters/window",
       "type": "symbol-api"
     },
     {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
       "to": "/zh/guides/rpc-browser/getting-started",
       "type": "symbol-guide"
     },
     {
       "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
       "type": "guide-symbol"
     },
     {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
       "to": "/zh/architecture/rpc-browser",
       "type": "symbol-architecture"
     },
     {
       "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--createBrowserPeer",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
       "type": "architecture-symbol"
     },
     {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "from": "/zh/docs/rpc-browser/adapters/window",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
       "type": "api-symbol"
     },
     {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
-      "to": "/zh/docs/rpc-browser",
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
+      "to": "/zh/docs/rpc-browser/adapters/window",
       "type": "symbol-api"
     },
     {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
       "to": "/zh/guides/rpc-browser/getting-started",
       "type": "symbol-guide"
     },
     {
       "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
       "type": "guide-symbol"
     },
     {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
       "to": "/zh/architecture/rpc-browser",
       "type": "symbol-architecture"
     },
     {
       "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRpcBrowserErrorCode",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
       "type": "architecture-symbol"
     },
     {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "from": "/zh/docs/rpc-browser/adapters/window",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
       "type": "api-symbol"
     },
     {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
-      "to": "/zh/docs/rpc-browser",
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
+      "to": "/zh/docs/rpc-browser/adapters/window",
       "type": "symbol-api"
     },
     {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
       "to": "/zh/guides/rpc-browser/getting-started",
       "type": "symbol-guide"
     },
     {
       "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
       "type": "guide-symbol"
     },
     {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
       "to": "/zh/architecture/rpc-browser",
       "type": "symbol-architecture"
     },
     {
       "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnect",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
       "type": "architecture-symbol"
     },
     {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "from": "/zh/docs/rpc-browser/adapters/window",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
       "type": "api-symbol"
     },
     {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
-      "to": "/zh/docs/rpc-browser",
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
+      "to": "/zh/docs/rpc-browser/adapters/window",
       "type": "symbol-api"
     },
     {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
       "to": "/zh/guides/rpc-browser/getting-started",
       "type": "symbol-guide"
     },
     {
       "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
       "type": "guide-symbol"
     },
     {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
       "to": "/zh/architecture/rpc-browser",
       "type": "symbol-architecture"
     },
     {
       "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserConnectEvent",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
       "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
-      "to": "/zh/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserListen",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
-      "to": "/zh/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserPeerOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
-      "to": "/zh/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcConnect",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
-      "to": "/zh/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserRtcDataChannel",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
-      "to": "/zh/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserSharedWorkerConnect",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
-      "to": "/zh/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--IRuntimeBrowserWindowConnect",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
-      "to": "/zh/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--RPC_BROWSER_ERROR_SOURCE",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
-      "to": "/zh/docs/rpc-browser",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser#rpc-browser-index--RpcBrowserErrorCode",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/broadcast-channel",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/broadcast-channel",
-      "type": "guide-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/broadcast-channel",
-      "to": "/en/architecture/rpc-browser",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/broadcast-channel",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/broadcast-channel",
-      "to": "/en/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
-      "to": "/en/docs/rpc-browser/adapters/broadcast-channel",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/broadcast-channel",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/broadcast-channel",
-      "type": "guide-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/broadcast-channel",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/broadcast-channel",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/broadcast-channel",
-      "to": "/zh/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
-      "to": "/zh/docs/rpc-browser/adapters/broadcast-channel",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/broadcast-channel#rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel",
-      "type": "guide-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel",
-      "to": "/en/architecture/rpc-browser",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel",
-      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
-      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
-      "type": "guide-symbol"
     },
     {
       "from": "/en/docs/rpc-contract",
@@ -197629,1006 +198629,6 @@
     {
       "from": "/zh/architecture/wasm",
       "to": "/zh/docs/wasm#wasm-index--SyncInitInput",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel",
-      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
-      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
-      "type": "guide-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
-      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
-      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
-      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
-      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/rtc-data-channel#rpc-browser-adapters/rtc-data-channel--IRTCDataChannel",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/service-worker",
-      "type": "guide-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker",
-      "to": "/en/architecture/rpc-browser",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/service-worker",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker",
-      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
-      "to": "/en/docs/rpc-browser/adapters/service-worker",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker",
-      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
-      "to": "/en/docs/rpc-browser/adapters/service-worker",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker",
-      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
-      "to": "/en/docs/rpc-browser/adapters/service-worker",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker",
-      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
-      "to": "/en/docs/rpc-browser/adapters/service-worker",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker",
-      "type": "guide-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--createServiceWorkerTransport",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageReceiver",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerMessageTarget",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/service-worker#rpc-browser-adapters/service-worker--IServiceWorkerTransportOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/shared-worker",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/shared-worker",
-      "type": "guide-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/shared-worker",
-      "to": "/en/architecture/rpc-browser",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/shared-worker",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/shared-worker",
-      "to": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
-      "to": "/en/docs/rpc-browser/adapters/shared-worker",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/shared-worker",
-      "to": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
-      "to": "/en/docs/rpc-browser/adapters/shared-worker",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/shared-worker",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/shared-worker",
-      "type": "guide-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/shared-worker",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/shared-worker",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/shared-worker",
-      "to": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
-      "to": "/zh/docs/rpc-browser/adapters/shared-worker",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--createSharedWorkerTransport",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/shared-worker",
-      "to": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
-      "to": "/zh/docs/rpc-browser/adapters/shared-worker",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/shared-worker#rpc-browser-adapters/shared-worker--ISharedWorkerPort",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/web-transport",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/web-transport",
-      "type": "guide-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/web-transport",
-      "to": "/en/architecture/rpc-browser",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/web-transport",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/web-transport",
-      "to": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
-      "to": "/en/docs/rpc-browser/adapters/web-transport",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/web-transport",
-      "to": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
-      "to": "/en/docs/rpc-browser/adapters/web-transport",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/web-transport",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/web-transport",
-      "type": "guide-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/web-transport",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/web-transport",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/web-transport",
-      "to": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
-      "to": "/zh/docs/rpc-browser/adapters/web-transport",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--createWebTransportDatagramTransport",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/web-transport",
-      "to": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
-      "to": "/zh/docs/rpc-browser/adapters/web-transport",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/web-transport#rpc-browser-adapters/web-transport--IWebTransportDatagrams",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/window",
-      "type": "guide-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window",
-      "to": "/en/architecture/rpc-browser",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/window",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window",
-      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
-      "to": "/en/docs/rpc-browser/adapters/window",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window",
-      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
-      "to": "/en/docs/rpc-browser/adapters/window",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window",
-      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "to": "/en/docs/rpc-browser/adapters/window",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window",
-      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "to": "/en/docs/rpc-browser/adapters/window",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "to": "/en/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-browser/getting-started",
-      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "to": "/en/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-browser",
-      "to": "/en/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/window",
-      "type": "guide-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/window",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
-      "to": "/zh/docs/rpc-browser/adapters/window",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--createWindowMessageTransport",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
-      "to": "/zh/docs/rpc-browser/adapters/window",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "to": "/zh/docs/rpc-browser/adapters/window",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "to": "/zh/docs/rpc-browser/adapters/window",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
       "type": "architecture-symbol"
     }
   ]

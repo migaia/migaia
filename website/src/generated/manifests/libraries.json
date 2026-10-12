@@ -4,7 +4,7 @@
     {
       "slug": "capability",
       "description": "Store-neutral capability lifecycle and feature gate.",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "exports": [".", "./graph", "./graph/dependency", "./graph/dynamic", "./graph/topology"],
       "documentation": {
         "readme": {
@@ -1303,7 +1303,7 @@
     {
       "slug": "event-subscriber",
       "description": "Runtime-neutral transient event subscription and fan-out primitives.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [".", "./subscriber"],
       "documentation": {
         "readme": {
@@ -2525,7 +2525,7 @@
     {
       "slug": "lifecycle",
       "description": "Runtime-neutral lifecycle primitives: scopes, generations, quiescence tracking and dispose transactions.",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "exports": [
         ".",
         "./abort",
@@ -4691,7 +4691,7 @@
     {
       "slug": "logger",
       "description": null,
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [".", "./plugins", "./plugins/file"],
       "documentation": {
         "readme": {
@@ -5912,7 +5912,7 @@
     {
       "slug": "middleware-pipeline",
       "description": "Runtime-neutral sync, async middleware and generator chain executors.",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -6324,7 +6324,7 @@
     {
       "slug": "plugin-host",
       "description": "Runtime-neutral plugin lifecycle, extension and pipeline host for Node.js, Bun, browsers and workers.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [".", "./composition"],
       "documentation": {
         "readme": {
@@ -8047,7 +8047,7 @@
     {
       "slug": "reactive",
       "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "exports": [
         ".",
         "./copy-check",
@@ -9028,7 +9028,7 @@
     {
       "slug": "resource",
       "description": "Store-neutral cancellable asynchronous reactive resources.",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -9653,7 +9653,7 @@
     {
       "slug": "rpc-bridge-jsonrpc",
       "description": "RPC bridge-jsonrpc owner.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -10823,7 +10823,7 @@
     {
       "slug": "rpc-contract",
       "description": "RPC contract owner.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [
         ".",
         "./binary",
@@ -12706,7 +12706,7 @@
     {
       "slug": "rpc-pool",
       "description": "Thread and process pools composed from public RPC peers.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -12878,7 +12878,7 @@
     {
       "slug": "rpc-process",
       "description": "RPC process owner.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [
         ".",
         "./adapters/bun-socket",
@@ -13917,7 +13917,7 @@
     {
       "slug": "rpc-threads",
       "description": "RPC threads owner.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [
         ".",
         "./adapters/browser",
@@ -13936,7 +13936,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Worker 线程 RPC。 用一套 `request` / `notify` / `stream` 调用 Worker 中的函数，Worker 也能反向调用主线程。支持 Node `worker_threads`、Bun、Deno、浏览器 Web Worker 和 Electron。本包负责创建 Worker、建立消息端口和监督重启；调用语义、超时、取消、错误还原等由 `@migaia/rpc-core` 统一提供，API 与 `@migaia/rpc-process` 完全一致。"
+                  "text": "Worker 线程 RPC。 用一套 `request` / `notify` / `stream` 调用 Worker 中的函数，Worker 也能反向调用主线程。支持 Node `worker_threads`、Bun、Deno、浏览器 Web Worker 和 Electron。本包负责创建 Worker、建立消息端口和监督重启；调用语义、超时、取消、错误还原等由 `@migaia/rpc-core` 统一提供，Peer 调用 API 与 `@migaia/rpc-process`、`@migaia/rpc-browser` 一致。"
                 }
               ]
             },
@@ -13964,7 +13964,7 @@
                   "type": "list",
                   "items": [
                     "需要进程级隔离（崩溃互不影响、独立权限）：用 `@migaia/rpc-process`。",
-                    "浏览器内跨窗口、iframe、Service Worker、BroadcastChannel：用 `@migaia/rpc-browser`。",
+                    "浏览器内跨窗口、iframe、SharedWorker、可靠有序的 RTCDataChannel：用 `@migaia/rpc-browser` 的 `createBrowserPeer`；Service Worker 与 BroadcastChannel 使用该包的 Endpoint transport。",
                     "需要 `SharedArrayBuffer` / `Atomics` 共享内存：不在支持范围内，传入会被拒绝。"
                   ]
                 }
@@ -14114,7 +14114,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { fileURLToPath } from 'node:url'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** 后台错误由应用统一记录。 */\nconst report = (error: unknown) => console.error(error)\n/** Node source 显式持有一个 Worker 的预算与监督依赖。 */\nexport const spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}"
+                  "code": "import { fileURLToPath } from 'node:url'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** 后台错误由应用统一记录。 */\nconst report = (error: unknown) => console.error(error)\n/** Node source 显式持有一个 Worker 的预算与监督依赖。 */\nexport const spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}"
                 },
                 {
                   "type": "paragraph",
@@ -14682,7 +14682,7 @@
     {
       "slug": "serialize",
       "description": "Store-neutral chunked serialization and codec registry.",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "exports": [
         ".",
         "./codec",
@@ -16487,7 +16487,7 @@
     {
       "slug": "storage-contract",
       "description": "Runtime-neutral storage contract: key-value store, codec, capability, context, key-domain and contract-level error types.",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -17710,7 +17710,7 @@
     {
       "slug": "storage-web",
       "description": "Independent web storage library: localStorage, sessionStorage, cookies, IndexedDB CRUD with entity, schema and serialize extension points.",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "exports": [
         ".",
         "./cookies",
@@ -32529,7 +32529,7 @@
     {
       "slug": "supervision",
       "description": "Runtime-neutral supervision for execution units and coroutines.",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "exports": [".", "./coroutine", "./process", "./threads"],
       "documentation": {
         "readme": {
@@ -32712,7 +32712,7 @@
     {
       "slug": "tray",
       "description": null,
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": [".", "./adapter", "./host", "./loader", "./runtime"],
       "documentation": {
         "readme": {
@@ -33237,7 +33237,7 @@
     {
       "slug": "utils",
       "description": "Runtime-neutral reusable utility primitives.",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "exports": [
         ".",
         "./bytes",
