@@ -1683,7 +1683,12 @@ function buildLibraryEntries() {
           return {}
         }
       })()
-      const exports = Object.keys(manifest.exports ?? {}).sort()
+      /** P5 keeps native cross-package operations installed, outside the adapter-author reference. */
+      const exports = Object.keys(manifest.exports ?? {})
+        .filter(
+          (exportPath) => entry.name !== 'rpc-core' || exportPath !== './adapter/internal-advanced'
+        )
+        .sort()
       return {
         slug: entry.name,
         description: typeof manifest.description === 'string' ? manifest.description : null,
