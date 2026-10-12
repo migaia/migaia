@@ -148,7 +148,7 @@
       "slug": "rpc-devtools",
       "description": "RPC probe, service and offline record contracts.",
       "version": "0.0.9",
-      "exports": [".", "./contract", "./hub"]
+      "exports": [".", "./contract", "./hub", "./log"]
     },
     {
       "slug": "rpc-pool",

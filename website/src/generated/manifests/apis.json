@@ -100064,16 +100064,16 @@
         {
           "name": "createRpcDevtools",
           "kind": "function",
-          "signature": "export declare function createRpcDevtools(_options?: IRpcDevtoolsOptions): IRpcDevtools;",
+          "signature": "export declare function createRpcDevtools(options?: IRpcDevtoolsOptions): IRpcDevtools;",
           "declarationLine": 3,
-          "source": "packages/rpc-devtools/dist/index.d.ts",
-          "purpose": "Layer-1 placeholder: collector construction becomes available when layer 2 replaces this body.",
+          "source": "packages/rpc-devtools/dist/collector/devtools.d.ts",
+          "purpose": "Build the complete host, then attach defineProbe once without copying or retaining a view.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRpcDevtools.",
           "advanced": "No additional advanced behavior is declared for createRpcDevtools.",
-          "parameters": ["_options: IRpcDevtoolsOptions (optional)"],
+          "parameters": ["options: IRpcDevtoolsOptions (optional)"],
           "parameterDetails": [
             {
-              "name": "_options",
+              "name": "options",
               "type": "IRpcDevtoolsOptions",
               "optional": true
             }
@@ -100081,16 +100081,21 @@
           "returns": "IRpcDevtools",
           "errors": ["No documented errors are declared for createRpcDevtools."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRpcDevtools.",
-          "examples": [],
+          "examples": [
+            "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport {\n  RpcProbeStage,\n  RpcProbeDirection,\n  RpcProbeKind,\n  RpcProbeOutcome,\n  type IRpcProbeEventView\n} from '@migaia/rpc-core/probe'\n\n/** 每个宿主一个 collector，主查询环保留最近事件。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 4 })\n/** 仅本例手填元数据；真实 emitter 在同步调用间复用同一 view。 */\nconst view: IRpcProbeEventView = {\n  seq: 0,\n  at: 0,\n  endpointId: 'client',\n  stage: RpcProbeStage.message,\n  direction: RpcProbeDirection.outbound,\n  kind: RpcProbeKind.request,\n  outcome: RpcProbeOutcome.settled,\n  messageId: 'call-1',\n  method: 'math.double',\n  senderId: 'client',\n  targetId: 'server',\n  receiverId: undefined,\n  peerId: undefined,\n  trace: 'trace-1',\n  sizeBytes: -1,\n  chunkIndex: -1,\n  chunkCount: -1,\n  members: -1,\n  durationMs: 2,\n  rejection: undefined,\n  lifecycle: undefined,\n  error: undefined,\n  carrier: undefined,\n  detail: undefined,\n  content: undefined\n}\n/** 录制使用独立容量，停止时才物化离线事件。 */\nconst recording = devtools.record({ maxEvents: 8 })\ndevtools.emit(view)\nview.method = 'math.changed' // 已写入的顶层元数据不再读取 view。\nconsole.log(devtools.query({ methods: ['math.double'] }).events[0]?.method)\nconsole.log(devtools.stats().methods[0]?.calls) // 1\n/** next() 开始订阅，后续写入唤醒当前消费者。 */\nconst watcher = devtools.watch({ stages: ['message'] })\nconst next = watcher.next()\ndevtools.emit(view)\nconsole.log((await next).value?.events.length) // 1\nawait watcher.return(undefined)\ndevtools.pause()\ndevtools.emit(view) // 计入 ignoredWhilePaused。\ndevtools.resume()\nconsole.log(devtools.query().counters.ignoredWhilePaused) // 1\n/** Codec 边界把录制转成独立 NDJSON 表示。 */\nconst text = devtools.exportRecord(recording.stop())\nconsole.log(devtools.importRecord(text).events.length) // 2\ndevtools.clear()\nconsole.log(devtools.stats().methods.length) // 0\ndevtools.close()",
+            "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport type { IRpcDevtoolsServiceApi } from '@migaia/rpc-devtools/contract'\nimport { createPeerPair } from '@migaia/rpc-core/testing'\n\n/** Service 专用 Peer 不安装 collector 作为 probe，避免观察自己的查询流量。 */\nconst devtools = createRpcDevtools({ maxEvents: 32 })\n/** 这里的类型断言公开冻结的 service 契约，供 typed Peer 推断方法。 */\nconst pair = await createPeerPair({\n  a: { provide: {} },\n  b: { provide: { devtools: devtools.service as IRpcDevtoolsServiceApi } }\n})\ntry {\n  console.log((await pair.a.request('devtools.describe')).limits.maxEvents) // 32\n  console.log((await pair.a.request('devtools.query', { stages: ['message'] })).events.length)\n  await pair.a.request('devtools.record.start', { maxEvents: 8 })\n  console.log(devtools.importRecord(await pair.a.request('devtools.record.stop')).header.version)\n  await pair.a.request('devtools.pause')\n  await pair.a.request('devtools.resume')\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n  devtools.close()\n}",
+            "import { createRpcDevtools } from '@migaia/rpc-devtools'\n\n/** 默认只采集元数据；调用方拥有 collector 生命周期。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 1_000 })\n/** 独立录制环不受主查询环的淘汰影响。 */\nconst recording = devtools.record({ maxEvents: 100 })\ndevtools.pause()\nconsole.log(devtools.describe().paused) // true\ndevtools.resume()\nconsole.log(devtools.query().events.length, devtools.stats().methods.length) // 0 0\nconsole.log(devtools.importRecord(devtools.exportRecord(recording.stop())).header.version) // 1\ndevtools.close()"
+          ],
           "members": [],
+          "aliasOf": "createRpcDevtools",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function createRpcDevtools(_options?: IRpcDevtoolsOptions): IRpcDevtools;"
+            "export declare function createRpcDevtools(options?: IRpcDevtoolsOptions): IRpcDevtools;"
           ],
           "overloadParameterDetails": [
             [
               {
-                "name": "_options",
+                "name": "options",
                 "type": "IRpcDevtoolsOptions",
                 "optional": true
               }
@@ -100103,7 +100108,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Layer-1 placeholder: collector construction becomes available when layer 2 replaces this body."
+              "content": "Build the complete host, then attach defineProbe once without copying or retaining a view."
             },
             {
               "id": "getting-started",
@@ -100132,9 +100137,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/index.d.ts:createRpcDevtools:export declare function createRpcDevtools(_options?: IRpcDevtoolsOptions): IRpcDevtools;",
+          "identity": "packages/rpc-devtools/dist/collector/devtools.d.ts:createRpcDevtools:export declare function createRpcDevtools(options?: IRpcDevtoolsOptions): IRpcDevtools;",
           "guidance": [],
-          "usageScore": 12,
+          "usageScore": 46,
           "configuration": [],
           "fragment": "rpc-devtools-index--createRpcDevtools"
         },
@@ -100337,7 +100342,7 @@
           "errors": ["No documented errors are declared for decodeRpcDevtoolsRecord."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for decodeRpcDevtoolsRecord.",
           "examples": [
-            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [{\n    seq: 1,\n    at: 0,\n    endpointId: 'client',\n    stage: 'message',\n    direction: 'outbound',\n    kind: 'request',\n    method: '读取',\n    content: new Uint8Array([1, 2, 3])\n  }]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
+            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 0,\n      endpointId: 'client',\n      stage: 'message',\n      direction: 'outbound',\n      kind: 'request',\n      method: '读取',\n      content: new Uint8Array([1, 2, 3])\n    }\n  ]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
             "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1"
           ],
           "members": [],
@@ -100418,7 +100423,7 @@
           "errors": ["No documented errors are declared for encodeRpcDevtoolsRecord."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for encodeRpcDevtoolsRecord.",
           "examples": [
-            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [{\n    seq: 1,\n    at: 0,\n    endpointId: 'client',\n    stage: 'message',\n    direction: 'outbound',\n    kind: 'request',\n    method: '读取',\n    content: new Uint8Array([1, 2, 3])\n  }]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
+            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 0,\n      endpointId: 'client',\n      stage: 'message',\n      direction: 'outbound',\n      kind: 'request',\n      method: '读取',\n      content: new Uint8Array([1, 2, 3])\n    }\n  ]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
             "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1"
           ],
           "members": [],
@@ -100809,7 +100814,7 @@
           "errors": ["No documented errors are declared for IRpcDevtoolsRecord."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsRecord.",
           "examples": [
-            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [{\n    seq: 1,\n    at: 0,\n    endpointId: 'client',\n    stage: 'message',\n    direction: 'outbound',\n    kind: 'request',\n    method: '读取',\n    content: new Uint8Array([1, 2, 3])\n  }]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
+            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 0,\n      endpointId: 'client',\n      stage: 'message',\n      direction: 'outbound',\n      kind: 'request',\n      method: '读取',\n      content: new Uint8Array([1, 2, 3])\n    }\n  ]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
             "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1"
           ],
           "members": [],
@@ -101003,7 +101008,9 @@
           "returns": "No explicit return annotation is declared for this type.",
           "errors": ["No documented errors are declared for IRpcDevtoolsServiceApi."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsServiceApi.",
-          "examples": [],
+          "examples": [
+            "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport type { IRpcDevtoolsServiceApi } from '@migaia/rpc-devtools/contract'\nimport { createPeerPair } from '@migaia/rpc-core/testing'\n\n/** Service 专用 Peer 不安装 collector 作为 probe，避免观察自己的查询流量。 */\nconst devtools = createRpcDevtools({ maxEvents: 32 })\n/** 这里的类型断言公开冻结的 service 契约，供 typed Peer 推断方法。 */\nconst pair = await createPeerPair({\n  a: { provide: {} },\n  b: { provide: { devtools: devtools.service as IRpcDevtoolsServiceApi } }\n})\ntry {\n  console.log((await pair.a.request('devtools.describe')).limits.maxEvents) // 32\n  console.log((await pair.a.request('devtools.query', { stages: ['message'] })).events.length)\n  await pair.a.request('devtools.record.start', { maxEvents: 8 })\n  console.log(devtools.importRecord(await pair.a.request('devtools.record.stop')).header.version)\n  await pair.a.request('devtools.pause')\n  await pair.a.request('devtools.resume')\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n  devtools.close()\n}"
+          ],
           "members": [],
           "exportPath": "./contract",
           "overloadSignatures": [
@@ -101048,7 +101055,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsServiceApi:export type IRpcDevtoolsServiceApi = { describe(): IRpcDevtoolsDescribe; query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; stats(): IRpcDevtoolsStats; record: { start(input?: Readonly<{ maxEvents?: number; }>): void; stop(): string; }; clear(): void; pause(): void; resume(): void; };",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 18,
           "configuration": [],
           "fragment": "rpc-devtools-contract--IRpcDevtoolsServiceApi"
         },
@@ -101368,7 +101375,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE` 与 `TARGET_UNKNOWN`。Collector/hub 相关错误在本阶段仅有契约定义。"
+                  "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE` 与 `TARGET_UNKNOWN`。Collector 配置和生命周期错误已实现；hub 相关运行时错误仍由 hub 实现提供。"
                 }
               ]
             }
@@ -101443,7 +101450,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE` 与 `TARGET_UNKNOWN`。Collector/hub 相关错误在本阶段仅有契约定义。"
+                  "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE` 与 `TARGET_UNKNOWN`。Collector 配置和生命周期错误已实现；hub 相关运行时错误仍由 hub 实现提供。"
                 }
               ]
             }
@@ -101467,7 +101474,7 @@
           "errors": ["No documented errors are declared for RpcDevtoolsRecordFormat."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcDevtoolsRecordFormat.",
           "examples": [
-            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [{\n    seq: 1,\n    at: 0,\n    endpointId: 'client',\n    stage: 'message',\n    direction: 'outbound',\n    kind: 'request',\n    method: '读取',\n    content: new Uint8Array([1, 2, 3])\n  }]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
+            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 0,\n      endpointId: 'client',\n      stage: 'message',\n      direction: 'outbound',\n      kind: 'request',\n      method: '读取',\n      content: new Uint8Array([1, 2, 3])\n    }\n  ]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
             "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1"
           ],
           "members": [],
@@ -101611,7 +101618,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-devtools/dist/hub/index.d.ts:createRpcDevtoolsHub:export declare function createRpcDevtoolsHub(_options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub;",
           "guidance": [],
-          "usageScore": 12,
+          "usageScore": 10,
           "configuration": [],
           "fragment": "rpc-devtools-hub--createRpcDevtoolsHub"
         },
@@ -102056,6 +102063,243 @@
           "usageScore": 6,
           "configuration": [],
           "fragment": "rpc-devtools-hub--RpcDevtoolsTargetStatus"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "rpc-devtools:log",
+      "library": "rpc-devtools",
+      "module": "log",
+      "exportPath": "./log",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-devtools/getting-started",
+      "architecturePath": "/en/architecture/rpc-devtools",
+      "symbols": [
+        {
+          "name": "createRpcLogProbe",
+          "kind": "function",
+          "signature": "export declare function createRpcLogProbe(\n  logger: IRpcLogSink,\n  options?: IRpcLogProbeOptions,\n): IRpcProbe;",
+          "declarationLine": 8,
+          "source": "packages/rpc-devtools/dist/log/log-probe.d.ts",
+          "purpose": "Builds one standalone probe. Successful/unsubscribed events stop before message or fields construction. Every qualifying event makes exactly one synchronous logger call; buffering and I/O remain owned by the logger. Sink failures are reported and never reach the business caller.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRpcLogProbe.",
+          "advanced": "No additional advanced behavior is declared for createRpcLogProbe.",
+          "parameters": ["logger: IRpcLogSink", "options: IRpcLogProbeOptions (optional)"],
+          "parameterDetails": [
+            {
+              "name": "logger",
+              "type": "IRpcLogSink",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "IRpcLogProbeOptions",
+              "optional": true
+            }
+          ],
+          "returns": "IRpcProbe",
+          "errors": ["No documented errors are declared for createRpcLogProbe."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRpcLogProbe.",
+          "examples": [
+            "import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, level } from '@migaia/logger/plugins'\nimport { file } from '@migaia/logger/plugins/file'\nimport { createRpcLogProbe } from '@migaia/rpc-devtools/log'\n\n/** 示例用内存代替文件 I/O；生产 fs 能力仍由 Logger 拥有。 */\nconst lines: string[] = []\n/** 注入拥有独立恢复句柄，关闭 Logger 后归还环境。 */\nconst restore = setLoggerRuntimeManager({\n  randomUUID: () => 'doc-log',\n  defer: (task) => queueMicrotask(task),\n  write: () => undefined,\n  fs: {\n    async append(_path, text) {\n      lines.push(text)\n    }\n  }\n})\n/** level 方法只入队，batch/file 接管输出与收尾。 */\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'debug', asyncOutput: true }),\n    batch({ maxSize: 20, maxWaitMs: 1_000, asyncOutput: true }),\n    file({ path: 'logs/rpc.jsonl' })\n  ]\n})\ntry {\n  /** 传给已有 Peer 的 probe；本例只展示 logger 配置。 */\n  const probe = createRpcLogProbe(logger, { slowMs: 200 })\n  console.log(probe.stageMask)\n  logger.info('RPC logger ready', { slowMs: 200 })\n  await logger.flush()\n  console.log(lines.length > 0) // true\n} finally {\n  await logger.shutdown('manual')\n  restore()\n}"
+          ],
+          "members": [],
+          "aliasOf": "createRpcLogProbe",
+          "exportPath": "./log",
+          "overloadSignatures": [
+            "export declare function createRpcLogProbe(logger: IRpcLogSink, options?: IRpcLogProbeOptions): IRpcProbe;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "logger",
+                "type": "IRpcLogSink",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "IRpcLogProbeOptions",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcProbe"],
+          "whenToUse": "Use createRpcLogProbe when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createRpcLogProbe does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Builds one standalone probe. Successful/unsubscribed events stop before message or fields construction. Every qualifying event makes exactly one synchronous logger call; buffering and I/O remain owned by the logger. Sink failures are reported and never reach the business caller."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createRpcLogProbe from @migaia/rpc-devtools/log, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createRpcLogProbe when its function contract and declared inputs match the result you need. Choose a different public symbol when createRpcLogProbe does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRpcLogProbe."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createRpcLogProbe."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/log/log-probe.d.ts:createRpcLogProbe:export declare function createRpcLogProbe(logger: IRpcLogSink, options?: IRpcLogProbeOptions): IRpcProbe;",
+          "guidance": [],
+          "usageScore": 22,
+          "configuration": [],
+          "fragment": "rpc-devtools-log--createRpcLogProbe"
+        },
+        {
+          "name": "IRpcLogProbeOptions",
+          "kind": "type",
+          "signature": "export type IRpcLogProbeOptions = Readonly<{\n  slowMs?: number;\n  sample?: number;\n  methods?: readonly string[];\n  stages?: readonly ('message' | 'peer')[];\n  /** Opts subscribed stages into capture; emit receives already-redacted caller-owned content. */ content?: boolean;\n  levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>;\n  /** Called synchronously for qualifying events; the reusable view must never be retained. */ message?(\n    view: IRpcProbeEventView,\n  ): string;\n  /** Receives logger or formatting failures without changing the business flow. */ onError?(\n    error: unknown,\n  ): void;\n}>;",
+          "declarationLine": 11,
+          "source": "packages/rpc-devtools/dist/log/types.d.ts",
+          "purpose": "Logging policy compiles once; the owning emitter applies source sampling and method filters.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcLogProbeOptions.",
+          "advanced": "No additional advanced behavior is declared for IRpcLogProbeOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcLogProbeOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcLogProbeOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcLogProbeOptions",
+          "exportPath": "./log",
+          "overloadSignatures": [
+            "export type IRpcLogProbeOptions = Readonly<{ slowMs?: number; sample?: number; methods?: readonly string[]; stages?: readonly ('message' | 'peer')[]; /** Opts subscribed stages into capture; emit receives already-redacted caller-owned content. */ content?: boolean; levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>; /** Called synchronously for qualifying events; the reusable view must never be retained. */ message?(view: IRpcProbeEventView): string; /** Receives logger or formatting failures without changing the business flow. */ onError?(error: unknown): void; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcLogProbeOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcLogProbeOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Logging policy compiles once; the owning emitter applies source sampling and method filters."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcLogProbeOptions from @migaia/rpc-devtools/log, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcLogProbeOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcLogProbeOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcLogProbeOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcLogProbeOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/log/types.d.ts:IRpcLogProbeOptions:export type IRpcLogProbeOptions = Readonly<{ slowMs?: number; sample?: number; methods?: readonly string[]; stages?: readonly ('message' | 'peer')[]; /** Opts subscribed stages into capture; emit receives already-redacted caller-owned content. */ content?: boolean; levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>; /** Called synchronously for qualifying events; the reusable view must never be retained. */ message?(view: IRpcProbeEventView): string; /** Receives logger or formatting failures without changing the business flow. */ onError?(error: unknown): void; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-log--IRpcLogProbeOptions"
+        },
+        {
+          "name": "IRpcLogSink",
+          "kind": "type",
+          "signature": "export type IRpcLogSink = Readonly<{\n  debug(message: string, fields: object): unknown;\n  info(message: string, fields: object): unknown;\n  warn(message: string, fields: object): unknown;\n  error(message: string, fields: object): unknown;\n}>;",
+          "declarationLine": 4,
+          "source": "packages/rpc-devtools/dist/log/types.d.ts",
+          "purpose": "Structural logger boundary: each method should enqueue work without blocking the RPC caller.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcLogSink.",
+          "advanced": "No additional advanced behavior is declared for IRpcLogSink.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcLogSink."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcLogSink.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcLogSink",
+          "exportPath": "./log",
+          "overloadSignatures": [
+            "export type IRpcLogSink = Readonly<{ debug(message: string, fields: object): unknown; info(message: string, fields: object): unknown; warn(message: string, fields: object): unknown; error(message: string, fields: object): unknown; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcLogSink when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcLogSink does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Structural logger boundary: each method should enqueue work without blocking the RPC caller."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcLogSink from @migaia/rpc-devtools/log, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcLogSink when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcLogSink does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcLogSink."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcLogSink."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-devtools/dist/log/types.d.ts:IRpcLogSink:export type IRpcLogSink = Readonly<{ debug(message: string, fields: object): unknown; info(message: string, fields: object): unknown; warn(message: string, fields: object): unknown; error(message: string, fields: object): unknown; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-devtools-log--IRpcLogSink"
         }
       ],
       "aliases": []
