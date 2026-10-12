@@ -10,8 +10,18 @@ import type {
   IBrowserMessagePortLike
 } from '@migaia/rpc-core/adapters/message-port'
 import type { IRuntimePeerSourceResult } from '@migaia/rpc-core/remote'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import type { IThreadChannelOptions, IThreadWebPort } from './types.js'
+
+/** Static policy keeps its synchronous zero-handshake path; runtime proposals require actual ACK. */
+function requiresCapabilityAcknowledgement(capabilities: readonly string[] | undefined): boolean {
+  return (
+    capabilities?.some(
+      (value) => !rpcMessageCapabilityControl.staticCapabilities.includes(value)
+    ) ?? false
+  )
+}
 
 /** Adapt EventTarget message shape without transferring Worker lifecycle ownership. */
 export function threadWebPort(port: IThreadWebPort): IBrowserMessagePortLike {
@@ -35,9 +45,7 @@ export function openThreadMessageResource(
   if (options.capabilities === undefined)
     return resource.openStatic({ peerId, scheduler: options.scheduler })
   /** Explicit local policy only narrows the static baseline unless it actually proposes extensions. */
-  const expanded = options.capabilities.some(
-    (value) => !rpcMessageCapabilityControl.staticCapabilities.includes(value)
-  )
+  const expanded = requiresCapabilityAcknowledgement(options.capabilities)
   return expanded
     ? resource.open({
         peerId,
@@ -78,22 +86,56 @@ export function constructWebThreadChannel(
   })
 }
 
-/** Borrow the supplied EventEmitter port with the original zero-handshake fixed profile. */
+/** Borrow the supplied EventEmitter port synchronously when its policy uses only the fixed profile. */
+export function createNodeThreadChannel(
+  port: INodeMessagePortLike,
+  peerId: string,
+  options: IThreadChannelOptions &
+    Readonly<{
+      capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]
+    }>
+): IRuntimePeerSourceResult
+/** Runtime capability proposals use Core's bounded bilateral ACK over the held native port. */
 export function createNodeThreadChannel(
   port: INodeMessagePortLike,
   peerId: string,
   options: IThreadChannelOptions
-): IRuntimePeerSourceResult {
-  return constructNodeThreadChannel(port, peerId, options)
+): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>
+/** Preserve fixed construction while the held resource owns expanded control and capability facts. */
+export function createNodeThreadChannel(
+  port: INodeMessagePortLike,
+  peerId: string,
+  options: IThreadChannelOptions
+): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult> {
+  return requiresCapabilityAcknowledgement(options.capabilities)
+    ? openThreadMessageResource(createEventEmitterMessageResource(port), peerId, options)
+    : constructNodeThreadChannel(port, peerId, options)
 }
 
-/** Borrow the supplied EventTarget port with the original zero-handshake fixed profile. */
+/** Borrow the supplied EventTarget port synchronously when its policy uses only the fixed profile. */
+export function createWebThreadChannel(
+  port: IThreadWebPort,
+  peerId: string,
+  options: IThreadChannelOptions &
+    Readonly<{
+      capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]
+    }>
+): IRuntimePeerSourceResult
+/** Runtime capability proposals use Core's same bilateral ACK over the held EventTarget resource. */
 export function createWebThreadChannel(
   port: IThreadWebPort,
   peerId: string,
   options: IThreadChannelOptions
-): IRuntimePeerSourceResult {
-  return constructWebThreadChannel(port, peerId, options)
+): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>
+/** Preserve fixed construction while Core captures the peer's actual expanded proposal. */
+export function createWebThreadChannel(
+  port: IThreadWebPort,
+  peerId: string,
+  options: IThreadChannelOptions
+): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult> {
+  return requiresCapabilityAcknowledgement(options.capabilities)
+    ? openThreadMessageResource(createEventTargetMessageResource(port), peerId, options)
+    : constructWebThreadChannel(port, peerId, options)
 }
 
 /** Await only adapter preparation; cancellation keeps the original reason and removes its listener. */

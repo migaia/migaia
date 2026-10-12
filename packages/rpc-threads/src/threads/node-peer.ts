@@ -1,7 +1,6 @@
 import { createEventEmitterMessageResource, prepareAdapterPeer } from '@migaia/rpc-core/adapter'
 import {
   RuntimePluginKey,
-  createRuntimePeer,
   type IRuntimePeerOptions,
   type IRuntimePeer
 } from '@migaia/rpc-core/remote'
@@ -19,7 +18,7 @@ export function createAdapterNodeThreadPeer(
   if (!parentPort)
     return typeof options.spawn === 'object'
       ? createThreadSourcePeer(options)
-      : createRuntimePeer(options as IRuntimePeerOptions)
+      : preparation.peer({ ...options, self: preparation.context.self } as IRuntimePeerOptions)
   /** Core reads the same actual workerData and keeps the closed admission snapshot private. */
   const resource = createEventEmitterMessageResource(parentPort)
   resource.receiveInitial({ direction: 'inbound', read: () => workerData })

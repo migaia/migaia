@@ -94,7 +94,44 @@ spawn: {
 
 **Web Worker 的终止边界**：浏览器、Bun、Deno 的 launcher 把 `termination` 与 `exit-observation` 声明为 `unsupported`。`terminate()` 之后无法确认 Worker 中的代码已经停止，监督层会保守地把该单元视为可能仍在运行。Node 与 Electron 主进程基于 `worker_threads`，可以观察退出。
 
-**只支持 spawn 来源**：线程版目前只支持由 launcher 创建的 Worker。借用一个已有的 `MessagePort`（`connect`）无法完成 runtime 调用所需的能力确认，会以 `CAPABILITY_UNSUPPORTED` 或 `INVALID_CONFIG` 拒绝。
+已有 `MessagePort` 可以作为 `connect` 来源。双方把 Core 提供的 `context.capabilities` 交给 channel；Core 在实际端口上交换 ACK，只有双方都提供的能力才会启用。双方应同时开始连接：
+
+```ts
+import { MessageChannel } from 'node:worker_threads'
+import { createNodeThreadChannel, createThreadPeer } from '@migaia/rpc-threads'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+const { port1, port2 } = new MessageChannel()
+const report = (error: unknown) => console.error(error)
+const [left, right] = await Promise.all([
+  createThreadPeer({
+    self: { name: 'left', instanceId: 'left-1' },
+    provide: { greet: (name: string) => `hello ${name}` },
+    connect: async (context) => createNodeThreadChannel(port1, 'right-1', {
+      scheduler: systemScheduler,
+      capabilities: context.capabilities
+    }),
+    report
+  }),
+  createThreadPeer<{ greet(name: string): string }>({
+    self: { name: 'right', instanceId: 'right-1' },
+    connect: async (context) => createNodeThreadChannel(port2, 'left-1', {
+      scheduler: systemScheduler,
+      capabilities: context.capabilities
+    }),
+    report
+  })
+])
+try {
+  console.log(await right.request('greet', 'world')) // hello world
+} finally {
+  await Promise.all([left.close(), right.close()])
+  port1.close()
+  port2.close()
+}
+```
+
+`self` 可以省略，Core 会生成本地标识；需要稳定地址时显式设置。`capabilities` 是本地提案，可显式缩小，不能声称已协商或已信任。Peer 关闭只注销借用端口的监听器；端口仍由调用方关闭。不传 `capabilities` 的底层 channel 保留同步、零握手的固定能力配置。
 
 ## 4. 交给 PluginHost 管理：createThreadPlugin
 
@@ -176,7 +213,7 @@ Worker 中抛出的业务错误会还原原生类型（例如 `RangeError`）、
 | `createWebThreadChannelFactory({ scheduler })`            | 与上面的 launcher 配套                                                                      |
 | `createAdapterNodeThreadLauncher(runtime, options)`       | 用自定义的 Node 运行时资源（`IThreadRuntimeResource`）创建 Worker                          |
 | `createAdapterNodeThreadPeer(options, parentPort, data)`  | Worker 一侧：用你持有的 `parentPort` 与 `workerData` 建立 Peer                              |
-| `createNodeThreadChannel`、`createWebThreadChannel`       | 在一个端口上构造固定基础能力的通道（零握手），用于自定义的底层 Endpoint 组装               |
+| `createNodeThreadChannel`、`createWebThreadChannel`       | 在借用端口上构造通道；固定基础能力同步返回，扩展 `capabilities` 等待 Core 双边 ACK          |
 | `receiveThreadData`、`readThreadBootstrap`                | 读取并校验 launcher 写入的 bootstrap 数据                                                   |
 
 launcher 返回的 handle 提供 `identity`、`port`、`exited`、`terminate`、`sampleUsage` 与 `open(signal, { scheduler })`。`open` 在该 Worker 的端口上完成能力确认并返回协议通道：
@@ -200,7 +237,7 @@ const channel = await handle.open(signal, { scheduler })
 默认按值复制。零拷贝转移需要 `transfer` 及相应配置（第 5 节）。
 
 **能在两个已有的 `MessagePort` 之间直接建立 Peer 吗？**
-目前不能（第 3 节末尾）。用 launcher 创建 Worker，或在底层用 `createNodeThreadChannel` 自行组装 Endpoint。
+可以。双方的 `connect` 使用 `createNodeThreadChannel` 或 `createWebThreadChannel`，并传入 `context.capabilities`（第 3 节末尾）。双方同时启动，能力确认由 Core 在实际端口上完成。
 
 **Worker 崩溃后会自动重启吗？**
 取决于 `supervisor.restart` 策略。使用 `createThreadPlugin` 时，可经 `host.thread.restart(name)` 手动重启，或用 `list` / `get` 查询当前代次与退出信息。

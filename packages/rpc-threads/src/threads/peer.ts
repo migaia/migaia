@@ -1,9 +1,9 @@
 import { createAdapterNodeThreadPeer } from './node-peer.js'
 import { threadRuntimeResource } from './runtime-resource.js'
 import type { IThreadRuntimeResource } from './runtime-types.js'
-import { validateAdapterPeerTimeout } from '@migaia/rpc-core/adapter'
+import { prepareAdapterPeer, validateAdapterPeerTimeout } from '@migaia/rpc-core/adapter'
 import type { IRuntimeTypedPeer } from '@migaia/rpc-core/remote'
-import { createRuntimePeer, type IRuntimePeerOptions } from '@migaia/rpc-core/remote'
+import { RuntimePluginKey, type IRuntimePeerOptions } from '@migaia/rpc-core/remote'
 import { createAutomaticWebThreadPeer } from './automatic-peer.js'
 import type { IThreadWebPort } from './types.js'
 import { createThreadSourcePeer, type IRuntimeThreadPeerOptions } from './runtime-peer.js'
@@ -47,7 +47,8 @@ export function createThreadPeer(
     return runtime
       .load()
       .then((native) => createAdapterNodeThreadPeer(options, native.parentPort, native.workerData))
-  return typeof options.spawn === 'object'
-    ? createThreadSourcePeer(options)
-    : createRuntimePeer(options as IRuntimePeerOptions)
+  if (typeof options.spawn === 'object') return createThreadSourcePeer(options)
+  /** Main-thread borrowed sources use the same Core-generated default address as spawn sources. */
+  const preparation = prepareAdapterPeer(options, RuntimePluginKey.thread)
+  return preparation.peer({ ...options, self: preparation.context.self } as IRuntimePeerOptions)
 }
