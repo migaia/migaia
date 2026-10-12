@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { parentPort, workerData, threadId } from 'node:worker_threads'
 import { performance } from 'node:perf_hooks'
-import { IpcBenchControl } from './text.mjs'
+import { IpcBenchControl, IpcBenchObservation } from './text.mjs'
 
 /** Deno exposes Node compatibility zeroes for ELU/threadId, rather than native observations. */
 const deno = typeof Deno !== 'undefined'
@@ -19,6 +19,17 @@ const loaded = []
 let sequence = 0
 /** Snapshot files belong to the selected side's serial measurement window. */
 const stem = workerData?.benchStem ?? workerData?.data?.benchStem ?? process.env.IPC_BENCH_STEM
+/** Only explicitly enabled peer boundaries collect; ordinary timing and parent observations do not. */
+const forcePeerGc =
+  process.env[IpcBenchObservation.forcePeerGcEnvironment] === '1' && isolateRole !== 'parent'
+/** Native V8 graph writing loads only for the Node peer's explicitly requested profile rerun. */
+const heapProfile =
+  forcePeerGc &&
+  !deno &&
+  !process.versions.bun &&
+  process.env[IpcBenchObservation.heapProfileEnvironment] === '1'
+    ? await import('node:v8')
+    : undefined
 /** Genuine runtime launchers keep portable data separate from the transferred observation port. */
 let observationReady = Promise.resolve()
 
@@ -86,11 +97,35 @@ if (process.versions.bun) {
 }
 
 /**
- * Capture the current isolate at a boundary outside timing; GC remains explicitly uncollected.
+ * Capture the current isolate outside timing, collecting only an explicitly opted-in peer.
  *
+ * @param {{ heapSnapshot?: 'start' | 'end' }} [options] Optional profile boundary on the existing
+ *   OOB control.
  * @returns {object} Actual process/thread CPU, ELU, heap and loaded module provenance.
+ * @throws {Error} Native GC or heap snapshot failure remains an observation failure.
  */
-export function snapshot() {
+export function snapshot(options = {}) {
+  /** The status records actual collection, never launch flags or a caller's claim. */
+  let gcStatus = IpcBenchObservation.uncollected
+  if (forcePeerGc) {
+    if (typeof globalThis.gc === 'function') {
+      globalThis.gc()
+      gcStatus = IpcBenchObservation.forcedPeerGc
+    } else gcStatus = IpcBenchObservation.peerGcUnavailable
+  }
+  /** Only a real post-GC profile boundary writes this isolate's retained heap graph. */
+  const heapSnapshot =
+    gcStatus === IpcBenchObservation.forcedPeerGc &&
+    heapProfile &&
+    IpcBenchObservation.heapBoundaries.includes(options.heapSnapshot)
+      ? heapProfile.writeHeapSnapshot(
+          stem +
+            (isolateRole === 'worker' ? '.peer' : '') +
+            '.' +
+            options.heapSnapshot +
+            '.heapsnapshot'
+        )
+      : undefined
   return {
     pid: process.pid,
     threadId: deno ? null : threadId,
@@ -104,12 +139,15 @@ export function snapshot() {
     classification: globalThis.__IPC_BENCH_CLASSIFICATION ?? null,
     epochMs: performance.timeOrigin + performance.now(),
     gc: [],
-    gcStatus: 'NOT_COLLECTED_FORMAL_TIMING'
+    gcStatus,
+    ...(heapSnapshot ? { heapSnapshot } : {})
   }
 }
 
 if (parentPort && !deno) {
-  workerData?.benchPort?.on('message', () => workerData.benchPort.postMessage(snapshot()))
+  workerData?.benchPort?.on('message', (options) =>
+    workerData.benchPort.postMessage(snapshot(options))
+  )
   if (workerData?.data?.observation)
     observationReady = new Promise((resolve) => {
       /** Consume before the runtime factory starts its bounded receive handoff. */
@@ -118,7 +156,7 @@ if (parentPort && !deno) {
         parentPort.off('message', receive)
         /** Only the already-transferred separate port receives out-of-band snapshot requests. */
         const port = message.port
-        port.on('message', () => port.postMessage(snapshot()))
+        port.on('message', (options) => port.postMessage(snapshot(options)))
         port.postMessage(IpcBenchControl.ready)
         resolve()
       }
@@ -128,7 +166,12 @@ if (parentPort && !deno) {
   process.on('SIGUSR2', () => {
     /** Publish only a complete boundary snapshot; existence is the parent's ready signal. */
     const path = stem + '.snapshot-' + sequence++ + '.json'
-    writeFileSync(path + '.tmp', JSON.stringify(snapshot()))
+    /** Profile requests use an existing local signal/file path, never an RPC control message. */
+    const options =
+      process.env[IpcBenchObservation.heapProfileEnvironment] === '1'
+        ? JSON.parse(readFileSync(stem + '.snapshot-request.json', 'utf8'))
+        : undefined
+    writeFileSync(path + '.tmp', JSON.stringify(snapshot(options)))
     renameSync(path + '.tmp', path)
   })
 }

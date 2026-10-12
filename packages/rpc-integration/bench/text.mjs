@@ -16,6 +16,22 @@ export const IpcBenchControl = Object.freeze({
   snapshot: 'bench.snapshot'
 })
 
+/** Peer heap evidence is opt-in and remains separate from ordinary timing diagnostics. */
+export const IpcBenchObservation = Object.freeze({
+  /** Only the ignored I22 soak driver enables explicit peer collection at snapshot boundaries. */
+  forcePeerGcEnvironment: 'IPC_BENCH_FORCE_PEER_GC',
+  /** Only a confirmed GROWING arm's profile rerun may write peer heap snapshots. */
+  heapProfileEnvironment: 'IPC_BENCH_HEAP_PROFILE',
+  /** A real completed isolate-local gc call is required before this status is emitted. */
+  forcedPeerGc: 'FORCED_PEER_GC',
+  /** Missing isolate-local gc prevents a post-GC verdict, even when heap bytes are readable. */
+  peerGcUnavailable: 'UNAVAILABLE_PEER_GC',
+  /** Ordinary timing runs preserve their existing explicitly uncollected status. */
+  uncollected: 'NOT_COLLECTED_FORMAL_TIMING',
+  /** The existing OOB observation path carries only these two optional profile boundaries. */
+  heapBoundaries: Object.freeze(['start', 'end'])
+})
+
 /** Frozen reference ownership is retained in every W3 result so primitive history stays distinct. */
 export const IpcW3Reference = Object.freeze({
   /** Explicit final-source collection still reports the unchanged old primitive guard separately. */
