@@ -92,7 +92,7 @@ ship:
 	@$(MAKE) ship-preflight
 	@$(MAKE) ship-ci
 	@$(MAKE) ship-pack-check
-	@$(MAKE) ship-cd
+	@$(MAKE) ship-cd RELEASE_NEW_RUN=1
 	@echo "==> all release packages shipped"
 
 # Executes every local release gate and previews each package artifact without
@@ -225,7 +225,7 @@ ship-pack-check:
 
 ship-cd:
 	@set -eu; \
-	patched_packages=$$(node scripts/release-progress.mjs $(RELEASE_PACKAGES)); \
+	patched_packages=$$(node scripts/release-progress.mjs $(if $(RELEASE_NEW_RUN),--new-run-if-finished) $(RELEASE_PACKAGES)); \
 	for package in $(RELEASE_PACKAGES); do \
 		echo "==> CD releasing $$package"; \
 		case " $$patched_packages " in \
@@ -248,7 +248,7 @@ store-ship:
 	@$(MAKE) store-ship-preflight
 	@$(MAKE) store-ship-ci
 	@$(MAKE) store-ship-pack-check
-	@$(MAKE) store-ship-cd
+	@$(MAKE) store-ship-cd RELEASE_NEW_RUN=1
 	@echo "==> all store release packages shipped"
 
 store-ship-dry-run:
@@ -276,7 +276,7 @@ store-ship-pack-check:
 
 store-ship-cd:
 	@set -eu; \
-	patched_packages=$$(node scripts/release-progress.mjs $(STORE_RELEASE_PACKAGES)); \
+	patched_packages=$$(node scripts/release-progress.mjs $(if $(RELEASE_NEW_RUN),--new-run-if-finished) $(STORE_RELEASE_PACKAGES)); \
 	for package in $(STORE_RELEASE_PACKAGES); do \
 		echo "==> Store CD releasing $$package"; \
 		case " $$patched_packages " in \
