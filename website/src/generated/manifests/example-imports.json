@@ -672,6 +672,7 @@
     },
     "@migaia/rpc-devtools": {
       "createRpcDevtoolsHub": "@migaia/rpc-devtools/hub",
+      "createRpcLogProbe": "@migaia/rpc-devtools/log",
       "decodeRpcDevtoolsRecord": "@migaia/rpc-devtools/contract",
       "encodeRpcDevtoolsRecord": "@migaia/rpc-devtools/contract",
       "IRpcDevtoolsCounters": "@migaia/rpc-devtools/contract",
@@ -692,6 +693,8 @@
       "IRpcDevtoolsTimelineQuery": "@migaia/rpc-devtools/hub",
       "IRpcDevtoolsWatchBatch": "@migaia/rpc-devtools/contract",
       "IRpcDevtoolsWireEvent": "@migaia/rpc-devtools/contract",
+      "IRpcLogProbeOptions": "@migaia/rpc-devtools/log",
+      "IRpcLogSink": "@migaia/rpc-devtools/log",
       "IRpcWireError": "@migaia/rpc-devtools/contract",
       "RPC_DEVTOOLS_SOURCE": "@migaia/rpc-devtools/contract",
       "RpcDevtoolsErrorCode": "@migaia/rpc-devtools/contract",

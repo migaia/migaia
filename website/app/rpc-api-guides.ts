@@ -4351,18 +4351,18 @@ try {
 /** Both devtools entries publish the same canonical error identity. */
 const rpcDevtoolsErrorGuide = guide({
   purposeEn:
-    'Provides the canonical rpc-devtools source and eight semantic error codes shared by codec, collector and hub. Layer 1 implements codec errors and placeholder CLOSED failures while runtime errors remain declared contracts.',
+    'Provides the canonical rpc-devtools source and eight semantic error codes shared by codec, collector and hub. Collector configuration/lifecycle and codec failures carry these registered identities; the hub runtime remains uninstalled and reports CLOSED.',
   purposeZh:
-    '提供 codec、collector 与 hub 共用的 rpc-devtools source 和八个语义错误码；layer 1 实现 codec 错误及占位 CLOSED，其它运行时错误仍只属于声明契约。',
+    '提供 codec、collector 与 hub 共用的 rpc-devtools source 和八个语义错误码；collector 配置、生命周期与 codec 失败已携带这些身份，hub 运行时仍未安装并报告 CLOSED。',
   quickStart: `import { RPC_DEVTOOLS_SOURCE, RpcDevtoolsErrorCode } from '@migaia/rpc-devtools/contract'
 
 console.log(RPC_DEVTOOLS_SOURCE, RpcDevtoolsErrorCode)`,
   useEn: [
-    'Branch on source and code when decoding a record or encountering a placeholder factory.',
+    'Branch on source and code when decoding a record, configuring the collector or encountering the uninstalled hub factory.',
     'Keep the original parse, validation or runtime failure reachable through cause.'
   ],
   useZh: [
-    '解码录制数据或调用占位工厂失败时，按 source 与 code 进行分支。',
+    '解码录制数据、配置 collector 或调用未安装的 hub 工厂失败时，按 source 与 code 进行分支。',
     '保留 cause，使原始解析、验证或运行时失败仍能追溯。'
   ],
   avoidEn: [
@@ -4379,30 +4379,202 @@ console.log(RPC_DEVTOOLS_SOURCE, RpcDevtoolsErrorCode)`,
 const rpcDevtoolsGuides = {
   'rpc-devtools:index:createRpcDevtools': guide({
     purposeEn:
-      'Reserves the typed collector factory and its Probe, query, watch, stats, recording and service surface. Layer 1 synchronously throws CLOSED; collection begins only after the collector implementation lands.',
+      'Creates one bounded RPC collector per host, directly usable as a Probe. Numeric ring columns preserve reusable-view metadata, independent statistics survive eviction, and local query, watch, recording and service expose snapshots only at their boundaries.',
     purposeZh:
-      '保留带类型的 collector 工厂及 Probe、query、watch、stats、录制与 service 出口；layer 1 同步抛出 CLOSED，只有 collector 实现合入后才开始采集。',
+      '为每个宿主创建有界 RPC collector，可直接作为 Probe 接入。数值环列保留复用 view 的顶层元数据，独立统计不受淘汰影响；本地 query、watch、录制与 service 只在出口物化结果。',
     quickStart: `import { createRpcDevtools } from '@migaia/rpc-devtools'
 
-/** Compile the contract now; layer 1 rejects until collector runtime lands. */
-export function prepareCollector() {
-  return createRpcDevtools({ stages: ['message'], sample: 0.25 }) // Layer 1 throws CLOSED.
-}`,
+/** Attach devtools directly to an existing host's probe option. */
+const devtools = createRpcDevtools({ stages: ['message'], maxEvents: 1_000 })
+/** Recording uses its own bounded ring until stop materializes an offline record. */
+const recording = devtools.record({ maxEvents: 100 })
+devtools.pause()
+console.log(devtools.describe().paused)
+devtools.resume()
+console.log(devtools.query({ stages: ['message'], limit: 100 }), devtools.stats())
+console.log(devtools.exportRecord(recording.stop()))
+devtools.close()`,
+    options: [
+      {
+        name: 'stages',
+        whenToUse:
+          'Select only observation layers needed by this collector. / 只选择当前 collector 需要观察的层。',
+        description:
+          'Metadata stages to observe; content capture is separately opt-in. Resume currently restores this initial list. / 订阅元数据阶段；内容捕获独立启用，resume 当前恢复此初始列表。'
+      },
+      {
+        name: 'capture',
+        whenToUse:
+          'Enable payload inspection only when metadata is insufficient. / 仅在元数据不足时启用内容检查。',
+        description:
+          'Stages whose content may be retained by reference after redaction. / 显式捕获内容的阶段，脱敏后按引用保留。'
+      },
+      {
+        name: 'redact',
+        whenToUse:
+          'Remove private fields before captured content reaches storage. / 内容入库前删除隐私字段。',
+        description:
+          'Synchronous content redaction; failure reports and discards content. / 同步脱敏内容，失败时报告并丢弃内容。'
+      },
+      {
+        name: 'methods',
+        whenToUse:
+          'Observe a bounded set of message/envelope methods. / 只观察指定 message/envelope 方法。',
+        description:
+          'Compiled message/envelope method whitelist. / 构造时编译的 message/envelope 方法白名单。'
+      },
+      {
+        name: 'sample',
+        whenToUse:
+          'Reduce metadata volume with deterministic sampling. / 用确定性采样降低元数据量。',
+        description:
+          'Compiled sampling ratio, decided before ingestion. / 采集前使用构造时编译的采样比例。'
+      },
+      {
+        name: 'maxEvents',
+        whenToUse: 'Set the retained local history capacity. / 设置本地历史保留容量。',
+        description:
+          'Main ring capacity; defaults to 10,000 events. / 主环容量，默认 10,000 个事件。'
+      },
+      {
+        name: 'maxContentBytes',
+        whenToUse:
+          'Bound retained payloads whose byte length is known. / 限制已知字节长度的保留 payload。',
+        description:
+          'Known content byte budget; defaults to 8 MiB. Opaque objects with sizeBytes -1 charge zero. / 已知内容字节预算默认 8 MiB，sizeBytes 为 -1 的 opaque object 计为零。'
+      },
+      {
+        name: 'maxInterned',
+        whenToUse:
+          'Bound distinct diagnostic names in a long-lived collector. / 限制长期 collector 的不同诊断名称数。',
+        description:
+          'Bounded name table; defaults to 65,536, with counted overflow id 0. / 名称驻留上限默认 65,536，超限记为 id 0 并计数。'
+      },
+      {
+        name: 'exposeContent',
+        whenToUse:
+          'Allow an authorized remote client to inspect captured payloads. / 允许已授权远端检查捕获内容。',
+        description:
+          'Explicitly allow content through the remote service; defaults false. / 明确允许远程 service 输出内容，默认 false。'
+      },
+      {
+        name: 'onError',
+        whenToUse:
+          'Connect collector failures to the application reporter. / 将采集失败交给应用 reporter。',
+        description:
+          'Report ingestion failures without throwing into business flow. / 报告采集失败，不向业务路径抛错。'
+      }
+    ],
     useEn: [
-      'Compile future collector integration against the frozen options and service types.',
-      'After the runtime implementation lands, attach one metadata-only collector to a host through probe.'
+      'Inspect local pages, per-method latency histograms and independent bounded recordings without creating another transport.',
+      'Mount devtools.service on a separate existing Peer without installing this collector as its probe; watch yields at most 256 events per batch and reports loss after its 64-batch queue overflows.'
     ],
     useZh: [
-      '按冻结的选项与 service 类型，编译后续 collector 接入代码。',
-      '运行时实现合入后，通过 probe 为每个宿主接入只读元数据的 collector。'
+      '查看本地分页、按方法聚合的延迟直方图与独立有界录制，不创建新的 transport。',
+      '把 devtools.service 挂到独立的已有 Peer，不把此 collector 安装为该 Peer 的 probe；watch 每批最多 256 个事件，64 批队列溢出后报告 dropped。'
     ],
     avoidEn: [
-      'Expecting the layer 1 placeholder to collect events or provide an operational remote service.',
-      'Capturing payloads without explicit capture and redaction, or exposing them without exposeContent.'
+      'Expecting detached copies of captured content, detail or errors: these retain references and later caller mutations can remain visible.',
+      'Capturing payloads without explicit capture/redact or exposing them without exposeContent.',
+      'Installing the same collector as a probe on its serving Peer: automatic service-endpoint exclusion remains incomplete until the contract exposes local endpoint identity.',
+      'Expecting resume to restore a later setStages update: it currently restores construction stages, so reapply the desired list explicitly.'
     ],
     avoidZh: [
-      '期待 layer 1 占位工厂已能采集事件或提供可用远程 service。',
-      '未显式设置 capture/redact 就捕获 payload，或未设置 exposeContent 就暴露内容。'
+      '期待 captured content、detail 或 error 是独立拷贝：它们保留引用，调用方后续修改仍可能可见。',
+      '未显式 capture/redact 就捕获 payload，或未设置 exposeContent 就暴露内容。',
+      '把同 collector 作为 probe 安装到 serving Peer；契约提供本地 endpoint identity 前，自动排除自身 service 流量仍未完成。',
+      '期待 resume 恢复后续 setStages 更新；它当前恢复构造时的列表，需显式重新应用需要的订阅。'
+    ]
+  }),
+  'rpc-devtools:log:createRpcLogProbe': guide({
+    purposeEn:
+      'Creates a first-party logging Probe for a structural debug/info/warn/error logger. Integer filtering precedes allocation, and qualifying events become independent fields objects before the reusable view changes; the logger owns all buffering, output and flush.',
+    purposeZh:
+      '为具有 debug/info/warn/error 的结构化 logger 创建日志 Probe。先用整数判断，再为合格事件提取独立字段对象，避免复用 view 被覆写；缓冲、输出与 flush 全部由 logger 拥有。',
+    quickStart: `import { createRpcLogProbe } from '@migaia/rpc-devtools/log'
+
+/** A recording sink demonstrates nonblocking admission without performing I/O. */
+const entries: object[] = []
+/** An existing logger owns this queue and its eventual output. */
+const logger = {
+  debug(_message: string, fields: object) { entries.push(fields) },
+  info(_message: string, fields: object) { entries.push(fields) },
+  warn(_message: string, fields: object) { entries.push(fields) },
+  error(_message: string, fields: object) { entries.push(fields) }
+}
+/** Pass this Probe to an existing host; successful calls under 200 ms stay silent. */
+const probe = createRpcLogProbe(logger, { slowMs: 200, levels: { rejected: 'off' } })
+console.log(probe.stageMask, entries.length)`,
+    options: [
+      {
+        name: 'slowMs',
+        whenToUse:
+          'Include settled calls that exceed the application latency budget. / 记录超过应用延迟预算的 settled 调用。',
+        description:
+          'Settled calls at or above this finite nonnegative threshold log warn. / settled 达到有限非负阈值后记 warn。'
+      },
+      {
+        name: 'sample',
+        whenToUse: 'Reduce admitted diagnostic events before logging. / 在日志决策前减少诊断事件。',
+        description:
+          'Compile sampling before fields objects are created. / 创建字段对象前使用编译后的采样。'
+      },
+      {
+        name: 'methods',
+        whenToUse: 'Restrict call logging to selected methods. / 限制日志涉及的方法。',
+        description: 'Compile a method whitelist at construction. / 构造时编译方法白名单。'
+      },
+      {
+        name: 'stages',
+        whenToUse:
+          'Select call observations, peer lifecycle, or both. / 选择调用观察、peer 生命周期或两者。',
+        description:
+          'Message/peer subscriptions; these are the default stages. / 订阅 message/peer，默认选择两者。'
+      },
+      {
+        name: 'content',
+        whenToUse:
+          'Include explicitly approved payload content in a diagnostic sink. / 将明确允许的内容输出给诊断 sink。',
+        description:
+          'Request capture for subscribed stages; emitter-owned capture/redaction supplies view.content. / 为订阅阶段请求捕获，view.content 来自 emitter 的捕获/脱敏路径。'
+      },
+      {
+        name: 'levels',
+        whenToUse:
+          'Adjust severity or suppress a known category with off. / 调整级别或用 off 抑制指定类别。',
+        description:
+          'Override failed/rejected/timeout/aborted/slow/lifecycle levels; off disables. / 覆盖对应事件日志级别，off 禁用。'
+      },
+      {
+        name: 'message',
+        whenToUse:
+          'Supply an application message while the view remains valid. / 在 view 有效期间生成应用 message。',
+        description:
+          'Build a custom message synchronously from the current view. / 同步读取当前 view 创建自定义 message。'
+      },
+      {
+        name: 'onError',
+        whenToUse:
+          'Observe logger failures without changing business settlement. / 观察 logger 失败，不改变业务结算。',
+        description:
+          'Report throws and rejected thenables without changing RPC flow. / 报告抛错及 rejected thenable，不改变 RPC 流程。'
+      }
+    ],
+    useEn: [
+      'Log failures and rejections by default, and opt in to slow settled calls with slowMs.',
+      'Use @migaia/logger level({ asyncOutput: true }), batch and file to enqueue asynchronously; put batch before file and await logger.flush/shutdown at application teardown.'
+    ],
+    useZh: [
+      '默认记录失败与拒绝，用 slowMs 显式记录慢 settled 调用。',
+      '使用 @migaia/logger level({ asyncOutput: true })、batch 与 file 异步入队；batch 放在 file 前，应用收尾等待 logger.flush/shutdown。'
+    ],
+    avoidEn: [
+      'Handing the reusable view to an asynchronous logger; later events overwrite its fields.',
+      'Using a synchronous file-writing logger on the RPC path, or adding another buffering/rotation/flush pipeline inside devtools.'
+    ],
+    avoidZh: [
+      '把复用 view 交给异步 logger；后续事件会覆写其字段。',
+      '在 RPC 路径使用同步文件 logger，或在 devtools 内另建缓冲、轮转与 flush 管线。'
     ]
   }),
   'rpc-devtools:hub:createRpcDevtoolsHub': guide({

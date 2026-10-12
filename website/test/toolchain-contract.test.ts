@@ -461,12 +461,11 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
    * the low-level adapter exports with defineMessageAdapter / defineByteAdapter and an
    * internal-advanced entry, and the short-source helpers added isProcessChild / isThreadChild.
    * Browser Peer adds createBrowserPeer and its package error source/code catalog at the root.
-   * Probe adds 12 runtime exports; devtools adds eight canonical runtime symbols across its
-   * entries. The contract entry's error-code/source re-exports are alias-only and are not counted
-   * twice.
+   * Probe adds 12 runtime exports; devtools adds nine canonical runtime symbols across its entries.
+   * The contract entry's error-code/source re-exports are alias-only and are not counted twice.
    */
-  /** Probe-core activates existing contract exports; no new runtime symbol changes this count. */
-  assert.equal(runtimeSymbols.length, 332)
+  /** Collector adds the log factory; probe-core and hub activate existing runtime exports. */
+  assert.equal(runtimeSymbols.length, 333)
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)

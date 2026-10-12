@@ -7451,6 +7451,30 @@
       "library": "rpc-devtools"
     },
     {
+      "path": "/en/docs/rpc-devtools/log",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/en/docs/rpc-devtools/log/IRpcLogProbeOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/en/docs/rpc-devtools/log/IRpcLogSink",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/en/docs/rpc-devtools/log/createRpcLogProbe",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
       "path": "/en/docs/rpc-devtools/overview",
       "locale": "en",
       "domain": "docs",
@@ -23430,6 +23454,30 @@
     },
     {
       "path": "/zh/docs/rpc-devtools/hub/createRpcDevtoolsHub",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/zh/docs/rpc-devtools/log",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/zh/docs/rpc-devtools/log/IRpcLogProbeOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/zh/docs/rpc-devtools/log/IRpcLogSink",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/zh/docs/rpc-devtools/log/createRpcLogProbe",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-devtools"
