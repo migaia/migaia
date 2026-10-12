@@ -177,6 +177,8 @@ try {
 
 `capture` 默认关闭，必须显式列出需要捕获内容的阶段，且定义时为 `stages` 的子集。`protected` 内容也须显式启用，并只在认证保护路径存在时产生。`setStages([])` 暂停；恢复时设置所需阶段，原 `captureMask` 保持不变。host 的公开 `stageMask` 为初始定义值，后续选择保存在私有状态；独立 handle 的 getter 则反映当前值。详细契约见 [USEGUIDE 的 Probe 节](./USEGUIDE.md#13-probe)。
 
+`sizeBytes` 只表示当前层已知的字节表示。UTF-8 string transport 与字节 buffer/view 提供精确长度；clone transport 中的字符串没有物理 UTF-8 字节表示，因此使用 `-1`，不为观察额外编码或扫描业务内容。
+
 ## 高阶用法：编写适配器
 
 已有消息端口或有序字节流时，用 `defineMessageAdapter` / `defineByteAdapter` 的 `open` 取得真实资源，再调用定义返回的 `peer` 或 `plugin`。通信、握手、治理和关闭沿用原 Core owner。完整可运行的 MessagePort、Host 与字节流例子见 [USEGUIDE 第 9 节](./USEGUIDE.md#9-高阶用法编写一个适配器)。
