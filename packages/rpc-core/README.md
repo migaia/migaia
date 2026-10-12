@@ -45,7 +45,7 @@ pnpm add @migaia/rpc-core @migaia/rpc-contract
 | `./plugins/log`、`./plugins/send-queue`、`./plugins/flow-control` | IPC 日志、发送队列等可选中间件                                                                                                                                                                 |
 | `./transport-kit`、`./transport-constants`                        | 编写自定义 transport 的工具与常量                                                                                                                                                              |
 | `./adapter`                                                       | `defineMessageAdapter`、`defineByteAdapter`：运行时适配器作者的任务级构造函数（见 USEGUIDE 第 9 节）                                                                                           |
-| `./probe`                                                         | Probe 类型、数值常量与名称表、`defineProbe`、`snapshotProbeEvent`、`rpcProbeSampleKey`；`probePlugin` 当前为占位入口                                                                              |
+| `./probe`                                                         | Probe 类型、数值常量与名称表、`defineProbe`、`snapshotProbeEvent`、`rpcProbeSampleKey` 与 Endpoint 安装入口 `probePlugin`                                                                              |
 
 ## 快速开始
 
@@ -97,25 +97,78 @@ await server.dispose()
 
 ## Probe
 
-`@migaia/rpc-core/probe` 定义同步观察接口。当前交付只包含契约：Peer 接受 `probe` 选项，但在 probe-core 实现合入之前不会产生观察事件；`probePlugin` 当前抛出 `INVALID_CONFIG`（`probe runtime not installed`）。
+`@migaia/rpc-core/probe` 在 Core Peer 或 Endpoint 上安装同步观察。默认只读元数据；请求、返回值与错误保持原有语义。下面的 `connect` 示例使用实际 MessagePort。当前 managed Thread spawn 与 Process `spawn: true` 的选项重建没有转发 `probe`，这些路径的跨包观察仍待补齐。
 
-```ts doc-test=check
+```ts doc-test=run group=readme-probe-peer file=main.ts
+import assert from 'node:assert/strict'
+import { MessageChannel } from 'node:worker_threads'
+import { createThreadPeer, createNodeThreadChannel } from '@migaia/rpc-threads'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { defineProbe, RpcProbeStageName } from '@migaia/rpc-core/probe'
 
 /** 调用方已有的对象保留同一身份，定义 Probe 后被冻结。 */
 const host = { name: 'metrics' }
+/** 同步计数确认示例实际收到了元数据，未保留复用 view。 */
+let observedEvents = 0
 /** 此 Probe 只读 message 元数据，不捕获业务内容。 */
 const probe = defineProbe({
   stages: ['message'],
-  sample: 0.25,
   emit(view) {
+    observedEvents += 1
     console.log(RpcProbeStageName[view.stage], view.method, view.durationMs)
   }
 }, host)
 console.log(probe === host, Object.isFrozen(host), probe.name) // true, true, 'metrics'
 
-/** 平台 Peer 工厂可接收同一个 probe；运行时观察由 probe-core 提供。 */
-export const peerProbeOptions = { probe }
+/** 创建方拥有实际 MessagePort；Peer 只负责自己的 Endpoint。 */
+const { port1, port2 } = new MessageChannel()
+try {
+  const [client, server] = await Promise.all([
+    createThreadPeer<{ echo(value: string): string }>({
+      self: { name: 'client', instanceId: 'probe-client' }, probe,
+      connect: async (context) => createNodeThreadChannel(port1, 'probe-server', {
+        scheduler: systemScheduler, capabilities: context.capabilities
+      })
+    }),
+    createThreadPeer({
+      self: { name: 'server', instanceId: 'probe-server' }, provide: { echo: (value: string) => value },
+      connect: async (context) => createNodeThreadChannel(port2, 'probe-client', {
+        scheduler: systemScheduler, capabilities: context.capabilities
+      })
+    })
+  ])
+  await using observed = client
+  await using provider = server
+  assert.equal(await observed.request('echo', 'ready'), 'ready')
+  assert.ok(observedEvents > 0)
+} finally {
+  port1.close()
+  port2.close()
+}
+```
+
+Endpoint 用户把 `probePlugin` 放进既有 `middlewares`；它不会创建 transport：
+
+```ts doc-test=run group=readme-probe-endpoint file=main.ts
+import assert from 'node:assert/strict'
+import { connect, createEndpoint } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+import { defineProbe, probePlugin } from '@migaia/rpc-core/probe'
+
+/** 在同步回调中读标量，不保留复用 view。 */
+let events = 0
+const probe = defineProbe({ stages: ['message'], emit() { events += 1 } })
+const [left, right] = createMemoryTransportPair()
+const server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })
+server.provide('echo', (context) => context.success(context.data))
+const client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [probePlugin(probe), connect({ transport: left })] })
+try {
+  assert.equal(await client.send('server', 'echo', 'ready'), 'ready')
+  assert.ok(events > 0)
+} finally {
+  await client.dispose()
+  await server.dispose()
+}
 ```
 
 `defineProbe(definition, host)` 直接为 `host` 添加五个 Probe 字段、注册私有状态并冻结该对象，返回 `THost & IRpcProbe`，与 `host` 为同一引用；原有成员保持不变，包括已有的 `emit`。私有状态持有 `definition.emit`，不会用它覆盖 host 的方法。省略 `host` 时沿用独立 handle 形式。`host` 必须是可扩展且未冻结的非 null 对象，不能已有这五个 Probe 字段或已注册为 Probe；验证失败时对象保持原样。
@@ -123,6 +176,8 @@ export const peerProbeOptions = { probe }
 事件 view 仅在 `emit` 调用期间有效。需保留它时显式调用 `snapshotProbeEvent(view)`（SC9c）；快照复制顶层字段，`detail`、`error` 与 `content` 仍保留引用，调用方稍后修改对象时这些引用可见修改。录制 codec 在格式转换边界形成新表示（SC9b）。`methods` 只过滤 `message` 与 `envelope`；其它阶段只按采样过滤。采样使用 `(senderId, messageId)` 的稳定 FNV-1a 32 位键。
 
 `capture` 默认关闭，必须显式列出需要捕获内容的阶段，且定义时为 `stages` 的子集。`protected` 内容也须显式启用，并只在认证保护路径存在时产生。`setStages([])` 暂停；恢复时设置所需阶段，原 `captureMask` 保持不变。host 的公开 `stageMask` 为初始定义值，后续选择保存在私有状态；独立 handle 的 getter 则反映当前值。详细契约见 [USEGUIDE 的 Probe 节](./USEGUIDE.md#13-probe)。
+
+`sizeBytes` 只表示当前层已知的字节表示。UTF-8 string transport 与字节 buffer/view 提供精确长度；clone transport 中的字符串没有物理 UTF-8 字节表示，因此使用 `-1`，不为观察额外编码或扫描业务内容。
 
 ## 高阶用法：编写适配器
 

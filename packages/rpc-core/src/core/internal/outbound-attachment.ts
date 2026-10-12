@@ -163,6 +163,18 @@ import type { IEndpointTimer } from './time-port.js'
 import { createEndpointTransportActivation } from './transport-activation.js'
 import { resolveAbortReason, raceWithAsyncControl } from './async-control.js'
 import type { IRpcOneWayOptions } from '../features/one-way.js'
+import {
+  RpcProbeDirection,
+  RpcProbeKind,
+  RpcProbeOutcome,
+  RpcProbeStage
+} from '../probe/constants.js'
+import {
+  envelopeProbeKind,
+  runtimeProbeKind,
+  probeSize,
+  type IProbeEmitter
+} from './probe-emitter.js'
 
 /** One pending slim-client request and its terminal cleanup handles. */
 type IOutboundPending = {
@@ -258,6 +270,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     readonly #completion = deferred<unknown>()
     /** Captured owner, input and options are the original operation values, never a second snapshot. */
     readonly #plan: IRuntimeOperationPlan
+    /** Probe duration shares the existing monotonic operation clock and owns no timer. */
+    #probeStartedAt = -1
 
     /** Receiver selection supplies this exact immutable envelope before any listener or write. */
     #envelope: IRpcRuntimeEnvelope | undefined
@@ -281,6 +295,11 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       this.targetId = targetId
       this.runtimeTask = plan.task
       this.#plan = plan
+      if (
+        plan.owner.#probe !== undefined &&
+        (plan.owner.#probe.mask & (1 << RpcProbeStage.message)) !== 0
+      )
+        this.#probeStartedAt = plan.owner.kernel.time.scheduler.now()
     }
 
     /** Established native selection can prepare directly; a genuine miss retains its continuation. */
@@ -299,6 +318,27 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     #captureFailed(error: unknown): void {
       this.#plan.owner.#replay.releaseId(this.#plan.taskId)
       this.#plan.operation.finish()
+      if (
+        this.#plan.owner.#probe !== undefined &&
+        (this.#plan.owner.#probe.mask & (1 << RpcProbeStage.message)) !== 0
+      )
+        this.#plan.owner.#probe.message(
+          RpcProbeDirection.outbound,
+          this.runtimeTask.mode === RpcRuntimeMode.notify
+            ? RpcProbeKind.notify
+            : RpcProbeKind.request,
+          RpcProbeOutcome.failed,
+          this.#plan.taskId,
+          this.runtimeTask.method,
+          this.#plan.owner.id,
+          this.targetId,
+          undefined,
+          this.#probeStartedAt < 0
+            ? 0
+            : this.#plan.owner.kernel.time.scheduler.now() - this.#probeStartedAt,
+          undefined,
+          error
+        )
       this.#completion.reject(error)
     }
 
@@ -356,6 +396,20 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
             )
           : createRuntimeRequestOutboundEnvelope(message, input as { method: string })
         : createRuntimeOutboundEnvelope(message)
+      if (owner.#probe !== undefined && (owner.#probe.mask & (1 << RpcProbeStage.message)) !== 0)
+        owner.#probe.message(
+          RpcProbeDirection.outbound,
+          runtimeProbeKind(this.#envelope),
+          RpcProbeOutcome.created,
+          taskId,
+          task.method,
+          owner.id,
+          this.targetId,
+          undefined,
+          -1,
+          undefined,
+          undefined
+        )
       this.#register()
     }
 
@@ -449,6 +503,25 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       this.#settled = true
       this.cleanup()
       if (
+        this.#plan.owner.#probe !== undefined &&
+        (this.#plan.owner.#probe.mask & (1 << RpcProbeStage.message)) !== 0
+      )
+        this.#plan.owner.#probe.message(
+          RpcProbeDirection.outbound,
+          this.#envelope === undefined ? RpcProbeKind.request : runtimeProbeKind(this.#envelope),
+          RpcProbeOutcome.failed,
+          this.#plan.taskId,
+          this.runtimeTask.method,
+          this.#plan.owner.id,
+          this.targetId,
+          undefined,
+          this.#probeStartedAt < 0
+            ? 0
+            : this.#plan.owner.kernel.time.scheduler.now() - this.#probeStartedAt,
+          undefined,
+          error
+        )
+      if (
         this.runtimeTask.mode === RpcRuntimeMode.notify &&
         this.#sent &&
         !this.#plan.awaitNotifyTerminal
@@ -463,6 +536,25 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       this.#settled = true
       this.#plan.operation.markSuccess()
       this.cleanup()
+      if (
+        this.#plan.owner.#probe !== undefined &&
+        (this.#plan.owner.#probe.mask & (1 << RpcProbeStage.message)) !== 0
+      )
+        this.#plan.owner.#probe.message(
+          RpcProbeDirection.outbound,
+          this.#envelope === undefined ? RpcProbeKind.request : runtimeProbeKind(this.#envelope),
+          RpcProbeOutcome.settled,
+          this.#plan.taskId,
+          this.runtimeTask.method,
+          this.#plan.owner.id,
+          this.targetId,
+          undefined,
+          this.#probeStartedAt < 0
+            ? 0
+            : this.#plan.owner.kernel.time.scheduler.now() - this.#probeStartedAt,
+          undefined,
+          undefined
+        )
       if (this.runtimeTask.mode !== RpcRuntimeMode.notify || this.#plan.awaitNotifyTerminal)
         this.#completion.resolve(result)
     }
@@ -511,6 +603,10 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   }
   /** All runtime scopes share the original canonical clock callable, without per-call captures. */
   readonly #runtimeNow = (): number => this.kernel.time.scheduler.now()
+  /** Construction captures the endpoint's sole emitter; receive/send never look up a port. */
+  readonly #probe: IProbeEmitter | undefined
+  /** Clone-friendly strings have unknown physical size; only string transports imply UTF-8 bytes. */
+  readonly #probeUtf8String: boolean
   /** Id allocation still checks the original replay owner synchronously. */
   readonly #runtimeReserved = (id: string): boolean => this.#replay.hasReservedId(id)
   /** Existing error serializer reporting remains endpoint-owned and receiver-free. */
@@ -618,6 +714,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     discoveryResolver?: () => IRpcDiscoveryResolverPort | undefined
   ) {
     this.kernel = kernel
+    this.#probe = kernel.probe
+    this.#probeUtf8String = kernel.encodedType === 'string'
     this.variations = new RpcVariationCoordinator(
       () => kernel.time.now(),
       () => kernel.time.scheduler.now()
@@ -697,6 +795,11 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         ? negotiated
         : undefined
     this.#fast = hasFastEndpoint(prepared.options)
+    if (this.#probe !== undefined) {
+      this.#probe.fastPath = this.#fast
+      if (this.#authentication && this.#probe.authentication === 'none')
+        this.#probe.authentication = 'sign'
+    }
     if (this.#fast) enableFastTimePort(kernel.time)
     this.#outboundGate = readOutboundGate(kernel.transport)
     this.#pipeline = new RpcOutboundSender(
@@ -711,7 +814,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       this.#batch,
       this.#physicalLimit,
       this.receiverId,
-      hasCloneTransferCarrier(kernel.transport)
+      hasCloneTransferCarrier(kernel.transport),
+      this.#probe
     )
     this.inboundIdentity = new InboundIdentityCoordinator({
       native: this.#native,
@@ -870,6 +974,19 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                 )
               frame = nativeBinary.protectedMetadata
             }
+            if (
+              this.#authentication &&
+              this.#probe !== undefined &&
+              (this.#probe.mask & (1 << RpcProbeStage.protected)) !== 0
+            )
+              this.#probe.protected(
+                RpcProbeDirection.inbound,
+                '',
+                probeSize(frame, this.#probeUtf8String),
+                -1,
+                -1,
+                (this.#probe.captureMask & (1 << RpcProbeStage.protected)) !== 0 ? frame : undefined
+              )
             if (carrier) {
               /**
                * Only original paired callables prove whole acceptance and the complete frame
@@ -995,12 +1112,50 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
               if (!restoredBinary)
                 throw createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
               decoded = restoredBinary
+              if (
+                this.#probe !== undefined &&
+                (this.#probe.mask & (1 << RpcProbeStage.encoded)) !== 0
+              )
+                this.#probe.encoded(
+                  RpcProbeDirection.inbound,
+                  restoredBinary.id,
+                  probeSize(frame, this.#probeUtf8String),
+                  (this.#probe.captureMask & (1 << RpcProbeStage.encoded)) !== 0
+                    ? frame
+                    : undefined,
+                  restoredBinary.task.method,
+                  restoredBinary.route.senderId
+                )
             } else if (this.#fast && !carrier) decoded = this.#runtimeComponents.codec.decode(frame)
             else {
               const preparedFrame = this.#runtimeComponents.ingressPrepare(frame, {
                 source: physical.sourceToken,
                 messageId: 'whole'
               })
+              if (
+                this.#probe !== undefined &&
+                (this.#probe.mask & (1 << RpcProbeStage.frame)) !== 0
+              ) {
+                /**
+                 * Only the exact native pair supplies a snapshotted chunk; custom frames remain
+                 * opaque.
+                 */
+                const fragment =
+                  this.#runtimeComponents.ingressPrepare.nativeOutputDomain !== undefined &&
+                  this.#runtimeComponents.ingressPrepare.singleFrameLimits !== undefined
+                    ? (preparedFrame.frame as { index?: number; count?: number } | null)
+                    : undefined
+                this.#probe.frame(
+                  RpcProbeDirection.inbound,
+                  preparedFrame.messageId,
+                  probeSize(preparedFrame.frame, this.#probeUtf8String),
+                  typeof fragment?.index === 'number' ? fragment.index : -1,
+                  typeof fragment?.count === 'number' ? fragment.count : -1,
+                  (this.#probe.captureMask & (1 << RpcProbeStage.frame)) !== 0
+                    ? preparedFrame.frame
+                    : undefined
+                )
+              }
               const accepted = this.#runtimeComponents.framer.accept(preparedFrame.frame, {
                 source: physical.sourceToken,
                 messageId: preparedFrame.messageId
@@ -1010,8 +1165,33 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                 this.emitFailure(accepted.error, RpcCoreErrorCode.transport)
                 return
               }
+              if (
+                this.#probe !== undefined &&
+                (this.#probe.mask & (1 << RpcProbeStage.encoded)) !== 0
+              )
+                this.#probe.encoded(
+                  RpcProbeDirection.inbound,
+                  preparedFrame.messageId,
+                  probeSize(accepted.value, this.#probeUtf8String),
+                  (this.#probe.captureMask & (1 << RpcProbeStage.encoded)) !== 0
+                    ? accepted.value
+                    : undefined
+                )
               decoded = this.#runtimeComponents.codec.decode(accepted.value)
             }
+            if (
+              this.#fast &&
+              !carrier &&
+              !nativeBinary &&
+              this.#probe !== undefined &&
+              (this.#probe.mask & (1 << RpcProbeStage.encoded)) !== 0
+            )
+              this.#probe.encoded(
+                RpcProbeDirection.inbound,
+                '',
+                probeSize(frame, this.#probeUtf8String),
+                (this.#probe.captureMask & (1 << RpcProbeStage.encoded)) !== 0 ? frame : undefined
+              )
             if (carrier)
               return await this.#receiveRuntimeEnvelope(
                 decoded,
@@ -1051,7 +1231,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                   proofs[index]!,
                   message,
                   generation,
-                  authenticationContext
+                  authenticationContext,
+                  members.length
                 ).catch((error: unknown) => {
                   this.emitFailure(error)
                 })
@@ -1128,6 +1309,15 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     }
     assertAuthenticationChallengeEnvelope(authenticationContext, envelope)
     markAuthenticationReplayEnvelope(authenticationContext, envelope)
+    if (this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.envelope)) !== 0)
+      this.#probe.envelope(
+        RpcProbeDirection.inbound,
+        envelope.id,
+        envelope.task.method,
+        -1,
+        (this.#probe.captureMask & (1 << RpcProbeStage.envelope)) !== 0 ? envelope : undefined,
+        envelope.route.senderId
+      )
     /** Every explicitly requested capability must be present in the actual completed intersection. */
     const required = runtimeOperationCapabilities(
       envelope.task.mode,
@@ -1158,6 +1348,20 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       inbound: message
     })
     if (!admission) return
+    if (this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.message)) !== 0)
+      this.#probe.message(
+        RpcProbeDirection.inbound,
+        runtimeProbeKind(envelope),
+        RpcProbeOutcome.received,
+        envelope.id,
+        envelope.task.method,
+        envelope.route.senderId,
+        envelope.route.targetId,
+        undefined,
+        -1,
+        undefined,
+        undefined
+      )
     /** One identity release serves rejection, withdrawal and eventual business completion. */
     let released = false
     const releaseIdentity = (): void => {
@@ -1554,7 +1758,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     physical: IInboundIdentityPreparedSource,
     message: IRpcInboundMessage,
     generation: number,
-    authenticationContext: import('../typing.js').IRpcAuthenticationContext
+    authenticationContext: import('../typing.js').IRpcAuthenticationContext,
+    members = -1
   ): Promise<void> {
     let envelope: IRpcEnvelope
     /** Unknown fields are reported after normalize returns its once-read kind. */
@@ -1581,6 +1786,15 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     assertAuthenticationChallengeEnvelope(authenticationContext, envelope)
     markAuthenticationReplayEnvelope(authenticationContext, envelope)
     const route = envelope.data
+    if (this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.envelope)) !== 0)
+      this.#probe.envelope(
+        RpcProbeDirection.inbound,
+        envelope.id,
+        envelope.kind === RpcEnvelopeKind.request ? envelope.method : route.route.method,
+        members,
+        (this.#probe.captureMask & (1 << RpcProbeStage.envelope)) !== 0 ? envelope : undefined,
+        route.route.senderId
+      )
     const pendingAdmission = this.inboundIdentity.admitPrepared(
       physical,
       {
@@ -1597,6 +1811,20 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         ? pendingAdmission
         : await pendingAdmission
     if (!admission) return
+    if (this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.message)) !== 0)
+      this.#probe.message(
+        RpcProbeDirection.inbound,
+        envelopeProbeKind(envelope),
+        RpcProbeOutcome.received,
+        envelope.id,
+        envelope.kind === RpcEnvelopeKind.request ? envelope.method : route.route.method,
+        route.route.senderId,
+        route.route.targetId,
+        route.route.trace,
+        -1,
+        undefined,
+        undefined
+      )
     try {
       this.kernel.assertActive(generation)
       /** Reverse freshness is retained only after the original identity owner admitted this member. */
@@ -1691,6 +1919,25 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       this.#reportReplayCapacity(error)
       return Promise.reject(error)
     }
+    /** Duration is read only for a subscribed logical stage and uses no separate timing owner. */
+    const probeStartedAt =
+      this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.message)) !== 0
+        ? this.kernel.time.scheduler.now()
+        : -1
+    if (this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.message)) !== 0)
+      this.#probe.message(
+        RpcProbeDirection.outbound,
+        RpcProbeKind.request,
+        RpcProbeOutcome.created,
+        taskId,
+        method,
+        this.id,
+        targetId,
+        options.trace,
+        -1,
+        undefined,
+        undefined
+      )
     return new Promise<T>((resolve, reject) => {
       let timer: IEndpointTimer | undefined
       let settled = false
@@ -1717,6 +1964,20 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         settled = true
         settlementError = error
         cleanup()
+        if (this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.message)) !== 0)
+          this.#probe.message(
+            RpcProbeDirection.outbound,
+            RpcProbeKind.request,
+            RpcProbeOutcome.failed,
+            taskId,
+            method,
+            this.id,
+            targetId,
+            options.trace,
+            probeStartedAt < 0 ? 0 : this.kernel.time.scheduler.now() - probeStartedAt,
+            undefined,
+            error
+          )
         reject(error)
       }
       const settleResolve = (value: unknown): void => {
@@ -1724,6 +1985,20 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         settled = true
         cleanup()
         operation.markSuccess()
+        if (this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.message)) !== 0)
+          this.#probe.message(
+            RpcProbeDirection.outbound,
+            RpcProbeKind.request,
+            RpcProbeOutcome.settled,
+            taskId,
+            method,
+            this.id,
+            targetId,
+            options.trace,
+            probeStartedAt < 0 ? 0 : this.kernel.time.scheduler.now() - probeStartedAt,
+            undefined,
+            undefined
+          )
         resolve(value as T)
       }
       // Matches legacy `notifyRemoteAbort()`: told the remote provider to cancel its active

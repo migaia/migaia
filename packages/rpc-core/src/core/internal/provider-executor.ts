@@ -18,6 +18,13 @@ import {
 } from '@migaia/rpc-contract/stream'
 import type { IRpcProviderRejection } from '../provider-admission.js'
 import {
+  RpcProbeDirection,
+  RpcProbeKind,
+  RpcProbeOutcome,
+  RpcProbeStage
+} from '../probe/constants.js'
+import { runtimeProbeKind, type IProbeEmitter } from './probe-emitter.js'
+import {
   createGenerationController,
   type IGenerationController,
   type IGenerationRequest
@@ -105,6 +112,8 @@ type IControllerRegistry = {
 }
 
 type IProviderExecutorOptions<TTargetId extends string> = {
+  /** The attachment passes its construction-cached emitter without another port lookup. */
+  readonly probe?: IProbeEmitter
   /** Only finalized canonical ordinary requests may defer their unread native signal. */
   readonly fast?: boolean
   /** Endpoint wall clock for response wire `sentAt` diagnostics; never used for deadlines. */
@@ -644,6 +653,23 @@ export class ProviderExecutor<TTargetId extends string> {
         )
         return
       }
+      if (
+        this.#owner.#probe !== undefined &&
+        (this.#owner.#probe.mask & (1 << RpcProbeStage.message)) !== 0
+      )
+        this.#owner.#probe.message(
+          RpcProbeDirection.inbound,
+          runtimeProbeKind(this.#envelope),
+          RpcProbeOutcome.admitted,
+          this.#envelope.id,
+          this.#envelope.task.method,
+          this.#envelope.route.senderId,
+          this.#envelope.route.targetId,
+          undefined,
+          -1,
+          undefined,
+          undefined
+        )
       this.#bulkRegistrations =
         this.#envelope.kind === RpcRuntimeKind.group
           ? this.#steps.map((step) =>
@@ -803,6 +829,23 @@ export class ProviderExecutor<TTargetId extends string> {
 
     /** Serialize terminal failure through the original error owner. */
     #failed(error: unknown): IRpcRuntimeCompletion {
+      if (
+        this.#owner.#probe !== undefined &&
+        (this.#owner.#probe.mask & (1 << RpcProbeStage.message)) !== 0
+      )
+        this.#owner.#probe.message(
+          RpcProbeDirection.inbound,
+          runtimeProbeKind(this.#envelope),
+          RpcProbeOutcome.failed,
+          this.#envelope.id,
+          this.#envelope.task.method,
+          this.#envelope.route.senderId,
+          this.#envelope.route.targetId,
+          undefined,
+          this.#owner.options.now() - this.#receivedAt,
+          undefined,
+          error
+        )
       return {
         ok: false,
         error: serializeRpcError(error, { report: (failure) => this.#report(failure.error) })
@@ -929,6 +972,24 @@ export class ProviderExecutor<TTargetId extends string> {
         if (firstUnused >= 0) this.#invokedMembers = firstUnused
       }
       this.#state = 'terminal'
+      if (
+        completion.ok &&
+        this.#owner.#probe !== undefined &&
+        (this.#owner.#probe.mask & (1 << RpcProbeStage.message)) !== 0
+      )
+        this.#owner.#probe.message(
+          RpcProbeDirection.inbound,
+          runtimeProbeKind(this.#envelope),
+          RpcProbeOutcome.settled,
+          this.#envelope.id,
+          this.#envelope.task.method,
+          this.#envelope.route.senderId,
+          this.#envelope.route.targetId,
+          undefined,
+          this.#owner.options.now() - this.#receivedAt,
+          undefined,
+          undefined
+        )
       if (this.#deadline) this.#owner.options.clearTimeout(this.#deadline)
       try {
         if (this.#envelope.kind === RpcRuntimeKind.group && !delivered)
@@ -1291,9 +1352,12 @@ export class ProviderExecutor<TTargetId extends string> {
   }
 
   readonly options: IProviderExecutorOptions<TTargetId>
+  /** Executor retains the same endpoint emitter for every admission and terminal observation. */
+  readonly #probe: IProbeEmitter | undefined
 
   constructor(options: IProviderExecutorOptions<TTargetId>) {
     this.options = options
+    this.#probe = options.probe
   }
 
   /** Creates the core-owned context once for an admitted request or stream open. */
@@ -1334,6 +1398,20 @@ export class ProviderExecutor<TTargetId extends string> {
     controllerKey: string,
     reason: RpcProviderRejectionReason
   ): void {
+    if (this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.message)) !== 0)
+      this.#probe.message(
+        RpcProbeDirection.inbound,
+        request.route.route.dispatchOnly ? RpcProbeKind.notify : RpcProbeKind.request,
+        RpcProbeOutcome.rejected,
+        request.envelope.id,
+        request.envelope.method,
+        request.route.route.senderId,
+        request.route.route.targetId,
+        request.route.route.trace,
+        -1,
+        reason,
+        undefined
+      )
     if (!this.options.onRejected) return
     /** Preserve the original observer failure under a core-owned coded wrapper. */
     const report = (cause: unknown): void => {
@@ -1501,12 +1579,31 @@ export class ProviderExecutor<TTargetId extends string> {
 
   /** Validates, executes, and settles one inbound request. */
   async execute(request: IProviderRequestInput, verifiedPeerKey = ''): Promise<void> {
+    /** Logical duration uses the executor's existing monotonic clock only when observed. */
+    const probeStartedAt =
+      this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.message)) !== 0
+        ? this.options.now()
+        : -1
     /** Forward refusal runs synchronously before replay or provider admission can allocate a lease. */
     try {
       readProviderPreflight(this.options.registry.getProvider(request.envelope.method))?.(
         request.route.route
       )
     } catch (error) {
+      if (this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.message)) !== 0)
+        this.#probe.message(
+          RpcProbeDirection.inbound,
+          request.route.route.dispatchOnly ? RpcProbeKind.notify : RpcProbeKind.request,
+          RpcProbeOutcome.failed,
+          request.envelope.id,
+          request.envelope.method,
+          request.route.route.senderId,
+          request.route.route.targetId,
+          request.route.route.trace,
+          probeStartedAt < 0 ? 0 : this.options.now() - probeStartedAt,
+          undefined,
+          error
+        )
       this.options.emitFailure(
         error,
         isLocalRpcError(error, RpcError) ? localRpcErrorCode(error)! : RpcCoreErrorCode.internal
@@ -1571,6 +1668,20 @@ export class ProviderExecutor<TTargetId extends string> {
       return
     }
     /** A keyed claim is made after replay/admission but before provider or schema execution. */
+    if (this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.message)) !== 0)
+      this.#probe.message(
+        RpcProbeDirection.inbound,
+        request.route.route.dispatchOnly ? RpcProbeKind.notify : RpcProbeKind.request,
+        RpcProbeOutcome.admitted,
+        request.envelope.id,
+        request.envelope.method,
+        request.route.route.senderId,
+        request.route.route.targetId,
+        request.route.route.trace,
+        -1,
+        undefined,
+        undefined
+      )
     let claim: IRpcIdempotencyClaim | undefined
     const key = request.route.route.idempotencyKey
     const store =
@@ -1652,6 +1763,20 @@ export class ProviderExecutor<TTargetId extends string> {
     try {
       this.options.validate(request.envelope.method, 'params', request.route.payload)
     } catch (error) {
+      if (this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.message)) !== 0)
+        this.#probe.message(
+          RpcProbeDirection.inbound,
+          request.route.route.dispatchOnly ? RpcProbeKind.notify : RpcProbeKind.request,
+          RpcProbeOutcome.failed,
+          request.envelope.id,
+          request.envelope.method,
+          request.route.route.senderId,
+          request.route.route.targetId,
+          request.route.route.trace,
+          probeStartedAt < 0 ? 0 : this.options.now() - probeStartedAt,
+          undefined,
+          error
+        )
       try {
         this.options.markCompleted?.(request, verifiedPeerKey)
         if (!request.route.route.dispatchOnly)
@@ -1741,6 +1866,10 @@ export class ProviderExecutor<TTargetId extends string> {
       undefined,
       verifiedPeerKey
     )
+    /** The original business error is retained directly; serialization cannot replace its identity. */
+    let probeError: unknown
+    /** JavaScript permits throwing undefined, so failure is distinct from its optional value. */
+    let probeFailed = false
     try {
       if (
         request.route.route.dispatchOnly &&
@@ -1809,6 +1938,8 @@ export class ProviderExecutor<TTargetId extends string> {
         response.ok ? response.transfer : undefined
       )
     } catch (error) {
+      probeError = error
+      probeFailed = true
       if (!request.route.route.dispatchOnly && !responseSendStarted && !isExpired())
         await this.failureResponse(request, error, undefined, true, sendResponse)
       this.options.emitFailure(
@@ -1818,6 +1949,20 @@ export class ProviderExecutor<TTargetId extends string> {
           : RpcCoreErrorCode.internal
       )
     } finally {
+      if (this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.message)) !== 0)
+        this.#probe.message(
+          RpcProbeDirection.inbound,
+          request.route.route.dispatchOnly ? RpcProbeKind.notify : RpcProbeKind.request,
+          probeFailed ? RpcProbeOutcome.failed : RpcProbeOutcome.settled,
+          request.envelope.id,
+          request.envelope.method,
+          request.route.route.senderId,
+          request.route.route.targetId,
+          request.route.route.trace,
+          probeStartedAt < 0 ? 0 : this.options.now() - probeStartedAt,
+          undefined,
+          probeError
+        )
       this.options.admission.release(controllerKey)
       this.options.releaseBinding?.(verifiedPeerKey)
       this.options.controllers.delete(controllerKey)
