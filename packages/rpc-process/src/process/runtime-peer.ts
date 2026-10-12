@@ -21,6 +21,7 @@ import type {
 } from './plugin/types.js'
 import { createNativeProcessOffer } from './offer.js'
 import { createProcessListenerPeer, type IRuntimeProcessListen } from './runtime-listener.js'
+import { ProcessPluginWire } from './plugin/constants.js'
 
 /**
  * Public deployed sources reuse the original native spawn and borrowed socket-session
@@ -122,7 +123,11 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
         offer,
         supervision: {
           ...spawn.supervision,
-          launcher: preparation.launcher(spawn.supervision.launcher, spawn.supervision.id)
+          /** JSON-RPC children consume the original token frame, without native runtime bootstrap. */
+          launcher:
+            spawn.wire === ProcessPluginWire.jsonrpc
+              ? spawn.supervision.launcher
+              : preparation.launcher(spawn.supervision.launcher, spawn.supervision.id)
         }
       },
       options.report

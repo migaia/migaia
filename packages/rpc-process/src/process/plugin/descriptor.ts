@@ -261,8 +261,6 @@ function deploymentShape(value: unknown, path: string): IProcessPluginDeployment
     if (!Object.values(ProcessPluginWire).includes(deployment.wire as ProcessPluginWire))
       invalid(`${path}.wire`)
     if (!spec.bootstrap) invalid(`${path}.spec.bootstrap`)
-    if (deployment.wire === ProcessPluginWire.jsonrpc && spec.bootstrap.via !== BootstrapVia.fd)
-      invalid(`${path}.spec.bootstrap.via`)
   } else if (deployment.channelKind === ProcessPluginChannelKind.messagePort) {
     if (deployment.wire !== undefined) invalid(`${path}.wire`)
     if (spec.bootstrap !== undefined) invalid(`${path}.spec.bootstrap`)

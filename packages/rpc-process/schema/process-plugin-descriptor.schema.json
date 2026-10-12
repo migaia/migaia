@@ -118,14 +118,6 @@
           ]
         },
         "budget": { "$ref": "#/$defs/budget" }
-      },
-      "if": { "properties": { "wire": { "const": "jsonrpc" } } },
-      "then": {
-        "properties": {
-          "spec": {
-            "properties": { "bootstrap": { "properties": { "via": { "const": "fd" } } } }
-          }
-        }
       }
     },
     "spawnMessage": {

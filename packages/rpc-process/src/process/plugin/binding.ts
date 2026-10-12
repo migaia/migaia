@@ -186,13 +186,7 @@ export function validateSpawnProcessPluginDeployment<THandle extends IProcessHan
   const bootstrap = deployment.supervision.spec.bootstrap
   if (!bootstrap || !sameUtf8(bootstrap.payload, deployment.token))
     invalidOption(`${specField}.bootstrap`)
-  if (deployment.wire === ProcessPluginWire.jsonrpc && bootstrap.via !== 'fd')
-    invalidOption(`${specField}.bootstrap.via`)
-  if (
-    deployment.wire === ProcessPluginWire.native &&
-    bootstrap.via !== 'stdin' &&
-    bootstrap.via !== 'fd'
-  )
+  if (bootstrap.via !== 'stdin' && bootstrap.via !== 'fd')
     invalidOption(`${specField}.bootstrap.via`)
 }
 

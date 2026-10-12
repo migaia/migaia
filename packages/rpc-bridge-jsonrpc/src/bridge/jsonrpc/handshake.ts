@@ -33,7 +33,7 @@ export type IJsonRpcBridgeOptions = Readonly<{
   scheduler: IScheduler
   wallClock: IWallClock
   ipc: IProcessCommonOptions['ipc']
-  signal?: AbortSignal
+  signal?: import('@migaia/rpc-core').IRpcAbortSignal
   handshakeTimeoutMs?: number
   report(error: unknown): void
 }>

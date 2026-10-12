@@ -45,71 +45,72 @@ TypeScript 端启动一个 Python 子进程并调用它（对端实现见 [USEGU
 ```ts
 import { randomBytes } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'
-import { createRuntimePeer } from '@migaia/rpc-core/remote'
-import type { IRemoteContract, IRuntimeTypedPeer } from '@migaia/rpc-core/remote'
+import { createProcessPeer } from '@migaia/rpc-process'
 import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
+import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'
+import type { IRemoteContract } from '@migaia/rpc-core/remote'
+import { createUnitBudget } from '@migaia/supervision'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'
+import { systemWallClock } from '@migaia/utils/scheduler'
 
-type IPythonApi = {
-  echo: (values: string[]) => string[]
-  math: { add: (pair: [number, number]) => number }
-}
-// 本地声明：桥接只用它做调用前校验（必须没有 stream 方法）。可调用目录以对端 describe 为准。
+/** The standard-library responder receives positional JSON-RPC arguments. */
+type IPythonApi = { echo(values: string[]): string[]; math: { add(pair: [number, number]): number } }
+/** A local scalar contract is checked before the remote directory becomes callable. */
 const contract: IRemoteContract = {
   schemaVersion: 1,
   plugin: 'python-service',
   features: { math: { methods: { add: { mode: 'request', idempotent: true } } } }
 }
+/** Record only classified diagnostic messages, never the ephemeral session credential. */
 const report = (error: unknown) => console.error(error)
-const launcher = createNodeProcessLauncher()
+/** One token belongs to this supervised child and is written through its original stdin frame. */
 const token = randomBytes(32).toString('base64url')
-let handle: Awaited<ReturnType<typeof launcher.launch>> | undefined
-
-// createRuntimePeer 本身不带泛型；用 IRuntimeTypedPeer 标注远端方法类型。
-const python = (await createRuntimePeer({
+/** The exact real launcher retains child execution and termination ownership. */
+const launcher = createNodeProcessLauncher()
+/** Closing the public Peer must release its genuine process budget. */
+const budget = createUnitBudget({ kind: 'process', maxUnits: 1 })
+/** Public generic construction supplies the remote method type without a Peer cast. */
+const peer = await createProcessPeer<IPythonApi>({
   self: { name: 'node-client', instanceId: 'node-client-1' },
-  connect: async (context) => {
-    handle = await launcher.launch(
-      {
-        command: 'python3',
-        args: [fileURLToPath(new URL('./service.py', import.meta.url))],
+  report,
+  spawn: {
+    kind: 'spawn', channelKind: 'byte', wire: 'jsonrpc', token,
+    supervision: {
+      id: 'python-service', isolation: 'best-effort', restart: { mode: 'never' }, budget,
+      report, launcher,
+      spec: {
+        command: 'python3', args: [fileURLToPath(new URL('./service.py', import.meta.url))],
         env: { inherit: ['PATH'], set: {} },
         stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
         bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
-      },
-      { signal: new AbortController().signal, output: () => undefined }
-    )
-    return createJsonRpcRemoteChannel({
-      byte: handle.channel!,
-      peerId: 'python-service',
-      target: { kind: 'plugin', contract },
-      offer: {
-        versions: [{ major: 1, minor: 1 }],
-        peer: { id: context.self.instanceId, runtime: 'node' },
-        capabilities: [RpcCapability.deadline, RpcCapability.trace]
-      },
-      token,
-      scheduler: systemScheduler,
-      wallClock: systemWallClock,
-      ipc: { connectionId: 'python-1', sessionId: 'python-1', log: () => undefined },
-      report
-    })
-  },
-  report
-})) as IRuntimeTypedPeer<IPythonApi>
+      }
+    },
+    rawChannel: async (handle) => (handle as Awaited<ReturnType<typeof launcher.launch>>).channel!,
+    establish: async (raw, prepared) => {
+      if (raw.kind !== 'byte') throw new TypeError('This example requires a byte channel')
+      return createJsonRpcRemoteChannel({
+        byte: raw, peerId: 'python-service', target: { kind: 'plugin', contract },
+        offer: {
+          versions: [{ major: 1, minor: 1 }],
+          peer: { id: 'node-client-1', runtime: 'node' },
+          capabilities: [RpcCapability.deadline, RpcCapability.trace]
+        },
+        token: prepared.token!, scheduler: prepared.scheduler, wallClock: systemWallClock,
+        ipc: { ...prepared.session, log: () => undefined }, signal: prepared.signal,
+        report
+      })
+    }
+  }
+})
 try {
-  console.log(await python.request('echo', ['hello', 'python'])) // ['hello', 'python']
-  console.log(await python.request('math.add', [20, 22])) // 42
+  console.log(await peer.request('echo', ['hello', 'python'])) // ['hello', 'python']
+  console.log(await peer.request('math.add', [20, 22])) // 42
 } finally {
-  await python.close() // 关闭本端连接
-  handle?.terminate('force') // 子进程由启动它的 launcher 负责结束
-  await handle?.exited
+  await peer.close() // 关闭连接、结束监督子进程并释放 budget
 }
 ```
 
-`connect` 来源只拥有这条连接，不拥有子进程，所以示例在 `finally` 中自己结束子进程。
+`spawn` 保留子进程的监督、退出与 budget 所有权；`peer.close()` 负责关闭连接和子进程。`establish` 收到当前代次的 token、scheduler、session 和取消信号，桥接仍在实际字节连接上完成握手。普通 Core `connect` 来源也可以使用 `createRuntimePeer<IPythonApi>(options)`，无需把返回值断言为 `IRuntimeTypedPeer`。
 
 ## 错误
 
@@ -118,7 +119,7 @@ try {
 | `@migaia/rpc/bridge/jsonrpc`    | `JSONRPC_FRAME_INVALID`、`JSONRPC_EXTENSION_MISSING`、`JSONRPC_PROFILE_INVALID`、`JSONRPC_UNSUPPORTED_MODE`、`JSONRPC_HANDSHAKE_TIMEOUT` | 分帧、扩展方法、配置、模式或握手问题 |
 | `@migaia/rpc/core`              | `DEADLINE_EXCEEDED`、`CANCELLED`、`PROVIDER_NOT_FOUND` | 调用层错误                                    |
 
-对端业务方法抛出的错误以 `RpcRemoteError` 呈现，对端给出的 source / code 保留在 `cause` 上。详见 [USEGUIDE 第 6 节](./USEGUIDE.md#6-错误处理)。
+通过 Peer 调用时，对端业务错误按原始类型、source / code、stack 和原因链恢复。Python 示例的业务错误携带 `python-service` / `BUSINESS`；这些字段只用于诊断，不获得本地控制身份。详见 [USEGUIDE 第 6 节](./USEGUIDE.md#6-错误处理)。
 
 ## 相关包
 

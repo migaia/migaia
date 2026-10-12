@@ -25,7 +25,7 @@ export type IProcessByteChannel = Readonly<{
 /** Per-connection identity, diagnostics, and lifecycle ports supplied by the owner. */
 export type IProcessCommonOptions = Readonly<{
   peerId: string
-  signal?: AbortSignal
+  signal?: import('@migaia/rpc-core').IRpcAbortSignal
   handshakeTimeoutMs?: number
   scheduler?: IScheduler
   report(error: unknown): void
@@ -91,7 +91,7 @@ export type IListenProcessByteChannel = (
     address: string
     /** Stable, non-secret owner for safe recovery of an abandoned Unix socket path. */
     serviceId?: string
-    signal?: AbortSignal
+    signal?: import('@migaia/rpc-core').IRpcAbortSignal
     auth: Readonly<{
       mode: 'required'
       verify(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>
