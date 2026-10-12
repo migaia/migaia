@@ -41,7 +41,7 @@ import { retainProviderFailureRoute } from '../../core/internal/provider.js'
 import { RpcCoreErrorText } from '../../core/error-text.js'
 import { readRuntimePreparationContext } from './launch-context.js'
 import { readRuntimeDefaultTimeout, prepareRuntimeCallTimeout } from './timeout.js'
-import type { IRuntimeCallOptions } from './typing.js'
+import type { IRuntimeCallOptions, IRuntimeTypedPeer } from './typing.js'
 import { isProviderAdmissionScopeOwner } from '../../core/internal/provider-admission.js'
 import type { IProviderAdmissionScope } from '../../core/features/provider.js'
 import { createAuthenticationNonce } from '../../core/index.js'
@@ -280,6 +280,16 @@ type IRuntimePeerResources = Readonly<{
  * Source and method validation precede connection effects; failure closes only resources obtained
  * by this construction, observing secondary cleanup failures while preserving the primary error.
  */
+export function createRuntimePeer(
+  options: IRuntimePeerOptions,
+  resources?: IRuntimePeerResources
+): Promise<IRuntimePeer>
+/** A declared remote surface preserves method and payload types on the original callable facade. */
+export function createRuntimePeer<TRemote>(
+  options: IRuntimePeerOptions,
+  resources?: IRuntimePeerResources
+): Promise<IRuntimeTypedPeer<TRemote>>
+/** Internal assembly retains its original dynamic operations and exact returned Promise. */
 export async function createRuntimePeer(
   options: IRuntimePeerOptions,
   resources?: IRuntimePeerResources
