@@ -18,7 +18,7 @@
 
 ## 1. 导入
 
-```ts
+```ts doc-test=check
 import {
   createThreadPeer,
   createThreadPlugin,
@@ -55,7 +55,7 @@ import { createThreadPeer } from '@migaia/rpc-threads'
 
 type IWorkerApi = {
   math: { double(value: number): number }
-  feed: { count(limit: number): AsyncIterable<number> }
+  feed: { count(limit: number): AsyncIterableIterator<number> }
 }
 
 /** URL 明确定位相邻 Worker，关闭时由 Peer 释放该 Worker。 */
@@ -137,7 +137,7 @@ if (await isThreadChild()) {
 
 已有 `MessagePort` 可以作为 `connect` 来源。双方把 Core 提供的 `context.capabilities` 交给 channel；Core 在实际端口上交换 ACK，只有双方都提供的能力才会启用。双方应同时开始连接：
 
-```ts
+```ts doc-test=run
 import { MessageChannel } from 'node:worker_threads'
 import { createNodeThreadChannel, createThreadPeer } from '@migaia/rpc-threads'
 import { systemScheduler } from '@migaia/utils/scheduler'
@@ -232,7 +232,7 @@ try {
 
 下面的 Node 示例用双方已持有的同一 HMAC 密钥签名。`RPC_SIGNING_KEY` 是本地部署配置中的十六进制密钥，两端分别读取；不要经 RPC 发送密钥。先把签名函数放在共享模块：
 
-```ts
+```ts doc-test=run group=thread-signed-transfer file=signing.ts
 // signing.ts
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { IRpcAuthenticationConfig } from '@migaia/rpc-core'
@@ -258,7 +258,7 @@ export const authentication: IRpcAuthenticationConfig = {
 
 Worker 与主线程分别安装这个普通配置：
 
-```ts
+```ts doc-test=run group=thread-signed-transfer file=worker.ts
 // worker.ts
 import { createThreadPeer } from '@migaia/rpc-threads'
 import { authentication } from './signing.js'
@@ -277,14 +277,19 @@ await createThreadPeer({
 })
 ```
 
-```ts
+```ts doc-test=run group=thread-signed-transfer file=guide-main.ts entry=guide-main.ts
 // main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。
 import { fileURLToPath } from 'node:url'
 import { createThreadPeer } from '@migaia/rpc-threads'
 import { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { authentication } from './signing.js'
+import { randomBytes } from 'node:crypto'
+
+/** 本地示例生成演示密钥；部署时应由双方配置提供 RPC_SIGNING_KEY。 */
+process.env.RPC_SIGNING_KEY ??= randomBytes(32).toString('hex')
+/** 设置环境后才加载签名模块，实际 Worker 继承同一环境。 */
+const { authentication } = await import('./signing.js')
 
 type IBytesApi = {
   bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }
@@ -342,7 +347,7 @@ Worker 中抛出的业务错误会还原原生类型（例如 `RangeError`）、
 
 自定义预算、监督或平台组合时，原来的完整 `IRuntimeThreadSpawn` 对象继续有效。下面对象直接作为 `createThreadPeer` 或 `createThreadPlugin` 的 `spawn`；`worker.js` 使用第 2 节的 Worker：
 
-```ts
+```ts doc-test=check file=source.ts
 import { fileURLToPath } from 'node:url'
 import { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'
 import { createUnitBudget } from '@migaia/supervision'
@@ -400,12 +405,29 @@ Deno Worker 需要相应权限；Bun、Deno、浏览器与 Electron 渲染进程
 
 launcher 返回的 handle 提供 `identity`、`port`、`exited`、`terminate`、`sampleUsage` 与 `open(signal, { scheduler })`。`open` 在该 Worker 的端口上完成能力确认并返回协议通道：
 
-```ts
+```ts doc-test=check
 import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'
+import type { IThreadSpec } from '@migaia/supervision/threads'
+import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IScheduler } from '@migaia/utils/scheduler'
 
-const launcher = createNodeThreadLauncher()
-const handle = await launcher.launch(threadSpec, { signal })
-const channel = await handle.open(signal, { scheduler })
+/** 调用方提供真实入口与生命周期；返回后负责关闭 channel、terminate 并等待 exited。 */
+export async function openWorkerChannel(
+  threadSpec: IThreadSpec,
+  signal: IAbortSignal,
+  scheduler: IScheduler
+) {
+  const launcher = createNodeThreadLauncher()
+  const handle = await launcher.launch(threadSpec, { signal })
+  try {
+    const channel = await handle.open(signal, { scheduler })
+    return { handle, channel }
+  } catch (primary) {
+    handle.terminate()
+    await handle.exited
+    throw primary
+  }
+}
 ```
 
 握手、能力确认和信任判断都在 `@migaia/rpc-core/adapter` 内部完成；这些构造函数只接收你实际持有的 Worker 与端口，不接受"已协商 / 已信任"之类的外部声明。

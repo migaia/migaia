@@ -149,7 +149,7 @@ try {
 
 原来的完整 source 对象继续有效。需要自定义预算、监督或 runtime 时，显式组合平台 launcher 与 channel factory；两者共用同一个 scheduler。下面导出的对象可直接作为 `createThreadPeer` 或 `createThreadPlugin` 的 `spawn`，入口使用快速开始的 `worker.js`：
 
-```ts
+```ts doc-test=check file=source.ts
 import { fileURLToPath } from 'node:url'
 import { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'
 import { createUnitBudget } from '@migaia/supervision'
@@ -176,14 +176,19 @@ export const spawn = {
 
 先保存 [USEGUIDE 第 5 节](./USEGUIDE.md#5-二进制数据与-transfer) 的 `signing.ts` 和 `worker.ts`；双方从各自环境读取同一 `RPC_SIGNING_KEY`，然后运行下面的主线程配置：
 
-```ts
+```ts doc-test=run group=thread-signed-transfer file=readme-main.ts entry=readme-main.ts
 // main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。
 import { fileURLToPath } from 'node:url'
 import { createThreadPeer } from '@migaia/rpc-threads'
 import { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { authentication } from './signing.js'
+import { randomBytes } from 'node:crypto'
+
+/** 本地示例生成演示密钥；部署时应由双方配置提供 RPC_SIGNING_KEY。 */
+process.env.RPC_SIGNING_KEY ??= randomBytes(32).toString('hex')
+/** 设置环境后才加载签名模块，实际 Worker 继承同一环境。 */
+const { authentication } = await import('./signing.js')
 
 type IBytesApi = {
   bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }

@@ -34,15 +34,18 @@
 
 大多数情况下，Runtime Peer 由平台包的工厂创建：`createProcessPeer`、`createThreadPeer`。Core 提供的 `createRuntimePeer(options)` 用于自定义来源：
 
-```ts
-import { createRuntimePeer } from '@migaia/rpc-core/remote'
+```ts doc-test=check
+import { createRuntimePeer, type IRuntimePeerSource } from '@migaia/rpc-core/remote'
 
-const peer = await createRuntimePeer({
-  self: { name: 'client', instanceId: 'client-1' },
-  provide: { ping: () => 'pong' },
-  connect: async (context) => openChannelSomehow(context), // 返回已完成握手的协议通道
-  report: (error) => console.error(error)
-})
+/** 调用方交入实际协议通道的来源；握手和资源仍由该来源的 owner 完成。 */
+export function createClientPeer(connect: IRuntimePeerSource) {
+  return createRuntimePeer({
+    self: { name: 'client', instanceId: 'client-1' },
+    provide: { ping: () => 'pong' },
+    connect,
+    report: (error) => console.error(error)
+  })
+}
 ```
 
 | 选项                         | 说明                                                                                                     |
@@ -63,14 +66,18 @@ const peer = await createRuntimePeer({
 
 ### 2.2 provide：声明可被调用的方法
 
-```ts
-provide: {
+```ts doc-test=check
+/** 方法树是完整数据；调用方把它交给所选平台 factory 的 provide。 */
+export const provide = {
   math: {
-    double: (value: number) => value * 2,         // request / notify
-    slow: async (ms: number) => { … }             // 返回 Promise 也可以
+    double: (value: number) => value * 2,
+    slow: async (ms: number) => {
+      await new Promise<void>((resolve) => setTimeout(resolve, ms))
+      return ms
+    }
   },
   feed: {
-    count: async function* (limit: number) {      // 返回 iterable / async iterable → stream
+    count: async function* (limit: number) {
       for (let index = 1; index <= limit; index++) yield index
     }
   }
@@ -109,14 +116,59 @@ provide: {
 
 ### 2.4 类型
 
-```ts
+下面的独立 Node 示例使用真实 MessageChannel 载体，并在结束时释放两个端口。平台 Peer 的类型来自 Core，方法树与参数仍严格关联。
+
+```ts doc-test=run
+import { MessageChannel } from 'node:worker_threads'
+import { createNodeThreadChannel, createThreadPeer } from '@migaia/rpc-threads'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
 type IRemoteApi = {
   math: { double: (value: number) => number }
   feed: { count: (limit: number) => AsyncIterableIterator<number> }
 }
-const peer = await createThreadPeer<IRemoteApi>(options)
-peer.request('math.double', 21) // Promise<number>
-peer.stream('feed.count', 3) // AsyncIterableIterator<number>
+/** 真实 MessagePort 是业务载体；创建方在最外层释放它们。 */
+const { port1, port2 } = new MessageChannel()
+try {
+  /** 双方在实际端口上确认能力，Peer 仍使用 Core 的同一套调用与类型规则。 */
+  const [peer, server] = await Promise.all([
+    createThreadPeer<IRemoteApi>({
+      self: { name: 'client', instanceId: 'client-1' },
+      connect: async (context) => createNodeThreadChannel(port1, 'server-1', {
+        scheduler: systemScheduler,
+        capabilities: context.capabilities
+      })
+    }),
+    createThreadPeer({
+      self: { name: 'server', instanceId: 'server-1' },
+      provide: {
+        math: { double: (value: number) => value * 2 },
+        feed: { count: async function* (limit: number) {
+          for (let index = 1; index <= limit; index++) yield index
+        } }
+      },
+      connect: async (context) => createNodeThreadChannel(port2, 'client-1', {
+        scheduler: systemScheduler,
+        capabilities: context.capabilities
+      })
+    })
+  ])
+  try {
+    console.log(await peer.request('math.double', 21)) // number：42
+    await peer.notify('math.double', 21) // 只确认发出，不确认业务完成
+    for await (const value of peer.stream('feed.count', 3)) console.log(value) // number：1、2、3
+    console.log(await peer.group([
+      { method: 'math.double', payload: 2 },
+      { method: 'math.double', payload: 3 }
+    ])) // 顺序执行，得到两个步骤结果
+    console.log(await peer.outcome('not-issued')) // unknown 不能证明某个业务操作没有执行
+  } finally {
+    await Promise.all([peer.close(), server.close()])
+  }
+} finally {
+  port1.close()
+  port2.close()
+}
 ```
 
 - 流式方法的返回类型要写成 `AsyncIterableIterator<T>`（或 `IterableIterator<T>`），这样 `stream` 才能识别它。
@@ -146,15 +198,18 @@ Endpoint 是更底层的 API：没有握手时的方法目录交换，调用按"
 
 ### 4.1 创建
 
-```ts
-import { connect, createEndpoint } from '@migaia/rpc-core'
+```ts doc-test=check
+import { connect, createEndpoint, type IRpcTransport } from '@migaia/rpc-core'
 
-const endpoint = await createEndpoint({
-  id: 'client',                     // 本端 id，写入每条消息
-  targetIds: ['server'],            // 已知对端；自动发现可在运行中补充
-  transport,                        // 载体（第 6 节）
-  middlewares: [connect({ transport })]
-})
+/** transport 由实际载体提供；返回的 Endpoint 由调用方 dispose。 */
+export function createClientEndpoint(transport: IRpcTransport) {
+  return createEndpoint({
+    id: 'client',
+    targetIds: ['server'],
+    transport,
+    middlewares: [connect({ transport })]
+  })
+}
 ```
 
 | 配置          | 说明                                                                     |
@@ -168,13 +223,29 @@ const endpoint = await createEndpoint({
 
 ### 4.2 提供与调用
 
-```ts
-endpoint.provide('add', (context) => {
+```ts doc-test=run
+import { connect, createEndpoint } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+
+const [left, right] = createMemoryTransportPair()
+const server = await createEndpoint({
+  id: 'server', transport: right, middlewares: [connect({ transport: right })]
+})
+server.provide('add', (context) => {
   const [a, b] = context.data as [number, number]
   return context.success(a + b) // 或 context.failed(error)
 })
-
-const sum = await endpoint.send<number>('server', 'add', [20, 22]) // data 必填，没有参数时传 null
+const client = await createEndpoint({
+  id: 'client', targetIds: ['server'],
+  transport: left, middlewares: [connect({ transport: left })]
+})
+try {
+  const sum = await client.send<number>('server', 'add', [20, 22])
+  console.log(sum) // 42；data 必填，没有参数时传 null
+} finally {
+  await client.dispose()
+  await server.dispose()
+}
 ```
 
 | 方法                                      | 说明                                                       |
@@ -310,7 +381,7 @@ const sum = await endpoint.send<number>('server', 'add', [20, 22]) // data 必�
 
 平台适配器共用 `resolveAdapterEntry`：原生层只提供主入口 URL 与运行参数快照，Core 不读取 Node、Bun 或 Deno 的全局对象。相对路径以主入口目录为基准；显式 `base` 可覆盖基准；URL 始终精确。`true` 在 REPL、eval、测试框架、Electron 或单文件可执行程序中拒绝自派生，要求显式入口。URL 解析错误保留原始 `cause`。
 
-```ts doc-test=run
+```ts doc-test=run group=adapter-entry file=main.ts
 import { resolveAdapterEntry, retainAdapterRuntimeFlags } from '@migaia/rpc-core/adapter'
 
 const entry = resolveAdapterEntry('./service.ts', { mainEntry: new URL('file:///app/main.ts') })
@@ -334,7 +405,7 @@ console.log(retainAdapterRuntimeFlags(['--import', './loader.mjs', '--eval', '1'
 
 最小示例：在你持有的事件端口上建立 Runtime Peer，扩展能力由 Core 读取对端 ACK 决定：
 
-```ts
+```ts doc-test=check group=adapter-message file=adapter.ts
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import {
   createEventEmitterMessageResource,
@@ -366,7 +437,7 @@ export function openCustomRuntimePeer(
 
 **适配器自己的错误**：用 `@migaia/utils/error` 的 `attachErrorIdentity` 附加你自己的 source 与 code，不要冒用 `@migaia/rpc/*`：
 
-```ts
+```ts doc-test=check group=adapter-error file=error.ts
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 const ADAPTER_SOURCE = '@example/custom-carrier'
@@ -386,18 +457,29 @@ export function raiseAdapterWriteFailure(cause: unknown): never {
 
 所有错误都是原生 `Error`（或子类），附带 `source` 与 `code`。按 `(source, code)` 分支，不要匹配 `message`。
 
-```ts
+```ts doc-test=run
 import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'
+import { createPeerPair } from '@migaia/rpc-core/testing'
 
+/** 可执行的对端让超时例子不依赖未定义 peer。 */
+const pair = await createPeerPair({
+  a: { provide: {} },
+  b: { provide: { math: { slow: async (ms: number) => {
+    await new Promise<void>((resolve) => setTimeout(resolve, ms))
+    return ms
+  } } } }
+})
 try {
-  await peer.request('math.slow', 300, { timeoutMs: 50 })
+  await pair.a.request('math.slow', 300, { timeoutMs: 50 })
 } catch (error) {
   const { source, code } = error as { source?: string; code?: string }
   if (isRpcTimeoutError(error)) {
-    // 超时（DEADLINE_EXCEEDED）：对端可能仍在执行
+    console.error(code) // DEADLINE_EXCEEDED：对端可能仍在执行
   } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {
-    // 对端额度已满，函数未执行，可以退避重试
+    console.error(code) // 对端额度已满，函数未执行，可以退避重试
   } else throw error
+} finally {
+  await Promise.all([pair.a.close(), pair.b.close()])
 }
 ```
 

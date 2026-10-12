@@ -32,7 +32,7 @@ pnpm add @migaia/rpc-browser @migaia/rpc-core
 
 iframe 内（`https://billing.example`）提供方法：
 
-```ts
+```ts doc-test=check file=billing-frame.ts
 // billing-frame.ts
 import { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'
 import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
@@ -59,7 +59,7 @@ window.addEventListener('pagehide', () => void billing.dispose(), { once: true }
 
 父页面（`https://shop.example`）调用：
 
-```ts
+```ts doc-test=check file=parent.ts
 // parent.ts
 import { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'
 import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'

@@ -19,19 +19,20 @@
 
 每个适配器返回一个 `IRpcTransport`。把它交给 `@migaia/rpc-core` 的 `createEndpoint`，并在 `connect` 中间件里再传一次，用于消息来源校验：
 
-```ts
-import { connect, createEndpoint } from '@migaia/rpc-core'
+```ts doc-test=check group=browser-endpoint-helper
+import { connect, createEndpoint, type IRpcTransport } from '@migaia/rpc-core'
 
-const endpoint = await createEndpoint({
-  id: 'my-side',                  // 本端标识
-  targetIds: ['other-side'],      // 允许调用的对端标识
-  transport,
-  middlewares: [connect({ transport })]
-})
-
-endpoint.provide('ping', (context) => context.success('pong'))           // 提供方法
-const reply = await endpoint.send<string>('other-side', 'ping', null)    // 调用对端
-await endpoint.dispose()                                                  // 释放
+/** 实际载体由调用方持有；返回的 Endpoint 由调用方 dispose。 */
+export async function openBrowserEndpoint(transport: IRpcTransport) {
+  const endpoint = await createEndpoint({
+    id: 'my-side',
+    targetIds: ['other-side'],
+    transport,
+    middlewares: [connect({ transport })]
+  })
+  endpoint.provide('ping', (context) => context.success('pong'))
+  return endpoint
+}
 ```
 
 - `send(target, method, data, options?)` 的 `data` 是必填参数，不需要参数时传 `null`。
@@ -40,7 +41,7 @@ await endpoint.dispose()                                                  // 释
 
 下面以 BroadcastChannel 为例的完整代码已在 Node 24 中实际运行（Node 内置 BroadcastChannel）：
 
-```ts
+```ts doc-test=run group=browser-broadcast-pair file=main.ts
 import { connect, createEndpoint } from '@migaia/rpc-core'
 import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'
 
@@ -76,12 +77,14 @@ try {
 
 ## 2. window：iframe 与弹窗
 
-```ts
+```ts doc-test=check
 import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
 
+/** 页面必须实际包含这个 iframe；本片段由浏览器宿主运行。 */
+const iframe = document.querySelector<HTMLIFrameElement>('#billing')!
 const transport = createWindowMessageTransport({
-  target: iframe.contentWindow!,   // 发往哪个窗口
-  receiver: window,                // 在哪里监听 message 事件
+  target: iframe.contentWindow!,
+  receiver: window,
   targetOrigin: 'https://billing.example'
 })
 ```
@@ -99,10 +102,13 @@ const transport = createWindowMessageTransport({
 
 ## 3. broadcast-channel：同源标签页
 
-```ts
+```ts doc-test=run
 import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'
 
-const transport = createBroadcastChannelTransport(new BroadcastChannel('cart'))
+const channel = new BroadcastChannel('cart')
+const transport = createBroadcastChannelTransport(channel)
+// 尚未交给 Endpoint；创建方负责关闭借用频道。
+channel.close()
 ```
 
 - 频道名相同的所有同源上下文（标签页、iframe、Worker）都会收到消息。用 Endpoint 的 `id` 与 `targetIds` 区分要调用的对象。
@@ -113,7 +119,7 @@ const transport = createBroadcastChannelTransport(new BroadcastChannel('cart'))
 
 页面一侧：
 
-```ts
+```ts doc-test=check file=page.ts
 import { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'
 
 const worker = new SharedWorker(new URL('./shared.worker.js', import.meta.url), { type: 'module' })
@@ -122,11 +128,18 @@ const transport = createSharedWorkerTransport(worker.port)
 
 SharedWorker 一侧，对每个连接进来的页面各创建一个 Endpoint：
 
-```ts
+```ts doc-test=check file=shared-worker.ts
+import { connect, createEndpoint } from '@migaia/rpc-core'
+import { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'
+
 self.addEventListener('connect', (event) => {
   const port = (event as MessageEvent).ports[0]!
   const transport = createSharedWorkerTransport(port)
-  // createEndpoint({ id: …, transport, middlewares: [connect({ transport })] })，再 provide 方法
+  void createEndpoint({
+    id: 'shared-worker', transport, middlewares: [connect({ transport })]
+  }).then((endpoint) => {
+    endpoint.provide('ping', (context) => context.success('pong'))
+  }).catch((error: unknown) => console.error(error))
 })
 ```
 
@@ -137,7 +150,7 @@ self.addEventListener('connect', (event) => {
 
 页面一侧（发给当前控制页面的 Service Worker）：
 
-```ts
+```ts doc-test=check file=page.ts
 import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'
 
 const registration = await navigator.serviceWorker.ready
@@ -149,12 +162,24 @@ const transport = createServiceWorkerTransport({
 
 Service Worker 一侧（回复某个具体页面）：
 
-```ts
-const client = await self.clients.get(clientId)
-const transport = createServiceWorkerTransport({
-  target: client!,
-  receiver: self,
-  peerId: client!.id
+```ts doc-test=skip reason="此模块运行于真实 ServiceWorkerGlobalScope，使用 worker 宿主的 clients 和 MessageEvent.source Client" file=service-worker.ts
+// service-worker.ts：由浏览器作为 Service Worker 加载。
+import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'
+
+self.addEventListener('message', (event) => {
+  /** Service Worker 也可能收到非 Client 来源；这里只为实际页面建立回复通道。 */
+  const source = event.source
+  if (!source || !('id' in source)) return
+  const clientId = source.id
+  void self.clients.get(clientId).then((client) => {
+    if (!client) return
+    const transport = createServiceWorkerTransport({
+      target: client,
+      receiver: self,
+      peerId: client.id
+    })
+    // 把这个实际 Client 的 transport 交给该页面对应的 Endpoint。
+  }).catch((error: unknown) => console.error(error))
 })
 ```
 
@@ -174,12 +199,15 @@ const transport = createServiceWorkerTransport({
 
 ### 6.1 rtc-data-channel：WebRTC 点对点
 
-```ts
+```ts doc-test=check
 import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'
 
-const channel = peerConnection.createDataChannel('rpc', { ordered: true })
-await new Promise<void>((resolve) => channel.addEventListener('open', () => resolve(), { once: true }))
-const transport = createRtcDataChannelTransport(channel)
+/** 已完成信令的真实连接由调用方提供；适配器借用其可靠、有序的 DataChannel。 */
+export async function openRtcTransport(peerConnection: RTCPeerConnection) {
+  const channel = peerConnection.createDataChannel('rpc', { ordered: true })
+  await new Promise<void>((resolve) => channel.addEventListener('open', () => resolve(), { once: true }))
+  return createRtcDataChannelTransport(channel)
+}
 ```
 
 - 请使用**可靠且有序**的 DataChannel（默认配置即是）。RPC 依赖消息不丢失、不乱序。
@@ -190,7 +218,7 @@ const transport = createRtcDataChannelTransport(channel)
 
 ### 6.2 web-transport：WebTransport datagram
 
-```ts
+```ts doc-test=check
 import { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'
 
 const session = new WebTransport('https://rpc.example:4433/rpc')
