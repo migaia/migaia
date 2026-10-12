@@ -1,0 +1,119 @@
+import { holdAdapterObjectChannel } from '../object/connection.js'
+import type { IRuntimeObjectIO, IRuntimeObjectConnection } from '../object/types.js'
+import type { IScheduledTask } from '@migaia/utils/scheduler'
+import {
+  collectListenerCleanupFailures,
+  createListenerFailure,
+  createListenerFailureState,
+  reportListenerFailure,
+  drainTerminalListenerFailures,
+  drainListenerFailures
+} from '../../core/internal/listener-safety.js'
+import type { IRemoteChannel } from '../../remote/types.js'
+import { JsonRpcLimit, JsonRpcBridgeErrorCode } from '@migaia/rpc-contract/framing/jsonrpc'
+import { createJsonRpcBridgeError } from './error.js'
+import {
+  prepareJsonRpcOffer,
+  readJsonRpcReply,
+  assertJsonRpcExtensions,
+  type IAdapterJsonRpcChannelOptions
+} from './handshake.js'
+import { bindJsonRpcWire, type IJsonRpcWire } from './transport.js'
+
+/** Ordinary physical-owner operations retain their diagnostic errors and held connection opening. */
+export type IAdapterJsonRpcChannelPresentation<
+  TOptions extends IAdapterJsonRpcChannelOptions = IAdapterJsonRpcChannelOptions
+> = Readonly<{
+  /** Construct the physical owner's existing closed error without changing its cause identity. */
+  closedError(cause?: unknown): Error
+  /** Open this actually negotiated connection with its original platform diagnostics and cleanup. */
+  openConnection(connection: IRuntimeObjectConnection, options: TOptions): IRemoteChannel
+}>
+
+/**
+ * Negotiate one authenticated JSON-RPC peer through the existing held object connection. The
+ * physical owner supplies only error presentation and opening of that same held connection;
+ * protocol admission, correlation, cleanup and accepted capabilities retain their sole Core owner.
+ */
+export async function createAdapterJsonRpcChannel<TOptions extends IAdapterJsonRpcChannelOptions>(
+  options: TOptions,
+  presentation: IAdapterJsonRpcChannelPresentation<TOptions>
+): Promise<IRemoteChannel> {
+  /** Adapter profile admission precedes physical subscriptions and the local hello serialization. */
+  const offer = prepareJsonRpcOffer(options)
+  /** The cold holder addresses the same physical binding installed after Core's prepare operation. */
+  let wire: IJsonRpcWire
+  /** The actual correlated hello response retains its extension fields until Core completes control. */
+  let received: unknown
+  /** Raw operations address held bytes and logical views; none accepts a transport qualification. */
+  const io: IRuntimeObjectIO = Object.freeze({
+    async exchange(hello) {
+      received = await wire.exchangeHello(hello)
+      return readJsonRpcReply(received)
+    },
+    activate(capabilities) {
+      assertJsonRpcExtensions(capabilities, received)
+      wire.setCapabilities(capabilities)
+    },
+    writeText: (value, sendOptions) => wire.writeText(value, sendOptions),
+    writeObject: (value, sendOptions) => wire.writeObject(value, sendOptions),
+    subscribeText: (listener) => wire.subscribeText(listener),
+    subscribeObject: (listener) => wire.subscribeObject(listener),
+    onTransportError: (listener) => wire.onTransportError(listener),
+    onClosing: (listener) => wire.onClosing(listener),
+    close: (reason) => wire.close(reason),
+    assertOpen: () => wire.assertOpen(),
+    get closed() {
+      return wire.closed
+    }
+  })
+  /** Core captures the original local proposal while this raw resource remains cold. */
+  const connection = holdAdapterObjectChannel(io)
+  connection.prepare(offer)
+  wire = bindJsonRpcWire(options, presentation.closedError)
+  /** Deadline rejects exchange even when the underlying byte writer never drains. */
+  let timer: IScheduledTask | undefined
+  /** Detach the owned task before invoking its possibly throwing disposer. */
+  const cancelTimer = (): void => {
+    /** Taking ownership first prevents a failed cancellation from being attempted twice. */
+    const owned = timer
+    timer = undefined
+    owned?.cancel()
+  }
+  try {
+    timer = options.scheduler.schedule(() => {
+      void wire
+        .close(createJsonRpcBridgeError(JsonRpcBridgeErrorCode.handshakeTimeout))
+        // The factory joins this same close Promise and surfaces collected cleanup failures.
+        .catch(() => undefined)
+    }, options.handshakeTimeoutMs ?? JsonRpcLimit.handshakeMs)
+    /** Core reads the actual reply after the original hello write has physically drained. */
+    await connection.negotiate()
+    // Timer cleanup must finish before the physical connection can be published.
+    drainListenerFailures(collectListenerCleanupFailures([cancelTimer]))
+    /** The physical owner retains its diagnostic resources around this same Core open operation. */
+    return presentation.openConnection(connection, options)
+  } catch (error) {
+    /** An earlier primary remains first while failed timer cleanup is reported and collected. */
+    const cleanup = collectListenerCleanupFailures([cancelTimer]).map((failure) =>
+      createListenerFailure([failure])!
+    )
+    /** Physical close may already have started on abort; join it without losing timer failures. */
+    let primary = error
+    try {
+      await wire.close(error)
+    } catch (failure) {
+      primary = failure
+    }
+    if (cleanup.length > 0) {
+      /** The timer owns these reporters even when the byte owner has completed its close. */
+      const failures = createListenerFailureState()
+      for (const failure of cleanup) reportListenerFailure(failure, [options.report], failures)
+      await drainTerminalListenerFailures([primary, ...cleanup], {
+        secondaryFailures: failures,
+        aggregateSingle: true
+      })
+    }
+    throw primary
+  }
+}
