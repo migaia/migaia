@@ -82,7 +82,8 @@ test('ship dry-run cannot reach release mutations', () => {
     cwd: repositoryRoot,
     encoding: 'utf8'
   })
-  assert.match(commandGraph, /oxfmt --check/)
+  /** The package gates, including fmt-check, run inside the shared CI runner. */
+  assert.match(commandGraph, /scripts\/ci-run\.mjs packages --packages/)
   assert.match(commandGraph, /pack --dry-run --json/)
   assert.match(commandGraph, /Missing workspace dependencies/)
   for (const forbidden of [
@@ -123,8 +124,8 @@ test('ship completes every CI and pack gate before entering resumable CD', () =>
     cwd: repositoryRoot,
     encoding: 'utf8'
   })
-  /** First marker owned by the all-package CI phase. */
-  const ci = commandGraph.indexOf('echo "==> CI validating $package"')
+  /** First marker owned by the all-package CI phase, now delegated to the shared CI runner. */
+  const ci = commandGraph.indexOf('scripts/ci-run.mjs packages --packages')
   /** Artifact preview begins only after every package check has expanded. */
   const pack = commandGraph.indexOf('echo "==> previewing @migaia/$package artifact"')
   /** CD is the first phase allowed to patch or publish. */
@@ -141,7 +142,7 @@ test('store ship is a separate all-CI then resumable-CD command graph', () => {
     cwd: repositoryRoot,
     encoding: 'utf8'
   })
-  const ci = commandGraph.indexOf('echo "==> Store CI validating $package"')
+  const ci = commandGraph.indexOf('scripts/ci-run.mjs packages --packages')
   const pack = commandGraph.indexOf('echo "==> previewing @migaia/$package artifact"')
   const cd = commandGraph.indexOf('echo "==> Store CD releasing $package"')
   assert.ok(ci >= 0 && pack > ci && cd > pack)
