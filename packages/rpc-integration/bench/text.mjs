@@ -32,6 +32,52 @@ export const IpcBenchObservation = Object.freeze({
   heapBoundaries: Object.freeze(['start', 'end'])
 })
 
+/** P3 diagnostics travel only on the existing observation control and never qualify timing. */
+export const IpcBenchDiagnostic = Object.freeze({
+  /** The child receives only the selected diagnostic mode, without credential configuration. */
+  environment: 'IPC_BENCH_DIAGNOSTIC',
+  /** CPU samples and exact guards run separately because they change execution differently. */
+  cpu: 'cpu',
+  guard: 'guard',
+  /** Boundaries enclose warmed business samples and the explicitly included control work. */
+  start: 'start',
+  stop: 'stop',
+  /** These receipts cannot be used as the uninstrumented P3 latency qualification lane. */
+  timingStatus: 'INSTRUMENTED_DIAGNOSTIC_NOT_QUALIFICATION',
+  /** Missing or failed capture is never represented by a numeric zero. */
+  started: 'STARTED',
+  captured: 'CAPTURED',
+  failed: 'FAILED',
+  /** Ownership classifies recorded source URLs; empty engine frames remain unknown. */
+  rpc: 'rpc',
+  dependency: 'dependency',
+  fixture: 'fixture',
+  runtime: 'runtime',
+  unknown: 'unknown',
+  /** Native init events count all Promise creations in this isolate's enabled interval. */
+  promiseStatus: 'EXACT_V8_PROMISE_INIT',
+  promiseScope:
+    'whole isolate hook interval including fixture and observation work; no per-request causal ownership claim',
+  /** V8 disables inline allocation for this non-sampling tracker; external/native bytes are absent. */
+  allocationStatus: 'EXACT_TRACKED_V8_HEAP_EVENTS',
+  allocationScope:
+    'V8 allocation tracker events with inline allocation disabled, including diagnostic/control work; excludes external/native allocation and uninstrumented execution',
+  /** Source buckets use each allocation trace node's direct frame, retaining every ancestor. */
+  ownershipScope:
+    'direct recorded allocation frame; full trace tree retains ancestry for recomputation',
+  /** Inspector protocol names have one fixture owner rather than scattered string contracts. */
+  profilerEnable: 'Profiler.enable',
+  profilerStart: 'Profiler.start',
+  profilerStop: 'Profiler.stop',
+  preciseStart: 'Profiler.startPreciseCoverage',
+  preciseTake: 'Profiler.takePreciseCoverage',
+  preciseStop: 'Profiler.stopPreciseCoverage',
+  heapEnable: 'HeapProfiler.enable',
+  heapStart: 'HeapProfiler.startTrackingHeapObjects',
+  heapStop: 'HeapProfiler.stopTrackingHeapObjects',
+  heapChunk: 'HeapProfiler.addHeapSnapshotChunk'
+})
+
 /** Frozen reference ownership is retained in every W3 result so primitive history stays distinct. */
 export const IpcW3Reference = Object.freeze({
   /** Explicit final-source collection still reports the unchanged old primitive guard separately. */
