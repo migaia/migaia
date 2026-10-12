@@ -465,6 +465,7 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
    * entries. The contract entry's error-code/source re-exports are alias-only and are not counted
    * twice.
    */
+  /** Probe-core activates existing contract exports; no new runtime symbol changes this count. */
   assert.equal(runtimeSymbols.length, 332)
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
