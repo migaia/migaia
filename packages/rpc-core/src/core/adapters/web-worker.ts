@@ -1,3 +1,6 @@
+import type { IRpcCarrierProbe } from '../probe/types.js'
+import { RpcCarrierDetailKey } from './probe-detail.js'
+import { carrierSizeBytes, captureTransferredContent } from './probe-content.js'
 import { createRpcTransportError, tagRpcError } from '../errors.js'
 import { registerBatchAgreement } from '../internal/batch-frame.js'
 import { RpcCapability } from '@migaia/rpc-contract/wire'
@@ -7,6 +10,8 @@ import {
   RpcPlatform,
   RpcTransportOwnership,
   createListenerFailureState,
+  collectListenerCleanupFailures,
+  drainTerminalListenerFailures,
   createMessageListenerHub,
   drainListenerFailures,
   observeListener,
@@ -55,6 +60,16 @@ export function createWebWorkerTransport(
   port: IWebWorkerLikePort,
   options: IWebWorkerTransportOptions = {}
 ): IRpcTransport<unknown, Transferable> {
+  /** The sole installed probe is replaced per observation generation. */
+  let probe: IRpcCarrierProbe | undefined
+  /** Disposers compare generations even when the same probe object is installed twice. */
+  let probeGeneration = 0
+  /** Reused detail belongs to this adapter; recipients consume it synchronously. */
+  const probeDetail = { [RpcCarrierDetailKey.transfers]: -1 }
+  /** Adapter retirement never terminates its borrowed native Worker. */
+  let closed = false
+  /** Repeated close shares its first cleanup result. */
+  let closeResult: void | Promise<void>
   const messageListeners = createMessageListenerHub<{
     data: unknown
     origin?: string
@@ -98,6 +113,26 @@ export function createWebWorkerTransport(
         )
       )
       return
+    }
+    if (probe !== undefined) {
+      /** One event retains the installed handle even if its callback replaces observation. */
+      const currentProbe = probe
+      try {
+        probeDetail[RpcCarrierDetailKey.transfers] = -1
+        currentProbe.emit(
+          1,
+          carrierSizeBytes(data),
+          RpcPlatform.worker,
+          probeDetail,
+          currentProbe.capturing ? data : undefined
+        )
+      } catch (error) {
+        reportListenerFailure(
+          createRpcTransportError(BrowserRpcErrorText.probeFailed, error),
+          listenerErrors,
+          secondaryFailures
+        )
+      }
     }
     messageListeners.dispatch({ data, origin, source }, (listener, message) => {
       observeListener(
@@ -145,13 +180,49 @@ export function createWebWorkerTransport(
     ownership: RpcTransportOwnership.borrowed,
     peerId: options.peerId,
     origin: options.origin,
+    get closed() {
+      return closed
+    },
+    /** Replace observation; the returned disposer retires only its own installation generation. */
+    observe(next) {
+      /** Every installation replaces the prior generation, including equal probe identities. */
+      const generation = ++probeGeneration
+      if (!closed) probe = next
+      return () => {
+        if (generation === probeGeneration) probe = undefined
+      }
+    },
     send(message, options?: IRpcSendOptions<Transferable>) {
-      port.postMessage(message, options?.transfer)
+      if (closed) throw createRpcTransportError(BrowserRpcErrorText.workerClosed)
+      /** Read the native transfer option once; observation cannot select a different list. */
+      const transfer = options?.transfer
+      if (probe !== undefined) {
+        /** One event retains the installed handle even if its callback replaces observation. */
+        const currentProbe = probe
+        try {
+          probeDetail[RpcCarrierDetailKey.transfers] = transfer?.length ?? 0
+          currentProbe.emit(
+            0,
+            carrierSizeBytes(message),
+            RpcPlatform.worker,
+            probeDetail,
+            currentProbe.capturing ? captureTransferredContent(message, transfer) : undefined
+          )
+        } catch (error) {
+          reportListenerFailure(
+            createRpcTransportError(BrowserRpcErrorText.probeFailed, error),
+            listenerErrors,
+            secondaryFailures
+          )
+        }
+      }
+      port.postMessage(message, transfer)
     },
     // Attached lazily on first subscriber, detached once the last one
     // leaves — a client that closes must not leave the underlying port
     // still holding real listeners it can no longer reach.
     subscribe(listener) {
+      if (closed) throw createRpcTransportError(BrowserRpcErrorText.workerClosed)
       messageListeners.add(listener, () =>
         registerListeners(
           [
@@ -172,8 +243,29 @@ export function createWebWorkerTransport(
         )
       }
     },
+    /** Retire observation and detach borrowed native hooks without terminating the Worker. */
+    close() {
+      if (closed) return closeResult
+      closed = true
+      probe = undefined
+      messageListeners.clear(() => undefined)
+      closeResult = drainTerminalListenerFailures(
+        collectListenerCleanupFailures([
+          () => port.removeEventListener('message', onMessage),
+          () => port.removeEventListener('error', onError),
+          () => port.removeEventListener('messageerror', onMessageError)
+        ]),
+        {
+          code: RpcCoreErrorCode.transport,
+          message: BrowserRpcErrorText.workerCleanupFailed,
+          secondaryFailures,
+          aggregateSingle: true
+        }
+      )
+      return closeResult
+    },
     onTransportError(listener) {
-      if (errorListeners.size === 0) {
+      if (!closed && errorListeners.size === 0) {
         registerListeners(
           [
             {

@@ -209,6 +209,10 @@ try {
 
 未配置签名时，`transfer` 仍以 `CAPABILITY_UNSUPPORTED` 拒绝。完整的签名配置与 Worker 示例见 [USEGUIDE 第 5 节](./USEGUIDE.md#5-二进制数据与-transfer)。
 
+## 载体观察
+
+Node、Bun、Deno、浏览器 Web Worker 与 Electron 通道共用 Core 的 MessagePort transport；通过最终通道的 `transport.observe(probe)` 安装物理观察，每次发送和接收各报告一次。`detail.transfers` 在发送时是原生 transfer 列表长度，接收时为 `-1`，因为 structured clone 无法区分原生 buffer 是复制还是转移。直接 `ArrayBuffer` 或其 view 的 `sizeBytes` 是字节长度；其他原生消息为 `-1`。内容只在 `probe.capturing` 开启时读取，未转移内容保留原引用；实际转移的 buffer 在发送前复制以保留观察字节。Core 对 own-data 原生容器的选择性捕获保留 Array、Record、Map、Set 中的循环、共享 backing 与未转移对象引用；只通过 accessor 返回转移 buffer 的捕获仍需契约裁定，因为额外调用 getter 会改变原有调用次数。Probe 异常沿既有 `onListenerError` 报告为 `@migaia/rpc/core` / `TRANSPORT`，原异常保留在 `cause`，消息继续发送和接收。重复安装替换上一代；旧 disposer 不会解除新一代。调用当前代 disposer 或逻辑 `channel.close()` 停止观察；既有原生终端处理也会退休观察。借用 Node 端口逻辑 close 只退休 observer，原有物理端口关闭状态、监听与错误 cause 顺序不变。
+
 ## 错误
 
 错误带 `(source, code)`。本包自己只有一个错误码：`@migaia/rpc/threads` / `THREAD_USAGE_SAMPLE_FAILED`（采样 Worker 资源用量失败）。调用层错误来自 `@migaia/rpc/core`，例如 `DEADLINE_EXCEEDED`、`CANCELLED`、`OVERLOADED`。Worker 中抛出的业务错误会还原原生类型、`message` 和 `stack`。超时或取消不代表 Worker 没有执行，重试前先对账，见 [USEGUIDE 第 7 节](./USEGUIDE.md#7-错误处理)。
