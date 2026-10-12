@@ -42,7 +42,7 @@ pnpm add @migaia/rpc-contract
 
 **Content-Length 分帧**（数据可以任意切块到达）：
 
-```ts
+```ts doc-test=run group=readme-framing file=main.ts
 import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'
 
 const frame = encodeJsonRpcFrame({ jsonrpc: '2.0', id: 1, method: 'ping', params: { text: '你好' } })
@@ -57,7 +57,7 @@ console.log(messages) // [{ jsonrpc: '2.0', id: 1, method: 'ping', params: { tex
 
 **跨进程 / 跨语言传递错误**：
 
-```ts
+```ts doc-test=run group=readme-errors file=main.ts
 import {
   serializeRpcError,
   deserializeRpcError,

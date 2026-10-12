@@ -49,7 +49,7 @@ pnpm add @migaia/rpc-core @migaia/rpc-contract
 
 **在测试里模拟两个对端**（真实的 Peer 与调用路径，内存传输）：
 
-```ts
+```ts doc-test=run group=readme-peer-pair file=main.ts
 import { createPeerPair } from '@migaia/rpc-core/testing'
 
 const pair = await createPeerPair({
@@ -66,7 +66,7 @@ try {
 
 **在任意载体上组装 Endpoint**（这里用内存载体演示，换成 iframe、MessagePort 等时只换 transport）：
 
-```ts
+```ts doc-test=run group=readme-endpoints file=main.ts
 import { connect, createEndpoint } from '@migaia/rpc-core'
 import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
 

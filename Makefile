@@ -82,7 +82,7 @@ endef
 	store-ship store-ship-dry-run store-ship-preflight store-ship-ci store-ship-pack-check \
 	store-ship-cd store-release-plan-check \
 	dependencies-check check-package release-check git-release-check git-publish-check auth-check patch publish \
-	coverage-custody-report ci ci-affected ci-fast ci-conformance ci-website-test ci-website-check fmt-check \
+	coverage-custody-report ci ci-affected ci-fast ci-conformance ci-website-test ci-website-check fmt-check docs-examples \
 	perf-guard long-test
 
 # Ship has one visible direction: prove the whole plan, prove every package,
@@ -110,6 +110,10 @@ ship-dry-run:
 ci:
 	@CI_ALLOW_MISSING_TOOLCHAINS=$(CI_ALLOW_MISSING_TOOLCHAINS) node scripts/ci-run.mjs ci \
 		--release "$(RELEASE_PACKAGES)" --store "$(STORE_RELEASE_PACKAGES)"
+
+# Maintained examples resolve built package exports; CI performs the preparation build first.
+docs-examples:
+	@node scripts/docs-examples.mjs
 
 # Daily package selection retains full registry and custody rules; shared inputs widen to full CI.
 ci-affected:

@@ -16,11 +16,11 @@
 
 ## 1. TypeScript 端：createJsonRpcRemoteChannel
 
-```ts
+```ts doc-test=check
 import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'
 ```
 
-`createJsonRpcRemoteChannel(options)` 在一条有序字节连接上完成 `migaia.hello` 握手，返回协议通道。它通常作为 `createRuntimePeer` 的 `connect` 来源使用（完整示例见 README）。
+`createJsonRpcRemoteChannel(options)` 在一条有序字节连接上完成 `migaia.hello` 握手，返回协议通道。它用于自有字节通道的高级组合。普通 Python 子进程直接使用 README 的 `createProcessPeer({ spawn: { command, args, wire: 'jsonrpc', contract } })`，不必手写 launcher 或握手。
 
 | 选项                   | 说明                                                                                                              |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -66,9 +66,9 @@ import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'
 
 ## 4. 对端最小实现（Python）
 
-下面的实现只依赖 Python 标准库，已与 README 中的 TypeScript 端实际联调通过：`request`、`notify`、并发批量调用和业务错误都按预期工作。把它保存为 `service.py`，即可作为其它语言实现的参照。
+下面的实现只依赖 Python 标准库，与 README 的 TypeScript parent 构成同一个可执行文档组，覆盖 `request`、`notify`、并发批量调用和业务错误。把它保存为 `service.py`，即可作为其它语言实现的参照。
 
-```python
+```python doc-test=run group=python-bridge file=service.py
 """A minimal migaia JSON-RPC bridge responder using only the Python standard library."""
 import json
 import struct
@@ -322,7 +322,7 @@ source 均为 `@migaia/rpc/bridge/jsonrpc`。
 
 这些常量从包根导入：
 
-```ts
+```ts doc-test=check
 import { JSONRPC_BRIDGE_ERROR_SOURCE, JsonRpcBridgeErrorCode } from '@migaia/rpc-bridge-jsonrpc'
 ```
 

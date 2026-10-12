@@ -26,8 +26,8 @@ pnpm add @migaia/rpc-bridge-jsonrpc @migaia/rpc-process @migaia/rpc-core @migaia
 
 ```text
 TypeScript（本包）                              对端（任意语言）
-createRuntimePeer
-  └─ createJsonRpcRemoteChannel ── Content-Length + JSON-RPC 2.0 ──► migaia.hello     认证与能力协商
+createProcessPeer({ spawn: { command, args, wire: 'jsonrpc', contract } })
+  └─ JSON-RPC bridge ── Content-Length + JSON-RPC 2.0 ──► migaia.hello     认证与能力协商
                                                                      migaia.describe  返回可调用方法目录
      request('math.add', …)  ───────────────────────────────────────► migaia.invoke   执行业务方法
      取消                    ───────────────────────────────────────► migaia.cancel   取消在途调用
@@ -42,75 +42,35 @@ createRuntimePeer
 
 TypeScript 端启动一个 Python 子进程并调用它（对端实现见 [USEGUIDE 第 4 节](./USEGUIDE.md#4-对端最小实现python)，约 100 行，只用标准库）：
 
-```ts
-import { randomBytes } from 'node:crypto'
+```ts doc-test=run group=python-bridge file=main.ts
 import { fileURLToPath } from 'node:url'
 import { createProcessPeer } from '@migaia/rpc-process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
-import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'
 import type { IRemoteContract } from '@migaia/rpc-core/remote'
-import { createUnitBudget } from '@migaia/supervision'
-import { RpcCapability } from '@migaia/rpc-contract'
-import { systemWallClock } from '@migaia/utils/scheduler'
 
-/** The standard-library responder receives positional JSON-RPC arguments. */
-type IPythonApi = { echo(values: string[]): string[]; math: { add(pair: [number, number]): number } }
-/** A local scalar contract is checked before the remote directory becomes callable. */
+type IPythonApi = { echo(values: string[]): string[]; math: { add(values: number[]): number } }
+/** This is the peer-specific local declaration; the accepted remote directory still owns routing. */
 const contract: IRemoteContract = {
-  schemaVersion: 1,
-  plugin: 'python-service',
-  features: { math: { methods: { add: { mode: 'request', idempotent: true } } } }
+  schemaVersion: 1, plugin: 'python-service',
+  features: { math: { methods: { add: { mode: 'request', idempotent: false } } } }
 }
-/** Record only classified diagnostic messages, never the ephemeral session credential. */
-const report = (error: unknown) => console.error(error)
-/** One token belongs to this supervised child and is written through its original stdin frame. */
-const token = randomBytes(32).toString('base64url')
-/** The exact real launcher retains child execution and termination ownership. */
-const launcher = createNodeProcessLauncher()
-/** Closing the public Peer must release its genuine process budget. */
-const budget = createUnitBudget({ kind: 'process', maxUnits: 1 })
-/** Public generic construction supplies the remote method type without a Peer cast. */
 const peer = await createProcessPeer<IPythonApi>({
-  self: { name: 'node-client', instanceId: 'node-client-1' },
-  report,
-  spawn: {
-    kind: 'spawn', channelKind: 'byte', wire: 'jsonrpc', token,
-    supervision: {
-      id: 'python-service', isolation: 'best-effort', restart: { mode: 'never' }, budget,
-      report, launcher,
-      spec: {
-        command: 'python3', args: [fileURLToPath(new URL('./service.py', import.meta.url))],
-        env: { inherit: ['PATH'], set: {} },
-        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
-        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
-      }
-    },
-    rawChannel: async (handle) => (handle as Awaited<ReturnType<typeof launcher.launch>>).channel!,
-    establish: async (raw, prepared) => {
-      if (raw.kind !== 'byte') throw new TypeError('This example requires a byte channel')
-      return createJsonRpcRemoteChannel({
-        byte: raw, peerId: 'python-service', target: { kind: 'plugin', contract },
-        offer: {
-          versions: [{ major: 1, minor: 1 }],
-          peer: { id: 'node-client-1', runtime: 'node' },
-          capabilities: [RpcCapability.deadline, RpcCapability.trace]
-        },
-        token: prepared.token!, scheduler: prepared.scheduler, wallClock: systemWallClock,
-        ipc: { ...prepared.session, log: () => undefined }, signal: prepared.signal,
-        report
-      })
-    }
-  }
+  spawn: { command: 'python3', args: [fileURLToPath(new URL('./service.py', import.meta.url))], wire: 'jsonrpc', contract }
 })
 try {
   console.log(await peer.request('echo', ['hello', 'python'])) // ['hello', 'python']
   console.log(await peer.request('math.add', [20, 22])) // 42
-} finally {
-  await peer.close() // 关闭连接、结束监督子进程并释放 budget
-}
+  await peer.notify('echo', ['notification'])
+  console.log(await Promise.all([peer.request('math.add', [1, 2]), peer.request('math.add', [3, 4])])) // [3, 7]
+  try { await peer.request('math.add', []) }
+  catch (error) {
+    const detail = error as { source?: string; code?: string }
+    if (detail.source !== 'python-service' || detail.code !== 'BUSINESS') throw error
+    console.log(detail.code) // BUSINESS
+  }
+} finally { await peer.close() }
 ```
 
-`spawn` 保留子进程的监督、退出与 budget 所有权；`peer.close()` 负责关闭连接和子进程。`establish` 收到当前代次的 token、scheduler、session 和取消信号，桥接仍在实际字节连接上完成握手。普通 Core `connect` 来源也可以使用 `createRuntimePeer<IPythonApi>(options)`，无需把返回值断言为 `IRuntimeTypedPeer`。
+`spawn` 保留子进程的监督、退出与 budget 所有权；`peer.close()` 关闭连接和子进程。只需声明对端特有的 command、args、wire 与本地 contract；launcher、预算、随机 stdin token 和桥接握手由既有操作组合。需要自有字节通道时，仍可使用 `createJsonRpcRemoteChannel`，见 USEGUIDE。文档检查器将本段与 USEGUIDE 的 `service.py` 联合执行；缺少 `python3` 时报告 SKIP-WARN。
 
 ## 错误
 

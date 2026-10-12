@@ -49,6 +49,7 @@ const GateName = Object.freeze({
   registry: 'registry:check',
   consumers: 'typecheck:consumers',
   docs: 'check-docs-independence',
+  docsExamples: 'docs-examples',
   custody: 'coverage-custody-report',
   conformance: 'rpc/test:conformance',
   parity: 'rpc/test:suite-parity'
@@ -547,7 +548,7 @@ const groupSummary = (name, names, packages) => {
 }
 
 /**
- * Execute the original 18 full-CI gates; only package scheduling and capture reuse change.
+ * Execute repository gates and the maintained documentation examples after the preparation build.
  *
  * @param {string[]} releasePackages Existing foundation release plan.
  * @param {string[]} storePackages Existing store release plan.
@@ -580,6 +581,17 @@ export const runCi = async (
     await runGate(GateName.docs, 'required', 'node', ['scripts/check-docs-independence.mjs'], {
       env: runtime.env
     })
+  )
+  results.push(
+    await runGate(
+      GateName.docsExamples,
+      'required',
+      'make',
+      ['--no-print-directory', 'docs-examples'],
+      {
+        env: runtime.env
+      }
+    )
   )
   for (const name of rootTestGates)
     results.push(await runGate(name, 'required', 'pnpm', ['run', name], { env: runtime.env }))

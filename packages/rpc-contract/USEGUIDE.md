@@ -39,7 +39,7 @@
 
 连接建立后，双方先交换一次握手：发起方发送 hello，响应方选出共同的版本、codec 与能力并回复 accept 或 reject，发起方再确认结果。
 
-```ts
+```ts doc-test=run
 import { acceptRpcHandshake, completeRpcHandshake, createRpcHello } from '@migaia/rpc-contract/handshake'
 import { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'
 
@@ -77,13 +77,20 @@ const agreement = completeRpcHandshake(clientOffer, accepted.reply)
 
 `normalizePortable(value)` 把业务数据转换为可在线上传输的形式，并在不支持时抛错：
 
-```ts
+```ts doc-test=run
 import { normalizePortable } from '@migaia/rpc-contract/portable'
+import { classifyRpcContractError } from '@migaia/rpc-contract'
 
 normalizePortable({ a: 1, b: [1, 2], c: new Uint8Array([1, 2]) })
 // { a: 1, b: [1, 2], c: { $rpc: 'bytes', base64url: 'AQI' } }
 
-normalizePortable({ when: new Date() }) // TypeError，@migaia/rpc/contract / INVALID_ENVELOPE
+try {
+  normalizePortable({ when: new Date() })
+} catch (error) {
+  const diagnostic = classifyRpcContractError(error)
+  if (!diagnostic) throw error
+  console.error(diagnostic.code) // TypeError，@migaia/rpc/contract / INVALID_ENVELOPE
+}
 ```
 
 | 输入                                    | 结果                                                         |
@@ -110,7 +117,7 @@ normalizePortable({ when: new Date() }) // TypeError，@migaia/rpc/contract / IN
 
 ### 长度前缀
 
-```ts
+```ts doc-test=run
 import { createRpcStreamFrameDecoder, encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
 
 const frame = encodeRpcStreamFrame(new TextEncoder().encode('hello')) // 4 字节长度 + 5 字节内容
@@ -130,7 +137,7 @@ decoder.finish() // 连接结束；残留半帧报告 INVALID_FRAME
 
 ### Content-Length
 
-```ts
+```ts doc-test=run
 import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'
 
 const bytes = encodeJsonRpcFrame({ jsonrpc: '2.0', id: 1, method: 'ping' })
@@ -225,7 +232,7 @@ runtime 调用（Peer 的 request / notify / stream / group）在线上以 runti
 
 ### 序列化与还原
 
-```ts
+```ts doc-test=run
 import { serializeRpcError, deserializeRpcError } from '@migaia/rpc-contract/errors'
 
 const original = new RangeError('bad input', { cause: new Error('root cause') })
@@ -245,13 +252,18 @@ restored instanceof RangeError // true；stack 保留发送方的原始 stack
 
 ### 与 JSON-RPC 互转
 
-```ts
-import { toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'
+```ts doc-test=run
+import { serializeRpcError, toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'
 
+/** JSON-RPC 示例自己构造错误树，不依赖上一个章节的局部变量。 */
+const wire = serializeRpcError(new RangeError('bad input'), {
+  report: (failure) => console.error(failure)
+})
 const jsonRpcError = toJsonRpcError(wire, -32000)
 // { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }
 
 const back = fromJsonRpcError(jsonRpcError)
+console.log(back.name, back.message) // RangeError bad input
 ```
 
 - 错误树放在 `error.data.migaiaWireError`（`RpcJsonRpcWireError.dataKey`）；整数 `code` 由调用方按 JSON-RPC 约定选择。
@@ -261,7 +273,7 @@ const back = fromJsonRpcError(jsonRpcError)
 
 第三方适配器应使用自己的 source 和 code，不要冒用 `@migaia/rpc/*` 的身份。用 `@migaia/utils/error` 的 `attachErrorIdentity` 给原生错误附加身份：
 
-```ts
+```ts doc-test=check
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { serializeRpcError, toJsonRpcError } from '@migaia/rpc-contract/errors'
 
@@ -282,7 +294,7 @@ export function writeFailure(cause: unknown, report: (failure: unknown) => void)
 
 `classifyRpcContractError(error)` 判断一个错误是否确实由本包在本地抛出（按对象引用识别，复制的错误或来自其它进程的错误返回 `undefined`），并返回其 code 与对外消息：
 
-```ts
+```ts doc-test=run
 import { classifyRpcContractError, normalizeRpcEnvelope } from '@migaia/rpc-contract'
 
 try {
