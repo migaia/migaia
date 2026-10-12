@@ -1,6 +1,6 @@
 {
   "name": "@migaia/rpc-threads",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "private": true,
   "description": "RPC threads owner.",
   "license": "MIT",
@@ -62,9 +62,9 @@
     "test": "vitest run --coverage"
   },
   "dependencies": {
+    "@migaia/lifecycle": "workspace:^",
     "@migaia/supervision": "workspace:^",
-    "@migaia/utils": "workspace:^",
-    "@migaia/lifecycle": "workspace:^"
+    "@migaia/utils": "workspace:^"
   },
   "peerDependencies": {
     "@migaia/rpc-contract": "workspace:*",
@@ -77,17 +77,17 @@
     }
   },
   "devDependencies": {
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/rpc-contract": "workspace:*",
+    "@migaia/rpc-core": "workspace:*",
+    "@migaia/utils": "workspace:^",
     "@types/node": "24.13.2",
     "cborg": "6.1.1",
     "elysia": "1.4.30",
     "msgpackr": "2.1.0",
     "protobufjs": "8.8.0",
     "typescript": "~6.0.2",
-    "vitest": "^4.1.10",
-    "@migaia/rpc-contract": "workspace:*",
-    "@migaia/rpc-core": "workspace:*",
-    "@migaia/plugin-host": "workspace:^",
-    "@migaia/utils": "workspace:^"
+    "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=18"
