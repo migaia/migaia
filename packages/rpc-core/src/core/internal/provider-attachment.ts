@@ -62,6 +62,7 @@ import {
   recordProviderRegistration,
   type IRpcEndpointDebugSnapshot
 } from './test-observer.js'
+import type { IProbeEmitter } from './probe-emitter.js'
 
 /** Inbound transport metadata retained only for identity admission. */
 type IProviderInbound = {
@@ -79,6 +80,8 @@ export type IRpcProviderPorts = {
 
 /** Canonical provider attachment with an inseparable replay/admission/identity/executor closure. */
 export class RpcProviderAttachment {
+  /** The provider and executor share one construction-cached endpoint emitter. */
+  readonly #probe: IProbeEmitter | undefined
   /** Provider and event callback ownership. */
   readonly #registry = new ProviderRegistry()
   /** Completed request replay ownership. */
@@ -123,6 +126,7 @@ export class RpcProviderAttachment {
     commitPolicy?: () => boolean
   ) {
     this.#kernel = kernel
+    this.#probe = kernel.probe
     this.#chunks = readSelectedFramerChunks(prepared.options.components!)
     this.#outbound = ports.outboundOperations
     this.#variations = ports.variationCoordinator
@@ -173,6 +177,7 @@ export class RpcProviderAttachment {
       }
     )
     this.#executor = new ProviderExecutor({
+      probe: this.#probe,
       fast: hasFastEndpoint(prepared.options),
       /** Borrow only the once-selected factory response format, never caller/wire policy. */
       responseError: selectedJsonObjectPort(prepared.options.components!)?.responseError,

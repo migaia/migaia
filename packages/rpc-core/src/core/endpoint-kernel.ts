@@ -20,6 +20,11 @@ import type {
 import type { IRpcPlatform } from './typing.js'
 import { RpcPlatform } from './transport-constants.js'
 import { systemScheduler, type IScheduler, type IWallClock } from '@migaia/utils/scheduler'
+import {
+  readInstalledProbe,
+  releaseInstalledProbe,
+  type IProbeEmitter
+} from './internal/probe-emitter.js'
 
 /** The kernel alone owns default scheduler identity; bootstrap and the time port reuse its decision. */
 export function isEndpointSystemScheduler(scheduler: IScheduler | undefined): boolean {
@@ -99,6 +104,8 @@ export type IEndpointKernelHost = {
   readonly closingSignal: AbortSignal
   readonly generation: number
   readonly state: IEndpointKernelState
+  /** Cold owner construction reads the emitter once after middleware ports have installed. */
+  readonly probe: IProbeEmitter | undefined
   readonly ownerKeys: readonly string[]
   readonly routeKeys: readonly string[]
   activate(activation: IEndpointKernelActivation): void
@@ -151,6 +158,12 @@ class EndpointKernel implements IEndpointKernelHost {
   #state: IEndpointKernelState = EndpointKernelState.constructing
   /** Invalidates callbacks captured before close without allocating per callback. */
   #generation = 0
+  /** One endpoint observer is cached at activation; normal send paths never read probe hosts. */
+  #probe: IProbeEmitter | undefined
+  /** Returns the transport-bound installation only during cold attachment construction. */
+  get probe(): IProbeEmitter | undefined {
+    return this.#probe ?? readInstalledProbe(this.#transport)
+  }
   /** Snapshots and validates transport metadata without subscribing or allocating feature owners. */
   constructor(
     transport: IRpcTransport,
@@ -300,6 +313,46 @@ class EndpointKernel implements IEndpointKernelHost {
         this.#resources.addSync('listener error subscription', activation.unsubscribeListenerError)
       this.#state = EndpointKernelState.active
       activation.commit()
+      this.#probe = this.probe
+      if (this.#probe) {
+        /**
+         * Capability masks describe real physical and lifecycle production, intersected with
+         * subscriptions.
+         */
+        let capabilities = this.#probe.mask
+        if (this.#probe.authentication === 'none') capabilities &= ~(1 << 5)
+        if (!this.#probe.peerOwned) capabilities &= ~(1 << 0)
+        if (!this.#transport.observe) capabilities &= ~(1 << 6)
+        this.#probe.describe({
+          endpointId: this.#probe.endpointId,
+          platform: this.#platform,
+          topology: this.#topology,
+          encodedType: this.#encodedType,
+          authentication: this.#probe.authentication,
+          fastPath: this.#probe.fastPath,
+          carrier: this.#transport.observe ? this.#platform : 'unavailable',
+          stageMask: capabilities
+        })
+        if (this.#transport.observe) {
+          try {
+            /**
+             * This exact receipt belongs to the canonical resource scope, never another lifecycle
+             * manager.
+             */
+            const release = this.#transport.observe(this.#probe.carrier())
+            this.#resources.add('probe transport observation', () => {
+              try {
+                release()
+              } catch (error) {
+                this.#probe?.report(error)
+                throw error
+              }
+            })
+          } catch (error) {
+            this.#probe.report(error)
+          }
+        }
+      }
     } catch (error) {
       this.#beginClose()
       const cleanupPromise = this.#resources.releaseAll()
@@ -398,6 +451,8 @@ class EndpointKernel implements IEndpointKernelHost {
     if (this.#state === EndpointKernelState.closing || this.#state === EndpointKernelState.disposed)
       return
     this.#state = EndpointKernelState.closing
+    this.#probe ??= readInstalledProbe(this.#transport)
+    if (this.#probe) releaseInstalledProbe(this.#transport, this.#probe)
     this.#generation += 1
     if (reason === undefined) this.#closing.abort()
     else this.#closing.abort(reason)
