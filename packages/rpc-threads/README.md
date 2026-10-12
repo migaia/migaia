@@ -126,7 +126,26 @@ try {
 
 ## 二进制数据
 
-`ArrayBuffer` 与 `Uint8Array` 可以直接作为参数和返回值，默认按值复制，调用后原 buffer 仍可用。零拷贝转移（`transfer` 选项）需要额外协商原生二进制与签名认证；默认配置下传入 `transfer` 会以 `CAPABILITY_UNSUPPORTED` 拒绝。详见 [USEGUIDE 第 5 节](./USEGUIDE.md#5-二进制数据与-transfer)。
+`ArrayBuffer` 与 `Uint8Array` 可以直接作为参数和返回值，默认按值复制，调用后原 buffer 仍可用。双方在 `createThreadPeer` 上配置 `authentication: { sign, verify }` 后，普通 launcher 与 channel factory 就能使用现有的签名原生二进制与 `transfer`；无需自定义 Endpoint。签名函数必须保护完整输入，校验函数必须拒绝伪造签名。Core 在实际端口上确认能力，并由认证中间件建立信任事实。
+
+```ts
+// 主线程与 Worker 分别配置相同的签名凭据；spawn 使用上面的普通配置。
+const worker = await createThreadPeer<IWorkerApi>({
+  spawn,
+  authentication: { sign, verify },
+  report
+})
+try {
+  const buffer = new Uint8Array([7, 8, 9]).buffer
+  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))
+  // { length: 3, first: 7 }
+  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效
+} finally {
+  await worker.close()
+}
+```
+
+未配置签名时，`transfer` 仍以 `CAPABILITY_UNSUPPORTED` 拒绝。完整的签名配置与 Worker 示例见 [USEGUIDE 第 5 节](./USEGUIDE.md#5-二进制数据与-transfer)。
 
 ## 错误
 

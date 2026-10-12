@@ -177,7 +177,73 @@ try {
 
 - transfer 在消息真正提交到端口时才使 buffer 失效（`byteLength` 变为 0），之后即使调用失败也无法恢复原 buffer；共享同一 backing 的所有视图同时失效。
 - 带 transfer 的调用不会被自动重试，库也不保留输入副本。需要重发时，先确认结果，再重新构造数据。
-- 默认的 `createThreadPeer` 配置不启用 transfer。启用需要自定义 `endpointFactory`，并在中间件中加入 `authentication({ sign, verify })`；组装方式见 [rpc-core USEGUIDE 的二进制章节](../rpc-core/USEGUIDE.md#11-二进制转发与重试)。
+- 双方的 `createThreadPeer` 配置 `authentication: { sign, verify }` 即可使用普通 factory；无需自定义 `endpointFactory`。原生二进制 profile 要求签名而不加密，且 `encodedType` 为默认的 `any`。库在实际端口上协商能力，由现有认证中间件建立信任事实。未配置签名时仍拒绝 transfer。
+
+下面的 Node 示例用双方已持有的同一 HMAC 密钥签名。`RPC_SIGNING_KEY` 是本地部署配置中的十六进制密钥，两端分别读取；不要经 RPC 发送密钥。先把签名函数放在共享模块：
+
+```ts
+// signing.ts
+import { createHmac, timingSafeEqual } from 'node:crypto'
+import type { IRpcAuthenticationConfig } from '@migaia/rpc-core'
+
+/** 双方从各自的部署配置读取同一密钥，不把密钥放进消息。 */
+const key = Buffer.from(process.env.RPC_SIGNING_KEY!, 'hex')
+/** 完整语义输入包含 Core 对原生 backing 计算的完整性摘要。 */
+const signature = (value: unknown) =>
+  createHmac('sha256', key).update(JSON.stringify(value)).digest()
+
+export const authentication: IRpcAuthenticationConfig = {
+  sign: (value) => ({ value, signature: signature(value).toString('hex') }),
+  verify: (input) => {
+    const frame = input as { value: unknown; signature: string }
+    const received = Buffer.from(frame.signature, 'hex')
+    const expected = signature(frame.value)
+    if (received.length !== expected.length || !timingSafeEqual(received, expected))
+      throw new TypeError('Invalid RPC signature')
+    return frame.value
+  }
+}
+```
+
+Worker 与主线程分别安装这个普通配置：
+
+```ts
+// worker.ts
+import { createThreadPeer } from '@migaia/rpc-threads'
+import { authentication } from './signing.js'
+
+await createThreadPeer({
+  authentication,
+  provide: {
+    bytes: {
+      inspect: (buffer: ArrayBuffer) => ({
+        length: buffer.byteLength,
+        first: new Uint8Array(buffer)[0]
+      })
+    }
+  },
+  report: (error) => console.error(error)
+})
+```
+
+```ts
+// main.ts：spawn 沿用第 3 节的 Node 配置，入口指向上面的 worker.js。
+import { createThreadPeer } from '@migaia/rpc-threads'
+import { authentication } from './signing.js'
+
+type IBytesApi = {
+  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }
+}
+const worker = await createThreadPeer<IBytesApi>({ spawn, authentication, report })
+try {
+  const buffer = new Uint8Array([7, 8, 9]).buffer
+  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))
+  // { length: 3, first: 7 }
+  console.log(buffer.byteLength) // 0
+} finally {
+  await worker.close()
+}
+```
 
 ## 6. 容量与超时
 
