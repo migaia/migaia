@@ -55,10 +55,11 @@ const service: IRpcDevtoolsServiceApi = {
 }
 
 describe('A3 public scaffold', () => {
-  it('imports all three entries and marks uninstalled runtimes with CLOSED', () => {
-    expect(() => createRpcDevtools()).toThrowError(
-      expect.objectContaining({ source: RPC_DEVTOOLS_SOURCE, code: RpcDevtoolsErrorCode.closed })
-    )
+  it('imports all three entries with the collector installed and the hub still uninstalled', () => {
+    /** Layer 2 replaces only the collector placeholder; its live public host now owns closure. */
+    const collector = createRpcDevtools()
+    expect(collector.query().events).toEqual([])
+    collector.close()
     expect(() => createRpcDevtoolsHub()).toThrowError(
       expect.objectContaining({ source: RPC_DEVTOOLS_SOURCE, code: RpcDevtoolsErrorCode.closed })
     )
