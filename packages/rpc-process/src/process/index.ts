@@ -2,6 +2,8 @@ export { createProcessTransport, createAdapterChannel } from './handshake.js'
 export { createProcessChannelClosedError } from './error.js'
 export { openProcessObjectChannel } from './object-channel.js'
 export { createProcessPeer } from './peer.js'
+export { isProcessChild } from './child.js'
+export type { IProcessShortSpawn, IProcessShortSourceOptions } from './short-source.js'
 export { createNativeProcessOffer } from './offer.js'
 export type { IProcessHostRegistrationApproval, IProcessHostRegistrations } from './host/types.js'
 export {

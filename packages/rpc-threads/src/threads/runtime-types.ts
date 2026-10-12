@@ -29,6 +29,7 @@ export type IThreadNativeWorkerConstructor = new (
   options: {
     name?: string
     workerData: unknown
+    execArgv?: string[]
     resourceLimits?: { maxOldGenerationSizeMb: number }
   }
 ) => IThreadNativeWorker

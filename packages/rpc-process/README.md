@@ -50,7 +50,7 @@ pnpm add @migaia/rpc-process @migaia/rpc-core @migaia/rpc-contract
 
 子进程只需声明自己提供的方法。它由库的 launcher 启动时，会通过 bootstrap 自动连回父进程，不需要任何地址配置。
 
-```ts
+```ts doc-test=run file=service.ts
 // service.ts（子进程入口）
 import { createProcessPeer } from '@migaia/rpc-process'
 
@@ -60,12 +60,60 @@ await createProcessPeer({
       double: (value: number) => value * 2,
       sum: (values: number[]) => values.reduce((total, value) => total + value, 0)
     }
-  },
-  report: (error) => console.error(error)
+  }
 })
 ```
 
-父进程用 `spawn` 来源启动它。下面的 `createNodeServiceSpawn` 把 launcher、预算、bootstrap 和握手组合成一个可复用的函数；同一个返回值只交给一个 Peer 或 Plugin 使用。
+父进程只需给出入口。URL 精确指向文件；相对字符串按主入口目录解析。`.ts` 可直接运行，但 Node 的原生类型剥离不会把 `.js` imports 改写为 `.ts`：有这种 import 的项目应传构建后的 `.js`，或保留父进程的 `--import` loader。Bun 能解析该 TS 导入写法；Deno 也需要构建输出或 loader。
+
+```ts doc-test=run file=main.ts
+import { createProcessPeer } from '@migaia/rpc-process'
+
+type IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }
+const service = await createProcessPeer<IServiceApi>({ spawn: new URL('./service.ts', import.meta.url) })
+try {
+  console.log(await service.request('math.double', 21)) // 42
+} finally {
+  await service.close()
+}
+```
+
+## 同一份入口派生子进程
+
+`spawn: true` 重新执行当前主入口，包含全部顶层代码。先用 `isProcessChild()` 区分角色，避免子进程再次派生。这个函数只读已有 bootstrap 标记；真正认证仍由 stdin bootstrap 和原握手完成。Node/Bun 的 runtime flags（包括 `--import`）与程序参数会保留。
+
+```ts doc-test=run file=self.ts
+import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'
+
+type IMathApi = { math: { double(value: number): number } }
+if (isProcessChild()) {
+  await createProcessPeer({ provide: { math: { double: (value: number) => value * 2 } } })
+} else {
+  const child = await createProcessPeer<IMathApi>({ spawn: true })
+  try { console.log(await child.request('math.double', 21)) } finally { await child.close() }
+}
+```
+
+REPL、`--eval`、单文件可执行程序、Electron 或测试运行器没有可用的自派生主入口时，会以注册的配置错误拒绝，不猜测调用位置。Deno 默认子入口只获得 bootstrap 所需的 env 权限；需要额外运行权限时使用显式 command/args。
+
+## 独立进程按名称连接
+
+名称不含 `/` 或协议。双方按 OS 用户与名称派生相同的本机端点，无需端口或通信文件。Unix 目录为 0700，socket 为 0600；当前 Node-compatible socket API 没有公开 peer-credential 读取接口，访问控制由这些 OS 权限完成。**同一用户的任何进程都能连接**；需要区分同用户程序时，双方显式设置 `token`。TCP、显式 socket 路径及没有 ACL 保证的 Windows named pipe 必须设置 token。
+
+```ts doc-test=run file=named.ts
+import { createProcessPeer } from '@migaia/rpc-process'
+
+type IMathApi = { math: { double(value: number): number } }
+const server = await createProcessPeer({ listen: 'math-service', provide: { math: { double: (value: number) => value * 2 } } })
+const math = await createProcessPeer<IMathApi>({ connect: 'math-service' })
+try { console.log(await math.request('math.double', 21)) } finally { await math.close(); await server.close() }
+```
+
+named `connect` 默认等待最多 5000 ms，可设 `connectTimeoutMs`。第二个同名 listener 仍以 `PROCESS_CHANNEL_LISTEN_FAILED` 拒绝；崩溃遗留 socket 只由现有 owner record 安全回收。
+
+## 高阶用法：完整来源对象
+
+原始 launcher、预算、bootstrap 与握手 source 仍可直接传入。下面的 `createNodeServiceSpawn` 展示它们的组合；同一个返回值只交给一个 Peer 或 Plugin 使用。
 
 ```ts
 // spawn-source.ts
@@ -157,7 +205,7 @@ try {
 }
 ```
 
-运行时 `report` 会收到一条 `@migaia/supervision` / `CAPABILITY_UNSUPPORTED`（`capability: 'termination'`）。这是预期的提示，不是故障：示例声明了 `isolation: 'best-effort'`，而 Node launcher 不能保证终止子进程派生出的孙进程。
+完整来源示例的 `report` 会收到 `@migaia/supervision` / `CAPABILITY_UNSUPPORTED`（`capability: 'termination'`）。这是预期提示：Node launcher 不能保证终止孙进程。短来源的默认 `console.error` 每进程只报告一次；短对象可用 `onNotice` 显式接收每次提示，其他错误始终正常报告。
 
 ## 三种来源
 

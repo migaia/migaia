@@ -4,7 +4,7 @@ import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import type { IRpcRuntimeGeneration } from '@migaia/rpc-contract'
 import { deferred } from '@migaia/utils/promise'
-import type { IScheduledTask } from '@migaia/utils/scheduler'
+import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
 import {
   createBrowserMessagePortTransport,
   createNodeMessagePortTransport,
@@ -87,6 +87,8 @@ class AdapterMessageResource implements IAdapterMessageResource {
   /** ACK traffic may arrive before a launcher hands its resource to the channel factory. */
   /** Automatic preparation waits for the actual initial message observed by this resource. */
   readonly #bootstrap = deferred<unknown>()
+  /** Child detection and automatic Peer construction share one bounded initial capture. */
+  #initialDeadline: IScheduledTask | undefined
   /** The original undecoded initial message stays private to the existing Peer owner. */
   #rawBootstrap: unknown
   /** Actual initial control is admitted once; Peer/generation reads share this exact cached result. */
@@ -256,7 +258,7 @@ class AdapterMessageResource implements IAdapterMessageResource {
   }
 
   /** Capture initial raw control synchronously before automatic preparation can yield. */
-  receiveInitial(initial?: IAdapterInitialMessageResource): Promise<unknown> {
+  receiveInitial(initial?: IAdapterInitialMessageResource, bounded?: true): Promise<unknown> {
     if (initial) {
       if (initial.direction !== 'inbound') invalidControl('runtimeApi')
       /** The actual native initial read supplies raw data without sending a capability ACK early. */
@@ -267,6 +269,17 @@ class AdapterMessageResource implements IAdapterMessageResource {
     }
     this.#waitingInitial = this.#rawBootstrap === undefined
     this.#capture()
+    if (bounded && this.#waitingInitial && !this.#initialDeadline) {
+      this.#initialDeadline = systemScheduler.schedule(
+        () => this.#handoff?.fail(),
+        rpcMessageCapabilityControl.timeoutMs
+      )
+      /** Observation releases the one timer while returning the original capture Promise. */
+      void this.#bootstrap.promise.then(
+        () => this.#initialDeadline?.cancel(),
+        () => this.#initialDeadline?.cancel()
+      )
+    }
     return this.#bootstrap.promise
   }
 

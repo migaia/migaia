@@ -18,10 +18,17 @@ export function createAdapterNodeThreadPeer(
   if (!parentPort)
     return typeof options.spawn === 'object'
       ? createThreadSourcePeer(options)
-      : preparation.peer({ ...options, self: preparation.context.self } as IRuntimePeerOptions)
+      : preparation.peer({
+          ...options,
+          self: preparation.context.self,
+          report: options.report ?? console.error
+        } as IRuntimePeerOptions)
   /** Core reads the same actual workerData and keeps the closed admission snapshot private. */
   const resource = createEventEmitterMessageResource(parentPort)
   resource.receiveInitial({ direction: 'inbound', read: () => workerData })
   /** Identity, local provider compilation, generation and actual ACK remain one Core operation. */
-  return preparation.peer(options as IRuntimePeerOptions, resource)
+  return preparation.peer(
+    (options.report ? options : { ...options, report: console.error }) as IRuntimePeerOptions,
+    resource
+  )
 }

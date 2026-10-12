@@ -6,12 +6,12 @@
 
 1. [导入](#1-导入)
 2. [Worker 端：自动连回父线程](#2-worker-端自动连回父线程)
-3. [spawn 来源与各平台 launcher](#3-spawn-来源与各平台-launcher)
+3. [spawn 短形式](#3-spawn-短形式)
 4. [交给 PluginHost 管理：createThreadPlugin](#4-交给-pluginhost-管理createthreadplugin)
 5. [二进制数据与 transfer](#5-二进制数据与-transfer)
 6. [容量与超时](#6-容量与超时)
 7. [错误处理](#7-错误处理)
-8. [高阶用法：自定义 Worker 构造与通道](#8-高阶用法自定义-worker-构造与通道)
+8. [高阶用法：完整 source 与自定义 Worker 构造](#8-高阶用法完整-source-与自定义-worker-构造)
 9. [常见问题](#9-常见问题)
 
 ---
@@ -22,20 +22,19 @@
 import {
   createThreadPeer,
   createThreadPlugin,
+  isThreadChild,
   RpcThreadErrorCode,
   RPC_THREAD_ERROR_SOURCE
 } from '@migaia/rpc-threads'
-import {
-  createNodeThreadLauncher,
-  createNodeThreadChannelFactory
-} from '@migaia/rpc-threads/adapters/node'
 ```
 
-只导入当前运行平台的 `./adapters/*` 子路径。各平台的 launcher 与 channel factory 名字不同，但组合方式一样（第 3 节）。
+普通 TS Worker 只需根入口；短 `spawn` 会延迟加载当前运行时的 adapter。自定义完整 source 时，只导入当前平台的 `./adapters/*` 子路径（第 8 节）。
 
 ## 2. Worker 端：自动连回父线程
 
-```ts
+把下面两个文件编译为同目录的 `worker.js` 与 `main.js`，然后运行 `main.js`。默认 `report` 为 `console.error`。
+
+```ts doc-test=run file=worker.ts
 // worker.ts
 import { createThreadPeer } from '@migaia/rpc-threads'
 
@@ -47,52 +46,94 @@ await createThreadPeer({
         for (let index = 1; index <= limit; index++) yield index
       }
     }
-  },
-  report: (error) => console.error(error)
+  }
 })
+```
+
+```ts doc-test=run file=main.ts
+import { createThreadPeer } from '@migaia/rpc-threads'
+
+type IWorkerApi = {
+  math: { double(value: number): number }
+  feed: { count(limit: number): AsyncIterable<number> }
+}
+
+/** URL 明确定位相邻 Worker，关闭时由 Peer 释放该 Worker。 */
+const worker = await createThreadPeer<IWorkerApi>({
+  spawn: new URL('./worker.js', import.meta.url)
+})
+try {
+  console.log(await worker.request('math.double', 21)) // 42
+  for await (const value of worker.stream('feed.count', 3)) console.log(value) // 1、2、3
+} finally {
+  await worker.close()
+}
 ```
 
 - 在 Worker 内省略来源时，库会识别当前运行环境（Node `worker_threads`、Web 的 `DedicatedWorkerGlobalScope`、Deno Worker、Bun Worker），并通过 launcher 写入的 bootstrap 连回父线程。不是由库 launcher 创建的 Worker 会在配置阶段被拒绝。
 - `provide` 的规则与进程版相同：只读取对象自身的可枚举数据属性，嵌套对象生成点分路径；返回 iterable 或 async iterable 的方法通过 `stream` 调用。
 - Worker 端得到的也是 Peer，可以 `request` 父线程 `provide` 的方法。
 
-## 3. spawn 来源与各平台 launcher
+## 3. spawn 短形式
 
-```ts
-spawn: {
-  spec: { entry, name: 'math-worker' },
-  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),
-  scheduler: systemScheduler,
-  launcher,          // 平台 launcher
-  channelFactory,    // 与 launcher 配套的通道工厂
-  report
+`createThreadPeer` 与 `createThreadPlugin` 接受同样的短形式，不需要新的 factory：
+
+| `spawn` | 说明 |
+| ------- | ---- |
+| `true` | 把当前主入口作为 Worker，必须用下面的 child guard。 |
+| `new URL('./worker.js', import.meta.url)` | 精确使用 URL；不经过相对字符串解析。 |
+| `'./worker.ts'` | Node / Bun / Deno 路径；相对**主入口文件所在目录**解析。 |
+| `{ entry: './worker.js', base: import.meta.url, name: 'math' }` | 显式选择当前模块为相对解析基准，并覆盖 Worker 名字。 |
+
+短对象的 `entry` 接受 `true`、`URL`、字符串，其余字段均可省略：
+
+| 字段 | 默认与用途 |
+| ---- | ---------- |
+| `base` | 显式模块 URL 或 URL 字符串，用于相对 entry 解析；省略时用主入口目录。不能通过堆栈猜调用模块。 |
+| `name`、`data`、`limits` | 传给既有 Worker spec 的名字、初始化数据和资源限制。 |
+| `scheduler` | `systemScheduler`。 |
+| `budget` | `createUnitBudget({ kind: 'thread', maxUnits: 1 })`。 |
+| `launcher`、`channelFactory` | 当前运行时对应的既有 adapter；延迟加载。自定义 channel factory 必须使用相同 scheduler。 |
+| `report` | `console.error`；可换成应用的错误收集函数。 |
+| `health` | 可选，复用完整 source 的健康检查策略。 |
+| `supervisor` | 既有监督策略，可设置 `ready`、`startupTimeoutMs`、`restart`、`terminalPolicy`、`stop`、`isolation` 等。 |
+| `keyFactory`、`retryPort` | 可选，复用完整 source 的幂等键生成与重试配置；顶层同名选项优先。 |
+
+这些默认值只展开为原来的完整 source。预算、握手、监督、代次和信任事实继续由原来的 owner 管理；短形式不接受“已经协商”或“已经信任”的声明。完整 source 仍可传入（第 8 节）。
+
+### self spawn：同文件的两条分支
+
+保存为 `self.ts`，编译为 `self.js` 后运行。整个模块会在 Worker 中再次执行；所有只属于主线程的副作用都应放在 `else` 分支：
+
+```ts doc-test=run file=self.ts
+import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
+
+type IMathApi = { double(value: number): number }
+
+if (await isThreadChild()) {
+  await createThreadPeer({ provide: { double: (value: number) => value * 2 } })
+} else {
+  /** self spawn 复用当前主入口，由既有 bootstrap 区分父子。 */
+  const worker = await createThreadPeer<IMathApi>({ spawn: true })
+  try {
+    console.log(await worker.request('double', 21)) // 42
+  } finally {
+    await worker.close()
+  }
 }
 ```
 
-| 字段             | 说明                                                                                                   |
-| ---------------- | ------------------------------------------------------------------------------------------------------ |
-| `spec.entry`     | Worker 入口。Node 用文件路径（`fileURLToPath(new URL('./worker.js', import.meta.url))`）；Web / Deno / Bun 用模块 URL。 |
-| `spec.name`      | Worker 名字，用于调试与查询。                                                                          |
-| `budget`         | `createUnitBudget({ kind: 'thread', maxUnits })`：同时存在的 Worker 上限。                              |
-| `scheduler`      | 计时与调度，通常用 `systemScheduler`；`channelFactory` 必须使用同一个 scheduler。                       |
-| `launcher`       | 创建 Worker。                                                                                          |
-| `channelFactory` | 在 Worker 端口上建立协议通道。                                                                         |
-| `report`         | 接收后台错误。                                                                                         |
-| `health`         | 可选，健康检查策略。                                                                                   |
-| `supervisor`     | 可选，`id`、`ready`、`startupTimeoutMs`、`restart`、`terminalPolicy`、`stop`、`isolation` 等监督策略。  |
+`isThreadChild()` 读取既有库 bootstrap 标记，不是授权外部 Worker 的输入。REPL、`--eval`、打包成单个二进制、Electron、以测试运行器为主入口等无法提供可用入口的场景，`spawn: true` 以 `INVALID_CONFIG` 拒绝，不猜入口。
 
-各平台的组合：
+### 入口与运行环境的边界
 
-| 平台                   | launcher                                                | channelFactory                                                    | 说明                                                 |
-| ---------------------- | ------------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------- |
-| Node                   | `createNodeThreadLauncher()`                            | `createNodeThreadChannelFactory({ scheduler })`                   | `worker_threads`，可观察退出、可终止                 |
-| Bun                    | `createBunThreadLauncher({ report })`                   | `createBunThreadChannelFactory({ scheduler })`                    | Web Worker 语义                                      |
-| Deno                   | `createDenoThreadLauncher({ report })`                  | `createDenoThreadChannelFactory({ scheduler })`                   | 模块 Worker；需要相应权限                            |
-| 浏览器                 | `createBrowserThreadLauncher({ report })`               | `createBrowserThreadChannelFactory({ scheduler })`                | `new Worker(url, { type: 'module' })`                |
-| Electron 主进程        | `createElectronMainThreadLauncher()`                    | `createElectronMainThreadChannelFactory({ scheduler })`           | 基于 Node `worker_threads`                           |
-| Electron 渲染进程      | `createElectronRendererThreadLauncher({ report })`      | `createElectronRendererThreadChannelFactory({ scheduler })`       | 基于 Web Worker                                      |
+- **相对路径**：库无法读取调用模块的 `import.meta.url`。裸字符串以主入口目录为基准；嵌套模块应传 `URL` 或显式 `base: import.meta.url`。URL 始终精确使用。
+- **TS 入口**：`.ts` 可直接传入。Node 24 的类型剥离不会改写 `./x.js` 到 `./x.ts`。Bun 支持这种映射；本仓库使用 `.js` specifier，所以 Node / Deno 应运行编译输出，或配置能处理映射的 loader。解析失败保留原始 module-resolution `cause`。
+- **浏览器**：只用明确的 URL；`true` 和裸字符串只用于 Node / Bun / Deno。动态 `Worker` 构造不能让 Vite / webpack 发现 Worker 源码。`spawn: new URL('./worker.js', import.meta.url)` 应指向已经构建的模块；需由 bundler 编译 `.ts` Worker 时，预构建 URL，或在自定义 Worker 构造中保留字面量 `new Worker(new URL('./worker.ts', import.meta.url))`（第 8 节）。
+- **Electron**：显式选用第 8 节的 Electron adapter；不使用 self spawn 猜测应用入口。
+- **Web Worker 终止**：浏览器、Bun、Deno 的 launcher 继续把 `termination` 与 `exit-observation` 声明为 `unsupported`。`terminate()` 后无法确认代码已经停止，监督层保守地视为可能仍在运行；Node 与 Electron 主进程可观察退出。
 
-**Web Worker 的终止边界**：浏览器、Bun、Deno 的 launcher 把 `termination` 与 `exit-observation` 声明为 `unsupported`。`terminate()` 之后无法确认 Worker 中的代码已经停止，监督层会保守地把该单元视为可能仍在运行。Node 与 Electron 主进程基于 `worker_threads`，可以观察退出。
+### 借用已有 MessagePort
 
 已有 `MessagePort` 可以作为 `connect` 来源。双方把 Core 提供的 `context.capabilities` 交给 channel；Core 在实际端口上交换 ACK，只有双方都提供的能力才会启用。双方应同时开始连接：
 
@@ -135,17 +176,27 @@ try {
 
 ## 4. 交给 PluginHost 管理：createThreadPlugin
 
-`createThreadPlugin(options, runtime?)` 接受与 `createThreadPeer` 相同的 `spawn`、`provide`，另加 `name`（Host 内的连接名）与可选的 `expose`。安装后经 `host.thread` 出口调用：
+`createThreadPlugin(options, runtime?)` 接受与 `createThreadPeer` 相同的短 `spawn`、完整 source、`provide`，另加 `name`（Host 内的连接名）与可选的 `expose`。下面两个文件编译后，由 Host 持有 Worker，并经 `host.thread` 出口调用：
 
-```ts
+```ts doc-test=run file=worker.ts
+import { createThreadPeer } from '@migaia/rpc-threads'
+
+await createThreadPeer({
+  provide: { math: { double: (value: number) => value * 2 } }
+})
+```
+
+```ts doc-test=run file=main.ts
 import { defineHost } from '@migaia/plugin-host'
 import { createThreadPlugin } from '@migaia/rpc-threads'
 
+type IWorkerApi = { math: { double(value: number): number } }
+/** 该插件将 Worker 交给 Host 管理。 */
 const worker = createThreadPlugin<IWorkerApi, Record<never, never>, 'worker'>({
   name: 'worker',
-  spawn,
-  report
+  spawn: new URL('./worker.js', import.meta.url)
 })
+/** Host 销毁时释放线程插件及其 Worker。 */
 const host = defineHost<Record<string, never>, never, readonly [typeof worker]>({
   host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
 })
@@ -285,9 +336,58 @@ Worker 中抛出的业务错误会还原原生类型（例如 `RangeError`）、
 
 **重试原则**：超时、取消、断线都不能证明 Worker 没有执行。非幂等操作重试前，用 `idempotencyKey` + `outcome(key)` 查询，或按业务规则对账。
 
-## 8. 高阶用法：自定义 Worker 构造与通道
+## 8. 高阶用法：完整 source 与自定义 Worker 构造
 
-以下导出面向需要自行控制 Worker 构造的运行时适配器作者。普通应用使用第 3 节的 launcher 即可。
+### 保留完整 source
+
+自定义预算、监督或平台组合时，原来的完整 `IRuntimeThreadSpawn` 对象继续有效。下面对象直接作为 `createThreadPeer` 或 `createThreadPlugin` 的 `spawn`；`worker.js` 使用第 2 节的 Worker：
+
+```ts
+import { fileURLToPath } from 'node:url'
+import { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'
+import { createUnitBudget } from '@migaia/supervision'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+/** 后台错误由应用统一记录。 */
+const report = (error: unknown) => console.error(error)
+/** 完整 Node source 显式组合预算、监督依赖与通道。 */
+export const spawn = {
+  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },
+  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),
+  scheduler: systemScheduler,
+  launcher: createNodeThreadLauncher(),
+  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+  report
+}
+```
+
+| 字段 | 说明 |
+| ---- | ---- |
+| `spec.entry` | Node 文件路径或 URL 字符串；Web / Deno / Bun 模块 URL 字符串。 |
+| `spec.name`、`spec.data`、`spec.limits` | Worker 名字、初始化数据与资源限制。 |
+| `budget` | 同时存在的 Worker 上限。 |
+| `scheduler` | 计时与调度；channel factory 必须使用同一个 scheduler。 |
+| `launcher`、`channelFactory` | 平台 Worker 创建与协议通道。 |
+| `report` | 必填，接收后台错误。 |
+| `health` | 可选，健康检查策略。 |
+| `supervisor` | 可选，`id`、`ready`、`startupTimeoutMs`、`restart`、`terminalPolicy`、`stop`、`isolation` 等监督策略。 |
+
+各平台的显式组合：
+
+| 平台 | launcher | channelFactory |
+| ---- | -------- | -------------- |
+| Node | `createNodeThreadLauncher()` | `createNodeThreadChannelFactory({ scheduler })` |
+| Bun | `createBunThreadLauncher({ report })` | `createBunThreadChannelFactory({ scheduler })` |
+| Deno | `createDenoThreadLauncher({ report })` | `createDenoThreadChannelFactory({ scheduler })` |
+| 浏览器 | `createBrowserThreadLauncher({ report })` | `createBrowserThreadChannelFactory({ scheduler })` |
+| Electron 主进程 | `createElectronMainThreadLauncher()` | `createElectronMainThreadChannelFactory({ scheduler })` |
+| Electron 渲染进程 | `createElectronRendererThreadLauncher({ report })` | `createElectronRendererThreadChannelFactory({ scheduler })` |
+
+Deno Worker 需要相应权限；Bun、Deno、浏览器与 Electron 渲染进程沿用 Web Worker 的终止边界（第 3 节）。
+
+### 自定义 Worker 构造与通道
+
+以下导出面向需要自行控制 Worker 构造的运行时适配器作者。普通应用使用第 3 节的短形式即可。浏览器 bundler 只识别源码中的字面量 Worker 构造；库的 URL 短形式不保证自动生成 Worker chunk。
 
 | 导出                                                      | 用途                                                                                       |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------ |

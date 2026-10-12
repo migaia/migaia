@@ -31,8 +31,13 @@ import { createAdapterBytePeer, type IAdapterBytePeerOptions } from './byte/peer
 import type { IRuntimeByteIO } from './byte/types.js'
 
 /** Adapter deployment objects are ordinary configuration; resource factories remain adapter-owned. */
-export type IAdapterPeerOptions = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'> &
+export type IAdapterPeerOptions = Omit<
+  IRuntimePeerOptions,
+  'spawn' | 'connect' | 'listen' | 'report'
+> &
   Readonly<{
+    /** Platform factories default to console reporting without copying Host provenance. */
+    report?: IRuntimePeerOptions['report']
     spawn?: unknown
     connect?: unknown
     listen?: unknown
@@ -237,7 +242,7 @@ class AdapterPeerPreparation {
       defaultTimeoutMs: this.#options.defaultTimeoutMs,
       contract: this.#options.contract,
       endpointFactory: this.#options.endpointFactory,
-      report: this.#options.report
+      report: this.#options.report ?? console.error
     }
     return createAdapterListenerPreparation(options, localOffer, preparation)
   }
@@ -273,18 +278,7 @@ class AdapterPeerPreparation {
     try {
       /** EventTarget acquisition installs its real reader synchronously before the first await. */
       if (!preparation.initial) {
-        /** The original automatic bootstrap deadline starts after the same synchronous capture. */
-        const receiving = resource.receiveInitial()
-        /** This task belongs only to initial acquisition, not to the later capability exchange. */
-        const deadline = systemScheduler.schedule(
-          () => preparation.fail(),
-          rpcMessageCapabilityControl.timeoutMs
-        )
-        try {
-          await receiving
-        } finally {
-          deadline.cancel()
-        }
+        await resource.receiveInitial(undefined, true)
       }
       /** The held resource admitted this actual initial message once, before resolving the read. */
       const initial = preparation.initial!

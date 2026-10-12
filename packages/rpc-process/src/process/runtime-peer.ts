@@ -22,12 +22,13 @@ import type {
 import { createNativeProcessOffer } from './offer.js'
 import { createProcessListenerPeer, type IRuntimeProcessListen } from './runtime-listener.js'
 import { ProcessPluginWire } from './plugin/constants.js'
+import type { IProcessShortSpawn, IProcessShortSourceOptions } from './short-source.js'
 
 /**
  * Public deployed sources reuse the original native spawn and borrowed socket-session
  * specifications.
  */
-export type IRuntimeProcessPeerOptions<THandle extends IProcessHandle = IProcessHandle> = Omit<
+export type IRuntimeProcessFullPeerOptions<THandle extends IProcessHandle = IProcessHandle> = Omit<
   IRuntimePeerOptions,
   'spawn' | 'connect' | 'listen'
 > &
@@ -37,9 +38,28 @@ export type IRuntimeProcessPeerOptions<THandle extends IProcessHandle = IProcess
     listen?: IRuntimePeerSource | IRuntimeProcessListen
   }>
 
+/** Short forms select ordinary sources; Core still captures the original options' Host provenance. */
+export type IRuntimeProcessPeerOptions<THandle extends IProcessHandle = IProcessHandle> = Omit<
+  IRuntimeProcessFullPeerOptions<THandle>,
+  'spawn' | 'connect' | 'listen' | 'report'
+> &
+  IProcessShortSourceOptions &
+  Readonly<{
+    spawn?:
+      | IRuntimePeerSource
+      | ISpawnProcessPluginDeployment<THandle>
+      | true
+      | string
+      | URL
+      | IProcessShortSpawn
+    connect?: IRuntimePeerSource | IConnectProcessPluginDeployment | string
+    listen?: IRuntimePeerSource | IRuntimeProcessListen | string
+    report?(error: unknown): void
+  }>
+
 /** Real execution and local socket sessions retain their existing independent supervision owners. */
 export function createProcessSourcePeer<THandle extends IProcessHandle>(
-  options: IRuntimeProcessPeerOptions<THandle>,
+  options: IRuntimeProcessFullPeerOptions<THandle>,
   runtime: string,
   preparation: IAdapterPeerPreparation
 ): Promise<IRuntimePeer> {

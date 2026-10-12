@@ -22,7 +22,11 @@ function borrowNodeThreadParent(port: IThreadParentPort): AdapterNodeThreadParen
 
 /** Launch this runtime's actual Worker through the complete Core-owned execution operation. */
 export function createNodeThreadLauncher(
-  options: Readonly<{ runtimeApi?: IRuntimePeerSourceContext }> = {}
+  options: Readonly<{
+    runtimeApi?: IRuntimePeerSourceContext
+    /** Explicit runtime flags apply to short entries without replaying their parent's controller. */
+    execArgv?: readonly string[]
+  }> = {}
 ) {
   return createAdapterNodeThreadLauncher(threadRuntimeResource, options)
 }

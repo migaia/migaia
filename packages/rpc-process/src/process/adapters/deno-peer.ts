@@ -1,6 +1,7 @@
 import type { IAdapterProcessRuntimeIO } from '../peer.js'
 import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS } from '../constants.js'
 import { openProcessStdioChannel } from './deno-command.js'
+import { isProcessChild } from '../child.js'
 
 /** Only this native process retains consumed discovery; grandchildren inherit no automatic marker. */
 let automaticMarker: string | undefined
@@ -23,6 +24,7 @@ class NativeDenoProcessRuntimeIO implements IAdapterProcessRuntimeIO {
     /** The process's own consumed marker stays authoritative over later environment reads. */
     const marker =
       automaticMarker ?? (permitted ? runtime.env.get(PROCESS_RUNTIME_API_ENV) : undefined)
+    isProcessChild()
     if (marker !== undefined && permitted) {
       automaticMarker = marker
       runtime.env.delete(PROCESS_RUNTIME_API_ENV)

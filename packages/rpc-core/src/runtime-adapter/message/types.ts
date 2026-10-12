@@ -55,7 +55,7 @@ export type IAdapterMessageOpenOptions = Readonly<{
 
 /** A held resource constructs its own complete channel, never signs an external transport. */
 export type IAdapterMessageResource = Readonly<{
-  receiveInitial(initial?: IAdapterInitialMessageResource): Promise<unknown>
+  receiveInitial(initial?: IAdapterInitialMessageResource, bounded?: true): Promise<unknown>
   prepareControl(
     offer: readonly string[],
     bootstrap?: IAdapterInitialMessageResource

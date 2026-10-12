@@ -36,6 +36,15 @@ export const RpcProcessErrorText = {
   handshakeTimeoutInvalid: 'process channel handshake timeout is invalid',
   /** Process plugin admission rejects malformed deployment configuration before any side effect. */
   pluginInvalidOption: 'process plugin options are invalid',
+  /** TCP and platforms without enforced owner-only endpoint access require caller credentials. */
+  localTokenRequired: 'process endpoint requires an explicit token',
+  /** The named Unix endpoint may only use a directory already owned exclusively by this OS user. */
+  localPermissionsRequired: 'process named endpoint requires an owner-only directory',
+  /**
+   * A foreign peer needs its real local facade declaration before the canonical bridge can admit
+   * it.
+   */
+  jsonrpcContractRequired: 'JSON-RPC spawn requires a local contract',
   /** Resilience construction rejects an invalid limit or missing ownership or health port. */
   resilienceInvalidOption: 'process resilience options are invalid',
   /** The report schedule field name is stable in invalid-option detail diagnostics. */

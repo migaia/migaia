@@ -1,4 +1,6 @@
 /** Adapter admission and presentation retain canonical owners without exposing trust writers. */
+export { resolveAdapterEntry, retainAdapterRuntimeFlags } from './runtime-adapter/entry.js'
+export type { IAdapterEntryOptions } from './runtime-adapter/entry.js'
 /** The one JSON-RPC wire owner accepts only held bytes and local presentation operations. */
 export {
   createAdapterJsonRpcChannel,

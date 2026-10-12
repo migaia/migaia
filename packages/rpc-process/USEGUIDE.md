@@ -77,6 +77,27 @@ await createProcessPeer({
 
 ## 3. spawn 来源：启动并拥有子进程
 
+普通 TS 子进程用 `spawn: './service.ts'` 或 `spawn: new URL('./service.js', import.meta.url)`；`spawn: true` 重跑主入口。
+
+```ts doc-test=run file=self.ts
+import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'
+
+type IEchoApi = { echo(value: string): string }
+if (isProcessChild()) await createProcessPeer({ provide: { echo: (value: string) => value } })
+else {
+  const child = await createProcessPeer<IEchoApi>({ spawn: true })
+  try { console.log(await child.request('echo', 'hello')) } finally { await child.close() }
+}
+```
+
+`isProcessChild()` 只表示本入口由既有 launcher bootstrap 启动，不授予信任。它在发现过程消费 env 标记后仍返回 `true`。子进程执行整个模块，包括顶层初始化；应把父进程启动逻辑放进 `else`。
+
+相对字符串按主入口目录解析；显式 URL 不受当前工作目录影响。短对象可用 `{ entry: './service.ts', base: import.meta.url }` 指定基准。Node/Bun 继承 `process.execArgv`，所以父入口的 loader 会继续生效；Node 原生类型剥离不解析 `.js` 指向 `.ts` 的 imports，Node/Deno 此类项目要构建输出或 loader，Bun 可直接解析。失败保留原监督错误及其 cause 与 stderr 诊断，不把错误改成成功。
+
+自派生不支持 REPL、eval、Electron、测试运行器及无可用主模块的单文件可执行程序；传精确 URL 或 `{ command, args }`。Deno 默认用 `run` 与 bootstrap 的 env 权限；额外权限通过显式 command/args 提供。
+
+短对象的 `args`、`cwd`、`env`、`stdio`、`limits`、`permissions`、`supervision` 可以覆盖默认值。默认每源创建一个 process budget、随机 stdin token、byte channel 与 best-effort supervisor。省略 `report` 使用 `console.error`；默认终止能力提示每进程只报一次，`onNotice` 接收原提示对象。完整来源不改变现有行为。
+
 `spawn` 对象把四件事组合在一起：**怎么启动**（`supervision`）、**拿哪条通道**（`rawChannel`）、**怎么握手**（`establish`）、**用什么凭据**（`token`）。README 中的 `createNodeServiceSpawn` 是一个完整、可复用的实现，下表解释每个字段。
 
 | 字段                       | 说明                                                                                                                        |
@@ -159,6 +180,30 @@ service.stream('feed.count', 3) // AsyncIterableIterator<number>
 不传泛型时没有可调用的方法类型。需要按字符串动态调用时，用 `IRuntimeDynamicSurface`：它只放宽编译期检查，运行时仍按对端实际目录拒绝未知方法。
 
 ## 5. 连接已运行的服务：connect 与 listen
+
+普通名称自动映射同一用户的本机端点，适合独立启动的程序。连接端先启动时，默认等最多 5000 ms；`connectTimeoutMs` 修改这个等待上限。
+
+```ts doc-test=run file=named.ts
+import { createProcessPeer } from '@migaia/rpc-process'
+
+type IMathApi = { math: { double(value: number): number } }
+const server = await createProcessPeer({ listen: 'math-service', provide: { math: { double: (value: number) => value * 2 } } })
+const client = await createProcessPeer<IMathApi>({ connect: 'math-service' })
+try { console.log(await client.request('math.double', 21)) } finally { await client.close(); await server.close() }
+```
+
+POSIX named endpoint 使用 0700 用户目录与 0600 socket，并复用已有 Unix owner record；第二个同名 listener 拒绝，只有相同服务的崩溃遗留 inode 可以回收。Node-compatible socket API 未提供 peer-credential 读取接口，因此访问控制来自 OS 文件权限。这个边界允许**该用户的任何进程**接入；显式 `token` 可以进一步限制同用户应用。TCP、显式 socket 路径及本 adapter 未提供 ACL 的 Windows named pipe 必须给 token。内部 same-user hello 标记是公开协议值，不是 secret，也不代替 OS 权限。
+
+```ts doc-test=run file=tcp.ts
+import { createProcessPeer } from '@migaia/rpc-process'
+
+const token = 'local-example-secret'
+const server = await createProcessPeer({ listen: 'tcp://127.0.0.1:4000', token, provide: { echo: (value: string) => value } })
+const client = await createProcessPeer<{ echo(value: string): string }>({ connect: 'tcp://127.0.0.1:4000', token })
+try { console.log(await client.request('echo', 'hello')) } finally { await client.close(); await server.close() }
+```
+
+完整监听与连接来源如下。
 
 当服务进程不是由你启动的（例如常驻守护进程），服务端用 `listen` 接受连接，客户端用 `connect` 连接。两端都通过握手认证：服务端的 `verify` 校验客户端提供的 `token`。
 
