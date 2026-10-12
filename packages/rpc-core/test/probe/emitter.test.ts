@@ -240,3 +240,36 @@ it('[A1] one transport retains its canonical observer and rolls back a conflicti
   release()
   expect(readInstalledProbe(transport)).toBeUndefined()
 })
+
+it('[A1] method filtering applies only to logical and envelope stages from the frozen contract', () => {
+  /** Only stages whose contract knows the method participate in method selection. */
+  const seen: number[] = []
+  /** Peer and frame observations remain available even when a logical method filter is configured. */
+  const probe = defineProbe({
+    stages: ['peer', 'message', 'envelope', 'frame'],
+    methods: ['selected'],
+    emit: (view) => {
+      seen.push(view.stage)
+    }
+  })
+  /** Source-side filtering follows contract §4, without inventing frame metadata. */
+  const emitter = createProbeEmitter([probe], () => 0, 'methods')
+  emitter.message(
+    0,
+    0,
+    1,
+    'message',
+    'other',
+    undefined,
+    undefined,
+    undefined,
+    -1,
+    undefined,
+    undefined
+  )
+  emitter.envelope(0, 'envelope', 'other', -1, undefined)
+  emitter.frame(0, 'frame', -1, -1, -1, undefined)
+  emitter.peer('ready', undefined, undefined)
+  expect(seen).toEqual([RpcProbeStage.frame, RpcProbeStage.peer])
+  emitter.dispose()
+})
