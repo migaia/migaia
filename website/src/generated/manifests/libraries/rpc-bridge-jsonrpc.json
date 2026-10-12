@@ -14,15 +14,129 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "外部语言 JSON-RPC。使用 `createJsonRpcRemoteChannel` 绑定 `@migaia/rpc-process` 提供的实际有序字节通道；普通 framing 工具来自 `@migaia/rpc-contract/framing/jsonrpc`。"
+                "text": "与非 TypeScript 语言互通的 JSON-RPC 桥。 让 Node / Bun / Deno 端用与其它 RPC 包相同的 `request` / `notify` 调用 Python、Go、Rust 等语言实现的服务。对端只需要实现标准 JSON-RPC 2.0（Content-Length 分帧），再加四个 `migaia.*` 扩展方法，不需要引入任何 migaia 的库。"
+              }
+            ]
+          },
+          {
+            "id": "适用与不适用场景",
+            "heading": "适用与不适用场景",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "适用："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "主程序是 TypeScript，部分能力由 Python / Go / Rust 等语言的子进程或本机服务提供。",
+                  "对端已经有 JSON-RPC 实现，或者希望用最少的代码接入。"
+                ]
               },
               {
                 "type": "paragraph",
-                "text": "RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不发布；仓内消费方直接导入各公开包。同一 realm 的第二份模块实例在取得资源前抛出 native Error，source 为 `@migaia/rpc/core`、code 为 `DUPLICATE_MODULE_INSTANCE`；修复依赖解析并重载 realm。不同 Worker realm 独立。既有六个语义 source、wire 与错误身份保持不变。"
+                "text": "不适用："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "对端也是 TypeScript：直接用 `@migaia/rpc-process` 的原生协议，功能更全。",
+                  "需要 `stream`（流式返回）或 `transfer`：桥接协议不支持，包含 stream 方法的声明会以 `JSONRPC_UNSUPPORTED_MODE` 拒绝。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "安装",
+            "heading": "安装",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "bash",
+                "code": "pnpm add @migaia/rpc-bridge-jsonrpc @migaia/rpc-process @migaia/rpc-core @migaia/rpc-contract"
               },
               {
                 "type": "paragraph",
-                "text": "完整使用边界见 USEGUIDE。"
+                "text": "`@migaia/rpc-core`、`@migaia/rpc-contract`、`@migaia/rpc-process` 是 peer 依赖，版本必须与本包完全一致（当前 `0.0.7`）。本包通过 `@migaia/rpc-process` 获得子进程或 socket 的字节通道。"
+              }
+            ]
+          },
+          {
+            "id": "工作方式",
+            "heading": "工作方式",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "text",
+                "code": "TypeScript（本包）                              对端（任意语言）\ncreateRuntimePeer\n  └─ createJsonRpcRemoteChannel ── Content-Length + JSON-RPC 2.0 ──► migaia.hello     认证与能力协商\n                                                                     migaia.describe  返回可调用方法目录\n     request('math.add', …)  ───────────────────────────────────────► migaia.invoke   执行业务方法\n     取消                    ───────────────────────────────────────► migaia.cancel   取消在途调用"
+              },
+              {
+                "type": "paragraph",
+                "text": "1. 本包在你提供的字节通道上发送 `migaia.hello`，携带会话 token。对端校验后回复 accept，并列出它实现的四个扩展方法。 2. 本包调用 `migaia.describe` 获取对端的方法目录。之后只有目录中的方法可以调用。 3. 每次 `request` 被翻译为一次 `migaia.invoke`。`notify` 是不带 `id` 的 `migaia.invoke`，对端不回复。多个并发调用会合并成 JSON-RPC 批量数组发送。 4. 对端返回的错误会被还原为带 `(source, code)` 的错误对象。"
+              }
+            ]
+          },
+          {
+            "id": "快速开始",
+            "heading": "快速开始",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "TypeScript 端启动一个 Python 子进程并调用它（对端实现见 USEGUIDE 第 4 节，约 100 行，只用标准库）："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\nimport { createRuntimePeer } from '@migaia/rpc-core/remote'\nimport type { IRemoteContract, IRuntimeTypedPeer } from '@migaia/rpc-core/remote'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { RpcCapability } from '@migaia/rpc-contract'\nimport { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'\n\ntype IPythonApi = {\n  echo: (values: string[]) => string[]\n  math: { add: (pair: [number, number]) => number }\n}\n// 本地声明：桥接只用它做调用前校验（必须没有 stream 方法）。可调用目录以对端 describe 为准。\nconst contract: IRemoteContract = {\n  schemaVersion: 1,\n  plugin: 'python-service',\n  features: { math: { methods: { add: { mode: 'request', idempotent: true } } } }\n}\nconst report = (error: unknown) => console.error(error)\nconst launcher = createNodeProcessLauncher()\nconst token = randomBytes(32).toString('base64url')\nlet handle: Awaited<ReturnType<typeof launcher.launch>> | undefined\n\n// createRuntimePeer 本身不带泛型；用 IRuntimeTypedPeer 标注远端方法类型。\nconst python = (await createRuntimePeer({\n  self: { name: 'node-client', instanceId: 'node-client-1' },\n  connect: async (context) => {\n    handle = await launcher.launch(\n      {\n        command: 'python3',\n        args: [fileURLToPath(new URL('./service.py', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      },\n      { signal: new AbortController().signal, output: () => undefined }\n    )\n    return createJsonRpcRemoteChannel({\n      byte: handle.channel!,\n      peerId: 'python-service',\n      target: { kind: 'plugin', contract },\n      offer: {\n        versions: [{ major: 1, minor: 1 }],\n        peer: { id: context.self.instanceId, runtime: 'node' },\n        capabilities: [RpcCapability.deadline, RpcCapability.trace]\n      },\n      token,\n      scheduler: systemScheduler,\n      wallClock: systemWallClock,\n      ipc: { connectionId: 'python-1', sessionId: 'python-1', log: () => undefined },\n      report\n    })\n  },\n  report\n})) as IRuntimeTypedPeer<IPythonApi>\ntry {\n  console.log(await python.request('echo', ['hello', 'python'])) // ['hello', 'python']\n  console.log(await python.request('math.add', [20, 22])) // 42\n} finally {\n  await python.close() // 关闭本端连接\n  handle?.terminate('force') // 子进程由启动它的 launcher 负责结束\n  await handle?.exited\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`connect` 来源只拥有这条连接，不拥有子进程，所以示例在 `finally` 中自己结束子进程。"
+              }
+            ]
+          },
+          {
+            "id": "错误",
+            "heading": "错误",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["source", "典型 code", "含义"],
+                "rows": [
+                  [
+                    "`@migaia/rpc/bridge/jsonrpc`",
+                    "`JSONRPC_FRAME_INVALID`、`JSONRPC_EXTENSION_MISSING`、`JSONRPC_PROFILE_INVALID`、`JSONRPC_UNSUPPORTED_MODE`、`JSONRPC_HANDSHAKE_TIMEOUT`",
+                    "分帧、扩展方法、配置、模式或握手问题"
+                  ],
+                  [
+                    "`@migaia/rpc/core`",
+                    "`DEADLINE_EXCEEDED`、`CANCELLED`、`PROVIDER_NOT_FOUND`",
+                    "调用层错误"
+                  ]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "对端业务方法抛出的错误以 `RpcRemoteError` 呈现，对端给出的 source / code 保留在 `cause` 上。详见 USEGUIDE 第 6 节。"
+              }
+            ]
+          },
+          {
+            "id": "相关包",
+            "heading": "相关包",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["包", "关系"],
+                "rows": [
+                  ["`@migaia/rpc-process`", "提供子进程与本机 socket 字节通道"],
+                  ["`@migaia/rpc-core`", "`createRuntimePeer` 与调用语义"],
+                  ["`@migaia/rpc-contract`", "Content-Length 分帧工具、错误码常量、wire 错误转换"]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "完整的对端协议说明、Python 参考实现与错误处理见 USEGUIDE。"
               }
             ]
           }
@@ -31,64 +145,405 @@
       "guide": {
         "sections": [
           {
-            "id": "migaia-rpc-bridge-jsonrpc-使用指南",
-            "heading": "@migaia/rpc-bridge-jsonrpc 使用指南",
+            "id": "migaia-rpc-bridge-jsonrpc-使用手册",
+            "heading": "@migaia/rpc-bridge-jsonrpc 使用手册",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "使用 `createJsonRpcRemoteChannel` 绑定 `@migaia/rpc-process` 提供的实际有序字节通道；普通 framing 工具来自 `@migaia/rpc-contract/framing/jsonrpc`。"
-              },
-              {
-                "type": "code",
-                "language": "ts",
-                "code": "import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\nimport { encodeJsonRpcFrame, createJsonRpcFrameDecoder } from '@migaia/rpc-contract/framing/jsonrpc'"
-              },
-              {
-                "type": "paragraph",
-                "text": "此包仅用于外部语言 peer。握手、相关 ID、已协商 batch、invoke/cancel 与错误链沿原 JSON-RPC profile 执行；不为不支持的 stream 或 transfer 模式增加 fallback。非法 frame、UTF-8 或 JSON 仍终止连接，cancel 不新增 ACK。Core 的完整通道操作保留实际 transport、object port 与 batch 状态。"
-              },
-              {
-                "type": "paragraph",
-                "text": "RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不发布；仓内消费方直接导入各公开包。同一 realm 的第二份模块实例在取得资源前抛出 native Error，source 为 `@migaia/rpc/core`、code 为 `DUPLICATE_MODULE_INSTANCE`；修复依赖解析并重载 realm。不同 Worker realm 独立。既有六个语义 source、wire 与错误身份保持不变。"
-              },
-              {
-                "type": "paragraph",
-                "text": "包内使用相对路径；跨包调用只使用公开 API。协议工具使用 `@migaia/rpc-contract`，Core/Remote/Testing 使用 `@migaia/rpc-core` 的普通入口。"
-              },
-              {
-                "type": "paragraph",
-                "text": "从包根导入 `JSONRPC_BRIDGE_ERROR_SOURCE` 和 `JsonRpcBridgeErrorCode`，用原 `@migaia/rpc/bridge/jsonrpc` source 与 code 识别 frame/profile/扩展/握手失败。`JsonRpcBridgeErrorText` 已从公开面删除，这是更名后包的破坏性导出变更。外部语言 peer 通过 `@migaia/rpc-contract/errors` 的 `toJsonRpcError`、`fromJsonRpcError` 和 `RpcJsonRpcWireError.dataKey` 保留完整 wire 错误树；JSON-RPC 整数 code 仍由 peer profile 决定。消息与 wire source/code 均不授予 Core 运行时权限。"
+                "text": "本手册面向两类读者：在 TypeScript 端使用桥接的应用开发者（第 1–3、6 节），以及用其它语言实现对端的开发者（第 4–5 节）。安装与最短示例见 README。"
               }
             ]
           },
           {
-            "id": "advanced-usage-把真实字节连接接入-runtime-peer",
-            "heading": "Advanced usage：把真实字节连接接入 Runtime Peer",
+            "id": "目录",
+            "heading": "目录",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "外部语言服务先在自己的连接上实现 `migaia.hello`、`migaia.describe`、`migaia.invoke` 与 `migaia.cancel`，并在实际 v2 目录公开 `echo`。应用取得真实有序 `heldByteIO`，由自己的认证 issuer 提供 `issuedToken`；`remoteContract` 是该服务现有的本地声明，`localOffer` 是受支持 JSON-RPC profile 的真实本端提案。它们是协议输入，不能给其它 transport 授 owned 或 native 控制权限。"
+                "text": "1. TypeScript 端：createJsonRpcRemoteChannel 2. 获得字节通道：子进程与本机 socket 3. 调用与限制 4. 对端最小实现（Python） 5. 高阶用法：对端协议规范 6. 错误处理 7. 常见问题"
+              }
+            ]
+          },
+          {
+            "id": "1-typescript-端-createjsonrpcremotechannel",
+            "heading": "1. TypeScript 端：createJsonRpcRemoteChannel",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'"
               },
               {
                 "type": "paragraph",
-                "text": "下面从已存在的完整 bridge channel 操作接入普通 Runtime Peer："
+                "text": "`createJsonRpcRemoteChannel(options)` 在一条有序字节连接上完成 `migaia.hello` 握手，返回协议通道。它通常作为 `createRuntimePeer` 的 `connect` 来源使用（完整示例见 README）。"
+              },
+              {
+                "type": "table",
+                "headers": ["选项", "说明"],
+                "rows": [
+                  [
+                    "`byte`",
+                    "有序字节连接（`IProcessByteChannel`），来自 `@migaia/rpc-process` 的 launcher handle 或 socket 适配器。"
+                  ],
+                  ["`peerId`", "对端标识。"],
+                  [
+                    "`target`",
+                    "`{ kind: 'plugin', contract }`（单个服务）或 `{ kind: 'host', catalog }`（对端是一个插件宿主）。见下文。"
+                  ],
+                  [
+                    "`offer`",
+                    "本端提议：`versions`、`peer: { id, runtime }`、`capabilities`。`codecs` 与 `auth` 由本包填写。"
+                  ],
+                  [
+                    "`offer.capabilities`",
+                    "只能从 `deadline@1`、`trace@1`、`idempotency@1`（以及桥接必需能力）中选择；其它能力以 `JSONRPC_PROFILE_INVALID` 拒绝。"
+                  ],
+                  ["`token`", "会话凭据，随 `migaia.hello` 发给对端认证。"],
+                  [
+                    "`scheduler`、`wallClock`",
+                    "计时依赖，通常用 `@migaia/utils/scheduler` 的 `systemScheduler` 与 `systemWallClock`。"
+                  ],
+                  ["`ipc`", "`{ connectionId, sessionId, log }`：诊断标签与日志回调。"],
+                  [
+                    "`handshakeTimeoutMs`",
+                    "可选，握手超时；超时以 `JSONRPC_HANDSHAKE_TIMEOUT` 失败。"
+                  ],
+                  ["`signal`", "可选，取消握手。"],
+                  ["`report`", "接收后台错误。"]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "关于 `target.contract`：它是本地声明，桥接只用它在建立连接前校验\"没有 stream 方法\"。真正可以调用的方法以对端 `migaia.describe` 返回的目录为准；调用目录之外的方法会以 `PROVIDER_NOT_FOUND` 拒绝。"
+              },
+              {
+                "type": "paragraph",
+                "text": "必需能力 `jsonrpc-bridge@1`、`runtime-api@1`、`batch@1`、`abort@1`、`wire-error@1` 由本包自动加入提议，不需要在 `offer.capabilities` 中列出。"
+              }
+            ]
+          },
+          {
+            "id": "2-获得字节通道-子进程与本机-socket",
+            "heading": "2. 获得字节通道：子进程与本机 socket",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "子进程：用 `@migaia/rpc-process` 的 launcher 启动对端，取 `handle.channel`。`spec.stdio` 设为 `{ stdin: 'channel', stdout: 'channel', stderr: 'drain' }`，对端从 stdin 读、向 stdout 写；stderr 由库持续读取，对端可以放心向 stderr 写日志。用 `bootstrap: { via: 'stdin', payload }` 把 token 交给对端，对端会先读到一个\"4 字节大端长度 + 内容\"的 bootstrap 帧（见第 5.1 节）。"
+              },
+              {
+                "type": "paragraph",
+                "text": "本机 socket：对端已经在监听时，用 `@migaia/rpc-process/adapters/node-socket` 的 `dialProcessByteChannel({ address })` 拨号，把返回的通道作为 `byte`。token 需要通过你自己的方式（例如配置或密钥服务）让双方事先共享。"
+              },
+              {
+                "type": "paragraph",
+                "text": "所有权：`connect` 来源只拥有这条连接。`peer.close()` 关闭连接，但不会结束对端进程；如果进程是你启动的，用 `handle.terminate()` 结束它。"
+              }
+            ]
+          },
+          {
+            "id": "3-调用与限制",
+            "heading": "3. 调用与限制",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["调用", "映射到", "说明"],
+                "rows": [
+                  ["`request(method, payload)`", "带 `id` 的 `migaia.invoke`", "等待对端回复"],
+                  ["`notify(method, payload)`", "不带 `id` 的 `migaia.invoke`", "对端执行但不回复"],
+                  [
+                    "并发的多个调用",
+                    "JSON-RPC 批量数组",
+                    "对端按数组顺序处理，并以数组回复（notify 不出现在回复中）"
+                  ],
+                  [
+                    "`signal` / 超时取消",
+                    "`migaia.cancel`",
+                    "通知对端放弃该调用；不等待确认，不回滚已发生的副作用"
+                  ],
+                  ["`stream`", "—", "不支持"],
+                  ["`transfer`", "—", "不支持"]
+                ]
+              },
+              {
+                "type": "list",
+                "items": [
+                  "payload 必须是数组，作为对端方法的位置参数列表；传入非数组以 `JSONRPC_PROFILE_INVALID` 拒绝。",
+                  "数据经 JSON 编码。跨语言传整数时，超过 ±(2^53 − 1) 的值请用字符串表示。",
+                  "帧、UTF-8 或 JSON 格式非法时连接会被终止（`JSONRPC_FRAME_INVALID`）。",
+                  "收到未知 `id` 或迟到的回复会被报告并丢弃，不影响其它调用。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "4-对端最小实现-python",
+            "heading": "4. 对端最小实现（Python）",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "下面的实现只依赖 Python 标准库，已与 README 中的 TypeScript 端实际联调通过：`request`、`notify`、并发批量调用和业务错误都按预期工作。把它保存为 `service.py`，即可作为其它语言实现的参照。"
+              },
+              {
+                "type": "code",
+                "language": "python",
+                "code": "\"\"\"A minimal migaia JSON-RPC bridge responder using only the Python standard library.\"\"\"\nimport json\nimport struct\nimport sys\n\n# 本端提供的业务方法：只支持 request / notify，不支持 stream。\nMETHODS = {\n    \"echo\": lambda args: args,\n    \"math.add\": lambda args: args[0] + args[1],\n}\n# 本端握手时声明的能力；前五项是桥接协议的必需能力。\nCAPABILITIES = [\"jsonrpc-bridge@1\", \"runtime-api@1\", \"batch@1\", \"abort@1\", \"wire-error@1\",\n                \"deadline@1\", \"trace@1\", \"idempotency@1\"]\nPEER = {\"id\": \"python-service\", \"runtime\": \"python\"}\n\nstdin, stdout = sys.stdin.buffer, sys.stdout.buffer\n\n\ndef read_exact(size):\n    data = stdin.read(size)\n    if len(data) != size:\n        raise SystemExit(0)\n    return data\n\n\ndef read_message():\n    \"\"\"Read one Content-Length frame; return None at EOF.\"\"\"\n    header = b\"\"\n    while not header.endswith(b\"\\r\\n\\r\\n\"):\n        byte = stdin.read(1)\n        if not byte:\n            return None\n        header += byte\n    length = next(int(line.split(b\":\", 1)[1]) for line in header.split(b\"\\r\\n\")\n                  if line.lower().startswith(b\"content-length:\"))\n    return json.loads(read_exact(length).decode(\"utf-8\"))\n\n\ndef write_message(message):\n    body = json.dumps(message, ensure_ascii=False, separators=(\",\", \":\")).encode(\"utf-8\")\n    stdout.write(b\"Content-Length: %d\\r\\n\\r\\n\" % len(body) + body)\n    stdout.flush()\n\n\ndef wire_error(code, message):\n    \"\"\"JSON-RPC error carrying the migaia wire error tree in data.migaiaWireError.\"\"\"\n    return {\"code\": -32000, \"message\": message, \"data\": {\"migaiaWireError\": {\n        \"source\": \"python-service\", \"code\": code, \"name\": \"Error\",\n        \"message\": message, \"stack\": \"Error: \" + message}}}\n\n\ndef handle(message, state):\n    method, params, ident = message.get(\"method\"), message.get(\"params\", {}), message.get(\"id\")\n    if method == \"migaia.hello\":\n        hello = json.loads(params[\"hello\"])\n        ok = hello.get(\"auth\") == state[\"token\"] and {\"major\": 1, \"minor\": 1} in hello[\"versions\"]\n        state[\"authenticated\"] = ok\n        if ok:\n            reply = {\"kind\": \"handshake\", \"step\": \"accept\", \"protocol\": \"migaia.rpc\",\n                     \"major\": 1, \"minor\": 1, \"codec\": \"json\", \"peer\": PEER,\n                     \"capabilities\": [c for c in hello[\"capabilities\"] if c in CAPABILITIES]}\n        else:\n            reply = {\"kind\": \"handshake\", \"step\": \"reject\", \"protocol\": \"migaia.rpc\",\n                     \"error\": wire_error(\"AUTH_REJECTED\", \"authentication rejected\")[\"data\"][\"migaiaWireError\"]}\n        result = {\"reply\": json.dumps(reply), \"methods\": [\"migaia.hello\", \"migaia.describe\",\n                                                          \"migaia.invoke\", \"migaia.cancel\"]}\n        return {\"jsonrpc\": \"2.0\", \"id\": ident, \"result\": result}\n    if not state[\"authenticated\"]:\n        raise SystemExit(1)\n    if method == \"migaia.describe\":\n        return {\"jsonrpc\": \"2.0\", \"id\": ident, \"result\": {\n            \"schemaVersion\": 2, \"self\": {\"name\": \"python-service\", \"instanceId\": PEER[\"id\"]},\n            \"methods\": [{\"name\": name, \"supportedModes\": [\"request\", \"notify\"], \"modeSource\": \"declared\"}\n                        for name in METHODS]}}\n    if method == \"migaia.cancel\":\n        return None  # 本示例的方法都是同步完成，没有可取消的在途调用\n    if method == \"migaia.invoke\":\n        provider = METHODS.get(params[\"method\"])\n        if ident is None:  # 无 id 即 notify：执行但不回复\n            if provider:\n                provider(params[\"args\"])\n            return None\n        if provider is None:\n            return {\"jsonrpc\": \"2.0\", \"id\": ident,\n                    \"error\": wire_error(\"PROVIDER_NOT_FOUND\", \"method not found\")}\n        try:\n            return {\"jsonrpc\": \"2.0\", \"id\": ident, \"result\": provider(params[\"args\"])}\n        except Exception as error:  # 业务异常转换为 wire error\n            return {\"jsonrpc\": \"2.0\", \"id\": ident, \"error\": wire_error(\"BUSINESS\", str(error))}\n    return {\"jsonrpc\": \"2.0\", \"id\": ident, \"error\": {\"code\": -32601, \"message\": \"method not found\"}}\n\n\ndef main():\n    # 父进程先写入一个 4 字节大端长度前缀的 bootstrap 帧，内容是会话 token。\n    (length,) = struct.unpack(\">I\", read_exact(4))\n    state = {\"token\": read_exact(length).decode(\"utf-8\"), \"authenticated\": False}\n    while (message := read_message()) is not None:\n        if isinstance(message, list):  # 已协商 batch：逐个处理，按顺序回复数组\n            replies = [r for r in (handle(m, state) for m in message) if r is not None]\n            if replies:\n                write_message(replies)\n        else:\n            reply = handle(message, state)\n            if reply is not None:\n                write_message(reply)\n\n\nmain()"
+              },
+              {
+                "type": "paragraph",
+                "text": "实现要点："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "先读 bootstrap 帧拿到 token，再进入 Content-Length 消息循环。",
+                  "握手通过前，除 `migaia.hello` 外的任何消息都应拒绝（示例直接退出）。",
+                  "握手回复中的 `capabilities` 必须包含五个必需能力，`methods` 必须列出全部四个扩展方法，否则 TypeScript 端以 `JSONRPC_EXTENSION_MISSING` 拒绝。",
+                  "回复写到 stdout，日志写到 stderr，不要把日志混进 stdout。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "5-高阶用法-对端协议规范-5-1-分帧",
+            "heading": "5. 高阶用法：对端协议规范 · 5.1 分帧",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "bootstrap 帧（仅子进程场景、启用 `bootstrap` 时）：连接建立后，对端最先从 stdin 收到一个 4 字节大端无符号长度，紧接着是该长度的 UTF-8 内容（通常是 token）。之后才是 JSON-RPC 消息。",
+                  "消息帧：`Content-Length: <字节数>\\r\\n\\r\\n<UTF-8 JSON>`。长度按 UTF-8 字节计算，不是字符数。头部不超过 1024 字节，单帧不超过 16 MiB。",
+                  "消息体是一个 JSON-RPC 2.0 对象，或者（握手成功后）一个由这些对象组成的数组（批量）。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "5-高阶用法-对端协议规范-5-2-migaia-hello-握手",
+            "heading": "5. 高阶用法：对端协议规范 · 5.2 migaia.hello：握手",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "请求："
+              },
+              {
+                "type": "code",
+                "language": "json",
+                "code": "{ \"jsonrpc\": \"2.0\", \"id\": \"…\", \"method\": \"migaia.hello\", \"params\": { \"hello\": \"<JSON 字符串>\" } }"
+              },
+              {
+                "type": "paragraph",
+                "text": "`params.hello` 是一个 JSON 字符串，解析后为："
+              },
+              {
+                "type": "code",
+                "language": "json",
+                "code": "{\n  \"kind\": \"handshake\", \"step\": \"hello\", \"protocol\": \"migaia.rpc\",\n  \"versions\": [{ \"major\": 1, \"minor\": 1 }],\n  \"codecs\": [\"json\"],\n  \"capabilities\": [\"jsonrpc-bridge@1\", \"runtime-api@1\", \"batch@1\", \"abort@1\", \"wire-error@1\", \"deadline@1\"],\n  \"peer\": { \"id\": \"node-client-1\", \"runtime\": \"node\" },\n  \"auth\": \"<token>\"\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "对端校验 `auth`，选出双方共同的版本（目前为 1.1）、codec（`json`）与能力，然后回复："
+              },
+              {
+                "type": "code",
+                "language": "json",
+                "code": "{\n  \"jsonrpc\": \"2.0\", \"id\": \"…\",\n  \"result\": {\n    \"reply\": \"<JSON 字符串>\",\n    \"methods\": [\"migaia.hello\", \"migaia.describe\", \"migaia.invoke\", \"migaia.cancel\"]\n  }\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`result.reply` 是一个 JSON 字符串。接受时为："
+              },
+              {
+                "type": "code",
+                "language": "json",
+                "code": "{ \"kind\": \"handshake\", \"step\": \"accept\", \"protocol\": \"migaia.rpc\",\n  \"major\": 1, \"minor\": 1, \"codec\": \"json\",\n  \"capabilities\": [\"…双方都支持的能力，按请求中的顺序…\"],\n  \"peer\": { \"id\": \"python-service\", \"runtime\": \"python\" } }"
+              },
+              {
+                "type": "paragraph",
+                "text": "拒绝时为 `{ \"kind\": \"handshake\", \"step\": \"reject\", \"protocol\": \"migaia.rpc\", \"error\": <wire error> }`，wire error 的结构见 5.6 节；凭据错误用 code `AUTH_REJECTED`。"
+              }
+            ]
+          },
+          {
+            "id": "5-高阶用法-对端协议规范-5-3-migaia-describe-方法目录",
+            "heading": "5. 高阶用法：对端协议规范 · 5.3 migaia.describe：方法目录",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "请求 `params` 为 `{ \"args\": [] }`，回复："
+              },
+              {
+                "type": "code",
+                "language": "json",
+                "code": "{\n  \"schemaVersion\": 2,\n  \"self\": { \"name\": \"python-service\", \"instanceId\": \"python-service\" },\n  \"methods\": [\n    { \"name\": \"echo\", \"supportedModes\": [\"request\", \"notify\"], \"modeSource\": \"declared\" },\n    { \"name\": \"math.add\", \"supportedModes\": [\"request\", \"notify\"], \"modeSource\": \"declared\" }\n  ]\n}"
+              },
+              {
+                "type": "list",
+                "items": [
+                  "`self.instanceId` 必须与握手回复中的 `peer.id` 一致。",
+                  "`supportedModes` 只能包含 `request` 与 `notify`；出现 `stream` 时 TypeScript 端以 `JSONRPC_UNSUPPORTED_MODE` 拒绝。",
+                  "可选字段 `idempotent: boolean` 声明该方法是否幂等。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "5-高阶用法-对端协议规范-5-4-migaia-invoke-调用",
+            "heading": "5. 高阶用法：对端协议规范 · 5.4 migaia.invoke：调用",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "json",
+                "code": "{ \"jsonrpc\": \"2.0\", \"id\": \"7\", \"method\": \"migaia.invoke\",\n  \"params\": { \"method\": \"math.add\", \"args\": [20, 22], \"meta\": { \"timeoutMs\": 30000 } } }"
+              },
+              {
+                "type": "list",
+                "items": [
+                  "`params.args` 就是 TypeScript 端传入的 payload，必须是数组（按位置的参数列表）：`request('math.add', [20, 22])` 发出 `\"args\": [20, 22]`；不传 payload 时为 `[]`。",
+                  "`params.meta` 可选，只会包含 `timeoutMs`、`idempotencyKey`、`trace` 中实际设置了的字段。对端可以忽略它。",
+                  "成功：`{ \"jsonrpc\": \"2.0\", \"id\": \"7\", \"result\": 42 }`。",
+                  "没有 `id` 的 invoke 是 notify：执行，但不回复。",
+                  "方法不存在：回复 wire error，code 为 `PROVIDER_NOT_FOUND`。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "5-高阶用法-对端协议规范-5-5-migaia-cancel-取消",
+            "heading": "5. 高阶用法：对端协议规范 · 5.5 migaia.cancel：取消",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "json",
+                "code": "{ \"jsonrpc\": \"2.0\", \"method\": \"migaia.cancel\", \"params\": { \"id\": \"7\", \"reason\": \"…可选，取消原因…\" } }"
+              },
+              {
+                "type": "paragraph",
+                "text": "通知对端放弃 `id` 为 `\"7\"` 的在途调用。这是一条通知，对端不回复确认。之后再到达的该调用结果会被 TypeScript 端丢弃。"
+              }
+            ]
+          },
+          {
+            "id": "5-高阶用法-对端协议规范-5-6-错误格式",
+            "heading": "5. 高阶用法：对端协议规范 · 5.6 错误格式",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "业务失败时，按 JSON-RPC 规范回复 `error`，并把完整错误信息放在 `data.migaiaWireError`："
+              },
+              {
+                "type": "code",
+                "language": "json",
+                "code": "{\n  \"jsonrpc\": \"2.0\", \"id\": \"7\",\n  \"error\": {\n    \"code\": -32000,\n    \"message\": \"list index out of range\",\n    \"data\": {\n      \"migaiaWireError\": {\n        \"source\": \"python-service\", \"code\": \"BUSINESS\", \"name\": \"Error\",\n        \"message\": \"list index out of range\", \"stack\": \"Error: list index out of range\"\n      }\n    }\n  }\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "wire error 至少包含 `source`、`code`、`name`、`message`、`stack`；可选的 `cause` 与 `errors` 用于嵌套原因。JSON-RPC 整数 `code` 建议使用标准值：`-32700`（解析错误）、`-32600`（无效请求）、`-32601`（方法不存在）、`-32602`（参数无效）、`-32603`（内部错误）、`-32000`（业务错误）。"
+              },
+              {
+                "type": "paragraph",
+                "text": "TypeScript 实现的对端可以直接用 `@migaia/rpc-contract/errors` 的 `toJsonRpcError(serialized, code)` 与 `fromJsonRpcError(value)` 生成和解析这种格式，并用 `@migaia/rpc-contract/framing/jsonrpc` 的 `encodeJsonRpcFrame`、`createJsonRpcFrameDecoder` 处理 Content-Length 分帧。"
+              }
+            ]
+          },
+          {
+            "id": "5-高阶用法-对端协议规范-5-7-批量",
+            "heading": "5. 高阶用法：对端协议规范 · 5.7 批量",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "握手成功后，TypeScript 端可能把多个调用放进一个数组发送。对端应按数组顺序逐个处理，并把所有带 `id` 的回复按顺序放进一个数组写回；某个成员失败不影响其它成员。全是 notify 的批量不需要回复。"
+              }
+            ]
+          },
+          {
+            "id": "本包错误码",
+            "heading": "本包错误码",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "source 均为 `@migaia/rpc/bridge/jsonrpc`。"
+              },
+              {
+                "type": "table",
+                "headers": ["code", "何时发生", "处理"],
+                "rows": [
+                  [
+                    "`JSONRPC_FRAME_INVALID`",
+                    "头部、UTF-8、JSON 非法，或连接在一帧中途关闭；连接随之终止",
+                    "修正对端的分帧与编码；已发出的调用先对账"
+                  ],
+                  [
+                    "`JSONRPC_EXTENSION_MISSING`",
+                    "握手回复缺少必需能力或四个扩展方法",
+                    "对端补齐扩展实现"
+                  ],
+                  [
+                    "`JSONRPC_PROFILE_INVALID`",
+                    "本端选项不合法，或提议了桥接不支持的能力",
+                    "修正选项；原样重试无效"
+                  ],
+                  [
+                    "`JSONRPC_UNSUPPORTED_MODE`",
+                    "本地声明或对端目录中包含 stream 方法",
+                    "流式场景改用原生协议"
+                  ],
+                  [
+                    "`JSONRPC_HANDSHAKE_TIMEOUT`",
+                    "握手超时",
+                    "检查对端是否在读 stdin / socket，然后重新建立连接"
+                  ]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "这些常量从包根导入："
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\nimport { createRuntimePeer } from '@migaia/rpc-core/remote'\n\n/** 类型对应外部服务实际公开的 echo，不代替其握手目录或鉴权。 */\ntype IForeignApi = { echo: (payload: readonly string[]) => readonly string[] }\n\n/** Peer 只拥有这条已取得字节连接；本端身份与实际 offer 相同。 */\nconst peer = await createRuntimePeer<IForeignApi>({\n  self: { name: 'foreign-client', instanceId: localOffer.peer.id },\n  connect: () =>\n    createJsonRpcRemoteChannel({\n      byte: heldByteIO,\n      peerId,\n      target: { kind: 'plugin', contract: remoteContract },\n      offer: localOffer,\n      token: issuedToken,\n      scheduler,\n      wallClock,\n      ipc,\n      report\n    }),\n  report\n})\ntry {\n  console.log(await peer.request('echo', ['hello']))\n} finally {\n  await peer.close()\n}"
+                "code": "import { JSONRPC_BRIDGE_ERROR_SOURCE, JsonRpcBridgeErrorCode } from '@migaia/rpc-bridge-jsonrpc'"
+              }
+            ]
+          },
+          {
+            "id": "对端返回的业务错误",
+            "heading": "对端返回的业务错误",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "对端回复的 wire error 会被还原为 `RpcRemoteError`：顶层 `source` 为 `@migaia/rpc/core`，`code` 与 `message` 来自对端；对端给出的原始 `source` 与 `code` 保留在 `error.cause` 上。对端声明的 source / code 只用于诊断，不会被当作本地库的错误身份。"
+              }
+            ]
+          },
+          {
+            "id": "重试原则",
+            "heading": "重试原则",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "超时、取消或连接中断都不能证明对端没有执行。对非幂等方法，重试前请先确认结果，或者让对端在 `meta.idempotencyKey` 上实现去重。"
+              }
+            ]
+          },
+          {
+            "id": "7-常见问题",
+            "heading": "7. 常见问题",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "握手一直超时？ 确认对端在读 stdin（或 socket），并且回复写到了 stdout 而不是 stderr；确认先消费了 bootstrap 帧。"
               },
               {
                 "type": "paragraph",
-                "text": "`heldByteIO` 是 Process 包产生的实际 `IProcessByteChannel`，有序 write 的完成必须反映真实物理写入；不能把日志或复制 DTO 当通道。`peerId` 指向这条连接的实际对端，`scheduler`、`wallClock`、`ipc` 和 `report` 来自应用现有生命周期与报告策略。`localOffer` 只包含支持的 bridge capabilities，库在自己的握手边界加入 JSON codec 和必需扩展；不宣称原生进程控制、stream 或 transfer。"
+                "text": "对端日志打乱了协议？ stdout 只能输出协议帧，日志写 stderr。"
               },
               {
                 "type": "paragraph",
-                "text": "`connect` 创建并完成原认证 hello 后才向 Runtime Peer 交出该 channel。Core 继续拥有 framing、相关 ID、已协商 batch、错误链与 gated transport；业务只调用真实目录允许的 request/notify。非法 frame、UTF-8、JSON 或不支持的 mode 沿既有代码拒绝，`report` 保留原错误链，不能将失败消息解释成安全重执许可。"
+                "text": "需要流式返回？ 桥接不支持。可以拆成分页的 `request`，或者把对端改为原生协议实现。"
               },
               {
                 "type": "paragraph",
-                "text": "`peer.close()` 关闭本端通道并清理原监听/drain 资源；这个 connect source 不拥有外部进程的执行权限。若应用另外用 launcher 创建了服务，服务的 terminate/exited 仍交该 launcher owner 收尾，不因 bridge 成功或对端名称就转移控制权。"
+                "text": "对端能主动调用 TypeScript 端吗？ 桥接协议在同一连接上允许对端发送 `migaia.invoke`，调用 TypeScript 端 `provide` 的方法。本手册的示例只演示 TypeScript 端发起调用；需要反向调用时，请先在你的场景中验证。"
               }
             ]
           }
@@ -212,7 +667,7 @@
           "errors": ["No documented errors are declared for createJsonRpcRemoteChannel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createJsonRpcRemoteChannel.",
           "examples": [
-            "import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\nimport { createRuntimePeer } from '@migaia/rpc-core/remote'\n\n/** 类型对应外部服务实际公开的 echo，不代替其握手目录或鉴权。 */\ntype IForeignApi = { echo: (payload: readonly string[]) => readonly string[] }\n\n/** Peer 只拥有这条已取得字节连接；本端身份与实际 offer 相同。 */\nconst peer = await createRuntimePeer<IForeignApi>({\n  self: { name: 'foreign-client', instanceId: localOffer.peer.id },\n  connect: () =>\n    createJsonRpcRemoteChannel({\n      byte: heldByteIO,\n      peerId,\n      target: { kind: 'plugin', contract: remoteContract },\n      offer: localOffer,\n      token: issuedToken,\n      scheduler,\n      wallClock,\n      ipc,\n      report\n    }),\n  report\n})\ntry {\n  console.log(await peer.request('echo', ['hello']))\n} finally {\n  await peer.close()\n}"
+            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\nimport { createRuntimePeer } from '@migaia/rpc-core/remote'\nimport type { IRemoteContract, IRuntimeTypedPeer } from '@migaia/rpc-core/remote'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { RpcCapability } from '@migaia/rpc-contract'\nimport { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'\n\ntype IPythonApi = {\n  echo: (values: string[]) => string[]\n  math: { add: (pair: [number, number]) => number }\n}\n// 本地声明：桥接只用它做调用前校验（必须没有 stream 方法）。可调用目录以对端 describe 为准。\nconst contract: IRemoteContract = {\n  schemaVersion: 1,\n  plugin: 'python-service',\n  features: { math: { methods: { add: { mode: 'request', idempotent: true } } } }\n}\nconst report = (error: unknown) => console.error(error)\nconst launcher = createNodeProcessLauncher()\nconst token = randomBytes(32).toString('base64url')\nlet handle: Awaited<ReturnType<typeof launcher.launch>> | undefined\n\n// createRuntimePeer 本身不带泛型；用 IRuntimeTypedPeer 标注远端方法类型。\nconst python = (await createRuntimePeer({\n  self: { name: 'node-client', instanceId: 'node-client-1' },\n  connect: async (context) => {\n    handle = await launcher.launch(\n      {\n        command: 'python3',\n        args: [fileURLToPath(new URL('./service.py', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      },\n      { signal: new AbortController().signal, output: () => undefined }\n    )\n    return createJsonRpcRemoteChannel({\n      byte: handle.channel!,\n      peerId: 'python-service',\n      target: { kind: 'plugin', contract },\n      offer: {\n        versions: [{ major: 1, minor: 1 }],\n        peer: { id: context.self.instanceId, runtime: 'node' },\n        capabilities: [RpcCapability.deadline, RpcCapability.trace]\n      },\n      token,\n      scheduler: systemScheduler,\n      wallClock: systemWallClock,\n      ipc: { connectionId: 'python-1', sessionId: 'python-1', log: () => undefined },\n      report\n    })\n  },\n  report\n})) as IRuntimeTypedPeer<IPythonApi>\ntry {\n  console.log(await python.request('echo', ['hello', 'python'])) // ['hello', 'python']\n  console.log(await python.request('math.add', [20, 22])) // 42\n} finally {\n  await python.close() // 关闭本端连接\n  handle?.terminate('force') // 子进程由启动它的 launcher 负责结束\n  await handle?.exited\n}"
           ],
           "members": [],
           "exportPath": ".",
@@ -268,7 +723,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/index.d.ts:createJsonRpcRemoteChannel:export declare function createJsonRpcRemoteChannel(options: IJsonRpcBridgeOptions): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>;",
           "guidance": [],
-          "usageScore": 30,
+          "usageScore": 48,
           "configuration": [],
           "fragment": "rpc-bridge-jsonrpc-index--createJsonRpcRemoteChannel"
         },
@@ -478,7 +933,9 @@
           "returns": "No explicit return annotation is declared for this const.",
           "errors": ["No documented errors are declared for JSONRPC_BRIDGE_ERROR_SOURCE."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for JSONRPC_BRIDGE_ERROR_SOURCE.",
-          "examples": [],
+          "examples": [
+            "import { JSONRPC_BRIDGE_ERROR_SOURCE, JsonRpcBridgeErrorCode } from '@migaia/rpc-bridge-jsonrpc'"
+          ],
           "members": [],
           "aliasOf": "JSONRPC_BRIDGE_ERROR_SOURCE",
           "exportPath": ".",
@@ -523,8 +980,59 @@
           ],
           "declaredConfiguration": [],
           "identity": "@migaia/rpc-bridge-jsonrpc:packages/rpc-contract/dist/contract/framing/jsonrpc/error-code.d.ts:JSONRPC_BRIDGE_ERROR_SOURCE:export declare const JSONRPC_BRIDGE_ERROR_SOURCE = \"@migaia/rpc/bridge/jsonrpc\";",
-          "guidance": [],
-          "usageScore": 4,
+          "guidance": [
+            {
+              "id": "本包错误码",
+              "heading": "本包错误码",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "source 均为 `@migaia/rpc/bridge/jsonrpc`。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["code", "何时发生", "处理"],
+                  "rows": [
+                    [
+                      "`JSONRPC_FRAME_INVALID`",
+                      "头部、UTF-8、JSON 非法，或连接在一帧中途关闭；连接随之终止",
+                      "修正对端的分帧与编码；已发出的调用先对账"
+                    ],
+                    [
+                      "`JSONRPC_EXTENSION_MISSING`",
+                      "握手回复缺少必需能力或四个扩展方法",
+                      "对端补齐扩展实现"
+                    ],
+                    [
+                      "`JSONRPC_PROFILE_INVALID`",
+                      "本端选项不合法，或提议了桥接不支持的能力",
+                      "修正选项；原样重试无效"
+                    ],
+                    [
+                      "`JSONRPC_UNSUPPORTED_MODE`",
+                      "本地声明或对端目录中包含 stream 方法",
+                      "流式场景改用原生协议"
+                    ],
+                    [
+                      "`JSONRPC_HANDSHAKE_TIMEOUT`",
+                      "握手超时",
+                      "检查对端是否在读 stdin / socket，然后重新建立连接"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这些常量从包根导入："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { JSONRPC_BRIDGE_ERROR_SOURCE, JsonRpcBridgeErrorCode } from '@migaia/rpc-bridge-jsonrpc'"
+                }
+              ]
+            }
+          ],
+          "usageScore": 10,
           "configuration": [],
           "fragment": "rpc-bridge-jsonrpc-index--JSONRPC_BRIDGE_ERROR_SOURCE"
         },
@@ -542,7 +1050,9 @@
           "returns": "No explicit return annotation is declared for this const.",
           "errors": ["No documented errors are declared for JsonRpcBridgeErrorCode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for JsonRpcBridgeErrorCode.",
-          "examples": [],
+          "examples": [
+            "import { JSONRPC_BRIDGE_ERROR_SOURCE, JsonRpcBridgeErrorCode } from '@migaia/rpc-bridge-jsonrpc'"
+          ],
           "members": [],
           "aliasOf": "JsonRpcBridgeErrorCode",
           "exportPath": ".",
@@ -587,8 +1097,59 @@
           ],
           "declaredConfiguration": [],
           "identity": "@migaia/rpc-bridge-jsonrpc:packages/rpc-contract/dist/contract/framing/jsonrpc/error-code.d.ts:JsonRpcBridgeErrorCode:export declare const JsonRpcBridgeErrorCode: { /** Invalid headers, body encoding, JSON or truncated EOF closes this byte connection. */ readonly frameInvalid: \"JSONRPC_FRAME_INVALID\"; /** A required method, capability or business wire-error extension is absent. */ readonly extensionMissing: \"JSONRPC_EXTENSION_MISSING\"; /** A profile message or caller option cannot be translated; choose a supported profile. */ readonly profileInvalid: \"JSONRPC_PROFILE_INVALID\"; /** A contract includes generators; use a native channel for streaming methods. */ readonly unsupportedMode: \"JSONRPC_UNSUPPORTED_MODE\"; /** The hello deadline expires; the caller may establish a new connection. */ readonly handshakeTimeout: \"JSONRPC_HANDSHAKE_TIMEOUT\"; };",
-          "guidance": [],
-          "usageScore": 4,
+          "guidance": [
+            {
+              "id": "本包错误码",
+              "heading": "本包错误码",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "source 均为 `@migaia/rpc/bridge/jsonrpc`。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["code", "何时发生", "处理"],
+                  "rows": [
+                    [
+                      "`JSONRPC_FRAME_INVALID`",
+                      "头部、UTF-8、JSON 非法，或连接在一帧中途关闭；连接随之终止",
+                      "修正对端的分帧与编码；已发出的调用先对账"
+                    ],
+                    [
+                      "`JSONRPC_EXTENSION_MISSING`",
+                      "握手回复缺少必需能力或四个扩展方法",
+                      "对端补齐扩展实现"
+                    ],
+                    [
+                      "`JSONRPC_PROFILE_INVALID`",
+                      "本端选项不合法，或提议了桥接不支持的能力",
+                      "修正选项；原样重试无效"
+                    ],
+                    [
+                      "`JSONRPC_UNSUPPORTED_MODE`",
+                      "本地声明或对端目录中包含 stream 方法",
+                      "流式场景改用原生协议"
+                    ],
+                    [
+                      "`JSONRPC_HANDSHAKE_TIMEOUT`",
+                      "握手超时",
+                      "检查对端是否在读 stdin / socket，然后重新建立连接"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这些常量从包根导入："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { JSONRPC_BRIDGE_ERROR_SOURCE, JsonRpcBridgeErrorCode } from '@migaia/rpc-bridge-jsonrpc'"
+                }
+              ]
+            }
+          ],
+          "usageScore": 10,
           "configuration": [],
           "fragment": "rpc-bridge-jsonrpc-index--JsonRpcBridgeErrorCode"
         }
