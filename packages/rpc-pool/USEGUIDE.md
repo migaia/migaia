@@ -1,6 +1,6 @@
 # @migaia/rpc-pool 使用手册
 
-## 1. 创建线程池、通知与 stream
+## 1. 高阶用法：线程池、通知与 stream
 
 这些文件使用真实 Worker。类型参数描述远端方法，调用形式与 Peer 一致。
 
