@@ -1,3 +1,5 @@
+import type { IRpcCarrierProbe } from '../probe/types.js'
+import { carrierSizeBytes } from './probe-content.js'
 import { createRpcTransportError, RpcCoreErrorCode, tagRpcError } from '../errors.js'
 import { RpcAdapterErrorText } from './error-text.js'
 
@@ -14,6 +16,9 @@ import {
   createMessageListenerHub,
   type IMessageListenerHub
 } from '../internal/message-listener-hub.js'
+
+/** Closure-owned observation state keeps both physical sides visible to queued delivery. */
+type IMemoryObservation = { probe: IRpcCarrierProbe | undefined; generation: number }
 
 export type IMemoryTransport = IRpcTransport & {
   /**
@@ -33,6 +38,10 @@ export type IMemoryTransport = IRpcTransport & {
 export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemoryTransport] {
   const listenersA = createMessageListenerHub<{ data: unknown }>()
   const listenersB = createMessageListenerHub<{ data: unknown }>()
+  /** Each physical side owns one independently replaceable observation generation. */
+  const observationA: IMemoryObservation = { probe: undefined, generation: 0 }
+  /** B-side receive observation reads its own state at physical delivery time. */
+  const observationB: IMemoryObservation = { probe: undefined, generation: 0 }
   let closed = false
   const errorsA = new Set<(error: unknown) => void>(),
     errorsB = new Set<(error: unknown) => void>()
@@ -50,17 +59,66 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
     listenerErrors: Set<(error: unknown) => void>,
     remoteListenerErrors: Set<(error: unknown) => void>,
     secondaryFailures: ReturnType<typeof createListenerFailureState>,
-    remoteSecondaryFailures: ReturnType<typeof createListenerFailureState>
+    remoteSecondaryFailures: ReturnType<typeof createListenerFailureState>,
+    observation: IMemoryObservation,
+    remoteObservation: IMemoryObservation
   ): IMemoryTransport => ({
     platform: RpcPlatform.memory,
     topology: 'exclusive',
     ownership: RpcTransportOwnership.borrowed,
+    /** Replace observation; the returned disposer retires only its own installation generation. */
+    observe(next) {
+      /** Reinstalling the same probe still creates a distinct disposer generation. */
+      const generation = ++observation.generation
+      if (!closed) observation.probe = next
+      return () => {
+        if (generation === observation.generation) observation.probe = undefined
+      }
+    },
     send(message) {
       if (closed) throw createRpcTransportError(RpcAdapterErrorText.rpcMemoryTransportIsClosed)
+      if (observation.probe !== undefined) {
+        /** One event retains its installed handle across reentrant observation replacement. */
+        const currentProbe = observation.probe
+        try {
+          currentProbe.emit(
+            0,
+            carrierSizeBytes(message),
+            RpcPlatform.memory,
+            undefined,
+            currentProbe.capturing ? message : undefined
+          )
+        } catch (error) {
+          reportListenerFailure(
+            createRpcTransportError(RpcAdapterErrorText.probeFailed, error),
+            listenerErrors,
+            secondaryFailures
+          )
+        }
+      }
       queueMicrotask(() => {
         // Closed between send() and delivery — the other side is gone,
         // there is nobody left to deliver to.
         if (closed) return
+        if (remoteObservation.probe !== undefined) {
+          /** Physical delivery reads the receiver's currently installed generation once. */
+          const receivingProbe = remoteObservation.probe
+          try {
+            receivingProbe.emit(
+              1,
+              carrierSizeBytes(message),
+              RpcPlatform.memory,
+              undefined,
+              receivingProbe.capturing ? message : undefined
+            )
+          } catch (error) {
+            reportListenerFailure(
+              createRpcTransportError(RpcAdapterErrorText.probeFailed, error),
+              remoteListenerErrors,
+              remoteSecondaryFailures
+            )
+          }
+        }
         outgoing.dispatch({ data: message }, (listener, messageValue) => {
           observeListener(
             () => listener(messageValue),
@@ -82,6 +140,8 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
       if (closeStarted) return closeResult
       closeStarted = true
       closed = true
+      observationA.probe = undefined
+      observationB.probe = undefined
       reportListenerFailure(
         tagRpcError(
           new Error(RpcAdapterErrorText.rpcMemoryTransportIsClosed),
@@ -135,7 +195,9 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
       listenerErrorsA,
       listenerErrorsB,
       secondaryFailuresA,
-      secondaryFailuresB
+      secondaryFailuresB,
+      observationA,
+      observationB
     ),
     makeSide(
       listenersA,
@@ -144,7 +206,9 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
       listenerErrorsB,
       listenerErrorsA,
       secondaryFailuresB,
-      secondaryFailuresA
+      secondaryFailuresA,
+      observationB,
+      observationA
     )
   ]
 }

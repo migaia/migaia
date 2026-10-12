@@ -1,5 +1,25 @@
 import { expect, test } from '@playwright/test'
 
+test('carriers A1: real SharedWorker observe preserves physical capture and disposal', async ({
+  page
+}) => {
+  await page.goto('/browser-peer/observe.html')
+  /** Native SharedWorker echo reports physical capture while disposal leaves delivery working. */
+  const result = await page.evaluate(() => globalThis.runSharedWorkerObserve())
+  expect(result).toEqual({
+    directions: [0, 1],
+    carrier: ['shared-worker', 'shared-worker'],
+    sizes: [3, 3],
+    detached: true,
+    captured: [7, 8, 9],
+    received: [7, 8, 9],
+    transfers: 1,
+    rejectedSource: 0,
+    afterDispose: 2,
+    failures: []
+  })
+})
+
 test('two pages isolate same sender/task through one SharedWorker', async ({ context }) => {
   const pageA = await context.newPage()
   const pageB = await context.newPage()
