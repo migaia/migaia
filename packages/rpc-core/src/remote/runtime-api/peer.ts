@@ -299,15 +299,16 @@ type IRuntimePeerResources = Readonly<{
  * Source and method validation precede connection effects; failure closes only resources obtained
  * by this construction, observing secondary cleanup failures while preserving the primary error.
  */
+/** A declared remote surface preserves method and payload types on the original callable facade. */
+export function createRuntimePeer<TRemote = never>(
+  options: IRuntimePeerOptions,
+  resources?: IRuntimePeerResources
+): Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>
+/** The dynamic signature remains last so existing factory consumers and mocks retain its type. */
 export function createRuntimePeer(
   options: IRuntimePeerOptions,
   resources?: IRuntimePeerResources
 ): Promise<IRuntimePeer>
-/** A declared remote surface preserves method and payload types on the original callable facade. */
-export function createRuntimePeer<TRemote>(
-  options: IRuntimePeerOptions,
-  resources?: IRuntimePeerResources
-): Promise<IRuntimeTypedPeer<TRemote>>
 /** Internal assembly retains its original dynamic operations and exact returned Promise. */
 export async function createRuntimePeer(
   options: IRuntimePeerOptions,
