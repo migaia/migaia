@@ -173,7 +173,6 @@ import {
   type IProcessServeListenerIngress
 } from '@migaia/rpc-process'
 import { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'
-import { RpcCapability } from '@migaia/rpc-contract'
 
 const report = (error: unknown) => console.error(error)
 // 与客户端事先约定的共享凭据；生产中从密钥管理读取，不要硬编码。
@@ -193,22 +192,10 @@ const ingress: IProcessServeListenerIngress = {
     if (auth !== expectedToken) throw new Error('unknown client')
     return 'math-client'
   },
-  // 监听端必须声明 runtime 调用所需的全部能力；客户端由库自动生成同一组提议。
+  // 库根据本端已安装的 runtime 能力补全默认提议。
   offer: createNativeProcessOffer({
     peer: { id: 'math-server', runtime: 'node' },
-    stream: true,
-    capabilities: [
-      RpcCapability.abort,
-      RpcCapability.runtimeApi,
-      RpcCapability.forwardRoute,
-      RpcCapability.generation,
-      RpcCapability.order,
-      RpcCapability.group,
-      RpcCapability.cancelBeforeStart,
-      RpcCapability.outcome,
-      RpcCapability.deadline,
-      RpcCapability.portableBinary
-    ]
+    stream: true
   }),
   createConnectionContext: () => ({
     peerId: `client-${++sequence}`,
@@ -224,7 +211,7 @@ const server = await createProcessPeer({
 process.once('SIGTERM', () => void server.close())
 ```
 
-监听端的 `offer` 少了上面这组能力时，客户端握手会以 `@migaia/rpc/contract` / `HANDSHAKE_INCOMPATIBLE` 失败。
+省略 `createNativeProcessOffer` 的 `capabilities` 时，监听端根据 Core 已安装的能力生成 runtime 提议。显式传入 `capabilities`（包括空数组）仍表示调用方选择的窄提议，库不会拓宽它。
 
 ### 客户端
 
