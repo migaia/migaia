@@ -1,7 +1,199 @@
-# @migaia/rpc-process
+# `@migaia/rpc-process`
 
-独立进程通信。从包根使用 `createProcessPeer`、`createProcessPlugin`。按平台导入 Node、Bun、Deno、Electron utility process 或 Windows job 的普通 adapter 子路径。
+**跨进程 RPC。** 用一套 `request` / `notify` / `stream` 调用另一个操作系统进程里的函数。它可以是你启动的子进程，也可以是已经在运行、通过本机 socket 连接的服务。本包负责启动子进程、打开 stdio 或 socket 字节通道、认证握手和监督重启；调用语义、超时、取消、错误还原等由 `@migaia/rpc-core` 统一提供。
 
-RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不发布；仓内消费方直接导入各公开包。同一 realm 的第二份模块实例在取得资源前抛出 native Error，source 为 `@migaia/rpc/core`、code 为 `DUPLICATE_MODULE_INSTANCE`；修复依赖解析并重载 realm。不同 Worker realm 独立。既有六个语义 source、wire 与错误身份保持不变。
+## 适用与不适用场景
 
-完整使用边界见 [USEGUIDE](./USEGUIDE.md)。
+**适用：**
+
+- 主进程把 CPU 密集、易崩溃或需要隔离权限的工作放进子进程，并像调用本地函数一样调用它。
+- 多个本机进程之间（例如 CLI 与常驻守护进程）通过 TCP 回环或 Unix socket 互相调用。
+- 需要由 PluginHost 统一管理一组子进程：查询状态、监听事件、重启或替换。
+- Node、Bun、Deno 或 Electron utility process 之间互通。
+
+**不适用：**
+
+- 同一进程内的 Worker 线程：用 [`@migaia/rpc-threads`](../rpc-threads/README.md)，可以零拷贝转移 `ArrayBuffer`。
+- 浏览器内的窗口、iframe、Service Worker：用 [`@migaia/rpc-browser`](../rpc-browser/README.md)。
+- Python、Go、Rust 等非 TypeScript 对端：用 [`@migaia/rpc-bridge-jsonrpc`](../rpc-bridge-jsonrpc/README.md)，它基于本包的字节通道。
+- 跨机器网络通信：socket 适配器只接受本机地址（`127.0.0.1`、`[::1]`、Unix socket 路径或 Windows 命名管道）。
+- 需要严格保证"整棵进程树都被终止"：Node launcher 目前只能尽力终止（见下文）。
+
+## 安装
+
+```bash
+pnpm add @migaia/rpc-process @migaia/rpc-core @migaia/rpc-contract
+```
+
+`@migaia/rpc-core` 与 `@migaia/rpc-contract` 是 peer 依赖，三者版本必须完全一致（当前 `0.0.7`）。运行时依赖 `@migaia/supervision`（进程监督与预算）、`@migaia/lifecycle`、`@migaia/plugin-host`、`@migaia/utils`，会随包安装。
+
+两个可选 peer，只在用到对应子路径时才需要：
+
+| 子路径                                  | 需要安装             |
+| --------------------------------------- | -------------------- |
+| `./adapters/electron-utility-process`   | `electron` ^44       |
+| `./adapters/windows-job`                | `koffi` ^3.1         |
+
+## 入口一览
+
+| 入口                                       | 内容                                                                                       |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `@migaia/rpc-process`                      | `createProcessPeer`、`createProcessPlugin`、`createProcessTransport`、`createNativeProcessOffer`、`createProcessResilience`、错误码与常量 |
+| `./adapters/node-child-process`            | `createNodeProcessLauncher`（Node 启动子进程）、`openProcessStdioChannel`（子进程读取自己的 stdio） |
+| `./adapters/node-socket`                   | `dialProcessByteChannel`、`listenProcessByteChannel`（TCP 回环 / Unix socket / 命名管道）   |
+| `./adapters/bun-spawn`、`./adapters/bun-socket` | Bun 下的同名能力（`createBunProcessLauncher` 等）                                     |
+| `./adapters/deno-command`、`./adapters/deno-socket` | Deno 下的启动器与 socket                                                           |
+| `./adapters/electron-utility-process`      | `createElectronUtilityProcessLauncher`（Electron utility process，消息通道）                |
+| `./adapters/windows-job`                   | `createWindowsJobProcessLauncher`：**占位实现**，当前 `launch` 一律拒绝                      |
+
+## 快速开始：启动子进程并调用它
+
+子进程只需声明自己提供的方法。它由库的 launcher 启动时，会通过 bootstrap 自动连回父进程，不需要任何地址配置。
+
+```ts
+// service.ts（子进程入口）
+import { createProcessPeer } from '@migaia/rpc-process'
+
+await createProcessPeer({
+  provide: {
+    math: {
+      double: (value: number) => value * 2,
+      sum: (values: number[]) => values.reduce((total, value) => total + value, 0)
+    }
+  },
+  report: (error) => console.error(error)
+})
+```
+
+父进程用 `spawn` 来源启动它。下面的 `createNodeServiceSpawn` 把 launcher、预算、bootstrap 和握手组合成一个可复用的函数；同一个返回值只交给一个 Peer 或 Plugin 使用。
+
+```ts
+// spawn-source.ts
+import { randomBytes } from 'node:crypto'
+import { fileURLToPath } from 'node:url'
+import {
+  createProcessPeer,
+  createProcessTransport,
+  type IProcessByteChannel
+} from '@migaia/rpc-process'
+import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
+import { createUnitBudget } from '@migaia/supervision'
+
+type IOptions = Parameters<typeof createProcessPeer>[0]
+/** spawn 的对象形式（另一种是高级回调形式）。 */
+export type IProcessSpawn = Exclude<NonNullable<IOptions['spawn']>, Function>
+
+/**
+ * 为一个 Node 子进程入口构造 spawn 来源。
+ * 每次调用都创建新的 token、launcher 与预算；同一个来源只给一个 Peer 或 Plugin 使用。
+ */
+export function createNodeServiceSpawn(
+  entry: URL,
+  report: (error: unknown) => void
+): IProcessSpawn {
+  const launcher = createNodeProcessLauncher()
+  // 一次性会话凭据：经 stdin bootstrap 交给子进程，用于握手认证，不要打印或写入日志。
+  const token = randomBytes(32).toString('base64url')
+  // launcher 返回的真实 handle；建立连接时复用它的字节通道与身份。
+  let handle: Awaited<ReturnType<typeof launcher.launch>>
+  return {
+    kind: 'spawn',
+    channelKind: 'byte',
+    wire: 'native',
+    token,
+    supervision: {
+      id: 'math-service',
+      isolation: 'best-effort',
+      report,
+      launcher: {
+        ...launcher,
+        launch: async (spec, request) => {
+          handle = await launcher.launch(spec, request)
+          return handle
+        }
+      },
+      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),
+      spec: {
+        command: process.execPath,
+        args: [fileURLToPath(entry)],
+        env: { inherit: ['PATH'], set: {} },
+        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
+        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
+      }
+    },
+    rawChannel: async () => handle.channel!,
+    establish: (raw, prepared) =>
+      createProcessTransport(raw as IProcessByteChannel, {
+        role: 'initiator',
+        offer: prepared.offer!,
+        peerId: handle.runtimeApiIdentity!.instanceId,
+        scheduler: prepared.scheduler,
+        ipc: { ...prepared.session, log: () => undefined },
+        report
+      })
+  }
+}
+```
+
+```ts
+// main.ts（父进程）
+import { createProcessPeer } from '@migaia/rpc-process'
+import { createNodeServiceSpawn } from './spawn-source.js'
+
+type IServiceApi = {
+  math: { double: (value: number) => number; sum: (values: number[]) => number }
+}
+const report = (error: unknown) => console.error(error)
+
+const service = await createProcessPeer<IServiceApi>({
+  spawn: createNodeServiceSpawn(new URL('./service.js', import.meta.url), report),
+  report
+})
+try {
+  console.log(await service.request('math.double', 21)) // 42
+  console.log(await service.request('math.sum', [1, 2, 3])) // 6
+} finally {
+  await service.close() // 结束连接并按监督策略停止子进程
+}
+```
+
+运行时 `report` 会收到一条 `@migaia/supervision` / `CAPABILITY_UNSUPPORTED`（`capability: 'termination'`）。这是预期的提示，不是故障：示例声明了 `isolation: 'best-effort'`，而 Node launcher 不能保证终止子进程派生出的孙进程。
+
+## 三种来源
+
+每个 Peer 必须且只能选择一种来源。唯一例外是由库 launcher 启动的子进程：它省略来源时会自动连回父进程。
+
+| 来源      | 谁拥有对端                   | `close()` 的效果             | 能否 stop / restart / replace |
+| --------- | ---------------------------- | ---------------------------- | ----------------------------- |
+| `spawn`   | 本 Peer（经 supervision）    | 关闭连接并停止子进程         | 能（经 PluginHost 出口）      |
+| `connect` | 外部，本端只持有自己的连接   | 只关闭本端连接               | 不能                          |
+| `listen`  | 外部，每个接入会话各自独立   | 停止监听并关闭已接入的会话   | 不能                          |
+
+连接一个已在运行的服务、或让本进程作为服务端接受连接，见 [USEGUIDE 的 socket 章节](./USEGUIDE.md#5-连接已运行的服务connect-与-listen)。
+
+## 两种所有权：Peer 与 Plugin
+
+- **`createProcessPeer`**：独立连接，调用方负责 `close()`。适合脚本、CLI，或只有一个子进程的场景。
+- **`createProcessPlugin`**：安装进 `@migaia/plugin-host`，由 Host 统一持有和释放。调用经 `host.process.request(target, method, …)`；`list` / `get` / `on` / `watch` / `stop` / `restart` / `replace` 也都在这个出口上。适合需要管理多个子进程、观察状态或热替换的应用。
+
+## 错误
+
+所有错误都带 `(source, code)`，按这两个字段判断，不要依赖 `message` 文本：
+
+- 本包错误：`source === '@migaia/rpc/process'`，`code` 取自 `RpcProcessErrorCode`，例如 `PROCESS_CHANNEL_AUTH_REJECTED`、`PROCESS_HANDSHAKE_TIMEOUT`。
+- 调用层错误来自 `@migaia/rpc/core`，例如超时 `DEADLINE_EXCEEDED`（`TimeoutError`）、取消 `CANCELLED`（`AbortError`）、过载 `OVERLOADED`。
+- 对端业务函数抛出的错误会还原原生类型、`message` 和 `stack`，例如子进程抛 `RangeError('bad input')`，父端收到的也是 `RangeError`。
+
+超时、断线或"结果未知"都**不代表**对端没有执行。重试非幂等操作前请先对账，详见 [USEGUIDE 第 8 节](./USEGUIDE.md#8-错误处理)。
+
+## 相关包
+
+| 包                                                      | 关系                                                   |
+| ------------------------------------------------------- | ------------------------------------------------------ |
+| [`@migaia/rpc-core`](../rpc-core/README.md)             | 调用语义、Endpoint、Remote、测试工具；本包的 peer 依赖 |
+| [`@migaia/rpc-contract`](../rpc-contract/README.md)     | 协议常量（`RpcCapability` 等）与 framing；peer 依赖    |
+| [`@migaia/rpc-threads`](../rpc-threads/README.md)       | 同一套 API 的 Worker 版本                              |
+| [`@migaia/rpc-bridge-jsonrpc`](../rpc-bridge-jsonrpc/README.md) | 在本包字节通道上与非 TS 语言互通               |
+| [`@migaia/supervision`](../supervision/README.md)       | launcher、预算、重启策略                               |
+
+完整用法、选项说明、错误码表与高级用法见 [USEGUIDE](./USEGUIDE.md)。

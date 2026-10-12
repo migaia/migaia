@@ -1,28 +1,93 @@
-# @migaia/rpc-contract
+# `@migaia/rpc-contract`
 
-Runtime-neutral RPC protocol toolkit. It depends only on Utils and the existing Serialize package. It creates protocol data and framing resources; the runtime packages own native I/O, authentication, replay, execution and lifecycle rights.
+**RPC 协议工具包。** 定义 migaia RPC 的线上格式：协议常量、握手、消息信封、可移植数据、分帧、二进制清单与错误树，并提供对应的构造、校验与编解码函数。它只处理"数据长什么样、合不合法"，不打开任何连接，不执行调用，也不依赖 Node、DOM 或任何运行时。
 
-| Entry | Ordinary capability |
-| --- | --- |
-| `@migaia/rpc-contract` / `./v1` | Descriptors, protocol 1.1 envelopes, portable data, coded error wire trees |
-| `./wire` / `./portable` | Stable wire domains and portable-data normalization |
-| `./runtime`, `./runtime/lazy`, `./runtime/metadata` | Runtime envelopes, selectors and generation/step metadata |
-| `./handshake` | Hello, accept, completion and handshake normalization |
-| `./stream` | Stream payload grammar and actual held sequence/credit validation |
-| `./framing`, `./framing/v1` | Message framing, reassembly, ingress binding and physical batch accounting |
-| `./framing/stream` | Incremental length-prefixed decoding and protocol receive resources |
-| `./framing/jsonrpc` | Content-Length encoding/decoding and stable JSON-RPC source/code identities |
-| `./binary`, `./binary/capture`, `./binary/lazy`, `./binary/inspect` | Binary capture, prepare, restore, integrity and full native backing accounting |
-| `./errors` | Error serialization/restoration with caller-held presentation and route maps |
+## 谁需要直接使用它
 
-For a custom byte carrier, feed its actual chunks to `createJsonRpcFrameDecoder()` or `createRpcStreamFrameDecoder()`. For a carrier that already delivers complete strings, use `processStringFramer` or `remoteProcessStringFramer`. The latter checks unknown inputs and preserves the canonical native error identity.
+| 你在做什么                                                     | 用到的部分                                                 |
+| -------------------------------------------------------------- | ---------------------------------------------------------- |
+| 只是在 TS 里用 RPC 调用进程、Worker 或浏览器对端               | 通常不需要直接导入；它是 `@migaia/rpc-core` 的 peer 依赖   |
+| 用其它语言实现兼容的对端（Python / Go / Rust）                 | 线上格式常量、握手、分帧、错误树结构                       |
+| 为新的载体（自定义 IPC、Electron 通道等）写适配器              | 分帧（`./framing*`）、握手（`./handshake`）、错误工具      |
+| 需要把错误跨进程 / 跨语言传递并还原                            | `./errors`                                                 |
+| 需要常量来声明能力（例如 listen 端的 `offer.capabilities`）    | `RpcCapability`、`RpcProtocol`、`RpcCodecId`、`RpcPeerRuntime` |
 
-Binary preparation snapshots business data synchronously, retains original native backing identities, and completes through the original codec. The light `./binary/lazy` entry exports the same `prepareRpcBinary` and `restoreRpcBinary` names and keeps the first native digest ahead of cold codec loading. `./runtime/lazy` likewise exports the canonical normalizer names. `captureRpcBinaryData` holds captured data in an opaque resource and exposes only its complete `prepare()` operation. A held `IRpcBinaryDataCodec` provides ordinary encoding and optional JSON-data capture; raw prehash, finish and registration callbacks are internal.
+## 安装
 
-Protocol error source names remain stable semantic identities across the physical package split. Error factories, execution proofs and metadata writers are private. Caller-held maps select wire presentation for exact Error references; copying wire fields does not grant runtime rights.
+```bash
+pnpm add @migaia/rpc-contract
+```
 
-See [USEGUIDE](./USEGUIDE.md) for custom carrier and error-resource examples. Package and consumer gates are controlled by the split implementation task; this documentation does not claim they have passed.
+运行时依赖只有 `@migaia/utils` 与 `@migaia/serialize`。没有 peer 依赖。
 
-Portable normalization uses Serialize's canonical `createPortableWalker` with Contract-owned wire and native strategies captured once at module scope. Contract retains its tag grammar, 64-level depth limit, snapshot and native-binary proof policy, and stable error identities. The public `normalizePortable`, `RPC_PORTABLE_MAX_DEPTH` and `./portable` entry stay unchanged.
+## 入口一览
 
-Public source/code tables and wire-error operations support protocol implementers and adapter authors. Human-readable diagnostic tables are private; `normalizeRuntimePortable` and `hasRpcPortableBinary` remain internal. `classifyRpcContractError` queries an actual local violation's disclosure policy without reading error getters; copied or foreign errors have no classification. Contract errors use the protocol serializer, while Core/Remote error redaction and routes use the ordinary Core error operations. See USEGUIDE for the source table, wire schema and third-party adapter example.
+| 入口                                       | 内容                                                                                              |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `@migaia/rpc-contract`                     | 常用常量（`RpcCapability`、`RpcProtocol`、`RpcCodecId` 等）、信封校验、握手、错误工具、可移植数据 |
+| `./wire`                                   | 全部线上格式常量（字段名、枚举、上限、违规原因），不含函数逻辑                                    |
+| `./handshake`                              | `createRpcHello`、`acceptRpcHandshake`、`completeRpcHandshake`、`normalizeRpcHandshake`            |
+| `./portable`                               | `normalizePortable`：把业务数据规范化为可在线上传输的形式                                         |
+| `./errors`                                 | `serializeRpcError`、`deserializeRpcError`、`toJsonRpcError`、`fromJsonRpcError` 等               |
+| `./framing`                                | 字符串 / 二进制 framer、消息重组、物理帧大小检查                                                  |
+| `./framing/stream`                         | 4 字节长度前缀分帧（`encodeRpcStreamFrame`、`createRpcStreamFrameDecoder`）                         |
+| `./framing/jsonrpc`                        | Content-Length 分帧（`encodeJsonRpcFrame`、`createJsonRpcFrameDecoder`）与 JSON-RPC 桥错误码       |
+| `./framing/v1`、`./v1`                     | 协议 1.x 的消息 framer 与信封校验                                                                 |
+| `./runtime`、`./runtime/lazy`、`./runtime/metadata` | runtime 调用信封的校验与构造；`lazy` 版按需加载重型解析器                                |
+| `./stream`                                 | 流式调用的负载校验、序号与背压额度检查                                                            |
+| `./binary`、`./binary/lazy`、`./binary/capture`、`./binary/inspect` | 二进制数据的捕获、清单生成、还原与完整性 / 大小检查                       |
+| `./schema/wire-error`                      | 错误树的 JSON Schema（随包发布的 JSON 文件）                                                      |
+
+## 示例
+
+**Content-Length 分帧**（数据可以任意切块到达）：
+
+```ts
+import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'
+
+const frame = encodeJsonRpcFrame({ jsonrpc: '2.0', id: 1, method: 'ping', params: { text: '你好' } })
+
+const decoder = createJsonRpcFrameDecoder()
+const messages: unknown[] = []
+for (let offset = 0; offset < frame.length; offset += 7)
+  messages.push(...decoder.push(frame.subarray(offset, offset + 7)))
+decoder.finish() // 连接结束时调用：残留半帧会以 JSONRPC_FRAME_INVALID 报错
+console.log(messages) // [{ jsonrpc: '2.0', id: 1, method: 'ping', params: { text: '你好' } }]
+```
+
+**跨进程 / 跨语言传递错误**：
+
+```ts
+import {
+  serializeRpcError,
+  deserializeRpcError,
+  toJsonRpcError,
+  fromJsonRpcError
+} from '@migaia/rpc-contract/errors'
+
+const original = new RangeError('bad input', { cause: new Error('root cause') })
+const wire = serializeRpcError(original, { report: (failure) => console.error(failure) })
+const jsonRpcError = toJsonRpcError(wire, -32000) // 错误树放在 error.data.migaiaWireError
+
+const restored = deserializeRpcError(fromJsonRpcError(jsonRpcError))
+console.log(restored instanceof RangeError, restored.message) // true 'bad input'
+console.log((restored.cause as Error).message) // 'root cause'
+```
+
+## 错误
+
+本包错误的 source 为 `@migaia/rpc/contract`（常量 `RPC_CONTRACT_SOURCE`），code 取自 `RpcContractErrorCode`：
+
+`INVALID_DESCRIPTOR`、`INVALID_ENVELOPE`、`INVALID_STREAM`、`INVALID_FRAME`、`FRAME_LIMIT_EXCEEDED`、`FRAME_ASSEMBLY_EXPIRED`、`INVALID_WIRE_ERROR`、`HANDSHAKE_INVALID`、`HANDSHAKE_INCOMPATIBLE`、`HANDSHAKE_REJECTED`。
+
+Content-Length 分帧错误使用 JSON-RPC 桥的身份 `@migaia/rpc/bridge/jsonrpc`（`JsonRpcBridgeErrorCode`）。各错误码的含义与处理见 [USEGUIDE 第 8 节](./USEGUIDE.md#8-错误码)。
+
+## 相关包
+
+| 包                                                            | 关系                                       |
+| ------------------------------------------------------------- | ------------------------------------------ |
+| [`@migaia/rpc-core`](../rpc-core/README.md)                   | 使用本包实现 Endpoint、调用与连接          |
+| [`@migaia/rpc-bridge-jsonrpc`](../rpc-bridge-jsonrpc/README.md) | 基于本包的 Content-Length 分帧与错误转换 |
+| [`@migaia/serialize`](../serialize/README.md)                 | 可移植数据遍历的底层实现                   |
+
+各入口的详细用法见 [USEGUIDE](./USEGUIDE.md)。
