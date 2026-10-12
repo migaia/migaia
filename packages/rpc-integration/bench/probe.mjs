@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { resolve, join } from 'node:path'
 import { registerHooks } from 'node:module'
 import { promiseHooks } from 'node:v8'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { spawn } from 'node:child_process'
 import { loadavg } from 'node:os'
 import { IpcBenchErrorText } from './error-text.mjs'
@@ -27,12 +28,23 @@ const ProbeBench = {
 const entry = fileURLToPath(import.meta.url)
 /** Module-relative ownership lets every arm retain the same full IPC fixture and dependencies. */
 const workspace = resolve(import.meta.dirname, '../../..')
+/** Read the fixture's canonical private readiness notice instead of duplicating its protocol text. */
+const readyNotice = /^const readyText = '([^']+)'/mu
+  .exec(readFileSync(new URL('../test/bench/ipc-session.mjs', import.meta.url), 'utf8'))?.[1]
+  ?.replaceAll('\\n', '\n')
 /** Base selection only overrides frozen Core bytes; every import still resolves through its owner. */
 const corePrefix = pathToFileURL(join(workspace, 'packages/rpc-core/dist/')).href
 /** Exact emitted-view identities are counted only in guard launches, outside formal timing. */
 const views = new WeakSet()
 /** Per-isolate native counters begin before IPC acquisition, then snapshots exclude warm-up. */
-const counters = { promises: 0, eventObjects: 0, events: 0, normalizePortable: 0 }
+const counters = {
+  promises: 0,
+  eventObjects: 0,
+  events: 0,
+  normalizePortable: 0,
+  nativePromises: 0,
+  samplerPromises: 0
+}
 /** Provenance records original dist bytes separately from intentional guard instrumentation. */
 const loaded = []
 /** Arm and lane are inherited data; they never alter the carrier or business value. */
@@ -41,11 +53,17 @@ const arm = process.env.PROBE_BENCH_ARM
 const guarding = process.env.PROBE_BENCH_LANE === ProbeBench.guard
 /** Frozen Core bytes are required for a genuine base rather than two candidate configurations. */
 const baseDist = process.env.PROBE_BENCH_BASE_DIST
+/** Guard-only context labels the existing PID sampling work; the sampler never invokes RPC. */
+const samplerRole = guarding ? new AsyncLocalStorage() : undefined
+/** Run the unchanged timer callback in its own diagnostic role, including its async continuations. */
+globalThis.__PROBE_BENCH_SAMPLER = (callback) => samplerRole.run(true, callback)
 /** Native Promise initialization counts actual allocations in this isolate, without stack sampling. */
 const stopPromises = guarding
   ? promiseHooks.createHook({
       init() {
-        counters.promises += 1
+        counters.nativePromises += 1
+        if (samplerRole.getStore() === true) counters.samplerPromises += 1
+        else counters.promises += 1
       }
     })
   : undefined
@@ -91,6 +109,32 @@ if (arm !== undefined) {
         const pattern = /(export function normalizePortable\([^)]*\)\s*\{)/u
         if (!pattern.test(source)) throw new Error(IpcBenchErrorText.configuration)
         source = source.replace(pattern, '$1 globalThis.__PROBE_BENCH_NORMALIZE();')
+      }
+      if (guarding && url.endsWith('/rpc-integration/bench/bare-node.mjs')) {
+        /**
+         * Exact sampler-role counts remove only demonstrated auxiliary work, never unknown
+         * promises.
+         */
+        const marker = 'const timer = setInterval(() => {'
+        if (!source.includes(marker)) throw new Error(IpcBenchErrorText.configuration)
+        source = source.replace(
+          marker,
+          'const timer = setInterval(() => globalThis.__PROBE_BENCH_SAMPLER(() => {'
+        )
+        source = source.replace('}, intervalMs)', '}), intervalMs)')
+      }
+      if (url.endsWith('/rpc-integration/test/bench/ipc-session.mjs')) {
+        /**
+         * The existing stdio launcher deliberately inherits PATH only. This fixture-only boundary
+         * forwards its explicit diagnostic configuration so the real peer uses the same arm, frozen
+         * Core bytes and counters. Business arguments, transport and ownership stay unchanged.
+         */
+        const marker = "inherit: ['PATH']"
+        if (!source.includes(marker)) throw new Error(IpcBenchErrorText.configuration)
+        source = source.replaceAll(
+          marker,
+          "inherit: ['PATH', 'NODE_OPTIONS', 'PROBE_BENCH_ARM', 'PROBE_BENCH_LANE', 'PROBE_BENCH_BASE_DIST']"
+        )
       }
       if (
         url.endsWith('/rpc-core/dist/remote/runtime-api/peer.js') &&
@@ -194,9 +238,16 @@ function classifyFailure(error, seen = new Set()) {
  * @returns {object} Exact counts and per-request rates; event-view allocations are identity counts.
  * @throws {Error} Missing actual counter observations remain an error, never a zero claim.
  */
-function countDelta(receipt) {
+export function countDelta(receipt) {
   /** Per-isolate deltas include the same existing OOB boundaries for every arm. */
-  const total = { promises: 0, eventObjects: 0, events: 0, normalizePortable: 0 }
+  const total = {
+    promises: 0,
+    eventObjects: 0,
+    events: 0,
+    normalizePortable: 0,
+    nativePromises: 0,
+    samplerPromises: 0
+  }
   for (const [before, after] of [
     [receipt.parentBefore, receipt.parentAfter],
     [receipt.peerBefore, receipt.peerAfter]
@@ -213,7 +264,7 @@ function countDelta(receipt) {
     ),
     eventObjectsPerEvent: total.events === 0 ? null : total.eventObjects / total.events,
     semantics:
-      'exact native Promise init; exact canonical normalizePortable entry; exact distinct emitted view identities after warmup; identical OOB boundary cost in every arm'
+      'exact native Promise init with native/sampler totals retained; promises exclude only the existing PID-sampler role (AsyncLocalStorage); all unknown and constant OOB boundary allocations remain counted; exact canonical normalizePortable entry; exact distinct emitted view identities after warmup'
   }
 }
 
@@ -271,7 +322,13 @@ async function launch(cell, selectedArm, lane, options, stem) {
     join(options.output, `${stem}.json`),
     JSON.stringify({ cell, arm: selectedArm, lane, status, stderr, receipt }, null, 2)
   )
-  if (status.code !== 0 || receipt.status === 'ERROR' || stderr.trim())
+  /** Stdio emits its existing readiness notice on stderr; every other diagnostic remains an error. */
+  if (
+    !readyNotice ||
+    status.code !== 0 ||
+    receipt.status === 'ERROR' ||
+    stderr.replaceAll(readyNotice, '').trim()
+  )
     throw new Error(IpcBenchErrorText.paired, { cause: { status, stderr, receipt } })
   if (selectedArm === ProbeBench.installed) {
     /** Every measured installed launch must actually observe both original Core endpoint isolates. */
@@ -333,6 +390,8 @@ export function judgeProbe(rounds, guard, reportOnly = false) {
         ? 'PASS'
         : 'FAIL',
     promisesDelta: installed.promises - absent.promises,
+    nativePromisesDelta: installed.nativePromises - absent.nativePromises,
+    samplerPromisesDelta: installed.samplerPromises - absent.samplerPromises,
     normalizePortableDelta: installed.normalizePortable - absent.normalizePortable,
     eventObjects: installed.eventObjects,
     events: installed.events,
@@ -534,8 +593,7 @@ async function main() {
         startLoad,
         endLoad,
         failureInventory,
-        recompute:
-          'import { judgeProbe } from bench/probe.mjs; judgeProbe(result.rounds, result.verdict.counterGuard.observations, result.cell.payloadBytes === 1048576)',
+        recompute: `node docs/rpc-devtools/scratch/probe-core/bench/recompute.mjs ${join(options.output, 'summary.json')}`,
         results
       },
       null,
