@@ -3653,6 +3653,72 @@
       "library": "rpc-browser"
     },
     {
+      "path": "/en/docs/rpc-browser/IRpcBrowserErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/IRuntimeBrowserConnect",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/IRuntimeBrowserConnectEvent",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/IRuntimeBrowserListen",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/IRuntimeBrowserPeerOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/IRuntimeBrowserRtcConnect",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/IRuntimeBrowserRtcDataChannel",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/IRuntimeBrowserSharedWorkerConnect",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/IRuntimeBrowserWindowConnect",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/RPC_BROWSER_ERROR_SOURCE",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/RpcBrowserErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
       "path": "/en/docs/rpc-browser/adapters/broadcast-channel",
       "locale": "en",
       "domain": "docs",
@@ -3714,72 +3780,6 @@
     },
     {
       "path": "/en/docs/rpc-browser/adapters/shared-worker",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/en/docs/rpc-browser/adapters/shared-worker/ISharedWorkerPort",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/en/docs/rpc-browser/adapters/shared-worker/createSharedWorkerTransport",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/en/docs/rpc-browser/adapters/web-transport",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/en/docs/rpc-browser/adapters/web-transport/IWebTransportDatagrams",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/en/docs/rpc-browser/adapters/web-transport/createWebTransportDatagramTransport",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/en/docs/rpc-browser/adapters/window",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/en/docs/rpc-browser/adapters/window/IWindowMessageReceiver",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/en/docs/rpc-browser/adapters/window/IWindowMessageTarget",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/en/docs/rpc-browser/adapters/window/IWindowMessageTransportOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/en/docs/rpc-browser/adapters/window/createWindowMessageTransport",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/en/docs/rpc-browser/overview",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-browser"
@@ -14441,15 +14441,15 @@
       "library": "rpc-bridge-jsonrpc"
     },
     {
-      "path": "/en/guides/rpc-browser",
+      "path": "/en/docs/rpc-browser/adapters/shared-worker/ISharedWorkerPort",
       "locale": "en",
-      "domain": "guides",
+      "domain": "docs",
       "library": "rpc-browser"
     },
     {
-      "path": "/en/guides/rpc-browser/getting-started",
+      "path": "/en/docs/rpc-browser/adapters/shared-worker/createSharedWorkerTransport",
       "locale": "en",
-      "domain": "guides",
+      "domain": "docs",
       "library": "rpc-browser"
     },
     {
@@ -15515,9 +15515,9 @@
       "library": "rpc-bridge-jsonrpc"
     },
     {
-      "path": "/zh/architecture/rpc-browser",
-      "locale": "zh",
-      "domain": "architecture",
+      "path": "/en/docs/rpc-browser/adapters/web-transport",
+      "locale": "en",
+      "domain": "docs",
       "library": "rpc-browser"
     },
     {
@@ -19211,139 +19211,139 @@
       "library": "rpc-bridge-jsonrpc"
     },
     {
+      "path": "/en/docs/rpc-browser/adapters/web-transport/IWebTransportDatagrams",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/adapters/web-transport/createWebTransportDatagramTransport",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/adapters/window",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/adapters/window/IWindowMessageReceiver",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/adapters/window/IWindowMessageTarget",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/adapters/window/IWindowMessageTransportOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/adapters/window/createWindowMessageTransport",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/createBrowserPeer",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/guides/rpc-browser",
+      "locale": "en",
+      "domain": "guides",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/guides/rpc-browser/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/architecture/rpc-browser",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "rpc-browser"
+    },
+    {
       "path": "/zh/docs/rpc-browser",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-browser"
     },
     {
-      "path": "/zh/docs/rpc-browser/adapters/broadcast-channel",
+      "path": "/zh/docs/rpc-browser/IRpcBrowserErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-browser"
     },
     {
-      "path": "/zh/docs/rpc-browser/adapters/broadcast-channel/createBroadcastChannelTransport",
+      "path": "/zh/docs/rpc-browser/IRuntimeBrowserConnect",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-browser"
     },
     {
-      "path": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
+      "path": "/zh/docs/rpc-browser/IRuntimeBrowserConnectEvent",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-browser"
     },
     {
-      "path": "/zh/docs/rpc-browser/adapters/rtc-data-channel/IRTCDataChannel",
+      "path": "/zh/docs/rpc-browser/IRuntimeBrowserListen",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-browser"
     },
     {
-      "path": "/zh/docs/rpc-browser/adapters/rtc-data-channel/createRtcDataChannelTransport",
+      "path": "/zh/docs/rpc-browser/IRuntimeBrowserPeerOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-browser"
     },
     {
-      "path": "/zh/docs/rpc-browser/adapters/service-worker",
+      "path": "/zh/docs/rpc-browser/IRuntimeBrowserRtcConnect",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-browser"
     },
     {
-      "path": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerMessageReceiver",
+      "path": "/zh/docs/rpc-browser/IRuntimeBrowserRtcDataChannel",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-browser"
     },
     {
-      "path": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerMessageTarget",
+      "path": "/zh/docs/rpc-browser/IRuntimeBrowserSharedWorkerConnect",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-browser"
     },
     {
-      "path": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerTransportOptions",
+      "path": "/zh/docs/rpc-browser/IRuntimeBrowserWindowConnect",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-browser"
     },
     {
-      "path": "/zh/docs/rpc-browser/adapters/service-worker/createServiceWorkerTransport",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/zh/docs/rpc-browser/adapters/shared-worker",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/zh/docs/rpc-browser/adapters/shared-worker/ISharedWorkerPort",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/zh/docs/rpc-browser/adapters/shared-worker/createSharedWorkerTransport",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/zh/docs/rpc-browser/adapters/web-transport",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/zh/docs/rpc-browser/adapters/web-transport/IWebTransportDatagrams",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/zh/docs/rpc-browser/adapters/web-transport/createWebTransportDatagramTransport",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/zh/docs/rpc-browser/adapters/window",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/zh/docs/rpc-browser/adapters/window/IWindowMessageReceiver",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTarget",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTransportOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/zh/docs/rpc-browser/adapters/window/createWindowMessageTransport",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-browser"
-    },
-    {
-      "path": "/zh/docs/rpc-browser/overview",
+      "path": "/zh/docs/rpc-browser/RPC_BROWSER_ERROR_SOURCE",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-browser"
@@ -30095,15 +30095,15 @@
       "library": "rpc-bridge-jsonrpc"
     },
     {
-      "path": "/zh/guides/rpc-browser",
+      "path": "/zh/docs/rpc-browser/RpcBrowserErrorCode",
       "locale": "zh",
-      "domain": "guides",
+      "domain": "docs",
       "library": "rpc-browser"
     },
     {
-      "path": "/zh/guides/rpc-browser/getting-started",
+      "path": "/zh/docs/rpc-browser/adapters/broadcast-channel",
       "locale": "zh",
-      "domain": "guides",
+      "domain": "docs",
       "library": "rpc-browser"
     },
     {
@@ -31107,6 +31107,150 @@
       "locale": "zh",
       "domain": "guides",
       "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/broadcast-channel/createBroadcastChannelTransport",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/rtc-data-channel",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/rtc-data-channel/IRTCDataChannel",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/rtc-data-channel/createRtcDataChannelTransport",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/service-worker",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerMessageReceiver",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerMessageTarget",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/service-worker/IServiceWorkerTransportOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/service-worker/createServiceWorkerTransport",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/shared-worker",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/shared-worker/ISharedWorkerPort",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/shared-worker/createSharedWorkerTransport",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/web-transport",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/web-transport/IWebTransportDatagrams",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/web-transport/createWebTransportDatagramTransport",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/window",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/window/IWindowMessageReceiver",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTarget",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTransportOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/adapters/window/createWindowMessageTransport",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/createBrowserPeer",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/guides/rpc-browser",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/guides/rpc-browser/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "rpc-browser"
     }
   ]
 }

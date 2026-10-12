@@ -2,22 +2,23 @@
 
 **RPC 的运行时无关核心。** 定义一次调用从发出到返回的全部语义：路由、超时、取消、分组、幂等、并发准入、错误还原、生命周期，并提供两层 API：
 
-- **Runtime Peer**（`@migaia/rpc-core/remote`）：`request` / `notify` / `stream` / `group` / `outcome`，按方法路径调用，带类型推导。进程、线程、桥接包都在这一层上构建。
+- **Runtime Peer**（`@migaia/rpc-core/remote`）：`request` / `notify` / `stream` / `group` / `outcome`，按方法路径调用，带类型推导。进程、线程、浏览器、桥接包都在这一层上构建。
 - **Endpoint**（包根）：`createEndpoint` + 中间件，`send` / `provide`，用于在任意载体（iframe、BroadcastChannel、MessagePort 等）上自行组装。
 
 本包不包含任何平台代码：没有 `node:` 导入，也不依赖 DOM。启动进程、创建 Worker 由其它包负责。
 
 ## 我应该用哪个包？
 
-| 需求                                         | 使用                                                              |
-| -------------------------------------------- | ----------------------------------------------------------------- |
-| 调用子进程或本机其它进程                     | [`@migaia/rpc-process`](../rpc-process/README.md)                 |
-| 调用 Worker 线程                             | [`@migaia/rpc-threads`](../rpc-threads/README.md)                 |
-| iframe、标签页、SharedWorker、Service Worker | [`@migaia/rpc-browser`](../rpc-browser/README.md) + 本包的 Endpoint |
-| 调用 Python / Go / Rust 服务                 | [`@migaia/rpc-bridge-jsonrpc`](../rpc-bridge-jsonrpc/README.md)   |
-| 在单元测试里模拟两个对端                     | 本包 `./testing` 的 `createPeerPair`                              |
-| 已有 `MessagePort` 或 Dedicated Worker       | 本包 `./adapters/message-port`、`./adapters/web-worker` + Endpoint |
-| 为新平台或新载体写适配器                     | 本包 `./adapter`                                                  |
+| 需求                                              | 使用                                                                     |
+| ------------------------------------------------- | ------------------------------------------------------------------------ |
+| 调用子进程或本机其它进程                          | [`@migaia/rpc-process`](../rpc-process/README.md)                        |
+| 调用 Worker 线程                                  | [`@migaia/rpc-threads`](../rpc-threads/README.md)                        |
+| iframe、SharedWorker、可靠有序的 RTCDataChannel   | [`@migaia/rpc-browser`](../rpc-browser/README.md) 的 `createBrowserPeer` |
+| 标签页广播、Service Worker、WebTransport datagram | `rpc-browser` transport + 本包的 Endpoint                                |
+| 调用 Python / Go / Rust 服务                      | [`@migaia/rpc-bridge-jsonrpc`](../rpc-bridge-jsonrpc/README.md)          |
+| 在单元测试里模拟两个对端                          | 本包 `./testing` 的 `createPeerPair`                                     |
+| 已有 `MessagePort` 或 Dedicated Worker            | 本包 `./adapters/message-port`、`./adapters/web-worker` + Endpoint       |
+| 为新平台或新载体写适配器                          | 本包 `./adapter`                                                         |
 
 ## 安装
 
@@ -31,19 +32,19 @@ pnpm add @migaia/rpc-core @migaia/rpc-contract
 
 ## 入口一览
 
-| 入口                                   | 内容                                                                                 |
-| -------------------------------------- | ------------------------------------------------------------------------------------ |
-| `@migaia/rpc-core`                     | `createEndpoint`、中间件（`connect`、`contract`、`protocol`、`codec`、`framer`、`abort`、`timeout`、`ping`、`authentication`、`hooks`、`uuid`）、错误码与错误守卫、`createRpcIdempotencyStore` |
-| `./remote`                             | `createRuntimePeer`、`createManagedRuntimePeer`、`createRuntimePlugin`、出口与事件常量、`RPC_REMOTE_ERROR_SOURCE` |
-| `./testing`                            | `createPeerPair`：内存中两个真实 Peer，用于测试                                      |
-| `./adapters/memory`                    | `createMemoryTransportPair`                                                          |
-| `./adapters/message-port`              | `createNodeMessagePortTransport`、`createBrowserMessagePortTransport`                |
-| `./adapters/web-worker`                | `createWebWorkerTransport`                                                           |
-| `./client`、`./provider`、`./full`、`./composed` | 只装需要的能力的 Endpoint 工厂，减小打包体积                               |
-| `./features/*`、`./stream`             | 供 `./composed` 选择的功能模块                                                       |
-| `./plugins/log`、`./plugins/send-queue`、`./plugins/flow-control` | IPC 日志、发送队列等可选中间件                          |
-| `./transport-kit`、`./transport-constants` | 编写自定义 transport 的工具与常量                                                |
-| `./adapter`                            | `defineMessageAdapter`、`defineByteAdapter`：运行时适配器作者的任务级构造函数（见 USEGUIDE 第 9 节） |
+| 入口                                                              | 内容                                                                                                                                                                                           |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@migaia/rpc-core`                                                | `createEndpoint`、中间件（`connect`、`contract`、`protocol`、`codec`、`framer`、`abort`、`timeout`、`ping`、`authentication`、`hooks`、`uuid`）、错误码与错误守卫、`createRpcIdempotencyStore` |
+| `./remote`                                                        | `createRuntimePeer`、`createManagedRuntimePeer`、`createRuntimePlugin`、出口与事件常量、`RPC_REMOTE_ERROR_SOURCE`                                                                              |
+| `./testing`                                                       | `createPeerPair`：内存中两个真实 Peer，用于测试                                                                                                                                                |
+| `./adapters/memory`                                               | `createMemoryTransportPair`                                                                                                                                                                    |
+| `./adapters/message-port`                                         | `createNodeMessagePortTransport`、`createBrowserMessagePortTransport`                                                                                                                          |
+| `./adapters/web-worker`                                           | `createWebWorkerTransport`                                                                                                                                                                     |
+| `./client`、`./provider`、`./full`、`./composed`                  | 只装需要的能力的 Endpoint 工厂，减小打包体积                                                                                                                                                   |
+| `./features/*`、`./stream`                                        | 供 `./composed` 选择的功能模块                                                                                                                                                                 |
+| `./plugins/log`、`./plugins/send-queue`、`./plugins/flow-control` | IPC 日志、发送队列等可选中间件                                                                                                                                                                 |
+| `./transport-kit`、`./transport-constants`                        | 编写自定义 transport 的工具与常量                                                                                                                                                              |
+| `./adapter`                                                       | `defineMessageAdapter`、`defineByteAdapter`：运行时适配器作者的任务级构造函数（见 USEGUIDE 第 9 节）                                                                                           |
 
 ## 快速开始
 
@@ -118,22 +119,22 @@ Runtime Peer 支持 `await using`，其 `Symbol.asyncDispose` 就是原来的 `c
 
 ## 错误
 
-| source                 | 常量                      | code 表                   |
-| ---------------------- | ------------------------- | ------------------------- |
-| `@migaia/rpc/core`     | `RPC_CORE_ERROR_SOURCE`   | `RpcCoreErrorCode`        |
-| `@migaia/rpc/remote`   | `RPC_REMOTE_ERROR_SOURCE` | `RpcRemoteLayerErrorCode` |
+| source               | 常量                      | code 表                   |
+| -------------------- | ------------------------- | ------------------------- |
+| `@migaia/rpc/core`   | `RPC_CORE_ERROR_SOURCE`   | `RpcCoreErrorCode`        |
+| `@migaia/rpc/remote` | `RPC_REMOTE_ERROR_SOURCE` | `RpcRemoteLayerErrorCode` |
 
 按 `(source, code)` 分支，不要匹配 `message`。跨 Worker、iframe 或模块副本时，用 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 判断错误族，而不是 `instanceof`。全部错误码及处理建议见 [USEGUIDE 第 10 节](./USEGUIDE.md#10-错误码与处理)。
 
 ## 相关包
 
-| 包                                                              | 关系                                       |
-| --------------------------------------------------------------- | ------------------------------------------ |
-| [`@migaia/rpc-contract`](../rpc-contract/README.md)             | 线上格式与协议工具；peer 依赖              |
-| [`@migaia/rpc-process`](../rpc-process/README.md)               | 跨进程                                     |
-| [`@migaia/rpc-threads`](../rpc-threads/README.md)               | Worker 线程                                |
-| [`@migaia/rpc-browser`](../rpc-browser/README.md)               | 浏览器载体                                 |
-| [`@migaia/rpc-bridge-jsonrpc`](../rpc-bridge-jsonrpc/README.md) | 其它语言                                   |
-| [`@migaia/plugin-host`](../plugin-host/README.md)               | `createRuntimePlugin` 安装的宿主           |
+| 包                                                              | 关系                                 |
+| --------------------------------------------------------------- | ------------------------------------ |
+| [`@migaia/rpc-contract`](../rpc-contract/README.md)             | 线上格式与协议工具；peer 依赖        |
+| [`@migaia/rpc-process`](../rpc-process/README.md)               | 跨进程                               |
+| [`@migaia/rpc-threads`](../rpc-threads/README.md)               | Worker 线程                          |
+| [`@migaia/rpc-browser`](../rpc-browser/README.md)               | 浏览器 Runtime Peer 与 Endpoint 载体 |
+| [`@migaia/rpc-bridge-jsonrpc`](../rpc-bridge-jsonrpc/README.md) | 其它语言                             |
+| [`@migaia/plugin-host`](../plugin-host/README.md)               | `createRuntimePlugin` 安装的宿主     |
 
 完整用法见 [USEGUIDE](./USEGUIDE.md)。

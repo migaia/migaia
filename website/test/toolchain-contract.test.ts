@@ -459,8 +459,9 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
    * Adapter extraction moved owner entries into the adapter packages; the adapter SDK then replaced
    * the low-level adapter exports with defineMessageAdapter / defineByteAdapter and an
    * internal-advanced entry, and the short-source helpers added isProcessChild / isThreadChild.
+   * Browser Peer adds createBrowserPeer and its package error source/code catalog at the root.
    */
-  assert.equal(runtimeSymbols.length, 309)
+  assert.equal(runtimeSymbols.length, 312)
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)

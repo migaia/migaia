@@ -77,8 +77,9 @@
     {
       "slug": "rpc-browser",
       "description": "RPC browser owner.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [
+        ".",
         "./adapters/broadcast-channel",
         "./adapters/rtc-data-channel",
         "./adapters/service-worker",
@@ -116,7 +117,7 @@
     {
       "slug": "rpc-core",
       "description": "RPC core owner.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [
         ".",
         "./adapter",
