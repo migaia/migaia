@@ -21,15 +21,138 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "浏览器载体适配器。按实际载体导入 `./adapters/window`、`shared-worker`、`service-worker`、`broadcast-channel`、`web-transport` 或 `rtc-data-channel`。模块没有根 barrel。"
+                "text": "浏览器通信载体适配器。 把浏览器里的各种消息通道包装成 `@migaia/rpc-core` 的 transport，用来在父页面与 iframe、标签页之间、页面与 SharedWorker / Service Worker 之间，以及经 WebRTC 或 WebTransport 进行 RPC 调用。本包只做\"载体\"这一层：消息来源校验、监听器注册与释放。调用、超时、错误处理由 `@migaia/rpc-core` 的 Endpoint 提供。"
+              }
+            ]
+          },
+          {
+            "id": "适用与不适用场景",
+            "heading": "适用与不适用场景",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "适用："
+              },
+              {
+                "type": "table",
+                "headers": ["场景", "适配器"],
+                "rows": [
+                  ["父页面 ↔ iframe、页面 ↔ `window.open` 弹窗", "`./adapters/window`"],
+                  ["同源多个标签页之间广播或协作", "`./adapters/broadcast-channel`"],
+                  ["页面 ↔ SharedWorker", "`./adapters/shared-worker`"],
+                  ["页面 ↔ Service Worker", "`./adapters/service-worker`"],
+                  ["两个浏览器之间经 WebRTC DataChannel", "`./adapters/rtc-data-channel`"],
+                  ["浏览器 ↔ 服务器经 WebTransport datagram", "`./adapters/web-transport`"]
+                ]
               },
               {
                 "type": "paragraph",
-                "text": "RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不发布；仓内消费方直接导入各公开包。同一 realm 的第二份模块实例在取得资源前抛出 native Error，source 为 `@migaia/rpc/core`、code 为 `DUPLICATE_MODULE_INSTANCE`；修复依赖解析并重载 realm。不同 Worker realm 独立。既有六个语义 source、wire 与错误身份保持不变。"
+                "text": "不适用："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "Dedicated Worker 与 `MessagePort`：适配器在 `@migaia/rpc-core/adapters/web-worker` 与 `@migaia/rpc-core/adapters/message-port`。如果要由库创建和管理 Worker，用 `@migaia/rpc-threads`。",
+                  "Node / Bun / Deno 的进程与线程：用 `@migaia/rpc-process`、`@migaia/rpc-threads`。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "安装",
+            "heading": "安装",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "bash",
+                "code": "pnpm add @migaia/rpc-browser @migaia/rpc-core"
               },
               {
                 "type": "paragraph",
-                "text": "完整使用边界见 USEGUIDE。"
+                "text": "`@migaia/rpc-core` 是 peer 依赖，版本必须一致（当前 `0.0.7`）。本包没有根入口，每个适配器从各自的子路径导入，不会把用不到的载体打进包里。"
+              }
+            ]
+          },
+          {
+            "id": "快速开始-父页面调用-iframe",
+            "heading": "快速开始：父页面调用 iframe",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "iframe 内（`https://billing.example`）提供方法："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "// billing-frame.ts\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst transport = createWindowMessageTransport({\n  target: window.parent,\n  receiver: window,\n  targetOrigin: 'https://shop.example' // 只接受来自、也只发往父页面这个源\n})\nconst billing = await createEndpoint({\n  id: 'billing-frame',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nbilling.provide('calculateTotal', (context) => {\n  const input = context.data as { prices: number[]; taxRate: number }\n  const subtotal = input.prices.reduce((sum, price) => sum + price, 0)\n  return context.success(subtotal * (1 + input.taxRate))\n})\n\nwindow.addEventListener('pagehide', () => void billing.dispose(), { once: true })"
+              },
+              {
+                "type": "paragraph",
+                "text": "父页面（`https://shop.example`）调用："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "// parent.ts\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nawait new Promise<void>((resolve) => iframe.addEventListener('load', () => resolve(), { once: true }))\n\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: new URL(iframe.src).origin\n})\nconst billing = await createEndpoint({\n  id: 'checkout-page',\n  targetIds: ['billing-frame'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst total = await billing.send<number>('billing-frame', 'calculateTotal', {\n  prices: [12, 30],\n  taxRate: 0.08\n})\nconsole.log(total) // 45.36\n\nawait billing.dispose()"
+              },
+              {
+                "type": "paragraph",
+                "text": "两端的 `middlewares` 必须一致：`contract({ version })` 约定业务版本，`protocol()` 启用协议帧，`connect({ transport })` 在收发前校验消息来源。"
+              }
+            ]
+          },
+          {
+            "id": "安全要点",
+            "heading": "安全要点",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "必须指定 `targetOrigin`。省略时默认使用当前页面的 origin；跨域 iframe 必须显式写出对方的源。`'*'` 会被拒绝，除非同时设置 `allowUnsafeTargetOrigin: true`（即使这样，接收时仍会校验来源窗口）。",
+                  "接收端只接受来自 `target` 那个窗口的消息，其它窗口（包括其它 iframe）发来的同格式消息会被忽略。",
+                  "BroadcastChannel 对同源的所有标签页可见，不要用它传输只应发给某一方的敏感数据。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "资源所有权",
+            "heading": "资源所有权",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "除 WebTransport 外，适配器都借用你传入的窗口、端口或频道，不负责关闭它们。`endpoint.dispose()` 会注销适配器注册的监听器；`BroadcastChannel.close()`、`port.close()`、`RTCDataChannel.close()` 等由创建它们的代码负责。例如在 Node 或测试中使用 BroadcastChannel，不关闭频道会让进程一直存活。WebTransport 适配器会取得 datagram 的写入端，关闭 transport 时一并关闭它。"
+              }
+            ]
+          },
+          {
+            "id": "错误",
+            "heading": "错误",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "本包没有自己的错误码（`RpcBrowserErrorCode` 为空），所有错误都使用 `@migaia/rpc-core` 的身份，例如配置错误为 `@migaia/rpc/core` / `INVALID_CONFIG`，载体失败为 `TRANSPORT`。"
+              }
+            ]
+          },
+          {
+            "id": "相关包",
+            "heading": "相关包",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["包", "关系"],
+                "rows": [
+                  [
+                    "`@migaia/rpc-core`",
+                    "`createEndpoint`、中间件、MessagePort 与 Dedicated Worker 适配器"
+                  ],
+                  ["`@migaia/rpc-threads`", "由库创建并监督的 Web Worker"]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "各适配器的参数、行为差异与选择建议见 USEGUIDE。"
               }
             ]
           }
@@ -38,29 +161,300 @@
       "guide": {
         "sections": [
           {
-            "id": "migaia-rpc-browser-使用指南",
-            "heading": "@migaia/rpc-browser 使用指南",
+            "id": "migaia-rpc-browser-使用手册",
+            "heading": "@migaia/rpc-browser 使用手册",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "按实际载体导入 `./adapters/window`、`shared-worker`、`service-worker`、`broadcast-channel`、`web-transport` 或 `rtc-data-channel`。模块没有根 barrel。"
+                "text": "本手册说明每个浏览器载体适配器的参数、来源校验规则与资源所有权。安装与最短示例见 README。Endpoint 的组装、`send` / `provide` 的完整语义与中间件见 rpc-core USEGUIDE。"
+              }
+            ]
+          },
+          {
+            "id": "目录",
+            "heading": "目录",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "1. 如何组装：transport + Endpoint 2. window：iframe 与弹窗 3. broadcast-channel：同源标签页 4. shared-worker：页面与 SharedWorker 5. service-worker：页面与 Service Worker 6. 高阶用法：WebRTC 与 WebTransport 7. 选择指南 8. 错误与常见问题"
+              }
+            ]
+          },
+          {
+            "id": "1-如何组装-transport-endpoint",
+            "heading": "1. 如何组装：transport + Endpoint",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "每个适配器返回一个 `IRpcTransport`。把它交给 `@migaia/rpc-core` 的 `createEndpoint`，并在 `connect` 中间件里再传一次，用于消息来源校验："
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'"
+                "code": "import { connect, createEndpoint } from '@migaia/rpc-core'\n\nconst endpoint = await createEndpoint({\n  id: 'my-side',                  // 本端标识\n  targetIds: ['other-side'],      // 允许调用的对端标识\n  transport,\n  middlewares: [connect({ transport })]\n})\n\nendpoint.provide('ping', (context) => context.success('pong'))           // 提供方法\nconst reply = await endpoint.send<string>('other-side', 'ping', null)    // 调用对端\nawait endpoint.dispose()                                                  // 释放"
+              },
+              {
+                "type": "list",
+                "items": [
+                  "`send(target, method, data, options?)` 的 `data` 是必填参数，不需要参数时传 `null`。",
+                  "提供方用 `context.data` 读取参数，用 `context.success(value)` 返回结果，或 `context.failed(error)` 返回错误。",
+                  "需要版本约定与协议帧时，加入 `contract({ version })` 和 `protocol()` 中间件（README 的 iframe 示例就是这样）。两端的中间件组合必须一致。"
+                ]
               },
               {
                 "type": "paragraph",
-                "text": "各适配器使用实际持有的窗口、端口或连接资源。自定义 Endpoint 从 `@migaia/rpc-core` 构造。Dedicated Worker 适配器从 `@migaia/rpc-core/adapters/web-worker` 导入。释放规则与载体校验保持原操作语义。"
+                "text": "下面以 BroadcastChannel 为例的完整代码已在 Node 24 中实际运行（Node 内置 BroadcastChannel）："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\n// 两个标签页（这里用同一进程里的两个 BroadcastChannel 实例模拟）共享频道名 'cart'。\nconst channelA = new BroadcastChannel('cart')\nconst channelB = new BroadcastChannel('cart')\nconst tabATransport = createBroadcastChannelTransport(channelA)\nconst tabBTransport = createBroadcastChannelTransport(channelB)\n\nconst tabB = await createEndpoint({\n  id: 'tab-b',\n  transport: tabBTransport,\n  middlewares: [connect({ transport: tabBTransport })]\n})\ntabB.provide('cart.count', (context) => context.success(3))\n\nconst tabA = await createEndpoint({\n  id: 'tab-a',\n  targetIds: ['tab-b'],\n  transport: tabATransport,\n  middlewares: [connect({ transport: tabATransport })]\n})\ntry {\n  console.log(await tabA.send<number>('tab-b', 'cart.count', null)) // 3\n} finally {\n  await tabA.dispose()\n  await tabB.dispose()\n  // 适配器借用频道，不负责关闭；由创建它的一方关闭。\n  channelA.close()\n  channelB.close()\n}"
+              }
+            ]
+          },
+          {
+            "id": "2-window-iframe-与弹窗",
+            "heading": "2. window：iframe 与弹窗",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,   // 发往哪个窗口\n  receiver: window,                // 在哪里监听 message 事件\n  targetOrigin: 'https://billing.example'\n})"
+              },
+              {
+                "type": "table",
+                "headers": ["选项", "说明"],
+                "rows": [
+                  [
+                    "`target`",
+                    "对端窗口：`iframe.contentWindow`、`window.parent`、`window.opener` 或 `window.open()` 的返回值"
+                  ],
+                  [
+                    "`receiver`",
+                    "监听 `message` 事件的对象。在窗口环境中可省略，默认为当前全局对象"
+                  ],
+                  [
+                    "`targetOrigin`",
+                    "对端的源。省略时默认 `location.origin`（只适用于同源）；跨域必须显式写出"
+                  ],
+                  [
+                    "`allowUnsafeTargetOrigin`",
+                    "设为 `true` 才允许 `targetOrigin: '*'`；仅在确实无法得知对端源时使用"
+                  ]
+                ]
               },
               {
                 "type": "paragraph",
-                "text": "RPC 包族精确锁步为 0.0.7，跨包 peer 使用精确版本。此工作不发布；仓内消费方直接导入各公开包。同一 realm 的第二份模块实例在取得资源前抛出 native Error，source 为 `@migaia/rpc/core`、code 为 `DUPLICATE_MODULE_INSTANCE`；修复依赖解析并重载 realm。不同 Worker realm 独立。既有六个语义 source、wire 与错误身份保持不变。"
+                "text": "来源校验：只有同时满足\"事件的 `source` 就是 `target` 这个窗口\"和\"事件的 `origin` 等于 `targetOrigin`\"的消息才会被处理。页面中其它 iframe、扩展脚本发来的消息即使格式正确也会被忽略。使用 `'*'` 时仍会校验 `source`。"
               },
               {
                 "type": "paragraph",
-                "text": "包内使用相对路径；跨包调用只使用公开 API。协议工具使用 `@migaia/rpc-contract`，Core/Remote/Testing 使用 `@migaia/rpc-core` 的普通入口。"
+                "text": "时机：父页面要等 iframe 的 `load` 事件之后再创建 Endpoint；iframe 内的代码也需要先完成 `createEndpoint` 和 `provide`，父页面的调用才会被处理。对端尚未就绪时，调用会在超时后失败，可以在业务层重试或先约定一个就绪信号。"
+              }
+            ]
+          },
+          {
+            "id": "3-broadcast-channel-同源标签页",
+            "heading": "3. broadcast-channel：同源标签页",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\nconst transport = createBroadcastChannelTransport(new BroadcastChannel('cart'))"
+              },
+              {
+                "type": "list",
+                "items": [
+                  "频道名相同的所有同源上下文（标签页、iframe、Worker）都会收到消息。用 Endpoint 的 `id` 与 `targetIds` 区分要调用的对象。",
+                  "同一频道上有多个对端提供同名方法时，用唯一的 `id` 定位调用目标。",
+                  "适配器借用频道，不负责关闭。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "4-shared-worker-页面与-sharedworker",
+            "heading": "4. shared-worker：页面与 SharedWorker",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "页面一侧："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'\n\nconst worker = new SharedWorker(new URL('./shared.worker.js', import.meta.url), { type: 'module' })\nconst transport = createSharedWorkerTransport(worker.port)"
+              },
+              {
+                "type": "paragraph",
+                "text": "SharedWorker 一侧，对每个连接进来的页面各创建一个 Endpoint："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "self.addEventListener('connect', (event) => {\n  const port = (event as MessageEvent).ports[0]!\n  const transport = createSharedWorkerTransport(port)\n  // createEndpoint({ id: …, transport, middlewares: [connect({ transport })] })，再 provide 方法\n})"
+              },
+              {
+                "type": "list",
+                "items": [
+                  "适配器会在需要时调用 `port.start()`，并监听 `messageerror`（无法反序列化的消息）作为载体错误上报。",
+                  "每个页面与 SharedWorker 之间是独立的端口，对端身份由端口本身区分。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "5-service-worker-页面与-service-worker",
+            "heading": "5. service-worker：页面与 Service Worker",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "页面一侧（发给当前控制页面的 Service Worker）："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\nconst registration = await navigator.serviceWorker.ready\nconst transport = createServiceWorkerTransport({\n  target: registration.active!,\n  receiver: navigator.serviceWorker\n})"
+              },
+              {
+                "type": "paragraph",
+                "text": "Service Worker 一侧（回复某个具体页面）："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "const client = await self.clients.get(clientId)\nconst transport = createServiceWorkerTransport({\n  target: client!,\n  receiver: self,\n  peerId: client!.id\n})"
+              },
+              {
+                "type": "table",
+                "headers": ["选项", "说明"],
+                "rows": [
+                  [
+                    "`target`",
+                    "发送目标：页面一侧为 `ServiceWorker`，Service Worker 一侧为某个 `Client`"
+                  ],
+                  [
+                    "`receiver`",
+                    "监听 `message` 的对象：页面一侧为 `navigator.serviceWorker`，Service Worker 一侧为 `self`"
+                  ],
+                  ["`peerId`", "期望的对端 Client id；默认取 `target.id`"]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "来源校验：消息的 `source` 必须是 `target` 本身，或其 `id` 等于 `peerId`。其它页面发来的消息会被忽略。"
+              },
+              {
+                "type": "paragraph",
+                "text": "生命周期提示：Service Worker 空闲时可能被浏览器终止，内存中的 Endpoint 随之消失。页面侧的调用会超时；在业务层准备好重建连接，并让需要持久的状态落到 IndexedDB 等存储中。"
+              }
+            ]
+          },
+          {
+            "id": "6-高阶用法-webrtc-与-webtransport",
+            "heading": "6. 高阶用法：WebRTC 与 WebTransport",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "点对点与服务器 datagram 载体需要你自行完成信令或会话建立，并且对消息可靠性有额外要求。"
+              }
+            ]
+          },
+          {
+            "id": "6-高阶用法-webrtc-与-webtransport-6-1-rtc-data-channel-webrtc-点对点",
+            "heading": "6. 高阶用法：WebRTC 与 WebTransport · 6.1 rtc-data-channel：WebRTC 点对点",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'\n\nconst channel = peerConnection.createDataChannel('rpc', { ordered: true })\nawait new Promise<void>((resolve) => channel.addEventListener('open', () => resolve(), { once: true }))\nconst transport = createRtcDataChannelTransport(channel)"
+              },
+              {
+                "type": "list",
+                "items": [
+                  "请使用可靠且有序的 DataChannel（默认配置即是）。RPC 依赖消息不丢失、不乱序。",
+                  "适配器以字符串收发：发送对象时自动 `JSON.stringify`。",
+                  "先等 `open` 再创建 transport：DataChannel 仍处于 `connecting` 时创建会以 `INVALID_CONFIG`（`TypeError`）拒绝。已经 `closed` 的频道创建后立即处于关闭状态，发送以 `TRANSPORT` 失败。",
+                  "`closing` / `close` / `error` 事件会作为载体关闭上报，之后的发送以 `TRANSPORT` 失败。",
+                  "信令（交换 SDP 与 ICE）不在本包范围内。适配器借用 DataChannel，不负责关闭。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "6-高阶用法-webrtc-与-webtransport-6-2-web-transport-webtransport-datagram",
+            "heading": "6. 高阶用法：WebRTC 与 WebTransport · 6.2 web-transport：WebTransport datagram",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'\n\nconst session = new WebTransport('https://rpc.example:4433/rpc')\nawait session.ready\nconst transport = createWebTransportDatagramTransport(session.datagrams)"
+              },
+              {
+                "type": "list",
+                "items": [
+                  "只接受 `Uint8Array`：Endpoint 必须配置把消息编码为字节的 codec 中间件，否则发送时以 `TypeError` 拒绝。",
+                  "datagram 不可靠：可能丢失、乱序，且单个 datagram 的大小受路径 MTU 限制（通常一千多字节）。丢失的调用只能靠超时发现。只适合小消息、可容忍丢失的场景；需要可靠传输时，请在应用层改用其它载体。",
+                  "适配器取得 `datagrams.writable` 的写入端，关闭 transport 时一并关闭；`WebTransport` 会话本身仍由你关闭。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "7-选择指南",
+            "heading": "7. 选择指南",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["需求", "推荐"],
+                "rows": [
+                  ["嵌入第三方页面 / 被第三方嵌入", "`window`，并精确设置 `targetOrigin`"],
+                  ["同一站点多个标签页共享状态或选主", "`broadcast-channel`"],
+                  ["多个标签页共享一个计算或连接", "`shared-worker`"],
+                  ["离线缓存、推送、后台同步", "`service-worker`"],
+                  [
+                    "页面内的后台计算",
+                    "`@migaia/rpc-threads`（由库创建 Worker）或 rpc-core 的 `web-worker` 适配器"
+                  ],
+                  ["浏览器之间直连", "`rtc-data-channel`"],
+                  ["低延迟、可丢包的服务器推送", "`web-transport`"]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "8-错误与常见问题",
+            "heading": "8. 错误与常见问题",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "本包不定义自己的错误码，错误都带 `@migaia/rpc/core` 的身份："
+              },
+              {
+                "type": "table",
+                "headers": ["code", "何时发生"],
+                "rows": [
+                  [
+                    "`INVALID_CONFIG`",
+                    "参数缺失或非法，例如非窗口环境下没有 `receiver`、`targetOrigin` 为空或未经允许的 `'*'`、DataChannel 尚未 `open`"
+                  ],
+                  [
+                    "`TRANSPORT`",
+                    "载体失败：频道已关闭、DataChannel 不是 `open`、WebTransport 已关闭等"
+                  ]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "调用一直超时？ 最常见的原因是来源校验没有通过：检查 `targetOrigin` 是否与对端实际的源一致（协议、域名、端口都要相同），以及 `target` 是否是真正发消息的那个窗口。其次检查对端是否已经完成 `createEndpoint` 与 `provide`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "页面关闭后需要清理吗？ 在 `pagehide` 中调用 `endpoint.dispose()`，注销监听器并拒绝在途调用。"
+              },
+              {
+                "type": "paragraph",
+                "text": "能传 `ArrayBuffer` 吗？ window、shared-worker、service-worker 基于结构化克隆，可以传输；rtc-data-channel 以 JSON 字符串传输，二进制需要自行编码（例如 base64）。"
               }
             ]
           }
@@ -105,7 +499,10 @@
           "returns": "IRpcTransport",
           "errors": ["No documented errors are declared for createBroadcastChannelTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBroadcastChannelTransport.",
-          "examples": [],
+          "examples": [
+            "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\n// 两个标签页（这里用同一进程里的两个 BroadcastChannel 实例模拟）共享频道名 'cart'。\nconst channelA = new BroadcastChannel('cart')\nconst channelB = new BroadcastChannel('cart')\nconst tabATransport = createBroadcastChannelTransport(channelA)\nconst tabBTransport = createBroadcastChannelTransport(channelB)\n\nconst tabB = await createEndpoint({\n  id: 'tab-b',\n  transport: tabBTransport,\n  middlewares: [connect({ transport: tabBTransport })]\n})\ntabB.provide('cart.count', (context) => context.success(3))\n\nconst tabA = await createEndpoint({\n  id: 'tab-a',\n  targetIds: ['tab-b'],\n  transport: tabATransport,\n  middlewares: [connect({ transport: tabATransport })]\n})\ntry {\n  console.log(await tabA.send<number>('tab-b', 'cart.count', null)) // 3\n} finally {\n  await tabA.dispose()\n  await tabB.dispose()\n  // 适配器借用频道，不负责关闭；由创建它的一方关闭。\n  channelA.close()\n  channelB.close()\n}",
+            "import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\nconst transport = createBroadcastChannelTransport(new BroadcastChannel('cart'))"
+          ],
           "members": [],
           "exportPath": "./adapters/broadcast-channel",
           "overloadSignatures": [
@@ -158,7 +555,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-browser/dist/browser/adapters/broadcast-channel.d.ts:createBroadcastChannelTransport:export declare function createBroadcastChannelTransport(channel: BroadcastChannel): IRpcTransport;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 32,
           "configuration": [],
           "fragment": "rpc-browser-adapters/broadcast-channel--createBroadcastChannelTransport"
         }
@@ -201,7 +598,9 @@
           "returns": "IRpcTransport",
           "errors": ["No documented errors are declared for createRtcDataChannelTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRtcDataChannelTransport.",
-          "examples": [],
+          "examples": [
+            "import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'\n\nconst channel = peerConnection.createDataChannel('rpc', { ordered: true })\nawait new Promise<void>((resolve) => channel.addEventListener('open', () => resolve(), { once: true }))\nconst transport = createRtcDataChannelTransport(channel)"
+          ],
           "members": [],
           "exportPath": "./adapters/rtc-data-channel",
           "overloadSignatures": [
@@ -254,7 +653,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-browser/dist/browser/adapters/rtc-data-channel.d.ts:createRtcDataChannelTransport:export declare function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTransport;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "rpc-browser-adapters/rtc-data-channel--createRtcDataChannelTransport"
         },
@@ -360,7 +759,10 @@
           "returns": "IRpcTransport<unknown, Transferable>",
           "errors": ["No documented errors are declared for createServiceWorkerTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createServiceWorkerTransport.",
-          "examples": [],
+          "examples": [
+            "import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\nconst registration = await navigator.serviceWorker.ready\nconst transport = createServiceWorkerTransport({\n  target: registration.active!,\n  receiver: navigator.serviceWorker\n})",
+            "const client = await self.clients.get(clientId)\nconst transport = createServiceWorkerTransport({\n  target: client!,\n  receiver: self,\n  peerId: client!.id\n})"
+          ],
           "members": [],
           "exportPath": "./adapters/service-worker",
           "overloadSignatures": [
@@ -432,31 +834,31 @@
           ],
           "identity": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts:createServiceWorkerTransport:export declare function createServiceWorkerTransport(options: IServiceWorkerTransportOptions): IRpcTransport<unknown, Transferable>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 18,
           "configuration": [
             {
               "name": "target",
               "type": "IServiceWorkerMessageTarget",
               "optional": false,
-              "description": "ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target.",
+              "description": "`target` — 发送目标：页面一侧为 `ServiceWorker`，Service Worker 一侧为某个 `Client`",
               "descriptionEn": "ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target.",
-              "descriptionZh": ""
+              "descriptionZh": "`target` — 发送目标：页面一侧为 `ServiceWorker`，Service Worker 一侧为某个 `Client`"
             },
             {
               "name": "receiver",
               "type": "IServiceWorkerMessageReceiver",
               "optional": false,
-              "description": "Message event owner, usually navigator.serviceWorker in a page or self in the worker.",
+              "description": "`receiver` — 监听 `message` 的对象：页面一侧为 `navigator.serviceWorker`，Service Worker 一侧为 `self`",
               "descriptionEn": "Message event owner, usually navigator.serviceWorker in a page or self in the worker.",
-              "descriptionZh": ""
+              "descriptionZh": "`receiver` — 监听 `message` 的对象：页面一侧为 `navigator.serviceWorker`，Service Worker 一侧为 `self`"
             },
             {
               "name": "peerId",
               "type": "string",
               "optional": true,
-              "description": "Expected remote Client identity; defaults to target.id when that identity is available.",
+              "description": "`peerId` — 期望的对端 Client id；默认取 `target.id`",
               "descriptionEn": "Expected remote Client identity; defaults to target.id when that identity is available.",
-              "descriptionZh": ""
+              "descriptionZh": "`peerId` — 期望的对端 Client id；默认取 `target.id`"
             }
           ],
           "fragment": "rpc-browser-adapters/service-worker--createServiceWorkerTransport"
@@ -689,7 +1091,10 @@
           "returns": "IRpcTransport<unknown, Transferable>",
           "errors": ["No documented errors are declared for createSharedWorkerTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createSharedWorkerTransport.",
-          "examples": [],
+          "examples": [
+            "import { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'\n\nconst worker = new SharedWorker(new URL('./shared.worker.js', import.meta.url), { type: 'module' })\nconst transport = createSharedWorkerTransport(worker.port)",
+            "self.addEventListener('connect', (event) => {\n  const port = (event as MessageEvent).ports[0]!\n  const transport = createSharedWorkerTransport(port)\n  // createEndpoint({ id: …, transport, middlewares: [connect({ transport })] })，再 provide 方法\n})"
+          ],
           "members": [],
           "exportPath": "./adapters/shared-worker",
           "overloadSignatures": [
@@ -742,7 +1147,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-browser/dist/browser/adapters/shared-worker.d.ts:createSharedWorkerTransport:export declare function createSharedWorkerTransport(port: ISharedWorkerPort): IRpcTransport<unknown, Transferable>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 18,
           "configuration": [],
           "fragment": "rpc-browser-adapters/shared-worker--createSharedWorkerTransport"
         },
@@ -848,7 +1253,9 @@
           "returns": "IRpcTransport<Uint8Array>",
           "errors": ["No documented errors are declared for createWebTransportDatagramTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWebTransportDatagramTransport.",
-          "examples": [],
+          "examples": [
+            "import { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'\n\nconst session = new WebTransport('https://rpc.example:4433/rpc')\nawait session.ready\nconst transport = createWebTransportDatagramTransport(session.datagrams)"
+          ],
           "members": [],
           "exportPath": "./adapters/web-transport",
           "overloadSignatures": [
@@ -901,7 +1308,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-browser/dist/browser/adapters/web-transport.d.ts:createWebTransportDatagramTransport:export declare function createWebTransportDatagramTransport(datagrams: IWebTransportDatagrams): IRpcTransport<Uint8Array>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "rpc-browser-adapters/web-transport--createWebTransportDatagramTransport"
         },
@@ -1007,7 +1414,11 @@
           "returns": "IRpcTransport<unknown, Transferable>",
           "errors": ["No documented errors are declared for createWindowMessageTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWindowMessageTransport.",
-          "examples": [],
+          "examples": [
+            "import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,   // 发往哪个窗口\n  receiver: window,                // 在哪里监听 message 事件\n  targetOrigin: 'https://billing.example'\n})",
+            "// billing-frame.ts\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst transport = createWindowMessageTransport({\n  target: window.parent,\n  receiver: window,\n  targetOrigin: 'https://shop.example' // 只接受来自、也只发往父页面这个源\n})\nconst billing = await createEndpoint({\n  id: 'billing-frame',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nbilling.provide('calculateTotal', (context) => {\n  const input = context.data as { prices: number[]; taxRate: number }\n  const subtotal = input.prices.reduce((sum, price) => sum + price, 0)\n  return context.success(subtotal * (1 + input.taxRate))\n})\n\nwindow.addEventListener('pagehide', () => void billing.dispose(), { once: true })",
+            "// parent.ts\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nawait new Promise<void>((resolve) => iframe.addEventListener('load', () => resolve(), { once: true }))\n\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: new URL(iframe.src).origin\n})\nconst billing = await createEndpoint({\n  id: 'checkout-page',\n  targetIds: ['billing-frame'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst total = await billing.send<number>('billing-frame', 'calculateTotal', {\n  prices: [12, 30],\n  taxRate: 0.08\n})\nconsole.log(total) // 45.36\n\nawait billing.dispose()"
+          ],
           "members": [],
           "exportPath": "./adapters/window",
           "overloadSignatures": [
@@ -1085,39 +1496,39 @@
           ],
           "identity": "packages/rpc-browser/dist/browser/adapters/window.d.ts:createWindowMessageTransport:export declare function createWindowMessageTransport(options: IWindowMessageTransportOptions): IRpcTransport<unknown, Transferable>;",
           "guidance": [],
-          "usageScore": 10,
+          "usageScore": 28,
           "configuration": [
             {
               "name": "target",
               "type": "IWindowMessageTarget",
               "optional": false,
-              "description": "Outbound ServiceWorker or Client target. */ export type IServiceWorkerMessageTarget = { postMessage(message: unknown, transfer?: readonly Transferable[]): void readonly id?: string } /** Inbound page or ServiceWorkerGlobalScope event target. */ export type IServiceWorkerMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void } export type IServiceWorkerTransportOptions = { /** ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target.",
+              "description": "`target` — 对端窗口：`iframe.contentWindow`、`window.parent`、`window.opener` 或 `window.open()` 的返回值",
               "descriptionEn": "Outbound ServiceWorker or Client target. */ export type IServiceWorkerMessageTarget = { postMessage(message: unknown, transfer?: readonly Transferable[]): void readonly id?: string } /** Inbound page or ServiceWorkerGlobalScope event target. */ export type IServiceWorkerMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void } export type IServiceWorkerTransportOptions = { /** ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target.",
-              "descriptionZh": ""
+              "descriptionZh": "`target` — 对端窗口：`iframe.contentWindow`、`window.parent`、`window.opener` 或 `window.open()` 的返回值"
             },
             {
               "name": "receiver",
               "type": "IWindowMessageReceiver",
               "optional": true,
-              "description": "Message event owner, usually navigator.serviceWorker in a page or self in the worker.",
+              "description": "`receiver` — 监听 `message` 事件的对象。在窗口环境中可省略，默认为当前全局对象",
               "descriptionEn": "Message event owner, usually navigator.serviceWorker in a page or self in the worker.",
-              "descriptionZh": ""
+              "descriptionZh": "`receiver` — 监听 `message` 事件的对象。在窗口环境中可省略，默认为当前全局对象"
             },
             {
               "name": "targetOrigin",
               "type": "string",
               "optional": true,
-              "description": "Defaults to current window.location.origin when available.",
+              "description": "`targetOrigin` — 对端的源。省略时默认 `location.origin`（只适用于同源）；跨域必须显式写出",
               "descriptionEn": "Defaults to current window.location.origin when available.",
-              "descriptionZh": ""
+              "descriptionZh": "`targetOrigin` — 对端的源。省略时默认 `location.origin`（只适用于同源）；跨域必须显式写出"
             },
             {
               "name": "allowUnsafeTargetOrigin",
               "type": "boolean",
               "optional": true,
-              "description": "Explicit opt-in for wildcard delivery; source identity is still required on receive.",
+              "description": "`allowUnsafeTargetOrigin` — 设为 `true` 才允许 `targetOrigin: '*'`；仅在确实无法得知对端源时使用",
               "descriptionEn": "Explicit opt-in for wildcard delivery; source identity is still required on receive.",
-              "descriptionZh": ""
+              "descriptionZh": "`allowUnsafeTargetOrigin` — 设为 `true` 才允许 `targetOrigin: '*'`；仅在确实无法得知对端源时使用"
             }
           ],
           "fragment": "rpc-browser-adapters/window--createWindowMessageTransport"
