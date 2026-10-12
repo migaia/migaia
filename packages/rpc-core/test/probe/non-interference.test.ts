@@ -355,7 +355,10 @@ describe('probe non-interference A6', () => {
         expect(payload).toEqual({ value: 'x'.repeat(512) })
         await vi.waitFor(() => expect(admission.size).toBe(0))
         if (mode !== 'absent') {
-          /** The receiving endpoint observes every ciphertext before its corresponding plaintext. */
+          /**
+           * Existing concurrent unprotect starts all ciphertext observations before plaintext
+           * resumes.
+           */
           const inbound = events.filter(
             (event) =>
               event.endpointId === 'encrypted-server' &&
@@ -365,16 +368,15 @@ describe('probe non-interference A6', () => {
           const frameCount = inbound.filter((event) => event.stage === RpcProbeStage.frame).length
           expect(frameCount).toBeGreaterThan(1)
           expect(inbound.map((event) => event.stage)).toEqual([
-            ...Array.from({ length: frameCount }, () => [
-              RpcProbeStage.protected,
-              RpcProbeStage.frame
-            ]).flat(),
+            ...Array.from({ length: frameCount }, () => RpcProbeStage.protected),
+            ...Array.from({ length: frameCount }, () => RpcProbeStage.frame),
             RpcProbeStage.encoded,
             RpcProbeStage.envelope
           ])
           for (let index = 0; index < frameCount; index++) {
-            expect(inbound[index * 2]!.content === inbound[index * 2 + 1]!.content).toBe(false)
-            expect(inbound[index * 2 + 1]).toMatchObject({
+            expect(inbound[index]!.content === inbound[frameCount + index]!.content).toBe(false)
+            expect(inbound[index]!.seq).toBeLessThan(inbound[frameCount + index]!.seq)
+            expect(inbound[frameCount + index]).toMatchObject({
               chunkIndex: index,
               chunkCount: frameCount
             })
@@ -439,8 +441,9 @@ describe('probe non-interference A6', () => {
         const capabilities = [
           ...RUNTIME_API_FIXTURE_BASE_CAPABILITIES,
           RpcCapability.generation,
+          RpcCapability.deadline,
           RpcCapability.portableBinary,
-          ...(protection === 'signed' ? [RpcCapability.nativeBinary] : [])
+          ...(protection === 'signed' ? [RpcCapability.nativeBinary, RpcCapability.transfer] : [])
         ]
         registerBatchAgreement(leftWire, capabilities)
         registerBatchAgreement(rightWire, capabilities)

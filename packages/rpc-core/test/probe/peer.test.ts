@@ -126,6 +126,8 @@ it('[A4] collects observer cleanup after the critical close failure and reports 
   let observed = 0,
     released = 0
   Object.assign(left, {
+    /** Memory adapters default to borrowed; this fixture explicitly owns its critical close. */
+    ownership: 'owned',
     close: () => {
       throw primary
     },
