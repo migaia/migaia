@@ -63,6 +63,12 @@ export const RpcCoreErrorCode = {
   invalidConfig: 'INVALID_CONFIG',
 
   /**
+   * A probe emit, describe or redact callback fails. Probe-core reports it with the original cause
+   * and isolates it from business execution; callers should repair or disable the diagnostic sink.
+   */
+  probeFailed: 'PROBE_FAILED',
+
+  /**
    * 同一个 method 被 `provide()` 注册了两次。
    *
    * 同名 provider 不覆盖；调用方应合并实现或改名。

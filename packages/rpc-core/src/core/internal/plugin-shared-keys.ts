@@ -49,7 +49,7 @@ export function readCanonicalReceiver(
 /** Typed outbound owner port consumed by dependent feature descriptors. */
 export type IRpcOutboundAttachmentPort = IOutboundAttachmentHost
 
-/** Stable Feature names for the seventeen package-owned middleware ports. */
+/** Stable Feature names for the package-owned middleware ports, including the inert probe slot. */
 export const RpcPortName = Object.freeze({
   protocol: 'protocol',
   authentication: 'authentication',
@@ -67,7 +67,8 @@ export const RpcPortName = Object.freeze({
   candidatePing: 'candidatePing',
   providerCancellation: 'providerCancellation',
   time: 'time',
-  outboundAttachment: 'outboundAttachment'
+  outboundAttachment: 'outboundAttachment',
+  probe: 'probe'
 } as const)
 
 export type IRpcPortName = (typeof RpcPortName)[keyof typeof RpcPortName]
