@@ -41,6 +41,13 @@ export function readManagedRuntimeHolder(
   return managedRegistrations.get(peer)
 }
 
+/** Existing registration consumers retain the exact registration owned by this facade's holder. */
+export function readManagedRuntimeRegistration(
+  peer: IRuntimePeer
+): IRemoteRuntimeRegistration | undefined {
+  return managedRegistrations.get(peer)?.registration
+}
+
 /**
  * Original remote generation and resource owners prepare one platform binding without a v1
  * contract.
