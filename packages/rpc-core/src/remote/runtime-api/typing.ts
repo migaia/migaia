@@ -275,6 +275,7 @@ type IRuntimeOutletCalls<
   P extends readonly unknown[],
   K
 > = import('./outlet.js').IRuntimeOutletControls<K> &
+  Pick<import('./outlet.js').IRuntimeOutlet, 'on' | 'watch'> &
   Readonly<{
     /** Local query retains the same format overloads regardless of erased remote surface. */
     list: import('./outlet.js').IRuntimeOutlet['list']
