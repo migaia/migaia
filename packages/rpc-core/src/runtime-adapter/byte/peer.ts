@@ -47,6 +47,8 @@ export async function createAdapterBytePeer(
   local: IAdapterBytePeerOptions,
   preparation: IRuntimePreparationContext | undefined
 ): Promise<IRuntimePeer> {
+  /** Default diagnostics retain the original options that carry Core preparation provenance. */
+  const report = options.report ?? console.error
   try {
     /** Adapter-returned mutable bytes cannot replace the private snapshot taken during actual read. */
     const raw = readRuntimeByteBootstrapSnapshot(io)
@@ -92,7 +94,7 @@ export async function createAdapterBytePeer(
                   throw createRpcError(RpcCoreErrorCode.invalidConfig, local.bootstrapInvalidText)
               }
             },
-            report: options.report,
+            report,
             ipc: { connectionId: defaultRpcId(), sessionId: defaultRpcId(), log: () => undefined }
           },
           local.diagnostics
@@ -110,7 +112,7 @@ export async function createAdapterBytePeer(
       await io.close()
     } catch (cleanup) {
       try {
-        options.report(cleanup)
+        report(cleanup)
       } catch (failure) {
         hostRethrowReporter(failure, IpcReporterContext)
       }

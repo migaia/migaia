@@ -1,6 +1,6 @@
 import type { IProcessLauncher, IProcessSpec } from '@migaia/supervision/process'
-import { holdAdapterLaunch } from '@migaia/rpc-core/adapter'
-import { readAdapterAbortReason as resolveAbortReason } from '@migaia/rpc-core/adapter'
+import { holdAdapterLaunch } from '@migaia/rpc-core/adapter/internal-advanced'
+import { readAdapterAbortReason as resolveAbortReason } from '@migaia/rpc-core/adapter/internal-advanced'
 import {
   prepareProcessRuntimeBootstrap,
   invalidProcessRuntimeBootstrap

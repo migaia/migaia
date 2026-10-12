@@ -1,6 +1,6 @@
 import type { Readable, Writable } from 'node:stream'
 import { Buffer } from 'node:buffer'
-import { createRuntimeEventByteIO } from '@migaia/rpc-core/adapter'
+import { createRuntimeEventByteIO } from '@migaia/rpc-core/adapter/internal-advanced'
 import { ProcessChannelDiagnostics } from './diagnostics.js'
 
 /** Node glue supplies actual streams; Core constructs and observes the physical byte resource. */

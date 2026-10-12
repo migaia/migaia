@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { resolveAdapterEntry, retainAdapterRuntimeFlags } from '../src/adapter.js'
+import {
+  resolveAdapterEntry,
+  retainAdapterRuntimeFlags
+} from '../dist/adapter/internal-advanced.js'
 
 describe('short-source main entry policy', () => {
   it('preserves loaders while removing eval and test controller arguments for another entry', () => {

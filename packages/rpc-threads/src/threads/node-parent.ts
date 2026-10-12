@@ -1,7 +1,7 @@
 import {
   createEventEmitterMessageResource,
   type IAdapterMessageResource
-} from '@migaia/rpc-core/adapter'
+} from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IThreadChannelOptions } from './types.js'
 import type { IThreadParentPort } from './runtime-types.js'
 

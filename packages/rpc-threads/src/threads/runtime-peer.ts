@@ -5,17 +5,20 @@ import {
   type IThreadSpec
 } from '@migaia/supervision/threads'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import { createAdapterBindingDrain, createAdapterId } from '@migaia/rpc-core/adapter'
+import {
+  createAdapterBindingDrain,
+  createAdapterId
+} from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IRemoteBinding, IRemoteRetryPort } from '@migaia/rpc-core/remote'
 import { portableThreadSpec } from './error.js'
-import { prepareAdapterPeer, createAdapterSourceConfigurationError } from '@migaia/rpc-core/adapter'
+import { createAdapterSourceConfigurationError } from '@migaia/rpc-core/adapter/internal-advanced'
 import {
-  RuntimePluginKey,
   type IRuntimePeerOptions,
   type IRuntimePeer,
   type IRuntimePeerSource
 } from '@migaia/rpc-core/remote'
 import type { IThreadChannelFactory } from './types.js'
+import { captureThreadTask, type IThreadAdapterTask } from './adapter.js'
 
 /** Existing thread deployment owns its original supervisor, budget, launcher and channel factory. */
 export type IRuntimeThreadSpawn<THandle extends IThreadHandle = IThreadHandle> = Readonly<{
@@ -69,10 +72,13 @@ export type IRuntimeThreadPeerOptions<THandle extends IThreadHandle = IThreadHan
 /** Construct real owned execution through the same binding and remote generation owner. */
 export function createThreadSourcePeer<THandle extends IThreadHandle>(
   options: IRuntimeThreadPeerOptions<THandle>,
-  expanded?: IRuntimeThreadSpawn<THandle>
+  expanded?: IRuntimeThreadSpawn<THandle>,
+  task?: IThreadAdapterTask
 ): Promise<IRuntimePeer> {
   /** The opaque Core operation performs the original early timeout admission exactly once. */
-  const preparation = prepareAdapterPeer(options, RuntimePluginKey.thread)
+  const captured = task ?? captureThreadTask(options)
+  /** Native bindings share the SDK task's sole original Host preparation. */
+  const preparation = captured.preparation
   if (
     (!expanded && (!options.spawn || typeof options.spawn !== 'object')) ||
     options.connect ||
@@ -119,7 +125,7 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
     scheduler: sourceOptions.scheduler,
     openChannel: (handle, signal) => sourceOptions.channelFactory.open(handle, signal)
   }
-  return preparation.managed(
+  return captured.managed(
     {
       self,
       provide: options.provide,

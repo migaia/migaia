@@ -12,7 +12,7 @@ import {
 import type { IProcessPendingByteConnection } from '@migaia/rpc-process'
 import type { IRemoteServeEndpoint } from '@migaia/rpc-core/remote'
 import { createProcessResilience } from '@migaia/rpc-process'
-import type { IRuntimeByteConnection } from '@migaia/rpc-core/adapter'
+import type { IRuntimeByteConnection } from '@migaia/rpc-core/adapter/internal-advanced'
 import { processSessionManager } from '../../../rpc-process/dist/process/resilience/index.js'
 import {
   matrixEndpoint,

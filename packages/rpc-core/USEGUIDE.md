@@ -40,17 +40,15 @@ import { createRuntimePeer, type IRuntimePeerSource } from '@migaia/rpc-core/rem
 /** 调用方交入实际协议通道的来源；握手和资源仍由该来源的 owner 完成。 */
 export function createClientPeer(connect: IRuntimePeerSource) {
   return createRuntimePeer({
-    self: { name: 'client', instanceId: 'client-1' },
     provide: { ping: () => 'pong' },
-    connect,
-    report: (error) => console.error(error)
+    connect
   })
 }
 ```
 
 | 选项                         | 说明                                                                                                     |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `self`                       | 本端身份 `{ name, instanceId }`。`name` 只是显示标签，不用于认证                                         |
+| `self`                       | 可省略；Core 生成显示名 `peer` 与唯一 `instanceId`。显式 `{ name, instanceId }` 保持原值，`name` 不用于认证 |
 | `provide`                    | 本端提供的方法树（见 2.2）                                                                               |
 | `spawn` / `connect` / `listen` | 来源，必须且只能有一个。Core 层是回调形式 `(context) => Promise<channel>`；平台包另有对象形式          |
 | `defaultTimeoutMs`           | request / stream 的默认超时，必须是有限正数；不设时为 30000                                              |
@@ -58,7 +56,7 @@ export function createClientPeer(connect: IRuntimePeerSource) {
 | `contract`                   | 显式的方法契约（模式、幂等声明、schema），一般不需要                                                    |
 | `keyFactory`、`retryPort`    | 幂等键生成与重试端口，用于自定义重试策略                                                                 |
 | `endpointFactory`            | 自定义 Endpoint 组装（例如加入 `authentication` 中间件）                                                 |
-| `report`                     | 接收后台错误，必填                                                                                       |
+| `report`                     | 接收后台错误；省略时使用 `console.error`                                                                 |
 
 来源回调收到的 `context` 包含本端 `self` 与本端实际编译出的能力 `capabilities`。回调必须返回已经完成握手的协议通道，不能伪造能力或身份。
 
@@ -100,6 +98,8 @@ export const provide = {
 | `outcome(idempotencyKey)`               | `Promise<…>`               | 查询幂等调用的状态：`pending`、`done`（含结果）、`unknown`（不代表未执行）              |
 | `describe(options?)`                    | `Promise<对象>`            | 本地查询：身份、连接、方法目录                                                         |
 | `close()`                               | `Promise<void>`            | 立即拒绝新调用；已接受的调用执行完毕后关闭。重复调用返回同一个 Promise                  |
+| `on(event, listener)`                    | `取消函数`                 | 订阅真实 owner 的后续生命周期事实；取消可重复调用，不重放首次 ready                    |
+| `[Symbol.asyncDispose]()`               | `Promise<void>`            | 原 `close` 函数本身，供 `await using` 释放作用域资源                                   |
 
 调用选项：
 
@@ -174,6 +174,43 @@ try {
 - 流式方法的返回类型要写成 `AsyncIterableIterator<T>`（或 `IterableIterator<T>`），这样 `stream` 才能识别它。
 - 不提供泛型时没有可调用的方法类型。需要按字符串动态调用时用 `IRuntimeDynamicSurface`：只放宽编译期检查，运行时仍按对端目录拒绝未知方法。
 - `IRuntimeSurface<THost, TPlugin>` 从 Host 与插件定义中提取纯类型，不产生运行时代码。
+
+### 2.5 作用域释放与真实生命周期事件
+
+首次 ready 已经包含在 `await createThreadPeer(...)` / `await createRuntimePeer(...)` 的完成里。`on('ready')` 从订阅时开始，只观察原 registration 后来真正接受的新代次。受监督的 Peer 从原 supervisor 获取 exit/restart/degraded；listener 的 ready 来自实际接受的 session。raw Peer 没有原生执行生命周期，不伪造 exit 或后续 ready。事件不是资源 disposer；释放仍用 `close` 或 `await using`。
+
+下面的 Node Worker 自然退出，由真实 supervisor 发布 exit；父线程等待该事实，然后由 `await using` 释放 Peer：
+
+```ts doc-test=run file=worker.ts
+import { createThreadPeer } from '@migaia/rpc-threads'
+
+await createThreadPeer({
+  provide: {
+    exit: () => {
+      // 先回复调用，再自然退出这个实际 Worker。
+      setTimeout(() => process.exit(0), 0)
+      return true
+    }
+  }
+})
+```
+
+```ts doc-test=run file=main.ts
+import { createThreadPeer } from '@migaia/rpc-threads'
+import type { IRuntimeEvent } from '@migaia/rpc-core/remote'
+
+type IWorkerApi = { exit(): boolean }
+/** 作用域结束时直接调用 Peer 原来的 close。 */
+await using worker = await createThreadPeer<IWorkerApi>({
+  spawn: new URL('./worker.js', import.meta.url)
+})
+/** 只等待原 supervisor 对实际 Worker 的退出观察，没有自造 ready 或 exit。 */
+const exited = new Promise<IRuntimeEvent>((resolve) => worker.on('exit', resolve))
+console.log(await worker.request('exit')) // true
+console.log((await exited).type) // exit
+```
+
+`Symbol.asyncDispose` 与 `close` 是同一函数引用，重复或并发调用保留同一个原 Promise。取消订阅不会停止 Worker；Peer 开始关闭时注销其事件订阅。listener 没有原生执行控制，raw Peer 也不会把逻辑关闭包装成原生 exit。
 
 ## 3. Plugin 与 Host 出口
 
@@ -377,80 +414,154 @@ try {
 
 **幂等存储**：`createRpcIdempotencyStore({ retentionMs, maxEntries, maxEntriesPerScope, maxBytes, maxOutcomeBytes })` 创建有界的幂等结果存储，用于 `idempotencyKey` 去重与 `outcome` 查询。默认的内存存储在进程重启后会丢失，`outcome` 此时会报告连续性已中断。
 
-## 9. 高阶用法：为新运行时编写适配器
+## 9. 编写一个适配器
 
-平台适配器共用 `resolveAdapterEntry`：原生层只提供主入口 URL 与运行参数快照，Core 不读取 Node、Bun 或 Deno 的全局对象。相对路径以主入口目录为基准；显式 `base` 可覆盖基准；URL 始终精确。`true` 在 REPL、eval、测试框架、Electron 或单文件可执行程序中拒绝自派生，要求显式入口。URL 解析错误保留原始 `cause`。
+`@migaia/rpc-core/adapter` 提供 `defineMessageAdapter({ open, launch? })` 和 `defineByteAdapter({ open, listen?, dial? })`。定义完成后，用 `adapter.peer(options)` 创建独立 Peer，用 `adapter.plugin(options)` 安装到 Host。`open` 返回真实消息端口或有序字节 I/O；Core 继续完成原来的握手、能力协商、方法目录与收发。
 
-```ts doc-test=run group=adapter-entry file=main.ts
-import { resolveAdapterEntry, retainAdapterRuntimeFlags } from '@migaia/rpc-core/adapter'
+| 定义 | 物理操作 | 创建结果 |
+| --- | --- | --- |
+| `defineMessageAdapter` | `open` 打开端口；可选 `launch` 调用运行时原有启动操作 | Peer 与 `host.thread` Plugin |
+| `defineByteAdapter` | `open` 打开字节流；可选 `dial` 拨号、`listen` 取得一条已接受的字节流 | Peer 与 `host.process` Plugin |
 
-const entry = resolveAdapterEntry('./service.ts', { mainEntry: new URL('file:///app/main.ts') })
-console.log(entry) // file:///app/service.ts
-console.log(retainAdapterRuntimeFlags(['--import', './loader.mjs', '--eval', '1'])) // 保留 loader
-```
+下面是完整的第三方 MessagePort 适配器。它只用公开 SDK；两个原生端口由示例创建和关闭。
 
-`@migaia/rpc-core/adapter` 面向适配器作者：为一种新的运行时或载体（例如 Electron 的某种通道、自定义 IPC）实现与 rpc-process、rpc-threads 同等的能力。
+```ts doc-test=run group=custom-message-adapter file=peer-main.ts entry=peer-main.ts
+import { MessageChannel, type MessagePort } from 'node:worker_threads'
+import { defineMessageAdapter } from '@migaia/rpc-core/adapter'
 
-**原则**：适配器只交给 Core 它实际持有的原始资源（字节流、消息端口、启动句柄）。握手、能力协商、信任判断都由 Core 在自己的收发路径上完成。接口不接受"已协商 / 已认证 / 已拥有"之类的声明，也不接受对已有 transport 的登记。
-
-| 分组           | 函数                                                                                                                  | 用途                                                       |
-| -------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| 消息端口       | `createEventEmitterMessageResource`、`createEventTargetMessageResource`                                               | 持有原始端口；`openStatic` 建立固定能力通道，`open` 经能力确认（ACK）建立扩展通道 |
-| 字节连接       | `createRuntimeEventByteIO`、`createRuntimeByteConnection`、`readRuntimeByteBootstrap`                                 | 在有序字节流上完成握手、认证与 bootstrap 读取              |
-| 消息连接       | `createRuntimeMessageConnection`                                                                                      | 完整消息 I/O；固定基础能力零握手，扩展能力经 ACK           |
-| 对象连接       | `holdAdapterObjectChannel`、`materializeAdapterJson`                                                                  | 文本 / 对象 I/O 的协商与构造（JSON-RPC 桥使用）            |
-| 准入与会话     | `createRuntimeProviderGovernor`、`createRuntimeProviderScope`                                                         | 连接数、速率、payload 限额，以及按认证身份划分的会话作用域 |
-| Peer 与启动    | `prepareAdapterPeer`、`holdAdapterLaunch`、`createAdapterBindingDrain`、`createAdapterPlugin`、`holdAdapterRegistration` | 复用 Core 的 Peer、启动、绑定、插件生命周期               |
-| 数据与诊断     | `createAdapterId`、`readAdapterAbortReason`、`validateAdapterPeerTimeout`、`validateAdapterPeerMethods`、`normalizeAdapterDescription`、`adapterContractRequiresStream`、`createAdapter*Error`、`IpcReporterContext` | 配置校验、目录规范化、标准错误构造 |
-
-最小示例：在你持有的事件端口上建立 Runtime Peer，扩展能力由 Core 读取对端 ACK 决定：
-
-```ts doc-test=check group=adapter-message file=adapter.ts
-import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
-import {
-  createEventEmitterMessageResource,
-  prepareAdapterPeer,
-  type IAdapterEventEmitterMessagePort
-} from '@migaia/rpc-core/adapter'
-import type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'
-import { systemScheduler } from '@migaia/utils/scheduler'
-
-export function openCustomRuntimePeer(
-  port: IAdapterEventEmitterMessagePort,
-  parentId: string,
-  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>
-): Promise<IRuntimePeer> {
-  const preparation = prepareAdapterPeer(options, 'custom-runtime')
-  const resource = createEventEmitterMessageResource(port)
-  const connect: IRuntimePeerSource = (context) =>
-    resource.open({
-      peerId: parentId,
-      scheduler: systemScheduler,
-      offer: context.capabilities,
-      control: rpcMessageCapabilityControl
-    })
-  return preparation.peer({ ...options, self: preparation.context.self, connect })
-}
-```
-
-对端没有回 ACK，或 ACK 中没有某项扩展能力时，该能力不启用。参考实现见 `@migaia/rpc-process`（字节与消息通道）和 `@migaia/rpc-threads`（Worker 端口）的源码。
-
-**适配器自己的错误**：用 `@migaia/utils/error` 的 `attachErrorIdentity` 附加你自己的 source 与 code，不要冒用 `@migaia/rpc/*`：
-
-```ts doc-test=check group=adapter-error file=error.ts
-import { attachErrorIdentity } from '@migaia/utils/error'
-
-const ADAPTER_SOURCE = '@example/custom-carrier'
-const AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const
-
-export function raiseAdapterWriteFailure(cause: unknown): never {
-  throw attachErrorIdentity(new Error('adapter write failed', { cause }), {
-    source: ADAPTER_SOURCE,
-    code: AdapterErrorCode.writeFailed
+/** 把调用方实际持有的端口交给 Core 的现有消息 owner。 */
+const adapter = defineMessageAdapter({ open: (port: MessagePort) => port })
+/** 原生端口由创建方持有，Peer.close() 释放借用的监听器。 */
+const { port1, port2 } = new MessageChannel()
+/** 显式地址用于这两个独立端口的对称路由。 */
+const [left, right] = await Promise.all([
+  adapter.peer<{ echo(value: number): number }>({
+    self: { name: 'left', instanceId: 'left' }, connect: port1, peerId: 'right'
+  }),
+  adapter.peer({
+    self: { name: 'right', instanceId: 'right' }, connect: port2, peerId: 'left',
+    provide: { echo: (value: number) => value }
   })
+])
+try {
+  console.log(await left.request('echo', 42)) // 42
+} finally {
+  await Promise.all([left.close(), right.close()])
+  port1.close()
+  port2.close()
 }
 ```
 
+同一个定义也能构造真正的 Host Plugin。Host 的原安装批次管理连接与资源，插件只公开 `expose` 中的 Host 方法。
+
+```ts doc-test=run group=custom-message-adapter-host file=main.ts
+import { MessageChannel, type MessagePort } from 'node:worker_threads'
+import { defineHost } from '@migaia/plugin-host'
+import { defineMessageAdapter } from '@migaia/rpc-core/adapter'
+
+/** 这个第三方定义只负责取得真实端口。 */
+const adapter = defineMessageAdapter({ open: (port: MessagePort) => port })
+/** 两个端口的物理生命周期仍由创建方持有。 */
+const { port1, port2 } = new MessageChannel()
+/** 服务端与 Host 安装并发开始，让原消息 owner 完成双向 ACK。 */
+const serving = adapter.peer({
+  self: { name: 'service', instanceId: 'service' }, connect: port2, peerId: 'host',
+  provide: { echo: (value: number) => value }
+})
+/** 这个定义产生的真实 Plugin 交给原 Host 安装批次。 */
+const plugin = adapter.plugin<{ echo(value: number): number }>({
+  name: 'custom', self: { name: 'host', instanceId: 'host' },
+  connect: port1, peerId: 'service'
+})
+/** Plugin 元组把实际 thread 出口保留在 Host 类型上。 */
+const host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({
+  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+})
+/** 与已经开始的服务端 Peer 并发安装，完成原双向握手。 */
+const installed = host.use(plugin)
+/** 服务端 Peer 与实际安装都完成后才发业务调用。 */
+const right = await serving
+try {
+  await installed
+  console.log(await host.thread!.request('custom', 'echo', 42)) // 42
+} finally {
+  await host.dispose()
+  await right.close()
+  port1.close()
+  port2.close()
+}
+```
+
+`defineByteAdapter` 同样只接物理 I/O。下面用 Node 标准库的两条 PassThrough 演示有序双向字节流；握手、分帧和目录交换仍由 Core 完成。
+
+```ts doc-test=run group=custom-byte-adapter file=main.ts
+import { PassThrough } from 'node:stream'
+import { defineByteAdapter } from '@migaia/rpc-core/adapter'
+
+/** 一端持有实际读流和写流，关闭时释放自己持有的两条流。 */
+type IStreams = Readonly<{ input: PassThrough; output: PassThrough }>
+/** 标准库流只提供字节读写；Core 负责协议和能力判断。 */
+const adapter = defineByteAdapter({
+  open: (streams: IStreams) => ({
+    kind: 'byte' as const,
+    write: (chunk: Uint8Array) => new Promise<void>((resolve, reject) => {
+      streams.output.write(chunk, (error) => error ? reject(error) : resolve())
+    }),
+    onData: (listener: (chunk: Uint8Array) => void) => {
+      streams.input.on('data', listener)
+      return () => { streams.input.off('data', listener) }
+    },
+    onClose: (listener: (reason?: unknown) => void) => {
+      streams.input.on('end', listener)
+      return () => { streams.input.off('end', listener) }
+    },
+    close: () => { streams.input.destroy(); streams.output.destroy() }
+  }),
+  listen: (streams: IStreams) => ({
+    kind: 'byte' as const,
+    write: (chunk: Uint8Array) => new Promise<void>((resolve, reject) => {
+      streams.output.write(chunk, (error) => error ? reject(error) : resolve())
+    }),
+    onData: (listener: (chunk: Uint8Array) => void) => {
+      streams.input.on('data', listener)
+      return () => { streams.input.off('data', listener) }
+    },
+    onClose: (listener: (reason?: unknown) => void) => {
+      streams.input.on('end', listener)
+      return () => { streams.input.off('end', listener) }
+    },
+    close: () => { streams.input.destroy(); streams.output.destroy() }
+  })
+})
+/** 两条真实流分别承载两个方向，顺序由标准库保持。 */
+const toLeft = new PassThrough()
+const toRight = new PassThrough()
+/** 一端发 hello，另一端在自己实际接收的流上 accept。 */
+const [left, right] = await Promise.all([
+  adapter.peer<{ double(value: number): number }>({
+    self: { name: 'left', instanceId: 'left' }, peerId: 'right',
+    connect: { input: toLeft, output: toRight }
+  }),
+  adapter.peer({
+    self: { name: 'right', instanceId: 'right' }, peerId: 'left',
+    listen: { input: toRight, output: toLeft },
+    provide: { double: (value: number) => value * 2 }
+  })
+])
+try {
+  console.log(await left.request('double', 21)) // 42
+} finally {
+  await Promise.all([left.close(), right.close()])
+}
+```
+
+`launch` 真的调用定义中提供的物理启动操作，并返回端口、`exited` 与 `terminate`。现有运行时可以把自己的 supervisor 的原启动结果交给它；重启、预算与原生退出观察继续属于那个 supervisor。Core 的消息 resource 在握手失败、冷启动取消及 Peer 关闭时，通过同一个 termination-once owner 释放这个实际句柄。rpc-process 与 rpc-threads 的完整 managed 来源仍交给原 supervision 与 generation owner。
+
+治理配置保留为 `peer` / `plugin` 的 `governor` 和 `scope` 选项。`governor` 使用原 rate、payload、连续超时与 idle 策略；其 disposer 挂在实际连接的 close owner 上。`adapter.scope(store?)` 创建原 provider scope，调用方共享它时，在所有 Peer 关闭后执行 `scope.close()`。作用域使用 Core 从实际连接捕获的认证 principal；普通借用端口的地址字符串不提供 principal。需要会话幂等作用域时，字节 responder 必须使用实际 `auth.verify`。
+
+`./adapter/internal-advanced` 保留原生 Process、Threads 与 JSON-RPC Bridge 仍需要的低级操作。第三方的起点是上面的两个定义函数；它们不接受成品 Peer、channel、已协商能力、可信身份或 ownership 声明。
+
+适配器自己的错误继续用 `@migaia/utils/error` 的 `attachErrorIdentity` 附加自己的 source/code，并保留原错误在 `cause` 上；协议错误继续由原 Core/Contract owner 产生。
 ## 10. 错误码与处理
 
 ### 10.1 判断错误

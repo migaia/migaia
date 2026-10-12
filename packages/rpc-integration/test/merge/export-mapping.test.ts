@@ -208,31 +208,40 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
     ]
   },
   'rpc-core': {
-    './adapter': [
+    /** P5 SDK exposes only the two task-level factories to ordinary adapter authors. */
+    './adapter': ['defineByteAdapter', 'defineMessageAdapter'],
+    /** Only real native owners retain the moved low-level runtime operations. */
+    './adapter/internal-advanced': [
+      'JSONRPC_ALLOWED_CAPABILITIES',
+      'JSONRPC_REQUIRED_CAPABILITIES',
+      'JSONRPC_REQUIRED_METHODS',
       'IpcReporterContext',
-      'adapterContractRequiresStream',
+      'JsonRpcErrorNumber',
+      'JsonRpcProfile',
+      'assembleAdapterPlugin',
+      'captureAdapterTask',
       'createAdapterBindingDrain',
       'createAdapterConfigurationError',
       'createAdapterConfigurationTypeError',
       'createAdapterId',
+      'createAdapterJsonRpcChannel',
       'createAdapterPlugin',
       'createAdapterSourceConfigurationError',
       'createAdapterTransportError',
       'createEventEmitterMessageResource',
       'createEventTargetMessageResource',
+      'createJsonRpcBridgeError',
       'createRuntimeByteConnection',
       'createRuntimeEventByteIO',
       'createRuntimeMessageConnection',
       'createRuntimeProviderGovernor',
       'createRuntimeProviderScope',
       'holdAdapterLaunch',
-      'holdAdapterObjectChannel',
       'holdAdapterRegistration',
-      'materializeAdapterJson',
-      'normalizeAdapterDescription',
-      'prepareAdapterPeer',
       'readAdapterAbortReason',
       'readRuntimeByteBootstrap',
+      'resolveAdapterEntry',
+      'retainAdapterRuntimeFlags',
       'validateAdapterPeerMethods',
       'validateAdapterPeerTimeout'
     ]
@@ -354,7 +363,7 @@ describe('A1 merged public exports', () => {
     for (const [owner, entries] of Object.entries(ordinaryEntries))
       currentEntries.push(...Object.keys(entries).map((key) => `${owner}:${key}`))
     currentEntries.push('rpc-contract:./schema/wire-error')
-    expect(currentEntries).toHaveLength(64)
+    expect(currentEntries).toHaveLength(65)
     expect(
       Object.entries(manifests)
         .flatMap(([owner, entry]) => Object.keys(entry.exports).map((key) => `${owner}:${key}`))
@@ -534,6 +543,7 @@ describe('A1 merged public exports', () => {
         'createProcessResilience',
         'createProcessTransport',
         'openProcessObjectChannel',
+        'isProcessChild',
         'parseProcessPluginDescriptor',
         'receiveAdapterBootstrap'
       ].sort()
@@ -587,6 +597,7 @@ describe('A1 merged public exports', () => {
         'createNodeThreadChannel',
         'createThreadPeer',
         'createThreadPlugin',
+        'isThreadChild',
         'createWebThreadChannel',
         'createWebThreadChannelFactory',
         'createWebThreadLauncher',

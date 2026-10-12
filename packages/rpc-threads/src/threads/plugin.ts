@@ -5,10 +5,12 @@ import type {
   IRuntimeExpose,
   IRuntimeRegistry
 } from '@migaia/rpc-core/remote'
-import { createRuntimePlugin, type IRuntimePluginOptions } from '@migaia/rpc-core/remote'
+import type { createRuntimePlugin, IRuntimePluginOptions } from '@migaia/rpc-core/remote'
+import { assembleAdapterPlugin } from '@migaia/rpc-core/adapter/internal-advanced'
 import { RuntimePluginKey } from '@migaia/rpc-core/remote'
 import { createThreadPeer } from './peer.js'
 import type { IRuntimeThreadPeerOptions } from './runtime-peer.js'
+import { threadMessageAdapter } from './adapter.js'
 
 /** This physical owner alone retains the stable family token for its actual Host slot operation. */
 const threadRuntimeSlotFamily = Object.freeze({})
@@ -44,7 +46,8 @@ export function createThreadPlugin<
   runtime: IThreadRuntimeResource = threadRuntimeResource
 ): ReturnType<typeof createRuntimePlugin> &
   IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'> {
-  return createRuntimePlugin(
+  return assembleAdapterPlugin(
+    threadMessageAdapter,
     options as IRuntimePluginOptions<IRuntimeThreadPeerOptions['spawn']>,
     {
       key: threadRuntimeSlotKey,

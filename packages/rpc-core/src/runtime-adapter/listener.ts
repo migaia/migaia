@@ -36,6 +36,7 @@ import type { IRuntimeProviderScope } from './provider/scope.js'
 import { readRuntimeProviderScope } from './provider/scope.js'
 import type { IRuntimeProviderGovernor } from './provider/governor.js'
 import { readRuntimeProviderGovernor } from './provider/governor.js'
+import { createRuntimeEventPublisher, runtimeReadyEvent } from '../remote/runtime-api/events.js'
 
 /** The original session owner stores this actual callable Peer and closes its same resource. */
 export type IAdapterListenerService = IRemoteServePluginHandle & Readonly<{ peer: IRuntimePeer }>
@@ -187,6 +188,10 @@ export function createAdapterListenerPreparation(
   localOffer: readonly string[],
   preparation: IRuntimePreparationContext | undefined
 ): IAdapterListenerPreparation {
+  /** Listener diagnostics keep the original options while selecting one default reporter. */
+  const report = options.report ?? console.error
+  /** Accepted sessions publish through the same event subscriber owner as other Runtime Peers. */
+  const events = createRuntimeEventPublisher()
   /** Local registration summaries exist before any physical listener or accepted session. */
   const methods = compileRuntimeMethods(options.provide, options.contract)
   /** Use the original description grammar and local stream-proposal predicate unchanged. */
@@ -235,9 +240,15 @@ export function createAdapterListenerPreparation(
           )
         return ownedService(service).peer
       }
+      /** Subscriber close does not replace the actual listener owner's cleanup Promise. */
+      const close = (): Promise<void> => {
+        events.close()
+        return owner.close()
+      }
       /** Calls and streams retain the real accepted Peer Promise/iterator without async wrappers. */
       const peer: IRuntimePeer = Object.freeze({
         self: options.self!,
+        on: events.on,
         request: (method, payload, callOptions) => current().request(method, payload, callOptions),
         notify: (method, payload, callOptions) => current().notify(method, payload, callOptions),
         stream: (method, payload, callOptions) => current().stream(method, payload, callOptions),
@@ -267,7 +278,8 @@ export function createAdapterListenerPreparation(
             methods.map((method) => method.name)
           )
         }),
-        close: () => owner.close()
+        close,
+        [Symbol.asyncDispose]: close
       })
       retainRuntimePeerSessions(peer, () =>
         owner.services().map((service) => ownedService(service).peer)
@@ -276,7 +288,12 @@ export function createAdapterListenerPreparation(
     },
     publish(service) {
       if (this !== listener) invalidResource()
-      return preparation?.publishPeer?.(ownedService(service).peer) ?? (() => undefined)
+      /** Exact service membership, not a copied Peer shape, determines this accepted readiness. */
+      const peer = ownedService(service).peer
+      /** Host publication succeeds before standalone subscribers receive the same accepted fact. */
+      const withdraw = preparation?.publishPeer?.(peer) ?? (() => undefined)
+      events.publish(runtimeReadyEvent(local.self.name, peer), report)
+      return withdraw
     }
   })
   return listener

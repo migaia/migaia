@@ -4,11 +4,11 @@ import type { IProcessCommonOptions } from '@migaia/rpc-process'
 import { RpcPlatform } from '@migaia/rpc-core/transport-constants'
 import {
   createRuntimeMessageConnection,
-  prepareAdapterPeer,
-  type IRuntimeByteDiagnostics,
-  type IRuntimeMessageIO
-} from '@migaia/rpc-core/adapter'
-import { RuntimePluginKey, type IRuntimePeerOptions } from '@migaia/rpc-core/remote'
+  type IRuntimeByteDiagnostics
+} from '@migaia/rpc-core/adapter/internal-advanced'
+import { captureProcessTask } from '../../../rpc-process/dist/process/adapter.js'
+import type { IRuntimeMessageIO } from '../../../rpc-core/dist/runtime-adapter/byte/types.js'
+import type { IRuntimePeerOptions } from '@migaia/rpc-core/remote'
 import { createProcessListenerPeer } from '../../../rpc-process/dist/process/runtime-listener.js'
 import {
   bindRuntimeByteWire,
@@ -82,11 +82,7 @@ export function createProcessFixtureListenerPeer(
   options: IRuntimePeerOptions,
   ingress: Parameters<typeof createProcessListenerPeer>[1]
 ) {
-  return createProcessListenerPeer(
-    options,
-    ingress,
-    prepareAdapterPeer(options, RuntimePluginKey.process).withoutTransfer()
-  )
+  return createProcessListenerPeer(options, ingress, captureProcessTask(options))
 }
 
 /** Supply only the moved diagnostic/presentation arguments to the same private byte mechanism. */

@@ -1,10 +1,10 @@
 import { processSessionManager } from '../resilience/index.js'
 import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IPluginRemoval } from '@migaia/plugin-host'
-import { createAdapterId as defaultRpcId } from '@migaia/rpc-core/adapter'
-import { readAdapterAbortReason as resolveAbortReason } from '@migaia/rpc-core/adapter'
+import { createAdapterId as defaultRpcId } from '@migaia/rpc-core/adapter/internal-advanced'
+import { readAdapterAbortReason as resolveAbortReason } from '@migaia/rpc-core/adapter/internal-advanced'
 import { normalizeRemoteContract } from '@migaia/rpc-core/remote'
-import { holdAdapterRegistration } from '@migaia/rpc-core/adapter'
+import { holdAdapterRegistration } from '@migaia/rpc-core/adapter/internal-advanced'
 import type {
   IProcessDependencyHostPort,
   IProcessResilience,

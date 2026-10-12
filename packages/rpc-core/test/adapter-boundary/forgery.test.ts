@@ -8,7 +8,8 @@ import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { RpcBinaryProfile } from '@migaia/rpc-contract/wire'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import * as core from '../../dist/core/index.js'
-import * as adapter from '../../dist/adapter.js'
+import * as adapterSdk from '../../dist/adapter.js'
+import * as adapter from '../../dist/adapter/internal-advanced.js'
 import * as remote from '../../dist/remote/index.js'
 import * as provider from '../../dist/core/features/provider.js'
 import { createClientEndpoint } from '../../dist/core/client.js'
@@ -41,7 +42,7 @@ const jsonrpc = (await import(
 )) as typeof import('../../../rpc-bridge-jsonrpc/dist/bridge/jsonrpc/index.js')
 
 /** Every assertion observes only public construction and private read-only facts, never a writer. */
-const publicEntries = [core, adapter, jsonrpc, threads, remote, provider]
+const publicEntries = [core, adapterSdk, adapter, jsonrpc, threads, remote, provider]
 
 /** An ordinary entry cannot expose the private operation that would qualify an arbitrary target. */
 function expectPrivateWriter(name: string): void {

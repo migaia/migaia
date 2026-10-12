@@ -2,7 +2,7 @@ import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
 import { RpcProcessErrorText } from '../error-text.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { IpcReporterContext } from '@migaia/rpc-core/adapter'
+import { IpcReporterContext } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IRemoteChannel } from '@migaia/rpc-core/remote'
 import { RpcProcessErrorCode } from '../error-code.js'
 

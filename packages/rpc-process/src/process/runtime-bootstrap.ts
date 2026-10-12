@@ -1,4 +1,4 @@
-import { createAdapterConfigurationError } from '@migaia/rpc-core/adapter'
+import { createAdapterConfigurationError } from '@migaia/rpc-core/adapter/internal-advanced'
 import { RpcWireLimit } from '@migaia/rpc-contract'
 import type { IRuntimePeerIdentity } from '@migaia/rpc-core/remote'
 import type { IRpcRuntimeGeneration } from '@migaia/rpc-contract'

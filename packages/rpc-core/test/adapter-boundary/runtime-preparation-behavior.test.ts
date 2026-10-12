@@ -12,19 +12,19 @@ import {
 } from '@migaia/rpc-contract'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import {
-  prepareAdapterPeer,
   holdAdapterLaunch,
   createAdapterBindingDrain,
   createAdapterPlugin,
   createRuntimeProviderScope,
   createRuntimeProviderGovernor,
   createEventEmitterMessageResource,
-  holdAdapterObjectChannel,
-  type IAdapterListenerOwner,
   type IAdapterListenerService,
-  type IRuntimeObjectIO,
   type IRuntimeConnectionOptions
-} from '../../dist/adapter.js'
+} from '../../dist/adapter/internal-advanced.js'
+import { prepareAdapterPeer } from '../../dist/runtime-adapter/peer.js'
+import { holdAdapterObjectChannel } from '../../dist/runtime-adapter/object/index.js'
+import type { IRuntimeObjectIO } from '../../dist/runtime-adapter/object/types.js'
+import type { IAdapterListenerOwner } from '../../dist/runtime-adapter/listener.js'
 import { readAdapterBindingDrain } from '../../dist/runtime-adapter/binding.js'
 import { readRuntimeProviderScope } from '../../dist/runtime-adapter/provider/scope.js'
 import { withRuntimePreparationContext } from '../../dist/remote/runtime-api/launch-context.js'

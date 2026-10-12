@@ -56,12 +56,11 @@ const pair = await createPeerPair({
   a: { provide: { echo: (text: string) => text } },
   b: { provide: { double: (value: number) => value * 2 } }
 })
-try {
-  console.log(await pair.a.request('double', 21)) // 42：a 调用 b 提供的方法
-  console.log(await pair.b.request('echo', 'ready')) // 'ready'
-} finally {
-  await Promise.all([pair.a.close(), pair.b.close()])
-}
+/** 两个实际 Peer 都在模块作用域结束时调用原 close。 */
+await using client = pair.a
+await using server = pair.b
+console.log(await client.request('double', 21)) // 42：a 调用 b 提供的方法
+console.log(await server.request('echo', 'ready')) // 'ready'
 ```
 
 **在任意载体上组装 Endpoint**（这里用内存载体演示，换成 iframe、MessagePort 等时只换 transport）：
@@ -95,6 +94,10 @@ await server.dispose()
 ```
 
 ## 调用语义速览
+
+Runtime Peer 支持 `await using`，其 `Symbol.asyncDispose` 就是原来的 `close` 函数，保留相同 Promise 与错误。Core 的 `createRuntimePeer` 可以省略 `self` 与 `report`：生成本地身份，后台错误默认交给 `console.error`。
+
+独立 Peer 的 `on(event, listener)` 使用与 Host 出口相同的事件投影；返回的取消函数可重复调用。首次 ready 由 factory 的 `await` 表示，订阅不重放它。受监督的 Peer 只发布真实重启后的 ready 和原 supervisor 的 exit/restart/degraded；listener 只发布真实接受的 session ready。raw Peer 没有原生执行生命周期，不伪造 exit，也没有后续 ready。事件不能代替 `close` 或 `await using` 释放资源。完整可执行例子见 [USEGUIDE 第 2.5 节](./USEGUIDE.md#25-作用域释放与真实生命周期事件)。
 
 这些规则对所有 RPC 包都成立：
 

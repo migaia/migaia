@@ -4,7 +4,7 @@ import {
   createEventTargetMessageResource,
   readAdapterAbortReason,
   type IAdapterMessageResource
-} from '@migaia/rpc-core/adapter'
+} from '@migaia/rpc-core/adapter/internal-advanced'
 import type {
   INodeMessagePortLike,
   IBrowserMessagePortLike

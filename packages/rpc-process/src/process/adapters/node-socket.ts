@@ -4,7 +4,7 @@ import { lstat } from 'node:fs/promises'
 import { createConnection, createServer, type Server, type Socket } from 'node:net'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-core'
-import { IpcReporterContext } from '@migaia/rpc-core/adapter'
+import { IpcReporterContext } from '@migaia/rpc-core/adapter/internal-advanced'
 import { RpcProcessErrorCode } from '../error-code.js'
 
 import { RpcProcessErrorText } from '../error-text.js'
