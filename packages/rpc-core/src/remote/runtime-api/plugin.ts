@@ -50,7 +50,7 @@ import {
 } from './catalog.js'
 import { RuntimeApiMode } from './constants.js'
 import { withRuntimePreparationContext } from './launch-context.js'
-import { readManagedRuntimeRegistration } from './managed-peer.js'
+import { readManagedRuntimeHolder } from './managed-peer.js'
 import { readRuntimeDefaultTimeout } from './timeout.js'
 import { createProviderAdmissionScope } from '../../core/features/provider.js'
 import { attachProviderPreflight } from '../../core/internal/provider.js'
@@ -543,7 +543,9 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
         () => createPeer(preparationOptions)
       )
       /** Managed native resources were already registered before startup; callbacks transfer here. */
-      const registration = readManagedRuntimeRegistration(peer)
+      const holder = readManagedRuntimeHolder(peer)
+      /** The holder owns one canonical registration and coalesces observer/command preparation. */
+      const registration = holder?.registration
       /** Listener provenance denotes original early scope ownership, even with no ready sessions. */
       const listenerSource = readRuntimePeerSessions(peer) !== undefined
       try {
@@ -566,6 +568,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
         name,
         peer,
         execution: registration?.execution,
+        whenReady: holder ? () => holder.prepareRebind(core.lifecycle.signal) : undefined,
         instanceIds: (): readonly string[] =>
           registration
             ? registration.runtimeInstanceIds()

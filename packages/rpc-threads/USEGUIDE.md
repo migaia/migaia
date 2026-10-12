@@ -161,7 +161,7 @@ try {
 
 `host.thread` 出口的方法与 `host.process` 相同：`request` / `notify` / `stream` / `group` / `outcome`（第一个参数是目标连接名或 `{ name, instanceId }`）、`list` / `get`、`broadcast`，以及只对 spawn 来源有效的 `stop` / `kill` / `restart` / `replace`。线程的 `stop` 只接受 `{ graceMs }`，传入 `signal` 字段（包括 `undefined`）会被拒绝。
 
-**重启后的调用时机**：`restart()` 返回时新 Worker 已经启动，但新连接重新出现在出口目录中可能还要稍等片刻。在此之前调用会得到 `@migaia/rpc/core` / `TARGET_UNKNOWN`。重启后若需立即调用，先等待出口的 `ready` 事件，或在重试预算内对 `TARGET_UNKNOWN` 做短暂退避。
+**重启后的调用时机**：`restart()` 返回 `ready` 或 `replace()` 返回 `replaced` 时，新代次已经进入出口目录，可以立即调用，无需额外等待 `ready` 事件或退避重试。
 
 **`expose`**：默认不向 Worker 公开主线程 Host 的任何方法；显式列出的路径才可见，例如 `expose: ['settings.read']`。
 
