@@ -98,11 +98,14 @@ function assertEvent(value: unknown): asserts value is IRpcDevtoolsRecordEvent {
 }
 
 /** SC9(b): byte-tag objects provide the record representation; other values keep their references. */
-function replaceBytes(_key: string, value: unknown): unknown {
-  if (value instanceof Uint8Array) return { [RpcDevtoolsRecordField.bytes]: encodeBytes(value) }
+function replaceBytes(this: object, key: string, value: unknown): unknown {
+  /** SC9(b): retain the original data-slot reference before a byte subtype's toJSON hides its brand. */
+  const original: unknown = Object.getOwnPropertyDescriptor(this, key)?.value ?? value
+  if (original instanceof Uint8Array)
+    return { [RpcDevtoolsRecordField.bytes]: encodeBytes(original) }
   /** SC9(b): this byte view changes representation only and shares the original ArrayBuffer. */
-  if (value instanceof ArrayBuffer)
-    return { [RpcDevtoolsRecordField.bytes]: encodeBytes(new Uint8Array(value)) }
+  if (original instanceof ArrayBuffer)
+    return { [RpcDevtoolsRecordField.bytes]: encodeBytes(new Uint8Array(original)) }
   return value
 }
 

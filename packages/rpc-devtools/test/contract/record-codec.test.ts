@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { Buffer } from 'node:buffer'
 import { serializeRpcError } from '@migaia/rpc-contract/errors'
 import {
   decodeRpcDevtoolsRecord,
@@ -34,6 +35,22 @@ function event(error?: Error): IRpcDevtoolsRecordEvent {
 }
 
 describe('A4 record codec', () => {
+  it.each([false, true])('preserves Node byte payloads before toJSON (nested=%s)', (nested) => {
+    /** Node carrier chunks are byte views whose JSON conversion must not replace their bytes. */
+    const bytes = Buffer.from([0, 127, 255])
+    /** Raw carrier content and bytes inside logical content share the same record boundary. */
+    const record: IRpcDevtoolsRecord = {
+      header: RpcDevtoolsRecordFormat,
+      events: [{ ...event(), content: nested ? { bytes } : bytes }]
+    }
+    /** The NDJSON must use the record tag rather than Buffer's type/data JSON object. */
+    const text = encodeRpcDevtoolsRecord(record)
+    expect(text).toContain('"$bytes":"AH//"')
+    expect(decodeRpcDevtoolsRecord(text).events[0].content).toEqual(
+      nested ? { bytes: new Uint8Array([0, 127, 255]) } : new Uint8Array([0, 127, 255])
+    )
+  })
+
   it('round-trips native cause and aggregate graphs, byte ranges and Chinese methods', () => {
     /** The leaf remains reachable through cause and AggregateError.errors after import. */
     const cause = codedError(new TypeError('original cause'), 'ORIGINAL')
