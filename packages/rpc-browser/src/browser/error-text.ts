@@ -1,5 +1,7 @@
 /** Stable browser adapter failure text owned by the browser layer. */
 export const BrowserRpcErrorText = {
+  /** A synchronous carrier probe failure reports through existing adapter listener channels. */
+  carrierObservationFailed: 'Browser carrier observation failed',
   /** The RTC adapter reports setup and rollback failure with this stable aggregate text. */
   rtcSubscriptionCleanupFailed: 'subscription setup failed',
   /** The WebTransport adapter reports terminal cleanup failure with this stable aggregate text. */

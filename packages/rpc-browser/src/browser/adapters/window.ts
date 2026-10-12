@@ -1,3 +1,4 @@
+import { BrowserCarrierObservation, BrowserRpcCarrier } from '../probe-detail.js'
 import { BrowserRpcErrorText } from '../error-text.js'
 import { createBrowserConfigurationError } from '../error.js'
 import type { IRpcSendOptions, IRpcTransport } from '@migaia/rpc-core/transport-kit'
@@ -66,6 +67,13 @@ export function createWindowMessageTransport(
   }>()
   const listenerErrors = new Set<(error: unknown) => void>()
   const secondaryFailures = createListenerFailureState()
+  /** Observation owns no platform resource and reports through the existing carrier channel. */
+  const observation = new BrowserCarrierObservation(BrowserRpcCarrier.window, (error) =>
+    reportListenerFailure(error, listenerErrors, secondaryFailures)
+  )
+  /** One source/origin rule serves both transport admission and carrier observation. */
+  const sourceProof = (source: unknown, origin?: string) =>
+    source === target && (targetOrigin === '*' || origin === targetOrigin)
   const onMessage = (event: MessageEvent<unknown>): void => {
     let data: unknown
     let origin: string | undefined
@@ -77,6 +85,12 @@ export function createWindowMessageTransport(
     } catch (error) {
       reportListenerFailure(error, listenerErrors, secondaryFailures)
       return
+    }
+    /** Rejected messages retain existing dispatch semantics but never enter observation. */
+    const probe = observation.probe
+    if (probe !== undefined) {
+      if (sourceProof(source, origin)) observation.emit(probe, 1, data, origin)
+      else observation.rejectSource()
     }
     listeners.dispatch({ data, origin, source }, (listener, message) =>
       observeListener(
@@ -90,11 +104,19 @@ export function createWindowMessageTransport(
     platform: RpcPlatform.iframe,
     topology: 'multiplexed',
     ownership: RpcTransportOwnership.borrowed,
-    sourceProof: (source, origin) =>
-      source === target && (targetOrigin === '*' || origin === targetOrigin),
+    sourceProof,
     ...(targetOrigin === '*' ? {} : { origin: targetOrigin }),
     send(message, options?: IRpcSendOptions<Transferable>) {
-      target.postMessage(message, targetOrigin, options?.transfer)
+      /** Read the caller's transfer choice once, preserving getter failure and native detachment. */
+      const transfer = options?.transfer
+      /** Observe before postMessage can detach an explicitly transferred byte buffer. */
+      const probe = observation.probe
+      if (probe !== undefined) observation.emit(probe, 0, message, targetOrigin, transfer)
+      target.postMessage(message, targetOrigin, transfer)
+    },
+    /** Replace the single endpoint probe; disposal is generation-safe and idempotent. */
+    observe(probe) {
+      return observation.observe(probe)
     },
     subscribe(listener) {
       listeners.add(listener, () =>
