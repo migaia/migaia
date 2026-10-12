@@ -9718,7 +9718,7 @@
                 {
                   "type": "code",
                   "language": "text",
-                  "code": "TypeScript（本包）                              对端（任意语言）\ncreateRuntimePeer\n  └─ createJsonRpcRemoteChannel ── Content-Length + JSON-RPC 2.0 ──► migaia.hello     认证与能力协商\n                                                                     migaia.describe  返回可调用方法目录\n     request('math.add', …)  ───────────────────────────────────────► migaia.invoke   执行业务方法\n     取消                    ───────────────────────────────────────► migaia.cancel   取消在途调用"
+                  "code": "TypeScript（本包）                              对端（任意语言）\ncreateProcessPeer({ spawn: { command, args, wire: 'jsonrpc', contract } })\n  └─ JSON-RPC bridge ── Content-Length + JSON-RPC 2.0 ──► migaia.hello     认证与能力协商\n                                                                     migaia.describe  返回可调用方法目录\n     request('math.add', …)  ───────────────────────────────────────► migaia.invoke   执行业务方法\n     取消                    ───────────────────────────────────────► migaia.cancel   取消在途调用"
                 },
                 {
                   "type": "paragraph",
@@ -9737,11 +9737,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport { createProcessPeer } from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\nimport type { IRemoteContract } from '@migaia/rpc-core/remote'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { RpcCapability } from '@migaia/rpc-contract'\nimport { systemWallClock } from '@migaia/utils/scheduler'\n\n/** The standard-library responder receives positional JSON-RPC arguments. */\ntype IPythonApi = { echo(values: string[]): string[]; math: { add(pair: [number, number]): number } }\n/** A local scalar contract is checked before the remote directory becomes callable. */\nconst contract: IRemoteContract = {\n  schemaVersion: 1,\n  plugin: 'python-service',\n  features: { math: { methods: { add: { mode: 'request', idempotent: true } } } }\n}\n/** Record only classified diagnostic messages, never the ephemeral session credential. */\nconst report = (error: unknown) => console.error(error)\n/** One token belongs to this supervised child and is written through its original stdin frame. */\nconst token = randomBytes(32).toString('base64url')\n/** The exact real launcher retains child execution and termination ownership. */\nconst launcher = createNodeProcessLauncher()\n/** Closing the public Peer must release its genuine process budget. */\nconst budget = createUnitBudget({ kind: 'process', maxUnits: 1 })\n/** Public generic construction supplies the remote method type without a Peer cast. */\nconst peer = await createProcessPeer<IPythonApi>({\n  self: { name: 'node-client', instanceId: 'node-client-1' },\n  report,\n  spawn: {\n    kind: 'spawn', channelKind: 'byte', wire: 'jsonrpc', token,\n    supervision: {\n      id: 'python-service', isolation: 'best-effort', restart: { mode: 'never' }, budget,\n      report, launcher,\n      spec: {\n        command: 'python3', args: [fileURLToPath(new URL('./service.py', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as Awaited<ReturnType<typeof launcher.launch>>).channel!,\n    establish: async (raw, prepared) => {\n      if (raw.kind !== 'byte') throw new TypeError('This example requires a byte channel')\n      return createJsonRpcRemoteChannel({\n        byte: raw, peerId: 'python-service', target: { kind: 'plugin', contract },\n        offer: {\n          versions: [{ major: 1, minor: 1 }],\n          peer: { id: 'node-client-1', runtime: 'node' },\n          capabilities: [RpcCapability.deadline, RpcCapability.trace]\n        },\n        token: prepared.token!, scheduler: prepared.scheduler, wallClock: systemWallClock,\n        ipc: { ...prepared.session, log: () => undefined }, signal: prepared.signal,\n        report\n      })\n    }\n  }\n})\ntry {\n  console.log(await peer.request('echo', ['hello', 'python'])) // ['hello', 'python']\n  console.log(await peer.request('math.add', [20, 22])) // 42\n} finally {\n  await peer.close() // 关闭连接、结束监督子进程并释放 budget\n}"
+                  "code": "import { fileURLToPath } from 'node:url'\nimport { createProcessPeer } from '@migaia/rpc-process'\nimport type { IRemoteContract } from '@migaia/rpc-core/remote'\n\ntype IPythonApi = { echo(values: string[]): string[]; math: { add(values: number[]): number } }\n/** This is the peer-specific local declaration; the accepted remote directory still owns routing. */\nconst contract: IRemoteContract = {\n  schemaVersion: 1, plugin: 'python-service',\n  features: { math: { methods: { add: { mode: 'request', idempotent: false } } } }\n}\nconst peer = await createProcessPeer<IPythonApi>({\n  spawn: { command: 'python3', args: [fileURLToPath(new URL('./service.py', import.meta.url))], wire: 'jsonrpc', contract }\n})\ntry {\n  console.log(await peer.request('echo', ['hello', 'python'])) // ['hello', 'python']\n  console.log(await peer.request('math.add', [20, 22])) // 42\n  await peer.notify('echo', ['notification'])\n  console.log(await Promise.all([peer.request('math.add', [1, 2]), peer.request('math.add', [3, 4])])) // [3, 7]\n  try { await peer.request('math.add', []) }\n  catch (error) {\n    const detail = error as { source?: string; code?: string }\n    if (detail.source !== 'python-service' || detail.code !== 'BUSINESS') throw error\n    console.log(detail.code) // BUSINESS\n  }\n} finally { await peer.close() }"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`spawn` 保留子进程的监督、退出与 budget 所有权；`peer.close()` 负责关闭连接和子进程。`establish` 收到当前代次的 token、scheduler、session 和取消信号，桥接仍在实际字节连接上完成握手。普通 Core `connect` 来源也可以使用 `createRuntimePeer<IPythonApi>(options)`，无需把返回值断言为 `IRuntimeTypedPeer`。"
+                  "text": "`spawn` 保留子进程的监督、退出与 budget 所有权；`peer.close()` 关闭连接和子进程。只需声明对端特有的 command、args、wire 与本地 contract；launcher、预算、随机 stdin token 和桥接握手由既有操作组合。需要自有字节通道时，仍可使用 `createJsonRpcRemoteChannel`，见 USEGUIDE。文档检查器将本段与 USEGUIDE 的 `service.py` 联合执行；缺少 `python3` 时报告 SKIP-WARN。"
                 }
               ]
             },
@@ -9825,7 +9825,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createJsonRpcRemoteChannel(options)` 在一条有序字节连接上完成 `migaia.hello` 握手，返回协议通道。它通常作为 `createRuntimePeer` 的 `connect` 来源使用（完整示例见 README）。"
+                  "text": "`createJsonRpcRemoteChannel(options)` 在一条有序字节连接上完成 `migaia.hello` 握手，返回协议通道。它用于自有字节通道的高级组合。普通 Python 子进程直接使用 README 的 `createProcessPeer({ spawn: { command, args, wire: 'jsonrpc', contract } })`，不必手写 launcher 或握手。"
                 },
                 {
                   "type": "table",
@@ -9935,7 +9935,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "下面的实现只依赖 Python 标准库，已与 README 中的 TypeScript 端实际联调通过：`request`、`notify`、并发批量调用和业务错误都按预期工作。把它保存为 `service.py`，即可作为其它语言实现的参照。"
+                  "text": "下面的实现只依赖 Python 标准库，与 README 的 TypeScript parent 构成同一个可执行文档组，覆盖 `request`、`notify`、并发批量调用和业务错误。把它保存为 `service.py`，即可作为其它语言实现的参照。"
                 },
                 {
                   "type": "code",
@@ -10396,7 +10396,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { connect, createEndpoint } from '@migaia/rpc-core'\n\nconst endpoint = await createEndpoint({\n  id: 'my-side',                  // 本端标识\n  targetIds: ['other-side'],      // 允许调用的对端标识\n  transport,\n  middlewares: [connect({ transport })]\n})\n\nendpoint.provide('ping', (context) => context.success('pong'))           // 提供方法\nconst reply = await endpoint.send<string>('other-side', 'ping', null)    // 调用对端\nawait endpoint.dispose()                                                  // 释放"
+                  "code": "import { connect, createEndpoint, type IRpcTransport } from '@migaia/rpc-core'\n\n/** 实际载体由调用方持有；返回的 Endpoint 由调用方 dispose。 */\nexport async function openBrowserEndpoint(transport: IRpcTransport) {\n  const endpoint = await createEndpoint({\n    id: 'my-side',\n    targetIds: ['other-side'],\n    transport,\n    middlewares: [connect({ transport })]\n  })\n  endpoint.provide('ping', (context) => context.success('pong'))\n  return endpoint\n}"
                 },
                 {
                   "type": "list",
@@ -10424,7 +10424,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,   // 发往哪个窗口\n  receiver: window,                // 在哪里监听 message 事件\n  targetOrigin: 'https://billing.example'\n})"
+                  "code": "import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\n/** 页面必须实际包含这个 iframe；本片段由浏览器宿主运行。 */\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: 'https://billing.example'\n})"
                 },
                 {
                   "type": "table",
@@ -10465,7 +10465,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\nconst transport = createBroadcastChannelTransport(new BroadcastChannel('cart'))"
+                  "code": "import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('cart')\nconst transport = createBroadcastChannelTransport(channel)\n// 尚未交给 Endpoint；创建方负责关闭借用频道。\nchannel.close()"
                 },
                 {
                   "type": "list",
@@ -10497,7 +10497,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "self.addEventListener('connect', (event) => {\n  const port = (event as MessageEvent).ports[0]!\n  const transport = createSharedWorkerTransport(port)\n  // createEndpoint({ id: …, transport, middlewares: [connect({ transport })] })，再 provide 方法\n})"
+                  "code": "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'\n\nself.addEventListener('connect', (event) => {\n  const port = (event as MessageEvent).ports[0]!\n  const transport = createSharedWorkerTransport(port)\n  void createEndpoint({\n    id: 'shared-worker', transport, middlewares: [connect({ transport })]\n  }).then((endpoint) => {\n    endpoint.provide('ping', (context) => context.success('pong'))\n  }).catch((error: unknown) => console.error(error))\n})"
                 },
                 {
                   "type": "list",
@@ -10528,7 +10528,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const client = await self.clients.get(clientId)\nconst transport = createServiceWorkerTransport({\n  target: client!,\n  receiver: self,\n  peerId: client!.id\n})"
+                  "code": "// service-worker.ts：由浏览器作为 Service Worker 加载。\nimport { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\nself.addEventListener('message', (event) => {\n  /** Service Worker 也可能收到非 Client 来源；这里只为实际页面建立回复通道。 */\n  const source = event.source\n  if (!source || !('id' in source)) return\n  const clientId = source.id\n  void self.clients.get(clientId).then((client) => {\n    if (!client) return\n    const transport = createServiceWorkerTransport({\n      target: client,\n      receiver: self,\n      peerId: client.id\n    })\n    // 把这个实际 Client 的 transport 交给该页面对应的 Endpoint。\n  }).catch((error: unknown) => console.error(error))\n})"
                 },
                 {
                   "type": "table",
@@ -10572,7 +10572,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'\n\nconst channel = peerConnection.createDataChannel('rpc', { ordered: true })\nawait new Promise<void>((resolve) => channel.addEventListener('open', () => resolve(), { once: true }))\nconst transport = createRtcDataChannelTransport(channel)"
+                  "code": "import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'\n\n/** 已完成信令的真实连接由调用方提供；适配器借用其可靠、有序的 DataChannel。 */\nexport async function openRtcTransport(peerConnection: RTCPeerConnection) {\n  const channel = peerConnection.createDataChannel('rpc', { ordered: true })\n  await new Promise<void>((resolve) => channel.addEventListener('open', () => resolve(), { once: true }))\n  return createRtcDataChannelTransport(channel)\n}"
                 },
                 {
                   "type": "list",
@@ -10949,7 +10949,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { normalizePortable } from '@migaia/rpc-contract/portable'\n\nnormalizePortable({ a: 1, b: [1, 2], c: new Uint8Array([1, 2]) })\n// { a: 1, b: [1, 2], c: { $rpc: 'bytes', base64url: 'AQI' } }\n\nnormalizePortable({ when: new Date() }) // TypeError，@migaia/rpc/contract / INVALID_ENVELOPE"
+                  "code": "import { normalizePortable } from '@migaia/rpc-contract/portable'\nimport { classifyRpcContractError } from '@migaia/rpc-contract'\n\nnormalizePortable({ a: 1, b: [1, 2], c: new Uint8Array([1, 2]) })\n// { a: 1, b: [1, 2], c: { $rpc: 'bytes', base64url: 'AQI' } }\n\ntry {\n  normalizePortable({ when: new Date() })\n} catch (error) {\n  const diagnostic = classifyRpcContractError(error)\n  if (!diagnostic) throw error\n  console.error(diagnostic.code) // TypeError，@migaia/rpc/contract / INVALID_ENVELOPE\n}"
                 },
                 {
                   "type": "table",
@@ -11305,7 +11305,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'\n\nconst jsonRpcError = toJsonRpcError(wire, -32000)\n// { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }\n\nconst back = fromJsonRpcError(jsonRpcError)"
+                  "code": "import { serializeRpcError, toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'\n\n/** JSON-RPC 示例自己构造错误树，不依赖上一个章节的局部变量。 */\nconst wire = serializeRpcError(new RangeError('bad input'), {\n  report: (failure) => console.error(failure)\n})\nconst jsonRpcError = toJsonRpcError(wire, -32000)\n// { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }\n\nconst back = fromJsonRpcError(jsonRpcError)\nconsole.log(back.name, back.message) // RangeError bad input"
                 },
                 {
                   "type": "list",
@@ -11504,7 +11504,10 @@
                       "`./transport-kit`、`./transport-constants`",
                       "编写自定义 transport 的工具与常量"
                     ],
-                    ["`./adapter`", "运行时适配器作者用的构造函数（见 USEGUIDE 第 9 节）"]
+                    [
+                      "`./adapter`",
+                      "`defineMessageAdapter`、`defineByteAdapter`：运行时适配器作者的任务级构造函数（见 USEGUIDE 第 9 节）"
+                    ]
                   ]
                 }
               ]
@@ -11520,7 +11523,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createPeerPair } from '@migaia/rpc-core/testing'\n\nconst pair = await createPeerPair({\n  a: { provide: { echo: (text: string) => text } },\n  b: { provide: { double: (value: number) => value * 2 } }\n})\ntry {\n  console.log(await pair.a.request('double', 21)) // 42：a 调用 b 提供的方法\n  console.log(await pair.b.request('echo', 'ready')) // 'ready'\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n}"
+                  "code": "import { createPeerPair } from '@migaia/rpc-core/testing'\n\nconst pair = await createPeerPair({\n  a: { provide: { echo: (text: string) => text } },\n  b: { provide: { double: (value: number) => value * 2 } }\n})\n/** 两个实际 Peer 都在模块作用域结束时调用原 close。 */\nawait using client = pair.a\nawait using server = pair.b\nconsole.log(await client.request('double', 21)) // 42：a 调用 b 提供的方法\nconsole.log(await server.request('echo', 'ready')) // 'ready'"
                 },
                 {
                   "type": "paragraph",
@@ -11534,9 +11537,31 @@
               ]
             },
             {
+              "id": "高阶用法-编写适配器",
+              "heading": "高阶用法：编写适配器",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "已有消息端口或有序字节流时，用 `defineMessageAdapter` / `defineByteAdapter` 的 `open` 取得真实资源，再调用定义返回的 `peer` 或 `plugin`。通信、握手、治理和关闭沿用原 Core owner。完整可运行的 MessagePort、Host 与字节流例子见 USEGUIDE 第 9 节。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`./adapter/internal-advanced` 是仓库内原生 Process、Threads 与 Bridge 的低级接入入口；网站用户 API 索引以这两个任务级定义函数为适配器作者的起点。安装包仍保留原生包需要的实际导出。"
+                }
+              ]
+            },
+            {
               "id": "调用语义速览",
               "heading": "调用语义速览",
               "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Runtime Peer 支持 `await using`，其 `Symbol.asyncDispose` 就是原来的 `close` 函数，保留相同 Promise 与错误。Core 的 `createRuntimePeer` 可以省略 `self` 与 `report`：生成本地身份，后台错误默认交给 `console.error`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "独立 Peer 的 `on(event, listener)` 使用与 Host 出口相同的事件投影；返回的取消函数可重复调用。首次 ready 由 factory 的 `await` 表示，订阅不重放它。受监督的 Peer 只发布真实重启后的 ready 和原 supervisor 的 exit/restart/degraded；listener 只发布真实接受的 session ready。raw Peer 没有原生执行生命周期，不伪造 exit，也没有后续 ready。事件不能代替 `close` 或 `await using` 释放资源。完整可执行例子见 USEGUIDE 第 2.5 节。"
+                },
                 {
                   "type": "paragraph",
                   "text": "这些规则对所有 RPC 包都成立："
@@ -11620,7 +11645,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 两层 API：Runtime Peer 与 Endpoint 2. Runtime Peer 3. Plugin 与 Host 出口 4. Endpoint 5. 中间件 6. 载体：内置 transport 与自定义 transport 7. 按需组装：减小打包体积 8. 容量、并发与重放窗口 9. 高阶用法：为新运行时编写适配器 10. 错误码与处理 11. 二进制、转发与重试 12. 常见问题"
+                  "text": "1. 两层 API：Runtime Peer 与 Endpoint 2. Runtime Peer 3. Plugin 与 Host 出口 4. Endpoint 5. 中间件 6. 载体：内置 transport 与自定义 transport 7. 按需组装：减小打包体积 8. 容量、并发与重放窗口 9. 高阶用法：编写一个适配器 10. 错误码与处理 11. 二进制、转发与重试 12. 常见问题"
                 }
               ]
             },
@@ -11663,13 +11688,16 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntimePeer } from '@migaia/rpc-core/remote'\n\nconst peer = await createRuntimePeer({\n  self: { name: 'client', instanceId: 'client-1' },\n  provide: { ping: () => 'pong' },\n  connect: async (context) => openChannelSomehow(context), // 返回已完成握手的协议通道\n  report: (error) => console.error(error)\n})"
+                  "code": "import { createRuntimePeer, type IRuntimePeerSource } from '@migaia/rpc-core/remote'\n\n/** 调用方交入实际协议通道的来源；握手和资源仍由该来源的 owner 完成。 */\nexport function createClientPeer(connect: IRuntimePeerSource) {\n  return createRuntimePeer({\n    provide: { ping: () => 'pong' },\n    connect\n  })\n}"
                 },
                 {
                   "type": "table",
                   "headers": ["选项", "说明"],
                   "rows": [
-                    ["`self`", "本端身份 `{ name, instanceId }`。`name` 只是显示标签，不用于认证"],
+                    [
+                      "`self`",
+                      "可省略；Core 生成显示名 `peer` 与唯一 `instanceId`。显式 `{ name, instanceId }` 保持原值，`name` 不用于认证"
+                    ],
                     ["`provide`", "本端提供的方法树（见 2.2）"],
                     [
                       "`spawn` / `connect` / `listen`",
@@ -11689,7 +11717,7 @@
                       "`endpointFactory`",
                       "自定义 Endpoint 组装（例如加入 `authentication` 中间件）"
                     ],
-                    ["`report`", "接收后台错误，必填"]
+                    ["`report`", "接收后台错误；省略时使用 `console.error`"]
                   ]
                 },
                 {
@@ -11709,7 +11737,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "provide: {\n  math: {\n    double: (value: number) => value * 2,         // request / notify\n    slow: async (ms: number) => { … }             // 返回 Promise 也可以\n  },\n  feed: {\n    count: async function* (limit: number) {      // 返回 iterable / async iterable → stream\n      for (let index = 1; index <= limit; index++) yield index\n    }\n  }\n}"
+                  "code": "/** 方法树是完整数据；调用方把它交给所选平台 factory 的 provide。 */\nexport const provide = {\n  math: {\n    double: (value: number) => value * 2,\n    slow: async (ms: number) => {\n      await new Promise<void>((resolve) => setTimeout(resolve, ms))\n      return ms\n    }\n  },\n  feed: {\n    count: async function* (limit: number) {\n      for (let index = 1; index <= limit; index++) yield index\n    }\n  }\n}"
                 },
                 {
                   "type": "list",
@@ -11756,6 +11784,16 @@
                       "`close()`",
                       "`Promise<void>`",
                       "立即拒绝新调用；已接受的调用执行完毕后关闭。重复调用返回同一个 Promise"
+                    ],
+                    [
+                      "`on(event, listener)`",
+                      "`取消函数`",
+                      "订阅真实 owner 的后续生命周期事实；取消可重复调用，不重放首次 ready"
+                    ],
+                    [
+                      "`Symbol.asyncDispose`",
+                      "`Promise<void>`",
+                      "原 `close` 函数本身，供 `await using` 释放作用域资源"
                     ]
                   ]
                 },
@@ -11792,9 +11830,13 @@
               "heading": "2.4 类型",
               "blocks": [
                 {
+                  "type": "paragraph",
+                  "text": "下面的独立 Node 示例使用真实 MessageChannel 载体，并在结束时释放两个端口。平台 Peer 的类型来自 Core，方法树与参数仍严格关联。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IRemoteApi = {\n  math: { double: (value: number) => number }\n  feed: { count: (limit: number) => AsyncIterableIterator<number> }\n}\nconst peer = await createThreadPeer<IRemoteApi>(options)\npeer.request('math.double', 21) // Promise<number>\npeer.stream('feed.count', 3) // AsyncIterableIterator<number>"
+                  "code": "import { MessageChannel } from 'node:worker_threads'\nimport { createNodeThreadChannel, createThreadPeer } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IRemoteApi = {\n  math: { double: (value: number) => number }\n  feed: { count: (limit: number) => AsyncIterableIterator<number> }\n}\n/** 真实 MessagePort 是业务载体；创建方在最外层释放它们。 */\nconst { port1, port2 } = new MessageChannel()\ntry {\n  /** 双方在实际端口上确认能力，Peer 仍使用 Core 的同一套调用与类型规则。 */\n  const [peer, server] = await Promise.all([\n    createThreadPeer<IRemoteApi>({\n      self: { name: 'client', instanceId: 'client-1' },\n      connect: async (context) => createNodeThreadChannel(port1, 'server-1', {\n        scheduler: systemScheduler,\n        capabilities: context.capabilities\n      })\n    }),\n    createThreadPeer({\n      self: { name: 'server', instanceId: 'server-1' },\n      provide: {\n        math: { double: (value: number) => value * 2 },\n        feed: { count: async function* (limit: number) {\n          for (let index = 1; index <= limit; index++) yield index\n        } }\n      },\n      connect: async (context) => createNodeThreadChannel(port2, 'client-1', {\n        scheduler: systemScheduler,\n        capabilities: context.capabilities\n      })\n    })\n  ])\n  try {\n    console.log(await peer.request('math.double', 21)) // number：42\n    await peer.notify('math.double', 21) // 只确认发出，不确认业务完成\n    for await (const value of peer.stream('feed.count', 3)) console.log(value) // number：1、2、3\n    console.log(await peer.group([\n      { method: 'math.double', payload: 2 },\n      { method: 'math.double', payload: 3 }\n    ])) // 顺序执行，得到两个步骤结果\n    console.log(await peer.outcome('not-issued')) // unknown 不能证明某个业务操作没有执行\n  } finally {\n    await Promise.all([peer.close(), server.close()])\n  }\n} finally {\n  port1.close()\n  port2.close()\n}"
                 },
                 {
                   "type": "list",
@@ -11803,6 +11845,34 @@
                     "不提供泛型时没有可调用的方法类型。需要按字符串动态调用时用 `IRuntimeDynamicSurface`：只放宽编译期检查，运行时仍按对端目录拒绝未知方法。",
                     "`IRuntimeSurface<THost, TPlugin>` 从 Host 与插件定义中提取纯类型，不产生运行时代码。"
                   ]
+                }
+              ]
+            },
+            {
+              "id": "2-5-作用域释放与真实生命周期事件",
+              "heading": "2.5 作用域释放与真实生命周期事件",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "首次 ready 已经包含在 `await createThreadPeer(.)` / `await createRuntimePeer(.)` 的完成里。`on('ready')` 从订阅时开始，只观察原 registration 后来真正接受的新代次。受监督的 Peer 从原 supervisor 获取 exit/restart/degraded；listener 的 ready 来自实际接受的 session。raw Peer 没有原生执行生命周期，不伪造 exit 或后续 ready。事件不是资源 disposer；释放仍用 `close` 或 `await using`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "下面的 Node Worker 自然退出，由真实 supervisor 发布 exit；父线程等待该事实，然后由 `await using` 释放 Peer："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: {\n    exit: () => {\n      // 先回复调用，再自然退出这个实际 Worker。\n      setTimeout(() => process.exit(0), 0)\n      return true\n    }\n  }\n})"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createThreadPeer } from '@migaia/rpc-threads'\nimport type { IRuntimeEvent } from '@migaia/rpc-core/remote'\n\ntype IWorkerApi = { exit(): boolean }\n/** 作用域结束时直接调用 Peer 原来的 close。 */\nawait using worker = await createThreadPeer<IWorkerApi>({\n  spawn: new URL('./worker.js', import.meta.url)\n})\n/** 只等待原 supervisor 对实际 Worker 的退出观察，没有自造 ready 或 exit。 */\nconst exited = new Promise<IRuntimeEvent>((resolve) => worker.on('exit', resolve))\nconsole.log(await worker.request('exit')) // true\nconsole.log((await exited).type) // exit"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`Symbol.asyncDispose` 与 `close` 是同一函数引用，重复或并发调用保留同一个原 Promise。取消订阅不会停止 Worker；Peer 开始关闭时注销其事件订阅。listener 没有原生执行控制，raw Peer 也不会把逻辑关闭包装成原生 exit。"
                 }
               ]
             },
@@ -11871,7 +11941,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { connect, createEndpoint } from '@migaia/rpc-core'\n\nconst endpoint = await createEndpoint({\n  id: 'client',                     // 本端 id，写入每条消息\n  targetIds: ['server'],            // 已知对端；自动发现可在运行中补充\n  transport,                        // 载体（第 6 节）\n  middlewares: [connect({ transport })]\n})"
+                  "code": "import { connect, createEndpoint, type IRpcTransport } from '@migaia/rpc-core'\n\n/** transport 由实际载体提供；返回的 Endpoint 由调用方 dispose。 */\nexport function createClientEndpoint(transport: IRpcTransport) {\n  return createEndpoint({\n    id: 'client',\n    targetIds: ['server'],\n    transport,\n    middlewares: [connect({ transport })]\n  })\n}"
                 },
                 {
                   "type": "table",
@@ -11894,7 +11964,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "endpoint.provide('add', (context) => {\n  const [a, b] = context.data as [number, number]\n  return context.success(a + b) // 或 context.failed(error)\n})\n\nconst sum = await endpoint.send<number>('server', 'add', [20, 22]) // data 必填，没有参数时传 null"
+                  "code": "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({\n  id: 'server', transport: right, middlewares: [connect({ transport: right })]\n})\nserver.provide('add', (context) => {\n  const [a, b] = context.data as [number, number]\n  return context.success(a + b) // 或 context.failed(error)\n})\nconst client = await createEndpoint({\n  id: 'client', targetIds: ['server'],\n  transport: left, middlewares: [connect({ transport: left })]\n})\ntry {\n  const sum = await client.send<number>('server', 'add', [20, 22])\n  console.log(sum) // 42；data 必填，没有参数时传 null\n} finally {\n  await client.dispose()\n  await server.dispose()\n}"
                 },
                 {
                   "type": "table",
@@ -12142,79 +12212,71 @@
               ]
             },
             {
-              "id": "9-高阶用法-为新运行时编写适配器",
-              "heading": "9. 高阶用法：为新运行时编写适配器",
+              "id": "9-高阶用法-编写一个适配器",
+              "heading": "9. 高阶用法：编写一个适配器",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`@migaia/rpc-core/adapter` 面向适配器作者：为一种新的运行时或载体（例如 Electron 的某种通道、自定义 IPC）实现与 rpc-process、rpc-threads 同等的能力。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "原则：适配器只交给 Core 它实际持有的原始资源（字节流、消息端口、启动句柄）。握手、能力协商、信任判断都由 Core 在自己的收发路径上完成。接口不接受\"已协商 / 已认证 / 已拥有\"之类的声明，也不接受对已有 transport 的登记。"
+                  "text": "`@migaia/rpc-core/adapter` 提供 `defineMessageAdapter({ open, launch? })` 和 `defineByteAdapter({ open, listen?, dial? })`。定义完成后，用 `adapter.peer(options)` 创建独立 Peer，用 `adapter.plugin(options)` 安装到 Host。`open` 返回真实消息端口或有序字节 I/O；Core 继续完成原来的握手、能力协商、方法目录与收发。"
                 },
                 {
                   "type": "table",
-                  "headers": ["分组", "函数", "用途"],
+                  "headers": ["定义", "物理操作", "创建结果"],
                   "rows": [
                     [
-                      "消息端口",
-                      "`createEventEmitterMessageResource`、`createEventTargetMessageResource`",
-                      "持有原始端口；`openStatic` 建立固定能力通道，`open` 经能力确认（ACK）建立扩展通道"
+                      "`defineMessageAdapter`",
+                      "`open` 打开端口；可选 `launch` 调用运行时原有启动操作",
+                      "Peer 与 `host.thread` Plugin"
                     ],
                     [
-                      "字节连接",
-                      "`createRuntimeEventByteIO`、`createRuntimeByteConnection`、`readRuntimeByteBootstrap`",
-                      "在有序字节流上完成握手、认证与 bootstrap 读取"
-                    ],
-                    [
-                      "消息连接",
-                      "`createRuntimeMessageConnection`",
-                      "完整消息 I/O；固定基础能力零握手，扩展能力经 ACK"
-                    ],
-                    [
-                      "对象连接",
-                      "`holdAdapterObjectChannel`、`materializeAdapterJson`",
-                      "文本 / 对象 I/O 的协商与构造（JSON-RPC 桥使用）"
-                    ],
-                    [
-                      "准入与会话",
-                      "`createRuntimeProviderGovernor`、`createRuntimeProviderScope`",
-                      "连接数、速率、payload 限额，以及按认证身份划分的会话作用域"
-                    ],
-                    [
-                      "Peer 与启动",
-                      "`prepareAdapterPeer`、`holdAdapterLaunch`、`createAdapterBindingDrain`、`createAdapterPlugin`、`holdAdapterRegistration`",
-                      "复用 Core 的 Peer、启动、绑定、插件生命周期"
-                    ],
-                    [
-                      "数据与诊断",
-                      "`createAdapterId`、`readAdapterAbortReason`、`validateAdapterPeerTimeout`、`validateAdapterPeerMethods`、`normalizeAdapterDescription`、`adapterContractRequiresStream`、`createAdapter*Error`、`IpcReporterContext`",
-                      "配置校验、目录规范化、标准错误构造"
+                      "`defineByteAdapter`",
+                      "`open` 打开字节流；可选 `dial` 拨号、`listen` 取得一条已接受的字节流",
+                      "Peer 与 `host.process` Plugin"
                     ]
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "最小示例：在你持有的事件端口上建立 Runtime Peer，扩展能力由 Core 读取对端 ACK 决定："
+                  "text": "下面是完整的第三方 MessagePort 适配器。它只用公开 SDK；两个原生端口由示例创建和关闭。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  const resource = createEventEmitterMessageResource(port)\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}"
+                  "code": "import { MessageChannel, type MessagePort } from 'node:worker_threads'\nimport { defineMessageAdapter } from '@migaia/rpc-core/adapter'\n\n/** 把调用方实际持有的端口交给 Core 的现有消息 owner。 */\nconst adapter = defineMessageAdapter({ open: (port: MessagePort) => port })\n/** 原生端口由创建方持有，Peer.close() 释放借用的监听器。 */\nconst { port1, port2 } = new MessageChannel()\n/** 显式地址用于这两个独立端口的对称路由。 */\nconst [left, right] = await Promise.all([\n  adapter.peer<{ echo(value: number): number }>({\n    self: { name: 'left', instanceId: 'left' }, connect: port1, peerId: 'right'\n  }),\n  adapter.peer({\n    self: { name: 'right', instanceId: 'right' }, connect: port2, peerId: 'left',\n    provide: { echo: (value: number) => value }\n  })\n])\ntry {\n  console.log(await left.request('echo', 42)) // 42\n} finally {\n  await Promise.all([left.close(), right.close()])\n  port1.close()\n  port2.close()\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "对端没有回 ACK，或 ACK 中没有某项扩展能力时，该能力不启用。参考实现见 `@migaia/rpc-process`（字节与消息通道）和 `@migaia/rpc-threads`（Worker 端口）的源码。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "适配器自己的错误：用 `@migaia/utils/error` 的 `attachErrorIdentity` 附加你自己的 source 与 code，不要冒用 `@migaia/rpc/*`："
+                  "text": "同一个定义也能构造真正的 Host Plugin。Host 的原安装批次管理连接与资源，插件只公开 `expose` 中的 Host 方法。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { attachErrorIdentity } from '@migaia/utils/error'\n\nconst ADAPTER_SOURCE = '@example/custom-carrier'\nconst AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const\n\nexport function raiseAdapterWriteFailure(cause: unknown): never {\n  throw attachErrorIdentity(new Error('adapter write failed', { cause }), {\n    source: ADAPTER_SOURCE,\n    code: AdapterErrorCode.writeFailed\n  })\n}"
+                  "code": "import { MessageChannel, type MessagePort } from 'node:worker_threads'\nimport { defineHost } from '@migaia/plugin-host'\nimport { defineMessageAdapter } from '@migaia/rpc-core/adapter'\n\n/** 这个第三方定义只负责取得真实端口。 */\nconst adapter = defineMessageAdapter({ open: (port: MessagePort) => port })\n/** 两个端口的物理生命周期仍由创建方持有。 */\nconst { port1, port2 } = new MessageChannel()\n/** 服务端与 Host 安装并发开始，让原消息 owner 完成双向 ACK。 */\nconst serving = adapter.peer({\n  self: { name: 'service', instanceId: 'service' }, connect: port2, peerId: 'host',\n  provide: { echo: (value: number) => value }\n})\n/** 这个定义产生的真实 Plugin 交给原 Host 安装批次。 */\nconst plugin = adapter.plugin<{ echo(value: number): number }>({\n  name: 'custom', self: { name: 'host', instanceId: 'host' },\n  connect: port1, peerId: 'service'\n})\n/** Plugin 元组把实际 thread 出口保留在 Host 类型上。 */\nconst host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n/** 与已经开始的服务端 Peer 并发安装，完成原双向握手。 */\nconst installed = host.use(plugin)\n/** 服务端 Peer 与实际安装都完成后才发业务调用。 */\nconst right = await serving\ntry {\n  await installed\n  console.log(await host.thread!.request('custom', 'echo', 42)) // 42\n} finally {\n  await host.dispose()\n  await right.close()\n  port1.close()\n  port2.close()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`defineByteAdapter` 同样只接物理 I/O。下面用 Node 标准库的两条 PassThrough 演示有序双向字节流；握手、分帧和目录交换仍由 Core 完成。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { PassThrough } from 'node:stream'\nimport { defineByteAdapter } from '@migaia/rpc-core/adapter'\n\n/** 一端持有实际读流和写流，关闭时释放自己持有的两条流。 */\ntype IStreams = Readonly<{ input: PassThrough; output: PassThrough }>\n/** 标准库流只提供字节读写；Core 负责协议和能力判断。 */\nconst adapter = defineByteAdapter({\n  open: (streams: IStreams) => ({\n    kind: 'byte' as const,\n    write: (chunk: Uint8Array) => new Promise<void>((resolve, reject) => {\n      streams.output.write(chunk, (error) => error ? reject(error) : resolve())\n    }),\n    onData: (listener: (chunk: Uint8Array) => void) => {\n      streams.input.on('data', listener)\n      return () => { streams.input.off('data', listener) }\n    },\n    onClose: (listener: (reason?: unknown) => void) => {\n      streams.input.on('end', listener)\n      return () => { streams.input.off('end', listener) }\n    },\n    close: () => { streams.input.destroy(); streams.output.destroy() }\n  }),\n  listen: (streams: IStreams) => ({\n    kind: 'byte' as const,\n    write: (chunk: Uint8Array) => new Promise<void>((resolve, reject) => {\n      streams.output.write(chunk, (error) => error ? reject(error) : resolve())\n    }),\n    onData: (listener: (chunk: Uint8Array) => void) => {\n      streams.input.on('data', listener)\n      return () => { streams.input.off('data', listener) }\n    },\n    onClose: (listener: (reason?: unknown) => void) => {\n      streams.input.on('end', listener)\n      return () => { streams.input.off('end', listener) }\n    },\n    close: () => { streams.input.destroy(); streams.output.destroy() }\n  })\n})\n/** 两条真实流分别承载两个方向，顺序由标准库保持。 */\nconst toLeft = new PassThrough()\nconst toRight = new PassThrough()\n/** 一端发 hello，另一端在自己实际接收的流上 accept。 */\nconst [left, right] = await Promise.all([\n  adapter.peer<{ double(value: number): number }>({\n    self: { name: 'left', instanceId: 'left' }, peerId: 'right',\n    connect: { input: toLeft, output: toRight }\n  }),\n  adapter.peer({\n    self: { name: 'right', instanceId: 'right' }, peerId: 'left',\n    listen: { input: toRight, output: toLeft },\n    provide: { double: (value: number) => value * 2 }\n  })\n])\ntry {\n  console.log(await left.request('double', 21)) // 42\n} finally {\n  await Promise.all([left.close(), right.close()])\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`launch` 真的调用定义中提供的物理启动操作，并返回端口、`exited` 与 `terminate`。现有运行时可以把自己的 supervisor 的原启动结果交给它；重启、预算与原生退出观察继续属于那个 supervisor。Core 的消息 resource 在握手失败、冷启动取消及 Peer 关闭时，通过同一个 termination-once owner 释放这个实际句柄。rpc-process 与 rpc-threads 的完整 managed 来源仍交给原 supervision 与 generation owner。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "治理配置保留为 `peer` / `plugin` 的 `governor` 和 `scope` 选项。`governor` 使用原 rate、payload、连续超时与 idle 策略；其 disposer 挂在实际连接的 close owner 上。`adapter.scope(store?)` 创建原 provider scope，调用方共享它时，在所有 Peer 关闭后执行 `scope.close()`。作用域使用 Core 从实际连接捕获的认证 principal；普通借用端口的地址字符串不提供 principal。需要会话幂等作用域时，字节 responder 必须使用实际 `auth.verify`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`./adapter/internal-advanced` 保留原生 Process、Threads 与 JSON-RPC Bridge 仍需要的低级操作。第三方的起点是上面的两个定义函数；它们不接受成品 Peer、channel、已协商能力、可信身份或 ownership 声明。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "适配器自己的错误继续用 `@migaia/utils/error` 的 `attachErrorIdentity` 附加自己的 source/code，并保留原错误在 `cause` 上；协议错误继续由原 Core/Contract owner 产生。"
                 }
               ]
             },
@@ -12229,7 +12291,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\n\ntry {\n  await peer.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    // 超时（DEADLINE_EXCEEDED）：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n}"
+                  "code": "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\nimport { createPeerPair } from '@migaia/rpc-core/testing'\n\n/** 可执行的对端让超时例子不依赖未定义 peer。 */\nconst pair = await createPeerPair({\n  a: { provide: {} },\n  b: { provide: { math: { slow: async (ms: number) => {\n    await new Promise<void>((resolve) => setTimeout(resolve, ms))\n    return ms\n  } } } }\n})\ntry {\n  await pair.a.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    console.error(code) // DEADLINE_EXCEEDED：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    console.error(code) // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n}"
                 },
                 {
                   "type": "list",
@@ -12485,6 +12547,178 @@
       }
     },
     {
+      "slug": "rpc-pool",
+      "description": "Thread and process pools composed from public RPC peers.",
+      "version": "0.0.7",
+      "exports": ["."],
+      "documentation": {
+        "readme": {
+          "sections": [
+            {
+              "id": "migaia-rpc-pool",
+              "heading": "@migaia/rpc-pool",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "在公开 RPC Peer 上组合线程与进程池。每个成员一个客户端操作槽，最少 in-flight 调度，平局轮转；忙时进入有限 FIFO。通信、握手、监督与错误仍由原 Peer 管理。"
+                }
+              ]
+            },
+            {
+              "id": "createthreadpool-线程池",
+              "heading": "createThreadPool：线程池",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`spawn` 原样交给 `createThreadPeer`，支持 `true`、入口路径、URL 和现有配置。不同程序才需要入口。此例的两个文件由文档检查器构建并运行。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({ provide: { double: (value: number) => value * 2 } })"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createThreadPool } from '@migaia/rpc-pool'\n\nconst pool = await createThreadPool<{ double(value: number): number }>({\n  spawn: new URL('./worker.js', import.meta.url), size: 2\n})\ntry {\n  console.log(await Promise.all([pool.request('double', 21), pool.request('double', 10)]))\n  await pool.resize(3)\n  console.log(pool.stats())\n} finally {\n  await pool.close()\n}"
+                }
+              ]
+            },
+            {
+              "id": "createprocesspool-进程池",
+              "heading": "createProcessPool：进程池",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`spawn` 原样交给 `createProcessPeer`。入口、运行时与权限规则和原工厂一致。名字端点用于独立进程；池 API 创建自己的成员程序。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({ provide: { add: (value: { a: number; b: number }) => value.a + value.b } })"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createProcessPool } from '@migaia/rpc-pool'\n\nconst pool = await createProcessPool<{ add(value: { a: number; b: number }): number }>({\n  spawn: new URL('./service.js', import.meta.url), size: 2, maxQueue: 16\n})\ntry {\n  console.log(await pool.request('add', { a: 20, b: 22 }))\n} finally {\n  await pool.close()\n}"
+                }
+              ]
+            },
+            {
+              "id": "调度与生命周期",
+              "heading": "调度与生命周期",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "两个工厂都返回 `request / notify / stream / resize / close / stats`。没有 Proxy。"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`size` 是正整数；`maxQueue` 默认 256，允许 0。所有槽忙且队列满时拒绝 `QUEUE_FULL`，不发送业务调用。",
+                    "`stats()` 是池自身的客户端操作快照，不是远端 provider 并发。request 到 Promise 完成、notify 到发送 Promise 完成、stream 到 done/return/throw 才释放槽。",
+                    "`stream` 是惰性 iterator：首次 `next()` 才接纳；未开始的 iterator 不阻碍关闭。长 stream 需要消费、return 或取消才能 drain。",
+                    "`resize(size)` 按调用顺序增减成员，缩容等正在使用的成员完成。`close()` 停止新接纳并排空已接受的队列，重复调用返回同一 Promise。",
+                    "`idleTimeoutMs` 设置为不超过 2147483647 毫秒的有限正数时，闲置成员通过原 `peer.close()` 退役，下一个任务通过原公开工厂补回目标大小。",
+                    "原 supervisor 负责崩溃重启与重新绑定。默认裸 spawn 使用原 on-failure 策略和五次预算；不重置用户预算。恢复期间原 Peer 可以拒绝 `CLOSED`；恢复后未来新调用使用同一个 Peer。池不自动重放失败业务调用。",
+                    "派发后的 call options 和 signal 原样传给 Peer；排队阶段取消为 DOMException AbortError，`CALL_ABORTED` 的 cause 是原 reason。`timeoutMs` 从原 Peer 接收操作时起算，池不另建队列 deadline。"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`spawn: true` 会重跑整个主入口，使用原 `isProcessChild()` / `await isThreadChild()` guard。相对字符串基于主入口目录；URL 精确。浏览器线程沿原 URL 规则；Node `.ts` 去类型不重写 `.js` 导入，使用编译输出或 loader。详细入口、认证与运行时边界见 rpc-process / rpc-threads 使用手册。"
+                }
+              ]
+            },
+            {
+              "id": "错误",
+              "heading": "错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "本包 source 为 `@migaia/rpc-pool`：`INVALID_OPTIONS`（TypeError/RangeError）、`POOL_CLOSED`、`QUEUE_FULL`、`CALL_ABORTED`（DOMException）、`CLOSE_FAILED`（AggregateError）。原 Native/Peer 错误保持自己的 source/code 与实例；启动回滚的 secondary cleanup 报告，原 primary 保留；关闭汇总保留原 errors/cause。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "只依赖 rpc-core、rpc-process、rpc-threads 的公开入口。没有工作窃取、跨机器池或另一套 RPC/native supervision。"
+                }
+              ]
+            }
+          ]
+        },
+        "guide": {
+          "sections": [
+            {
+              "id": "1-高阶用法-线程池-通知与-stream",
+              "heading": "1. 高阶用法：线程池、通知与 stream",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "这些文件使用真实 Worker。类型参数描述远端方法，调用形式与 Peer 一致。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: {\n    double: (value: number) => value * 2,\n    mark: (_value: number) => undefined,\n    values: async function* (count: number) { for (let index = 0; index < count; index++) yield index }\n  }\n})"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createThreadPool } from '@migaia/rpc-pool'\n\nconst pool = await createThreadPool<{\n  double(value: number): number\n  mark(value: number): void\n  values(count: number): AsyncIterableIterator<number>\n}>({ spawn: new URL('./worker.js', import.meta.url), size: 2, maxQueue: 8, idleTimeoutMs: 1000 })\ntry {\n  console.log(await pool.request('double', 21))\n  await pool.notify('mark', 1)\n  for await (const value of pool.stream('values', 3)) console.log(value)\n  await pool.resize(1)\n  console.log(pool.stats())\n} finally {\n  await pool.close()\n}"
+                }
+              ]
+            },
+            {
+              "id": "2-创建进程池",
+              "heading": "2. 创建进程池",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。"
+                }
+              ]
+            },
+            {
+              "id": "3-取消-恢复与关闭",
+              "heading": "3. 取消、恢复与关闭",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "原 signal/options 对象进入 Peer。取消排队项仅移除那一项，`CALL_ABORTED` 的 cause 保留原 reason；已经派发的取消由原 Peer 执行。queue 等待不重算或缩短原 timeoutMs。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "崩溃成员由原 supervisor 重新绑定；恢复期间调用可收到原 CLOSED，池不自动重放。关闭停止新 request/notify、首次 stream next 和 resize；已接受的工作排空后才关闭成员。stream 未消费完会延长 drain，使用 iterator.return 或 signal 取消。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "缩容先回收闲置成员，忙成员结束后关闭；扩容只创建差额。闲置回收仍使用原公开 close/factory。stats 的 in-flight 是本池客户端操作，不是 provider concurrency；notify 的槽只覆盖原发送完成点。"
+                }
+              ]
+            },
+            {
+              "id": "4-所有权与错误边界",
+              "heading": "4. 所有权与错误边界",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "池拥有自己创建的 Peer 和本地 FIFO，没有 Native 句柄、握手、admission 或 trust 权限入口。默认 queue 容量 256，maxQueue=0 禁止等待；overflow 在接纳前拒绝。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "idleTimeoutMs 必须为有限正数且不超过 2147483647 毫秒，避免原生 timer 溢出变成立即回收。非法 size/maxQueue/idleTimeoutMs 在创建前以 TypeError/RangeError+INVALID_OPTIONS 拒绝。部分启动失败保留原 primary 并关闭本批已取得 Peer；secondary cleanup 报告。close 汇总原失败在 AggregateError.errors/cause，不只保留 code。source 与完整代码列表见 README。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "支持环境继承原工厂。当前文档执行使用 Node 24 的真实 Process/Worker；Bun、Deno、浏览器线程仍受原入口、权限与 native lifetime 限制，不把 Node 文档结果当作其他运行时验证。"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
       "slug": "rpc-process",
       "description": "RPC process owner.",
       "version": "0.0.7",
@@ -12623,25 +12857,78 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// service.ts（子进程入口）\nimport { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: {\n    math: {\n      double: (value: number) => value * 2,\n      sum: (values: number[]) => values.reduce((total, value) => total + value, 0)\n    }\n  },\n  report: (error) => console.error(error)\n})"
+                  "code": "// service.ts（子进程入口）\nimport { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: {\n    math: {\n      double: (value: number) => value * 2,\n      sum: (values: number[]) => values.reduce((total, value) => total + value, 0)\n    }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
-                  "text": "父进程用 `spawn` 来源启动它。下面的 `createNodeServiceSpawn` 把 launcher、预算、bootstrap 和握手组合成一个可复用的函数；同一个返回值只交给一个 Peer 或 Plugin 使用。"
+                  "text": "父进程只需给出入口。URL 精确指向文件；相对字符串按主入口目录解析。`.ts` 可直接运行，但 Node 的原生类型剥离不会把 `.js` imports 改写为 `.ts`：有这种 import 的项目应传构建后的 `.js`，或保留父进程的 `--import` loader。Bun 能解析该 TS 导入写法；Deno 也需要构建输出或 loader。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// spawn-source.ts\nimport { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport {\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessByteChannel\n} from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IOptions = Parameters<typeof createProcessPeer>[0]\n/** spawn 的对象形式（另一种是高级回调形式）。 */\nexport type IProcessSpawn = Exclude<NonNullable<IOptions['spawn']>, Function>\n\n/**\n * 为一个 Node 子进程入口构造 spawn 来源。\n * 每次调用都创建新的 token、launcher 与预算；同一个来源只给一个 Peer 或 Plugin 使用。\n */\nexport function createNodeServiceSpawn(\n  entry: URL,\n  report: (error: unknown) => void\n): IProcessSpawn {\n  const launcher = createNodeProcessLauncher()\n  // 一次性会话凭据：经 stdin bootstrap 交给子进程，用于握手认证，不要打印或写入日志。\n  const token = randomBytes(32).toString('base64url')\n  // launcher 返回的真实 handle；建立连接时复用它的字节通道与身份。\n  let handle: Awaited<ReturnType<typeof launcher.launch>>\n  return {\n    kind: 'spawn',\n    channelKind: 'byte',\n    wire: 'native',\n    token,\n    supervision: {\n      id: 'math-service',\n      isolation: 'best-effort',\n      report,\n      launcher: {\n        ...launcher,\n        launch: async (spec, request) => {\n          handle = await launcher.launch(spec, request)\n          return handle\n        }\n      },\n      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n      spec: {\n        command: process.execPath,\n        args: [fileURLToPath(entry)],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async () => handle.channel!,\n    establish: (raw, prepared) =>\n      createProcessTransport(raw as IProcessByteChannel, {\n        role: 'initiator',\n        offer: prepared.offer!,\n        peerId: handle.runtimeApiIdentity!.instanceId,\n        scheduler: prepared.scheduler,\n        ipc: { ...prepared.session, log: () => undefined },\n        report\n      })\n  }\n}"
+                  "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\nconst service = await createProcessPeer<IServiceApi>({ spawn: new URL('./service.ts', import.meta.url) })\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n} finally {\n  await service.close()\n}"
+                }
+              ]
+            },
+            {
+              "id": "同一份入口派生子进程",
+              "heading": "同一份入口派生子进程",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`spawn: true` 重新执行当前主入口，包含全部顶层代码。先用 `isProcessChild()` 区分角色，避免子进程再次派生。这个函数只读已有 bootstrap 标记；真正认证仍由 stdin bootstrap 和原握手完成。Node/Bun 的 runtime flags（包括 `--import`）与程序参数会保留。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// main.ts（父进程）\nimport { createProcessPeer } from '@migaia/rpc-process'\nimport { createNodeServiceSpawn } from './spawn-source.js'\n\ntype IServiceApi = {\n  math: { double: (value: number) => number; sum: (values: number[]) => number }\n}\nconst report = (error: unknown) => console.error(error)\n\nconst service = await createProcessPeer<IServiceApi>({\n  spawn: createNodeServiceSpawn(new URL('./service.js', import.meta.url), report),\n  report\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  console.log(await service.request('math.sum', [1, 2, 3])) // 6\n} finally {\n  await service.close() // 结束连接并按监督策略停止子进程\n}"
+                  "code": "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nif (isProcessChild()) {\n  await createProcessPeer({ provide: { math: { double: (value: number) => value * 2 } } })\n} else {\n  const child = await createProcessPeer<IMathApi>({ spawn: true })\n  try { console.log(await child.request('math.double', 21)) } finally { await child.close() }\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "运行时 `report` 会收到一条 `@migaia/supervision` / `CAPABILITY_UNSUPPORTED`（`capability: 'termination'`）。这是预期的提示，不是故障：示例声明了 `isolation: 'best-effort'`，而 Node launcher 不能保证终止子进程派生出的孙进程。"
+                  "text": "REPL、`--eval`、单文件可执行程序、Electron 或测试运行器没有可用的自派生主入口时，会以注册的配置错误拒绝，不猜测调用位置。Deno 默认子入口只获得 bootstrap 所需的 env 权限；需要额外运行权限时使用显式 command/args。"
+                }
+              ]
+            },
+            {
+              "id": "独立进程按名称连接",
+              "heading": "独立进程按名称连接",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "名称不含 `/` 或协议。双方按 OS 用户与名称派生相同的本机端点，无需端口或通信文件。Unix 目录为 0700，socket 为 0600；当前 Node-compatible socket API 没有公开 peer-credential 读取接口，访问控制由这些 OS 权限完成。同一用户的任何进程都能连接；需要区分同用户程序时，双方显式设置 `token`。TCP、显式 socket 路径及没有 ACL 保证的 Windows named pipe 必须设置 token。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nconst server = await createProcessPeer({ listen: 'math-service', provide: { math: { double: (value: number) => value * 2 } } })\nconst math = await createProcessPeer<IMathApi>({ connect: 'math-service' })\ntry { console.log(await math.request('math.double', 21)) } finally { await math.close(); await server.close() }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "named `connect` 默认等待最多 5000 ms，可设 `connectTimeoutMs`。第二个同名 listener 仍以 `PROCESS_CHANNEL_LISTEN_FAILED` 拒绝；崩溃遗留 socket 只由现有 owner record 安全回收。"
+                }
+              ]
+            },
+            {
+              "id": "高阶用法-完整来源对象",
+              "heading": "高阶用法：完整来源对象",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "原始 launcher、预算、bootstrap 与握手 source 仍可直接传入。下面在现有工厂中直接组合完整来源，每个来源只交给一个 Peer 或 Plugin 使用。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport { createProcessPeer, createProcessTransport, type IProcessByteChannel } from '@migaia/rpc-process'\nimport { createNodeProcessLauncher, type INodeProcessHandle } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\n/** The original native launcher retains all child lifetime operations. */\nconst launcher = createNodeProcessLauncher()\n/** This fresh credential travels only through the existing stdin bootstrap and handshake. */\nconst token = randomBytes(32).toString('base64url')\n/** Full sources explicitly retain their reporter instead of using the short-source default. */\nconst report = (error: unknown) => console.error(error)\nconst service = await createProcessPeer<IServiceApi>({\n  report,\n  spawn: {\n    kind: 'spawn', channelKind: 'byte', wire: 'native', token,\n    supervision: {\n      id: 'math-service', isolation: 'best-effort', report, launcher,\n      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n      spec: {\n        command: process.execPath,\n        args: [fileURLToPath(new URL('./service.ts', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as INodeProcessHandle).channel!,\n    establish: (raw, prepared) => createProcessTransport(raw as IProcessByteChannel, {\n      role: 'initiator', offer: prepared.offer!, peerId: prepared.session.processId!,\n      scheduler: prepared.scheduler, signal: prepared.signal,\n      ipc: { ...prepared.session, log: () => undefined }, report\n    })\n  }\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  console.log(await service.request('math.sum', [1, 2, 3])) // 6\n} finally { await service.close() }"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: { math: { double: (value: number) => value * 2, sum: (values: number[]) => values.reduce((total, value) => total + value, 0) } }\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "完整来源示例的 `report` 会收到 `@migaia/supervision` / `CAPABILITY_UNSUPPORTED`（`capability: 'termination'`）。这是预期提示：Node launcher 不能保证终止孙进程。短来源的默认 `console.error` 每进程只报告一次；短对象可用 `onNotice` 显式接收每次提示，其他错误始终正常报告。"
                 }
               ]
             },
@@ -12839,6 +13126,15 @@
                   "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: {\n    math: { double: (value: number) => value * 2 },\n    feed: {\n      // async generator 方法可以被对端用 stream() 逐项读取\n      count: async function* (limit: number) {\n        for (let index = 1; index <= limit; index++) yield index\n      }\n    }\n  },\n  report: (error) => console.error(error)\n})"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "父进程同组示例："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IServiceApi = { math: { double(value: number): number }; feed: { count(limit: number): AsyncIterableIterator<number> } }\nconst service = await createProcessPeer<IServiceApi>({ spawn: new URL('./service.ts', import.meta.url) })\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  for await (const value of service.stream('feed.count', 3)) console.log(value) // 1 2 3\n} finally { await service.close() }"
+                },
+                {
                   "type": "list",
                   "items": [
                     "自动来源的前提：省略 `spawn` / `connect` / `listen` 只在\"本进程由库的 launcher 启动\"时成立。launcher 会通过环境变量（`PROCESS_RUNTIME_API_ENV`）和 bootstrap 把父端信息交给子进程。直接用 `node service.js` 运行这个文件会在配置阶段拒绝。想让一个独立运行的服务被连接，用第 5 节的 `listen`。",
@@ -12855,7 +13151,32 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`spawn` 对象把四件事组合在一起：怎么启动（`supervision`）、拿哪条通道（`rawChannel`）、怎么握手（`establish`）、用什么凭据（`token`）。README 中的 `createNodeServiceSpawn` 是一个完整、可复用的实现，下表解释每个字段。"
+                  "text": "普通 TS 子进程用 `spawn: './service.ts'` 或 `spawn: new URL('./service.js', import.meta.url)`；`spawn: true` 重跑主入口。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IEchoApi = { echo(value: string): string }\nif (isProcessChild()) await createProcessPeer({ provide: { echo: (value: string) => value } })\nelse {\n  const child = await createProcessPeer<IEchoApi>({ spawn: true })\n  try { console.log(await child.request('echo', 'hello')) } finally { await child.close() }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`isProcessChild()` 只表示本入口由既有 launcher bootstrap 启动，不授予信任。它在发现过程消费 env 标记后仍返回 `true`。子进程执行整个模块，包括顶层初始化；应把父进程启动逻辑放进 `else`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "相对字符串按主入口目录解析；显式 URL 不受当前工作目录影响。短对象可用 `{ entry: './service.ts', base: import.meta.url }` 指定基准。Node/Bun 保留 runtime flags 与 loader，移除 eval/print/test 控制参数，所以父入口的 loader 会继续生效；Node 原生类型剥离不解析 `.js` 指向 `.ts` 的 imports，Node/Deno 此类项目要构建输出或 loader，Bun 可直接解析。失败保留原监督错误及其 cause 与 stderr 诊断，不把错误改成成功。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "自派生不支持 REPL、eval、Electron、测试运行器及无可用主模块的单文件可执行程序；传精确 URL 或 `{ command, args }`。Deno 默认用 `run` 与 bootstrap 的 env 权限；额外权限通过显式 command/args 提供。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "短对象的 `args`、`cwd`、`env`、`stdio`、`limits`、`permissions`、`supervision` 可以覆盖默认值。默认每源创建一个 process budget、随机 stdin token、byte channel 与 best-effort supervisor。省略 `report` 使用 `console.error`；默认终止能力提示每进程只报一次，`onNotice` 接收原提示对象。完整来源不改变现有行为。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`spawn` 对象把四件事组合在一起：怎么启动（`supervision`）、拿哪条通道（`rawChannel`）、怎么握手（`establish`）、用什么凭据（`token`）。README 的“高阶用法”直接展示完整来源对象，下表解释每个字段。"
                 },
                 {
                   "type": "table",
@@ -12877,7 +13198,7 @@
                     ["`supervision.id`", "该执行单元在监督与查询中的标识。"],
                     [
                       "`supervision.launcher`",
-                      "平台 launcher。示例把 `launch` 包了一层，用来记住返回的 handle。"
+                      "平台 launcher。`rawChannel` 读取本次启动实际返回的 handle。"
                     ],
                     [
                       "`supervision.budget`",
@@ -12885,7 +13206,7 @@
                     ],
                     [
                       "`supervision.isolation`",
-                      "`'best-effort'` 或 `'strict'`。`strict` 要求 launcher 声明能可靠终止整棵进程树；Node launcher 不满足，只能用 `best-effort`。"
+                      "`'best-effort'` 或 `'required'`。`required` 要求 launcher 声明必需能力受到保证；Node 的整树终止能力不满足，只能用 `best-effort`。"
                     ],
                     [
                       "`supervision.spec`",
@@ -12976,7 +13297,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await service.notify('log.note', 'hello')\n\nfor await (const item of service.stream('feed.count', 3)) console.log(item) // 1 2 3\n\nconst steps = await service.group([\n  { method: 'math.double', payload: 1 },\n  { method: 'fail.boom' },\n  { method: 'math.double', payload: 3 }\n])\n// [{ state: 'success', result: 2 }, { state: 'failure', error: {…} }, { state: 'not-executed' }]\n\nawait service.request('math.double', 5, { idempotencyKey: 'order-42' })\nawait service.outcome('order-42') // { state: 'done', outcome: { completion: { ok: true, result: 10 } }, … }"
+                  "code": "import type { IRuntimeTypedPeer } from '@migaia/rpc-process'\n\ntype IActionApi = {\n  math: { double(value: number): number }; log: { note(value: string): void }\n  feed: { count(limit: number): AsyncIterableIterator<number> }; fail: { boom(): void }\n}\n/** The application already owns this peer; the idempotency examples need a matching server declaration. */\ndeclare const service: IRuntimeTypedPeer<IActionApi>\n\nawait service.notify('log.note', 'hello')\n\nfor await (const item of service.stream('feed.count', 3)) console.log(item) // 1 2 3\n\nconst steps = await service.group([\n  { method: 'math.double', payload: 1 },\n  { method: 'fail.boom' },\n  { method: 'math.double', payload: 3 }\n])\n// [{ state: 'success', result: 2 }, { state: 'failure', error: {…} }, { state: 'not-executed' }]\n\nawait service.request('math.double', 5, { idempotencyKey: 'order-42' })\nawait service.outcome('order-42') // { state: 'done', outcome: { completion: { ok: true, result: 10 } }, … }"
                 }
               ]
             },
@@ -13025,7 +13346,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IServiceApi = {\n  math: { double: (value: number) => number }\n  feed: { count: (limit: number) => AsyncIterableIterator<number> }\n}\nconst service = await createProcessPeer<IServiceApi>({ spawn, report })\nservice.request('math.double', 21) // Promise<number>\nservice.stream('feed.count', 3) // AsyncIterableIterator<number>"
+                  "code": "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IServiceApi = {\n  math: { double(value: number): number }\n  feed: { count(limit: number): AsyncIterableIterator<number> }\n}\nif (isProcessChild()) {\n  await createProcessPeer({ provide: {\n    math: { double: (value: number) => value * 2 },\n    feed: { count: async function* (limit: number) { for (let value = 1; value <= limit; value++) yield value } }\n  } })\n} else {\n  const service = await createProcessPeer<IServiceApi>({ spawn: true })\n  try {\n    const result: number = await service.request('math.double', 21)\n    console.log(result) // 42\n    for await (const value of service.stream('feed.count', 3)) console.log(value) // 1 2 3\n  } finally { await service.close() }\n}"
                 },
                 {
                   "type": "paragraph",
@@ -13039,6 +13360,28 @@
               "blocks": [
                 {
                   "type": "paragraph",
+                  "text": "普通名称自动映射同一用户的本机端点，适合独立启动的程序。连接端先启动时，默认等最多 5000 ms；`connectTimeoutMs` 修改这个等待上限。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nconst server = await createProcessPeer({ listen: 'math-service', provide: { math: { double: (value: number) => value * 2 } } })\nconst client = await createProcessPeer<IMathApi>({ connect: 'math-service' })\ntry { console.log(await client.request('math.double', 21)) } finally { await client.close(); await server.close() }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "POSIX named endpoint 使用 0700 用户目录与 0600 socket，并复用已有 Unix owner record；第二个同名 listener 拒绝，只有相同服务的崩溃遗留 inode 可以回收。Node-compatible socket API 未提供 peer-credential 读取接口，因此访问控制来自 OS 文件权限。这个边界允许该用户的任何进程接入；显式 `token` 可以进一步限制同用户应用。TCP、显式 socket 路径及本 adapter 未提供 ACL 的 Windows named pipe 必须给 token。内部 same-user hello 标记是公开协议值，不是 secret，也不代替 OS 权限。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\nconst token = 'local-example-secret'\nconst server = await createProcessPeer({ listen: 'tcp://127.0.0.1:4000', token, provide: { echo: (value: string) => value } })\nconst client = await createProcessPeer<{ echo(value: string): string }>({ connect: 'tcp://127.0.0.1:4000', token })\ntry { console.log(await client.request('echo', 'hello')) } finally { await client.close(); await server.close() }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "完整监听与连接来源如下。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "当服务进程不是由你启动的（例如常驻守护进程），服务端用 `listen` 接受连接，客户端用 `connect` 连接。两端都通过握手认证：服务端的 `verify` 校验客户端提供的 `token`。"
                 },
                 {
@@ -13048,28 +13391,21 @@
               ]
             },
             {
-              "id": "服务端",
-              "heading": "服务端",
+              "id": "高阶-完整-socket-来源",
+              "heading": "高阶：完整 socket 来源",
               "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "这一组在同一程序中创建服务端与客户端，实际地址从原 listener 返回，关闭时分别释放连接和 listener。独立部署时，应用将该地址与凭据交给客户端。"
+                },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\nconst report = (error: unknown) => console.error(error)\n// 与客户端事先约定的共享凭据；生产中从密钥管理读取，不要硬编码。\nconst expectedToken = process.env.MATH_TOKEN!\nlet sequence = 0\n\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    console.log(`listening on ${listener.address}`)\n    return listener\n  },\n  // 握手阶段校验凭据，返回该会话的 principal；抛错即拒绝连接。\n  verify: (auth) => {\n    if (auth !== expectedToken) throw new Error('unknown client')\n    return 'math-client'\n  },\n  // 库根据本端已安装的 runtime 能力补全默认提议。\n  offer: createNativeProcessOffer({\n    peer: { id: 'math-server', runtime: 'node' },\n    stream: true\n  }),\n  createConnectionContext: () => ({\n    peerId: `client-${++sequence}`,\n    ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined }\n  })\n}\n\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\nprocess.once('SIGTERM', () => void server.close())"
+                  "code": "import { createNativeProcessOffer, createProcessPeer, createProcessTransport, type IProcessServeListenerIngress } from '@migaia/rpc-process'\nimport { dialProcessByteChannel, listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener', address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return { peerId: `client-${sequence}`, ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined } }\n  }\n}\nconst server = await createProcessPeer({ listen: ingress, provide: { math: { double: (value: number) => value * 2 } }, report })\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect', address, token,\n      dial: (value, signal) => dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) => createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n        role: 'initiator', offer: prepared.offer!, peerId: 'math-server', scheduler: prepared.scheduler,\n        signal: prepared.signal, ipc: { ...prepared.session, log: () => undefined }, report\n      })\n    }\n  })\n  try { console.log(await client.request('math.double', 21)) } finally { await client.close() }\n} finally { await server.close() }"
                 },
                 {
                   "type": "paragraph",
                   "text": "省略 `createNativeProcessOffer` 的 `capabilities` 时，监听端根据 Core 已安装的能力生成 runtime 提议。显式传入 `capabilities`（包括空数组）仍表示调用方选择的窄提议，库不会拓宽它。"
-                }
-              ]
-            },
-            {
-              "id": "客户端",
-              "heading": "客户端",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { createProcessPeer, createProcessTransport } from '@migaia/rpc-process'\nimport { dialProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double: (value: number) => number } }\nconst report = (error: unknown) => console.error(error)\n\nconst client = await createProcessPeer<IServerApi>({\n  connect: {\n    kind: 'connect',\n    address: process.env.MATH_ADDRESS!,\n    token: process.env.MATH_TOKEN!,\n    dial: (address, signal) => dialProcessByteChannel({ address, signal: signal as AbortSignal }),\n    establish: (raw, prepared) => {\n      if (raw.kind !== 'byte') throw new TypeError('socket connections are byte channels')\n      return createProcessTransport(raw, {\n        role: 'initiator',\n        offer: prepared.offer!,\n        peerId: 'math-server',\n        scheduler: prepared.scheduler,\n        signal: prepared.signal as AbortSignal,\n        ipc: { ...prepared.session, log: () => undefined },\n        report\n      })\n    }\n  },\n  report\n})\ntry {\n  console.log(await client.request('math.double', 21)) // 42\n} finally {\n  // 只关闭本端连接；服务端进程不受影响。\n  await client.close()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -13100,7 +13436,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineHost } from '@migaia/plugin-host'\nimport { createProcessPlugin } from '@migaia/rpc-process'\nimport { createNodeServiceSpawn } from './spawn-source.js'\n\ntype IServiceApi = { math: { double: (value: number) => number } }\nconst report = (error: unknown) => console.error(error)\n\nconst service = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({\n  name: 'service',\n  spawn: createNodeServiceSpawn(new URL('./service.js', import.meta.url), report),\n  report\n})\nconst host = defineHost<Record<string, never>, never, readonly [typeof service]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\ntry {\n  await host.use(service)\n  console.log(await host.process!.request('service', 'math.double', 21)) // 42\n  const overview = await host.process!.list()\n  console.log(overview.connections.map((connection) => connection.kind)) // ['spawn']\n} finally {\n  await host.dispose() // 卸载插件并停止子进程\n}"
+                  "code": "import { defineHost } from '@migaia/plugin-host'\nimport { createProcessPeer, createProcessPlugin, isProcessChild } from '@migaia/rpc-process'\n\ntype IServiceApi = { math: { double(value: number): number } }\nif (isProcessChild()) {\n  await createProcessPeer({ provide: { math: { double: (value: number) => value * 2 } } })\n} else {\n  const service = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({ name: 'service', spawn: true })\n  const host = defineHost<Record<string, never>, never, readonly [typeof service]>({\n    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n  })\n  try {\n    await host.use(service)\n    console.log(await host.process!.request('service', 'math.double', 21)) // 42\n    console.log((await host.process!.list()).connections.map((connection) => connection.kind)) // ['spawn']\n  } finally { await host.dispose() }\n}"
                 },
                 {
                   "type": "paragraph",
@@ -13166,7 +13502,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { RPC_PROCESS_ERROR_SOURCE, RpcProcessErrorCode } from '@migaia/rpc-process'\n\ntry {\n  await service.request('math.double', 21, { timeoutMs: 1000 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (source === '@migaia/rpc/core' && code === 'DEADLINE_EXCEEDED') {\n    // 超时：对端可能仍在执行，先对账再决定是否重试\n  } else if (source === RPC_PROCESS_ERROR_SOURCE && code === RpcProcessErrorCode.channelClosed) {\n    // 通道已关闭：需要新建连接\n  } else throw error\n}"
+                  "code": "import type { IRuntimeTypedPeer } from '@migaia/rpc-process'\n\n/** Error handling continues an established application-owned connection. */\ndeclare const service: IRuntimeTypedPeer<{ math: { double(value: number): number } }>\n\nimport { RPC_PROCESS_ERROR_SOURCE, RpcProcessErrorCode } from '@migaia/rpc-process'\n\ntry {\n  await service.request('math.double', 21, { timeoutMs: 1000 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (source === '@migaia/rpc/core' && code === 'DEADLINE_EXCEEDED') {\n    // 超时：对端可能仍在执行，先对账再决定是否重试\n  } else if (source === RPC_PROCESS_ERROR_SOURCE && code === RpcProcessErrorCode.channelClosed) {\n    // 通道已关闭：需要新建连接\n  } else throw error\n}"
                 },
                 {
                   "type": "paragraph",
@@ -13352,7 +13688,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createProcessTransport } from '@migaia/rpc-process'\nimport { createAdapterSocketByteIO } from '@migaia/rpc-process/adapters/node-socket'\nimport { RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\n// socket 是你的适配器实际持有的 Duplex 连接\nconst raw = createAdapterSocketByteIO(socket)\nconst channel = await createProcessTransport(raw, {\n  peerId: 'service',\n  role: 'initiator',\n  offer: {\n    peer: { id: 'client', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: []\n  },\n  scheduler,\n  ipc: { connectionId: 'custom-ipc', sessionId: 'session', log },\n  report\n})"
+                  "code": "import type { Socket } from 'node:net'\nimport { createProcessTransport } from '@migaia/rpc-process'\nimport { createAdapterSocketByteIO } from '@migaia/rpc-process/adapters/node-socket'\nimport { RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** The application supplies an already connected Duplex socket; this fragment does not dial another one. */\ndeclare const socket: Socket\nconst raw = createAdapterSocketByteIO(socket)\nconst channel = await createProcessTransport(raw, {\n  peerId: 'service', role: 'initiator',\n  offer: {\n    peer: { id: 'client', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json], capabilities: []\n  },\n  scheduler: systemScheduler,\n  ipc: { connectionId: 'custom-ipc', sessionId: 'session', log: () => undefined },\n  report: console.error\n})\ntry { console.log(channel.peerId) } finally { await channel.close() }"
                 },
                 {
                   "type": "paragraph",
@@ -13387,7 +13723,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "这些函数只接收你实际持有的 I/O 资源。握手、能力协商和信任判断都由 `@migaia/rpc-core/adapter` 内部完成，不接受\"已认证 / 已协商\"之类的外部声明。"
+                  "text": "新适配器使用 `@migaia/rpc-core/adapter` 的 `defineByteAdapter` 或 `defineMessageAdapter`，让 Core 从真实 I/O 组装 Peer 与 Plugin；完整示例见 Core 的“编写一个适配器”。上表的原生资源构造继续适用于自定义运行时，复杂 launch、session 与诊断组合使用 `@migaia/rpc-core/adapter/internal-advanced`。这些操作只读取实际持有的资源，不接受“已认证 / 已协商”的声明。"
                 }
               ]
             },
@@ -13502,7 +13838,7 @@
                   "rows": [
                     [
                       "`@migaia/rpc-threads`",
-                      "`createThreadPeer`、`createThreadPlugin`、错误码 `RpcThreadErrorCode`、高级通道与 launcher 构造函数"
+                      "`createThreadPeer`、`createThreadPlugin`、`isThreadChild`、错误码 `RpcThreadErrorCode`、高级通道与 launcher 构造函数"
                     ],
                     [
                       "`./adapters/node`",
@@ -13538,25 +13874,52 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Worker 入口只声明自己提供的方法。由库的 launcher 创建时，它会自动连回父线程。"
+                  "text": "保存下面两个文件，编译为同目录的 `worker.js` 和 `main.js`，再运行 `main.js`。Worker 入口只声明自己提供的方法；由库创建时，它会自动连回父线程。后台错误默认交给 `console.error`。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.ts\nimport { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: {\n    math: { double: (value: number) => value * 2 },\n    bytes: {\n      inspect: (buffer: ArrayBuffer) => ({\n        length: buffer.byteLength,\n        first: new Uint8Array(buffer)[0]\n      })\n    }\n  },\n  report: (error) => console.error(error)\n})"
+                  "code": "// worker.ts\nimport { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: {\n    math: { double: (value: number) => value * 2 },\n    bytes: {\n      inspect: (buffer: ArrayBuffer) => ({\n        length: buffer.byteLength,\n        first: new Uint8Array(buffer)[0]\n      })\n    }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
-                  "text": "主线程用 `spawn` 来源创建 Worker 并调用："
+                  "text": "主线程只需要 Worker 入口。Node / Bun / Deno 的 launcher、一个 Worker 的预算、调度器和通道由当前运行时的适配器延迟加载："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// main.ts\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IWorkerApi = {\n  math: { double: (value: number) => number }\n  bytes: { inspect: (buffer: ArrayBuffer) => { length: number; first: number } }\n}\nconst report = (error: unknown) => console.error(error)\n\nconst worker = await createThreadPeer<IWorkerApi>({\n  spawn: {\n    spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n    budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n    scheduler: systemScheduler,\n    launcher: createNodeThreadLauncher(),\n    channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n    report\n  },\n  report\n})\ntry {\n  console.log(await worker.request('math.double', 21)) // 42\n  console.log(await worker.request('bytes.inspect', new Uint8Array([7, 8, 9]).buffer))\n  // { length: 3, first: 7 }\n} finally {\n  await worker.close() // 关闭连接并终止 Worker\n}"
+                  "code": "// main.ts\nimport { createThreadPeer } from '@migaia/rpc-threads'\n\ntype IWorkerApi = {\n  math: { double: (value: number) => number }\n  bytes: { inspect: (buffer: ArrayBuffer) => { length: number; first: number } }\n}\n/** 当前文件的相邻模块是 Worker 入口。 */\nconst worker = await createThreadPeer<IWorkerApi>({\n  spawn: new URL('./worker.js', import.meta.url)\n})\ntry {\n  console.log(await worker.request('math.double', 21)) // 42\n  console.log(await worker.request('bytes.inspect', new Uint8Array([7, 8, 9]).buffer))\n  // { length: 3, first: 7 }\n} finally {\n  await worker.close() // 关闭连接并终止 Worker\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`spawn` 的六个字段各有分工：`spec`（入口与名字）、`budget`（最多同时存在几个 Worker）、`scheduler`（计时与调度）、`launcher`（创建 Worker）、`channelFactory`（在 Worker 端口上建立协议通道）、`report`（接收后台错误）。换平台时只需换 `launcher` 与 `channelFactory`。"
+                  "text": "`spawn` 接受 `true`、`URL`、路径字符串，或以 `entry` 为必填字段的短对象；`base`、`name`、`data`、`limits` 与既有 source 的依赖和监督字段都可覆盖。相对字符串按主入口文件所在目录解析；显式 `base: import.meta.url` 可改为当前模块，`URL` 始终按原值使用。短形式只展开为既有 source，仍经过相同的监督、握手和关闭路径。字段详情见 USEGUIDE 第 3 节，完整配置见高阶用法。"
+                }
+              ]
+            },
+            {
+              "id": "同一个文件作为-worker",
+              "heading": "同一个文件作为 Worker",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`spawn: true` 会重新执行主入口的全部顶层代码。用 `await isThreadChild()` 分开两支，避免子线程再次创建 Worker："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IMathApi = { double(value: number): number }\n\nif (await isThreadChild()) {\n  await createThreadPeer({ provide: { double: (value: number) => value * 2 } })\n} else {\n  /** 当前主入口的副本提供计算方法。 */\n  const worker = await createThreadPeer<IMathApi>({ spawn: true })\n  try {\n    console.log(await worker.request('double', 21)) // 42\n  } finally {\n    await worker.close()\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`isThreadChild()` 读取既有 launcher bootstrap 标记；它不授权外部 Worker。REPL、`--eval`、打包成单个二进制、Electron、以测试运行器为主入口等没有可用入口的场景，self spawn 以 `INVALID_CONFIG` 拒绝，不猜入口。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`.ts` 入口可直接传入。Node 24 能剥离类型，但不会把 `./x.js` 改为 `./x.ts`；Bun 支持该映射，Node / Deno 应使用编译后的 `.js`，或能处理该映射的 loader。模块解析失败保留原始 `cause`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "浏览器请传明确的 Worker URL；`true` 和裸字符串只用于 Node / Bun / Deno。`spawn: new URL('./worker.js', import.meta.url)` 使用已经构建的模块。Vite / webpack 的 Worker 源码发现依赖字面量 `new Worker(new URL('./worker.ts', import.meta.url))`；库内部的动态构造不能代替这一规则。源码打包需预构建 Worker URL，或使用自定义 Worker 构造。"
                 }
               ]
             },
@@ -13574,7 +13937,31 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineHost } from '@migaia/plugin-host'\nimport { createThreadPlugin } from '@migaia/rpc-threads'\n\nconst worker = createThreadPlugin<IWorkerApi, Record<never, never>, 'worker'>({\n  name: 'worker',\n  spawn, // 与上例相同的 spawn 对象\n  report\n})\nconst host = defineHost<Record<string, never>, never, readonly [typeof worker]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\ntry {\n  await host.use(worker)\n  console.log(await host.thread!.request('worker', 'math.double', 21)) // 42\n} finally {\n  await host.dispose()\n}"
+                  "code": "import { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: { math: { double: (value: number) => value * 2 } }\n})"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineHost } from '@migaia/plugin-host'\nimport { createThreadPlugin } from '@migaia/rpc-threads'\n\ntype IWorkerApi = { math: { double(value: number): number } }\n/** Host 接管 Worker 的连接与释放。 */\nconst worker = createThreadPlugin<IWorkerApi, Record<never, never>, 'worker'>({\n  name: 'worker',\n  spawn: new URL('./worker.js', import.meta.url)\n})\n/** 安装线程插件后，thread 出口提供调用与监督操作。 */\nconst host = defineHost<Record<string, never>, never, readonly [typeof worker]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\ntry {\n  await host.use(worker)\n  console.log(await host.thread!.request('worker', 'math.double', 21)) // 42\n} finally {\n  await host.dispose()\n}"
+                }
+              ]
+            },
+            {
+              "id": "高阶用法-完整-source",
+              "heading": "高阶用法：完整 source",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "原来的完整 source 对象继续有效。需要自定义预算、监督或 runtime 时，显式组合平台 launcher 与 channel factory；两者共用同一个 scheduler。下面导出的对象可直接作为 `createThreadPeer` 或 `createThreadPlugin` 的 `spawn`，入口使用快速开始的 `worker.js`："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { fileURLToPath } from 'node:url'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** 后台错误由应用统一记录。 */\nconst report = (error: unknown) => console.error(error)\n/** Node source 显式持有一个 Worker 的预算与监督依赖。 */\nexport const spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "各平台组合与 Web Worker 终止能力边界见 USEGUIDE 第 8 节。"
                 }
               ]
             },
@@ -13593,7 +13980,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { authentication } from './signing.js'\n\ntype IBytesApi = {\n  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }\n}\n/** 后台诊断由应用接收，签名凭据不进入日志。 */\nconst report = (error: unknown) => console.error(error)\n/** 标准 Node source 持有 Worker 和一个单位的预算。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)) },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** 普通 factory 使用双方配置的签名资源，无需自定义 Endpoint。 */\nconst worker = await createThreadPeer<IBytesApi>({ spawn, authentication, report })\ntry {\n  const buffer = new Uint8Array([7, 8, 9]).buffer\n  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))\n  // { length: 3, first: 7 }\n  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效\n} finally {\n  await worker.close()\n}"
+                  "code": "// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { randomBytes } from 'node:crypto'\n\n/** 本地示例生成演示密钥；部署时应由双方配置提供 RPC_SIGNING_KEY。 */\nprocess.env.RPC_SIGNING_KEY ??= randomBytes(32).toString('hex')\n/** 设置环境后才加载签名模块，实际 Worker 继承同一环境。 */\nconst { authentication } = await import('./signing.js')\n\ntype IBytesApi = {\n  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }\n}\n/** 短 source 保留同一签名与原生 transfer owner，无需重复 Worker wiring。 */\nconst worker = await createThreadPeer<IBytesApi>({\n  spawn: new URL('./worker.js', import.meta.url),\n  authentication\n})\ntry {\n  const buffer = new Uint8Array([7, 8, 9]).buffer\n  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))\n  // { length: 3, first: 7 }\n  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效\n} finally {\n  await worker.close()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -13651,7 +14038,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 导入 2. Worker 端：自动连回父线程 3. spawn 来源与各平台 launcher 4. 交给 PluginHost 管理：createThreadPlugin 5. 二进制数据与 transfer 6. 容量与超时 7. 错误处理 8. 高阶用法：自定义 Worker 构造与通道 9. 常见问题"
+                  "text": "1. 导入 2. Worker 端：自动连回父线程 3. spawn 短形式 4. 交给 PluginHost 管理：createThreadPlugin 5. 二进制数据与 transfer 6. 容量与超时 7. 错误处理 8. 高阶用法：完整 source 与自定义 Worker 构造 9. 常见问题"
                 }
               ]
             },
@@ -13662,11 +14049,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createThreadPeer,\n  createThreadPlugin,\n  RpcThreadErrorCode,\n  RPC_THREAD_ERROR_SOURCE\n} from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'"
+                  "code": "import {\n  createThreadPeer,\n  createThreadPlugin,\n  isThreadChild,\n  RpcThreadErrorCode,\n  RPC_THREAD_ERROR_SOURCE\n} from '@migaia/rpc-threads'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "只导入当前运行平台的 `./adapters/*` 子路径。各平台的 launcher 与 channel factory 名字不同，但组合方式一样（第 3 节）。"
+                  "text": "普通 TS Worker 只需根入口；短 `spawn` 会延迟加载当前运行时的 adapter。自定义完整 source 时，只导入当前平台的 `./adapters/*` 子路径（第 8 节）。"
                 }
               ]
             },
@@ -13675,9 +14062,18 @@
               "heading": "2. Worker 端：自动连回父线程",
               "blocks": [
                 {
+                  "type": "paragraph",
+                  "text": "把下面两个文件编译为同目录的 `worker.js` 与 `main.js`，然后运行 `main.js`。默认 `report` 为 `console.error`。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.ts\nimport { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: {\n    math: { double: (value: number) => value * 2 },\n    feed: {\n      count: async function* (limit: number) {\n        for (let index = 1; index <= limit; index++) yield index\n      }\n    }\n  },\n  report: (error) => console.error(error)\n})"
+                  "code": "// worker.ts\nimport { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: {\n    math: { double: (value: number) => value * 2 },\n    feed: {\n      count: async function* (limit: number) {\n        for (let index = 1; index <= limit; index++) yield index\n      }\n    }\n  }\n})"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createThreadPeer } from '@migaia/rpc-threads'\n\ntype IWorkerApi = {\n  math: { double(value: number): number }\n  feed: { count(limit: number): AsyncIterableIterator<number> }\n}\n\n/** URL 明确定位相邻 Worker，关闭时由 Peer 释放该 Worker。 */\nconst worker = await createThreadPeer<IWorkerApi>({\n  spawn: new URL('./worker.js', import.meta.url)\n})\ntry {\n  console.log(await worker.request('math.double', 21)) // 42\n  for await (const value of worker.stream('feed.count', 3)) console.log(value) // 1、2、3\n} finally {\n  await worker.close()\n}"
                 },
                 {
                   "type": "list",
@@ -13690,91 +14086,108 @@
               ]
             },
             {
-              "id": "3-spawn-来源与各平台-launcher",
-              "heading": "3. spawn 来源与各平台 launcher",
+              "id": "3-spawn-短形式",
+              "heading": "3. spawn 短形式",
               "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createThreadPeer` 与 `createThreadPlugin` 接受同样的短形式，不需要新的 factory："
+                },
+                {
+                  "type": "table",
+                  "headers": ["`spawn`", "说明"],
+                  "rows": [
+                    ["`true`", "把当前主入口作为 Worker，必须用下面的 child guard。"],
+                    [
+                      "`new URL('./worker.js', import.meta.url)`",
+                      "精确使用 URL；不经过相对字符串解析。"
+                    ],
+                    ["`'./worker.ts'`", "Node / Bun / Deno 路径；相对主入口文件所在目录解析。"],
+                    [
+                      "`{ entry: './worker.js', base: import.meta.url, name: 'math' }`",
+                      "显式选择当前模块为相对解析基准，并覆盖 Worker 名字。"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "短对象的 `entry` 接受 `true`、`URL`、字符串，其余字段均可省略："
+                },
+                {
+                  "type": "table",
+                  "headers": ["字段", "默认与用途"],
+                  "rows": [
+                    [
+                      "`base`",
+                      "显式模块 URL 或 URL 字符串，用于相对 entry 解析；省略时用主入口目录。不能通过堆栈猜调用模块。"
+                    ],
+                    [
+                      "`name`、`data`、`limits`",
+                      "传给既有 Worker spec 的名字、初始化数据和资源限制。"
+                    ],
+                    ["`scheduler`", "`systemScheduler`。"],
+                    ["`budget`", "`createUnitBudget({ kind: 'thread', maxUnits: 1 })`。"],
+                    [
+                      "`launcher`、`channelFactory`",
+                      "当前运行时对应的既有 adapter；延迟加载。自定义 channel factory 必须使用相同 scheduler。"
+                    ],
+                    ["`report`", "`console.error`；可换成应用的错误收集函数。"],
+                    ["`health`", "可选，复用完整 source 的健康检查策略。"],
+                    [
+                      "`supervisor`",
+                      "既有监督策略，可设置 `ready`、`startupTimeoutMs`、`restart`、`terminalPolicy`、`stop`、`isolation` 等。"
+                    ],
+                    [
+                      "`keyFactory`、`retryPort`",
+                      "可选，复用完整 source 的幂等键生成与重试配置；顶层同名选项优先。"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这些默认值只展开为原来的完整 source。预算、握手、监督、代次和信任事实继续由原来的 owner 管理；短形式不接受“已经协商”或“已经信任”的声明。完整 source 仍可传入（第 8 节）。"
+                }
+              ]
+            },
+            {
+              "id": "self-spawn-同文件的两条分支",
+              "heading": "self spawn：同文件的两条分支",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "保存为 `self.ts`，编译为 `self.js` 后运行。整个模块会在 Worker 中再次执行；所有只属于主线程的副作用都应放在 `else` 分支："
+                },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "spawn: {\n  spec: { entry, name: 'math-worker' },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher,          // 平台 launcher\n  channelFactory,    // 与 launcher 配套的通道工厂\n  report\n}"
-                },
-                {
-                  "type": "table",
-                  "headers": ["字段", "说明"],
-                  "rows": [
-                    [
-                      "`spec.entry`",
-                      "Worker 入口。Node 用文件路径（`fileURLToPath(new URL('./worker.js', import.meta.url))`）；Web / Deno / Bun 用模块 URL。"
-                    ],
-                    ["`spec.name`", "Worker 名字，用于调试与查询。"],
-                    [
-                      "`budget`",
-                      "`createUnitBudget({ kind: 'thread', maxUnits })`：同时存在的 Worker 上限。"
-                    ],
-                    [
-                      "`scheduler`",
-                      "计时与调度，通常用 `systemScheduler`；`channelFactory` 必须使用同一个 scheduler。"
-                    ],
-                    ["`launcher`", "创建 Worker。"],
-                    ["`channelFactory`", "在 Worker 端口上建立协议通道。"],
-                    ["`report`", "接收后台错误。"],
-                    ["`health`", "可选，健康检查策略。"],
-                    [
-                      "`supervisor`",
-                      "可选，`id`、`ready`、`startupTimeoutMs`、`restart`、`terminalPolicy`、`stop`、`isolation` 等监督策略。"
-                    ]
-                  ]
+                  "code": "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IMathApi = { double(value: number): number }\n\nif (await isThreadChild()) {\n  await createThreadPeer({ provide: { double: (value: number) => value * 2 } })\n} else {\n  /** self spawn 复用当前主入口，由既有 bootstrap 区分父子。 */\n  const worker = await createThreadPeer<IMathApi>({ spawn: true })\n  try {\n    console.log(await worker.request('double', 21)) // 42\n  } finally {\n    await worker.close()\n  }\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "各平台的组合："
-                },
+                  "text": "`isThreadChild()` 读取既有库 bootstrap 标记，不是授权外部 Worker 的输入。REPL、`--eval`、打包成单个二进制、Electron、以测试运行器为主入口等无法提供可用入口的场景，`spawn: true` 以 `INVALID_CONFIG` 拒绝，不猜入口。"
+                }
+              ]
+            },
+            {
+              "id": "入口与运行环境的边界",
+              "heading": "入口与运行环境的边界",
+              "blocks": [
                 {
-                  "type": "table",
-                  "headers": ["平台", "launcher", "channelFactory", "说明"],
-                  "rows": [
-                    [
-                      "Node",
-                      "`createNodeThreadLauncher()`",
-                      "`createNodeThreadChannelFactory({ scheduler })`",
-                      "`worker_threads`，可观察退出、可终止"
-                    ],
-                    [
-                      "Bun",
-                      "`createBunThreadLauncher({ report })`",
-                      "`createBunThreadChannelFactory({ scheduler })`",
-                      "Web Worker 语义"
-                    ],
-                    [
-                      "Deno",
-                      "`createDenoThreadLauncher({ report })`",
-                      "`createDenoThreadChannelFactory({ scheduler })`",
-                      "模块 Worker；需要相应权限"
-                    ],
-                    [
-                      "浏览器",
-                      "`createBrowserThreadLauncher({ report })`",
-                      "`createBrowserThreadChannelFactory({ scheduler })`",
-                      "`new Worker(url, { type: 'module' })`"
-                    ],
-                    [
-                      "Electron 主进程",
-                      "`createElectronMainThreadLauncher()`",
-                      "`createElectronMainThreadChannelFactory({ scheduler })`",
-                      "基于 Node `worker_threads`"
-                    ],
-                    [
-                      "Electron 渲染进程",
-                      "`createElectronRendererThreadLauncher({ report })`",
-                      "`createElectronRendererThreadChannelFactory({ scheduler })`",
-                      "基于 Web Worker"
-                    ]
+                  "type": "list",
+                  "items": [
+                    "相对路径：库无法读取调用模块的 `import.meta.url`。裸字符串以主入口目录为基准；嵌套模块应传 `URL` 或显式 `base: import.meta.url`。URL 始终精确使用。",
+                    "TS 入口：`.ts` 可直接传入。Node 24 的类型剥离不会改写 `./x.js` 到 `./x.ts`。Bun 支持这种映射；本仓库使用 `.js` specifier，所以 Node / Deno 应运行编译输出，或配置能处理映射的 loader。解析失败保留原始 module-resolution `cause`。",
+                    "浏览器：只用明确的 URL；`true` 和裸字符串只用于 Node / Bun / Deno。动态 `Worker` 构造不能让 Vite / webpack 发现 Worker 源码。`spawn: new URL('./worker.js', import.meta.url)` 应指向已经构建的模块；需由 bundler 编译 `.ts` Worker 时，预构建 URL，或在自定义 Worker 构造中保留字面量 `new Worker(new URL('./worker.ts', import.meta.url))`（第 8 节）。",
+                    "Electron：显式选用第 8 节的 Electron adapter；不使用 self spawn 猜测应用入口。",
+                    "Web Worker 终止：浏览器、Bun、Deno 的 launcher 继续把 `termination` 与 `exit-observation` 声明为 `unsupported`。`terminate()` 后无法确认代码已经停止，监督层保守地视为可能仍在运行；Node 与 Electron 主进程可观察退出。"
                   ]
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Web Worker 的终止边界：浏览器、Bun、Deno 的 launcher 把 `termination` 与 `exit-observation` 声明为 `unsupported`。`terminate()` 之后无法确认 Worker 中的代码已经停止，监督层会保守地把该单元视为可能仍在运行。Node 与 Electron 主进程基于 `worker_threads`，可以观察退出。"
-                },
+                }
+              ]
+            },
+            {
+              "id": "借用已有-messageport",
+              "heading": "借用已有 MessagePort",
+              "blocks": [
                 {
                   "type": "paragraph",
                   "text": "已有 `MessagePort` 可以作为 `connect` 来源。双方把 Core 提供的 `context.capabilities` 交给 channel；Core 在实际端口上交换 ACK，只有双方都提供的能力才会启用。双方应同时开始连接："
@@ -13796,12 +14209,17 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`createThreadPlugin(options, runtime?)` 接受与 `createThreadPeer` 相同的 `spawn`、`provide`，另加 `name`（Host 内的连接名）与可选的 `expose`。安装后经 `host.thread` 出口调用："
+                  "text": "`createThreadPlugin(options, runtime?)` 接受与 `createThreadPeer` 相同的短 `spawn`、完整 source、`provide`，另加 `name`（Host 内的连接名）与可选的 `expose`。下面两个文件编译后，由 Host 持有 Worker，并经 `host.thread` 出口调用："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineHost } from '@migaia/plugin-host'\nimport { createThreadPlugin } from '@migaia/rpc-threads'\n\nconst worker = createThreadPlugin<IWorkerApi, Record<never, never>, 'worker'>({\n  name: 'worker',\n  spawn,\n  report\n})\nconst host = defineHost<Record<string, never>, never, readonly [typeof worker]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\ntry {\n  await host.use(worker)\n  console.log(await host.thread!.request('worker', 'math.double', 21)) // 42\n  const detail = await host.thread!.get('worker')\n  console.log(detail.kind) // 'spawn'\n} finally {\n  await host.dispose()\n}"
+                  "code": "import { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: { math: { double: (value: number) => value * 2 } }\n})"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineHost } from '@migaia/plugin-host'\nimport { createThreadPlugin } from '@migaia/rpc-threads'\n\ntype IWorkerApi = { math: { double(value: number): number } }\n/** 该插件将 Worker 交给 Host 管理。 */\nconst worker = createThreadPlugin<IWorkerApi, Record<never, never>, 'worker'>({\n  name: 'worker',\n  spawn: new URL('./worker.js', import.meta.url)\n})\n/** Host 销毁时释放线程插件及其 Worker。 */\nconst host = defineHost<Record<string, never>, never, readonly [typeof worker]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\ntry {\n  await host.use(worker)\n  console.log(await host.thread!.request('worker', 'math.double', 21)) // 42\n  const detail = await host.thread!.get('worker')\n  console.log(detail.kind) // 'spawn'\n} finally {\n  await host.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -13869,7 +14287,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { authentication } from './signing.js'\n\ntype IBytesApi = {\n  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }\n}\n/** 后台诊断由应用接收，签名凭据不进入日志。 */\nconst report = (error: unknown) => console.error(error)\n/** 标准 Node source 持有 Worker 和一个单位的预算。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)) },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** 普通 factory 使用双方配置的签名资源，无需自定义 Endpoint。 */\nconst worker = await createThreadPeer<IBytesApi>({ spawn, authentication, report })\ntry {\n  const buffer = new Uint8Array([7, 8, 9]).buffer\n  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))\n  // { length: 3, first: 7 }\n  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效\n} finally {\n  await worker.close()\n}"
+                  "code": "// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。\nimport { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { randomBytes } from 'node:crypto'\n\n/** 本地示例生成演示密钥；部署时应由双方配置提供 RPC_SIGNING_KEY。 */\nprocess.env.RPC_SIGNING_KEY ??= randomBytes(32).toString('hex')\n/** 设置环境后才加载签名模块，实际 Worker 继承同一环境。 */\nconst { authentication } = await import('./signing.js')\n\ntype IBytesApi = {\n  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }\n}\n/** 后台诊断由应用接收，签名凭据不进入日志。 */\nconst report = (error: unknown) => console.error(error)\n/** 标准 Node source 持有 Worker 和一个单位的预算。 */\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)) },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\n/** 普通 factory 使用双方配置的签名资源，无需自定义 Endpoint。 */\nconst worker = await createThreadPeer<IBytesApi>({ spawn, authentication, report })\ntry {\n  const buffer = new Uint8Array([7, 8, 9]).buffer\n  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))\n  // { length: 3, first: 7 }\n  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效\n} finally {\n  await worker.close()\n}"
                 }
               ]
             },
@@ -13947,12 +14365,94 @@
               ]
             },
             {
-              "id": "8-高阶用法-自定义-worker-构造与通道",
-              "heading": "8. 高阶用法：自定义 Worker 构造与通道",
+              "id": "8-高阶用法-完整-source-与自定义-worker-构造-保留完整-source",
+              "heading": "8. 高阶用法：完整 source 与自定义 Worker 构造 · 保留完整 source",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "以下导出面向需要自行控制 Worker 构造的运行时适配器作者。普通应用使用第 3 节的 launcher 即可。"
+                  "text": "自定义预算、监督或平台组合时，原来的完整 `IRuntimeThreadSpawn` 对象继续有效。下面对象直接作为 `createThreadPeer` 或 `createThreadPlugin` 的 `spawn`；`worker.js` 使用第 2 节的 Worker："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { fileURLToPath } from 'node:url'\nimport { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** 后台错误由应用统一记录。 */\nconst report = (error: unknown) => console.error(error)\n/** 完整 Node source 显式组合预算、监督依赖与通道。 */\nexport const spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}"
+                },
+                {
+                  "type": "table",
+                  "headers": ["字段", "说明"],
+                  "rows": [
+                    [
+                      "`spec.entry`",
+                      "Node 文件路径或 URL 字符串；Web / Deno / Bun 模块 URL 字符串。"
+                    ],
+                    [
+                      "`spec.name`、`spec.data`、`spec.limits`",
+                      "Worker 名字、初始化数据与资源限制。"
+                    ],
+                    ["`budget`", "同时存在的 Worker 上限。"],
+                    ["`scheduler`", "计时与调度；channel factory 必须使用同一个 scheduler。"],
+                    ["`launcher`、`channelFactory`", "平台 Worker 创建与协议通道。"],
+                    ["`report`", "必填，接收后台错误。"],
+                    ["`health`", "可选，健康检查策略。"],
+                    [
+                      "`supervisor`",
+                      "可选，`id`、`ready`、`startupTimeoutMs`、`restart`、`terminalPolicy`、`stop`、`isolation` 等监督策略。"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "各平台的显式组合："
+                },
+                {
+                  "type": "table",
+                  "headers": ["平台", "launcher", "channelFactory"],
+                  "rows": [
+                    [
+                      "Node",
+                      "`createNodeThreadLauncher()`",
+                      "`createNodeThreadChannelFactory({ scheduler })`"
+                    ],
+                    [
+                      "Bun",
+                      "`createBunThreadLauncher({ report })`",
+                      "`createBunThreadChannelFactory({ scheduler })`"
+                    ],
+                    [
+                      "Deno",
+                      "`createDenoThreadLauncher({ report })`",
+                      "`createDenoThreadChannelFactory({ scheduler })`"
+                    ],
+                    [
+                      "浏览器",
+                      "`createBrowserThreadLauncher({ report })`",
+                      "`createBrowserThreadChannelFactory({ scheduler })`"
+                    ],
+                    [
+                      "Electron 主进程",
+                      "`createElectronMainThreadLauncher()`",
+                      "`createElectronMainThreadChannelFactory({ scheduler })`"
+                    ],
+                    [
+                      "Electron 渲染进程",
+                      "`createElectronRendererThreadLauncher({ report })`",
+                      "`createElectronRendererThreadChannelFactory({ scheduler })`"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Deno Worker 需要相应权限；Bun、Deno、浏览器与 Electron 渲染进程沿用 Web Worker 的终止边界（第 3 节）。"
+                }
+              ]
+            },
+            {
+              "id": "8-高阶用法-完整-source-与自定义-worker-构造-自定义-worker-构造与通道",
+              "heading": "8. 高阶用法：完整 source 与自定义 Worker 构造 · 自定义 Worker 构造与通道",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "以下导出面向需要自行控制 Worker 构造的运行时适配器作者。普通应用使用第 3 节的短形式即可。浏览器 bundler 只识别源码中的字面量 Worker 构造；库的 URL 短形式不保证自动生成 Worker chunk。"
                 },
                 {
                   "type": "table",
@@ -13988,11 +14488,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'\n\nconst launcher = createNodeThreadLauncher()\nconst handle = await launcher.launch(threadSpec, { signal })\nconst channel = await handle.open(signal, { scheduler })"
+                  "code": "import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'\nimport type { IThreadSpec } from '@migaia/supervision/threads'\nimport type { IAbortSignal } from '@migaia/lifecycle'\nimport type { IScheduler } from '@migaia/utils/scheduler'\n\n/** 调用方提供真实入口与生命周期；返回后负责关闭 channel、terminate 并等待 exited。 */\nexport async function openWorkerChannel(\n  threadSpec: IThreadSpec,\n  signal: IAbortSignal,\n  scheduler: IScheduler\n) {\n  const launcher = createNodeThreadLauncher()\n  const handle = await launcher.launch(threadSpec, { signal })\n  try {\n    const channel = await handle.open(signal, { scheduler })\n    return { handle, channel }\n  } catch (primary) {\n    handle.terminate()\n    await handle.exited\n    throw primary\n  }\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "握手、能力确认和信任判断都在 `@migaia/rpc-core/adapter` 内部完成；这些构造函数只接收你实际持有的 Worker 与端口，不接受\"已协商 / 已信任\"之类的外部声明。"
+                  "text": "新消息适配器使用 `@migaia/rpc-core/adapter` 的 `defineMessageAdapter`，完整示例见 Core 的“编写一个适配器”。本包也通过该 SDK 从实际端口组装 Peer 与 Plugin。上面的原生构造保留 Worker、启动 bootstrap 和原能力 ACK 的所有权；复杂原生组合使用 `@migaia/rpc-core/adapter/internal-advanced`，不接受“已协商 / 已信任”的声明。"
                 }
               ]
             },

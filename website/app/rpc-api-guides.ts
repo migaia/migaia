@@ -3708,8 +3708,274 @@ export function inspectByteLaunchFrame(frame: Uint8Array) {
   })
 } satisfies Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>>
 
+/**
+ * Guides for the short-source helpers, the adapter SDK and the pool package added by the DX
+ * roadmap.
+ */
+const rpcDxRoadmapGuides = {
+  'rpc-core:adapter:defineMessageAdapter': guide({
+    quickStart: `import { MessageChannel, type MessagePort } from 'node:worker_threads'
+import { defineMessageAdapter } from '@migaia/rpc-core/adapter'
+
+const adapter = defineMessageAdapter({ open: (port: MessagePort) => port })
+const { port1, port2 } = new MessageChannel()
+const [left, right] = await Promise.all([
+  adapter.peer<{ echo(value: number): number }>({ self: { name: 'left', instanceId: 'left' }, connect: port1, peerId: 'right' }),
+  adapter.peer({ self: { name: 'right', instanceId: 'right' }, connect: port2, peerId: 'left', provide: { echo: (value: number) => value } })
+])
+console.log(await left.request('echo', 42))
+await Promise.all([left.close(), right.close()])
+port1.close()
+port2.close()`,
+    purposeEn:
+      'Defines a third-party runtime adapter over a message port the adapter already holds. The definition supplies only how to open that port; Core still runs the handshake, capability acknowledgement, method directory and lifecycle, and the result creates standalone Peers or Host plugins.',
+    purposeZh:
+      '为适配器已经持有的消息端口定义第三方运行时适配器。定义只负责打开端口；握手、能力确认、方法目录与生命周期仍由 Core 完成，结果可以创建独立 Peer 或 Host 插件。',
+    useEn: [
+      'A new runtime or carrier exposes MessagePort-like ports and should behave like the built-in thread adapters.',
+      'An application wants a Peer over its own pair of ports without writing handshake code.'
+    ],
+    useZh: [
+      '新的运行时或载体提供类似 MessagePort 的端口，并希望与内置线程适配器行为一致。',
+      '应用希望在自己的一对端口上建立 Peer，而不编写握手代码。'
+    ],
+    avoidEn: [
+      'Node, Bun, Deno or browser Workers are already covered by createThreadPeer and its short spawn options.',
+      'The carrier is an ordered byte stream rather than a message port; use defineByteAdapter.'
+    ],
+    avoidZh: [
+      'Node、Bun、Deno 或浏览器 Worker 已由 createThreadPeer 及其 spawn 简写覆盖。',
+      '载体是有序字节流而不是消息端口时改用 defineByteAdapter。'
+    ]
+  }),
+  'rpc-core:adapter:defineByteAdapter': guide({
+    quickStart: `import { defineByteAdapter } from '@migaia/rpc-core/adapter'
+import type { IProcessByteChannel } from '@migaia/rpc-process'
+
+/** The adapter only opens the ordered byte channel it already holds. */
+export const adapter = defineByteAdapter({ open: (channel: IProcessByteChannel) => channel })
+// adapter.peer(options) creates a standalone Peer; adapter.plugin(options) installs a Host plugin.`,
+    purposeEn:
+      'Defines a third-party runtime adapter over an ordered byte stream such as a pipe or socket. Optional dial and listen operations obtain connections; Core performs the authenticated handshake, framing, capability agreement and lifecycle on the bytes it receives.',
+    purposeZh:
+      '为管道、socket 等有序字节流定义第三方运行时适配器。可选的 dial 与 listen 负责取得连接；认证握手、分帧、能力协商与生命周期由 Core 在实际收到的字节上完成。',
+    useEn: [
+      'A custom IPC mechanism delivers ordered bytes and should reuse the native process protocol.',
+      'The in-repo process adapter is the reference shape for a new byte carrier.'
+    ],
+    useZh: [
+      '自定义 IPC 机制传递有序字节，并希望复用原生进程协议。',
+      '以仓库内的进程适配器为参照，为新的字节载体实现适配器。'
+    ],
+    avoidEn: [
+      'Local child processes and named endpoints are already covered by createProcessPeer short options.',
+      'The carrier delivers whole messages; use defineMessageAdapter instead of reframing them as bytes.'
+    ],
+    avoidZh: [
+      '本机子进程和名字端点已由 createProcessPeer 简写覆盖。',
+      '载体按完整消息投递时使用 defineMessageAdapter，不要再把消息重新包装成字节流。'
+    ]
+  }),
+  'rpc-process:index:isProcessChild': guide({
+    quickStart: `import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'
+
+if (isProcessChild()) {
+  await createProcessPeer({ provide: { double: (value: number) => value * 2 } })
+} else {
+  const child = await createProcessPeer<{ double(value: number): number }>({ spawn: true })
+  console.log(await child.request('double', 21))
+  await child.close()
+}`,
+    purposeEn:
+      'Reports synchronously whether the current process was started by the library launcher, by reading the existing bootstrap marker. It guards the two branches of a module that spawns a copy of itself with spawn: true.',
+    purposeZh:
+      '通过读取现有 bootstrap 标记，同步判断当前进程是否由库的启动器派生。用于区分以 spawn: true 派生自身的模块中父端与子端两个分支。',
+    useEn: [
+      'One entry file is both the parent and the child of a self spawn.',
+      'Top-level work such as starting a server must run only in the parent.'
+    ],
+    useZh: ['同一个入口文件既是自我派生的父端，也是子端。', '启动服务器等顶层工作只能在父端执行。'],
+    avoidEn: [
+      'The child runs a different program; that program simply calls createProcessPeer without a guard.',
+      'The marker is not authentication and must not be used to grant privileges.'
+    ],
+    avoidZh: [
+      '子进程运行的是另一个程序时，该程序直接调用 createProcessPeer，不需要判断。',
+      '该标记不是认证信息，不能用来授予权限。'
+    ]
+  }),
+  'rpc-threads:index:isThreadChild': guide({
+    quickStart: `import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
+
+if (await isThreadChild()) {
+  await createThreadPeer({ provide: { double: (value: number) => value * 2 } })
+} else {
+  const worker = await createThreadPeer<{ double(value: number): number }>({ spawn: true })
+  console.log(await worker.request('double', 21))
+  await worker.close()
+}`,
+    purposeEn:
+      'Resolves whether the current module runs inside a Worker started by the library launcher, by reading the existing bootstrap marker. It guards the two branches of a module started as its own Worker with spawn: true.',
+    purposeZh:
+      '通过读取现有 bootstrap 标记，异步判断当前模块是否运行在由库的启动器创建的 Worker 中。用于区分以 spawn: true 将自身作为 Worker 启动的模块中的两个分支。',
+    useEn: [
+      'One module is both the main-thread code and the Worker body.',
+      'Main-thread work must not run again inside the Worker.'
+    ],
+    useZh: [
+      '同一个模块既是主线程代码，也是 Worker 的主体。',
+      '主线程的工作不能在 Worker 中再执行一遍。'
+    ],
+    avoidEn: [
+      'Browser bundlers need new Worker(new URL(...)); use an explicit Worker entry there.',
+      'The marker is not authentication and must not be used to grant privileges.'
+    ],
+    avoidZh: [
+      '浏览器打包器需要 new Worker(new URL(...)) 写法，浏览器中请使用独立的 Worker 入口。',
+      '该标记不是认证信息，不能用来授予权限。'
+    ]
+  }),
+  'rpc-pool:index:createThreadPool': guide({
+    quickStart: `import { createThreadPool } from '@migaia/rpc-pool'
+
+const pool = await createThreadPool<{ double(value: number): number }>({
+  spawn: new URL('./worker.js', import.meta.url),
+  size: 2
+})
+try {
+  console.log(await Promise.all([pool.request('double', 21), pool.request('double', 10)]))
+} finally {
+  await pool.close()
+}`,
+    purposeEn:
+      'Creates a bounded pool of Worker Peers using the same spawn options as createThreadPeer. Calls go to the member with the fewest in-flight operations; when every member is busy they wait in a bounded FIFO, and close drains accepted work.',
+    purposeZh:
+      '使用与 createThreadPeer 相同的 spawn 选项创建有界的 Worker Peer 池。调用派给在途操作最少的成员；全部繁忙时进入有界 FIFO 等待，close 会排空已接纳的工作。',
+    useEn: [
+      'CPU-bound calls should spread across several Workers.',
+      'The number of concurrent Workers and queued calls must be bounded.'
+    ],
+    useZh: [
+      'CPU 密集的调用需要分散到多个 Worker。',
+      '需要限制同时存在的 Worker 数量和排队调用数量。'
+    ],
+    avoidEn: [
+      'A single Worker is enough; use createThreadPeer directly.',
+      'Work must move between machines; the pool is local only and does not steal work.'
+    ],
+    avoidZh: [
+      '一个 Worker 就够用时直接使用 createThreadPeer。',
+      '需要跨机器分发工作时不适用，池只在本机工作且不做工作窃取。'
+    ]
+  }),
+  'rpc-pool:index:createProcessPool': guide({
+    quickStart: `import { createProcessPool } from '@migaia/rpc-pool'
+
+const pool = await createProcessPool<{ add(value: { a: number; b: number }): number }>({
+  spawn: new URL('./service.js', import.meta.url),
+  size: 2,
+  maxQueue: 16
+})
+try {
+  console.log(await pool.request('add', { a: 20, b: 22 }))
+} finally {
+  await pool.close()
+}`,
+    purposeEn:
+      'Creates a bounded pool of child-process Peers using the same spawn options as createProcessPeer. Dispatch, queueing, resizing and draining match the thread pool, while each member keeps its own process isolation and supervision.',
+    purposeZh:
+      '使用与 createProcessPeer 相同的 spawn 选项创建有界的子进程 Peer 池。派发、排队、扩缩容与排空规则与线程池一致，每个成员保留各自的进程隔离与监督。',
+    useEn: [
+      'Work needs process isolation and should run on several children at once.',
+      'Crashing members should be restarted by the existing supervisor without the caller rebuilding the pool.'
+    ],
+    useZh: [
+      '工作需要进程隔离，并希望在多个子进程上同时执行。',
+      '成员崩溃后由现有监督者重启，调用方不必重建整个池。'
+    ],
+    avoidEn: [
+      'Threads are sufficient and cheaper to start; use createThreadPool.',
+      'Calls are non-idempotent and must never be retried; the pool does not replay failed calls, so design recovery explicitly.'
+    ],
+    avoidZh: [
+      '线程已经足够且启动更便宜时使用 createThreadPool。',
+      '调用不幂等且绝不能重试时需要自行设计恢复，池不会重放失败的调用。'
+    ]
+  }),
+  'rpc-pool:index:RPC_POOL_ERROR_SOURCE': guide({
+    quickStart: `import { RPC_POOL_ERROR_SOURCE, RpcPoolErrorCode } from '@migaia/rpc-pool'
+
+export function isQueueFull(error: unknown) {
+  const { source, code } = error as { source?: string; code?: string }
+  return source === RPC_POOL_ERROR_SOURCE && code === RpcPoolErrorCode.queueFull
+}`,
+    purposeEn:
+      'The stable source string of errors raised by the pool itself, such as a full queue or a closed pool. Errors from members keep their original RPC or native source, so branching on this source separates pool decisions from call failures.',
+    purposeZh:
+      '池自身抛出的错误（例如队列已满、池已关闭）所带的稳定 source。成员产生的错误保留原有的 RPC 或原生 source，因此可以按这个 source 区分池的决定与调用本身的失败。',
+    useEn: [
+      'Callers branch on (source, code) to retry only pool-level rejections.',
+      'Logs need to tell pool admission apart from member failures.'
+    ],
+    useZh: [
+      '调用方按 (source, code) 分支，只对池层面的拒绝做重试。',
+      '日志需要区分池的准入拒绝与成员失败。'
+    ],
+    avoidEn: [
+      'Matching message text instead of the source string.',
+      'Treating a member error as a pool error.'
+    ],
+    avoidZh: ['用 message 文本代替 source 判断。', '把成员错误当成池错误处理。']
+  }),
+  'rpc-pool:index:RpcPoolErrorCode': guide({
+    quickStart: `import { RpcPoolErrorCode } from '@migaia/rpc-pool'
+
+// INVALID_OPTIONS, POOL_CLOSED, QUEUE_FULL, CALL_ABORTED, CLOSE_FAILED
+console.log(Object.values(RpcPoolErrorCode))`,
+    purposeEn:
+      'Enumerates the five pool error codes: invalid options, a closed pool, a full queue, cancellation while queued and failures collected during close. A QUEUE_FULL or CALL_ABORTED call never reached a member, so it is safe to retry.',
+    purposeZh:
+      '列出池的五个错误码：选项无效、池已关闭、队列已满、排队期间被取消，以及关闭时汇总的失败。QUEUE_FULL 和 CALL_ABORTED 的调用从未到达成员，可以安全重试。',
+    useEn: [
+      'Retry policies need to know which rejections never executed.',
+      'Shutdown handling needs to inspect CLOSE_FAILED aggregates.'
+    ],
+    useZh: ['重试策略需要知道哪些拒绝确定没有执行。', '关闭流程需要检查 CLOSE_FAILED 汇总的错误。'],
+    avoidEn: [
+      'Assuming any pool error means the call was not executed; check the code.',
+      'Hard-coding the code strings instead of using the constants.'
+    ],
+    avoidZh: [
+      '以为任何池错误都意味着调用未执行，必须看具体 code。',
+      '硬编码错误码字符串而不使用常量。'
+    ]
+  }),
+  'rpc-pool:index:RpcPoolState': guide({
+    quickStart: `import { createThreadPool, RpcPoolState } from '@migaia/rpc-pool'
+
+const pool = await createThreadPool({ spawn: new URL('./worker.js', import.meta.url), size: 1 })
+console.log(pool.stats().state === RpcPoolState.open)
+await pool.close()`,
+    purposeEn:
+      'Names the lifecycle states reported by pool.stats(): open while accepting work, then closing and closed after close() is called. It is a reporting value for dashboards and shutdown logic, not an error.',
+    purposeZh:
+      '为 pool.stats() 报告的生命周期状态命名：接纳工作时为 open，调用 close() 后依次为 closing 与 closed。它是用于监控与关闭逻辑的报告值，不是错误。',
+    useEn: [
+      'Health pages show whether a pool still accepts work.',
+      'Shutdown code waits until the pool reports closed.'
+    ],
+    useZh: ['健康页面展示池是否仍在接纳工作。', '关闭流程等待池报告 closed。'],
+    avoidEn: [
+      'Polling stats in a hot loop instead of awaiting close().',
+      'Inferring member health from the pool state alone.'
+    ],
+    avoidZh: ['在热循环里轮询 stats，而不是 await close()。', '只凭池状态推断成员的健康情况。']
+  })
+} satisfies Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>>
+
 export const rpcApiGuides = {
   ...rpcAdapterGuides,
+  ...rpcDxRoadmapGuides,
   ...rpcProtocolToolkitGuides,
   ...rpcContractGuides,
   ...webRpcCoreGuides,

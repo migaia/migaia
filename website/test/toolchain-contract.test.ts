@@ -229,8 +229,11 @@ test('SITE-T-A24 generated projections contain no volatile metadata', () => {
   assert.equal(apiManifest.version, 1)
   assert.equal(routeManifest.version, 1)
   assert.equal(relationshipManifest.version, 1)
-  /** Six RPC runtime owners replace the former single package, adding exactly five libraries. */
-  assert.equal(libraryManifest.libraries.length, 32)
+  /**
+   * Six RPC runtime owners replace the former single package, adding exactly five libraries; the
+   * separate rpc-pool package adds one more.
+   */
+  assert.equal(libraryManifest.libraries.length, 33)
   assert.equal(
     libraryManifest.libraries.some((library: { readonly slug: string }) => library.slug === 'docs'),
     false
@@ -453,10 +456,11 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
     )
 
   /**
-   * Adapter extraction moves owner entries and adds held-resource operations to the exact RPC
-   * inventory.
+   * Adapter extraction moved owner entries into the adapter packages; the adapter SDK then replaced
+   * the low-level adapter exports with defineMessageAdapter / defineByteAdapter and an
+   * internal-advanced entry, and the short-source helpers added isProcessChild / isThreadChild.
    */
-  assert.equal(runtimeSymbols.length, 331)
+  assert.equal(runtimeSymbols.length, 309)
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)

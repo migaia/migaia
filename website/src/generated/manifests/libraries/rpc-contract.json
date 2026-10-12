@@ -282,7 +282,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { normalizePortable } from '@migaia/rpc-contract/portable'\n\nnormalizePortable({ a: 1, b: [1, 2], c: new Uint8Array([1, 2]) })\n// { a: 1, b: [1, 2], c: { $rpc: 'bytes', base64url: 'AQI' } }\n\nnormalizePortable({ when: new Date() }) // TypeError，@migaia/rpc/contract / INVALID_ENVELOPE"
+                "code": "import { normalizePortable } from '@migaia/rpc-contract/portable'\nimport { classifyRpcContractError } from '@migaia/rpc-contract'\n\nnormalizePortable({ a: 1, b: [1, 2], c: new Uint8Array([1, 2]) })\n// { a: 1, b: [1, 2], c: { $rpc: 'bytes', base64url: 'AQI' } }\n\ntry {\n  normalizePortable({ when: new Date() })\n} catch (error) {\n  const diagnostic = classifyRpcContractError(error)\n  if (!diagnostic) throw error\n  console.error(diagnostic.code) // TypeError，@migaia/rpc/contract / INVALID_ENVELOPE\n}"
               },
               {
                 "type": "table",
@@ -634,7 +634,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'\n\nconst jsonRpcError = toJsonRpcError(wire, -32000)\n// { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }\n\nconst back = fromJsonRpcError(jsonRpcError)"
+                "code": "import { serializeRpcError, toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'\n\n/** JSON-RPC 示例自己构造错误树，不依赖上一个章节的局部变量。 */\nconst wire = serializeRpcError(new RangeError('bad input'), {\n  report: (failure) => console.error(failure)\n})\nconst jsonRpcError = toJsonRpcError(wire, -32000)\n// { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }\n\nconst back = fromJsonRpcError(jsonRpcError)\nconsole.log(back.name, back.message) // RangeError bad input"
               },
               {
                 "type": "list",
@@ -4502,6 +4502,7 @@
           "errors": ["No documented errors are declared for classifyRpcContractError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for classifyRpcContractError.",
           "examples": [
+            "import { normalizePortable } from '@migaia/rpc-contract/portable'\nimport { classifyRpcContractError } from '@migaia/rpc-contract'\n\nnormalizePortable({ a: 1, b: [1, 2], c: new Uint8Array([1, 2]) })\n// { a: 1, b: [1, 2], c: { $rpc: 'bytes', base64url: 'AQI' } }\n\ntry {\n  normalizePortable({ when: new Date() })\n} catch (error) {\n  const diagnostic = classifyRpcContractError(error)\n  if (!diagnostic) throw error\n  console.error(diagnostic.code) // TypeError，@migaia/rpc/contract / INVALID_ENVELOPE\n}",
             "import { classifyRpcContractError, normalizeRpcEnvelope } from '@migaia/rpc-contract'\n\ntry {\n  normalizeRpcEnvelope({})\n} catch (error) {\n  const diagnostic = classifyRpcContractError(error)\n  if (!diagnostic) throw error\n  console.error(diagnostic.code, diagnostic.message) // INVALID_ENVELOPE rpc envelope is invalid\n}"
           ],
           "members": [],
@@ -4577,7 +4578,7 @@
               ]
             }
           ],
-          "usageScore": 18,
+          "usageScore": 32,
           "configuration": [],
           "fragment": "rpc-contract-errors--classifyRpcContractError"
         },
@@ -4732,7 +4733,7 @@
           "errors": ["No documented errors are declared for fromJsonRpcError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for fromJsonRpcError.",
           "examples": [
-            "import { toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'\n\nconst jsonRpcError = toJsonRpcError(wire, -32000)\n// { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }\n\nconst back = fromJsonRpcError(jsonRpcError)",
+            "import { serializeRpcError, toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'\n\n/** JSON-RPC 示例自己构造错误树，不依赖上一个章节的局部变量。 */\nconst wire = serializeRpcError(new RangeError('bad input'), {\n  report: (failure) => console.error(failure)\n})\nconst jsonRpcError = toJsonRpcError(wire, -32000)\n// { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }\n\nconst back = fromJsonRpcError(jsonRpcError)\nconsole.log(back.name, back.message) // RangeError bad input",
             "import {\n  serializeRpcError,\n  deserializeRpcError,\n  toJsonRpcError,\n  fromJsonRpcError\n} from '@migaia/rpc-contract/errors'\n\nconst original = new RangeError('bad input', { cause: new Error('root cause') })\nconst wire = serializeRpcError(original, { report: (failure) => console.error(failure) })\nconst jsonRpcError = toJsonRpcError(wire, -32000) // 错误树放在 error.data.migaiaWireError\n\nconst restored = deserializeRpcError(fromJsonRpcError(jsonRpcError))\nconsole.log(restored instanceof RangeError, restored.message) // true 'bad input'\nconsole.log((restored.cause as Error).message) // 'root cause'"
           ],
           "members": [],
@@ -4795,7 +4796,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'\n\nconst jsonRpcError = toJsonRpcError(wire, -32000)\n// { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }\n\nconst back = fromJsonRpcError(jsonRpcError)"
+                  "code": "import { serializeRpcError, toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'\n\n/** JSON-RPC 示例自己构造错误树，不依赖上一个章节的局部变量。 */\nconst wire = serializeRpcError(new RangeError('bad input'), {\n  report: (failure) => console.error(failure)\n})\nconst jsonRpcError = toJsonRpcError(wire, -32000)\n// { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }\n\nconst back = fromJsonRpcError(jsonRpcError)\nconsole.log(back.name, back.message) // RangeError bad input"
                 },
                 {
                   "type": "list",
@@ -6176,7 +6177,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'\n\nconst jsonRpcError = toJsonRpcError(wire, -32000)\n// { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }\n\nconst back = fromJsonRpcError(jsonRpcError)"
+                  "code": "import { serializeRpcError, toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'\n\n/** JSON-RPC 示例自己构造错误树，不依赖上一个章节的局部变量。 */\nconst wire = serializeRpcError(new RangeError('bad input'), {\n  report: (failure) => console.error(failure)\n})\nconst jsonRpcError = toJsonRpcError(wire, -32000)\n// { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }\n\nconst back = fromJsonRpcError(jsonRpcError)\nconsole.log(back.name, back.message) // RangeError bad input"
                 },
                 {
                   "type": "list",
@@ -6570,6 +6571,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for serializeRpcError.",
           "examples": [
             "import { serializeRpcError, deserializeRpcError } from '@migaia/rpc-contract/errors'\n\nconst original = new RangeError('bad input', { cause: new Error('root cause') })\nconst wire = serializeRpcError(original, { report: (failure) => console.error(failure) })\n// { source: 'unknown', code: 'UNKNOWN', name: 'RangeError', message: 'bad input', stack: '…', cause: {…} }\n\nconst restored = deserializeRpcError(wire)\nrestored instanceof RangeError // true；stack 保留发送方的原始 stack",
+            "import { serializeRpcError, toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'\n\n/** JSON-RPC 示例自己构造错误树，不依赖上一个章节的局部变量。 */\nconst wire = serializeRpcError(new RangeError('bad input'), {\n  report: (failure) => console.error(failure)\n})\nconst jsonRpcError = toJsonRpcError(wire, -32000)\n// { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }\n\nconst back = fromJsonRpcError(jsonRpcError)\nconsole.log(back.name, back.message) // RangeError bad input",
             "import { attachErrorIdentity } from '@migaia/utils/error'\nimport { serializeRpcError, toJsonRpcError } from '@migaia/rpc-contract/errors'\n\nconst ADAPTER_SOURCE = '@example/electron-carrier'\nconst AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const\n\nexport function writeFailure(cause: unknown, report: (failure: unknown) => void) {\n  const error = attachErrorIdentity(new Error('adapter write failed', { cause }), {\n    source: ADAPTER_SOURCE,\n    code: AdapterErrorCode.writeFailed\n  })\n  const wire = serializeRpcError(error, { report })\n  return { error, wire, jsonrpc: toJsonRpcError(wire, -32000) }\n}",
             "import {\n  serializeRpcError,\n  deserializeRpcError,\n  toJsonRpcError,\n  fromJsonRpcError\n} from '@migaia/rpc-contract/errors'\n\nconst original = new RangeError('bad input', { cause: new Error('root cause') })\nconst wire = serializeRpcError(original, { report: (failure) => console.error(failure) })\nconst jsonRpcError = toJsonRpcError(wire, -32000) // 错误树放在 error.data.migaiaWireError\n\nconst restored = deserializeRpcError(fromJsonRpcError(jsonRpcError))\nconsole.log(restored instanceof RangeError, restored.message) // true 'bad input'\nconsole.log((restored.cause as Error).message) // 'root cause'"
           ],
@@ -6661,6 +6663,24 @@
               ]
             },
             {
+              "id": "9-高阶用法-跨进程与跨语言传递错误-与-json-rpc-互转",
+              "heading": "9. 高阶用法：跨进程与跨语言传递错误 · 与 JSON-RPC 互转",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { serializeRpcError, toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'\n\n/** JSON-RPC 示例自己构造错误树，不依赖上一个章节的局部变量。 */\nconst wire = serializeRpcError(new RangeError('bad input'), {\n  report: (failure) => console.error(failure)\n})\nconst jsonRpcError = toJsonRpcError(wire, -32000)\n// { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }\n\nconst back = fromJsonRpcError(jsonRpcError)\nconsole.log(back.name, back.message) // RangeError bad input"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "错误树放在 `error.data.migaiaWireError`（`RpcJsonRpcWireError.dataKey`）；整数 `code` 由调用方按 JSON-RPC 约定选择。",
+                    "`fromJsonRpcError` 也接受不带扩展数据的普通 JSON-RPC 错误：此时 source 记为 `RpcJsonRpcWireError.foreignSource`，code 为整数的字符串形式。"
+                  ]
+                }
+              ]
+            },
+            {
               "id": "9-高阶用法-跨进程与跨语言传递错误-为自己的适配器定义错误身份",
               "heading": "9. 高阶用法：跨进程与跨语言传递错误 · 为自己的适配器定义错误身份",
               "blocks": [
@@ -6676,7 +6696,7 @@
               ]
             }
           ],
-          "usageScore": 44,
+          "usageScore": 58,
           "configuration": [],
           "fragment": "rpc-contract-errors--serializeRpcError"
         },
@@ -6706,7 +6726,7 @@
           "errors": ["No documented errors are declared for toJsonRpcError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for toJsonRpcError.",
           "examples": [
-            "import { toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'\n\nconst jsonRpcError = toJsonRpcError(wire, -32000)\n// { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }\n\nconst back = fromJsonRpcError(jsonRpcError)",
+            "import { serializeRpcError, toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'\n\n/** JSON-RPC 示例自己构造错误树，不依赖上一个章节的局部变量。 */\nconst wire = serializeRpcError(new RangeError('bad input'), {\n  report: (failure) => console.error(failure)\n})\nconst jsonRpcError = toJsonRpcError(wire, -32000)\n// { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }\n\nconst back = fromJsonRpcError(jsonRpcError)\nconsole.log(back.name, back.message) // RangeError bad input",
             "import { attachErrorIdentity } from '@migaia/utils/error'\nimport { serializeRpcError, toJsonRpcError } from '@migaia/rpc-contract/errors'\n\nconst ADAPTER_SOURCE = '@example/electron-carrier'\nconst AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const\n\nexport function writeFailure(cause: unknown, report: (failure: unknown) => void) {\n  const error = attachErrorIdentity(new Error('adapter write failed', { cause }), {\n    source: ADAPTER_SOURCE,\n    code: AdapterErrorCode.writeFailed\n  })\n  const wire = serializeRpcError(error, { report })\n  return { error, wire, jsonrpc: toJsonRpcError(wire, -32000) }\n}",
             "import {\n  serializeRpcError,\n  deserializeRpcError,\n  toJsonRpcError,\n  fromJsonRpcError\n} from '@migaia/rpc-contract/errors'\n\nconst original = new RangeError('bad input', { cause: new Error('root cause') })\nconst wire = serializeRpcError(original, { report: (failure) => console.error(failure) })\nconst jsonRpcError = toJsonRpcError(wire, -32000) // 错误树放在 error.data.migaiaWireError\n\nconst restored = deserializeRpcError(fromJsonRpcError(jsonRpcError))\nconsole.log(restored instanceof RangeError, restored.message) // true 'bad input'\nconsole.log((restored.cause as Error).message) // 'root cause'"
           ],
@@ -6775,7 +6795,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'\n\nconst jsonRpcError = toJsonRpcError(wire, -32000)\n// { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }\n\nconst back = fromJsonRpcError(jsonRpcError)"
+                  "code": "import { serializeRpcError, toJsonRpcError, fromJsonRpcError } from '@migaia/rpc-contract/errors'\n\n/** JSON-RPC 示例自己构造错误树，不依赖上一个章节的局部变量。 */\nconst wire = serializeRpcError(new RangeError('bad input'), {\n  report: (failure) => console.error(failure)\n})\nconst jsonRpcError = toJsonRpcError(wire, -32000)\n// { code: -32000, message: 'bad input', data: { migaiaWireError: { …错误树… } } }\n\nconst back = fromJsonRpcError(jsonRpcError)\nconsole.log(back.name, back.message) // RangeError bad input"
                 },
                 {
                   "type": "list",
@@ -11466,7 +11486,7 @@
           "errors": ["No documented errors are declared for normalizePortable."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for normalizePortable.",
           "examples": [
-            "import { normalizePortable } from '@migaia/rpc-contract/portable'\n\nnormalizePortable({ a: 1, b: [1, 2], c: new Uint8Array([1, 2]) })\n// { a: 1, b: [1, 2], c: { $rpc: 'bytes', base64url: 'AQI' } }\n\nnormalizePortable({ when: new Date() }) // TypeError，@migaia/rpc/contract / INVALID_ENVELOPE"
+            "import { normalizePortable } from '@migaia/rpc-contract/portable'\nimport { classifyRpcContractError } from '@migaia/rpc-contract'\n\nnormalizePortable({ a: 1, b: [1, 2], c: new Uint8Array([1, 2]) })\n// { a: 1, b: [1, 2], c: { $rpc: 'bytes', base64url: 'AQI' } }\n\ntry {\n  normalizePortable({ when: new Date() })\n} catch (error) {\n  const diagnostic = classifyRpcContractError(error)\n  if (!diagnostic) throw error\n  console.error(diagnostic.code) // TypeError，@migaia/rpc/contract / INVALID_ENVELOPE\n}"
           ],
           "members": [],
           "aliasOf": "normalizePortable",

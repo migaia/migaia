@@ -68,7 +68,7 @@
               {
                 "type": "code",
                 "language": "text",
-                "code": "TypeScript（本包）                              对端（任意语言）\ncreateRuntimePeer\n  └─ createJsonRpcRemoteChannel ── Content-Length + JSON-RPC 2.0 ──► migaia.hello     认证与能力协商\n                                                                     migaia.describe  返回可调用方法目录\n     request('math.add', …)  ───────────────────────────────────────► migaia.invoke   执行业务方法\n     取消                    ───────────────────────────────────────► migaia.cancel   取消在途调用"
+                "code": "TypeScript（本包）                              对端（任意语言）\ncreateProcessPeer({ spawn: { command, args, wire: 'jsonrpc', contract } })\n  └─ JSON-RPC bridge ── Content-Length + JSON-RPC 2.0 ──► migaia.hello     认证与能力协商\n                                                                     migaia.describe  返回可调用方法目录\n     request('math.add', …)  ───────────────────────────────────────► migaia.invoke   执行业务方法\n     取消                    ───────────────────────────────────────► migaia.cancel   取消在途调用"
               },
               {
                 "type": "paragraph",
@@ -87,11 +87,11 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport { createProcessPeer } from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\nimport type { IRemoteContract } from '@migaia/rpc-core/remote'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { RpcCapability } from '@migaia/rpc-contract'\nimport { systemWallClock } from '@migaia/utils/scheduler'\n\n/** The standard-library responder receives positional JSON-RPC arguments. */\ntype IPythonApi = { echo(values: string[]): string[]; math: { add(pair: [number, number]): number } }\n/** A local scalar contract is checked before the remote directory becomes callable. */\nconst contract: IRemoteContract = {\n  schemaVersion: 1,\n  plugin: 'python-service',\n  features: { math: { methods: { add: { mode: 'request', idempotent: true } } } }\n}\n/** Record only classified diagnostic messages, never the ephemeral session credential. */\nconst report = (error: unknown) => console.error(error)\n/** One token belongs to this supervised child and is written through its original stdin frame. */\nconst token = randomBytes(32).toString('base64url')\n/** The exact real launcher retains child execution and termination ownership. */\nconst launcher = createNodeProcessLauncher()\n/** Closing the public Peer must release its genuine process budget. */\nconst budget = createUnitBudget({ kind: 'process', maxUnits: 1 })\n/** Public generic construction supplies the remote method type without a Peer cast. */\nconst peer = await createProcessPeer<IPythonApi>({\n  self: { name: 'node-client', instanceId: 'node-client-1' },\n  report,\n  spawn: {\n    kind: 'spawn', channelKind: 'byte', wire: 'jsonrpc', token,\n    supervision: {\n      id: 'python-service', isolation: 'best-effort', restart: { mode: 'never' }, budget,\n      report, launcher,\n      spec: {\n        command: 'python3', args: [fileURLToPath(new URL('./service.py', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as Awaited<ReturnType<typeof launcher.launch>>).channel!,\n    establish: async (raw, prepared) => {\n      if (raw.kind !== 'byte') throw new TypeError('This example requires a byte channel')\n      return createJsonRpcRemoteChannel({\n        byte: raw, peerId: 'python-service', target: { kind: 'plugin', contract },\n        offer: {\n          versions: [{ major: 1, minor: 1 }],\n          peer: { id: 'node-client-1', runtime: 'node' },\n          capabilities: [RpcCapability.deadline, RpcCapability.trace]\n        },\n        token: prepared.token!, scheduler: prepared.scheduler, wallClock: systemWallClock,\n        ipc: { ...prepared.session, log: () => undefined }, signal: prepared.signal,\n        report\n      })\n    }\n  }\n})\ntry {\n  console.log(await peer.request('echo', ['hello', 'python'])) // ['hello', 'python']\n  console.log(await peer.request('math.add', [20, 22])) // 42\n} finally {\n  await peer.close() // 关闭连接、结束监督子进程并释放 budget\n}"
+                "code": "import { fileURLToPath } from 'node:url'\nimport { createProcessPeer } from '@migaia/rpc-process'\nimport type { IRemoteContract } from '@migaia/rpc-core/remote'\n\ntype IPythonApi = { echo(values: string[]): string[]; math: { add(values: number[]): number } }\n/** This is the peer-specific local declaration; the accepted remote directory still owns routing. */\nconst contract: IRemoteContract = {\n  schemaVersion: 1, plugin: 'python-service',\n  features: { math: { methods: { add: { mode: 'request', idempotent: false } } } }\n}\nconst peer = await createProcessPeer<IPythonApi>({\n  spawn: { command: 'python3', args: [fileURLToPath(new URL('./service.py', import.meta.url))], wire: 'jsonrpc', contract }\n})\ntry {\n  console.log(await peer.request('echo', ['hello', 'python'])) // ['hello', 'python']\n  console.log(await peer.request('math.add', [20, 22])) // 42\n  await peer.notify('echo', ['notification'])\n  console.log(await Promise.all([peer.request('math.add', [1, 2]), peer.request('math.add', [3, 4])])) // [3, 7]\n  try { await peer.request('math.add', []) }\n  catch (error) {\n    const detail = error as { source?: string; code?: string }\n    if (detail.source !== 'python-service' || detail.code !== 'BUSINESS') throw error\n    console.log(detail.code) // BUSINESS\n  }\n} finally { await peer.close() }"
               },
               {
                 "type": "paragraph",
-                "text": "`spawn` 保留子进程的监督、退出与 budget 所有权；`peer.close()` 负责关闭连接和子进程。`establish` 收到当前代次的 token、scheduler、session 和取消信号，桥接仍在实际字节连接上完成握手。普通 Core `connect` 来源也可以使用 `createRuntimePeer<IPythonApi>(options)`，无需把返回值断言为 `IRuntimeTypedPeer`。"
+                "text": "`spawn` 保留子进程的监督、退出与 budget 所有权；`peer.close()` 关闭连接和子进程。只需声明对端特有的 command、args、wire 与本地 contract；launcher、预算、随机 stdin token 和桥接握手由既有操作组合。需要自有字节通道时，仍可使用 `createJsonRpcRemoteChannel`，见 USEGUIDE。文档检查器将本段与 USEGUIDE 的 `service.py` 联合执行；缺少 `python3` 时报告 SKIP-WARN。"
               }
             ]
           },
@@ -175,7 +175,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`createJsonRpcRemoteChannel(options)` 在一条有序字节连接上完成 `migaia.hello` 握手，返回协议通道。它通常作为 `createRuntimePeer` 的 `connect` 来源使用（完整示例见 README）。"
+                "text": "`createJsonRpcRemoteChannel(options)` 在一条有序字节连接上完成 `migaia.hello` 握手，返回协议通道。它用于自有字节通道的高级组合。普通 Python 子进程直接使用 README 的 `createProcessPeer({ spawn: { command, args, wire: 'jsonrpc', contract } })`，不必手写 launcher 或握手。"
               },
               {
                 "type": "table",
@@ -281,7 +281,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "下面的实现只依赖 Python 标准库，已与 README 中的 TypeScript 端实际联调通过：`request`、`notify`、并发批量调用和业务错误都按预期工作。把它保存为 `service.py`，即可作为其它语言实现的参照。"
+                "text": "下面的实现只依赖 Python 标准库，与 README 的 TypeScript parent 构成同一个可执行文档组，覆盖 `request`、`notify`、并发批量调用和业务错误。把它保存为 `service.py`，即可作为其它语言实现的参照。"
               },
               {
                 "type": "code",
@@ -572,9 +572,9 @@
           "name": "createJsonRpcAdapterChannel",
           "kind": "function",
           "signature": "export declare function createJsonRpcAdapterChannel(options: IJsonRpcBridgeOptions): Promise<IRemoteChannel>;",
-          "declarationLine": 4,
+          "declarationLine": 7,
           "source": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/channel.d.ts",
-          "purpose": "Negotiate one authenticated JSON-RPC peer, then expose its complete Core-constructed channel.",
+          "purpose": "Delegate JSON-RPC construction to its canonical Core owner while Process retains the existing closed-error constructor and diagnostic/stderr opening of that same held connection.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createJsonRpcAdapterChannel.",
           "advanced": "No additional advanced behavior is declared for createJsonRpcAdapterChannel.",
           "parameters": ["options: IJsonRpcBridgeOptions"],
@@ -611,7 +611,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Negotiate one authenticated JSON-RPC peer, then expose its complete Core-constructed channel."
+              "content": "Delegate JSON-RPC construction to its canonical Core owner while Process retains the existing closed-error constructor and diagnostic/stderr opening of that same held connection."
             },
             {
               "id": "getting-started",
@@ -666,9 +666,7 @@
           "returns": "Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>",
           "errors": ["No documented errors are declared for createJsonRpcRemoteChannel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createJsonRpcRemoteChannel.",
-          "examples": [
-            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport { createProcessPeer } from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\nimport type { IRemoteContract } from '@migaia/rpc-core/remote'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { RpcCapability } from '@migaia/rpc-contract'\nimport { systemWallClock } from '@migaia/utils/scheduler'\n\n/** The standard-library responder receives positional JSON-RPC arguments. */\ntype IPythonApi = { echo(values: string[]): string[]; math: { add(pair: [number, number]): number } }\n/** A local scalar contract is checked before the remote directory becomes callable. */\nconst contract: IRemoteContract = {\n  schemaVersion: 1,\n  plugin: 'python-service',\n  features: { math: { methods: { add: { mode: 'request', idempotent: true } } } }\n}\n/** Record only classified diagnostic messages, never the ephemeral session credential. */\nconst report = (error: unknown) => console.error(error)\n/** One token belongs to this supervised child and is written through its original stdin frame. */\nconst token = randomBytes(32).toString('base64url')\n/** The exact real launcher retains child execution and termination ownership. */\nconst launcher = createNodeProcessLauncher()\n/** Closing the public Peer must release its genuine process budget. */\nconst budget = createUnitBudget({ kind: 'process', maxUnits: 1 })\n/** Public generic construction supplies the remote method type without a Peer cast. */\nconst peer = await createProcessPeer<IPythonApi>({\n  self: { name: 'node-client', instanceId: 'node-client-1' },\n  report,\n  spawn: {\n    kind: 'spawn', channelKind: 'byte', wire: 'jsonrpc', token,\n    supervision: {\n      id: 'python-service', isolation: 'best-effort', restart: { mode: 'never' }, budget,\n      report, launcher,\n      spec: {\n        command: 'python3', args: [fileURLToPath(new URL('./service.py', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as Awaited<ReturnType<typeof launcher.launch>>).channel!,\n    establish: async (raw, prepared) => {\n      if (raw.kind !== 'byte') throw new TypeError('This example requires a byte channel')\n      return createJsonRpcRemoteChannel({\n        byte: raw, peerId: 'python-service', target: { kind: 'plugin', contract },\n        offer: {\n          versions: [{ major: 1, minor: 1 }],\n          peer: { id: 'node-client-1', runtime: 'node' },\n          capabilities: [RpcCapability.deadline, RpcCapability.trace]\n        },\n        token: prepared.token!, scheduler: prepared.scheduler, wallClock: systemWallClock,\n        ipc: { ...prepared.session, log: () => undefined }, signal: prepared.signal,\n        report\n      })\n    }\n  }\n})\ntry {\n  console.log(await peer.request('echo', ['hello', 'python'])) // ['hello', 'python']\n  console.log(await peer.request('math.add', [20, 22])) // 42\n} finally {\n  await peer.close() // 关闭连接、结束监督子进程并释放 budget\n}"
-          ],
+          "examples": [],
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
@@ -723,7 +721,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/index.d.ts:createJsonRpcRemoteChannel:export declare function createJsonRpcRemoteChannel(options: IJsonRpcBridgeOptions): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils/scheduler\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>;",
           "guidance": [],
-          "usageScore": 48,
+          "usageScore": 32,
           "configuration": [],
           "fragment": "rpc-bridge-jsonrpc-index--createJsonRpcRemoteChannel"
         },
@@ -794,10 +792,10 @@
         {
           "name": "IJsonRpcBridgeOptions",
           "kind": "type",
-          "signature": "export type IJsonRpcBridgeOptions = Readonly<{ byte: IProcessByteChannel; peerId: string; target: Readonly<{ kind: 'plugin'; contract: IRemoteContract; }> | Readonly<{ kind: 'host'; catalog: IRemoteHostCatalog; }>; offer: Omit<IRpcHandshakeOffer, 'auth' | 'codecs'>; token: string; scheduler: IScheduler; wallClock: IWallClock; ipc: IProcessCommonOptions['ipc']; signal?: import('@migaia/rpc-core').IRpcAbortSignal; handshakeTimeoutMs?: number; report(error: unknown): void; }>;",
-          "declarationLine": 6,
+          "signature": "export type IJsonRpcBridgeOptions = Omit<IAdapterJsonRpcChannelOptions, 'byte' | 'ipc'> & Readonly<{ byte: IProcessByteChannel; ipc: IProcessCommonOptions['ipc']; }>;",
+          "declarationLine": 4,
           "source": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/handshake.d.ts",
-          "purpose": "Caller owns launch, authentication issuance, clocks and the physical byte connection.",
+          "purpose": "Bridge callers keep their original Process byte and stderr/diagnostic presentation inputs.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IJsonRpcBridgeOptions.",
           "advanced": "No additional advanced behavior is declared for IJsonRpcBridgeOptions.",
           "parameters": ["This type declaration has no parameters."],
@@ -810,7 +808,7 @@
           "aliasOf": "IJsonRpcBridgeOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IJsonRpcBridgeOptions = Readonly<{ byte: IProcessByteChannel; peerId: string; target: Readonly<{ kind: 'plugin'; contract: IRemoteContract; }> | Readonly<{ kind: 'host'; catalog: IRemoteHostCatalog; }>; offer: Omit<IRpcHandshakeOffer, 'auth' | 'codecs'>; token: string; scheduler: IScheduler; wallClock: IWallClock; ipc: IProcessCommonOptions['ipc']; signal?: import('@migaia/rpc-core').IRpcAbortSignal; handshakeTimeoutMs?: number; report(error: unknown): void; }>;"
+            "export type IJsonRpcBridgeOptions = Omit<IAdapterJsonRpcChannelOptions, 'byte' | 'ipc'> & Readonly<{ byte: IProcessByteChannel; ipc: IProcessCommonOptions['ipc']; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -820,7 +818,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Caller owns launch, authentication issuance, clocks and the physical byte connection."
+              "content": "Bridge callers keep their original Process byte and stderr/diagnostic presentation inputs."
             },
             {
               "id": "getting-started",
@@ -849,7 +847,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/handshake.d.ts:IJsonRpcBridgeOptions:export type IJsonRpcBridgeOptions = Readonly<{ byte: IProcessByteChannel; peerId: string; target: Readonly<{ kind: 'plugin'; contract: IRemoteContract; }> | Readonly<{ kind: 'host'; catalog: IRemoteHostCatalog; }>; offer: Omit<IRpcHandshakeOffer, 'auth' | 'codecs'>; token: string; scheduler: IScheduler; wallClock: IWallClock; ipc: IProcessCommonOptions['ipc']; signal?: import('@migaia/rpc-core').IRpcAbortSignal; handshakeTimeoutMs?: number; report(error: unknown): void; }>;",
+          "identity": "packages/rpc-bridge-jsonrpc/dist/bridge/jsonrpc/handshake.d.ts:IJsonRpcBridgeOptions:export type IJsonRpcBridgeOptions = Omit<IAdapterJsonRpcChannelOptions, 'byte' | 'ipc'> & Readonly<{ byte: IProcessByteChannel; ipc: IProcessCommonOptions['ipc']; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
