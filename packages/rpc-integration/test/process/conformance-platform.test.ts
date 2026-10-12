@@ -170,14 +170,17 @@ describe('conformance toolchain and platform evidence boundaries', () => {
     for (const path of packages) {
       if (path === 'packages/rpc/package.json') {
         expect(existsSync(new URL(path, `file://${repository}`))).toBe(false)
-        /** Required RPC edges are exact; optionality remains solely on native toolchain peers. */
+        /**
+         * Required RPC edges use the workspace protocol (packed as the exact lockstep version);
+         * optionality remains solely on native toolchain peers.
+         */
         const replacements = {
           'rpc-contract': { peers: {}, nativeOptional: {} },
-          'rpc-core': { peers: { '@migaia/rpc-contract': '0.0.7' }, nativeOptional: {} },
+          'rpc-core': { peers: { '@migaia/rpc-contract': 'workspace:*' }, nativeOptional: {} },
           'rpc-process': {
             peers: {
-              '@migaia/rpc-contract': '0.0.7',
-              '@migaia/rpc-core': '0.0.7',
+              '@migaia/rpc-contract': 'workspace:*',
+              '@migaia/rpc-core': 'workspace:*',
               electron: '^44.0.0',
               koffi: '^3.1.6'
             },
@@ -185,29 +188,36 @@ describe('conformance toolchain and platform evidence boundaries', () => {
           },
           'rpc-threads': {
             peers: {
-              '@migaia/rpc-contract': '0.0.7',
-              '@migaia/rpc-core': '0.0.7',
+              '@migaia/rpc-contract': 'workspace:*',
+              '@migaia/rpc-core': 'workspace:*',
               electron: '^44.0.0'
             },
             nativeOptional: { electron: { optional: true } }
           },
           'rpc-bridge-jsonrpc': {
             peers: {
-              '@migaia/rpc-contract': '0.0.7',
-              '@migaia/rpc-core': '0.0.7',
-              '@migaia/rpc-process': '0.0.7'
+              '@migaia/rpc-contract': 'workspace:*',
+              '@migaia/rpc-core': 'workspace:*',
+              '@migaia/rpc-process': 'workspace:*'
             },
             nativeOptional: {}
           },
-          'rpc-browser': { peers: { '@migaia/rpc-core': '0.0.7' }, nativeOptional: {} }
+          'rpc-browser': { peers: { '@migaia/rpc-core': 'workspace:*' }, nativeOptional: {} }
         }
+        /** The RPC family releases in lockstep; every owner shares rpc-contract's version. */
+        const lockstepVersion = JSON.parse(
+          readFileSync(
+            new URL('packages/rpc-contract/package.json', `file://${repository}`),
+            'utf8'
+          )
+        ).version
         for (const [owner, policy] of Object.entries(replacements)) {
           /** Each replacement remains a real locked-version package, not a compatibility alias. */
           const metadata = JSON.parse(
             readFileSync(new URL(`packages/${owner}/package.json`, `file://${repository}`), 'utf8')
           )
           expect(metadata.name).toBe(`@migaia/${owner}`)
-          expect(metadata.version).toBe('0.0.7')
+          expect(metadata.version).toBe(lockstepVersion)
           expect(metadata.peerDependencies ?? {}).toEqual(policy.peers)
           expect(metadata.peerDependenciesMeta ?? {}).toEqual(policy.nativeOptional)
         }
@@ -232,10 +242,10 @@ describe('conformance toolchain and platform evidence boundaries', () => {
               )
             : before[key]
         if (path === 'packages/storage-web/package.json' && key === 'devDependencies')
-          expected['@migaia/rpc-contract'] = 'workspace:0.0.7'
+          expected['@migaia/rpc-contract'] = 'workspace:*'
         if (path === 'packages/store-worker/package.json' && key === 'dependencies') {
-          expected['@migaia/rpc-contract'] = 'workspace:0.0.7'
-          expected['@migaia/rpc-core'] = 'workspace:0.0.7'
+          expected['@migaia/rpc-contract'] = 'workspace:*'
+          expected['@migaia/rpc-core'] = 'workspace:*'
         }
         expect(after[key], `${path} ${key}`).toEqual(expected)
       }

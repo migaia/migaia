@@ -46,9 +46,10 @@ describe('threads public exports', () => {
       '@migaia/utils': 'workspace:^',
       '@migaia/lifecycle': 'workspace:^'
     })
+    /** Source peers use the workspace protocol; pnpm pack writes the exact lockstep version. */
     expect(manifest.peerDependencies).toEqual({
-      '@migaia/rpc-contract': manifest.version,
-      '@migaia/rpc-core': manifest.version,
+      '@migaia/rpc-contract': 'workspace:*',
+      '@migaia/rpc-core': 'workspace:*',
       electron: base.peerDependencies.electron
     })
     expect(manifest.peerDependenciesMeta.electron.optional).toBe(true)

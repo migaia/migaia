@@ -41,8 +41,8 @@
     "@migaia/resource": "workspace:^",
     "@migaia/serialize": "workspace:^",
     "@migaia/utils": "workspace:^",
-    "@migaia/rpc-core": "workspace:0.0.7",
-    "@migaia/rpc-contract": "workspace:0.0.7"
+    "@migaia/rpc-core": "workspace:*",
+    "@migaia/rpc-contract": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

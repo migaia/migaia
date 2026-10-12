@@ -41,9 +41,9 @@
     "@migaia/utils": "workspace:^"
   },
   "peerDependencies": {
-    "@migaia/rpc-contract": "0.0.7",
-    "@migaia/rpc-core": "0.0.7",
-    "@migaia/rpc-process": "0.0.7"
+    "@migaia/rpc-contract": "workspace:*",
+    "@migaia/rpc-core": "workspace:*",
+    "@migaia/rpc-process": "workspace:*"
   },
   "peerDependenciesMeta": {},
   "devDependencies": {
@@ -54,9 +54,9 @@
     "protobufjs": "8.8.0",
     "typescript": "~6.0.2",
     "vitest": "^4.1.10",
-    "@migaia/rpc-contract": "workspace:0.0.7",
-    "@migaia/rpc-core": "workspace:0.0.7",
-    "@migaia/rpc-process": "workspace:0.0.7"
+    "@migaia/rpc-contract": "workspace:*",
+    "@migaia/rpc-core": "workspace:*",
+    "@migaia/rpc-process": "workspace:*"
   },
   "engines": {
     "node": ">=18"
