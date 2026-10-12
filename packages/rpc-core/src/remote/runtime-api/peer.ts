@@ -976,17 +976,20 @@ export async function prepareRuntimePeerEndpoint(
   }>
 ): Promise<IRemoteServeEndpoint> {
   /** Peer options bind directly to the owned transport, leaving canonical middleware proofs intact. */
+  /** Managed preparation may already own this exact endpoint before its facade is constructed. */
+  const existingProbe = readInstalledProbe(channel.transport)
   const probe =
     options.probe === undefined
       ? undefined
-      : createProbeEmitter(
+      : (existingProbe ??
+        createProbeEmitter(
           Array.isArray(options.probe) ? options.probe : [options.probe as IRpcProbe],
           () => channel.scheduler.now(),
           prepareRuntimePeerSourceContext(options.self).self.instanceId
-        )
+        ))
   /** Failure before kernel acquisition releases all genuine stage subscriptions. */
   let releaseProbe: (() => void) | undefined
-  if (probe) {
+  if (probe && existingProbe === undefined) {
     probe.peerOwned = true
     probe.authentication = options.authentication?.encrypt
       ? 'encrypt-sign'
