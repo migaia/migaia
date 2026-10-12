@@ -1,6 +1,6 @@
 {
   "name": "@migaia/supervision",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "Runtime-neutral supervision for execution units and coroutines.",
   "license": "MIT",
