@@ -16,6 +16,10 @@ const ProbeBench = {
   installed: 'installed',
   guard: 'guard',
   timing: 'timing',
+  collectorEnabled: '1',
+  coreAcceptance: 'A5',
+  rootAcceptance: 'A-perf',
+  collectorRingPath: 'packages/rpc-devtools/dist/collector/ring.js',
   sourceCommit: 'f607fe6a93c20799521ac1aacc019dde810f5d95',
   cells: [
     { id: 'node-stdio-64B-c1', carrier: 'stdio-framed', payloadBytes: 64, concurrency: 1 },
@@ -43,7 +47,9 @@ const counters = {
   events: 0,
   normalizePortable: 0,
   nativePromises: 0,
-  samplerPromises: 0
+  samplerPromises: 0,
+  collectorCalls: 0,
+  collectorEventObjects: 0
 }
 /** Provenance records original dist bytes separately from intentional guard instrumentation. */
 const loaded = []
@@ -51,6 +57,16 @@ const loaded = []
 const arm = process.env.PROBE_BENCH_ARM
 /** Exact counters deliberately run separately so their observer cost receives no timing credit. */
 const guarding = process.env.PROBE_BENCH_LANE === ProbeBench.guard
+/** Root timing installs the genuine collector with default metadata stages and capture disabled. */
+const collectorMode = process.env.PROBE_BENCH_COLLECTOR === ProbeBench.collectorEnabled
+/**
+ * The frozen collector host remains the installed identity; only cold snapshots call its API.
+ *
+ * @type {import('@migaia/rpc-devtools').IRpcDevtools | undefined}
+ */
+let collector
+/** Loaded guard provenance proves the actual collector event allocation site was instrumented. */
+let collectorEventCounter
 /** Frozen Core bytes are required for a genuine base rather than two candidate configurations. */
 const baseDist = process.env.PROBE_BENCH_BASE_DIST
 /** Guard-only context labels the existing PID sampling work; the sampler never invokes RPC. */
@@ -74,8 +90,20 @@ const stopPromises = guarding
  * @returns {object} Exact cumulative counts and loaded SHA rows from this isolate.
  */
 function counterSnapshot() {
+  if (collector !== undefined) {
+    counters.collectorCalls = 0
+    for (const row of collector.stats().methods) counters.collectorCalls += row.calls
+  }
   // SC9(b): an OOB diagnostic receipt converts local counters to a wire representation.
-  return { ...counters, loaded: loaded.slice() }
+  return {
+    ...counters,
+    loaded: loaded.slice(),
+    collectorEventCounter: collectorEventCounter ?? null,
+    collector:
+      collector === undefined
+        ? null
+        : { stageMask: collector.stageMask, captureMask: collector.captureMask }
+  }
 }
 globalThis.__PROBE_BENCH_SNAPSHOT = counterSnapshot
 
@@ -95,14 +123,43 @@ if (arm !== undefined) {
           'utf8'
         )
       }
+      /** Keep original selected bytes, then add the hash of the final loader-returned source. */
+      let provenance
       if (url.includes('/dist/') && url.startsWith('file:')) {
-        loaded.push({
+        provenance = {
           url,
           source:
             arm === ProbeBench.base && url.startsWith(corePrefix) ? ProbeBench.base : 'candidate',
           sha256: createHash('sha256').update(source).digest('hex'),
           guarded: guarding
-        })
+        }
+        loaded.push(provenance)
+      }
+      if (
+        guarding &&
+        collectorMode &&
+        arm === ProbeBench.installed &&
+        url === pathToFileURL(join(workspace, ProbeBench.collectorRingPath)).href
+      ) {
+        /** The source audit fixes coverage; this hook counts the one event-shaped allocation site. */
+        const pattern = /(\n        const event = \{\n            seq: c\.seq\[slot\],)/gu
+        if (
+          Array.from(source.matchAll(pattern)).length !== 1 ||
+          provenance.sha256 !== process.env.PROBE_BENCH_COLLECTOR_RING_SHA ||
+          !process.env.PROBE_BENCH_COLLECTOR_AUDIT_SHA
+        )
+          throw new Error(IpcBenchErrorText.configuration)
+        source = source.replace(
+          pattern,
+          '\n        globalThis.__PROBE_BENCH_COLLECTOR_EVENT_OBJECT();$1'
+        )
+        collectorEventCounter = {
+          source: url,
+          counter: 'collectorEventObjects',
+          instrumented: true,
+          sourceSha256: provenance.sha256,
+          auditSha256: process.env.PROBE_BENCH_COLLECTOR_AUDIT_SHA
+        }
       }
       if (guarding && url.endsWith('/rpc-contract/dist/contract/normalize.js')) {
         /** Count the canonical normalization entry, never an inferred proxy or wrapper call. */
@@ -133,7 +190,7 @@ if (arm !== undefined) {
         if (!source.includes(marker)) throw new Error(IpcBenchErrorText.configuration)
         source = source.replaceAll(
           marker,
-          "inherit: ['PATH', 'NODE_OPTIONS', 'PROBE_BENCH_ARM', 'PROBE_BENCH_LANE', 'PROBE_BENCH_BASE_DIST']"
+          "inherit: ['PATH', 'NODE_OPTIONS', 'PROBE_BENCH_ARM', 'PROBE_BENCH_LANE', 'PROBE_BENCH_BASE_DIST', 'PROBE_BENCH_COLLECTOR', 'PROBE_BENCH_COLLECTOR_RING_SHA', 'PROBE_BENCH_COLLECTOR_AUDIT_SHA']"
         )
       }
       if (
@@ -141,12 +198,11 @@ if (arm !== undefined) {
         arm === ProbeBench.installed
       ) {
         /**
-         * Carrier managed sources currently omit probe when reconstructing options (D4/A7 gap).
-         * Core-alone A5 installs at the actual Core constructor/preparation, preserving this exact
+         * Carrier managed sources currently omit probe when reconstructing options (D4/A7 gap). A5
+         * and root A-perf install at the actual Core constructor/preparation, preserving this exact
          * options identity and its private preparation context. Managed construction prepares the
-         * endpoint before creating its facade, so both existing entry points need the same handle.
-         * This diagnostic changes only loaded source; it never edits the closed carrier write
-         * sets.
+         * endpoint before creating its facade, so both entries need the same genuine handle. This
+         * diagnostic changes only loaded source; it never edits the closed carrier write sets.
          */
         const pattern =
           /(export async function (?:createRuntimePeer|prepareRuntimePeerEndpoint)\(options,[\s\S]*?\)\s*\{)/gu
@@ -174,6 +230,12 @@ if (arm !== undefined) {
           'return {\n    probeCounters: globalThis.__PROBE_BENCH_SNAPSHOT(),\n    pid: process.pid,'
         )
       }
+      if (provenance !== undefined) {
+        provenance.executedSha256 = createHash('sha256').update(source).digest('hex')
+        provenance.instrumented = provenance.executedSha256 !== provenance.sha256
+        if (collectorEventCounter?.source === url)
+          collectorEventCounter.executedSha256 = provenance.executedSha256
+      }
       // SC9(b): the Node loader boundary needs a result carrying the selected source representation.
       return { ...result, source }
     }
@@ -181,22 +243,46 @@ if (arm !== undefined) {
   globalThis.__PROBE_BENCH_NORMALIZE = () => {
     counters.normalizePortable += 1
   }
+  globalThis.__PROBE_BENCH_COLLECTOR_EVENT_OBJECT = () => {
+    counters.collectorEventObjects += 1
+  }
   if (arm === ProbeBench.installed) {
-    /** All supported Core stages are selected; capture, filters and sampling are absent. */
-    const { defineProbe } = await import('@migaia/rpc-core/probe')
-    globalThis.__PROBE_BENCH_PROBE = defineProbe({
-      stages: ['peer', 'message', 'envelope', 'encoded', 'frame', 'protected', 'carrier'],
-      emit(view) {
-        counters.events += 1
-        if (guarding && !views.has(view)) {
-          views.add(view)
-          counters.eventObjects += 1
-        }
-      },
-      onError(error) {
-        console.error(JSON.stringify(classifyFailure(error)))
+    /** Canonical stage names select the same mask for the guard as the actual installed probe. */
+    const { defineProbe, RpcProbeStageName } = await import('@migaia/rpc-core/probe')
+    /** Cold reporting preserves full native failure classification in both measured modes. */
+    const onError = (error) => {
+      console.error(JSON.stringify(classifyFailure(error)))
+    }
+    if (collectorMode) {
+      /** No host copy, wrapper or post-definition emit replacement changes its compiled identity. */
+      const { createRpcDevtools } = await import('@migaia/rpc-devtools')
+      collector = createRpcDevtools({ onError })
+      if (collector.captureMask !== 0) throw new Error(IpcBenchErrorText.configuration)
+      globalThis.__PROBE_BENCH_PROBE = collector
+    }
+    /** Root timing has only the genuine collector; the separate counting probe is guard-only. */
+    if (!collectorMode || guarding) {
+      /** Build stage membership once, never enabling a stage absent from the actual collector. */
+      const stages = []
+      for (let index = 0; index < RpcProbeStageName.length; index++) {
+        if (collector === undefined || (collector.stageMask & (1 << index)) !== 0)
+          stages.push(RpcProbeStageName[index])
       }
-    })
+      /** Guard-only counting observes Core view identities, not gross collector VM allocations. */
+      const countingProbe = defineProbe({
+        stages,
+        emit(view) {
+          counters.events += 1
+          if (guarding && !views.has(view)) {
+            views.add(view)
+            counters.eventObjects += 1
+          }
+        },
+        onError
+      })
+      globalThis.__PROBE_BENCH_PROBE =
+        collector === undefined ? countingProbe : [collector, countingProbe]
+    }
   }
 }
 
@@ -246,7 +332,9 @@ export function countDelta(receipt) {
     events: 0,
     normalizePortable: 0,
     nativePromises: 0,
-    samplerPromises: 0
+    samplerPromises: 0,
+    collectorCalls: 0,
+    collectorEventObjects: 0
   }
   for (const [before, after] of [
     [receipt.parentBefore, receipt.parentAfter],
@@ -263,8 +351,12 @@ export function countDelta(receipt) {
       Object.entries(total).map(([key, value]) => [key, value / receipt.samples])
     ),
     eventObjectsPerEvent: total.events === 0 ? null : total.eventObjects / total.events,
+    collectorEventCounter: [
+      receipt.parentAfter.probeCounters.collectorEventCounter,
+      receipt.peerAfter.probeCounters.collectorEventCounter
+    ],
     semantics:
-      'exact native Promise init with native/sampler totals retained; promises exclude only the existing PID-sampler role (AsyncLocalStorage); all unknown and constant OOB boundary allocations remain counted; exact canonical normalizePortable entry; exact distinct emitted view identities after warmup'
+      'exact native Promise init with native/sampler totals retained; promises exclude only the existing PID-sampler role (AsyncLocalStorage); all unknown and constant OOB boundary allocations remain counted; exact canonical normalizePortable entry; exact distinct emitted Core view identities after warmup in guard lane; collectorCalls is the genuine collector public stats delta; collectorEventObjects counts the audited collector ring.event literal after its cache-hit return in guard lane; gross VM/Map/hash/string/backing-store allocation remains UNVERIFIED'
   }
 }
 
@@ -272,7 +364,7 @@ export function countDelta(receipt) {
  * Run one frozen cell/arm in a fresh actual Node parent; retain stderr and all failed receipts.
  *
  * @param {object} cell Frozen carrier, portable payload and bounded concurrency.
- * @param {string} selectedArm Base, absent or installed counting probe.
+ * @param {string} selectedArm Base, absent or installed Core probe/genuine default collector.
  * @param {string} lane Formal timing or separate exact counter guard.
  * @param {object} options Samples, warm-up, base dist and raw output folder.
  * @param {string} stem Unique receipt name preserving every interleaved launch.
@@ -286,6 +378,9 @@ async function launch(cell, selectedArm, lane, options, stem) {
     PROBE_BENCH_ARM: selectedArm,
     PROBE_BENCH_LANE: lane,
     PROBE_BENCH_BASE_DIST: options.baseDist,
+    PROBE_BENCH_COLLECTOR: options.collector ? ProbeBench.collectorEnabled : '0',
+    PROBE_BENCH_COLLECTOR_RING_SHA: options.collectorAudit?.ringCompiledSha256 ?? '',
+    PROBE_BENCH_COLLECTOR_AUDIT_SHA: options.collectorAudit?.sha256 ?? '',
     IPC_BENCH_STEM: join(options.output, stem),
     NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${pathToFileURL(entry).href}`
   }
@@ -331,10 +426,25 @@ async function launch(cell, selectedArm, lane, options, stem) {
   )
     throw new Error(IpcBenchErrorText.paired, { cause: { status, stderr, receipt } })
   if (selectedArm === ProbeBench.installed) {
-    /** Every measured installed launch must actually observe both original Core endpoint isolates. */
+    if (options.collector) {
+      for (const snapshot of [receipt.parentAfter, receipt.peerAfter]) {
+        if (
+          !snapshot?.probeCounters?.collector ||
+          snapshot.probeCounters.collector.captureMask !== 0 ||
+          (lane === ProbeBench.guard &&
+            snapshot.probeCounters.collectorEventCounter?.instrumented !== true)
+        )
+          throw new Error(IpcBenchErrorText.configuration)
+      }
+    }
+    /** The installed collector must ingest real calls; Core-only A5 retains its emitted-event proof. */
     const observations = countDelta(receipt)
-    if (!(observations.total.events > 0)) throw new Error(IpcBenchErrorText.configuration)
+    if (
+      !(options.collector ? observations.total.collectorCalls > 0 : observations.total.events > 0)
+    )
+      throw new Error(IpcBenchErrorText.configuration)
     receipt.observedEvents = observations.total.events
+    if (options.collector) receipt.observedCollectorCalls = observations.total.collectorCalls
   }
   if (lane === ProbeBench.guard) receipt.counterGuard = countDelta(receipt)
   return receipt
@@ -346,9 +456,12 @@ async function launch(cell, selectedArm, lane, options, stem) {
  * @param {object[]} rounds Each round contains baseA, baseB, absent and installed receipts.
  * @param {object} guard Separate exact-counter receipts for the three arms.
  * @param {boolean} reportOnly True only for the 1 MiB cell.
+ * @param {boolean} [collector] Root D2 mode selects 5%; ordinary Core A5 remains fixed at 3%.
+ * @param {object} [collectorAudit] Current source/compiled hashes covering the collector allocation
+ *   site.
  * @returns {object} Raw ratios, exact medians, noise bounds and independent verdicts.
  */
-export function judgeProbe(rounds, guard, reportOnly = false) {
+export function judgeProbe(rounds, guard, reportOnly = false, collector = false, collectorAudit) {
   /** SC9(b): analysis restores sorted scalar report data without changing the original raw series. */
   const median = (values) => {
     const sorted = values.toSorted((a, b) => a - b)
@@ -380,13 +493,29 @@ export function judgeProbe(rounds, guard, reportOnly = false) {
   const absent = guard.absent.counterGuard.total
   /** Probe warm-up has already registered each reusable view, so no distinct view may appear now. */
   const installed = guard.installed.counterGuard.total
+  /** Both genuine installed isolates must execute the allocation hook tied to the current audit. */
+  const collectorCounterPresent =
+    !collector ||
+    (collectorAudit !== undefined &&
+      guard.installed.counterGuard.collectorEventCounter?.length === 2 &&
+      guard.installed.counterGuard.collectorEventCounter.every(
+        (evidence) =>
+          evidence?.instrumented === true &&
+          evidence.sourceSha256 === collectorAudit.ringCompiledSha256 &&
+          evidence.auditSha256 === collectorAudit.sha256 &&
+          typeof evidence.executedSha256 === 'string'
+      ))
   /** Promise/normalization deltas must be exactly zero, not a statistical tolerance. */
   const counterGuard = {
     status:
       installed.promises === absent.promises &&
       installed.normalizePortable === absent.normalizePortable &&
       installed.eventObjects === 0 &&
-      installed.events > 0
+      installed.events > 0 &&
+      (!collector ||
+        (collectorCounterPresent &&
+          installed.collectorEventObjects === 0 &&
+          installed.collectorEventObjects - absent.collectorEventObjects === 0))
         ? 'PASS'
         : 'FAIL',
     promisesDelta: installed.promises - absent.promises,
@@ -395,8 +524,20 @@ export function judgeProbe(rounds, guard, reportOnly = false) {
     normalizePortableDelta: installed.normalizePortable - absent.normalizePortable,
     eventObjects: installed.eventObjects,
     events: installed.events,
+    collectorCalls: installed.collectorCalls,
+    collectorEventObjects: collector ? installed.collectorEventObjects : null,
+    collectorEventObjectsDelta: collector
+      ? installed.collectorEventObjects - absent.collectorEventObjects
+      : null,
+    collectorCounterPresent: collector ? collectorCounterPresent : null,
+    collectorAudit: collector ? collectorAudit : null,
+    allocationScope: collector
+      ? 'Core view identity count plus exact audited collector event-literal count; gross VM/Map/hash/string/backing-store allocation UNVERIFIED'
+      : 'Core emitted-view identities after warmup',
     observations: guard
   }
+  /** Root D2 and Core A5 are distinct fixed budgets; neither derives a looser limit from noise. */
+  const budget = collector ? 0.05 : 0.03
   /**
    * The large cell still must meet absent/A/A and counter guards; only its installed timing
    * reports.
@@ -404,7 +545,7 @@ export function judgeProbe(rounds, guard, reportOnly = false) {
   const status =
     Math.abs(deltas.absentP50) <= noise.p50 &&
     Math.abs(deltas.absentThroughput) <= noise.throughput &&
-    (reportOnly || (deltas.installedP50 <= 0.03 && deltas.installedThroughput >= -0.03)) &&
+    (reportOnly || (deltas.installedP50 <= budget && deltas.installedThroughput >= -budget)) &&
     counterGuard.status === 'PASS'
       ? 'PASS'
       : 'FAIL'
@@ -414,22 +555,29 @@ export function judgeProbe(rounds, guard, reportOnly = false) {
     noise,
     series,
     deltas,
-    installedBudget: reportOnly ? 'REPORT_ONLY' : { p50Maximum: 0.03, throughputMinimum: -0.03 },
+    installedBudget: reportOnly
+      ? 'REPORT_ONLY'
+      : { p50Maximum: budget, throughputMinimum: -budget },
     counterGuard,
-    collector: 'DISABLED: hub owns root A-perf after collector integration'
+    collector: collector
+      ? 'ENABLED: genuine default metadata collector; guard-only same-mask Core view probe and audited collector event-literal counter'
+      : 'DISABLED: Core-only A5'
   }
 }
 
 /**
  * Run each requested cell using interleaved base A/A, absent and installed arms, N>=5.
  *
- * @returns {Promise<void>} Raw series and recomputable A5 verdict written before exit status.
+ * @returns {Promise<void>} Raw series and recomputable A5/A-perf verdict written before exit
+ *   status.
  * @throws {Error} Invalid options or failed fixture preparation remains ERROR, not a performance
  *   FAIL.
  */
 async function main() {
   /** Explicit cell selection lets the caller keep each exclusive window below its 45-minute cap. */
   const args = process.argv.slice(2)
+  /** Explicit root mode changes only the installed arm and its frozen D2 acceptance label/budget. */
+  const rootMode = args.includes('--collector')
   /** Read options once before starting any actual peer or measurement. */
   const value = (name, fallback) => {
     const index = args.indexOf(name)
@@ -437,6 +585,7 @@ async function main() {
   }
   /** Defaults retain the original IPC fixture's 1000 requests and 100 warm-up calls. */
   const options = {
+    collector: rootMode,
     pairs: Number(value('--pairs', '5')),
     samples: Number(value('--samples', '1000')),
     warmup: Number(value('--warmup', '100')),
@@ -444,7 +593,10 @@ async function main() {
       value('--base-dist', join(workspace, 'docs/rpc-devtools/scratch/probe-core/base-dist'))
     ),
     output: resolve(
-      value('--output', join(workspace, 'docs/rpc-devtools/scratch/probe-core/bench'))
+      value(
+        '--output',
+        join(workspace, `docs/rpc-devtools/scratch/${rootMode ? 'hub' : 'probe-core'}/bench`)
+      )
     )
   }
   /** A frozen cell cannot be changed by independent carrier or payload CLI switches. */
@@ -461,6 +613,34 @@ async function main() {
     options.warmup < 1
   )
     throw new Error(IpcBenchErrorText.configuration)
+  if (rootMode) {
+    /** The bounded source audit names the existing six owners and their exact current emitted bytes. */
+    const path = join(workspace, 'docs/rpc-devtools/scratch/hub/collector-source-audit.json')
+    /** Keep the complete original audit receipt; its byte hash binds every installed guard snapshot. */
+    const bytes = readFileSync(path)
+    /** Audit evidence covers source-defined event constructors, not unknown VM storage allocation. */
+    const audit = JSON.parse(bytes)
+    for (const file of audit.files) {
+      if (
+        createHash('sha256')
+          .update(readFileSync(join(workspace, file.sourcePath)))
+          .digest('hex') !== file.sourceSha256 ||
+        createHash('sha256')
+          .update(readFileSync(join(workspace, file.compiledPath)))
+          .digest('hex') !== file.compiledSha256
+      )
+        throw new Error(IpcBenchErrorText.configuration)
+    }
+    /** Only the audited ring owns a source-defined collector event-shaped object construction. */
+    const ring = audit.files.find((file) => file.compiledPath === ProbeBench.collectorRingPath)
+    if (ring === undefined) throw new Error(IpcBenchErrorText.configuration)
+    options.collectorAudit = {
+      path,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+      ringCompiledSha256: ring.compiledSha256,
+      files: audit.files
+    }
+  }
   mkdirSync(options.output, { recursive: true })
   /** Canonical declared codes bound the native fixture's observable package classification. */
   const codeTables = {
@@ -472,6 +652,11 @@ async function main() {
     '@migaia/rpc/process': ['packages/rpc-process/src/error-code.ts', 'RpcProcessErrorCode'],
     '@migaia/rpc/threads': ['packages/rpc-threads/src/error-code.ts', 'RpcThreadErrorCode']
   }
+  if (rootMode)
+    codeTables['@migaia/rpc/devtools'] = [
+      'packages/rpc-devtools/src/error-code.ts',
+      'RpcDevtoolsErrorCode'
+    ]
   /** Inventory parsing reads source tables only; it never adds a production diagnostic path. */
   const observableCodes = Object.fromEntries(
     Object.entries(codeTables).map(([source, [path, name]]) => {
@@ -492,7 +677,7 @@ async function main() {
   const failureInventory = {
     observableCodes,
     installedPath:
-      'Core constructor/preparation diagnostic; actual carrier Peer forwarding remains pending D4/A7',
+      'Core constructor/preparation diagnostic; this fixture does not prove public carrier Peer forwarding (D4/A7)',
     source: '@migaia/rpc/core',
     sharedCode: 'OVERLOADED',
     reasons: Object.values(RpcProviderRejectionReason),
@@ -509,7 +694,8 @@ async function main() {
       cells,
       options,
       failureInventory,
-      collector: 'DISABLED'
+      acceptance: rootMode ? ProbeBench.rootAcceptance : ProbeBench.coreAcceptance,
+      collector: rootMode ? 'ENABLED: default metadata, captureMask=0' : 'DISABLED: Core-only A5'
     })
   )
   /** The exclusive runner owns admission/end-load enforcement; this receipt also records raw loads. */
@@ -548,13 +734,20 @@ async function main() {
         `${cell.id}-guard-${selectedArm}`
       )
     /** Large payload reports its installed timing; all other acceptance rules remain binding. */
-    const verdict = judgeProbe(rounds, guard, cell.payloadBytes === 1048576)
+    const verdict = judgeProbe(
+      rounds,
+      guard,
+      cell.payloadBytes === 1048576,
+      rootMode,
+      options.collectorAudit
+    )
     results.push({ cell, rounds, verdict })
     writeFileSync(
       join(options.output, `${cell.id}-summary.json`),
       JSON.stringify(
         {
           baseCommit: ProbeBench.sourceCommit,
+          acceptance: rootMode ? ProbeBench.rootAcceptance : ProbeBench.coreAcceptance,
           startLoad,
           endLoad: loadavg(),
           failureInventory,
@@ -588,19 +781,26 @@ async function main() {
     JSON.stringify(
       {
         status,
+        acceptance: rootMode ? ProbeBench.rootAcceptance : ProbeBench.coreAcceptance,
         baseCommit: ProbeBench.sourceCommit,
         runtime: process.version,
         startLoad,
         endLoad,
         failureInventory,
-        recompute: `node docs/rpc-devtools/scratch/probe-core/bench/recompute.mjs ${join(options.output, 'summary.json')}`,
+        recompute: {
+          module: entry,
+          export: 'judgeProbe',
+          arguments: 'rounds, guard, reportOnly, collector, collectorAudit',
+          collector: rootMode,
+          collectorAudit: options.collectorAudit
+        },
         results
       },
       null,
       2
     )
   )
-  console.log(`A5 ${status}`)
+  console.log(`${rootMode ? ProbeBench.rootAcceptance : ProbeBench.coreAcceptance} ${status}`)
   if (status !== 'PASS') process.exitCode = status === 'ERROR' ? 2 : 1
 }
 
