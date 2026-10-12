@@ -52,7 +52,8 @@
     "@rpc-threads": "pnpm --filter ./packages/rpc-threads run",
     "@rpc-bridge-jsonrpc": "pnpm --filter ./packages/rpc-bridge-jsonrpc run",
     "@rpc-browser": "pnpm --filter ./packages/rpc-browser run",
-    "@rpc-integration": "pnpm --filter ./packages/rpc-integration run"
+    "@rpc-integration": "pnpm --filter ./packages/rpc-integration run",
+    "@rpc-pool": "pnpm --filter ./packages/rpc-pool run"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
