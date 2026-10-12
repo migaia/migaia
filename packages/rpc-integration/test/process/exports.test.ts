@@ -86,7 +86,10 @@ describe('process package layering and exports', () => {
       'koffi'
     ])
     for (const peer of ['@migaia/rpc-contract', '@migaia/rpc-core']) {
-      /** Source uses the workspace protocol; the packed smoke test checks the exact lockstep version. */
+      /**
+       * Source uses the workspace protocol; the packed smoke test checks the exact lockstep
+       * version.
+       */
       expect(manifest.peerDependencies[peer]).toBe('workspace:*')
       expect(manifest.peerDependenciesMeta[peer]?.optional ?? false).toBe(false)
     }
