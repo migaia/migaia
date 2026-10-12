@@ -345,6 +345,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
     connect: options.connect as IRuntimePeerSource | undefined,
     listen: options.listen as IRuntimePeerSource | undefined,
     providerLimits: options.providerLimits,
+    authentication: options.authentication,
     defaultTimeoutMs,
     contract: options.contract,
     keyFactory: options.keyFactory,

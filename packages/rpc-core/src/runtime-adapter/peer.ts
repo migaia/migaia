@@ -85,7 +85,11 @@ class AdapterPeerPreparation {
       this.#selectedSelf && (configured === undefined || this.#preparation?.selfDefaulted)
         ? this.#selectedSelf
         : (configured ?? { name: this.#defaultName, instanceId: defaultRpcId() })
-    return (this.#context = prepareRuntimePeerSourceContext(self, !this.#options.endpointFactory))
+    return (this.#context = prepareRuntimePeerSourceContext(
+      self,
+      !this.#options.endpointFactory,
+      this.#options.authentication
+    ))
   }
 
   /** A caller can read the original signals without obtaining a context setter or ownership writer. */
@@ -229,6 +233,7 @@ class AdapterPeerPreparation {
       self: this.context.self,
       provide: this.#options.provide,
       providerLimits: this.#options.providerLimits,
+      authentication: this.#options.authentication,
       defaultTimeoutMs: this.#options.defaultTimeoutMs,
       contract: this.#options.contract,
       endpointFactory: this.#options.endpointFactory,

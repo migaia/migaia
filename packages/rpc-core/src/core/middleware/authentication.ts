@@ -65,10 +65,10 @@ export const authentication = (config: IRpcAuthenticationConfig): IRpcPlugin => 
   return freezePlugin(plugin)
 }
 
-/** Validates one immutable authentication snapshot and creates its complete typed port. */
-function createAuthenticationCapability(
+/** Internal callers share the existing credential admission and its original getter-error cause. */
+export function snapshotAuthenticationConfig(
   config: IRpcAuthenticationConfig
-): IRpcAuthenticationCapability {
+): Readonly<IRpcAuthenticationConfig> {
   if (!config || typeof config !== 'object' || Array.isArray(config))
     throw createRpcError(
       RpcCoreErrorCode.invalidConfig,
@@ -119,6 +119,15 @@ function createAuthenticationCapability(
       RpcCoreErrorCode.invalidConfig,
       RpcMiddlewareErrorText.authenticationEncodedTypeIsInvalid
     )
+  return Object.freeze({ encrypt, decrypt, sign, verify, encodedType })
+}
+
+/** Validates one immutable authentication snapshot and creates its complete typed port. */
+function createAuthenticationCapability(
+  config: IRpcAuthenticationConfig
+): IRpcAuthenticationCapability {
+  /** One admitted snapshot retains the original transforms independently of caller mutation. */
+  const { encrypt, decrypt, sign, verify, encodedType } = snapshotAuthenticationConfig(config)
 
   /** Each installed endpoint owns a nonce, independent of shared plugin configuration identity. */
   let nonce: string | undefined

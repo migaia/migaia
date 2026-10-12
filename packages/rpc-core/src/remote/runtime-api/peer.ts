@@ -45,6 +45,8 @@ import type { IRuntimeCallOptions, IRuntimeTypedPeer } from './typing.js'
 import { isProviderAdmissionScopeOwner } from '../../core/internal/provider-admission.js'
 import type { IProviderAdmissionScope } from '../../core/features/provider.js'
 import { createAuthenticationNonce } from '../../core/index.js'
+import { authentication } from '../../core/index.js'
+import { snapshotAuthenticationConfig } from '../../core/middleware/authentication.js'
 import { hooks } from '../../core/index.js'
 import { ping } from '../../core/index.js'
 import {
@@ -52,6 +54,7 @@ import {
   type IRpcProvider,
   type IRpcProviderLimits,
   type IRpcFactoryConfig,
+  type IRpcAuthenticationConfig,
   type IRpcAbortSignal
 } from '../../core/index.js'
 import { RemoteMethodName } from '../constants.js'
@@ -134,6 +137,8 @@ export type IRuntimePeerOptions = Pick<
     connect?: IRuntimePeerSource
     listen?: IRuntimePeerSource
     providerLimits?: IRpcProviderLimits
+    /** Existing per-frame credentials enable signed native transfer without a custom endpoint. */
+    authentication?: IRpcAuthenticationConfig
     /** Only request/stream inherit this positive default in their original timeout scope. */
     defaultTimeoutMs?: number
     /** Explicit advanced schema, modes and idempotency retain their original contract owner. */
@@ -240,7 +245,8 @@ function invalid(message: string): never {
 /** Both raw and supervised factories validate safe identity through this same cold owner. */
 export function prepareRuntimePeerSourceContext(
   configured: IRuntimePeerIdentity | undefined,
-  canonicalAssembly = true
+  canonicalAssembly = true,
+  credentials?: IRpcAuthenticationConfig
 ): IRuntimePeerSourceContext {
   if (
     !configured ||
@@ -252,9 +258,22 @@ export function prepareRuntimePeerSourceContext(
     configured.instanceId.length > RpcWireLimit.maxIdentifierChars
   )
     invalid(RuntimeApiErrorText.identityInvalid)
+  /** Local credentials propose transfer; only actual ACK and authentication mint its authority. */
+  const profile = credentials === undefined ? undefined : snapshotAuthenticationConfig(credentials)
+  /** The validated ordinary configuration proposes storage transfer without claiming agreement. */
+  const signedNativeTransfer =
+    canonicalAssembly &&
+    typeof profile?.sign === 'function' &&
+    typeof profile.verify === 'function' &&
+    profile.encrypt === undefined &&
+    (profile.encodedType === undefined || profile.encodedType === 'any')
   return Object.freeze({
     self: Object.freeze({ name: configured.name, instanceId: configured.instanceId }),
-    capabilities: canonicalAssembly ? RUNTIME_API_CAPABILITIES : RUNTIME_API_BASE_CAPABILITIES
+    capabilities: signedNativeTransfer
+      ? Object.freeze([...RUNTIME_API_CAPABILITIES, RpcCapability.transfer])
+      : canonicalAssembly
+        ? RUNTIME_API_CAPABILITIES
+        : RUNTIME_API_BASE_CAPABILITIES
   })
 }
 
@@ -315,7 +334,11 @@ export async function createRuntimePeer(
     invalid(RuntimeApiErrorText.sourceInvalid)
   /** Only safe identity fields are retained from user configuration or trusted bootstrap. */
   const configured = options.self
-  const sourceContext = prepareRuntimePeerSourceContext(configured, !options.endpointFactory)
+  const sourceContext = prepareRuntimePeerSourceContext(
+    configured,
+    !options.endpointFactory,
+    options.authentication
+  )
   /** Arbitrary extra fields, token, environment and source data never enter this projection. */
   const self = sourceContext.self
   /** A standalone accepted connection starts its own session at zero; native owners override it. */
@@ -922,6 +945,7 @@ export async function prepareRuntimePeerEndpoint(
       middlewares: [
         codec(channel.pipeline.codec),
         framer(channel.pipeline.framer),
+        ...(options.authentication ? [authentication(options.authentication)] : []),
         abort(),
         timeout(),
         hooks({ onHookError: options.report }),
