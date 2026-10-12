@@ -765,32 +765,51 @@
         "createWebWorkerTransport"
       ],
       "./adapter": [
+        "defineByteAdapter",
+        "defineMessageAdapter"
+      ],
+      "./adapter/internal-advanced": [
         "IpcReporterContext",
-        "adapterContractRequiresStream",
+        "JSONRPC_ALLOWED_CAPABILITIES",
+        "JSONRPC_REQUIRED_CAPABILITIES",
+        "JSONRPC_REQUIRED_METHODS",
+        "JsonRpcErrorNumber",
+        "JsonRpcProfile",
+        "assembleAdapterPlugin",
+        "captureAdapterTask",
         "createAdapterBindingDrain",
         "createAdapterConfigurationError",
         "createAdapterConfigurationTypeError",
         "createAdapterId",
+        "createAdapterJsonRpcChannel",
         "createAdapterPlugin",
         "createAdapterSourceConfigurationError",
         "createAdapterTransportError",
         "createEventEmitterMessageResource",
         "createEventTargetMessageResource",
+        "createJsonRpcBridgeError",
         "createRuntimeByteConnection",
         "createRuntimeEventByteIO",
         "createRuntimeMessageConnection",
         "createRuntimeProviderGovernor",
         "createRuntimeProviderScope",
         "holdAdapterLaunch",
-        "holdAdapterObjectChannel",
         "holdAdapterRegistration",
-        "materializeAdapterJson",
-        "normalizeAdapterDescription",
-        "prepareAdapterPeer",
         "readAdapterAbortReason",
         "readRuntimeByteBootstrap",
+        "resolveAdapterEntry",
+        "retainAdapterRuntimeFlags",
         "validateAdapterPeerMethods",
         "validateAdapterPeerTimeout"
+      ]
+    },
+    "@migaia/rpc-pool": {
+      ".": [
+        "RPC_POOL_ERROR_SOURCE",
+        "RpcPoolErrorCode",
+        "RpcPoolState",
+        "createProcessPool",
+        "createThreadPool"
       ]
     },
     "@migaia/rpc-process": {
@@ -816,6 +835,7 @@
         "createProcessPlugin",
         "createProcessResilience",
         "createProcessTransport",
+        "isProcessChild",
         "openProcessObjectChannel",
         "parseProcessPluginDescriptor",
         "receiveAdapterBootstrap"
@@ -868,6 +888,7 @@
         "createWebThreadChannel",
         "createWebThreadChannelFactory",
         "createWebThreadLauncher",
+        "isThreadChild",
         "readThreadBootstrap",
         "receiveThreadData"
       ],
