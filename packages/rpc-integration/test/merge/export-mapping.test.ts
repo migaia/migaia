@@ -245,6 +245,10 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'validateAdapterPeerMethods',
       'validateAdapterPeerTimeout'
     ]
+  },
+  'rpc-browser': {
+    /** Browser's root Peer joins the same ordinary API inventory as the other carrier owners. */
+    '.': ['createBrowserPeer', 'RpcBrowserErrorCode', 'RPC_BROWSER_ERROR_SOURCE']
   }
 }
 /** C3 retires factories/claim-oriented helpers; ordinary operations now own each violation or state. */
@@ -363,7 +367,7 @@ describe('A1 merged public exports', () => {
     for (const [owner, entries] of Object.entries(ordinaryEntries))
       currentEntries.push(...Object.keys(entries).map((key) => `${owner}:${key}`))
     currentEntries.push('rpc-contract:./schema/wire-error')
-    expect(currentEntries).toHaveLength(65)
+    expect(currentEntries).toHaveLength(66)
     expect(
       Object.entries(manifests)
         .flatMap(([owner, entry]) => Object.keys(entry.exports).map((key) => `${owner}:${key}`))

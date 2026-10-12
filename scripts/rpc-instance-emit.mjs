@@ -167,6 +167,7 @@ export const RPC_RESOURCE_POINTS = {
     'bridge/jsonrpc/channel.ts': ['createJsonRpcAdapterChannel']
   },
   '@migaia/rpc-browser': {
+    'browser/peer.ts': ['createBrowserPeer'],
     'browser/adapters/window.ts': ['createWindowMessageTransport'],
     'browser/adapters/shared-worker.ts': ['createSharedWorkerTransport'],
     'browser/adapters/service-worker.ts': ['createServiceWorkerTransport'],
