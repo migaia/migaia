@@ -12984,6 +12984,10 @@
                 {
                   "type": "paragraph",
                   "text": "选项包括 `stages`（默认所有阶段）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 过滤 message/envelope，`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "容量必须为正整数；内容预算允许 0。`maxEvents`（含录制容量）不超过 JavaScript Array 的长度上限 4,294,967,295；`maxInterned` 不超过 94,906,264，保证 endpoint/method 数值组合键仍是精确整数。这些是索引表示上限；实际可分配容量取决于宿主内存。"
                 }
               ]
             },
