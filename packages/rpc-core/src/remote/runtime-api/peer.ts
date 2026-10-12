@@ -1,4 +1,5 @@
 import { createRpcError, createRpcSerializationError } from '../../core/errors.js'
+import type { IRpcProbe } from '../../core/probe/types.js'
 import { createRuntimePeerCalls } from '../internal/runtime-call.js'
 import {
   runtimeConnectionDetail,
@@ -142,6 +143,8 @@ export type IRuntimePeerOptions = Pick<
     providerLimits?: IRpcProviderLimits
     /** Existing per-frame credentials enable signed native transfer without a custom endpoint. */
     authentication?: IRpcAuthenticationConfig
+    /** Passed through factory options unchanged; observation activates only after probe-core lands. */
+    probe?: IRpcProbe | readonly IRpcProbe[]
     /** Only request/stream inherit this positive default in their original timeout scope. */
     defaultTimeoutMs?: number
     /** Explicit advanced schema, modes and idempotency retain their original contract owner. */

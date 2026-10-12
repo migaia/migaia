@@ -208,6 +208,21 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
     ]
   },
   'rpc-core': {
+    /** Layer-1 probing adds one explicit namespace without changing the existing entries. */
+    './probe': [
+      'RpcProbeStage',
+      'RpcProbeStageName',
+      'RpcProbeDirection',
+      'RpcProbeDirectionName',
+      'RpcProbeKind',
+      'RpcProbeKindName',
+      'RpcProbeOutcome',
+      'RpcProbeOutcomeName',
+      'defineProbe',
+      'snapshotProbeEvent',
+      'rpcProbeSampleKey',
+      'probePlugin'
+    ],
     /** P5 SDK exposes only the two task-level factories to ordinary adapter authors. */
     './adapter': ['defineByteAdapter', 'defineMessageAdapter'],
     /** Only real native owners retain the moved low-level runtime operations. */
@@ -367,7 +382,7 @@ describe('A1 merged public exports', () => {
     for (const [owner, entries] of Object.entries(ordinaryEntries))
       currentEntries.push(...Object.keys(entries).map((key) => `${owner}:${key}`))
     currentEntries.push('rpc-contract:./schema/wire-error')
-    expect(currentEntries).toHaveLength(66)
+    expect(currentEntries).toHaveLength(67)
     expect(
       Object.entries(manifests)
         .flatMap(([owner, entry]) => Object.keys(entry.exports).map((key) => `${owner}:${key}`))
