@@ -1,6 +1,6 @@
 {
   "name": "@migaia/rpc-bridge-jsonrpc",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "private": true,
   "description": "RPC bridge-jsonrpc owner.",
   "license": "MIT",
