@@ -1,0 +1,44 @@
+{
+  "name": "@migaia/rpc-devtools",
+  "version": "0.0.9",
+  "private": true,
+  "description": "RPC probe, service and offline record contracts.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kimboyeme-maker/migai.git",
+    "directory": "packages/rpc-devtools"
+  },
+  "files": ["dist", "README.md", "USEGUIDE.md"],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./contract": { "types": "./dist/contract/index.d.ts", "default": "./dist/contract/index.js" },
+    "./hub": { "types": "./dist/hub/index.d.ts", "default": "./dist/hub/index.js" }
+  },
+  "scripts": {
+    "fmt": "oxfmt src test vitest.config.ts",
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json",
+    "lint": "oxlint src test vitest.config.ts",
+    "test": "vitest run test",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
+  },
+  "peerDependencies": {
+    "@migaia/rpc-core": "workspace:*",
+    "@migaia/rpc-contract": "workspace:*"
+  },
+  "devDependencies": {
+    "@migaia/rpc-core": "workspace:*",
+    "@migaia/rpc-contract": "workspace:*",
+    "@types/node": "24.13.2",
+    "typescript": "~6.0.2",
+    "vitest": "4.1.10"
+  }
+}
