@@ -75817,7 +75817,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/middleware/abort.d.ts:abort:export declare const abort: () => IRpcPlugin;",
           "guidance": [],
-          "usageScore": 8,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "rpc-core-index--abort"
         },
@@ -75912,47 +75912,47 @@
           ],
           "identity": "packages/rpc-core/dist/core/middleware/authentication.d.ts:authentication:export declare const authentication: (config: IRpcAuthenticationConfig) => IRpcPlugin;",
           "guidance": [],
-          "usageScore": 10,
+          "usageScore": 14,
           "configuration": [
             {
               "name": "encrypt",
               "type": "IRpcAuthenticationTransform",
               "optional": true,
-              "description": "",
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
             },
             {
               "name": "decrypt",
               "type": "IRpcAuthenticationTransform",
               "optional": true,
-              "description": "",
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
             },
             {
               "name": "sign",
               "type": "IRpcAuthenticationTransform",
               "optional": true,
-              "description": "",
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
             },
             {
               "name": "verify",
               "type": "IRpcAuthenticationTransform",
               "optional": true,
-              "description": "",
+              "description": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`authentication({ sign, verify, encrypt, decrypt })` — 逐帧签名 / 加密。启用线程间签名二进制与 transfer 时需要"
             },
             {
               "name": "encodedType",
               "type": "'any' | 'string' | 'uint8array'",
               "optional": true,
-              "description": "",
+              "description": "`authentication` 的 `encodedType` — 受保护帧的编码类型：`any`、`string` 或 `uint8array`",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`authentication` 的 `encodedType` — 受保护帧的编码类型：`any`、`string` 或 `uint8array`"
             }
           ],
           "fragment": "rpc-core-index--authentication"
@@ -76031,7 +76031,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/middleware/codec.d.ts:codec:export declare function codec<TDescriptor extends ICodecDescriptor>(descriptor: TDescriptor): IRpcPlugin<{ readonly codec: TDescriptor; }>;",
           "guidance": [],
-          "usageScore": 66,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "rpc-core-index--codec"
         },
@@ -76050,7 +76050,10 @@
           "errors": ["No documented errors are declared for connect."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for connect.",
           "examples": [
-            "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** 调用方持有真实端口；原 options 身份保留 Core 已有的 Host preparation。 */\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  /** 保留原配置身份和本地缺省地址，后续选项复制仍使用同一准备 owner。 */\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  /** Core 直接在同一个原始端口上观察 ACK，不接收协商结果声明。 */\n  const resource = createEventEmitterMessageResource(port)\n  /** 本地提案来自 Core 实际编译的 roots；启用项仍由收到的 ACK 决定。 */\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}"
+            "import { createRuntimePeer } from '@migaia/rpc-core/remote'\n\nconst peer = await createRuntimePeer({\n  self: { name: 'client', instanceId: 'client-1' },\n  provide: { ping: () => 'pong' },\n  connect: async (context) => openChannelSomehow(context), // 返回已完成握手的协议通道\n  report: (error) => console.error(error)\n})",
+            "import { connect, createEndpoint } from '@migaia/rpc-core'\n\nconst endpoint = await createEndpoint({\n  id: 'client',                     // 本端 id，写入每条消息\n  targetIds: ['server'],            // 已知对端；自动发现可在运行中补充\n  transport,                        // 载体（第 6 节）\n  middlewares: [connect({ transport })]\n})",
+            "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  const resource = createEventEmitterMessageResource(port)\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}",
+            "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\n\nconst server = await createEndpoint({\n  id: 'server',\n  transport: right,\n  middlewares: [connect({ transport: right })]\n})\nserver.provide('add', (context) => {\n  const [a, b] = context.data as [number, number]\n  return context.success(a + b)\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['server'],\n  transport: left,\n  middlewares: [connect({ transport: left })]\n})\nconsole.log(await client.send<number>('server', 'add', [20, 22])) // 42\n\nawait client.dispose()\nawait server.dispose()"
           ],
           "members": [],
           "aliasOf": "connect",
@@ -76096,141 +76099,7 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/middleware/connect.d.ts:connect:export declare const connect: <TMode extends IRpcDiscoveryMode = \"automatic\">(config?: IConnectConfig & { readonly discoveryMode?: TMode; }) => IConnectMiddleware<TMode>;",
-          "guidance": [
-            {
-              "id": "逐错误码处理与重试",
-              "heading": "逐错误码处理与重试",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "先看(source,code)和发送/执行阶段。未知结果不等于未执行；caller错误目前不带provider rejection reason，不能只凭OVERLOADED证明provider0。provider本地onRejected才保具体分支。退避、限制并发和总业务预算属于consumer。原registration严格单次keyed重试保持。"
-                },
-                {
-                  "type": "table",
-                  "headers": ["core code", "消费侧处理"],
-                  "rows": [
-                    [
-                      "PROVIDER_GENERATION_MISMATCH",
-                      "重新选择已接受目标；确认零执行后才新尝试，不沿name偷换当前在飞目标。"
-                    ],
-                    [
-                      "PROVIDER_GENERATION_RETIRED",
-                      "U38在飞转发可已执行，不仅凭此码重执；同key查询outcome或业务对账。"
-                    ],
-                    ["FORWARD_LOOP", "修连接/路径；相同路径重试无效。"],
-                    ["FORWARD_HOP_LIMIT", "缩短路径或用connect/listen；相同路径重试无效。"],
-                    ["MIDDLEWARE_DUPLICATED", "修构造配置。"],
-                    ["MIDDLEWARE_MISSING", "在原owner装必需能力。"],
-                    [
-                      "CAPABILITY_UNSUPPORTED",
-                      "换受支持method/mode/profile；不去掉order/group/cancel/transfer作隐式降级。"
-                    ],
-                    [
-                      "INVALID_CONFIG",
-                      "修配置/选项；process own transfer含[]/undefined必须删除或改用合法thread部署。"
-                    ],
-                    ["PROVIDER_DUPLICATED", "合并/改名注册，不能靠调用重试修复。"],
-                    ["PROTOCOL_INVALID", "修线材/协议与版本；不重发同一坏帧。"],
-                    [
-                      "CONTRACT_INVALID",
-                      "修method/模式/关联，key冲突保原操作；不能用换key掩盖已可能执行的业务。"
-                    ],
-                    [
-                      "PAYLOAD_INVALID",
-                      "修数据/大小/受支持binary形状；准备失败可重构数据，但物理commit后的buffer可能已detach。"
-                    ],
-                    [
-                      "PROVIDER_NOT_FOUND",
-                      "查已接受目录，迁方法或等待provider兼容升级；不盲重试同名未知方法。"
-                    ],
-                    ["PROVIDER_NOT_SETTLED", "修provider完成路径，不能推断业务副作用没发生。"],
-                    ["INTERNAL", "按业务错误和原cause链处理；默认不自动重执。"],
-                    [
-                      "TARGET_UNKNOWN",
-                      "重新读取本地可用性/目标目录；在零发送事实成立后再选择新目标。"
-                    ],
-                    [
-                      "TARGET_NOT_IDENTIFIABLE",
-                      "建立可pin的显式实例连接，不向广播匿名组重试逐实例操作。"
-                    ],
-                    ["ENDPOINT_DISPOSED", "新建Peer；不复活旧句柄，旧结果仍按原操作对账。"],
-                    [
-                      "CANCELLED",
-                      "尊重signal/reason；before-start start已赢时仍等原真实结果，不再发第二次业务。"
-                    ],
-                    [
-                      "DEADLINE_EXCEEDED",
-                      "已可能执行时查询同keyoutcome或对账；不换key盲跑。before-start明确未开始才可新尝试。"
-                    ],
-                    [
-                      "PROVIDER_CONTEXT_EXPIRED",
-                      "修provider生命周期；迟到完成不会补发副作用，不重新调用业务修补。"
-                    ],
-                    [
-                      "TRANSPORT",
-                      "物理commit/失联可能已执行，恢复通道后先查结果；transient不等于安全重试。"
-                    ],
-                    [
-                      "AUTHENTICATION_FAILED",
-                      "修配置或建立新真实会话；SESSION_UNKNOWN只丢challenge缓存，不自动重放旧业务。"
-                    ],
-                    ["SCHEMA_INVALID", "修参数/结果schema；原参数不重试。"],
-                    ["CAPABILITY_CONFLICT", "修装配/实例歧义；不能通过调用重试选择猜测的owner。"],
-                    [
-                      "OVERLOADED",
-                      "降并发，按总预算退避（consumer可用有界指数退避与抖动）；只有独立证据确定provider0才新尝试。"
-                    ],
-                    ["STREAM_RESULT_UNKNOWN", "不重放已交付item；先业务对账，再显式开新流。"],
-                    ["CHUNK_INVALID", "修framing/载体；native完整帧不通过chunk绕预算。"],
-                    ["PROPERTY_READ_FAILED", "修getter/proxy或报告边界；坏输入不重试。"],
-                    [
-                      "IDEMPOTENCY_RESULT_UNAVAILABLE",
-                      "原业务已执行但结果不保留；对账，不换key重执。"
-                    ],
-                    ["STRING_CONVERSION_FAILED", "修转换/诊断边界，原输入不重试。"]
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "text": "outcome：pending只在总预算内等待或查询；done复用保留成功/失败；unknown不推断未执行。memory连续性lost-since-restart需业务对账/放弃，外store真正done才确定。成功notify Promise只证明物理发送，不证明业务成功；错误的处理也必须遵守这一边界。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "transfer：签名/detach不等于provider成功。真正native commit后原buffer及共享views可能分离；任何自动key retry禁用，不保存输入重试备份。需要再发时consumer显式重构数据，且先确定业务结果/幂等安全。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "其它source的错误保原语义：remote的REMOTE_RESULT_UNKNOWN同样先查询/对账；REMOTE_CLOSED只允许新的目标选择而不重放已可能执行的调用；PluginHost可用性码按本地状态恢复，RPC不把业务或依赖副作用回滚成provider0。各公开 source 的处理见下表。"
-                }
-              ]
-            },
-            {
-              "id": "来源-调用与生命周期",
-              "heading": "来源、调用与生命周期",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "对端目录中的 name 是显示标签，不是 launcher 名称认证或控制权限；控制依实际 authenticated instanceId、generation 和原 native handle。自动 process instanceId 是模块本地单调身份，不承诺跨模块副本或跨父进程全局唯一。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "每个连接选择且只选择一个 spawn、connect 或 listen；只有真实库 launcher 的子端允许自动来源。connect/listen 借用对端，只关闭本端连接，不自动拥有 stop/kill/restart/replace。需要避开 relay 时显式建立独立 connect/listen 通道；没有 direct/upgrade 分配器。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "调用前的 method、payload、能力与本地选项准入可能同步抛错；需要统一处理时，把调用表达式放在 try/catch 内，不只对返回 Promise 调用 catch。这是既有严格前置准入语义。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "request 等待业务结果。notify 等待原物理发送完成，成功不证明 provider 已执行。stream 保留 lazy iterator 与原取消、drain owner。默认 request/stream 超时 30000 ms；defaultTimeoutMs 有限且为正，单调用 timeoutMs:false 关闭默认期限，0 表示立即到期；仍受 launcher 的总 callWallTimeMs cap 限制。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "orderKey 使用最终 provider 的原串行命名空间；before-start 只撤销开始许可，已经开始就保留原真实结果。group 保留已完成步骤，第一失败后余项 not-executed，不回滚副作用，也不是事务或分布式锁。outcome 的 unknown 不等于未执行。close 同步拒绝新调用，重复 close 返回同一 Promise，已接受工作按原 drain 结算。"
-                }
-              ]
-            }
-          ],
+          "guidance": [],
           "usageScore": 68,
           "configuration": [],
           "fragment": "rpc-core-index--connect"
@@ -76250,9 +76119,8 @@
           "errors": ["No documented errors are declared for contract."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for contract.",
           "examples": [
-            "import { createProcessTransport } from '@migaia/rpc-process'\nimport { createAdapterSocketByteIO } from '@migaia/rpc-process/adapters/node-socket'\nimport { RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\n// socket is the actual duplex resource acquired by this adapter.\nconst raw = createAdapterSocketByteIO(socket)\nconst channel = await createProcessTransport(raw, {\n  peerId: 'service',\n  role: 'initiator',\n  offer: {\n    peer: { id: 'client', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: []\n  },\n  scheduler,\n  ipc: { connectionId: 'custom-ipc', sessionId: 'session', log },\n  report\n})\n// The returned channel can be supplied to the normal Core/Remote endpoint construction.\nawait channel.close()",
-            "import { createJsonRpcAdapterChannel } from '@migaia/rpc-bridge-jsonrpc'\n\nconst channel = await createJsonRpcAdapterChannel({\n  byte: heldByteIO,\n  peerId,\n  target: { kind: 'plugin', contract: remoteContract },\n  offer: localOffer,\n  token: issuedToken,\n  scheduler,\n  wallClock,\n  ipc,\n  report\n})",
-            "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** 调用方持有真实端口；原 options 身份保留 Core 已有的 Host preparation。 */\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  /** 保留原配置身份和本地缺省地址，后续选项复制仍使用同一准备 owner。 */\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  /** Core 直接在同一个原始端口上观察 ACK，不接收协商结果声明。 */\n  const resource = createEventEmitterMessageResource(port)\n  /** 本地提案来自 Core 实际编译的 roots；启用项仍由收到的 ACK 决定。 */\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}"
+            "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  const resource = createEventEmitterMessageResource(port)\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}",
+            "pnpm add @migaia/rpc-core @migaia/rpc-contract"
           ],
           "members": [],
           "aliasOf": "contract",
@@ -76325,143 +76193,53 @@
           "identity": "packages/rpc-core/dist/core/middleware/contract.d.ts:contract:export declare const contract: (config?: IRpcContractConfig) => IRpcPlugin;",
           "guidance": [
             {
-              "id": "第三方公开错误面与错误编码",
-              "heading": "第三方公开错误面与错误编码",
+              "id": "10-4-跨进程传递错误",
+              "heading": "10.4 跨进程传递错误",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "协议实现者（自定义载体或 Go/Python/Rust 对端）从 `@migaia/rpc-contract/errors` 使用完整 wire 错误 schema、校验、遍历与 JSON-RPC 映射。运行时适配器作者使用 Core 根入口的 `serializeRpcError` / `deserializeRpcError`，保留 Core/Remote 私有脱敏与 forwarding-route 策略；完整 wire walker 唯一归 Contract。两类集成者都用公开 source/code 和错误族守卫解释诊断，不能据此推定 Core 的内部操作身份。"
+                  "text": "`serializeRpcError` / `deserializeRpcError`（包根）在 Core 层传递错误时使用：它们保留 Core 的脱敏与转发路由信息。错误树的结构、校验与 JSON-RPC 映射见 rpc-contract USEGUIDE 第 9 节。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "六个稳定语义 source 保留分包前字符串，按以下普通公开入口导入："
-                },
-                {
-                  "type": "table",
-                  "headers": ["公开入口", "source 常量与值", "错误码表", "第三方用途"],
-                  "rows": [
-                    [
-                      "`@migaia/rpc-contract` / `@migaia/rpc-contract/errors`",
-                      "`RPC_CONTRACT_SOURCE` = `@migaia/rpc/contract`",
-                      "`RpcContractErrorCode`",
-                      "识别非法 envelope、frame、handshake 与错误树，修复对应协议输入。"
-                    ],
-                    [
-                      "`@migaia/rpc-core`",
-                      "`RPC_CORE_ERROR_SOURCE` = `@migaia/rpc/core`",
-                      "`RpcCoreErrorCode`",
-                      "分类 Endpoint 的配置、取消、deadline、transport 与 provider 诊断。"
-                    ],
-                    [
-                      "`@migaia/rpc-core/remote`",
-                      "`RPC_REMOTE_ERROR_SOURCE` = `@migaia/rpc/remote`",
-                      "`RpcRemoteLayerErrorCode`",
-                      "解释 generation 关闭、启动失败及未知结果，按原 outcome/对账路径恢复。"
-                    ],
-                    [
-                      "`@migaia/rpc-process`",
-                      "`RPC_PROCESS_ERROR_SOURCE` = `@migaia/rpc/process`",
-                      "`RpcProcessErrorCode`",
-                      "分类实际 launch、dial、listen、bootstrap 与资源采样失败。"
-                    ],
-                    [
-                      "`@migaia/rpc-threads`",
-                      "`RPC_THREAD_ERROR_SOURCE` = `@migaia/rpc/threads`",
-                      "`RpcThreadErrorCode`",
-                      "报告真实 Worker 采样失败，保留原 cause 并展示 unavailable。"
-                    ],
-                    [
-                      "`@migaia/rpc-bridge-jsonrpc` / `@migaia/rpc-contract/framing/jsonrpc`",
-                      "`JSONRPC_BRIDGE_ERROR_SOURCE` = `@migaia/rpc/bridge/jsonrpc`",
-                      "`JsonRpcBridgeErrorCode`",
-                      "识别 framing、hello/profile 与扩展协商失败，处理实际连接。"
-                    ]
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`RpcCoreErrorText`、`RpcContractErrorText`、`RpcContractErrorDiagnostic`、`RpcProcessErrorText`、`RpcRemoteLayerErrorText`、`JsonRpcBridgeErrorText` 与 Thread 文本表均为私有展示。删除这些已更名包的公开表属于破坏性导出变更；message 字面量不是恢复、重试、终止或关闭契约。Process bootstrap 的环境名、版本、frame 限额和发现超时仍由 `@migaia/rpc-process` 普通导出；stderr 文本/配额常量不公开。"
-                }
-              ]
-            },
-            {
-              "id": "wire-错误-json-rpc-与接纳后的错误展示",
-              "heading": "Wire 错误、JSON-RPC 与接纳后的错误展示",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "`IRpcSerializedError` 的必需字段为 `source`、`code`、`name`、`message`、`stack`；可选字段为 `cause`、`errors`、portable `data`、bounded `route` 和 `truncated: true`。语言中立 JSON schema 从 `@migaia/rpc-contract/schema/wire-error` 的普通子路径读取。Contract 的 `serializeRpcError` 构造有界错误树，`normalizeRpcSerializedError` 验证接收数据，`deserializeRpcError` 保留传输 stack/native error family，`reachRpcError` 按身份去重遍历 cause/AggregateError。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "序列化的 `report` 是必须的诊断 sink，不可静默吞掉投影失败。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`RpcWireErrorField`、`RpcWireErrorViolation`、`RpcWireErrorUnknownFieldMode`、`RpcWireErrorFallback`、`RpcWireErrorLimit` 与 `RpcErrorReachLimit` 公开同一字段顺序、拒绝原因、fallback 与限额。Contract 的 `toJsonRpcError(wire, integerCode)` 把验证后的错误树放入 `RpcJsonRpcWireError.dataKey`；第三方协议拥有 safe integer code。`fromJsonRpcError` 恢复扩展，普通外部 JSON-RPC 错误使用 `RpcJsonRpcWireError.foreignSource` 和整数的 string code；这些映射不改变 transport/cancel 行为。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "普通 wire decoder 只恢复诊断，不注册 Core 的 live control 身份。接纳后的错误字段沿既有 wire、forwarding、缓存失败重放与 terminal report 路径展示，维持既有 source/code/name/message/stack 受控展示和 cause/errors 链策略；这同样适用于 caller 取消 reason 和 store 中已留存的错误。错误字段不能触发 mint、cancel、retry、close、计数、retire 或 replay admission，也不把适配器伪造的诊断字段变成控制身份。展示路径复用原 Error 不证明 Core 创建了它。"
-                }
-              ]
-            },
-            {
-              "id": "第三方公开错误面",
-              "heading": "第三方公开错误面",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "协议实现者使用 `@migaia/rpc-contract/errors` 的 wire schema、序列化/校验/遍历及 JSON-RPC 映射；适配器作者使用 Core 根入口的 wire 操作和 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError`。六个 source 常量与各 owner 的错误码表公开，原 source 字符串不变。B6 守卫跨 realm/模块副本用于诊断；`isRpcError` 的 code-is-string 检查不能替代它们。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`*ErrorText` / `*Diagnostic` 文本表和 `tagRpcError` 私有；这是更名后包的破坏性导出收敛。错误类仅作类型导出，唯一 `RpcLifecycleError` 运行时类供 Store Worker 等持有自身 dispose 状态的消费方构造诊断，不 mint Core 操作身份。真实 dispose 失败后的 cleanup 展示沿原路径复用原 Error 身份，不决定是否关闭操作。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "已接纳错误的现有字段，包括 caller 取消 reason、store/缓存及解码后的 wire 错误，可沿既有 wire 和 terminal report 展示。mint、cancel、retry、close、计数、retire 与 replay admission 由 owner 私有身份或实际操作状态决定，不能依据这些错误的公开 source/code。普通解码与公开 listener failure helpers 只产生诊断，不登记 Core 控制身份。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "第三方通过 `@migaia/utils/error` 的 `attachErrorIdentity` 抛自己的 source/code；Core 保留原错误或 cause。source/code 表、wire schema/限额、普通 JSON-RPC 映射及短例见 USEGUIDE。"
+                  "text": "对端抛出的业务错误会还原为原生类型并保留 `message`、`stack` 与 `cause` 链。来自对端的 source / code 只用于诊断，不会被当作本地库的错误身份，也不授予任何控制权限。"
                 }
               ]
             }
           ],
-          "usageScore": 164,
+          "usageScore": 52,
           "configuration": [
             {
               "name": "version",
               "type": "string",
               "optional": true,
-              "description": "",
+              "description": "`contract({ version, … })` — 业务契约：版本、可接受的版本、方法 schema 校验",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`contract({ version, … })` — 业务契约：版本、可接受的版本、方法 schema 校验"
             },
             {
               "name": "acceptVersions",
               "type": "readonly string[]",
               "optional": true,
-              "description": "",
+              "description": "`contract` 的 `acceptVersions` — 额外接受的对端契约版本列表",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`contract` 的 `acceptVersions` — 额外接受的对端契约版本列表"
             },
             {
               "name": "maxIdentifierLength",
               "type": "number",
               "optional": true,
-              "description": "",
+              "description": "`contract` 的 `maxIdentifierLength` — 方法名等标识符的最大长度",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`contract` 的 `maxIdentifierLength` — 方法名等标识符的最大长度"
             },
             {
               "name": "schemas",
               "type": "Readonly<Record<string, IRpcMethodSchema>>",
               "optional": true,
-              "description": "",
+              "description": "`contract` 的 `schemas` — 按方法名声明参数与结果的 schema，调用时校验",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`contract` 的 `schemas` — 按方法名声明参数与结果的 schema，调用时校验"
             }
           ],
           "fragment": "rpc-core-index--contract"
@@ -76543,7 +76321,10 @@
           "returns": "No explicit return annotation is declared for this const.",
           "errors": ["No documented errors are declared for createEndpoint."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createEndpoint.",
-          "examples": [],
+          "examples": [
+            "import { connect, createEndpoint } from '@migaia/rpc-core'\n\nconst endpoint = await createEndpoint({\n  id: 'client',                     // 本端 id，写入每条消息\n  targetIds: ['server'],            // 已知对端；自动发现可在运行中补充\n  transport,                        // 载体（第 6 节）\n  middlewares: [connect({ transport })]\n})",
+            "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\n\nconst server = await createEndpoint({\n  id: 'server',\n  transport: right,\n  middlewares: [connect({ transport: right })]\n})\nserver.provide('add', (context) => {\n  const [a, b] = context.data as [number, number]\n  return context.success(a + b)\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['server'],\n  transport: left,\n  middlewares: [connect({ transport: left })]\n})\nconsole.log(await client.send<number>('server', 'add', [20, 22])) // 42\n\nawait client.dispose()\nawait server.dispose()"
+          ],
           "members": [],
           "aliasOf": "createFullEndpoint",
           "exportPath": ".",
@@ -76587,7 +76368,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/full.d.ts:createEndpoint:export declare const createEndpoint: IPublicCallable;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 34,
           "configuration": [],
           "fragment": "rpc-core-index--createEndpoint"
         },
@@ -76667,7 +76448,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/idempotency-store.d.ts:createRpcIdempotencyStore:export declare function createRpcIdempotencyStore(options?: { readonly retentionMs?: number; readonly maxEntries?: number; readonly maxEntriesPerScope?: number; readonly maxBytes?: number; readonly maxOutcomeBytes?: number; }): IRpcIdempotencyStore;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "rpc-core-index--createRpcIdempotencyStore"
         },
@@ -76898,159 +76679,159 @@
           ],
           "identity": "packages/rpc-core/dist/core/runtime-api-endpoint.d.ts:createRuntimeApiEndpoint:export declare function createRuntimeApiEndpoint(config: Readonly<{ binding: IRuntimeEndpointBinding; }>): IRuntimeEndpointBinding;\nexport declare function createRuntimeApiEndpoint(config: IRpcFactoryConfig, channel: IRuntimeEndpointChannel, admission?: IProviderAdmissionScope): IRuntimeApiEndpoint;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 16,
           "configuration": [
             {
               "name": "id",
               "type": "string",
               "optional": false,
-              "description": "Stable local endpoint identity included in every routed protocol envelope.",
+              "description": "`id` — 本端稳定标识，写入每条消息",
               "descriptionEn": "Stable local endpoint identity included in every routed protocol envelope.",
-              "descriptionZh": ""
+              "descriptionZh": "`id` — 本端稳定标识，写入每条消息"
             },
             {
               "name": "scheduler",
               "type": "import('@migaia/utils/scheduler').IScheduler",
               "optional": true,
-              "description": "Endpoint monotonic clock and timers; the same injected instance also drives PluginHost * deadlines. `now()` must return finite non-negative milliseconds and is never read as an epoch.",
+              "description": "`scheduler` — 单调时钟与定时器；同一实例也驱动插件宿主的期限",
               "descriptionEn": "Endpoint monotonic clock and timers; the same injected instance also drives PluginHost * deadlines. `now()` must return finite non-negative milliseconds and is never read as an epoch.",
-              "descriptionZh": ""
+              "descriptionZh": "`scheduler` — 单调时钟与定时器；同一实例也驱动插件宿主的期限"
             },
             {
               "name": "wallClock",
               "type": "import('@migaia/utils/scheduler').IWallClock",
               "optional": true,
-              "description": "Endpoint wall clock; only produces wire `sentAt` and hook event `at` diagnostics. `timestamp()` * must return non-negative safe-integer epoch milliseconds. Defaults to the host wall clock.",
+              "description": "`wallClock` — 墙钟，只用于消息时间戳等诊断字段",
               "descriptionEn": "Endpoint wall clock; only produces wire `sentAt` and hook event `at` diagnostics. `timestamp()` * must return non-negative safe-integer epoch milliseconds. Defaults to the host wall clock.",
-              "descriptionZh": ""
+              "descriptionZh": "`wallClock` — 墙钟，只用于消息时间戳等诊断字段"
             },
             {
               "name": "targetIds",
               "type": "readonly TTargetId[]",
               "optional": true,
-              "description": "Optional known-peer seed; automatic discovery may resolve additional target ids lazily.",
+              "description": "`targetIds` — 已知对端 id",
               "descriptionEn": "Optional known-peer seed; automatic discovery may resolve additional target ids lazily.",
-              "descriptionZh": ""
+              "descriptionZh": "`targetIds` — 已知对端 id"
             },
             {
               "name": "transport",
               "type": "IRpcTransport<TFrame>",
               "optional": true,
-              "description": "Transport receives exactly the selected framer output, except an explicit opaque sink.",
+              "description": "`transport` — 载体；收到的正是所选 `framer` 的输出",
               "descriptionEn": "Transport receives exactly the selected framer output, except an explicit opaque sink.",
-              "descriptionZh": ""
+              "descriptionZh": "`transport` — 载体；收到的正是所选 `framer` 的输出"
             },
             {
               "name": "protocol",
               "type": "IRpcProtocol<TEnvelope, string, number>",
               "optional": true,
-              "description": "Semantic descriptor feeding the codec edge in the canonical endpoint pipeline.",
+              "description": "`protocol` — 协议描述，决定信封格式",
               "descriptionEn": "Semantic descriptor feeding the codec edge in the canonical endpoint pipeline.",
-              "descriptionZh": ""
+              "descriptionZh": "`protocol` — 协议描述，决定信封格式"
             },
             {
               "name": "codec",
               "type": "ICodec<TEnvelope, TEncoded>",
               "optional": true,
-              "description": "自定义字符串 carrier 已保证每次交付完整消息时，从 `@migaia/rpc-contract/framing` 使用 `processStringFramer`；接收未知类型的值时使用 `remoteProcessStringFramer`，由它校验字符串域。两者都不分片，也不改变 carrier 已有的消息边界。未知值 framer 的非字符串输入保留 `TypeError`、`@migaia/rpc/contract` 的 `INVALID_FRAME` 和原文本；Process codec 的字符串入参校验仍保留 Core `PAYLOAD_INVALID` 身份。",
+              "description": "`codec` — 编码器；输出必须正好是 `framer` 的输入",
               "descriptionEn": "Codec whose output must match the selected framer input exactly.",
-              "descriptionZh": "自定义字符串 carrier 已保证每次交付完整消息时，从 `@migaia/rpc-contract/framing` 使用 `processStringFramer`；接收未知类型的值时使用 `remoteProcessStringFramer`，由它校验字符串域。两者都不分片，也不改变 carrier 已有的消息边界。未知值 framer 的非字符串输入保留 `TypeError`、`@migaia/rpc/contract` 的 `INVALID_FRAME` 和原文本；Process codec 的字符串入参校验仍保留 Core `PAYLOAD_INVALID` 身份。"
+              "descriptionZh": "`codec` — 编码器；输出必须正好是 `framer` 的输入"
             },
             {
               "name": "framer",
               "type": "IRpcFramer<TEncoded, TFrame, string, number>",
               "optional": true,
-              "description": "自定义字符串 carrier 已保证每次交付完整消息时，从 `@migaia/rpc-contract/framing` 使用 `processStringFramer`；接收未知类型的值时使用 `remoteProcessStringFramer`，由它校验字符串域。两者都不分片，也不改变 carrier 已有的消息边界。未知值 framer 的非字符串输入保留 `TypeError`、`@migaia/rpc/contract` 的 `INVALID_FRAME` 和原文本；Process codec 的字符串入参校验仍保留 Core `PAYLOAD_INVALID` 身份。",
+              "description": "`transport` — 载体；收到的正是所选 `framer` 的输出",
               "descriptionEn": "Framer whose output is the value delivered to the selected transport.",
-              "descriptionZh": "自定义字符串 carrier 已保证每次交付完整消息时，从 `@migaia/rpc-contract/framing` 使用 `processStringFramer`；接收未知类型的值时使用 `remoteProcessStringFramer`，由它校验字符串域。两者都不分片，也不改变 carrier 已有的消息边界。未知值 framer 的非字符串输入保留 `TypeError`、`@migaia/rpc/contract` 的 `INVALID_FRAME` 和原文本；Process codec 的字符串入参校验仍保留 Core `PAYLOAD_INVALID` 身份。"
+              "descriptionZh": "`transport` — 载体；收到的正是所选 `framer` 的输出"
             },
             {
               "name": "provider",
               "type": "Readonly<Record<string, IRpcProvider>>",
               "optional": true,
-              "description": "`@migaia/rpc-core` 的 `createRuntimeApiEndpoint` 同步返回 endpoint 资源；先等待其稳定的 readonly `ready`，再使用已安装的控制与 provider。也可传入完整的 `{ binding }`，借用该对象已有的 request、notify、stream 和生命周期操作。`@migaia/rpc-core/features/provider` 的 `createProviderAdmissionScope` 用于在多个 endpoint 间共享同一个 quota handle；初始限制由第一次实际 attachment 的配置决定，ready 后的 `constrain` 只收紧限制，cold `constrain` 只校验而不保存策略，`clear` 清除该 handle 的现有占用。",
+              "description": "`provider` — 构造完成前就注册好的方法表",
               "descriptionEn": "Initial provider methods registered before endpoint construction completes.",
-              "descriptionZh": "`@migaia/rpc-core` 的 `createRuntimeApiEndpoint` 同步返回 endpoint 资源；先等待其稳定的 readonly `ready`，再使用已安装的控制与 provider。也可传入完整的 `{ binding }`，借用该对象已有的 request、notify、stream 和生命周期操作。`@migaia/rpc-core/features/provider` 的 `createProviderAdmissionScope` 用于在多个 endpoint 间共享同一个 quota handle；初始限制由第一次实际 attachment 的配置决定，ready 后的 `constrain` 只收紧限制，cold `constrain` 只校验而不保存策略，`clear` 清除该 handle 的现有占用。"
+              "descriptionZh": "`provider` — 构造完成前就注册好的方法表"
             },
             {
               "name": "providerLimits",
               "type": "IRpcProviderLimits",
               "optional": true,
-              "description": "Provider concurrency budgets; defaults to 256 global and 64 per peer.",
+              "description": "`providerLimits` — 入站并发上限，默认全局 256、每个对端 64",
               "descriptionEn": "Provider concurrency budgets; defaults to 256 global and 64 per peer.",
-              "descriptionZh": ""
+              "descriptionZh": "`providerLimits` — 入站并发上限，默认全局 256、每个对端 64"
             },
             {
               "name": "idempotency",
               "type": "IRpcIdempotencyConfig",
               "optional": true,
-              "description": "Optional store and session scope used only for keyed provider requests.",
+              "description": "`idempotency` — 幂等存储与会话作用域，只用于带 `idempotencyKey` 的调用",
               "descriptionEn": "Optional store and session scope used only for keyed provider requests.",
-              "descriptionZh": ""
+              "descriptionZh": "`idempotency` — 幂等存储与会话作用域，只用于带 `idempotencyKey` 的调用"
             },
             {
               "name": "replay",
               "type": "{ /** Maximum retained outbound request identifiers; defaults to 4096. */ readonly maxEntries?: number; /** Retention time for outbound request identifiers; defaults to 310 seconds. */ readonly ttlMs?: number; }",
               "optional": true,
-              "description": "Bounds outbound identifier replay reservations for this endpoint.",
+              "description": "`replay` — 出站重放账本的上限",
               "descriptionEn": "Bounds outbound identifier replay reservations for this endpoint.",
-              "descriptionZh": ""
+              "descriptionZh": "`replay` — 出站重放账本的上限"
             },
             {
               "name": "replay.maxEntries",
               "type": "number",
               "optional": true,
-              "description": "Maximum retained outbound request identifiers; defaults to 4096.",
+              "description": "`replay.maxEntries` — 保留的出站请求 id 数量，默认 4096",
               "descriptionEn": "Maximum retained outbound request identifiers; defaults to 4096.",
-              "descriptionZh": ""
+              "descriptionZh": "`replay.maxEntries` — 保留的出站请求 id 数量，默认 4096"
             },
             {
               "name": "replay.ttlMs",
               "type": "number",
               "optional": true,
-              "description": "Retention time for outbound request identifiers; defaults to 310 seconds.",
+              "description": "`replay.ttlMs` — 出站请求 id 的保留时间，默认 310 秒",
               "descriptionEn": "Retention time for outbound request identifiers; defaults to 310 seconds.",
-              "descriptionZh": ""
+              "descriptionZh": "`replay.ttlMs` — 出站请求 id 的保留时间，默认 310 秒"
             },
             {
               "name": "middlewares",
               "type": "TMiddlewares",
               "optional": false,
-              "description": "Ordered middleware tuple installed atomically during endpoint construction.",
+              "description": "`middlewares` — 中间件元组，构造时原子安装",
               "descriptionEn": "Ordered middleware tuple installed atomically during endpoint construction.",
-              "descriptionZh": ""
+              "descriptionZh": "`middlewares` — 中间件元组，构造时原子安装"
             },
             {
               "name": "features",
               "type": "TFeatures",
               "optional": true,
-              "description": "`@migaia/rpc-core` 的 `createRuntimeApiEndpoint` 同步返回 endpoint 资源；先等待其稳定的 readonly `ready`，再使用已安装的控制与 provider。也可传入完整的 `{ binding }`，借用该对象已有的 request、notify、stream 和生命周期操作。`@migaia/rpc-core/features/provider` 的 `createProviderAdmissionScope` 用于在多个 endpoint 间共享同一个 quota handle；初始限制由第一次实际 attachment 的配置决定，ready 后的 `constrain` 只收紧限制，cold `constrain` 只校验而不保存策略，`clear` 清除该 handle 的现有占用。",
+              "description": "`features` — 自定义功能模块元组",
               "descriptionEn": "Finite immutable tuple of user-defined features installed by the canonical Host batch.",
-              "descriptionZh": "`@migaia/rpc-core` 的 `createRuntimeApiEndpoint` 同步返回 endpoint 资源；先等待其稳定的 readonly `ready`，再使用已安装的控制与 provider。也可传入完整的 `{ binding }`，借用该对象已有的 request、notify、stream 和生命周期操作。`@migaia/rpc-core/features/provider` 的 `createProviderAdmissionScope` 用于在多个 endpoint 间共享同一个 quota handle；初始限制由第一次实际 attachment 的配置决定，ready 后的 `constrain` 只收紧限制，cold `constrain` 只校验而不保存策略，`clear` 清除该 handle 的现有占用。"
+              "descriptionZh": "`features` — 自定义功能模块元组"
             },
             {
               "name": "construction",
               "type": "{ /** Aborts construction while still rolling back every installed middleware. */ readonly signal?: IRpcAbortSignal; /** Bounds endpoint construction, or disables the deadline when explicitly `false`. */ readonly timeoutMs?: number | false; }",
               "optional": true,
-              "description": "Cancellation and deadline controls for middleware installation and rollback.",
+              "description": "`construction` — 构造过程的取消与期限",
               "descriptionEn": "Cancellation and deadline controls for middleware installation and rollback.",
-              "descriptionZh": ""
+              "descriptionZh": "`construction` — 构造过程的取消与期限"
             },
             {
               "name": "construction.signal",
               "type": "IRpcAbortSignal",
               "optional": true,
-              "description": "Aborts construction while still rolling back every installed middleware.",
+              "description": "`construction.signal` — 取消构造；已安装的中间件会被全部回滚",
               "descriptionEn": "Aborts construction while still rolling back every installed middleware.",
-              "descriptionZh": ""
+              "descriptionZh": "`construction.signal` — 取消构造；已安装的中间件会被全部回滚"
             },
             {
               "name": "construction.timeoutMs",
               "type": "number | false",
               "optional": true,
-              "description": "Bounds endpoint construction, or disables the deadline when explicitly `false`.",
+              "description": "`construction.timeoutMs` — 构造期限；`false` 表示不设期限",
               "descriptionEn": "Bounds endpoint construction, or disables the deadline when explicitly `false`.",
-              "descriptionZh": ""
+              "descriptionZh": "`construction.timeoutMs` — 构造期限；`false` 表示不设期限"
             }
           ],
           "fragment": "rpc-core-index--createRuntimeApiEndpoint"
@@ -77156,7 +76937,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/feature.d.ts:defineFeature:export declare function defineFeature<TSurface extends object = object, const TDependencies extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>>(install: IFeatureFactory<TExpose, TDependencies, TSurface>, dependencies?: TDependencies): IRpcFeature<TSurface, TDependencies, TExpose>;\nexport declare function defineFeature<TSurface extends object = object, const TDependencies extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>>(definition: IRpcFeatureDefinition<TSurface, TDependencies, TExpose>): IRpcFeature<TSurface, TDependencies, TExpose>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-index--defineFeature"
         },
@@ -77264,7 +77045,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/middleware.d.ts:defineMiddleware:export declare function defineMiddleware<const TComponents extends object>(definition: IRpcPlugin<TComponents>): IRpcNativeMiddleware & IRpcMiddlewareComponentContribution<Pick<TComponents, Extract<keyof TComponents, 'transport' | 'protocol' | 'codec' | 'framer' | 'discoveryMode' | 'pingCapability'>>>;\nexport declare function defineMiddleware<TExtension extends Record<string, unknown> = Record<never, never>, TPublic extends object = Record<never, never>, TFeatures extends IFeatureRecord = Record<never, never>, TFeatureExpose extends object & IFeatureRecordRequiredExpose<TFeatures> = object & IFeatureRecordRequiredExpose<TFeatures>>(name: string, descriptorFactory: (core: IRpcMiddlewareCore<TFeatures, TFeatureExpose>) => IRpcMiddlewareDescriptor<TExtension, TPublic, TFeatureExpose> & (keyof IFeatureRecordRequiredExpose<TFeatures> extends never ? unknown : { readonly featureExpose: () => TFeatureExpose; }), featureRecord?: TFeatures): IRpcNativeMiddleware<TExtension, TPublic, TFeatureExpose, TFeatures>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-index--defineMiddleware"
         },
@@ -77293,9 +77074,7 @@
           "returns": "Error",
           "errors": ["No documented errors are declared for deserializeRpcError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for deserializeRpcError.",
-          "examples": [
-            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  isRpcTimeoutError,\n  type RpcTimeoutError\n} from '@migaia/rpc-core'\n\n/** Retain Core's presentation and routes while encoding an actual held failure. */\nexport function transferError(error: unknown, report: (failure: unknown) => void) {\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) })\n  const received: unknown = JSON.parse(JSON.stringify(wire))\n  const restored = deserializeRpcError(received)\n  const timeout: RpcTimeoutError | undefined = isRpcTimeoutError(restored) ? restored : undefined\n  return { restored, timeout, stackPreserved: restored.stack === wire.stack }\n}"
-          ],
+          "examples": [],
           "members": [],
           "aliasOf": "deserializeRpcError",
           "exportPath": ".",
@@ -77355,113 +77134,21 @@
           "identity": "packages/rpc-core/dist/core/internal/error-wire-metadata.d.ts:deserializeRpcError:export declare function deserializeRpcError(value: unknown, options?: IRpcWireErrorOptions): Error;",
           "guidance": [
             {
-              "id": "第三方公开错误面与错误编码",
-              "heading": "第三方公开错误面与错误编码",
+              "id": "10-4-跨进程传递错误",
+              "heading": "10.4 跨进程传递错误",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "协议实现者（自定义载体或 Go/Python/Rust 对端）从 `@migaia/rpc-contract/errors` 使用完整 wire 错误 schema、校验、遍历与 JSON-RPC 映射。运行时适配器作者使用 Core 根入口的 `serializeRpcError` / `deserializeRpcError`，保留 Core/Remote 私有脱敏与 forwarding-route 策略；完整 wire walker 唯一归 Contract。两类集成者都用公开 source/code 和错误族守卫解释诊断，不能据此推定 Core 的内部操作身份。"
+                  "text": "`serializeRpcError` / `deserializeRpcError`（包根）在 Core 层传递错误时使用：它们保留 Core 的脱敏与转发路由信息。错误树的结构、校验与 JSON-RPC 映射见 rpc-contract USEGUIDE 第 9 节。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "六个稳定语义 source 保留分包前字符串，按以下普通公开入口导入："
-                },
-                {
-                  "type": "table",
-                  "headers": ["公开入口", "source 常量与值", "错误码表", "第三方用途"],
-                  "rows": [
-                    [
-                      "`@migaia/rpc-contract` / `@migaia/rpc-contract/errors`",
-                      "`RPC_CONTRACT_SOURCE` = `@migaia/rpc/contract`",
-                      "`RpcContractErrorCode`",
-                      "识别非法 envelope、frame、handshake 与错误树，修复对应协议输入。"
-                    ],
-                    [
-                      "`@migaia/rpc-core`",
-                      "`RPC_CORE_ERROR_SOURCE` = `@migaia/rpc/core`",
-                      "`RpcCoreErrorCode`",
-                      "分类 Endpoint 的配置、取消、deadline、transport 与 provider 诊断。"
-                    ],
-                    [
-                      "`@migaia/rpc-core/remote`",
-                      "`RPC_REMOTE_ERROR_SOURCE` = `@migaia/rpc/remote`",
-                      "`RpcRemoteLayerErrorCode`",
-                      "解释 generation 关闭、启动失败及未知结果，按原 outcome/对账路径恢复。"
-                    ],
-                    [
-                      "`@migaia/rpc-process`",
-                      "`RPC_PROCESS_ERROR_SOURCE` = `@migaia/rpc/process`",
-                      "`RpcProcessErrorCode`",
-                      "分类实际 launch、dial、listen、bootstrap 与资源采样失败。"
-                    ],
-                    [
-                      "`@migaia/rpc-threads`",
-                      "`RPC_THREAD_ERROR_SOURCE` = `@migaia/rpc/threads`",
-                      "`RpcThreadErrorCode`",
-                      "报告真实 Worker 采样失败，保留原 cause 并展示 unavailable。"
-                    ],
-                    [
-                      "`@migaia/rpc-bridge-jsonrpc` / `@migaia/rpc-contract/framing/jsonrpc`",
-                      "`JSONRPC_BRIDGE_ERROR_SOURCE` = `@migaia/rpc/bridge/jsonrpc`",
-                      "`JsonRpcBridgeErrorCode`",
-                      "识别 framing、hello/profile 与扩展协商失败，处理实际连接。"
-                    ]
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`RpcCoreErrorText`、`RpcContractErrorText`、`RpcContractErrorDiagnostic`、`RpcProcessErrorText`、`RpcRemoteLayerErrorText`、`JsonRpcBridgeErrorText` 与 Thread 文本表均为私有展示。删除这些已更名包的公开表属于破坏性导出变更；message 字面量不是恢复、重试、终止或关闭契约。Process bootstrap 的环境名、版本、frame 限额和发现超时仍由 `@migaia/rpc-process` 普通导出；stderr 文本/配额常量不公开。"
-                }
-              ]
-            },
-            {
-              "id": "wire-错误-json-rpc-与接纳后的错误展示",
-              "heading": "Wire 错误、JSON-RPC 与接纳后的错误展示",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "`IRpcSerializedError` 的必需字段为 `source`、`code`、`name`、`message`、`stack`；可选字段为 `cause`、`errors`、portable `data`、bounded `route` 和 `truncated: true`。语言中立 JSON schema 从 `@migaia/rpc-contract/schema/wire-error` 的普通子路径读取。Contract 的 `serializeRpcError` 构造有界错误树，`normalizeRpcSerializedError` 验证接收数据，`deserializeRpcError` 保留传输 stack/native error family，`reachRpcError` 按身份去重遍历 cause/AggregateError。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "序列化的 `report` 是必须的诊断 sink，不可静默吞掉投影失败。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`RpcWireErrorField`、`RpcWireErrorViolation`、`RpcWireErrorUnknownFieldMode`、`RpcWireErrorFallback`、`RpcWireErrorLimit` 与 `RpcErrorReachLimit` 公开同一字段顺序、拒绝原因、fallback 与限额。Contract 的 `toJsonRpcError(wire, integerCode)` 把验证后的错误树放入 `RpcJsonRpcWireError.dataKey`；第三方协议拥有 safe integer code。`fromJsonRpcError` 恢复扩展，普通外部 JSON-RPC 错误使用 `RpcJsonRpcWireError.foreignSource` 和整数的 string code；这些映射不改变 transport/cancel 行为。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "普通 wire decoder 只恢复诊断，不注册 Core 的 live control 身份。接纳后的错误字段沿既有 wire、forwarding、缓存失败重放与 terminal report 路径展示，维持既有 source/code/name/message/stack 受控展示和 cause/errors 链策略；这同样适用于 caller 取消 reason 和 store 中已留存的错误。错误字段不能触发 mint、cancel、retry、close、计数、retire 或 replay admission，也不把适配器伪造的诊断字段变成控制身份。展示路径复用原 Error 不证明 Core 创建了它。"
-                }
-              ]
-            },
-            {
-              "id": "适配器抛出自己的错误",
-              "heading": "适配器抛出自己的错误",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "通过 `@migaia/utils/error` 的 `attachErrorIdentity` 添加适配器拥有的 source/code。Core 沿原失败路径保留该对象，或在包装时通过 `cause` 保留原值；不把业务/依赖错误改成安全重试许可。下面是自定义载体写失败的最小例子，source、code 与文本由适配器维护："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { attachErrorIdentity } from '@migaia/utils/error'\n\n/** This application owns its carrier identity independently of Core. */\nconst ADAPTER_SOURCE = '@example/custom-carrier'\n/** A native write failure retains the original cause for diagnosis. */\nconst AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const\n/** Presentation text belongs to this adapter, never Core's private text table. */\nconst AdapterErrorText = { writeFailed: 'adapter write failed' } as const\n\n/** Raise the adapter's own failure when its held native writer rejects. */\nexport function raiseAdapterWriteFailure(cause: unknown): never {\n  throw attachErrorIdentity(new Error(AdapterErrorText.writeFailed, { cause }), {\n    source: ADAPTER_SOURCE,\n    code: AdapterErrorCode.writeFailed\n  })\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "对实际收到的异常做 wire 传输时，使用普通 Core 操作；错误族检查只返回诊断分类："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  isRpcTimeoutError,\n  type RpcTimeoutError\n} from '@migaia/rpc-core'\n\n/** Retain Core's presentation and routes while encoding an actual held failure. */\nexport function transferError(error: unknown, report: (failure: unknown) => void) {\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) })\n  const received: unknown = JSON.parse(JSON.stringify(wire))\n  const restored = deserializeRpcError(received)\n  const timeout: RpcTimeoutError | undefined = isRpcTimeoutError(restored) ? restored : undefined\n  return { restored, timeout, stackPreserved: restored.stack === wire.stack }\n}"
+                  "text": "对端抛出的业务错误会还原为原生类型并保留 `message`、`stack` 与 `cause` 链。来自对端的 source / code 只用于诊断，不会被当作本地库的错误身份，也不授予任何控制权限。"
                 }
               ]
             }
           ],
-          "usageScore": 24,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-index--deserializeRpcError"
         },
@@ -77539,7 +77226,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/middleware/framer.d.ts:framer:export declare function framer<TDescriptor extends IFramerDescriptor>(descriptor: TDescriptor): IRpcPlugin<{ readonly framer: TDescriptor; }>;",
           "guidance": [],
-          "usageScore": 16,
+          "usageScore": 18,
           "configuration": [],
           "fragment": "rpc-core-index--framer"
         },
@@ -77616,23 +77303,23 @@
           ],
           "identity": "packages/rpc-core/dist/core/middleware/hooks.d.ts:hooks:export declare const hooks: (config?: IRpcHooksConfig) => IRpcPlugin;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 14,
           "configuration": [
             {
               "name": "listeners",
               "type": "IRpcHook | readonly IRpcHook[]",
               "optional": true,
-              "description": "",
+              "description": "`hooks({ listeners })` — 观察调用生命周期事件",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`hooks({ listeners })` — 观察调用生命周期事件"
             },
             {
               "name": "onHookError",
               "type": "(error: unknown, event: IRpcHookEvent) => void",
               "optional": true,
-              "description": "",
+              "description": "`hooks` 的 `onHookError` — 钩子监听器抛错时的回调，不影响调用本身",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`hooks` 的 `onHookError` — 钩子监听器抛错时的回调，不影响调用本身"
             }
           ],
           "fragment": "rpc-core-index--hooks"
@@ -79967,7 +79654,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/typing.d.ts:IRpcIdempotencyConfig:export type IRpcIdempotencyConfig = Readonly<{ store?: IRpcIdempotencyStore; scope?: (admission: Readonly<{ token: string; senderId: string; }>) => string; }>;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-core-index--IRpcIdempotencyConfig"
         },
@@ -82486,29 +82173,52 @@
           "identity": "packages/rpc-core/dist/core/errors.d.ts:isRpcError:export declare const isRpcError: (value: unknown) => value is IRpcError;",
           "guidance": [
             {
-              "id": "第三方公开错误面",
-              "heading": "第三方公开错误面",
+              "id": "10-1-判断错误",
+              "heading": "10.1 判断错误",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "协议实现者使用 `@migaia/rpc-contract/errors` 的 wire schema、序列化/校验/遍历及 JSON-RPC 映射；适配器作者使用 Core 根入口的 wire 操作和 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError`。六个 source 常量与各 owner 的错误码表公开，原 source 字符串不变。B6 守卫跨 realm/模块副本用于诊断；`isRpcError` 的 code-is-string 检查不能替代它们。"
+                  "text": "所有错误都是原生 `Error`（或子类），附带 `source` 与 `code`。按 `(source, code)` 分支，不要匹配 `message`。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\n\ntry {\n  await peer.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    // 超时（DEADLINE_EXCEEDED）：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n}"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 按稳定字段判断，跨 Worker、iframe、模块副本都有效；不要依赖 `instanceof`。",
+                    "`isRpcError` 只检查 `code` 是否为字符串，不能代替上面三个守卫。",
+                    "错误类（`RpcError`、`RpcRemoteError`、`RpcTimeoutError` 等）只作为类型导出。唯一可构造的运行时类是 `RpcLifecycleError`，供持有自身释放状态的消费方（例如 Store Worker）报告生命周期失败。"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "错误",
+              "heading": "错误",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["source", "常量", "code 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "`RPC_CORE_ERROR_SOURCE`", "`RpcCoreErrorCode`"],
+                    [
+                      "`@migaia/rpc/remote`",
+                      "`RPC_REMOTE_ERROR_SOURCE`",
+                      "`RpcRemoteLayerErrorCode`"
+                    ]
+                  ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`*ErrorText` / `*Diagnostic` 文本表和 `tagRpcError` 私有；这是更名后包的破坏性导出收敛。错误类仅作类型导出，唯一 `RpcLifecycleError` 运行时类供 Store Worker 等持有自身 dispose 状态的消费方构造诊断，不 mint Core 操作身份。真实 dispose 失败后的 cleanup 展示沿原路径复用原 Error 身份，不决定是否关闭操作。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "已接纳错误的现有字段，包括 caller 取消 reason、store/缓存及解码后的 wire 错误，可沿既有 wire 和 terminal report 展示。mint、cancel、retry、close、计数、retire 与 replay admission 由 owner 私有身份或实际操作状态决定，不能依据这些错误的公开 source/code。普通解码与公开 listener failure helpers 只产生诊断，不登记 Core 控制身份。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "第三方通过 `@migaia/utils/error` 的 `attachErrorIdentity` 抛自己的 source/code；Core 保留原错误或 cause。source/code 表、wire schema/限额、普通 JSON-RPC 映射及短例见 USEGUIDE。"
+                  "text": "按 `(source, code)` 分支，不要匹配 `message`。跨 Worker、iframe 或模块副本时，用 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 判断错误族，而不是 `instanceof`。全部错误码及处理建议见 USEGUIDE 第 10 节。"
                 }
               ]
             }
           ],
-          "usageScore": 6,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-index--isRpcError"
         },
@@ -82587,24 +82297,47 @@
           "identity": "packages/rpc-core/dist/core/errors.d.ts:isRpcErrorInstance:export declare function isRpcErrorInstance(value: unknown): value is RpcError;",
           "guidance": [
             {
-              "id": "第三方公开错误面",
-              "heading": "第三方公开错误面",
+              "id": "10-1-判断错误",
+              "heading": "10.1 判断错误",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "协议实现者使用 `@migaia/rpc-contract/errors` 的 wire schema、序列化/校验/遍历及 JSON-RPC 映射；适配器作者使用 Core 根入口的 wire 操作和 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError`。六个 source 常量与各 owner 的错误码表公开，原 source 字符串不变。B6 守卫跨 realm/模块副本用于诊断；`isRpcError` 的 code-is-string 检查不能替代它们。"
+                  "text": "所有错误都是原生 `Error`（或子类），附带 `source` 与 `code`。按 `(source, code)` 分支，不要匹配 `message`。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\n\ntry {\n  await peer.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    // 超时（DEADLINE_EXCEEDED）：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n}"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 按稳定字段判断，跨 Worker、iframe、模块副本都有效；不要依赖 `instanceof`。",
+                    "`isRpcError` 只检查 `code` 是否为字符串，不能代替上面三个守卫。",
+                    "错误类（`RpcError`、`RpcRemoteError`、`RpcTimeoutError` 等）只作为类型导出。唯一可构造的运行时类是 `RpcLifecycleError`，供持有自身释放状态的消费方（例如 Store Worker）报告生命周期失败。"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "错误",
+              "heading": "错误",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["source", "常量", "code 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "`RPC_CORE_ERROR_SOURCE`", "`RpcCoreErrorCode`"],
+                    [
+                      "`@migaia/rpc/remote`",
+                      "`RPC_REMOTE_ERROR_SOURCE`",
+                      "`RpcRemoteLayerErrorCode`"
+                    ]
+                  ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`*ErrorText` / `*Diagnostic` 文本表和 `tagRpcError` 私有；这是更名后包的破坏性导出收敛。错误类仅作类型导出，唯一 `RpcLifecycleError` 运行时类供 Store Worker 等持有自身 dispose 状态的消费方构造诊断，不 mint Core 操作身份。真实 dispose 失败后的 cleanup 展示沿原路径复用原 Error 身份，不决定是否关闭操作。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "已接纳错误的现有字段，包括 caller 取消 reason、store/缓存及解码后的 wire 错误，可沿既有 wire 和 terminal report 展示。mint、cancel、retry、close、计数、retire 与 replay admission 由 owner 私有身份或实际操作状态决定，不能依据这些错误的公开 source/code。普通解码与公开 listener failure helpers 只产生诊断，不登记 Core 控制身份。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "第三方通过 `@migaia/utils/error` 的 `attachErrorIdentity` 抛自己的 source/code；Core 保留原错误或 cause。source/code 表、wire schema/限额、普通 JSON-RPC 映射及短例见 USEGUIDE。"
+                  "text": "按 `(source, code)` 分支，不要匹配 `message`。跨 Worker、iframe 或模块副本时，用 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 判断错误族，而不是 `instanceof`。全部错误码及处理建议见 USEGUIDE 第 10 节。"
                 }
               ]
             }
@@ -82688,24 +82421,47 @@
           "identity": "packages/rpc-core/dist/core/errors.d.ts:isRpcRemoteError:export declare function isRpcRemoteError(value: unknown): value is RpcRemoteError;",
           "guidance": [
             {
-              "id": "第三方公开错误面",
-              "heading": "第三方公开错误面",
+              "id": "10-1-判断错误",
+              "heading": "10.1 判断错误",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "协议实现者使用 `@migaia/rpc-contract/errors` 的 wire schema、序列化/校验/遍历及 JSON-RPC 映射；适配器作者使用 Core 根入口的 wire 操作和 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError`。六个 source 常量与各 owner 的错误码表公开，原 source 字符串不变。B6 守卫跨 realm/模块副本用于诊断；`isRpcError` 的 code-is-string 检查不能替代它们。"
+                  "text": "所有错误都是原生 `Error`（或子类），附带 `source` 与 `code`。按 `(source, code)` 分支，不要匹配 `message`。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\n\ntry {\n  await peer.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    // 超时（DEADLINE_EXCEEDED）：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n}"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 按稳定字段判断，跨 Worker、iframe、模块副本都有效；不要依赖 `instanceof`。",
+                    "`isRpcError` 只检查 `code` 是否为字符串，不能代替上面三个守卫。",
+                    "错误类（`RpcError`、`RpcRemoteError`、`RpcTimeoutError` 等）只作为类型导出。唯一可构造的运行时类是 `RpcLifecycleError`，供持有自身释放状态的消费方（例如 Store Worker）报告生命周期失败。"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "错误",
+              "heading": "错误",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["source", "常量", "code 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "`RPC_CORE_ERROR_SOURCE`", "`RpcCoreErrorCode`"],
+                    [
+                      "`@migaia/rpc/remote`",
+                      "`RPC_REMOTE_ERROR_SOURCE`",
+                      "`RpcRemoteLayerErrorCode`"
+                    ]
+                  ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`*ErrorText` / `*Diagnostic` 文本表和 `tagRpcError` 私有；这是更名后包的破坏性导出收敛。错误类仅作类型导出，唯一 `RpcLifecycleError` 运行时类供 Store Worker 等持有自身 dispose 状态的消费方构造诊断，不 mint Core 操作身份。真实 dispose 失败后的 cleanup 展示沿原路径复用原 Error 身份，不决定是否关闭操作。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "已接纳错误的现有字段，包括 caller 取消 reason、store/缓存及解码后的 wire 错误，可沿既有 wire 和 terminal report 展示。mint、cancel、retry、close、计数、retire 与 replay admission 由 owner 私有身份或实际操作状态决定，不能依据这些错误的公开 source/code。普通解码与公开 listener failure helpers 只产生诊断，不登记 Core 控制身份。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "第三方通过 `@migaia/utils/error` 的 `attachErrorIdentity` 抛自己的 source/code；Core 保留原错误或 cause。source/code 表、wire schema/限额、普通 JSON-RPC 映射及短例见 USEGUIDE。"
+                  "text": "按 `(source, code)` 分支，不要匹配 `message`。跨 Worker、iframe 或模块副本时，用 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 判断错误族，而不是 `instanceof`。全部错误码及处理建议见 USEGUIDE 第 10 节。"
                 }
               ]
             }
@@ -82735,7 +82491,7 @@
           "errors": ["No documented errors are declared for isRpcTimeoutError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isRpcTimeoutError.",
           "examples": [
-            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  isRpcTimeoutError,\n  type RpcTimeoutError\n} from '@migaia/rpc-core'\n\n/** Retain Core's presentation and routes while encoding an actual held failure. */\nexport function transferError(error: unknown, report: (failure: unknown) => void) {\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) })\n  const received: unknown = JSON.parse(JSON.stringify(wire))\n  const restored = deserializeRpcError(received)\n  const timeout: RpcTimeoutError | undefined = isRpcTimeoutError(restored) ? restored : undefined\n  return { restored, timeout, stackPreserved: restored.stack === wire.stack }\n}"
+            "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\n\ntry {\n  await peer.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    // 超时（DEADLINE_EXCEEDED）：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n}"
           ],
           "members": [],
           "aliasOf": "isRpcTimeoutError",
@@ -82791,48 +82547,47 @@
           "identity": "packages/rpc-core/dist/core/errors.d.ts:isRpcTimeoutError:export declare function isRpcTimeoutError(value: unknown): value is RpcTimeoutError;",
           "guidance": [
             {
-              "id": "适配器抛出自己的错误",
-              "heading": "适配器抛出自己的错误",
+              "id": "10-1-判断错误",
+              "heading": "10.1 判断错误",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "通过 `@migaia/utils/error` 的 `attachErrorIdentity` 添加适配器拥有的 source/code。Core 沿原失败路径保留该对象，或在包装时通过 `cause` 保留原值；不把业务/依赖错误改成安全重试许可。下面是自定义载体写失败的最小例子，source、code 与文本由适配器维护："
+                  "text": "所有错误都是原生 `Error`（或子类），附带 `source` 与 `code`。按 `(source, code)` 分支，不要匹配 `message`。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { attachErrorIdentity } from '@migaia/utils/error'\n\n/** This application owns its carrier identity independently of Core. */\nconst ADAPTER_SOURCE = '@example/custom-carrier'\n/** A native write failure retains the original cause for diagnosis. */\nconst AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const\n/** Presentation text belongs to this adapter, never Core's private text table. */\nconst AdapterErrorText = { writeFailed: 'adapter write failed' } as const\n\n/** Raise the adapter's own failure when its held native writer rejects. */\nexport function raiseAdapterWriteFailure(cause: unknown): never {\n  throw attachErrorIdentity(new Error(AdapterErrorText.writeFailed, { cause }), {\n    source: ADAPTER_SOURCE,\n    code: AdapterErrorCode.writeFailed\n  })\n}"
+                  "code": "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\n\ntry {\n  await peer.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    // 超时（DEADLINE_EXCEEDED）：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n}"
                 },
                 {
-                  "type": "paragraph",
-                  "text": "对实际收到的异常做 wire 传输时，使用普通 Core 操作；错误族检查只返回诊断分类："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  isRpcTimeoutError,\n  type RpcTimeoutError\n} from '@migaia/rpc-core'\n\n/** Retain Core's presentation and routes while encoding an actual held failure. */\nexport function transferError(error: unknown, report: (failure: unknown) => void) {\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) })\n  const received: unknown = JSON.parse(JSON.stringify(wire))\n  const restored = deserializeRpcError(received)\n  const timeout: RpcTimeoutError | undefined = isRpcTimeoutError(restored) ? restored : undefined\n  return { restored, timeout, stackPreserved: restored.stack === wire.stack }\n}"
+                  "type": "list",
+                  "items": [
+                    "`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 按稳定字段判断，跨 Worker、iframe、模块副本都有效；不要依赖 `instanceof`。",
+                    "`isRpcError` 只检查 `code` 是否为字符串，不能代替上面三个守卫。",
+                    "错误类（`RpcError`、`RpcRemoteError`、`RpcTimeoutError` 等）只作为类型导出。唯一可构造的运行时类是 `RpcLifecycleError`，供持有自身释放状态的消费方（例如 Store Worker）报告生命周期失败。"
+                  ]
                 }
               ]
             },
             {
-              "id": "第三方公开错误面",
-              "heading": "第三方公开错误面",
+              "id": "错误",
+              "heading": "错误",
               "blocks": [
                 {
-                  "type": "paragraph",
-                  "text": "协议实现者使用 `@migaia/rpc-contract/errors` 的 wire schema、序列化/校验/遍历及 JSON-RPC 映射；适配器作者使用 Core 根入口的 wire 操作和 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError`。六个 source 常量与各 owner 的错误码表公开，原 source 字符串不变。B6 守卫跨 realm/模块副本用于诊断；`isRpcError` 的 code-is-string 检查不能替代它们。"
+                  "type": "table",
+                  "headers": ["source", "常量", "code 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "`RPC_CORE_ERROR_SOURCE`", "`RpcCoreErrorCode`"],
+                    [
+                      "`@migaia/rpc/remote`",
+                      "`RPC_REMOTE_ERROR_SOURCE`",
+                      "`RpcRemoteLayerErrorCode`"
+                    ]
+                  ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`*ErrorText` / `*Diagnostic` 文本表和 `tagRpcError` 私有；这是更名后包的破坏性导出收敛。错误类仅作类型导出，唯一 `RpcLifecycleError` 运行时类供 Store Worker 等持有自身 dispose 状态的消费方构造诊断，不 mint Core 操作身份。真实 dispose 失败后的 cleanup 展示沿原路径复用原 Error 身份，不决定是否关闭操作。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "已接纳错误的现有字段，包括 caller 取消 reason、store/缓存及解码后的 wire 错误，可沿既有 wire 和 terminal report 展示。mint、cancel、retry、close、计数、retire 与 replay admission 由 owner 私有身份或实际操作状态决定，不能依据这些错误的公开 source/code。普通解码与公开 listener failure helpers 只产生诊断，不登记 Core 控制身份。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "第三方通过 `@migaia/utils/error` 的 `attachErrorIdentity` 抛自己的 source/code；Core 保留原错误或 cause。source/code 表、wire schema/限额、普通 JSON-RPC 映射及短例见 USEGUIDE。"
+                  "text": "按 `(source, code)` 分支，不要匹配 `message`。跨 Worker、iframe 或模块副本时，用 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 判断错误族，而不是 `instanceof`。全部错误码及处理建议见 USEGUIDE 第 10 节。"
                 }
               ]
             }
@@ -82855,7 +82610,9 @@
           "returns": "No explicit return annotation is declared for this const.",
           "errors": ["No documented errors are declared for ping."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ping.",
-          "examples": [],
+          "examples": [
+            "import { createRuntimePeer } from '@migaia/rpc-core/remote'\n\nconst peer = await createRuntimePeer({\n  self: { name: 'client', instanceId: 'client-1' },\n  provide: { ping: () => 'pong' },\n  connect: async (context) => openChannelSomehow(context), // 返回已完成握手的协议通道\n  report: (error) => console.error(error)\n})"
+          ],
           "members": [],
           "aliasOf": "ping",
           "exportPath": ".",
@@ -82899,7 +82656,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/middleware/ping.d.ts:ping:export declare const ping: () => IPingMiddleware;",
           "guidance": [],
-          "usageScore": 8,
+          "usageScore": 28,
           "configuration": [],
           "fragment": "rpc-core-index--ping"
         },
@@ -82982,7 +82739,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/middleware/canonical-protocol.d.ts:protocol:export declare function protocol(): IRpcPlugin<{ readonly protocol: typeof rpcProtocolV1; }>;\nexport declare function protocol<TDescriptor extends IRpcProtocol<IRpcEnvelope, string, number>>(descriptor: TDescriptor): IRpcPlugin<{ readonly protocol: TDescriptor; }>;",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 10,
           "configuration": [],
           "fragment": "rpc-core-index--protocol"
         },
@@ -83000,7 +82757,9 @@
           "returns": "No explicit return annotation is declared for this const.",
           "errors": ["No documented errors are declared for RPC_CORE_ERROR_SOURCE."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RPC_CORE_ERROR_SOURCE.",
-          "examples": [],
+          "examples": [
+            "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\n\ntry {\n  await peer.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    // 超时（DEADLINE_EXCEEDED）：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n}"
+          ],
           "members": [],
           "aliasOf": "RPC_CORE_ERROR_SOURCE",
           "exportPath": ".",
@@ -83047,67 +82806,52 @@
           "identity": "packages/rpc-core/dist/core/errors.d.ts:RPC_CORE_ERROR_SOURCE:export declare const RPC_CORE_ERROR_SOURCE = \"@migaia/rpc/core\";",
           "guidance": [
             {
-              "id": "第三方公开错误面与错误编码",
-              "heading": "第三方公开错误面与错误编码",
+              "id": "10-1-判断错误",
+              "heading": "10.1 判断错误",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "协议实现者（自定义载体或 Go/Python/Rust 对端）从 `@migaia/rpc-contract/errors` 使用完整 wire 错误 schema、校验、遍历与 JSON-RPC 映射。运行时适配器作者使用 Core 根入口的 `serializeRpcError` / `deserializeRpcError`，保留 Core/Remote 私有脱敏与 forwarding-route 策略；完整 wire walker 唯一归 Contract。两类集成者都用公开 source/code 和错误族守卫解释诊断，不能据此推定 Core 的内部操作身份。"
+                  "text": "所有错误都是原生 `Error`（或子类），附带 `source` 与 `code`。按 `(source, code)` 分支，不要匹配 `message`。"
                 },
                 {
-                  "type": "paragraph",
-                  "text": "六个稳定语义 source 保留分包前字符串，按以下普通公开入口导入："
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\n\ntry {\n  await peer.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    // 超时（DEADLINE_EXCEEDED）：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n}"
                 },
+                {
+                  "type": "list",
+                  "items": [
+                    "`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 按稳定字段判断，跨 Worker、iframe、模块副本都有效；不要依赖 `instanceof`。",
+                    "`isRpcError` 只检查 `code` 是否为字符串，不能代替上面三个守卫。",
+                    "错误类（`RpcError`、`RpcRemoteError`、`RpcTimeoutError` 等）只作为类型导出。唯一可构造的运行时类是 `RpcLifecycleError`，供持有自身释放状态的消费方（例如 Store Worker）报告生命周期失败。"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "错误",
+              "heading": "错误",
+              "blocks": [
                 {
                   "type": "table",
-                  "headers": ["公开入口", "source 常量与值", "错误码表", "第三方用途"],
+                  "headers": ["source", "常量", "code 表"],
                   "rows": [
+                    ["`@migaia/rpc/core`", "`RPC_CORE_ERROR_SOURCE`", "`RpcCoreErrorCode`"],
                     [
-                      "`@migaia/rpc-contract` / `@migaia/rpc-contract/errors`",
-                      "`RPC_CONTRACT_SOURCE` = `@migaia/rpc/contract`",
-                      "`RpcContractErrorCode`",
-                      "识别非法 envelope、frame、handshake 与错误树，修复对应协议输入。"
-                    ],
-                    [
-                      "`@migaia/rpc-core`",
-                      "`RPC_CORE_ERROR_SOURCE` = `@migaia/rpc/core`",
-                      "`RpcCoreErrorCode`",
-                      "分类 Endpoint 的配置、取消、deadline、transport 与 provider 诊断。"
-                    ],
-                    [
-                      "`@migaia/rpc-core/remote`",
-                      "`RPC_REMOTE_ERROR_SOURCE` = `@migaia/rpc/remote`",
-                      "`RpcRemoteLayerErrorCode`",
-                      "解释 generation 关闭、启动失败及未知结果，按原 outcome/对账路径恢复。"
-                    ],
-                    [
-                      "`@migaia/rpc-process`",
-                      "`RPC_PROCESS_ERROR_SOURCE` = `@migaia/rpc/process`",
-                      "`RpcProcessErrorCode`",
-                      "分类实际 launch、dial、listen、bootstrap 与资源采样失败。"
-                    ],
-                    [
-                      "`@migaia/rpc-threads`",
-                      "`RPC_THREAD_ERROR_SOURCE` = `@migaia/rpc/threads`",
-                      "`RpcThreadErrorCode`",
-                      "报告真实 Worker 采样失败，保留原 cause 并展示 unavailable。"
-                    ],
-                    [
-                      "`@migaia/rpc-bridge-jsonrpc` / `@migaia/rpc-contract/framing/jsonrpc`",
-                      "`JSONRPC_BRIDGE_ERROR_SOURCE` = `@migaia/rpc/bridge/jsonrpc`",
-                      "`JsonRpcBridgeErrorCode`",
-                      "识别 framing、hello/profile 与扩展协商失败，处理实际连接。"
+                      "`@migaia/rpc/remote`",
+                      "`RPC_REMOTE_ERROR_SOURCE`",
+                      "`RpcRemoteLayerErrorCode`"
                     ]
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`RpcCoreErrorText`、`RpcContractErrorText`、`RpcContractErrorDiagnostic`、`RpcProcessErrorText`、`RpcRemoteLayerErrorText`、`JsonRpcBridgeErrorText` 与 Thread 文本表均为私有展示。删除这些已更名包的公开表属于破坏性导出变更；message 字面量不是恢复、重试、终止或关闭契约。Process bootstrap 的环境名、版本、frame 限额和发现超时仍由 `@migaia/rpc-process` 普通导出；stderr 文本/配额常量不公开。"
+                  "text": "按 `(source, code)` 分支，不要匹配 `message`。跨 Worker、iframe 或模块副本时，用 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 判断错误族，而不是 `instanceof`。全部错误码及处理建议见 USEGUIDE 第 10 节。"
                 }
               ]
             }
           ],
-          "usageScore": 4,
+          "usageScore": 16,
           "configuration": [],
           "fragment": "rpc-core-index--RPC_CORE_ERROR_SOURCE"
         },
@@ -83364,7 +83108,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/errors.d.ts:RpcConfigurationError:export type { RpcConfigurationError } from './errors.js';",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-core-index--RpcConfigurationError"
         },
@@ -83504,68 +83248,7 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/errors.d.ts:RpcContractError:export type { RpcContractError } from './errors.js';",
-          "guidance": [
-            {
-              "id": "第三方公开错误面与错误编码",
-              "heading": "第三方公开错误面与错误编码",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "协议实现者（自定义载体或 Go/Python/Rust 对端）从 `@migaia/rpc-contract/errors` 使用完整 wire 错误 schema、校验、遍历与 JSON-RPC 映射。运行时适配器作者使用 Core 根入口的 `serializeRpcError` / `deserializeRpcError`，保留 Core/Remote 私有脱敏与 forwarding-route 策略；完整 wire walker 唯一归 Contract。两类集成者都用公开 source/code 和错误族守卫解释诊断，不能据此推定 Core 的内部操作身份。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "六个稳定语义 source 保留分包前字符串，按以下普通公开入口导入："
-                },
-                {
-                  "type": "table",
-                  "headers": ["公开入口", "source 常量与值", "错误码表", "第三方用途"],
-                  "rows": [
-                    [
-                      "`@migaia/rpc-contract` / `@migaia/rpc-contract/errors`",
-                      "`RPC_CONTRACT_SOURCE` = `@migaia/rpc/contract`",
-                      "`RpcContractErrorCode`",
-                      "识别非法 envelope、frame、handshake 与错误树，修复对应协议输入。"
-                    ],
-                    [
-                      "`@migaia/rpc-core`",
-                      "`RPC_CORE_ERROR_SOURCE` = `@migaia/rpc/core`",
-                      "`RpcCoreErrorCode`",
-                      "分类 Endpoint 的配置、取消、deadline、transport 与 provider 诊断。"
-                    ],
-                    [
-                      "`@migaia/rpc-core/remote`",
-                      "`RPC_REMOTE_ERROR_SOURCE` = `@migaia/rpc/remote`",
-                      "`RpcRemoteLayerErrorCode`",
-                      "解释 generation 关闭、启动失败及未知结果，按原 outcome/对账路径恢复。"
-                    ],
-                    [
-                      "`@migaia/rpc-process`",
-                      "`RPC_PROCESS_ERROR_SOURCE` = `@migaia/rpc/process`",
-                      "`RpcProcessErrorCode`",
-                      "分类实际 launch、dial、listen、bootstrap 与资源采样失败。"
-                    ],
-                    [
-                      "`@migaia/rpc-threads`",
-                      "`RPC_THREAD_ERROR_SOURCE` = `@migaia/rpc/threads`",
-                      "`RpcThreadErrorCode`",
-                      "报告真实 Worker 采样失败，保留原 cause 并展示 unavailable。"
-                    ],
-                    [
-                      "`@migaia/rpc-bridge-jsonrpc` / `@migaia/rpc-contract/framing/jsonrpc`",
-                      "`JSONRPC_BRIDGE_ERROR_SOURCE` = `@migaia/rpc/bridge/jsonrpc`",
-                      "`JsonRpcBridgeErrorCode`",
-                      "识别 framing、hello/profile 与扩展协商失败，处理实际连接。"
-                    ]
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`RpcCoreErrorText`、`RpcContractErrorText`、`RpcContractErrorDiagnostic`、`RpcProcessErrorText`、`RpcRemoteLayerErrorText`、`JsonRpcBridgeErrorText` 与 Thread 文本表均为私有展示。删除这些已更名包的公开表属于破坏性导出变更；message 字面量不是恢复、重试、终止或关闭契约。Process bootstrap 的环境名、版本、frame 限额和发现超时仍由 `@migaia/rpc-process` 普通导出；stderr 文本/配额常量不公开。"
-                }
-              ]
-            }
-          ],
+          "guidance": [],
           "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-core-index--RpcContractError"
@@ -83584,7 +83267,9 @@
           "returns": "No explicit return annotation is declared for this const.",
           "errors": ["No documented errors are declared for RpcCoreErrorCode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcCoreErrorCode.",
-          "examples": [],
+          "examples": [
+            "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\n\ntry {\n  await peer.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    // 超时（DEADLINE_EXCEEDED）：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n}"
+          ],
           "members": [],
           "aliasOf": "RpcCoreErrorCode",
           "exportPath": ".",
@@ -83631,67 +83316,52 @@
           "identity": "packages/rpc-core/dist/core/error-code.d.ts:RpcCoreErrorCode:export declare const RpcCoreErrorCode: { /** * BCPS1 rejects a second resolved owner instance before it constructs resources in this realm. * Fix dependency resolution and reload; the first instance and other realms continue normally. */ readonly duplicateModuleInstance: \"DUPLICATE_MODULE_INSTANCE\"; /** * The selected authenticated provider/caller generation no longer matches this task; select * again. */ readonly providerGenerationMismatch: \"PROVIDER_GENERATION_MISMATCH\"; /** U38 retires an admitted forward execution with its exact generation; never replay it. */ readonly providerGenerationRetired: \"PROVIDER_GENERATION_RETIRED\"; /** * A signed route already contains this Host or the selected next Host. D51 rejects before * admission and sending; callers must choose a route that does not revisit a Host. */ readonly forwardLoop: \"FORWARD_LOOP\"; /** * Three forwarding nodes have already been visited. D51 rejects a fourth before admission and * sending; callers may establish a direct connect/listen channel instead. */ readonly forwardHopLimit: \"FORWARD_HOP_LIMIT\"; /** * 两个 middleware 在同一 factory 里声明了相同的 `name`。 * * 安装器在安装任何 middleware 之前拒绝；调用方应给每个 middleware 唯一的 name。落实 §7.1 的 「重复 singleton middleware 创建失败」。 */ readonly middlewareDuplicated: \"MIDDLEWARE_DUPLICATED\"; /** * 某个必需 capability 未安装，却执行了依赖它的操作。 * * 例如未装 `connect` 就构造 endpoint、未装 `ping` 就调用 `ping()`、未装 `abort` 就传 `signal`。 调用方应补齐对应的 * middleware。 */ readonly middlewareMissing: \"MIDDLEWARE_MISSING\"; /** * A Runtime API operation requires a mode or capability absent from the actual peer agreement. * Enforces D5/D42; choose a supported method/mode rather than retrying the same operation. */ readonly capabilityUnsupported: \"CAPABILITY_UNSUPPORTED\"; /** * Factory / middleware / transport 描述符非法或配置字段取值不合法。 Replay r12 also rejects encrypt-only * configuration, unavailable entropy and exhausted counters. * * 这是参数/配置类错误的统一出口；调用方应按 `detail` 修正配置后重试，不要对同一份配置重试。 */ readonly invalidConfig: \"INVALID_CONFIG\"; /** * 同一个 method 被 `provide()` 注册了两次。 * * 同名 provider 不覆盖；调用方应合并实现或改名。 */ readonly providerDuplicated: \"PROVIDER_DUPLICATED\"; /** * Protocol codec / scheme / envelope 非法，或 caller 无法还原响应错误、provider 收到非法 abort 载荷；作为 * `RpcProtocolError` 的基础码。 * * 调用方检查 protocol 配置与对端 scheme 是否一致；载荷已发送或取消已生效时检查对端，不要对同一报文重试。 */ readonly protocolInvalid: \"PROTOCOL_INVALID\"; /** * Contract 字段、方向或 request/response 关联不合法，作为 `RpcContractError` 的基础码。 * * 调用方检查 version、identifier、sender/target 方向或 taskId/method 关联。 */ readonly contractInvalid: \"CONTRACT_INVALID\"; /** * Codec 的 payload 不符合其输入规则，或发送端错误序列化的读取、data 投影降级；作为 `RpcSerializationError` / `RpcChunkError` * 的基础码。 Physical batch shape/encoding failures preserve the contract cause; malformed semantic * members are reported individually without discarding valid siblings. * * 调用方检查 data、codec 或抛出值；载荷已照常发送或取消已生效时不应重试同一 payload。 */ readonly payloadInvalid: \"PAYLOAD_INVALID\"; /** * Provider 执行器解析不到目标 method 的 provider（`Provider not found`）。 * * 调用方检查 method 是否已 `provide()`；不可重试。这是入站 provider 查找失败的线材码。 */ readonly providerNotFound: \"PROVIDER_NOT_FOUND\"; /** * 非 dispatch provider 没有返回 `ctx.success()` / `ctx.failed()`。 * * 调用方应让 provider 的每个非 dispatch 分支都显式返回结果，或确认本意是 dispatch。 */ readonly providerNotSettled: \"PROVIDER_NOT_SETTLED\"; /** * Provider 抛出了未处理异常，作为 `INTERNAL` 响应的标准码。 * * 原始异常只进本地 hooks（脱敏），不进对端；调用方看远端会收到 `RpcRemoteError`（code `INTERNAL`）。 */ readonly internal: \"INTERNAL\"; /** * 目标或 receiver 未解析、失活或不属于当前 binding。 * * 调用方检查 targetId 是否已注册/发现，或 `receiverSelector` 是否返回了未知 receiver。 */ readonly targetUnknown: \"TARGET_UNKNOWN\"; /** * 操作要求独立 receiver，但目标是匿名 BroadcastChannel 广播组。 * * 调用方应配置 `uniqueTargetId` + `identifier` 后 pin，或放弃对广播组的逐实例操作。 */ readonly targetNotIdentifiable: \"TARGET_NOT_IDENTIFIABLE\"; /** * Endpoint 已 dispose 后继续调用其 API（`RpcLifecycleError`）。 * * 调用方应新建 endpoint，不要复用已关闭的实例。 */ readonly endpointDisposed: \"ENDPOINT_DISPOSED\"; /** * 调用方 AbortSignal 取消了本地 send（`RpcAbortError`）。 * * 这是协作式取消的结果；调用方按取消处理，不要把它当作远端失败。 */ readonly cancelled: \"CANCELLED\"; /** * 本地 deadline 到期（`RpcTimeoutError`）。 * * 调用方检查目标是否可达或超时是否过短；请求失败按单次传输结果处理。 */ readonly deadlineExceeded: \"DEADLINE_EXCEEDED\"; /** * `ctx.success()` / `ctx.failed()` 在 provider 任务结束后仍被调用。 * * 结果已过期，不会产生 wire 副作用；调用方应把响应逻辑收敛到 provider 的同步/await 生命周期内。 */ readonly contextExpired: \"PROVIDER_CONTEXT_EXPIRED\"; /** * Transport 发送失败、terminal 事件或 transport 关闭（`RpcTransportError`）。 * * 调用方检查底层通道状态；这是可重试的瞬时类失败（相对远端业务失败）。 */ readonly transport: \"TRANSPORT\"; /** * Authentication 的逐 frame transform（encrypt/sign/verify/decrypt）失败（`RpcAuthenticationError`）。 * Replay r12 rejects missing/invalid binding, duplicate counters and untrusted physical * sessions. * * 调用方检查密钥/算法配置；失败不向远端回传细节。 */ readonly authenticationFailed: \"AUTHENTICATION_FAILED\"; /** * Method 的 params/result 不满足 contract schema（`RpcSchemaValidationError`）。 * * 调用方按 `data.issues` 修正 data；schema 失败是稳定的，不要重试同一份 data。 */ readonly schemaInvalid: \"SCHEMA_INVALID\"; /** * 同一个 capability 被重复发布，或冻结的 capability registry 被二次写入。 I28 D8/D11 also rejects folded Feature * method collisions and ambiguous runtime instances. * * 调用方检查 middleware 是否重复声明了保留 capability；这是配置错误。 */ readonly capabilityConflict: \"CAPABILITY_CONFLICT\"; /** * 本地容量限制（provider admission / replay ledger / discovery waiter / outbound id / chunk 容量）拒绝新工作。 * * 调用方降低并发、缩短 TTL 或扩容；是背压信号，不是逻辑错误。 */ readonly overloaded: \"OVERLOADED\"; /** * A stream frame may have been sent before its transport rejected; the caller must open a fresh * stream and never replay delivered values (streaming R7). */ readonly streamResultUnknown: \"STREAM_RESULT_UNKNOWN\"; /** * Chunk frame 格式非法，作为 `RpcChunkError` 的基础码。 * * 调用方检查分片配置（chunkSize ≥ 4）与对端实现；非法帧只触发 hooks，不重试。 */ readonly chunkInvalid: \"CHUNK_INVALID\"; /** 无同步报告器的 safeRead 遇到 getter/Proxy 抛错，或报告器自身抛错（R11）。 调用方应修复输入对象，或在拥有诊断 sink 的边界传入同步 report。 */ readonly propertyReadFailed: \"PROPERTY_READ_FAILED\"; /** * A keyed call already executed but its result was not retained for replay. The caller must * resolve the outcome before issuing another non-idempotent attempt. */ readonly idempotencyResultUnavailable: \"IDEMPOTENCY_RESULT_UNAVAILABLE\"; /** * A string conversion throws without a synchronous reporter, or its reporter throws (cleanup * R12). The caller must repair the input or provide a synchronous diagnostic sink. */ readonly stringConversionFailed: \"STRING_CONVERSION_FAILED\"; };",
           "guidance": [
             {
-              "id": "第三方公开错误面与错误编码",
-              "heading": "第三方公开错误面与错误编码",
+              "id": "10-1-判断错误",
+              "heading": "10.1 判断错误",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "协议实现者（自定义载体或 Go/Python/Rust 对端）从 `@migaia/rpc-contract/errors` 使用完整 wire 错误 schema、校验、遍历与 JSON-RPC 映射。运行时适配器作者使用 Core 根入口的 `serializeRpcError` / `deserializeRpcError`，保留 Core/Remote 私有脱敏与 forwarding-route 策略；完整 wire walker 唯一归 Contract。两类集成者都用公开 source/code 和错误族守卫解释诊断，不能据此推定 Core 的内部操作身份。"
+                  "text": "所有错误都是原生 `Error`（或子类），附带 `source` 与 `code`。按 `(source, code)` 分支，不要匹配 `message`。"
                 },
                 {
-                  "type": "paragraph",
-                  "text": "六个稳定语义 source 保留分包前字符串，按以下普通公开入口导入："
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\n\ntry {\n  await peer.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    // 超时（DEADLINE_EXCEEDED）：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n}"
                 },
+                {
+                  "type": "list",
+                  "items": [
+                    "`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 按稳定字段判断，跨 Worker、iframe、模块副本都有效；不要依赖 `instanceof`。",
+                    "`isRpcError` 只检查 `code` 是否为字符串，不能代替上面三个守卫。",
+                    "错误类（`RpcError`、`RpcRemoteError`、`RpcTimeoutError` 等）只作为类型导出。唯一可构造的运行时类是 `RpcLifecycleError`，供持有自身释放状态的消费方（例如 Store Worker）报告生命周期失败。"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "错误",
+              "heading": "错误",
+              "blocks": [
                 {
                   "type": "table",
-                  "headers": ["公开入口", "source 常量与值", "错误码表", "第三方用途"],
+                  "headers": ["source", "常量", "code 表"],
                   "rows": [
+                    ["`@migaia/rpc/core`", "`RPC_CORE_ERROR_SOURCE`", "`RpcCoreErrorCode`"],
                     [
-                      "`@migaia/rpc-contract` / `@migaia/rpc-contract/errors`",
-                      "`RPC_CONTRACT_SOURCE` = `@migaia/rpc/contract`",
-                      "`RpcContractErrorCode`",
-                      "识别非法 envelope、frame、handshake 与错误树，修复对应协议输入。"
-                    ],
-                    [
-                      "`@migaia/rpc-core`",
-                      "`RPC_CORE_ERROR_SOURCE` = `@migaia/rpc/core`",
-                      "`RpcCoreErrorCode`",
-                      "分类 Endpoint 的配置、取消、deadline、transport 与 provider 诊断。"
-                    ],
-                    [
-                      "`@migaia/rpc-core/remote`",
-                      "`RPC_REMOTE_ERROR_SOURCE` = `@migaia/rpc/remote`",
-                      "`RpcRemoteLayerErrorCode`",
-                      "解释 generation 关闭、启动失败及未知结果，按原 outcome/对账路径恢复。"
-                    ],
-                    [
-                      "`@migaia/rpc-process`",
-                      "`RPC_PROCESS_ERROR_SOURCE` = `@migaia/rpc/process`",
-                      "`RpcProcessErrorCode`",
-                      "分类实际 launch、dial、listen、bootstrap 与资源采样失败。"
-                    ],
-                    [
-                      "`@migaia/rpc-threads`",
-                      "`RPC_THREAD_ERROR_SOURCE` = `@migaia/rpc/threads`",
-                      "`RpcThreadErrorCode`",
-                      "报告真实 Worker 采样失败，保留原 cause 并展示 unavailable。"
-                    ],
-                    [
-                      "`@migaia/rpc-bridge-jsonrpc` / `@migaia/rpc-contract/framing/jsonrpc`",
-                      "`JSONRPC_BRIDGE_ERROR_SOURCE` = `@migaia/rpc/bridge/jsonrpc`",
-                      "`JsonRpcBridgeErrorCode`",
-                      "识别 framing、hello/profile 与扩展协商失败，处理实际连接。"
+                      "`@migaia/rpc/remote`",
+                      "`RPC_REMOTE_ERROR_SOURCE`",
+                      "`RpcRemoteLayerErrorCode`"
                     ]
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`RpcCoreErrorText`、`RpcContractErrorText`、`RpcContractErrorDiagnostic`、`RpcProcessErrorText`、`RpcRemoteLayerErrorText`、`JsonRpcBridgeErrorText` 与 Thread 文本表均为私有展示。删除这些已更名包的公开表属于破坏性导出变更；message 字面量不是恢复、重试、终止或关闭契约。Process bootstrap 的环境名、版本、frame 限额和发现超时仍由 `@migaia/rpc-process` 普通导出；stderr 文本/配额常量不公开。"
+                  "text": "按 `(source, code)` 分支，不要匹配 `message`。跨 Worker、iframe 或模块副本时，用 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 判断错误族，而不是 `instanceof`。全部错误码及处理建议见 USEGUIDE 第 10 节。"
                 }
               ]
             }
           ],
-          "usageScore": 4,
+          "usageScore": 16,
           "configuration": [],
           "fragment": "rpc-core-index--RpcCoreErrorCode"
         },
@@ -83787,130 +83457,61 @@
           "identity": "packages/rpc-core/dist/core/errors.d.ts:RpcError:export type { RpcError } from './errors.js';",
           "guidance": [
             {
-              "id": "第三方公开错误面与错误编码",
-              "heading": "第三方公开错误面与错误编码",
+              "id": "10-1-判断错误",
+              "heading": "10.1 判断错误",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "协议实现者（自定义载体或 Go/Python/Rust 对端）从 `@migaia/rpc-contract/errors` 使用完整 wire 错误 schema、校验、遍历与 JSON-RPC 映射。运行时适配器作者使用 Core 根入口的 `serializeRpcError` / `deserializeRpcError`，保留 Core/Remote 私有脱敏与 forwarding-route 策略；完整 wire walker 唯一归 Contract。两类集成者都用公开 source/code 和错误族守卫解释诊断，不能据此推定 Core 的内部操作身份。"
+                  "text": "所有错误都是原生 `Error`（或子类），附带 `source` 与 `code`。按 `(source, code)` 分支，不要匹配 `message`。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\n\ntry {\n  await peer.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    // 超时（DEADLINE_EXCEEDED）：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n}"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 按稳定字段判断，跨 Worker、iframe、模块副本都有效；不要依赖 `instanceof`。",
+                    "`isRpcError` 只检查 `code` 是否为字符串，不能代替上面三个守卫。",
+                    "错误类（`RpcError`、`RpcRemoteError`、`RpcTimeoutError` 等）只作为类型导出。唯一可构造的运行时类是 `RpcLifecycleError`，供持有自身释放状态的消费方（例如 Store Worker）报告生命周期失败。"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "10-4-跨进程传递错误",
+              "heading": "10.4 跨进程传递错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`serializeRpcError` / `deserializeRpcError`（包根）在 Core 层传递错误时使用：它们保留 Core 的脱敏与转发路由信息。错误树的结构、校验与 JSON-RPC 映射见 rpc-contract USEGUIDE 第 9 节。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "六个稳定语义 source 保留分包前字符串，按以下普通公开入口导入："
-                },
+                  "text": "对端抛出的业务错误会还原为原生类型并保留 `message`、`stack` 与 `cause` 链。来自对端的 source / code 只用于诊断，不会被当作本地库的错误身份，也不授予任何控制权限。"
+                }
+              ]
+            },
+            {
+              "id": "错误",
+              "heading": "错误",
+              "blocks": [
                 {
                   "type": "table",
-                  "headers": ["公开入口", "source 常量与值", "错误码表", "第三方用途"],
+                  "headers": ["source", "常量", "code 表"],
                   "rows": [
+                    ["`@migaia/rpc/core`", "`RPC_CORE_ERROR_SOURCE`", "`RpcCoreErrorCode`"],
                     [
-                      "`@migaia/rpc-contract` / `@migaia/rpc-contract/errors`",
-                      "`RPC_CONTRACT_SOURCE` = `@migaia/rpc/contract`",
-                      "`RpcContractErrorCode`",
-                      "识别非法 envelope、frame、handshake 与错误树，修复对应协议输入。"
-                    ],
-                    [
-                      "`@migaia/rpc-core`",
-                      "`RPC_CORE_ERROR_SOURCE` = `@migaia/rpc/core`",
-                      "`RpcCoreErrorCode`",
-                      "分类 Endpoint 的配置、取消、deadline、transport 与 provider 诊断。"
-                    ],
-                    [
-                      "`@migaia/rpc-core/remote`",
-                      "`RPC_REMOTE_ERROR_SOURCE` = `@migaia/rpc/remote`",
-                      "`RpcRemoteLayerErrorCode`",
-                      "解释 generation 关闭、启动失败及未知结果，按原 outcome/对账路径恢复。"
-                    ],
-                    [
-                      "`@migaia/rpc-process`",
-                      "`RPC_PROCESS_ERROR_SOURCE` = `@migaia/rpc/process`",
-                      "`RpcProcessErrorCode`",
-                      "分类实际 launch、dial、listen、bootstrap 与资源采样失败。"
-                    ],
-                    [
-                      "`@migaia/rpc-threads`",
-                      "`RPC_THREAD_ERROR_SOURCE` = `@migaia/rpc/threads`",
-                      "`RpcThreadErrorCode`",
-                      "报告真实 Worker 采样失败，保留原 cause 并展示 unavailable。"
-                    ],
-                    [
-                      "`@migaia/rpc-bridge-jsonrpc` / `@migaia/rpc-contract/framing/jsonrpc`",
-                      "`JSONRPC_BRIDGE_ERROR_SOURCE` = `@migaia/rpc/bridge/jsonrpc`",
-                      "`JsonRpcBridgeErrorCode`",
-                      "识别 framing、hello/profile 与扩展协商失败，处理实际连接。"
+                      "`@migaia/rpc/remote`",
+                      "`RPC_REMOTE_ERROR_SOURCE`",
+                      "`RpcRemoteLayerErrorCode`"
                     ]
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`RpcCoreErrorText`、`RpcContractErrorText`、`RpcContractErrorDiagnostic`、`RpcProcessErrorText`、`RpcRemoteLayerErrorText`、`JsonRpcBridgeErrorText` 与 Thread 文本表均为私有展示。删除这些已更名包的公开表属于破坏性导出变更；message 字面量不是恢复、重试、终止或关闭契约。Process bootstrap 的环境名、版本、frame 限额和发现超时仍由 `@migaia/rpc-process` 普通导出；stderr 文本/配额常量不公开。"
-                }
-              ]
-            },
-            {
-              "id": "wire-错误-json-rpc-与接纳后的错误展示",
-              "heading": "Wire 错误、JSON-RPC 与接纳后的错误展示",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "`IRpcSerializedError` 的必需字段为 `source`、`code`、`name`、`message`、`stack`；可选字段为 `cause`、`errors`、portable `data`、bounded `route` 和 `truncated: true`。语言中立 JSON schema 从 `@migaia/rpc-contract/schema/wire-error` 的普通子路径读取。Contract 的 `serializeRpcError` 构造有界错误树，`normalizeRpcSerializedError` 验证接收数据，`deserializeRpcError` 保留传输 stack/native error family，`reachRpcError` 按身份去重遍历 cause/AggregateError。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "序列化的 `report` 是必须的诊断 sink，不可静默吞掉投影失败。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`RpcWireErrorField`、`RpcWireErrorViolation`、`RpcWireErrorUnknownFieldMode`、`RpcWireErrorFallback`、`RpcWireErrorLimit` 与 `RpcErrorReachLimit` 公开同一字段顺序、拒绝原因、fallback 与限额。Contract 的 `toJsonRpcError(wire, integerCode)` 把验证后的错误树放入 `RpcJsonRpcWireError.dataKey`；第三方协议拥有 safe integer code。`fromJsonRpcError` 恢复扩展，普通外部 JSON-RPC 错误使用 `RpcJsonRpcWireError.foreignSource` 和整数的 string code；这些映射不改变 transport/cancel 行为。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "普通 wire decoder 只恢复诊断，不注册 Core 的 live control 身份。接纳后的错误字段沿既有 wire、forwarding、缓存失败重放与 terminal report 路径展示，维持既有 source/code/name/message/stack 受控展示和 cause/errors 链策略；这同样适用于 caller 取消 reason 和 store 中已留存的错误。错误字段不能触发 mint、cancel、retry、close、计数、retire 或 replay admission，也不把适配器伪造的诊断字段变成控制身份。展示路径复用原 Error 不证明 Core 创建了它。"
-                }
-              ]
-            },
-            {
-              "id": "适配器抛出自己的错误",
-              "heading": "适配器抛出自己的错误",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "通过 `@migaia/utils/error` 的 `attachErrorIdentity` 添加适配器拥有的 source/code。Core 沿原失败路径保留该对象，或在包装时通过 `cause` 保留原值；不把业务/依赖错误改成安全重试许可。下面是自定义载体写失败的最小例子，source、code 与文本由适配器维护："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { attachErrorIdentity } from '@migaia/utils/error'\n\n/** This application owns its carrier identity independently of Core. */\nconst ADAPTER_SOURCE = '@example/custom-carrier'\n/** A native write failure retains the original cause for diagnosis. */\nconst AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const\n/** Presentation text belongs to this adapter, never Core's private text table. */\nconst AdapterErrorText = { writeFailed: 'adapter write failed' } as const\n\n/** Raise the adapter's own failure when its held native writer rejects. */\nexport function raiseAdapterWriteFailure(cause: unknown): never {\n  throw attachErrorIdentity(new Error(AdapterErrorText.writeFailed, { cause }), {\n    source: ADAPTER_SOURCE,\n    code: AdapterErrorCode.writeFailed\n  })\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "对实际收到的异常做 wire 传输时，使用普通 Core 操作；错误族检查只返回诊断分类："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  isRpcTimeoutError,\n  type RpcTimeoutError\n} from '@migaia/rpc-core'\n\n/** Retain Core's presentation and routes while encoding an actual held failure. */\nexport function transferError(error: unknown, report: (failure: unknown) => void) {\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) })\n  const received: unknown = JSON.parse(JSON.stringify(wire))\n  const restored = deserializeRpcError(received)\n  const timeout: RpcTimeoutError | undefined = isRpcTimeoutError(restored) ? restored : undefined\n  return { restored, timeout, stackPreserved: restored.stack === wire.stack }\n}"
-                }
-              ]
-            },
-            {
-              "id": "第三方公开错误面",
-              "heading": "第三方公开错误面",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "协议实现者使用 `@migaia/rpc-contract/errors` 的 wire schema、序列化/校验/遍历及 JSON-RPC 映射；适配器作者使用 Core 根入口的 wire 操作和 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError`。六个 source 常量与各 owner 的错误码表公开，原 source 字符串不变。B6 守卫跨 realm/模块副本用于诊断；`isRpcError` 的 code-is-string 检查不能替代它们。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`*ErrorText` / `*Diagnostic` 文本表和 `tagRpcError` 私有；这是更名后包的破坏性导出收敛。错误类仅作类型导出，唯一 `RpcLifecycleError` 运行时类供 Store Worker 等持有自身 dispose 状态的消费方构造诊断，不 mint Core 操作身份。真实 dispose 失败后的 cleanup 展示沿原路径复用原 Error 身份，不决定是否关闭操作。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "已接纳错误的现有字段，包括 caller 取消 reason、store/缓存及解码后的 wire 错误，可沿既有 wire 和 terminal report 展示。mint、cancel、retry、close、计数、retire 与 replay admission 由 owner 私有身份或实际操作状态决定，不能依据这些错误的公开 source/code。普通解码与公开 listener failure helpers 只产生诊断，不登记 Core 控制身份。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "第三方通过 `@migaia/utils/error` 的 `attachErrorIdentity` 抛自己的 source/code；Core 保留原错误或 cause。source/code 表、wire schema/限额、普通 JSON-RPC 映射及短例见 USEGUIDE。"
+                  "text": "按 `(source, code)` 分支，不要匹配 `message`。跨 Worker、iframe 或模块副本时，用 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 判断错误族，而不是 `instanceof`。全部错误码及处理建议见 USEGUIDE 第 10 节。"
                 }
               ]
             }
@@ -84027,29 +83628,30 @@
           "identity": "packages/rpc-core/dist/core/errors.d.ts:RpcLifecycleError:export declare class RpcLifecycleError extends RpcError { readonly cleanupErrors?: readonly IRpcCleanupError[]; constructor(message: string, cause?: unknown, cleanupErrors?: readonly IRpcCleanupError[]); }",
           "guidance": [
             {
-              "id": "第三方公开错误面",
-              "heading": "第三方公开错误面",
+              "id": "10-1-判断错误",
+              "heading": "10.1 判断错误",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "协议实现者使用 `@migaia/rpc-contract/errors` 的 wire schema、序列化/校验/遍历及 JSON-RPC 映射；适配器作者使用 Core 根入口的 wire 操作和 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError`。六个 source 常量与各 owner 的错误码表公开，原 source 字符串不变。B6 守卫跨 realm/模块副本用于诊断；`isRpcError` 的 code-is-string 检查不能替代它们。"
+                  "text": "所有错误都是原生 `Error`（或子类），附带 `source` 与 `code`。按 `(source, code)` 分支，不要匹配 `message`。"
                 },
                 {
-                  "type": "paragraph",
-                  "text": "`*ErrorText` / `*Diagnostic` 文本表和 `tagRpcError` 私有；这是更名后包的破坏性导出收敛。错误类仅作类型导出，唯一 `RpcLifecycleError` 运行时类供 Store Worker 等持有自身 dispose 状态的消费方构造诊断，不 mint Core 操作身份。真实 dispose 失败后的 cleanup 展示沿原路径复用原 Error 身份，不决定是否关闭操作。"
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\n\ntry {\n  await peer.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    // 超时（DEADLINE_EXCEEDED）：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n}"
                 },
                 {
-                  "type": "paragraph",
-                  "text": "已接纳错误的现有字段，包括 caller 取消 reason、store/缓存及解码后的 wire 错误，可沿既有 wire 和 terminal report 展示。mint、cancel、retry、close、计数、retire 与 replay admission 由 owner 私有身份或实际操作状态决定，不能依据这些错误的公开 source/code。普通解码与公开 listener failure helpers 只产生诊断，不登记 Core 控制身份。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "第三方通过 `@migaia/utils/error` 的 `attachErrorIdentity` 抛自己的 source/code；Core 保留原错误或 cause。source/code 表、wire schema/限额、普通 JSON-RPC 映射及短例见 USEGUIDE。"
+                  "type": "list",
+                  "items": [
+                    "`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 按稳定字段判断，跨 Worker、iframe、模块副本都有效；不要依赖 `instanceof`。",
+                    "`isRpcError` 只检查 `code` 是否为字符串，不能代替上面三个守卫。",
+                    "错误类（`RpcError`、`RpcRemoteError`、`RpcTimeoutError` 等）只作为类型导出。唯一可构造的运行时类是 `RpcLifecycleError`，供持有自身释放状态的消费方（例如 Store Worker）报告生命周期失败。"
+                  ]
                 }
               ]
             }
           ],
-          "usageScore": 6,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-index--RpcLifecycleError"
         },
@@ -84272,24 +83874,47 @@
           "identity": "packages/rpc-core/dist/core/errors.d.ts:RpcRemoteError:export type { RpcRemoteError } from './errors.js';",
           "guidance": [
             {
-              "id": "第三方公开错误面",
-              "heading": "第三方公开错误面",
+              "id": "10-1-判断错误",
+              "heading": "10.1 判断错误",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "协议实现者使用 `@migaia/rpc-contract/errors` 的 wire schema、序列化/校验/遍历及 JSON-RPC 映射；适配器作者使用 Core 根入口的 wire 操作和 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError`。六个 source 常量与各 owner 的错误码表公开，原 source 字符串不变。B6 守卫跨 realm/模块副本用于诊断；`isRpcError` 的 code-is-string 检查不能替代它们。"
+                  "text": "所有错误都是原生 `Error`（或子类），附带 `source` 与 `code`。按 `(source, code)` 分支，不要匹配 `message`。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\n\ntry {\n  await peer.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    // 超时（DEADLINE_EXCEEDED）：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n}"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 按稳定字段判断，跨 Worker、iframe、模块副本都有效；不要依赖 `instanceof`。",
+                    "`isRpcError` 只检查 `code` 是否为字符串，不能代替上面三个守卫。",
+                    "错误类（`RpcError`、`RpcRemoteError`、`RpcTimeoutError` 等）只作为类型导出。唯一可构造的运行时类是 `RpcLifecycleError`，供持有自身释放状态的消费方（例如 Store Worker）报告生命周期失败。"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "错误",
+              "heading": "错误",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["source", "常量", "code 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "`RPC_CORE_ERROR_SOURCE`", "`RpcCoreErrorCode`"],
+                    [
+                      "`@migaia/rpc/remote`",
+                      "`RPC_REMOTE_ERROR_SOURCE`",
+                      "`RpcRemoteLayerErrorCode`"
+                    ]
+                  ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`*ErrorText` / `*Diagnostic` 文本表和 `tagRpcError` 私有；这是更名后包的破坏性导出收敛。错误类仅作类型导出，唯一 `RpcLifecycleError` 运行时类供 Store Worker 等持有自身 dispose 状态的消费方构造诊断，不 mint Core 操作身份。真实 dispose 失败后的 cleanup 展示沿原路径复用原 Error 身份，不决定是否关闭操作。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "已接纳错误的现有字段，包括 caller 取消 reason、store/缓存及解码后的 wire 错误，可沿既有 wire 和 terminal report 展示。mint、cancel、retry、close、计数、retire 与 replay admission 由 owner 私有身份或实际操作状态决定，不能依据这些错误的公开 source/code。普通解码与公开 listener failure helpers 只产生诊断，不登记 Core 控制身份。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "第三方通过 `@migaia/utils/error` 的 `attachErrorIdentity` 抛自己的 source/code；Core 保留原错误或 cause。source/code 表、wire schema/限额、普通 JSON-RPC 映射及短例见 USEGUIDE。"
+                  "text": "按 `(source, code)` 分支，不要匹配 `message`。跨 Worker、iframe 或模块副本时，用 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 判断错误族，而不是 `instanceof`。全部错误码及处理建议见 USEGUIDE 第 10 节。"
                 }
               ]
             }
@@ -84445,9 +84070,7 @@
           "returns": "No explicit return annotation is declared for this type.",
           "errors": ["No documented errors are declared for RpcTimeoutError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcTimeoutError.",
-          "examples": [
-            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  isRpcTimeoutError,\n  type RpcTimeoutError\n} from '@migaia/rpc-core'\n\n/** Retain Core's presentation and routes while encoding an actual held failure. */\nexport function transferError(error: unknown, report: (failure: unknown) => void) {\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) })\n  const received: unknown = JSON.parse(JSON.stringify(wire))\n  const restored = deserializeRpcError(received)\n  const timeout: RpcTimeoutError | undefined = isRpcTimeoutError(restored) ? restored : undefined\n  return { restored, timeout, stackPreserved: restored.stack === wire.stack }\n}"
-          ],
+          "examples": [],
           "members": [
             {
               "name": "cleanupPromise",
@@ -84501,53 +84124,52 @@
           "identity": "packages/rpc-core/dist/core/errors.d.ts:RpcTimeoutError:export type { RpcTimeoutError } from './errors.js';",
           "guidance": [
             {
-              "id": "适配器抛出自己的错误",
-              "heading": "适配器抛出自己的错误",
+              "id": "10-1-判断错误",
+              "heading": "10.1 判断错误",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "通过 `@migaia/utils/error` 的 `attachErrorIdentity` 添加适配器拥有的 source/code。Core 沿原失败路径保留该对象，或在包装时通过 `cause` 保留原值；不把业务/依赖错误改成安全重试许可。下面是自定义载体写失败的最小例子，source、code 与文本由适配器维护："
+                  "text": "所有错误都是原生 `Error`（或子类），附带 `source` 与 `code`。按 `(source, code)` 分支，不要匹配 `message`。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { attachErrorIdentity } from '@migaia/utils/error'\n\n/** This application owns its carrier identity independently of Core. */\nconst ADAPTER_SOURCE = '@example/custom-carrier'\n/** A native write failure retains the original cause for diagnosis. */\nconst AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const\n/** Presentation text belongs to this adapter, never Core's private text table. */\nconst AdapterErrorText = { writeFailed: 'adapter write failed' } as const\n\n/** Raise the adapter's own failure when its held native writer rejects. */\nexport function raiseAdapterWriteFailure(cause: unknown): never {\n  throw attachErrorIdentity(new Error(AdapterErrorText.writeFailed, { cause }), {\n    source: ADAPTER_SOURCE,\n    code: AdapterErrorCode.writeFailed\n  })\n}"
+                  "code": "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\n\ntry {\n  await peer.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    // 超时（DEADLINE_EXCEEDED）：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n}"
                 },
                 {
-                  "type": "paragraph",
-                  "text": "对实际收到的异常做 wire 传输时，使用普通 Core 操作；错误族检查只返回诊断分类："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  isRpcTimeoutError,\n  type RpcTimeoutError\n} from '@migaia/rpc-core'\n\n/** Retain Core's presentation and routes while encoding an actual held failure. */\nexport function transferError(error: unknown, report: (failure: unknown) => void) {\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) })\n  const received: unknown = JSON.parse(JSON.stringify(wire))\n  const restored = deserializeRpcError(received)\n  const timeout: RpcTimeoutError | undefined = isRpcTimeoutError(restored) ? restored : undefined\n  return { restored, timeout, stackPreserved: restored.stack === wire.stack }\n}"
+                  "type": "list",
+                  "items": [
+                    "`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 按稳定字段判断，跨 Worker、iframe、模块副本都有效；不要依赖 `instanceof`。",
+                    "`isRpcError` 只检查 `code` 是否为字符串，不能代替上面三个守卫。",
+                    "错误类（`RpcError`、`RpcRemoteError`、`RpcTimeoutError` 等）只作为类型导出。唯一可构造的运行时类是 `RpcLifecycleError`，供持有自身释放状态的消费方（例如 Store Worker）报告生命周期失败。"
+                  ]
                 }
               ]
             },
             {
-              "id": "第三方公开错误面",
-              "heading": "第三方公开错误面",
+              "id": "错误",
+              "heading": "错误",
               "blocks": [
                 {
-                  "type": "paragraph",
-                  "text": "协议实现者使用 `@migaia/rpc-contract/errors` 的 wire schema、序列化/校验/遍历及 JSON-RPC 映射；适配器作者使用 Core 根入口的 wire 操作和 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError`。六个 source 常量与各 owner 的错误码表公开，原 source 字符串不变。B6 守卫跨 realm/模块副本用于诊断；`isRpcError` 的 code-is-string 检查不能替代它们。"
+                  "type": "table",
+                  "headers": ["source", "常量", "code 表"],
+                  "rows": [
+                    ["`@migaia/rpc/core`", "`RPC_CORE_ERROR_SOURCE`", "`RpcCoreErrorCode`"],
+                    [
+                      "`@migaia/rpc/remote`",
+                      "`RPC_REMOTE_ERROR_SOURCE`",
+                      "`RpcRemoteLayerErrorCode`"
+                    ]
+                  ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`*ErrorText` / `*Diagnostic` 文本表和 `tagRpcError` 私有；这是更名后包的破坏性导出收敛。错误类仅作类型导出，唯一 `RpcLifecycleError` 运行时类供 Store Worker 等持有自身 dispose 状态的消费方构造诊断，不 mint Core 操作身份。真实 dispose 失败后的 cleanup 展示沿原路径复用原 Error 身份，不决定是否关闭操作。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "已接纳错误的现有字段，包括 caller 取消 reason、store/缓存及解码后的 wire 错误，可沿既有 wire 和 terminal report 展示。mint、cancel、retry、close、计数、retire 与 replay admission 由 owner 私有身份或实际操作状态决定，不能依据这些错误的公开 source/code。普通解码与公开 listener failure helpers 只产生诊断，不登记 Core 控制身份。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "第三方通过 `@migaia/utils/error` 的 `attachErrorIdentity` 抛自己的 source/code；Core 保留原错误或 cause。source/code 表、wire schema/限额、普通 JSON-RPC 映射及短例见 USEGUIDE。"
+                  "text": "按 `(source, code)` 分支，不要匹配 `message`。跨 Worker、iframe 或模块副本时，用 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 判断错误族，而不是 `instanceof`。全部错误码及处理建议见 USEGUIDE 第 10 节。"
                 }
               ]
             }
           ],
-          "usageScore": 18,
+          "usageScore": 10,
           "configuration": [],
           "fragment": "rpc-core-index--RpcTimeoutError"
         },
@@ -84638,9 +84260,7 @@
           "returns": "IRpcSerializedError",
           "errors": ["No documented errors are declared for serializeRpcError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for serializeRpcError.",
-          "examples": [
-            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  isRpcTimeoutError,\n  type RpcTimeoutError\n} from '@migaia/rpc-core'\n\n/** Retain Core's presentation and routes while encoding an actual held failure. */\nexport function transferError(error: unknown, report: (failure: unknown) => void) {\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) })\n  const received: unknown = JSON.parse(JSON.stringify(wire))\n  const restored = deserializeRpcError(received)\n  const timeout: RpcTimeoutError | undefined = isRpcTimeoutError(restored) ? restored : undefined\n  return { restored, timeout, stackPreserved: restored.stack === wire.stack }\n}"
-          ],
+          "examples": [],
           "members": [],
           "aliasOf": "serializeRpcError",
           "exportPath": ".",
@@ -84700,113 +84320,21 @@
           "identity": "packages/rpc-core/dist/core/internal/error-wire-metadata.d.ts:serializeRpcError:export declare function serializeRpcError(value: unknown, options: IRpcSerializeErrorOptions): IRpcSerializedError;",
           "guidance": [
             {
-              "id": "第三方公开错误面与错误编码",
-              "heading": "第三方公开错误面与错误编码",
+              "id": "10-4-跨进程传递错误",
+              "heading": "10.4 跨进程传递错误",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "协议实现者（自定义载体或 Go/Python/Rust 对端）从 `@migaia/rpc-contract/errors` 使用完整 wire 错误 schema、校验、遍历与 JSON-RPC 映射。运行时适配器作者使用 Core 根入口的 `serializeRpcError` / `deserializeRpcError`，保留 Core/Remote 私有脱敏与 forwarding-route 策略；完整 wire walker 唯一归 Contract。两类集成者都用公开 source/code 和错误族守卫解释诊断，不能据此推定 Core 的内部操作身份。"
+                  "text": "`serializeRpcError` / `deserializeRpcError`（包根）在 Core 层传递错误时使用：它们保留 Core 的脱敏与转发路由信息。错误树的结构、校验与 JSON-RPC 映射见 rpc-contract USEGUIDE 第 9 节。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "六个稳定语义 source 保留分包前字符串，按以下普通公开入口导入："
-                },
-                {
-                  "type": "table",
-                  "headers": ["公开入口", "source 常量与值", "错误码表", "第三方用途"],
-                  "rows": [
-                    [
-                      "`@migaia/rpc-contract` / `@migaia/rpc-contract/errors`",
-                      "`RPC_CONTRACT_SOURCE` = `@migaia/rpc/contract`",
-                      "`RpcContractErrorCode`",
-                      "识别非法 envelope、frame、handshake 与错误树，修复对应协议输入。"
-                    ],
-                    [
-                      "`@migaia/rpc-core`",
-                      "`RPC_CORE_ERROR_SOURCE` = `@migaia/rpc/core`",
-                      "`RpcCoreErrorCode`",
-                      "分类 Endpoint 的配置、取消、deadline、transport 与 provider 诊断。"
-                    ],
-                    [
-                      "`@migaia/rpc-core/remote`",
-                      "`RPC_REMOTE_ERROR_SOURCE` = `@migaia/rpc/remote`",
-                      "`RpcRemoteLayerErrorCode`",
-                      "解释 generation 关闭、启动失败及未知结果，按原 outcome/对账路径恢复。"
-                    ],
-                    [
-                      "`@migaia/rpc-process`",
-                      "`RPC_PROCESS_ERROR_SOURCE` = `@migaia/rpc/process`",
-                      "`RpcProcessErrorCode`",
-                      "分类实际 launch、dial、listen、bootstrap 与资源采样失败。"
-                    ],
-                    [
-                      "`@migaia/rpc-threads`",
-                      "`RPC_THREAD_ERROR_SOURCE` = `@migaia/rpc/threads`",
-                      "`RpcThreadErrorCode`",
-                      "报告真实 Worker 采样失败，保留原 cause 并展示 unavailable。"
-                    ],
-                    [
-                      "`@migaia/rpc-bridge-jsonrpc` / `@migaia/rpc-contract/framing/jsonrpc`",
-                      "`JSONRPC_BRIDGE_ERROR_SOURCE` = `@migaia/rpc/bridge/jsonrpc`",
-                      "`JsonRpcBridgeErrorCode`",
-                      "识别 framing、hello/profile 与扩展协商失败，处理实际连接。"
-                    ]
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`RpcCoreErrorText`、`RpcContractErrorText`、`RpcContractErrorDiagnostic`、`RpcProcessErrorText`、`RpcRemoteLayerErrorText`、`JsonRpcBridgeErrorText` 与 Thread 文本表均为私有展示。删除这些已更名包的公开表属于破坏性导出变更；message 字面量不是恢复、重试、终止或关闭契约。Process bootstrap 的环境名、版本、frame 限额和发现超时仍由 `@migaia/rpc-process` 普通导出；stderr 文本/配额常量不公开。"
-                }
-              ]
-            },
-            {
-              "id": "wire-错误-json-rpc-与接纳后的错误展示",
-              "heading": "Wire 错误、JSON-RPC 与接纳后的错误展示",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "`IRpcSerializedError` 的必需字段为 `source`、`code`、`name`、`message`、`stack`；可选字段为 `cause`、`errors`、portable `data`、bounded `route` 和 `truncated: true`。语言中立 JSON schema 从 `@migaia/rpc-contract/schema/wire-error` 的普通子路径读取。Contract 的 `serializeRpcError` 构造有界错误树，`normalizeRpcSerializedError` 验证接收数据，`deserializeRpcError` 保留传输 stack/native error family，`reachRpcError` 按身份去重遍历 cause/AggregateError。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "序列化的 `report` 是必须的诊断 sink，不可静默吞掉投影失败。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`RpcWireErrorField`、`RpcWireErrorViolation`、`RpcWireErrorUnknownFieldMode`、`RpcWireErrorFallback`、`RpcWireErrorLimit` 与 `RpcErrorReachLimit` 公开同一字段顺序、拒绝原因、fallback 与限额。Contract 的 `toJsonRpcError(wire, integerCode)` 把验证后的错误树放入 `RpcJsonRpcWireError.dataKey`；第三方协议拥有 safe integer code。`fromJsonRpcError` 恢复扩展，普通外部 JSON-RPC 错误使用 `RpcJsonRpcWireError.foreignSource` 和整数的 string code；这些映射不改变 transport/cancel 行为。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "普通 wire decoder 只恢复诊断，不注册 Core 的 live control 身份。接纳后的错误字段沿既有 wire、forwarding、缓存失败重放与 terminal report 路径展示，维持既有 source/code/name/message/stack 受控展示和 cause/errors 链策略；这同样适用于 caller 取消 reason 和 store 中已留存的错误。错误字段不能触发 mint、cancel、retry、close、计数、retire 或 replay admission，也不把适配器伪造的诊断字段变成控制身份。展示路径复用原 Error 不证明 Core 创建了它。"
-                }
-              ]
-            },
-            {
-              "id": "适配器抛出自己的错误",
-              "heading": "适配器抛出自己的错误",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "通过 `@migaia/utils/error` 的 `attachErrorIdentity` 添加适配器拥有的 source/code。Core 沿原失败路径保留该对象，或在包装时通过 `cause` 保留原值；不把业务/依赖错误改成安全重试许可。下面是自定义载体写失败的最小例子，source、code 与文本由适配器维护："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { attachErrorIdentity } from '@migaia/utils/error'\n\n/** This application owns its carrier identity independently of Core. */\nconst ADAPTER_SOURCE = '@example/custom-carrier'\n/** A native write failure retains the original cause for diagnosis. */\nconst AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const\n/** Presentation text belongs to this adapter, never Core's private text table. */\nconst AdapterErrorText = { writeFailed: 'adapter write failed' } as const\n\n/** Raise the adapter's own failure when its held native writer rejects. */\nexport function raiseAdapterWriteFailure(cause: unknown): never {\n  throw attachErrorIdentity(new Error(AdapterErrorText.writeFailed, { cause }), {\n    source: ADAPTER_SOURCE,\n    code: AdapterErrorCode.writeFailed\n  })\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "对实际收到的异常做 wire 传输时，使用普通 Core 操作；错误族检查只返回诊断分类："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  isRpcTimeoutError,\n  type RpcTimeoutError\n} from '@migaia/rpc-core'\n\n/** Retain Core's presentation and routes while encoding an actual held failure. */\nexport function transferError(error: unknown, report: (failure: unknown) => void) {\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) })\n  const received: unknown = JSON.parse(JSON.stringify(wire))\n  const restored = deserializeRpcError(received)\n  const timeout: RpcTimeoutError | undefined = isRpcTimeoutError(restored) ? restored : undefined\n  return { restored, timeout, stackPreserved: restored.stack === wire.stack }\n}"
+                  "text": "对端抛出的业务错误会还原为原生类型并保留 `message`、`stack` 与 `cause` 链。来自对端的 source / code 只用于诊断，不会被当作本地库的错误身份，也不授予任何控制权限。"
                 }
               ]
             }
           ],
-          "usageScore": 24,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-index--serializeRpcError"
         },
@@ -84824,9 +84352,7 @@
           "returns": "No explicit return annotation is declared for this const.",
           "errors": ["No documented errors are declared for timeout."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for timeout.",
-          "examples": [
-            "import {\n  serializeRpcError,\n  deserializeRpcError,\n  isRpcTimeoutError,\n  type RpcTimeoutError\n} from '@migaia/rpc-core'\n\n/** Retain Core's presentation and routes while encoding an actual held failure. */\nexport function transferError(error: unknown, report: (failure: unknown) => void) {\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) })\n  const received: unknown = JSON.parse(JSON.stringify(wire))\n  const restored = deserializeRpcError(received)\n  const timeout: RpcTimeoutError | undefined = isRpcTimeoutError(restored) ? restored : undefined\n  return { restored, timeout, stackPreserved: restored.stack === wire.stack }\n}"
-          ],
+          "examples": [],
           "members": [],
           "aliasOf": "timeout",
           "exportPath": ".",
@@ -84880,65 +84406,38 @@
           "identity": "packages/rpc-core/dist/core/middleware/timeout.d.ts:timeout:export declare const timeout: (config?: IRpcTimeoutConfig) => IRpcPlugin;",
           "guidance": [
             {
-              "id": "适配器抛出自己的错误",
-              "heading": "适配器抛出自己的错误",
+              "id": "10-1-判断错误",
+              "heading": "10.1 判断错误",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "通过 `@migaia/utils/error` 的 `attachErrorIdentity` 添加适配器拥有的 source/code。Core 沿原失败路径保留该对象，或在包装时通过 `cause` 保留原值；不把业务/依赖错误改成安全重试许可。下面是自定义载体写失败的最小例子，source、code 与文本由适配器维护："
+                  "text": "所有错误都是原生 `Error`（或子类），附带 `source` 与 `code`。按 `(source, code)` 分支，不要匹配 `message`。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { attachErrorIdentity } from '@migaia/utils/error'\n\n/** This application owns its carrier identity independently of Core. */\nconst ADAPTER_SOURCE = '@example/custom-carrier'\n/** A native write failure retains the original cause for diagnosis. */\nconst AdapterErrorCode = { writeFailed: 'WRITE_FAILED' } as const\n/** Presentation text belongs to this adapter, never Core's private text table. */\nconst AdapterErrorText = { writeFailed: 'adapter write failed' } as const\n\n/** Raise the adapter's own failure when its held native writer rejects. */\nexport function raiseAdapterWriteFailure(cause: unknown): never {\n  throw attachErrorIdentity(new Error(AdapterErrorText.writeFailed, { cause }), {\n    source: ADAPTER_SOURCE,\n    code: AdapterErrorCode.writeFailed\n  })\n}"
+                  "code": "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\n\ntry {\n  await peer.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    // 超时（DEADLINE_EXCEEDED）：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n}"
                 },
                 {
-                  "type": "paragraph",
-                  "text": "对实际收到的异常做 wire 传输时，使用普通 Core 操作；错误族检查只返回诊断分类："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import {\n  serializeRpcError,\n  deserializeRpcError,\n  isRpcTimeoutError,\n  type RpcTimeoutError\n} from '@migaia/rpc-core'\n\n/** Retain Core's presentation and routes while encoding an actual held failure. */\nexport function transferError(error: unknown, report: (failure: unknown) => void) {\n  const wire = serializeRpcError(error, { report: ({ error: failure }) => report(failure) })\n  const received: unknown = JSON.parse(JSON.stringify(wire))\n  const restored = deserializeRpcError(received)\n  const timeout: RpcTimeoutError | undefined = isRpcTimeoutError(restored) ? restored : undefined\n  return { restored, timeout, stackPreserved: restored.stack === wire.stack }\n}"
-                }
-              ]
-            },
-            {
-              "id": "来源-调用与生命周期",
-              "heading": "来源、调用与生命周期",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "对端目录中的 name 是显示标签，不是 launcher 名称认证或控制权限；控制依实际 authenticated instanceId、generation 和原 native handle。自动 process instanceId 是模块本地单调身份，不承诺跨模块副本或跨父进程全局唯一。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "每个连接选择且只选择一个 spawn、connect 或 listen；只有真实库 launcher 的子端允许自动来源。connect/listen 借用对端，只关闭本端连接，不自动拥有 stop/kill/restart/replace。需要避开 relay 时显式建立独立 connect/listen 通道；没有 direct/upgrade 分配器。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "调用前的 method、payload、能力与本地选项准入可能同步抛错；需要统一处理时，把调用表达式放在 try/catch 内，不只对返回 Promise 调用 catch。这是既有严格前置准入语义。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "request 等待业务结果。notify 等待原物理发送完成，成功不证明 provider 已执行。stream 保留 lazy iterator 与原取消、drain owner。默认 request/stream 超时 30000 ms；defaultTimeoutMs 有限且为正，单调用 timeoutMs:false 关闭默认期限，0 表示立即到期；仍受 launcher 的总 callWallTimeMs cap 限制。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "orderKey 使用最终 provider 的原串行命名空间；before-start 只撤销开始许可，已经开始就保留原真实结果。group 保留已完成步骤，第一失败后余项 not-executed，不回滚副作用，也不是事务或分布式锁。outcome 的 unknown 不等于未执行。close 同步拒绝新调用，重复 close 返回同一 Promise，已接受工作按原 drain 结算。"
+                  "type": "list",
+                  "items": [
+                    "`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 按稳定字段判断，跨 Worker、iframe、模块副本都有效；不要依赖 `instanceof`。",
+                    "`isRpcError` 只检查 `code` 是否为字符串，不能代替上面三个守卫。",
+                    "错误类（`RpcError`、`RpcRemoteError`、`RpcTimeoutError` 等）只作为类型导出。唯一可构造的运行时类是 `RpcLifecycleError`，供持有自身释放状态的消费方（例如 Store Worker）报告生命周期失败。"
+                  ]
                 }
               ]
             }
           ],
-          "usageScore": 18,
+          "usageScore": 6,
           "configuration": [
             {
               "name": "timeoutMs",
               "type": "number | false",
               "optional": true,
-              "description": "request 返回原 canonical 操作 Promise；notify 在原物理发送 commit/completion 边界结束，不证明 provider 成功；stream 保留原 lazy iterator，在首个 next/preparation 前不发送业务帧。默认 request/stream 超时 30000 ms；factory 的 defaultTimeoutMs 必须有限且为正。每调用 `timeoutMs: false` 关闭默认期限，合法 `0` 表示立即到期；仍受原 launcher callWallTimeMs cap 限制。",
+              "description": "`timeoutMs` — 截止时间；`false` 关闭默认超时，`0` 立即到期。受来源设置的单次调用上限约束",
               "descriptionEn": "",
-              "descriptionZh": "request 返回原 canonical 操作 Promise；notify 在原物理发送 commit/completion 边界结束，不证明 provider 成功；stream 保留原 lazy iterator，在首个 next/preparation 前不发送业务帧。默认 request/stream 超时 30000 ms；factory 的 defaultTimeoutMs 必须有限且为正。每调用 `timeoutMs: false` 关闭默认期限，合法 `0` 表示立即到期；仍受原 launcher callWallTimeMs cap 限制。"
+              "descriptionZh": "`timeoutMs` — 截止时间；`false` 关闭默认超时，`0` 立即到期。受来源设置的单次调用上限约束"
             }
           ],
           "fragment": "rpc-core-index--timeout"
@@ -85010,15 +84509,15 @@
           ],
           "identity": "packages/rpc-core/dist/core/middleware/uuid.d.ts:uuid:export declare const uuid: (config?: IRpcUuidConfig) => IRpcPlugin;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 10,
           "configuration": [
             {
               "name": "generate",
               "type": "(context: IRpcUuidContext) => string",
               "optional": true,
-              "description": "",
+              "description": "`uuid` 的 `generate` — 自定义消息 id 生成函数",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`uuid` 的 `generate` — 自定义消息 id 生成函数"
             }
           ],
           "fragment": "rpc-core-index--uuid"
@@ -85445,7 +84944,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/runtime-adapter/data.d.ts:createAdapterConfigurationError:export declare function createAdapterConfigurationError(message: string): RpcError;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-core-adapter--createAdapterConfigurationError"
         },
@@ -85533,7 +85032,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/runtime-adapter/data.d.ts:createAdapterConfigurationTypeError:export declare function createAdapterConfigurationTypeError(message: string, cause?: unknown): TypeError;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-core-adapter--createAdapterConfigurationTypeError"
         },
@@ -85697,7 +85196,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/runtime-adapter/binding.d.ts:createAdapterPlugin:export declare function createAdapterPlugin<TUnit, TSpec, TMetadata extends object = object>(options: IRemotePluginOptions<TUnit, TSpec>, metadata?: TMetadata, lifecycle?: IAdapterPluginLifecycleResource): IRemotePluginDefinition & TMetadata;",
           "guidance": [],
-          "usageScore": 8,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-adapter--createAdapterPlugin"
         },
@@ -85763,7 +85262,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/runtime-adapter/data.d.ts:createAdapterSourceConfigurationError:export declare function createAdapterSourceConfigurationError(): RpcError;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-core-adapter--createAdapterSourceConfigurationError"
         },
@@ -85841,7 +85340,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/runtime-adapter/data.d.ts:createAdapterTransportError:export declare function createAdapterTransportError(...args: ConstructorParameters<typeof RpcTransportError>): RpcTransportError;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-core-adapter--createAdapterTransportError"
         },
@@ -85874,7 +85373,7 @@
           "errors": ["No documented errors are declared for createEventEmitterMessageResource."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createEventEmitterMessageResource.",
           "examples": [
-            "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** 调用方持有真实端口；原 options 身份保留 Core 已有的 Host preparation。 */\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  /** 保留原配置身份和本地缺省地址，后续选项复制仍使用同一准备 owner。 */\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  /** Core 直接在同一个原始端口上观察 ACK，不接收协商结果声明。 */\n  const resource = createEventEmitterMessageResource(port)\n  /** 本地提案来自 Core 实际编译的 roots；启用项仍由收到的 ACK 决定。 */\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}"
+            "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  const resource = createEventEmitterMessageResource(port)\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}"
           ],
           "members": [],
           "aliasOf": "createEventEmitterMessageResource",
@@ -86251,7 +85750,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/runtime-adapter/byte/event-byte-io.d.ts:createRuntimeEventByteIO:export declare function createRuntimeEventByteIO(reader: IRuntimeEventByteReader, writer: IRuntimeEventByteWriter, physical: IRuntimeBytePhysicalResource, closedDiagnostic: IRuntimeDiagnosticError, byteViewFactory?: IRuntimeByteViewFactory): IRuntimeByteIO;",
           "guidance": [],
-          "usageScore": 8,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-adapter--createRuntimeEventByteIO"
         },
@@ -86544,7 +86043,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/runtime-adapter/provider/scope.d.ts:createRuntimeProviderScope:export declare function createRuntimeProviderScope(inputStore?: IRpcIdempotencyStore): IRuntimeProviderScope;",
           "guidance": [],
-          "usageScore": 8,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-adapter--createRuntimeProviderScope"
         },
@@ -86780,7 +86279,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/runtime-adapter/binding.d.ts:holdAdapterRegistration:export declare function holdAdapterRegistration<TUnit, TSpec>(options: IRemotePluginOptions<TUnit, TSpec>): IAdapterRegistration;",
           "guidance": [],
-          "usageScore": 8,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-adapter--holdAdapterRegistration"
         },
@@ -86925,7 +86424,7 @@
           "errors": ["No documented errors are declared for IAdapterEventEmitterMessagePort."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAdapterEventEmitterMessagePort.",
           "examples": [
-            "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** 调用方持有真实端口；原 options 身份保留 Core 已有的 Host preparation。 */\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  /** 保留原配置身份和本地缺省地址，后续选项复制仍使用同一准备 owner。 */\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  /** Core 直接在同一个原始端口上观察 ACK，不接收协商结果声明。 */\n  const resource = createEventEmitterMessageResource(port)\n  /** 本地提案来自 Core 实际编译的 roots；启用项仍由收到的 ACK 决定。 */\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}"
+            "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  const resource = createEventEmitterMessageResource(port)\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}"
           ],
           "members": [],
           "aliasOf": "IAdapterEventEmitterMessagePort",
@@ -88380,7 +87879,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/runtime-adapter/byte/event-byte-io.d.ts:IRuntimeByteViewFactory:export type IRuntimeByteViewFactory = Readonly<{ from(backing: ArrayBufferLike, byteOffset: number, byteLength: number): Readonly<{ toString(alphabet: typeof RpcOwnedBinaryAlphabet): string; }>; }>;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-core-adapter--IRuntimeByteViewFactory"
         },
@@ -89345,7 +88844,7 @@
           "errors": ["No documented errors are declared for prepareAdapterPeer."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for prepareAdapterPeer.",
           "examples": [
-            "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** 调用方持有真实端口；原 options 身份保留 Core 已有的 Host preparation。 */\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  /** 保留原配置身份和本地缺省地址，后续选项复制仍使用同一准备 owner。 */\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  /** Core 直接在同一个原始端口上观察 ACK，不接收协商结果声明。 */\n  const resource = createEventEmitterMessageResource(port)\n  /** 本地提案来自 Core 实际编译的 roots；启用项仍由收到的 ACK 决定。 */\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}"
+            "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  const resource = createEventEmitterMessageResource(port)\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}"
           ],
           "members": [],
           "aliasOf": "prepareAdapterPeer",
@@ -89410,7 +88909,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/runtime-adapter/peer.d.ts:prepareAdapterPeer:export declare function prepareAdapterPeer(options: IAdapterPeerOptions, defaultName: string, selectedSelf?: IRuntimePeerIdentity): IAdapterPeerPreparation;",
           "guidance": [],
-          "usageScore": 22,
+          "usageScore": 18,
           "configuration": [],
           "fragment": "rpc-core-adapter--prepareAdapterPeer"
         },
@@ -89592,7 +89091,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/runtime-adapter/byte/bootstrap.d.ts:readRuntimeByteBootstrap:export declare function readRuntimeByteBootstrap(channel: IRuntimeByteIO, diagnostics: IRuntimeByteDiagnostics, options?: Readonly<{ timeoutMs?: number; scheduler?: IScheduler; }>): Promise<Readonly<{ channel: IRuntimeByteIO; bootstrap: Uint8Array; }>>;",
           "guidance": [],
-          "usageScore": 8,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-adapter--readRuntimeByteBootstrap"
         },
@@ -89787,7 +89286,9 @@
           "returns": "readonly [IMemoryTransport, IMemoryTransport]",
           "errors": ["No documented errors are declared for createMemoryTransportPair."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createMemoryTransportPair.",
-          "examples": [],
+          "examples": [
+            "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\n\nconst server = await createEndpoint({\n  id: 'server',\n  transport: right,\n  middlewares: [connect({ transport: right })]\n})\nserver.provide('add', (context) => {\n  const [a, b] = context.data as [number, number]\n  return context.success(a + b)\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['server'],\n  transport: left,\n  middlewares: [connect({ transport: left })]\n})\nconsole.log(await client.send<number>('server', 'add', [20, 22])) // 42\n\nawait client.dispose()\nawait server.dispose()"
+          ],
           "members": [],
           "exportPath": "./adapters/memory",
           "overloadSignatures": [
@@ -89832,7 +89333,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/adapters/memory.d.ts:createMemoryTransportPair:export declare function createMemoryTransportPair(): readonly [IMemoryTransport, IMemoryTransport];",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 16,
           "configuration": [],
           "fragment": "rpc-core-adapters/memory--createMemoryTransportPair"
         },
@@ -90011,14 +89512,14 @@
           ],
           "identity": "packages/rpc-core/dist/core/adapters/message-port.d.ts:createBrowserMessagePortTransport:export declare function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = unknown>(port: IBrowserMessagePortLike<TTransfer, TEvent>, options?: IBrowserMessagePortTransportOptions): IRpcTransport<unknown, TTransfer>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 10,
           "configuration": [
             {
               "name": "ownership",
               "type": "'owned' | 'borrowed'",
               "optional": true,
-              "description": "",
-              "descriptionEn": "",
+              "description": "`./adapters/message-port` — `createNodeMessagePortTransport(port)`、`createBrowserMessagePortTransport(port, { ownership })`",
+              "descriptionEn": "`./adapters/message-port` — `createNodeMessagePortTransport(port)`、`createBrowserMessagePortTransport(port, { ownership })`",
               "descriptionZh": ""
             }
           ],
@@ -90097,7 +89598,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/adapters/message-port.d.ts:createNodeMessagePortTransport:export declare function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpcTransport;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "rpc-core-adapters/message-port--createNodeMessagePortTransport"
         },
@@ -90414,31 +89915,31 @@
           ],
           "identity": "packages/rpc-core/dist/core/adapters/web-worker.d.ts:createWebWorkerTransport:export declare function createWebWorkerTransport(port: IWebWorkerLikePort, options?: IWebWorkerTransportOptions): IRpcTransport<unknown, Transferable>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 14,
           "configuration": [
             {
               "name": "capabilities",
               "type": "readonly string[]",
               "optional": true,
-              "description": "Explicit static agreement; both deployment endpoints must use the same capabilities.",
+              "description": "`createWebWorkerTransport` 的 `capabilities` — 静态约定的能力列表；两端必须一致（该载体不做握手）",
               "descriptionEn": "Explicit static agreement; both deployment endpoints must use the same capabilities.",
-              "descriptionZh": ""
+              "descriptionZh": "`createWebWorkerTransport` 的 `capabilities` — 静态约定的能力列表；两端必须一致（该载体不做握手）"
             },
             {
               "name": "peerId",
               "type": "string",
               "optional": true,
-              "description": "",
+              "description": "`createWebWorkerTransport` 的 `peerId` — 对端标识",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`createWebWorkerTransport` 的 `peerId` — 对端标识"
             },
             {
               "name": "origin",
               "type": "string",
               "optional": true,
-              "description": "",
+              "description": "`sourceProof?(source, origin)` — 多路复用载体用来证明消息确实来自预期对端",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`sourceProof?(source, origin)` — 多路复用载体用来证明消息确实来自预期对端"
             }
           ],
           "fragment": "rpc-core-adapters/web-worker--createWebWorkerTransport"
@@ -90646,7 +90147,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/client.d.ts:createClientEndpoint:export declare const createClientEndpoint: IPublicCallable;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-client--createClientEndpoint"
         }
@@ -90727,7 +90228,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/composed.d.ts:createComposedEndpoint:export declare const createComposedEndpoint: IPublicCallable;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-composed--createComposedEndpoint"
         },
@@ -91059,7 +90560,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/features/control.d.ts:createControlFeature:export declare const createControlFeature: (outboundCapability: IRpcFeature<IOutboundCapability>, discoveryCapability: IRpcFeature<IDiscoveryCapability>) => IRpcFeature<IControlCapability, { readonly outbound: IRpcFeature<IOutboundCapability>; readonly discovery: IRpcFeature<IDiscoveryCapability>; }, IEndpointCapabilitiesFeatureExpose>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-features/control--createControlFeature"
         },
@@ -91204,7 +90705,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/features/discovery.d.ts:createDiscoveryFeature:export declare const createDiscoveryFeature: (outboundCapability: IRpcFeature<IOutboundCapability>) => IRpcFeature<IDiscoveryCapability, { readonly outbound: IRpcFeature<IOutboundCapability>; }, IEndpointCapabilitiesFeatureExpose>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-features/discovery--createDiscoveryFeature"
         },
@@ -91349,7 +90850,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/features/one-way.d.ts:createOneWayFeature:export declare const createOneWayFeature: (outboundCapability: IRpcFeature<IOutboundCapability>) => IRpcFeature<IOneWayCapability, { readonly outbound: IRpcFeature<IOutboundCapability>; }, IEndpointCapabilitiesFeatureExpose>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-features/one-way--createOneWayFeature"
         },
@@ -91557,7 +91058,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/features/outbound.d.ts:createOutboundFeature:export declare const createOutboundFeature: (canonicalChunk: ReturnType<typeof createCanonicalChunkFeature>) => IRpcFeature<IOutboundCapability, { readonly canonicalChunk: ReturnType<typeof createCanonicalChunkFeature>; }, IEndpointCapabilitiesFeatureExpose>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-features/outbound--createOutboundFeature"
         },
@@ -91703,7 +91204,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/internal/provider-admission.d.ts:createProviderAdmissionScope:export declare function createProviderAdmissionScope(): IProviderAdmissionScope;",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-features/provider--createProviderAdmissionScope"
         },
@@ -91767,7 +91268,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/internal/provider-feature.d.ts:createProviderFeature:export declare const createProviderFeature: (outboundCapability: IRpcFeature<IOutboundCapability>) => IRpcFeature<IProviderCapability, { readonly outbound: IRpcFeature<IOutboundCapability>; }, IEndpointCapabilitiesFeatureExpose>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-features/provider--createProviderFeature"
         },
@@ -92040,7 +91541,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/full.d.ts:createFullEndpoint:export declare const createFullEndpoint: IPublicCallable;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-full--createFullEndpoint"
         },
@@ -93114,7 +92615,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/provider.d.ts:createProviderEndpoint:export declare const createProviderEndpoint: IPublicCallable;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-provider--createProviderEndpoint"
         }
@@ -93413,7 +92914,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/remote/runtime-api/managed-peer.d.ts:createManagedRuntimePeer:export declare function createManagedRuntimePeer<TUnit, TSpec>(options: IRuntimePeerOptions & Pick<IRemoteProxyOptions<TUnit, TSpec>, 'keyFactory' | 'retryPort' | 'callDeadlineCapMs'>, binding: IRemoteBinding<TUnit, TSpec>, bindEndpoint?: (channel: IRemoteChannel, endpoint: IRemoteServeEndpoint) => IRemoteServeEndpoint, preparation?: Readonly<{ selfDefaulted?: boolean; connectionOrigin?(): import('./overview.js').IRuntimeConnectionOrigin; restrictTransfer?(options: object | undefined): void; host?: import('@migaia/plugin-host').IPluginRuntimeIntegration; providerAdmission?: import('../../core/features/provider.js').IProviderAdmissionScope; providerAdmissionRegistration?: Readonly<{ stagePolicy(maxGlobal?: number, maxPerPeer?: number): void; isCommitted(): boolean; }>; initialSignal?: IAbortSignal; lifecycleSignal?: IAbortSignal; own?(dispose: () => Promise<void>): void; readProvide?(): import('./peer.js').IRuntimePeerProvide; publishPeer?(peer: IRuntimePeer): () => void; }>, beforeRelease?: () => Promise<void>, execution?: import('@migaia/supervision').ISupervisor<unknown, unknown>): Promise<IRuntimePeer>;",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "rpc-core-remote--createManagedRuntimePeer"
         },
@@ -93679,7 +93180,9 @@
           "returns": "Promise<IRuntimePeer>",
           "errors": ["No documented errors are declared for createRuntimePeer."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRuntimePeer.",
-          "examples": [],
+          "examples": [
+            "import { createRuntimePeer } from '@migaia/rpc-core/remote'\n\nconst peer = await createRuntimePeer({\n  self: { name: 'client', instanceId: 'client-1' },\n  provide: { ping: () => 'pong' },\n  connect: async (context) => openChannelSomehow(context), // 返回已完成握手的协议通道\n  report: (error) => console.error(error)\n})"
+          ],
           "members": [],
           "aliasOf": "createRuntimePeer",
           "exportPath": "./remote",
@@ -93738,7 +93241,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/remote/runtime-api/peer.d.ts:createRuntimePeer:export declare function createRuntimePeer(options: IRuntimePeerOptions, resources?: IRuntimePeerResources): Promise<IRuntimePeer>;",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 20,
           "configuration": [],
           "fragment": "rpc-core-remote--createRuntimePeer"
         },
@@ -93842,7 +93345,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/remote/runtime-api/plugin.d.ts:createRuntimePlugin:export declare function createRuntimePlugin<TSpawn, TConnect, TListen>(options: IRuntimePluginOptions<TSpawn, TConnect, TListen>, slotResource: IRuntimePluginSlotResource, createPeer?: (options: IRuntimePeerOptions) => Promise<IRuntimePeer>): IDefinedPluginConstraint<Record<string, never>, never, Record<string, never>>;",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 8,
           "configuration": [],
           "fragment": "rpc-core-remote--createRuntimePlugin"
         },
@@ -94224,7 +93727,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/remote/contract.d.ts:IRemoteContract:export type IRemoteContract = Readonly<{ schemaVersion: 1; plugin: string; features: Readonly<Record<string, IRemoteFeatureContract>>; }>;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-core-remote--IRemoteContract"
         },
@@ -96483,7 +95986,7 @@
           "errors": ["No documented errors are declared for IRuntimePeer."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimePeer.",
           "examples": [
-            "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** 调用方持有真实端口；原 options 身份保留 Core 已有的 Host preparation。 */\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  /** 保留原配置身份和本地缺省地址，后续选项复制仍使用同一准备 owner。 */\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  /** Core 直接在同一个原始端口上观察 ACK，不接收协商结果声明。 */\n  const resource = createEventEmitterMessageResource(port)\n  /** 本地提案来自 Core 实际编译的 roots；启用项仍由收到的 ACK 决定。 */\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}"
+            "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  const resource = createEventEmitterMessageResource(port)\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}"
           ],
           "members": [],
           "aliasOf": "IRuntimePeer",
@@ -96613,7 +96116,7 @@
           "errors": ["No documented errors are declared for IRuntimePeerOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimePeerOptions.",
           "examples": [
-            "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** 调用方持有真实端口；原 options 身份保留 Core 已有的 Host preparation。 */\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  /** 保留原配置身份和本地缺省地址，后续选项复制仍使用同一准备 owner。 */\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  /** Core 直接在同一个原始端口上观察 ACK，不接收协商结果声明。 */\n  const resource = createEventEmitterMessageResource(port)\n  /** 本地提案来自 Core 实际编译的 roots；启用项仍由收到的 ACK 决定。 */\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}"
+            "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  const resource = createEventEmitterMessageResource(port)\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}"
           ],
           "members": [],
           "aliasOf": "IRuntimePeerOptions",
@@ -96743,7 +96246,7 @@
           "errors": ["No documented errors are declared for IRuntimePeerSource."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimePeerSource.",
           "examples": [
-            "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** 调用方持有真实端口；原 options 身份保留 Core 已有的 Host preparation。 */\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  /** 保留原配置身份和本地缺省地址，后续选项复制仍使用同一准备 owner。 */\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  /** Core 直接在同一个原始端口上观察 ACK，不接收协商结果声明。 */\n  const resource = createEventEmitterMessageResource(port)\n  /** 本地提案来自 Core 实际编译的 roots；启用项仍由收到的 ACK 决定。 */\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}"
+            "import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport {\n  createEventEmitterMessageResource,\n  prepareAdapterPeer,\n  type IAdapterEventEmitterMessagePort\n} from '@migaia/rpc-core/adapter'\nimport type { IRuntimePeer, IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nexport function openCustomRuntimePeer(\n  port: IAdapterEventEmitterMessagePort,\n  parentId: string,\n  options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>\n): Promise<IRuntimePeer> {\n  const preparation = prepareAdapterPeer(options, 'custom-runtime')\n  const resource = createEventEmitterMessageResource(port)\n  const connect: IRuntimePeerSource = (context) =>\n    resource.open({\n      peerId: parentId,\n      scheduler: systemScheduler,\n      offer: context.capabilities,\n      control: rpcMessageCapabilityControl\n    })\n  return preparation.peer({ ...options, self: preparation.context.self, connect })\n}"
           ],
           "members": [],
           "aliasOf": "IRuntimePeerSource",
@@ -97366,7 +96869,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/remote/runtime-api/typing.d.ts:IRuntimeSurface:export type IRuntimeSurface<THost, TPlugin> = TPlugin extends IRuntimePluginTyping<any, infer P, any, infer E extends readonly string[], any> ? IRuntimeFlatten<P> & IRuntimeSelected<IRuntimeRegistry<THost>, E[number]> : Record<never, never>;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-remote--IRuntimeSurface"
         },
@@ -98248,62 +97751,24 @@
           "identity": "packages/rpc-core/dist/remote/error-code.d.ts:RPC_REMOTE_ERROR_SOURCE:export declare const RPC_REMOTE_ERROR_SOURCE = \"@migaia/rpc/remote\";",
           "guidance": [
             {
-              "id": "第三方公开错误面与错误编码",
-              "heading": "第三方公开错误面与错误编码",
+              "id": "错误",
+              "heading": "错误",
               "blocks": [
                 {
-                  "type": "paragraph",
-                  "text": "协议实现者（自定义载体或 Go/Python/Rust 对端）从 `@migaia/rpc-contract/errors` 使用完整 wire 错误 schema、校验、遍历与 JSON-RPC 映射。运行时适配器作者使用 Core 根入口的 `serializeRpcError` / `deserializeRpcError`，保留 Core/Remote 私有脱敏与 forwarding-route 策略；完整 wire walker 唯一归 Contract。两类集成者都用公开 source/code 和错误族守卫解释诊断，不能据此推定 Core 的内部操作身份。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "六个稳定语义 source 保留分包前字符串，按以下普通公开入口导入："
-                },
-                {
                   "type": "table",
-                  "headers": ["公开入口", "source 常量与值", "错误码表", "第三方用途"],
+                  "headers": ["source", "常量", "code 表"],
                   "rows": [
+                    ["`@migaia/rpc/core`", "`RPC_CORE_ERROR_SOURCE`", "`RpcCoreErrorCode`"],
                     [
-                      "`@migaia/rpc-contract` / `@migaia/rpc-contract/errors`",
-                      "`RPC_CONTRACT_SOURCE` = `@migaia/rpc/contract`",
-                      "`RpcContractErrorCode`",
-                      "识别非法 envelope、frame、handshake 与错误树，修复对应协议输入。"
-                    ],
-                    [
-                      "`@migaia/rpc-core`",
-                      "`RPC_CORE_ERROR_SOURCE` = `@migaia/rpc/core`",
-                      "`RpcCoreErrorCode`",
-                      "分类 Endpoint 的配置、取消、deadline、transport 与 provider 诊断。"
-                    ],
-                    [
-                      "`@migaia/rpc-core/remote`",
-                      "`RPC_REMOTE_ERROR_SOURCE` = `@migaia/rpc/remote`",
-                      "`RpcRemoteLayerErrorCode`",
-                      "解释 generation 关闭、启动失败及未知结果，按原 outcome/对账路径恢复。"
-                    ],
-                    [
-                      "`@migaia/rpc-process`",
-                      "`RPC_PROCESS_ERROR_SOURCE` = `@migaia/rpc/process`",
-                      "`RpcProcessErrorCode`",
-                      "分类实际 launch、dial、listen、bootstrap 与资源采样失败。"
-                    ],
-                    [
-                      "`@migaia/rpc-threads`",
-                      "`RPC_THREAD_ERROR_SOURCE` = `@migaia/rpc/threads`",
-                      "`RpcThreadErrorCode`",
-                      "报告真实 Worker 采样失败，保留原 cause 并展示 unavailable。"
-                    ],
-                    [
-                      "`@migaia/rpc-bridge-jsonrpc` / `@migaia/rpc-contract/framing/jsonrpc`",
-                      "`JSONRPC_BRIDGE_ERROR_SOURCE` = `@migaia/rpc/bridge/jsonrpc`",
-                      "`JsonRpcBridgeErrorCode`",
-                      "识别 framing、hello/profile 与扩展协商失败，处理实际连接。"
+                      "`@migaia/rpc/remote`",
+                      "`RPC_REMOTE_ERROR_SOURCE`",
+                      "`RpcRemoteLayerErrorCode`"
                     ]
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`RpcCoreErrorText`、`RpcContractErrorText`、`RpcContractErrorDiagnostic`、`RpcProcessErrorText`、`RpcRemoteLayerErrorText`、`JsonRpcBridgeErrorText` 与 Thread 文本表均为私有展示。删除这些已更名包的公开表属于破坏性导出变更；message 字面量不是恢复、重试、终止或关闭契约。Process bootstrap 的环境名、版本、frame 限额和发现超时仍由 `@migaia/rpc-process` 普通导出；stderr 文本/配额常量不公开。"
+                  "text": "按 `(source, code)` 分支，不要匹配 `message`。跨 Worker、iframe 或模块副本时，用 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 判断错误族，而不是 `instanceof`。全部错误码及处理建议见 USEGUIDE 第 10 节。"
                 }
               ]
             }
@@ -98373,67 +97838,29 @@
           "identity": "packages/rpc-core/dist/remote/error-code.d.ts:RpcRemoteLayerErrorCode:export declare const RpcRemoteLayerErrorCode: { /** A passive watch exceeded 100 unread events; query current state before subscribing again. */ readonly runtimeEventOverflow: \"RUNTIME_EVENT_OVERFLOW\"; /** A description or control payload violates the remote contract; correct it before retrying. */ readonly contractInvalid: \"REMOTE_CONTRACT_INVALID\"; /** * HostUnUse, including dryRun, lacks this connection's live adoption of the same remotely * installed definition. Enforces rpc-remote R4/K203; complete hostUse before removing it. */ readonly hostNotAdopted: \"REMOTE_HOST_NOT_ADOPTED\"; /** A supervisor cannot provide a ready unit or a channel cannot open; inspect the cause. */ readonly startFailed: \"REMOTE_START_FAILED\"; /** The registration was released or its generation left; wait for another ready generation. */ readonly closed: \"REMOTE_CLOSED\"; /** * A sent request lost its result with the generation; reconcile before another non-idempotent * call. */ readonly resultUnknown: \"REMOTE_RESULT_UNKNOWN\"; };",
           "guidance": [
             {
-              "id": "第三方公开错误面与错误编码",
-              "heading": "第三方公开错误面与错误编码",
+              "id": "错误",
+              "heading": "错误",
               "blocks": [
                 {
-                  "type": "paragraph",
-                  "text": "协议实现者（自定义载体或 Go/Python/Rust 对端）从 `@migaia/rpc-contract/errors` 使用完整 wire 错误 schema、校验、遍历与 JSON-RPC 映射。运行时适配器作者使用 Core 根入口的 `serializeRpcError` / `deserializeRpcError`，保留 Core/Remote 私有脱敏与 forwarding-route 策略；完整 wire walker 唯一归 Contract。两类集成者都用公开 source/code 和错误族守卫解释诊断，不能据此推定 Core 的内部操作身份。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "六个稳定语义 source 保留分包前字符串，按以下普通公开入口导入："
-                },
-                {
                   "type": "table",
-                  "headers": ["公开入口", "source 常量与值", "错误码表", "第三方用途"],
+                  "headers": ["source", "常量", "code 表"],
                   "rows": [
+                    ["`@migaia/rpc/core`", "`RPC_CORE_ERROR_SOURCE`", "`RpcCoreErrorCode`"],
                     [
-                      "`@migaia/rpc-contract` / `@migaia/rpc-contract/errors`",
-                      "`RPC_CONTRACT_SOURCE` = `@migaia/rpc/contract`",
-                      "`RpcContractErrorCode`",
-                      "识别非法 envelope、frame、handshake 与错误树，修复对应协议输入。"
-                    ],
-                    [
-                      "`@migaia/rpc-core`",
-                      "`RPC_CORE_ERROR_SOURCE` = `@migaia/rpc/core`",
-                      "`RpcCoreErrorCode`",
-                      "分类 Endpoint 的配置、取消、deadline、transport 与 provider 诊断。"
-                    ],
-                    [
-                      "`@migaia/rpc-core/remote`",
-                      "`RPC_REMOTE_ERROR_SOURCE` = `@migaia/rpc/remote`",
-                      "`RpcRemoteLayerErrorCode`",
-                      "解释 generation 关闭、启动失败及未知结果，按原 outcome/对账路径恢复。"
-                    ],
-                    [
-                      "`@migaia/rpc-process`",
-                      "`RPC_PROCESS_ERROR_SOURCE` = `@migaia/rpc/process`",
-                      "`RpcProcessErrorCode`",
-                      "分类实际 launch、dial、listen、bootstrap 与资源采样失败。"
-                    ],
-                    [
-                      "`@migaia/rpc-threads`",
-                      "`RPC_THREAD_ERROR_SOURCE` = `@migaia/rpc/threads`",
-                      "`RpcThreadErrorCode`",
-                      "报告真实 Worker 采样失败，保留原 cause 并展示 unavailable。"
-                    ],
-                    [
-                      "`@migaia/rpc-bridge-jsonrpc` / `@migaia/rpc-contract/framing/jsonrpc`",
-                      "`JSONRPC_BRIDGE_ERROR_SOURCE` = `@migaia/rpc/bridge/jsonrpc`",
-                      "`JsonRpcBridgeErrorCode`",
-                      "识别 framing、hello/profile 与扩展协商失败，处理实际连接。"
+                      "`@migaia/rpc/remote`",
+                      "`RPC_REMOTE_ERROR_SOURCE`",
+                      "`RpcRemoteLayerErrorCode`"
                     ]
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`RpcCoreErrorText`、`RpcContractErrorText`、`RpcContractErrorDiagnostic`、`RpcProcessErrorText`、`RpcRemoteLayerErrorText`、`JsonRpcBridgeErrorText` 与 Thread 文本表均为私有展示。删除这些已更名包的公开表属于破坏性导出变更；message 字面量不是恢复、重试、终止或关闭契约。Process bootstrap 的环境名、版本、frame 限额和发现超时仍由 `@migaia/rpc-process` 普通导出；stderr 文本/配额常量不公开。"
+                  "text": "按 `(source, code)` 分支，不要匹配 `message`。跨 Worker、iframe 或模块副本时，用 `isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError` 判断错误族，而不是 `instanceof`。全部错误码及处理建议见 USEGUIDE 第 10 节。"
                 }
               ]
             }
           ],
-          "usageScore": 4,
+          "usageScore": 2,
           "configuration": [],
           "fragment": "rpc-core-remote--RpcRemoteLayerErrorCode"
         },
@@ -98690,7 +98117,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/remote/runtime-api/constants.d.ts:RuntimeEventName:export declare const RuntimeEventName: { readonly ready: \"ready\"; readonly exit: \"exit\"; readonly degraded: \"degraded\"; readonly restart: \"restart\"; readonly liquidated: \"liquidated\"; };\nexport type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-remote--RuntimeEventName"
         },
@@ -98754,7 +98181,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/remote/runtime-api/constants.d.ts:RuntimePluginKey:export declare const RuntimePluginKey: Readonly<{ readonly process: \"process\"; readonly thread: \"thread\"; }>;",
           "guidance": [],
-          "usageScore": 8,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-remote--RuntimePluginKey"
         },
@@ -99573,7 +99000,9 @@
           "returns": "Promise<Readonly<{ a: IRuntimeTypedPeer<B>; b: IRuntimeTypedPeer<A>; }>>",
           "errors": ["No documented errors are declared for createPeerPair."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createPeerPair.",
-          "examples": [],
+          "examples": [
+            "import { createPeerPair } from '@migaia/rpc-core/testing'\n\nconst pair = await createPeerPair({\n  a: { provide: { echo: (text: string) => text } },\n  b: { provide: { double: (value: number) => value * 2 } }\n})\ntry {\n  console.log(await pair.a.request('double', 21)) // 42：a 调用 b 提供的方法\n  console.log(await pair.b.request('echo', 'ready')) // 'ready'\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n}"
+          ],
           "members": [],
           "exportPath": "./testing",
           "overloadSignatures": [
@@ -99628,7 +99057,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/testing/index.d.ts:createPeerPair:export declare function createPeerPair<A extends IRuntimePeerProvide, B extends IRuntimePeerProvide>(options: IPeerPairOptions<A, B>): Promise<Readonly<{ a: IRuntimeTypedPeer<B>; b: IRuntimeTypedPeer<A>; }>>;",
           "guidance": [],
-          "usageScore": 10,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "rpc-core-testing--createPeerPair"
         },
@@ -100340,7 +99769,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/transport-constants.d.ts:RpcPlatform:export declare const RpcPlatform: { readonly broadcastChannel: \"BroadcastChannel\"; readonly iframe: \"Iframe\"; readonly memory: \"Memory\"; readonly messagePort: \"MessagePort\"; readonly process: \"Process\"; readonly rtcDataChannel: \"RTCDataChannel\"; readonly webTransport: \"WebTransport\"; readonly worker: \"Worker\"; };",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-transport-constants--RpcPlatform"
         },
@@ -100933,7 +100362,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/internal/message-listener-hub.d.ts:createMessageListenerHub:export declare function createMessageListenerHub<TMessage>(): IMessageListenerHub<TMessage>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-transport-kit--createMessageListenerHub"
         },
@@ -101243,7 +100672,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/transport.d.ts:IRpcTransport:export type IRpcTransport<Message = unknown, Transfer = unknown> = { send(message: Message, options?: IRpcSendOptions<Transfer>): void | Promise<void>; subscribe(listener: (message: IRpcInboundMessage<Message>) => void): () => void; close?(): void | Promise<void>; onTransportError?(listener: (error: unknown) => void): () => void; onListenerError?(listener: (error: unknown) => void): () => void; readonly peerId?: string; readonly origin?: string; readonly platform: IRpcPlatformValue; /** Describes whether adapter messages share one peer, many peers, or a broadcast group. */ readonly topology?: IRpcTransportTopology; readonly encodedType?: IRpcTransportEncoding; readonly ownership?: IRpcTransportOwnership; /** Adapter-owned source proof for multiplexed transports. */ readonly sourceProof?: (source: unknown, origin?: string) => boolean; /** True only when the adapter can prove that no further messages can be delivered. */ readonly closed?: boolean; };",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-core-transport-kit--IRpcTransport"
         },
