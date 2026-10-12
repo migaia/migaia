@@ -1,0 +1,995 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "rpc-pool",
+    "description": "Thread and process pools composed from public RPC peers.",
+    "version": "0.0.7",
+    "exports": ["."],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-rpc-pool",
+            "heading": "@migaia/rpc-pool",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "在公开 RPC Peer 上组合线程与进程池。每个成员一个客户端操作槽，最少 in-flight 调度，平局轮转；忙时进入有限 FIFO。通信、握手、监督与错误仍由原 Peer 管理。"
+              }
+            ]
+          },
+          {
+            "id": "createthreadpool-线程池",
+            "heading": "createThreadPool：线程池",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`spawn` 原样交给 `createThreadPeer`，支持 `true`、入口路径、URL 和现有配置。不同程序才需要入口。此例的两个文件由文档检查器构建并运行。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({ provide: { double: (value: number) => value * 2 } })"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createThreadPool } from '@migaia/rpc-pool'\n\nconst pool = await createThreadPool<{ double(value: number): number }>({\n  spawn: new URL('./worker.js', import.meta.url), size: 2\n})\ntry {\n  console.log(await Promise.all([pool.request('double', 21), pool.request('double', 10)]))\n  await pool.resize(3)\n  console.log(pool.stats())\n} finally {\n  await pool.close()\n}"
+              }
+            ]
+          },
+          {
+            "id": "createprocesspool-进程池",
+            "heading": "createProcessPool：进程池",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`spawn` 原样交给 `createProcessPeer`。入口、运行时与权限规则和原工厂一致。名字端点用于独立进程；池 API 创建自己的成员程序。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({ provide: { add: (value: { a: number; b: number }) => value.a + value.b } })"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createProcessPool } from '@migaia/rpc-pool'\n\nconst pool = await createProcessPool<{ add(value: { a: number; b: number }): number }>({\n  spawn: new URL('./service.js', import.meta.url), size: 2, maxQueue: 16\n})\ntry {\n  console.log(await pool.request('add', { a: 20, b: 22 }))\n} finally {\n  await pool.close()\n}"
+              }
+            ]
+          },
+          {
+            "id": "调度与生命周期",
+            "heading": "调度与生命周期",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "两个工厂都返回 `request / notify / stream / resize / close / stats`。没有 Proxy。"
+              },
+              {
+                "type": "list",
+                "items": [
+                  "`size` 是正整数；`maxQueue` 默认 256，允许 0。所有槽忙且队列满时拒绝 `QUEUE_FULL`，不发送业务调用。",
+                  "`stats()` 是池自身的客户端操作快照，不是远端 provider 并发。request 到 Promise 完成、notify 到发送 Promise 完成、stream 到 done/return/throw 才释放槽。",
+                  "`stream` 是惰性 iterator：首次 `next()` 才接纳；未开始的 iterator 不阻碍关闭。长 stream 需要消费、return 或取消才能 drain。",
+                  "`resize(size)` 按调用顺序增减成员，缩容等正在使用的成员完成。`close()` 停止新接纳并排空已接受的队列，重复调用返回同一 Promise。",
+                  "`idleTimeoutMs` 设置为不超过 2147483647 毫秒的有限正数时，闲置成员通过原 `peer.close()` 退役，下一个任务通过原公开工厂补回目标大小。",
+                  "原 supervisor 负责崩溃重启与重新绑定。默认裸 spawn 使用原 on-failure 策略和五次预算；不重置用户预算。恢复期间原 Peer 可以拒绝 `CLOSED`；恢复后未来新调用使用同一个 Peer。池不自动重放失败业务调用。",
+                  "派发后的 call options 和 signal 原样传给 Peer；排队阶段取消为 DOMException AbortError，`CALL_ABORTED` 的 cause 是原 reason。`timeoutMs` 从原 Peer 接收操作时起算，池不另建队列 deadline。"
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "`spawn: true` 会重跑整个主入口，使用原 `isProcessChild()` / `await isThreadChild()` guard。相对字符串基于主入口目录；URL 精确。浏览器线程沿原 URL 规则；Node `.ts` 去类型不重写 `.js` 导入，使用编译输出或 loader。详细入口、认证与运行时边界见 rpc-process / rpc-threads 使用手册。"
+              }
+            ]
+          },
+          {
+            "id": "错误",
+            "heading": "错误",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "本包 source 为 `@migaia/rpc-pool`：`INVALID_OPTIONS`（TypeError/RangeError）、`POOL_CLOSED`、`QUEUE_FULL`、`CALL_ABORTED`（DOMException）、`CLOSE_FAILED`（AggregateError）。原 Native/Peer 错误保持自己的 source/code 与实例；启动回滚的 secondary cleanup 报告，原 primary 保留；关闭汇总保留原 errors/cause。"
+              },
+              {
+                "type": "paragraph",
+                "text": "只依赖 rpc-core、rpc-process、rpc-threads 的公开入口。没有工作窃取、跨机器池或另一套 RPC/native supervision。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "1-高阶用法-线程池-通知与-stream",
+            "heading": "1. 高阶用法：线程池、通知与 stream",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "这些文件使用真实 Worker。类型参数描述远端方法，调用形式与 Peer 一致。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: {\n    double: (value: number) => value * 2,\n    mark: (_value: number) => undefined,\n    values: async function* (count: number) { for (let index = 0; index < count; index++) yield index }\n  }\n})"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createThreadPool } from '@migaia/rpc-pool'\n\nconst pool = await createThreadPool<{\n  double(value: number): number\n  mark(value: number): void\n  values(count: number): AsyncIterableIterator<number>\n}>({ spawn: new URL('./worker.js', import.meta.url), size: 2, maxQueue: 8, idleTimeoutMs: 1000 })\ntry {\n  console.log(await pool.request('double', 21))\n  await pool.notify('mark', 1)\n  for await (const value of pool.stream('values', 3)) console.log(value)\n  await pool.resize(1)\n  console.log(pool.stats())\n} finally {\n  await pool.close()\n}"
+              }
+            ]
+          },
+          {
+            "id": "2-创建进程池",
+            "heading": "2. 创建进程池",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。"
+              }
+            ]
+          },
+          {
+            "id": "3-取消-恢复与关闭",
+            "heading": "3. 取消、恢复与关闭",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "原 signal/options 对象进入 Peer。取消排队项仅移除那一项，`CALL_ABORTED` 的 cause 保留原 reason；已经派发的取消由原 Peer 执行。queue 等待不重算或缩短原 timeoutMs。"
+              },
+              {
+                "type": "paragraph",
+                "text": "崩溃成员由原 supervisor 重新绑定；恢复期间调用可收到原 CLOSED，池不自动重放。关闭停止新 request/notify、首次 stream next 和 resize；已接受的工作排空后才关闭成员。stream 未消费完会延长 drain，使用 iterator.return 或 signal 取消。"
+              },
+              {
+                "type": "paragraph",
+                "text": "缩容先回收闲置成员，忙成员结束后关闭；扩容只创建差额。闲置回收仍使用原公开 close/factory。stats 的 in-flight 是本池客户端操作，不是 provider concurrency；notify 的槽只覆盖原发送完成点。"
+              }
+            ]
+          },
+          {
+            "id": "4-所有权与错误边界",
+            "heading": "4. 所有权与错误边界",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "池拥有自己创建的 Peer 和本地 FIFO，没有 Native 句柄、握手、admission 或 trust 权限入口。默认 queue 容量 256，maxQueue=0 禁止等待；overflow 在接纳前拒绝。"
+              },
+              {
+                "type": "paragraph",
+                "text": "idleTimeoutMs 必须为有限正数且不超过 2147483647 毫秒，避免原生 timer 溢出变成立即回收。非法 size/maxQueue/idleTimeoutMs 在创建前以 TypeError/RangeError+INVALID_OPTIONS 拒绝。部分启动失败保留原 primary 并关闭本批已取得 Peer；secondary cleanup 报告。close 汇总原失败在 AggregateError.errors/cause，不只保留 code。source 与完整代码列表见 README。"
+              },
+              {
+                "type": "paragraph",
+                "text": "支持环境继承原工厂。当前文档执行使用 Node 24 的真实 Process/Worker；Bun、Deno、浏览器线程仍受原入口、权限与 native lifetime 限制，不把 Node 文档结果当作其他运行时验证。"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "rpc-pool:index",
+      "library": "rpc-pool",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-pool/getting-started",
+      "architecturePath": "/en/architecture/rpc-pool",
+      "symbols": [
+        {
+          "name": "createProcessPool",
+          "kind": "function",
+          "signature": "export declare function createProcessPool<TRemote = Record<never, never>>(options: IProcessPoolOptions): Promise<IProcessPool<TRemote>>;",
+          "declarationLine": 5,
+          "source": "packages/rpc-pool/dist/index.d.ts",
+          "purpose": "Create independent Process Peers without overriding native restart or transfer semantics.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createProcessPool.",
+          "advanced": "No additional advanced behavior is declared for createProcessPool.",
+          "parameters": ["options: IProcessPoolOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IProcessPoolOptions",
+              "optional": false
+            }
+          ],
+          "returns": "Promise<IProcessPool<TRemote>>",
+          "errors": ["No documented errors are declared for createProcessPool."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createProcessPool.",
+          "examples": [
+            "import { createProcessPool } from '@migaia/rpc-pool'\n\nconst pool = await createProcessPool<{ add(value: { a: number; b: number }): number }>({\n  spawn: new URL('./service.js', import.meta.url), size: 2, maxQueue: 16\n})\ntry {\n  console.log(await pool.request('add', { a: 20, b: 22 }))\n} finally {\n  await pool.close()\n}"
+          ],
+          "members": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createProcessPool<TRemote = Record<never, never>>(options: IProcessPoolOptions): Promise<IProcessPool<TRemote>>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IProcessPoolOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["Promise<IProcessPool<TRemote>>"],
+          "whenToUse": "Use createProcessPool when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createProcessPool does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Create independent Process Peers without overriding native restart or transfer semantics."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createProcessPool from @migaia/rpc-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createProcessPool when its function contract and declared inputs match the result you need. Choose a different public symbol when createProcessPool does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createProcessPool."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createProcessPool."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-pool/dist/index.d.ts:createProcessPool:export declare function createProcessPool<TRemote = Record<never, never>>(options: IProcessPoolOptions): Promise<IProcessPool<TRemote>>;",
+          "guidance": [],
+          "usageScore": 24,
+          "configuration": [],
+          "fragment": "rpc-pool-index--createProcessPool"
+        },
+        {
+          "name": "createThreadPool",
+          "kind": "function",
+          "signature": "export declare function createThreadPool<TRemote = Record<never, never>>(options: IThreadPoolOptions): Promise<IThreadPool<TRemote>>;",
+          "declarationLine": 3,
+          "source": "packages/rpc-pool/dist/index.d.ts",
+          "purpose": "Create independent Thread Peers using the caller's exact original spawn source and policy.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createThreadPool.",
+          "advanced": "No additional advanced behavior is declared for createThreadPool.",
+          "parameters": ["options: IThreadPoolOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IThreadPoolOptions",
+              "optional": false
+            }
+          ],
+          "returns": "Promise<IThreadPool<TRemote>>",
+          "errors": ["No documented errors are declared for createThreadPool."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createThreadPool.",
+          "examples": [
+            "import { createThreadPool } from '@migaia/rpc-pool'\n\nconst pool = await createThreadPool<{ double(value: number): number }>({\n  spawn: new URL('./worker.js', import.meta.url), size: 2\n})\ntry {\n  console.log(await Promise.all([pool.request('double', 21), pool.request('double', 10)]))\n  await pool.resize(3)\n  console.log(pool.stats())\n} finally {\n  await pool.close()\n}"
+          ],
+          "members": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createThreadPool<TRemote = Record<never, never>>(options: IThreadPoolOptions): Promise<IThreadPool<TRemote>>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IThreadPoolOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["Promise<IThreadPool<TRemote>>"],
+          "whenToUse": "Use createThreadPool when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createThreadPool does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Create independent Thread Peers using the caller's exact original spawn source and policy."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createThreadPool from @migaia/rpc-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createThreadPool when its function contract and declared inputs match the result you need. Choose a different public symbol when createThreadPool does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createThreadPool."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createThreadPool."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-pool/dist/index.d.ts:createThreadPool:export declare function createThreadPool<TRemote = Record<never, never>>(options: IThreadPoolOptions): Promise<IThreadPool<TRemote>>;",
+          "guidance": [],
+          "usageScore": 34,
+          "configuration": [],
+          "fragment": "rpc-pool-index--createThreadPool"
+        },
+        {
+          "name": "IProcessPool",
+          "kind": "type",
+          "signature": "export type IProcessPool<TRemote = Record<never, never>> = Pick<Awaited<ReturnType<typeof createProcessPeer<TRemote>>>, 'request' | 'notify' | 'stream'> & IRpcPoolControls;",
+          "declarationLine": 21,
+          "source": "packages/rpc-pool/dist/types.d.ts",
+          "purpose": "Process call options retain the public owner's prohibition on native transfer lists.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessPool.",
+          "advanced": "No additional advanced behavior is declared for IProcessPool.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IProcessPool."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IProcessPool.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IProcessPool",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IProcessPool<TRemote = Record<never, never>> = Pick<Awaited<ReturnType<typeof createProcessPeer<TRemote>>>, 'request' | 'notify' | 'stream'> & IRpcPoolControls;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IProcessPool when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IProcessPool does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Process call options retain the public owner's prohibition on native transfer lists."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IProcessPool from @migaia/rpc-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IProcessPool when its type contract and declared inputs match the result you need. Choose a different public symbol when IProcessPool does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessPool."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IProcessPool."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-pool/dist/types.d.ts:IProcessPool:export type IProcessPool<TRemote = Record<never, never>> = Pick<Awaited<ReturnType<typeof createProcessPeer<TRemote>>>, 'request' | 'notify' | 'stream'> & IRpcPoolControls;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-pool-index--IProcessPool"
+        },
+        {
+          "name": "IProcessPoolOptions",
+          "kind": "type",
+          "signature": "export type IProcessPoolOptions = IRpcPoolOptions & Readonly<{ spawn: NonNullable<IRuntimeProcessPeerOptions['spawn']>; }>;",
+          "declarationLine": 33,
+          "source": "packages/rpc-pool/dist/types.d.ts",
+          "purpose": "Every Process member receives this exact original source value.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessPoolOptions.",
+          "advanced": "No additional advanced behavior is declared for IProcessPoolOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IProcessPoolOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IProcessPoolOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IProcessPoolOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IProcessPoolOptions = IRpcPoolOptions & Readonly<{ spawn: NonNullable<IRuntimeProcessPeerOptions['spawn']>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IProcessPoolOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IProcessPoolOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Every Process member receives this exact original source value."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IProcessPoolOptions from @migaia/rpc-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IProcessPoolOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IProcessPoolOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessPoolOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IProcessPoolOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-pool/dist/types.d.ts:IProcessPoolOptions:export type IProcessPoolOptions = IRpcPoolOptions & Readonly<{ spawn: NonNullable<IRuntimeProcessPeerOptions['spawn']>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-pool-index--IProcessPoolOptions"
+        },
+        {
+          "name": "IRpcPoolControls",
+          "kind": "type",
+          "signature": "export type IRpcPoolControls = Readonly<{ stats(): IRpcPoolStats; resize(size: number): Promise<void>; close(): Promise<void>; }>;",
+          "declarationLine": 13,
+          "source": "packages/rpc-pool/dist/types.d.ts",
+          "purpose": "Pool controls own only the Peers created by their corresponding public factory.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcPoolControls.",
+          "advanced": "No additional advanced behavior is declared for IRpcPoolControls.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcPoolControls."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcPoolControls.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcPoolControls",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcPoolControls = Readonly<{ stats(): IRpcPoolStats; resize(size: number): Promise<void>; close(): Promise<void>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcPoolControls when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcPoolControls does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Pool controls own only the Peers created by their corresponding public factory."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcPoolControls from @migaia/rpc-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcPoolControls when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcPoolControls does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcPoolControls."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcPoolControls."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-pool/dist/types.d.ts:IRpcPoolControls:export type IRpcPoolControls = Readonly<{ stats(): IRpcPoolStats; resize(size: number): Promise<void>; close(): Promise<void>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-pool-index--IRpcPoolControls"
+        },
+        {
+          "name": "IRpcPoolErrorCode",
+          "kind": "type",
+          "signature": "export type IRpcPoolErrorCode = (typeof RpcPoolErrorCode)[keyof typeof RpcPoolErrorCode];",
+          "declarationLine": 16,
+          "source": "packages/rpc-pool/dist/error-code.d.ts",
+          "purpose": "IRpcPoolErrorCode is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcPoolErrorCode.",
+          "advanced": "No additional advanced behavior is declared for IRpcPoolErrorCode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcPoolErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcPoolErrorCode.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcPoolErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcPoolErrorCode = (typeof RpcPoolErrorCode)[keyof typeof RpcPoolErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcPoolErrorCode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcPoolErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IRpcPoolErrorCode is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcPoolErrorCode from @migaia/rpc-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcPoolErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcPoolErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcPoolErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcPoolErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-pool/dist/error-code.d.ts:IRpcPoolErrorCode:export type IRpcPoolErrorCode = (typeof RpcPoolErrorCode)[keyof typeof RpcPoolErrorCode];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-pool-index--IRpcPoolErrorCode"
+        },
+        {
+          "name": "IRpcPoolStats",
+          "kind": "type",
+          "signature": "export type IRpcPoolStats = Readonly<{ targetSize: number; memberCount: number; inFlight: number; queued: number; state: RpcPoolState; }>;",
+          "declarationLine": 5,
+          "source": "packages/rpc-pool/dist/types.d.ts",
+          "purpose": "This snapshot measures pool client slots and FIFO entries, never provider concurrency.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcPoolStats.",
+          "advanced": "No additional advanced behavior is declared for IRpcPoolStats.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcPoolStats."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcPoolStats.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcPoolStats",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcPoolStats = Readonly<{ targetSize: number; memberCount: number; inFlight: number; queued: number; state: RpcPoolState; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcPoolStats when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcPoolStats does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "This snapshot measures pool client slots and FIFO entries, never provider concurrency."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcPoolStats from @migaia/rpc-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcPoolStats when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcPoolStats does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcPoolStats."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcPoolStats."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-pool/dist/types.d.ts:IRpcPoolStats:export type IRpcPoolStats = Readonly<{ targetSize: number; memberCount: number; inFlight: number; queued: number; state: RpcPoolState; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-pool-index--IRpcPoolStats"
+        },
+        {
+          "name": "IThreadPool",
+          "kind": "type",
+          "signature": "export type IThreadPool<TRemote = Record<never, never>> = Pick<Awaited<ReturnType<typeof createThreadPeer<TRemote>>>, 'request' | 'notify' | 'stream'> & IRpcPoolControls;",
+          "declarationLine": 19,
+          "source": "packages/rpc-pool/dist/types.d.ts",
+          "purpose": "Thread payload, method and transfer types remain exactly those of its public Peer.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadPool.",
+          "advanced": "No additional advanced behavior is declared for IThreadPool.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IThreadPool."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadPool.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IThreadPool",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IThreadPool<TRemote = Record<never, never>> = Pick<Awaited<ReturnType<typeof createThreadPeer<TRemote>>>, 'request' | 'notify' | 'stream'> & IRpcPoolControls;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IThreadPool when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IThreadPool does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Thread payload, method and transfer types remain exactly those of its public Peer."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IThreadPool from @migaia/rpc-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IThreadPool when its type contract and declared inputs match the result you need. Choose a different public symbol when IThreadPool does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadPool."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IThreadPool."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-pool/dist/types.d.ts:IThreadPool:export type IThreadPool<TRemote = Record<never, never>> = Pick<Awaited<ReturnType<typeof createThreadPeer<TRemote>>>, 'request' | 'notify' | 'stream'> & IRpcPoolControls;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-pool-index--IThreadPool"
+        },
+        {
+          "name": "IThreadPoolOptions",
+          "kind": "type",
+          "signature": "export type IThreadPoolOptions = IRpcPoolOptions & Readonly<{ spawn: NonNullable<IRuntimeThreadPeerOptions['spawn']>; }>;",
+          "declarationLine": 29,
+          "source": "packages/rpc-pool/dist/types.d.ts",
+          "purpose": "Every Thread member receives this exact original source value.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadPoolOptions.",
+          "advanced": "No additional advanced behavior is declared for IThreadPoolOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IThreadPoolOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadPoolOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IThreadPoolOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IThreadPoolOptions = IRpcPoolOptions & Readonly<{ spawn: NonNullable<IRuntimeThreadPeerOptions['spawn']>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IThreadPoolOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IThreadPoolOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Every Thread member receives this exact original source value."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IThreadPoolOptions from @migaia/rpc-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IThreadPoolOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IThreadPoolOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadPoolOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IThreadPoolOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-pool/dist/types.d.ts:IThreadPoolOptions:export type IThreadPoolOptions = IRpcPoolOptions & Readonly<{ spawn: NonNullable<IRuntimeThreadPeerOptions['spawn']>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-pool-index--IThreadPoolOptions"
+        },
+        {
+          "name": "RPC_POOL_ERROR_SOURCE",
+          "kind": "const",
+          "signature": "export declare const RPC_POOL_ERROR_SOURCE = \"@migaia/rpc-pool\";",
+          "declarationLine": 2,
+          "source": "packages/rpc-pool/dist/error-code.d.ts",
+          "purpose": "The stable module source identifies pool-owned admission and cleanup failures.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RPC_POOL_ERROR_SOURCE.",
+          "advanced": "No additional advanced behavior is declared for RPC_POOL_ERROR_SOURCE.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for RPC_POOL_ERROR_SOURCE."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RPC_POOL_ERROR_SOURCE.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "RPC_POOL_ERROR_SOURCE",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const RPC_POOL_ERROR_SOURCE = \"@migaia/rpc-pool\";"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use RPC_POOL_ERROR_SOURCE when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when RPC_POOL_ERROR_SOURCE does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The stable module source identifies pool-owned admission and cleanup failures."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RPC_POOL_ERROR_SOURCE from @migaia/rpc-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RPC_POOL_ERROR_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when RPC_POOL_ERROR_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RPC_POOL_ERROR_SOURCE."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for RPC_POOL_ERROR_SOURCE."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-pool/dist/error-code.d.ts:RPC_POOL_ERROR_SOURCE:export declare const RPC_POOL_ERROR_SOURCE = \"@migaia/rpc-pool\";",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-pool-index--RPC_POOL_ERROR_SOURCE"
+        },
+        {
+          "name": "RpcPoolErrorCode",
+          "kind": "const",
+          "signature": "export declare const RpcPoolErrorCode: { /** Invalid construction or resize arguments are rejected before any native acquisition. */ readonly invalidOptions: \"INVALID_OPTIONS\"; /** A closing pool rejects new work while draining operations already accepted. */ readonly poolClosed: \"POOL_CLOSED\"; /** A full bounded FIFO rejects the new operation without calling a Peer. */ readonly queueFull: \"QUEUE_FULL\"; /** Cancellation removes only an operation still waiting in the pool FIFO. */ readonly callAborted: \"CALL_ABORTED\"; /** All member closes were attempted and their original failures are collected. */ readonly closeFailed: \"CLOSE_FAILED\"; };",
+          "declarationLine": 4,
+          "source": "packages/rpc-pool/dist/error-code.d.ts",
+          "purpose": "Only pool-owned failures receive these registered codes; Peer errors pass through unchanged.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcPoolErrorCode.",
+          "advanced": "No additional advanced behavior is declared for RpcPoolErrorCode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for RpcPoolErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcPoolErrorCode.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "RpcPoolErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const RpcPoolErrorCode: { /** Invalid construction or resize arguments are rejected before any native acquisition. */ readonly invalidOptions: \"INVALID_OPTIONS\"; /** A closing pool rejects new work while draining operations already accepted. */ readonly poolClosed: \"POOL_CLOSED\"; /** A full bounded FIFO rejects the new operation without calling a Peer. */ readonly queueFull: \"QUEUE_FULL\"; /** Cancellation removes only an operation still waiting in the pool FIFO. */ readonly callAborted: \"CALL_ABORTED\"; /** All member closes were attempted and their original failures are collected. */ readonly closeFailed: \"CLOSE_FAILED\"; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use RpcPoolErrorCode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when RpcPoolErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Only pool-owned failures receive these registered codes; Peer errors pass through unchanged."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RpcPoolErrorCode from @migaia/rpc-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RpcPoolErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when RpcPoolErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcPoolErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for RpcPoolErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-pool/dist/error-code.d.ts:RpcPoolErrorCode:export declare const RpcPoolErrorCode: { /** Invalid construction or resize arguments are rejected before any native acquisition. */ readonly invalidOptions: \"INVALID_OPTIONS\"; /** A closing pool rejects new work while draining operations already accepted. */ readonly poolClosed: \"POOL_CLOSED\"; /** A full bounded FIFO rejects the new operation without calling a Peer. */ readonly queueFull: \"QUEUE_FULL\"; /** Cancellation removes only an operation still waiting in the pool FIFO. */ readonly callAborted: \"CALL_ABORTED\"; /** All member closes were attempted and their original failures are collected. */ readonly closeFailed: \"CLOSE_FAILED\"; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-pool-index--RpcPoolErrorCode"
+        },
+        {
+          "name": "RpcPoolState",
+          "kind": "const",
+          "signature": "export declare const RpcPoolState: { readonly open: \"open\"; readonly closing: \"closing\"; readonly closed: \"closed\"; };\nexport type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState];",
+          "declarationLine": 15,
+          "source": "packages/rpc-pool/dist/text.d.ts",
+          "purpose": "Pool lifecycle describes client dispatch only, independently of native supervision state.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcPoolState.",
+          "advanced": "No additional advanced behavior is declared for RpcPoolState.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for RpcPoolState."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcPoolState.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "RpcPoolState",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const RpcPoolState: { readonly open: \"open\"; readonly closing: \"closing\"; readonly closed: \"closed\"; };",
+            "export type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState];"
+          ],
+          "overloadParameterDetails": [[], []],
+          "overloadReturns": [],
+          "whenToUse": "Use RpcPoolState when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when RpcPoolState does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Pool lifecycle describes client dispatch only, independently of native supervision state."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RpcPoolState from @migaia/rpc-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RpcPoolState when its const contract and declared inputs match the result you need. Choose a different public symbol when RpcPoolState does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcPoolState."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for RpcPoolState."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-pool/dist/text.d.ts:RpcPoolState:export declare const RpcPoolState: { readonly open: \"open\"; readonly closing: \"closing\"; readonly closed: \"closed\"; };\nexport type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-pool-index--RpcPoolState"
+        }
+      ],
+      "aliases": []
+    }
+  ]
+}

@@ -191,7 +191,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { connect, createEndpoint } from '@migaia/rpc-core'\n\nconst endpoint = await createEndpoint({\n  id: 'my-side',                  // 本端标识\n  targetIds: ['other-side'],      // 允许调用的对端标识\n  transport,\n  middlewares: [connect({ transport })]\n})\n\nendpoint.provide('ping', (context) => context.success('pong'))           // 提供方法\nconst reply = await endpoint.send<string>('other-side', 'ping', null)    // 调用对端\nawait endpoint.dispose()                                                  // 释放"
+                "code": "import { connect, createEndpoint, type IRpcTransport } from '@migaia/rpc-core'\n\n/** 实际载体由调用方持有；返回的 Endpoint 由调用方 dispose。 */\nexport async function openBrowserEndpoint(transport: IRpcTransport) {\n  const endpoint = await createEndpoint({\n    id: 'my-side',\n    targetIds: ['other-side'],\n    transport,\n    middlewares: [connect({ transport })]\n  })\n  endpoint.provide('ping', (context) => context.success('pong'))\n  return endpoint\n}"
               },
               {
                 "type": "list",
@@ -219,7 +219,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,   // 发往哪个窗口\n  receiver: window,                // 在哪里监听 message 事件\n  targetOrigin: 'https://billing.example'\n})"
+                "code": "import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\n/** 页面必须实际包含这个 iframe；本片段由浏览器宿主运行。 */\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: 'https://billing.example'\n})"
               },
               {
                 "type": "table",
@@ -260,7 +260,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\nconst transport = createBroadcastChannelTransport(new BroadcastChannel('cart'))"
+                "code": "import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('cart')\nconst transport = createBroadcastChannelTransport(channel)\n// 尚未交给 Endpoint；创建方负责关闭借用频道。\nchannel.close()"
               },
               {
                 "type": "list",
@@ -292,7 +292,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "self.addEventListener('connect', (event) => {\n  const port = (event as MessageEvent).ports[0]!\n  const transport = createSharedWorkerTransport(port)\n  // createEndpoint({ id: …, transport, middlewares: [connect({ transport })] })，再 provide 方法\n})"
+                "code": "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'\n\nself.addEventListener('connect', (event) => {\n  const port = (event as MessageEvent).ports[0]!\n  const transport = createSharedWorkerTransport(port)\n  void createEndpoint({\n    id: 'shared-worker', transport, middlewares: [connect({ transport })]\n  }).then((endpoint) => {\n    endpoint.provide('ping', (context) => context.success('pong'))\n  }).catch((error: unknown) => console.error(error))\n})"
               },
               {
                 "type": "list",
@@ -323,7 +323,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const client = await self.clients.get(clientId)\nconst transport = createServiceWorkerTransport({\n  target: client!,\n  receiver: self,\n  peerId: client!.id\n})"
+                "code": "// service-worker.ts：由浏览器作为 Service Worker 加载。\nimport { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\nself.addEventListener('message', (event) => {\n  /** Service Worker 也可能收到非 Client 来源；这里只为实际页面建立回复通道。 */\n  const source = event.source\n  if (!source || !('id' in source)) return\n  const clientId = source.id\n  void self.clients.get(clientId).then((client) => {\n    if (!client) return\n    const transport = createServiceWorkerTransport({\n      target: client,\n      receiver: self,\n      peerId: client.id\n    })\n    // 把这个实际 Client 的 transport 交给该页面对应的 Endpoint。\n  }).catch((error: unknown) => console.error(error))\n})"
               },
               {
                 "type": "table",
@@ -367,7 +367,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'\n\nconst channel = peerConnection.createDataChannel('rpc', { ordered: true })\nawait new Promise<void>((resolve) => channel.addEventListener('open', () => resolve(), { once: true }))\nconst transport = createRtcDataChannelTransport(channel)"
+                "code": "import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'\n\n/** 已完成信令的真实连接由调用方提供；适配器借用其可靠、有序的 DataChannel。 */\nexport async function openRtcTransport(peerConnection: RTCPeerConnection) {\n  const channel = peerConnection.createDataChannel('rpc', { ordered: true })\n  await new Promise<void>((resolve) => channel.addEventListener('open', () => resolve(), { once: true }))\n  return createRtcDataChannelTransport(channel)\n}"
               },
               {
                 "type": "list",
@@ -501,7 +501,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBroadcastChannelTransport.",
           "examples": [
             "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\n// 两个标签页（这里用同一进程里的两个 BroadcastChannel 实例模拟）共享频道名 'cart'。\nconst channelA = new BroadcastChannel('cart')\nconst channelB = new BroadcastChannel('cart')\nconst tabATransport = createBroadcastChannelTransport(channelA)\nconst tabBTransport = createBroadcastChannelTransport(channelB)\n\nconst tabB = await createEndpoint({\n  id: 'tab-b',\n  transport: tabBTransport,\n  middlewares: [connect({ transport: tabBTransport })]\n})\ntabB.provide('cart.count', (context) => context.success(3))\n\nconst tabA = await createEndpoint({\n  id: 'tab-a',\n  targetIds: ['tab-b'],\n  transport: tabATransport,\n  middlewares: [connect({ transport: tabATransport })]\n})\ntry {\n  console.log(await tabA.send<number>('tab-b', 'cart.count', null)) // 3\n} finally {\n  await tabA.dispose()\n  await tabB.dispose()\n  // 适配器借用频道，不负责关闭；由创建它的一方关闭。\n  channelA.close()\n  channelB.close()\n}",
-            "import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\nconst transport = createBroadcastChannelTransport(new BroadcastChannel('cart'))"
+            "import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('cart')\nconst transport = createBroadcastChannelTransport(channel)\n// 尚未交给 Endpoint；创建方负责关闭借用频道。\nchannel.close()"
           ],
           "members": [],
           "exportPath": "./adapters/broadcast-channel",
@@ -599,7 +599,7 @@
           "errors": ["No documented errors are declared for createRtcDataChannelTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRtcDataChannelTransport.",
           "examples": [
-            "import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'\n\nconst channel = peerConnection.createDataChannel('rpc', { ordered: true })\nawait new Promise<void>((resolve) => channel.addEventListener('open', () => resolve(), { once: true }))\nconst transport = createRtcDataChannelTransport(channel)"
+            "import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'\n\n/** 已完成信令的真实连接由调用方提供；适配器借用其可靠、有序的 DataChannel。 */\nexport async function openRtcTransport(peerConnection: RTCPeerConnection) {\n  const channel = peerConnection.createDataChannel('rpc', { ordered: true })\n  await new Promise<void>((resolve) => channel.addEventListener('open', () => resolve(), { once: true }))\n  return createRtcDataChannelTransport(channel)\n}"
           ],
           "members": [],
           "exportPath": "./adapters/rtc-data-channel",
@@ -761,7 +761,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createServiceWorkerTransport.",
           "examples": [
             "import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\nconst registration = await navigator.serviceWorker.ready\nconst transport = createServiceWorkerTransport({\n  target: registration.active!,\n  receiver: navigator.serviceWorker\n})",
-            "const client = await self.clients.get(clientId)\nconst transport = createServiceWorkerTransport({\n  target: client!,\n  receiver: self,\n  peerId: client!.id\n})"
+            "// service-worker.ts：由浏览器作为 Service Worker 加载。\nimport { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'\n\nself.addEventListener('message', (event) => {\n  /** Service Worker 也可能收到非 Client 来源；这里只为实际页面建立回复通道。 */\n  const source = event.source\n  if (!source || !('id' in source)) return\n  const clientId = source.id\n  void self.clients.get(clientId).then((client) => {\n    if (!client) return\n    const transport = createServiceWorkerTransport({\n      target: client,\n      receiver: self,\n      peerId: client.id\n    })\n    // 把这个实际 Client 的 transport 交给该页面对应的 Endpoint。\n  }).catch((error: unknown) => console.error(error))\n})"
           ],
           "members": [],
           "exportPath": "./adapters/service-worker",
@@ -834,7 +834,7 @@
           ],
           "identity": "packages/rpc-browser/dist/browser/adapters/service-worker.d.ts:createServiceWorkerTransport:export declare function createServiceWorkerTransport(options: IServiceWorkerTransportOptions): IRpcTransport<unknown, Transferable>;",
           "guidance": [],
-          "usageScore": 18,
+          "usageScore": 22,
           "configuration": [
             {
               "name": "target",
@@ -1093,7 +1093,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createSharedWorkerTransport.",
           "examples": [
             "import { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'\n\nconst worker = new SharedWorker(new URL('./shared.worker.js', import.meta.url), { type: 'module' })\nconst transport = createSharedWorkerTransport(worker.port)",
-            "self.addEventListener('connect', (event) => {\n  const port = (event as MessageEvent).ports[0]!\n  const transport = createSharedWorkerTransport(port)\n  // createEndpoint({ id: …, transport, middlewares: [connect({ transport })] })，再 provide 方法\n})"
+            "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'\n\nself.addEventListener('connect', (event) => {\n  const port = (event as MessageEvent).ports[0]!\n  const transport = createSharedWorkerTransport(port)\n  void createEndpoint({\n    id: 'shared-worker', transport, middlewares: [connect({ transport })]\n  }).then((endpoint) => {\n    endpoint.provide('ping', (context) => context.success('pong'))\n  }).catch((error: unknown) => console.error(error))\n})"
           ],
           "members": [],
           "exportPath": "./adapters/shared-worker",
@@ -1147,7 +1147,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-browser/dist/browser/adapters/shared-worker.d.ts:createSharedWorkerTransport:export declare function createSharedWorkerTransport(port: ISharedWorkerPort): IRpcTransport<unknown, Transferable>;",
           "guidance": [],
-          "usageScore": 18,
+          "usageScore": 22,
           "configuration": [],
           "fragment": "rpc-browser-adapters/shared-worker--createSharedWorkerTransport"
         },
@@ -1415,7 +1415,7 @@
           "errors": ["No documented errors are declared for createWindowMessageTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWindowMessageTransport.",
           "examples": [
-            "import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,   // 发往哪个窗口\n  receiver: window,                // 在哪里监听 message 事件\n  targetOrigin: 'https://billing.example'\n})",
+            "import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\n/** 页面必须实际包含这个 iframe；本片段由浏览器宿主运行。 */\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: 'https://billing.example'\n})",
             "// billing-frame.ts\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst transport = createWindowMessageTransport({\n  target: window.parent,\n  receiver: window,\n  targetOrigin: 'https://shop.example' // 只接受来自、也只发往父页面这个源\n})\nconst billing = await createEndpoint({\n  id: 'billing-frame',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nbilling.provide('calculateTotal', (context) => {\n  const input = context.data as { prices: number[]; taxRate: number }\n  const subtotal = input.prices.reduce((sum, price) => sum + price, 0)\n  return context.success(subtotal * (1 + input.taxRate))\n})\n\nwindow.addEventListener('pagehide', () => void billing.dispose(), { once: true })",
             "// parent.ts\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nawait new Promise<void>((resolve) => iframe.addEventListener('load', () => resolve(), { once: true }))\n\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: new URL(iframe.src).origin\n})\nconst billing = await createEndpoint({\n  id: 'checkout-page',\n  targetIds: ['billing-frame'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst total = await billing.send<number>('billing-frame', 'calculateTotal', {\n  prices: [12, 30],\n  taxRate: 0.08\n})\nconsole.log(total) // 45.36\n\nawait billing.dispose()"
           ],

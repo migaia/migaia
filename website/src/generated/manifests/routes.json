@@ -95,6 +95,12 @@
       "library": "rpc-core"
     },
     {
+      "path": "/en/architecture/rpc-pool",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "rpc-pool"
+    },
+    {
       "path": "/en/architecture/rpc-process",
       "locale": "en",
       "domain": "architecture",
@@ -5735,373 +5741,55 @@
       "library": "rpc-core"
     },
     {
-      "path": "/en/docs/rpc-core/adapter/IAdapterBindingDrain",
+      "path": "/en/docs/rpc-core/adapter/IAdapterDefinition",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-core"
     },
     {
-      "path": "/en/docs/rpc-core/adapter/IAdapterBytePeerOptions",
+      "path": "/en/docs/rpc-core/adapter/IAdapterDefinitionPeerOptions",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-core"
     },
     {
-      "path": "/en/docs/rpc-core/adapter/IAdapterEventEmitterMessagePort",
+      "path": "/en/docs/rpc-core/adapter/IAdapterDefinitionPluginOptions",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-core"
     },
     {
-      "path": "/en/docs/rpc-core/adapter/IAdapterEventTargetMessagePort",
+      "path": "/en/docs/rpc-core/adapter/IByteAdapterOptions",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-core"
     },
     {
-      "path": "/en/docs/rpc-core/adapter/IAdapterInitialMessageResource",
+      "path": "/en/docs/rpc-core/adapter/IMessageAdapterLaunch",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-core"
     },
     {
-      "path": "/en/docs/rpc-core/adapter/IAdapterLaunchHandle",
+      "path": "/en/docs/rpc-core/adapter/IMessageAdapterOptions",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-core"
     },
     {
-      "path": "/en/docs/rpc-core/adapter/IAdapterListenerOwner",
+      "path": "/en/docs/rpc-core/adapter/IMessageAdapterPort",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-core"
     },
     {
-      "path": "/en/docs/rpc-core/adapter/IAdapterListenerPreparation",
+      "path": "/en/docs/rpc-core/adapter/defineByteAdapter",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-core"
     },
     {
-      "path": "/en/docs/rpc-core/adapter/IAdapterListenerService",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IAdapterListenerSession",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IAdapterManagedBinding",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IAdapterMessageOpenOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IAdapterMessageResource",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IAdapterPeerOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IAdapterPeerPreparation",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IAdapterPluginLifecycleResource",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IAdapterRegistration",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IAdapterStaticMessageOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeByteConnection",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeByteDiagnostics",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeByteIO",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeByteOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeBytePhysicalResource",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeByteViewFactory",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeConnectionOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeEventByteReader",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeEventByteWriter",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeMessageConnectionOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeMessageDiagnostics",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeMessageIO",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeObjectChannel",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeObjectConnection",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeObjectIO",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeProviderGovernor",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeProviderPolicy",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IRuntimeProviderScope",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/IpcReporterContext",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/adapterContractRequiresStream",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/createAdapterBindingDrain",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/createAdapterConfigurationError",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/createAdapterConfigurationTypeError",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/createAdapterId",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/createAdapterPlugin",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/createAdapterSourceConfigurationError",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/createAdapterTransportError",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/createEventEmitterMessageResource",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/createEventTargetMessageResource",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/createRuntimeByteConnection",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/createRuntimeEventByteIO",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/createRuntimeMessageConnection",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/createRuntimeProviderGovernor",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/createRuntimeProviderScope",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/holdAdapterLaunch",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/holdAdapterObjectChannel",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/holdAdapterRegistration",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/materializeAdapterJson",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/normalizeAdapterDescription",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/prepareAdapterPeer",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/readAdapterAbortReason",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/readRuntimeByteBootstrap",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/validateAdapterPeerMethods",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/adapter/validateAdapterPeerTimeout",
+      "path": "/en/docs/rpc-core/adapter/defineMessageAdapter",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-core"
@@ -7379,6 +7067,90 @@
       "library": "rpc-core"
     },
     {
+      "path": "/en/docs/rpc-pool",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/IProcessPool",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/IProcessPoolOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/IRpcPoolControls",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/IRpcPoolErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/IRpcPoolStats",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/IThreadPool",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/IThreadPoolOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/RPC_POOL_ERROR_SOURCE",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/RpcPoolErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/RpcPoolState",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/createProcessPool",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/createThreadPool",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
       "path": "/en/docs/rpc-process",
       "locale": "en",
       "domain": "docs",
@@ -7620,6 +7392,18 @@
     },
     {
       "path": "/en/docs/rpc-process/IProcessSessionLease",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/en/docs/rpc-process/IProcessShortSourceOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/en/docs/rpc-process/IProcessShortSpawn",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-process"
@@ -8027,6 +7811,12 @@
       "library": "rpc-process"
     },
     {
+      "path": "/en/docs/rpc-process/isProcessChild",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
       "path": "/en/docs/rpc-process/openProcessObjectChannel",
       "locale": "en",
       "domain": "docs",
@@ -8148,6 +7938,12 @@
     },
     {
       "path": "/en/docs/rpc-threads/IRuntimeThreadPluginOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/en/docs/rpc-threads/IRuntimeThreadShortSpawn",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-threads"
@@ -8424,6 +8220,12 @@
     },
     {
       "path": "/en/docs/rpc-threads/createWebThreadLauncher",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/en/docs/rpc-threads/isThreadChild",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-threads"
@@ -14723,6 +14525,18 @@
       "library": "rpc-core"
     },
     {
+      "path": "/en/guides/rpc-pool",
+      "locale": "en",
+      "domain": "guides",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/guides/rpc-pool/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "rpc-pool"
+    },
+    {
       "path": "/en/guides/rpc-process",
       "locale": "en",
       "domain": "guides",
@@ -15717,6 +15531,12 @@
       "locale": "zh",
       "domain": "architecture",
       "library": "rpc-core"
+    },
+    {
+      "path": "/zh/architecture/rpc-pool",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "rpc-pool"
     },
     {
       "path": "/zh/architecture/rpc-process",
@@ -21485,373 +21305,55 @@
       "library": "rpc-core"
     },
     {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterBindingDrain",
+      "path": "/zh/docs/rpc-core/adapter/IAdapterDefinition",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
     },
     {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterBytePeerOptions",
+      "path": "/zh/docs/rpc-core/adapter/IAdapterDefinitionPeerOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
     },
     {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterEventEmitterMessagePort",
+      "path": "/zh/docs/rpc-core/adapter/IAdapterDefinitionPluginOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
     },
     {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterEventTargetMessagePort",
+      "path": "/zh/docs/rpc-core/adapter/IByteAdapterOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
     },
     {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterInitialMessageResource",
+      "path": "/zh/docs/rpc-core/adapter/IMessageAdapterLaunch",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
     },
     {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterLaunchHandle",
+      "path": "/zh/docs/rpc-core/adapter/IMessageAdapterOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
     },
     {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterListenerOwner",
+      "path": "/zh/docs/rpc-core/adapter/IMessageAdapterPort",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
     },
     {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterListenerPreparation",
+      "path": "/zh/docs/rpc-core/adapter/defineByteAdapter",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
     },
     {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterListenerService",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterListenerSession",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterManagedBinding",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterMessageOpenOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterMessageResource",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterPeerOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterPeerPreparation",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterPluginLifecycleResource",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterRegistration",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IAdapterStaticMessageOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeByteConnection",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeByteDiagnostics",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeByteIO",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeByteOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeBytePhysicalResource",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeByteViewFactory",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeConnectionOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeEventByteReader",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeEventByteWriter",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeMessageConnectionOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeMessageDiagnostics",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeMessageIO",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeObjectChannel",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeObjectConnection",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeObjectIO",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeProviderGovernor",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeProviderPolicy",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IRuntimeProviderScope",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/IpcReporterContext",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/adapterContractRequiresStream",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/createAdapterBindingDrain",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/createAdapterConfigurationError",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/createAdapterConfigurationTypeError",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/createAdapterId",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/createAdapterPlugin",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/createAdapterSourceConfigurationError",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/createAdapterTransportError",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/createEventEmitterMessageResource",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/createEventTargetMessageResource",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/createRuntimeByteConnection",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/createRuntimeEventByteIO",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/createRuntimeMessageConnection",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/createRuntimeProviderGovernor",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/createRuntimeProviderScope",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/holdAdapterLaunch",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/holdAdapterObjectChannel",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/holdAdapterRegistration",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/materializeAdapterJson",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/normalizeAdapterDescription",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/prepareAdapterPeer",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/readAdapterAbortReason",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/readRuntimeByteBootstrap",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/validateAdapterPeerMethods",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/adapter/validateAdapterPeerTimeout",
+      "path": "/zh/docs/rpc-core/adapter/defineMessageAdapter",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
@@ -23147,6 +22649,90 @@
       "library": "rpc-core"
     },
     {
+      "path": "/zh/docs/rpc-pool",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/IProcessPool",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/IProcessPoolOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/IRpcPoolControls",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/IRpcPoolErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/IRpcPoolStats",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/IThreadPool",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/IThreadPoolOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/RPC_POOL_ERROR_SOURCE",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/RpcPoolErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/RpcPoolState",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/createProcessPool",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/createThreadPool",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
       "path": "/zh/docs/rpc-process",
       "locale": "zh",
       "domain": "docs",
@@ -23388,6 +22974,18 @@
     },
     {
       "path": "/zh/docs/rpc-process/IProcessSessionLease",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/zh/docs/rpc-process/IProcessShortSourceOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/zh/docs/rpc-process/IProcessShortSpawn",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-process"
@@ -23795,6 +23393,12 @@
       "library": "rpc-process"
     },
     {
+      "path": "/zh/docs/rpc-process/isProcessChild",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
       "path": "/zh/docs/rpc-process/openProcessObjectChannel",
       "locale": "zh",
       "domain": "docs",
@@ -23916,6 +23520,12 @@
     },
     {
       "path": "/zh/docs/rpc-threads/IRuntimeThreadPluginOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/zh/docs/rpc-threads/IRuntimeThreadShortSpawn",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-threads"
@@ -24192,6 +23802,12 @@
     },
     {
       "path": "/zh/docs/rpc-threads/createWebThreadLauncher",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/zh/docs/rpc-threads/isThreadChild",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-threads"
@@ -30561,6 +30177,18 @@
       "locale": "zh",
       "domain": "guides",
       "library": "rpc-core"
+    },
+    {
+      "path": "/zh/guides/rpc-pool",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/guides/rpc-pool/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "rpc-pool"
     },
     {
       "path": "/zh/guides/rpc-process",
