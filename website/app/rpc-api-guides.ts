@@ -4396,30 +4396,118 @@ export function prepareCollector() {
   }),
   'rpc-devtools:hub:createRpcDevtoolsHub': guide({
     purposeEn:
-      'Reserves the typed cross-host hub factory for supplied target clients, timelines and offline records. Layer 1 synchronously throws CLOSED; no transport or target connection is created by this placeholder.',
+      'Aggregates supplied devtools service clients and offline recordings into aligned timelines and incrementally indexed interactions. It aligns live clocks using the smallest round trip of five samples, retains event references, and creates no transports or Peers.',
     purposeZh:
-      '保留跨宿主 hub 工厂类型，用于调用方交入的 target client、timeline 与离线录制；layer 1 同步抛出 CLOSED，该占位实现不创建 transport 或 target 连接。',
+      '把调用方提供的 devtools service client 与离线录制聚合为对齐后的 timeline 和增量索引 interaction。实时连接从五次采样中选择最小 RTT 对齐时钟，保留事件引用，不创建 transport 或 Peer。',
     quickStart: `import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'
+import { RpcDevtoolsRecordFormat, encodeRpcDevtoolsRecord } from '@migaia/rpc-devtools/contract'
 
-/** Compile the contract now; layer 1 rejects until hub runtime lands. */
-export function prepareHub() {
-  return createRpcDevtoolsHub({ maxEvents: 50_000, realignMs: 30_000 }) // Layer 1 throws CLOSED.
+/** A codec-produced recording needs no live collector or transport. */
+const text = encodeRpcDevtoolsRecord({
+  header: RpcDevtoolsRecordFormat,
+  events: [{ seq: 1, at: 100, endpointId: 'parent', stage: 'message', direction: 'outbound', senderId: 'parent', messageId: 'm1', trace: 'T1' }]
+})
+/** The caller owns the hub lifetime; each target retains at most maxEvents. */
+const hub = createRpcDevtoolsHub({ maxEvents: 50_000 })
+try {
+  hub.importRecord('recording', text)
+  console.log(hub.timeline({ trace: 'T1' })[0]?.alignedAt) // 100
+  console.log(hub.interactions('T1')[0]?.oneSided) // true
+} finally {
+  await hub.close()
 }`,
+    options: [
+      {
+        name: 'maxEvents',
+        description:
+          'Maximum retained events per target; eviction removes the oldest events from correlation indexes.',
+        defaultValue: '50_000',
+        whenToUse: 'Set a smaller retention bound when several targets share the hub memory budget.'
+      },
+      {
+        name: 'realignMs',
+        description:
+          'Optional clock realignment period in milliseconds; stored timeline references receive updated alignedAt values.',
+        whenToUse:
+          'Enable periodic samples when a long-lived target needs its clock offset refreshed.'
+      },
+      {
+        name: 'onError',
+        description:
+          'Reports original client, watch and listener failures and collected watch-release errors without replacing their identity.',
+        whenToUse:
+          'Route hub runtime failures to the application reporter while preserving original errors.'
+      }
+    ],
+    examplesEn: [
+      {
+        id: 'existing-service-clients',
+        title: 'Aggregate existing service clients',
+        description:
+          'Supply bound clients whose request/stream method names match IRpcDevtoolsServiceApi. The hub catches up through query before watch and never creates the underlying connections.',
+        code: `import { createRpcDevtoolsHub, type IRpcDevtoolsTargetClient } from '@migaia/rpc-devtools/hub'
+
+/** Existing clients already map describe/query/stats/watch to their service. */
+export async function inspectHosts(parent: IRpcDevtoolsTargetClient, worker: IRpcDevtoolsTargetClient) {
+  /** Report runtime failures while the caller owns hub cleanup. */
+  const hub = createRpcDevtoolsHub({ realignMs: 30_000, onError: (error) => console.error(error) })
+  /** Unsubscribe before closing the hub. */
+  const unsubscribe = hub.on('status', (name, status) => console.log(name, status))
+  try {
+    await hub.addTarget('parent', parent)
+    await hub.addTarget('worker', worker)
+    console.log(hub.timeline({ trace: 'T1', limit: 100 }))
+    console.log(hub.interactions('T1'))
+    console.log(await hub.stats())
+  } finally {
+    unsubscribe()
+    await hub.close()
+  }
+}`
+      }
+    ],
+    examplesZh: [
+      {
+        id: 'existing-service-clients',
+        title: '聚合已有 service client',
+        description:
+          '交入 request/stream 方法名符合 IRpcDevtoolsServiceApi 的已绑定 client。Hub 先用 query 追上，再跟随 watch；底层连接始终由调用方管理。',
+        code: `import { createRpcDevtoolsHub, type IRpcDevtoolsTargetClient } from '@migaia/rpc-devtools/hub'
+
+/** 已有 client 把 describe/query/stats/watch 映射到各自 service。 */
+export async function inspectHosts(parent: IRpcDevtoolsTargetClient, worker: IRpcDevtoolsTargetClient) {
+  /** 报告运行时失败，hub 关闭由调用方负责。 */
+  const hub = createRpcDevtoolsHub({ realignMs: 30_000, onError: (error) => console.error(error) })
+  /** 关闭前解除状态监听。 */
+  const unsubscribe = hub.on('status', (name, status) => console.log(name, status))
+  try {
+    await hub.addTarget('parent', parent)
+    await hub.addTarget('worker', worker)
+    console.log(hub.timeline({ trace: 'T1', limit: 100 }))
+    console.log(hub.interactions('T1'))
+    console.log(await hub.stats())
+  } finally {
+    unsubscribe()
+    await hub.close()
+  }
+}`
+      }
+    ],
     useEn: [
-      'Compile future aggregation against the target client and timeline contract.',
-      'After hub runtime lands, supply already-created request/stream clients or import offline recordings.'
+      'Inspect explicit traces across already-created service clients, with uncertaintyMs retained alongside each aligned event.',
+      'Import codec-produced NDJSON as offline targets, query stored timeline references, or merge live target histograms bucket by bucket.'
     ],
     useZh: [
-      '按 target client 与 timeline 契约编译后续跨宿主聚合代码。',
-      'hub 运行时合入后，交入已经创建的 request/stream client 或导入离线录制。'
+      '通过已有 service client 检查跨宿主显式 trace，每个对齐事件保留 uncertaintyMs。',
+      '把 codec 生成的 NDJSON 导入 offline target，查询已存储 timeline 引用，或逐桶合并实时 target 的直方图。'
     ],
     avoidEn: [
-      'Expecting this placeholder to connect targets, align clocks or aggregate statistics.',
-      'Asking the hub to create transports, invent a missing observation side or propagate trace automatically.'
+      'Expecting the hub to create transports, reconnect a broken watch, invent a missing observation side or propagate trace automatically.',
+      'Treating results as immutable snapshots: captured content/detail/error retain references, and realignment updates stored alignedAt values.'
     ],
     avoidZh: [
-      '期待当前占位工厂已经能连接 target、校准时钟或聚合统计。',
-      '要求 hub 创建 transport、补造缺失侧的观察事件或自动传播 trace。'
+      '期待 hub 创建 transport、重连中断的 watch、补造缺失侧的观察事件或自动传播 trace。',
+      '把结果当成不可变快照：content/detail/error 保留引用，重新对齐会更新已存储的 alignedAt。'
     ]
   }),
   'rpc-devtools:hub:RpcDevtoolsTargetStatus': guide({
@@ -4431,11 +4519,11 @@ export function prepareHub() {
 
 console.log(RpcDevtoolsTargetStatus.offline)`,
     useEn: [
-      'Render or branch on a target state reported by the later hub implementation.',
+      "Render or branch on states returned by hub.status or published through hub.on('status').",
       'Distinguish imported offline records from live connected targets.'
     ],
     useZh: [
-      '显示后续 hub 实现报告的 target 状态，或据此进行分支。',
+      "显示 hub.status 返回或 hub.on('status') 发布的 target 状态，或据此进行分支。",
       '区分导入的离线录制与实时连接中的 target。'
     ],
     avoidEn: [
