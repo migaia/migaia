@@ -46,6 +46,8 @@ export type IBrowserMessagePortLike<TTransfer = unknown, TEvent = unknown> = {
   close(): void
   addEventListener(type: 'message' | 'messageerror', listener: (event: TEvent) => void): void
   removeEventListener(type: 'message' | 'messageerror', listener: (event: TEvent) => void): void
+  /** Optional physical failure observation preserves an adapter's original terminal error. */
+  onError?(listener: (error: unknown) => void): () => void
 }
 
 /** Controls whether the browser adapter is allowed to close the supplied port. */
@@ -130,6 +132,8 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
   let closed = false
   let closeResult: void | Promise<void>
   const ownership = options.ownership ?? 'owned'
+  /** This transport owns only its raw error subscription, never the borrowed physical port. */
+  let removeRawError: (() => void) | undefined
   const onMessage = (event: TEvent): void => {
     let readFailed = false
     const data = safeRead<unknown>(event, 'data', ({ error }) => {
@@ -180,6 +184,17 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
               add: () => port.addEventListener('messageerror', onMessageError),
               remove: () => port.removeEventListener('messageerror', onMessageError)
             },
+            {
+              add: () => {
+                removeRawError = port.onError?.((error) =>
+                  errorListeners.report(error, secondaryFailures)
+                )
+              },
+              remove: () => {
+                removeRawError?.()
+                removeRawError = undefined
+              }
+            },
             { add: () => port.start(), remove: () => undefined }
           ],
           { code: RpcCoreErrorCode.transport, secondaryFailures }
@@ -191,7 +206,11 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
           messageListeners.size === 1
             ? [
                 () => port.removeEventListener('message', onMessage),
-                () => port.removeEventListener('messageerror', onMessageError)
+                () => port.removeEventListener('messageerror', onMessageError),
+                () => {
+                  removeRawError?.()
+                  removeRawError = undefined
+                }
               ]
             : [],
           () => {
@@ -207,7 +226,11 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
       messageListeners.clear(() => undefined)
       const cleanupErrors = collectListenerCleanupFailures([
         () => port.removeEventListener('message', onMessage),
-        () => port.removeEventListener('messageerror', onMessageError)
+        () => port.removeEventListener('messageerror', onMessageError),
+        () => {
+          removeRawError?.()
+          removeRawError = undefined
+        }
       ])
       if (ownership === 'owned') {
         try {

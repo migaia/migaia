@@ -1,4 +1,5 @@
 import type { IScheduler } from '@migaia/utils/scheduler'
+import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IRpcHandshakeOffer } from '@migaia/rpc-contract'
 import type { IRpcIdempotencyStore } from '../core/idempotency-store.js'
 import type { IRuntimePeer, IRuntimePeerOptions } from '../remote/runtime-api/peer.js'
@@ -53,7 +54,10 @@ export type IAdapterDefinitionPeerOptions<TInput> = Omit<
     spawn?: TInput
     connect?: TInput
     listen?: TInput
-    peerId: string
+    /** Message adapters may omit this address and learn it from the existing raw initial exchange. */
+    peerId?: string
+    /** Caller cancellation retires this physical opening and its original directory handshake. */
+    signal?: IAbortSignal
     scheduler?: IScheduler
     offer?: IRpcHandshakeOffer
     auth?: Extract<IRuntimeByteOptions, { role: 'responder' }>['auth']

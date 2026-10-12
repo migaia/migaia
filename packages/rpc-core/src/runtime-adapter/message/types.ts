@@ -1,7 +1,7 @@
 import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IRpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
-import type { IRuntimePeerSourceResult } from '../../remote/index.js'
+import type { IRuntimePeerSourceResult, IRuntimePeerSourceContext } from '../../remote/index.js'
 import type { INodeMessagePortLike } from '../../core/adapters/message-port.js'
 
 /** Raw EventEmitter messaging optionally supplies its actual reader count and close observation. */
@@ -16,6 +16,8 @@ export type IAdapterEventTargetMessagePort = Readonly<{
   postMessage(message: unknown, transfer?: readonly unknown[]): void
   addEventListener(type: string, listener: (event: any) => void): void
   removeEventListener(type: string, listener: (event: any) => void): void
+  /** Physical adapters may retain their native terminal error object through this raw observer. */
+  onError?(listener: (error: unknown) => void): () => void
 }>
 
 /** Actual launch completion remains separate from requesting native termination. */
@@ -55,6 +57,8 @@ export type IAdapterMessageOpenOptions = Readonly<{
 
 /** A held resource constructs its own complete channel, never signs an external transport. */
 export type IAdapterMessageResource = Readonly<{
+  /** Exchange existing initial records and learn the remote address only from this held raw I/O. */
+  exchangeIdentity(context: IRuntimePeerSourceContext, signal?: IAbortSignal): Promise<string>
   receiveInitial(initial?: IAdapterInitialMessageResource, bounded?: true): Promise<unknown>
   prepareControl(
     offer: readonly string[],

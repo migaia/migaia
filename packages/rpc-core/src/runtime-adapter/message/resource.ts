@@ -18,7 +18,8 @@ import {
   registerNativeReplayOwner,
   bindNativeReplayTransport
 } from '../../core/internal/native-replay.js'
-import type { IRuntimePeerSourceResult } from '../../remote/index.js'
+import type { IRuntimePeerSourceResult, IRuntimePeerSourceContext } from '../../remote/index.js'
+import type { IAbortSignal } from '@migaia/lifecycle'
 import { createEventEmitterMessageHandoff, createEventTargetMessageHandoff } from './handoff.js'
 import type {
   IAdapterEventEmitterMessagePort,
@@ -121,6 +122,13 @@ class AdapterMessageResource implements IAdapterMessageResource {
   #peerOffer: readonly string[] | undefined
   /** Automatic initial capture rejects non-bootstrap traffic at the original admission boundary. */
   #waitingInitial = false
+  /** Symmetric address exchange retains its sole local initial proposal until raw peer readiness. */
+  #identityAnnouncement: unknown
+  /**
+   * Each symmetric endpoint sends its initial proposal once after observing ready or initial
+   * control.
+   */
+  #identityAnnounced = false
   /** Capability preparation stores only Core's own local offer and observed control result. */
   #control: Promise<readonly string[]> | undefined
   /** The Core-owned readiness Promise settles in the actual raw ACK/failure callback segment. */
@@ -232,7 +240,13 @@ class AdapterMessageResource implements IAdapterMessageResource {
     /** Received ACKs supply peer proposals; no public resource property may inject one. */
     const options = {
       consume: (message: unknown): boolean => {
-        if (this.#waitingInitial && !rpcMessageCapabilityControl.isInitial(message))
+        if (
+          this.#waitingInitial &&
+          !rpcMessageCapabilityControl.isInitial(message) &&
+          !(
+            this.#identityAnnouncement !== undefined && rpcMessageCapabilityControl.isReady(message)
+          )
+        )
           invalidControl('bootstrap')
         if (rpcMessageCapabilityControl.isAcknowledgement(message)) {
           if (this.#acknowledged) invalidControl('runtimeApi.ack')
@@ -247,11 +261,15 @@ class AdapterMessageResource implements IAdapterMessageResource {
           }
           return true
         }
-        if (rpcMessageCapabilityControl.isReady(message)) return true
+        if (rpcMessageCapabilityControl.isReady(message)) {
+          this.#announceIdentity()
+          return true
+        }
         if (rpcMessageCapabilityControl.isInitial(message)) {
           if (!this.#waitingInitial) return false
           this.#admitInitial(message)
           this.#waitingInitial = false
+          this.#announceIdentity()
           this.#bootstrap.resolve(message)
           return true
         }
@@ -267,6 +285,13 @@ class AdapterMessageResource implements IAdapterMessageResource {
     this.#handoff = this.#eventTarget
       ? createEventTargetMessageHandoff(this.#port as IAdapterEventTargetMessagePort, options)
       : createEventEmitterMessageHandoff(this.#port as IAdapterEventEmitterMessagePort, options)
+  }
+
+  /** Send the original initial record once only after this actual peer can receive it. */
+  #announceIdentity(): void {
+    if (this.#identityAnnouncement === undefined || this.#identityAnnounced) return
+    this.#identityAnnounced = true
+    this.#port.postMessage(this.#identityAnnouncement)
   }
 
   /** Admit only this actual held initial input and retain its original snapshot for Core consumers. */
@@ -314,6 +339,47 @@ class AdapterMessageResource implements IAdapterMessageResource {
   }
 
   /**
+   * Symmetric existing endpoints announce their own address using the original initial grammar.
+   * Received metadata supplies only the remote address; it never selects this endpoint's local
+   * identity.
+   */
+  async exchangeIdentity(
+    context: IRuntimePeerSourceContext,
+    signal?: IAbortSignal
+  ): Promise<string> {
+    if (signal?.aborted) throw resolveAbortReason(signal)
+    /** Self and parent name the announcing endpoint here; this frame grants no launch ownership. */
+    const initial = {
+      kind: rpcMessageCapabilityControl.data,
+      peerId: context.self.instanceId,
+      runtimeApi: {
+        version: rpcMessageCapabilityControl.version,
+        self: context.self,
+        parent: context.self,
+        capabilities: context.capabilities
+      }
+    }
+    /** The sole Contract parser validates local proposals before they leave this raw resource. */
+    const proposal = rpcMessageCapabilityControl.readInitial(initial)
+    if (!proposal.valid) invalidControl(proposal.field)
+    this.#identityAnnouncement = initial
+    /** Capture precedes sending, so both directions use the existing bounded initial owner. */
+    const received = this.receiveInitial(undefined, true)
+    /** Cancellation rejects that same capture with the original reason reachable through its cause. */
+    const abort = (): void => this.#handoff?.fail(resolveAbortReason(signal!))
+    try {
+      signal?.addEventListener('abort', abort, { once: true })
+      if (signal?.aborted) abort()
+      /** A later peer's readiness triggers one announcement even when the earlier ready was lost. */
+      this.#port.postMessage({ kind: rpcMessageCapabilityControl.ready })
+      await received
+      return this.#initial!.parent.instanceId
+    } finally {
+      signal?.removeEventListener('abort', abort)
+    }
+  }
+
+  /**
    * Build only Core's own transport over the held raw resource and internally accepted
    * capabilities.
    */
@@ -340,7 +406,13 @@ class AdapterMessageResource implements IAdapterMessageResource {
             removeEventListener: (event, listener) =>
               (port as IAdapterEventTargetMessagePort).removeEventListener(event, listener),
             start: () => undefined,
-            close: () => undefined
+            close: () => undefined,
+            ...(this.#eventTarget && (port as IAdapterEventTargetMessagePort).onError
+              ? {
+                  onError: (listener: (error: unknown) => void) =>
+                    (port as IAdapterEventTargetMessagePort).onError!(listener)
+                }
+              : {})
           } satisfies IBrowserMessagePortLike,
           { ownership: 'borrowed' }
         )
