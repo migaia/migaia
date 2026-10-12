@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto'
 import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { parentPort, workerData, threadId } from 'node:worker_threads'
 import { performance } from 'node:perf_hooks'
-import { IpcBenchControl, IpcBenchObservation } from './text.mjs'
+import { IpcBenchControl, IpcBenchObservation, IpcBenchDiagnostic } from './text.mjs'
+import { IpcBenchErrorText } from './error-text.mjs'
 
 /** Deno exposes Node compatibility zeroes for ELU/threadId, rather than native observations. */
 const deno = typeof Deno !== 'undefined'
@@ -144,10 +145,47 @@ export function snapshot(options = {}) {
   }
 }
 
+/**
+ * Capture an explicitly enabled Node diagnostic boundary without changing synchronous snapshot().
+ *
+ * @param {{ diagnostic?: 'start' | 'stop'; mode?: 'cpu' | 'guard' }} [options] Existing OOB
+ *   control.
+ * @returns {Promise<object>} Ordinary snapshot plus a diagnostic receipt or full failure
+ *   classification.
+ * @throws {Error} A missing diagnostic helper remains an actual observation setup failure.
+ */
+export async function captureSnapshot(options = {}) {
+  if (!options?.diagnostic) return snapshot(options)
+  /** Inspector modules load only on the separate opted-in diagnostic lane. */
+  const helper = await import('./p3-diagnostic.mjs')
+  try {
+    if (
+      deno ||
+      process.versions.bun ||
+      process.env[IpcBenchDiagnostic.environment] !== options.mode
+    )
+      throw new TypeError(IpcBenchErrorText.diagnosticMode)
+    /** The same isolate owns both boundaries, while module bytes remain untouched. */
+    const diagnostic = await helper.captureDiagnostic(options.diagnostic, options.mode)
+    return { ...snapshot(), diagnostic }
+  } catch (error) {
+    return {
+      ...snapshot(),
+      diagnostic: {
+        mode: options.mode,
+        status: IpcBenchDiagnostic.failed,
+        error: helper.classifyDiagnosticError(error)
+      }
+    }
+  }
+}
+
 if (parentPort && !deno) {
-  workerData?.benchPort?.on('message', (options) =>
-    workerData.benchPort.postMessage(snapshot(options))
-  )
+  workerData?.benchPort?.on('message', (options) => {
+    if (options?.diagnostic)
+      void captureSnapshot(options).then((value) => workerData.benchPort.postMessage(value))
+    else workerData.benchPort.postMessage(snapshot(options))
+  })
   if (workerData?.data?.observation)
     observationReady = new Promise((resolve) => {
       /** Consume before the runtime factory starts its bounded receive handoff. */
@@ -156,7 +194,11 @@ if (parentPort && !deno) {
         parentPort.off('message', receive)
         /** Only the already-transferred separate port receives out-of-band snapshot requests. */
         const port = message.port
-        port.on('message', (options) => port.postMessage(snapshot(options)))
+        port.on('message', (options) => {
+          if (options?.diagnostic)
+            void captureSnapshot(options).then((value) => port.postMessage(value))
+          else port.postMessage(snapshot(options))
+        })
         port.postMessage(IpcBenchControl.ready)
         resolve()
       }
@@ -168,10 +210,16 @@ if (parentPort && !deno) {
     const path = stem + '.snapshot-' + sequence++ + '.json'
     /** Profile requests use an existing local signal/file path, never an RPC control message. */
     const options =
-      process.env[IpcBenchObservation.heapProfileEnvironment] === '1'
+      process.env[IpcBenchObservation.heapProfileEnvironment] === '1' ||
+      process.env[IpcBenchDiagnostic.environment]
         ? JSON.parse(readFileSync(stem + '.snapshot-request.json', 'utf8'))
         : undefined
-    writeFileSync(path + '.tmp', JSON.stringify(snapshot(options)))
-    renameSync(path + '.tmp', path)
+    /** Diagnostic capture publishes the same atomic receipt after native profiler completion. */
+    const publish = (value) => {
+      writeFileSync(path + '.tmp', JSON.stringify(value))
+      renameSync(path + '.tmp', path)
+    }
+    if (options?.diagnostic) void captureSnapshot(options).then(publish)
+    else publish(snapshot(options))
   })
 }

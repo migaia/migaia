@@ -1,7 +1,12 @@
 import { IpcBenchErrorText } from '../../bench/error-text.mjs'
 import '../../bench/observe.mjs'
 import { snapshot, waitForObservation } from '../../bench/observe.mjs'
-import { IpcBenchControl, IpcBenchObservation, RuntimeBench } from '../../bench/text.mjs'
+import {
+  IpcBenchControl,
+  IpcBenchObservation,
+  IpcBenchDiagnostic,
+  RuntimeBench
+} from '../../bench/text.mjs'
 import { createHash } from 'node:crypto'
 import { spawn, execFileSync } from 'node:child_process'
 import { once } from 'node:events'
@@ -41,26 +46,47 @@ let snapshotSequence = 0
  * Read one peer boundary through its existing OOB control, optionally retaining a profile heap.
  *
  * @param {number} peerPid Actual child PID, or the Worker process PID.
- * @param {{ heapSnapshot?: 'start' | 'end' }} [options] Profile boundary, outside business
- *   exchanges.
+ * @param {{
+ *   heapSnapshot?: 'start' | 'end'
+ *   diagnostic?: 'start' | 'stop'
+ *   mode?: 'cpu' | 'guard'
+ * }} [options]
+ *   Profile boundary, outside business exchanges.
  * @returns {Promise<object>} Actual peer isolate snapshot and any native heap file path.
  */
 async function peerSnapshot(peerPid, options = {}) {
+  /** Serialized native capture failures keep their full original classification on the cause. */
+  const read = (value) => {
+    if (value?.diagnostic?.status === IpcBenchDiagnostic.failed)
+      throw new Error(IpcBenchErrorText.diagnosticPeer, { cause: value.diagnostic.error })
+    return value
+  }
   if (snapshotPeer) return snapshotPeer()
   if (snapshotPort)
-    return new Promise((resolve) => {
-      snapshotPort.once('message', resolve)
-      snapshotPort.postMessage(options.heapSnapshot ? options : 'snapshot')
+    return new Promise((resolve, reject) => {
+      /** One request consumes one existing OOB reply; capture errors reject rather than hang. */
+      const receive = (value) => {
+        try {
+          resolve(read(value))
+        } catch (error) {
+          reject(error)
+        }
+      }
+      snapshotPort.once('message', receive)
+      snapshotPort.postMessage(options.heapSnapshot || options.diagnostic ? options : 'snapshot')
     })
   const path = process.env.IPC_BENCH_STEM + '.peer.snapshot-' + snapshotSequence++ + '.json'
-  if (process.env[IpcBenchObservation.heapProfileEnvironment] === '1')
+  if (
+    process.env[IpcBenchObservation.heapProfileEnvironment] === '1' ||
+    process.env[IpcBenchDiagnostic.environment]
+  )
     writeFileSync(
       process.env.IPC_BENCH_STEM + '.peer.snapshot-request.json',
       JSON.stringify(options)
     )
   process.kill(peerPid, 'SIGUSR2')
   while (!existsSync(path)) await new Promise((resolve) => setTimeout(resolve, 1))
-  return JSON.parse(readFileSync(path, 'utf8'))
+  return read(JSON.parse(readFileSync(path, 'utf8')))
 }
 
 /** One entry serves both sides so runtime/carrier/payload stay identical across paired windows. */
@@ -412,7 +438,7 @@ export async function createIpcSession({
           })
           return {
             peerPid,
-            peerSnapshot: () => peerSnapshot(peerPid),
+            peerSnapshot: (options) => peerSnapshot(peerPid, options),
             classification: () => classification,
             ready: async () => undefined,
             exchange: () =>
@@ -453,6 +479,9 @@ export async function createIpcSession({
                 : {}),
               ...(process.env[IpcBenchObservation.heapProfileEnvironment] === '1'
                 ? { [IpcBenchObservation.heapProfileEnvironment]: '1' }
+                : {}),
+              ...(process.env[IpcBenchDiagnostic.environment]
+                ? { [IpcBenchDiagnostic.environment]: process.env[IpcBenchDiagnostic.environment] }
                 : {})
             }
           },
@@ -571,7 +600,7 @@ export async function createIpcSession({
     })
     return {
       peerPid,
-      peerSnapshot: () => peerSnapshot(peerPid),
+      peerSnapshot: (options) => peerSnapshot(peerPid, options),
       classification: () => classification,
       encodedBytes: encoded.length,
       ready: async () => {

@@ -54,6 +54,16 @@ export const IpcBenchErrorText = Object.freeze({
   workerObservation: 'Worker observation readiness invalid',
   /** A genuine Worker exit during cold observation setup invalidates preparation. */
   workerObservationExit: 'Worker exited before observation readiness',
+  /** P3 is a Node diagnostic over the two requested physical carriers, never a fallback lane. */
+  diagnosticMode: 'Invalid or unsupported P3 diagnostic mode/carrier',
+  /** One isolate owns exactly one separate CPU or guard capture at a time. */
+  diagnosticState: 'P3 diagnostic boundary does not match its active capture',
+  /** Peer diagnostic errors retain their full serialized causal classification as the cause. */
+  diagnosticPeer: 'Peer P3 diagnostic capture failed',
+  /** A failed local capture retains its serialized native cause instead of producing a guard zero. */
+  diagnosticCapture: 'P3 diagnostic capture failed',
+  /** A non-sampling guard must retain the native allocation trace schema, not substitute heapUsed. */
+  diagnosticTrace: 'V8 allocation trace metadata unavailable',
   /**
    * Raw side stderr stays attached to its actual exit rather than becoming a ratio failure.
    *
