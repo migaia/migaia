@@ -693,30 +693,54 @@ source 均为 `@migaia/rpc/remote`。
 
 `@migaia/rpc-core/probe` 是运行时无关的观察契约入口，导出阶段、方向、kind、outcome 的数值常量与同顺序名称表，以及 `defineProbe`、`snapshotProbeEvent`、`rpcProbeSampleKey` 和 `probePlugin`。
 
-**当前状态：** layer 1 只定义 Probe 与 Peer 的 `probe` 选项、transport 的可选 `observe` 类型。Peer 会接收选项，但 probe-core 实现合入之前不产生观察事件，也不调用 `transport.observe`。`probePlugin` 当前同步抛出 `INVALID_CONFIG`，文字为 `probe runtime not installed`。
-
+Core Peer 的 `probe` 与 Endpoint 的 `probePlugin` 安装同一 emitter。事件同步交给所订阅的 Probe；throw、reject、redact 或 describe 失败通过 `onError` 报告 `PROBE_FAILED`，原始错误留在 `cause`，不进入业务管道。没有 `onError` 时使用宿主 reporter。当前 managed Thread spawn 与 Process `spawn: true` 在选项重建时遗漏 `probe`；下面使用能够转发选项的直接 `connect` 路径。跨包 managed-source 观察仍为 pending，A7 没有通过。
 ### 13.1 定义与交入 Peer
 
-```ts doc-test=check
-import { createRuntimePeer, type IRuntimePeerSource } from '@migaia/rpc-core/remote'
+```ts doc-test=run group=useguide-probe-peer file=main.ts
+import assert from 'node:assert/strict'
+import { MessageChannel } from 'node:worker_threads'
+import { createThreadPeer, createNodeThreadChannel } from '@migaia/rpc-threads'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { defineProbe, RpcProbeStageName } from '@migaia/rpc-core/probe'
 
-/** 只记录所选方法的元数据，不读取业务 payload。 */
+/** 调用方已有的对象保留同一身份，定义 Probe 后被冻结。 */
+const host = { name: 'metrics' }
+/** 同步计数确认示例实际收到了元数据，未保留复用 view。 */
+let observedEvents = 0
+/** 此 Probe 只读 message 元数据，不捕获业务内容。 */
 const probe = defineProbe({
-  stages: ['message', 'envelope', 'frame'],
-  methods: ['math.double'],
-  sample: 0.25,
+  stages: ['message'],
   emit(view) {
+    observedEvents += 1
     console.log(RpcProbeStageName[view.stage], view.method, view.durationMs)
-  },
-  onError(error) {
-    console.error(error)
   }
-})
+}, host)
+console.log(probe === host, Object.isFrozen(host), probe.name) // true, true, 'metrics'
 
-/** connect 来源仍由调用方拥有；probe 不创建任何 transport。 */
-export function createObservedPeer(connect: IRuntimePeerSource) {
-  return createRuntimePeer({ connect, probe })
+/** 创建方拥有实际 MessagePort；Peer 只负责自己的 Endpoint。 */
+const { port1, port2 } = new MessageChannel()
+try {
+  const [client, server] = await Promise.all([
+    createThreadPeer<{ echo(value: string): string }>({
+      self: { name: 'client', instanceId: 'probe-client' }, probe,
+      connect: async (context) => createNodeThreadChannel(port1, 'probe-server', {
+        scheduler: systemScheduler, capabilities: context.capabilities
+      })
+    }),
+    createThreadPeer({
+      self: { name: 'server', instanceId: 'probe-server' }, provide: { echo: (value: string) => value },
+      connect: async (context) => createNodeThreadChannel(port2, 'probe-client', {
+        scheduler: systemScheduler, capabilities: context.capabilities
+      })
+    })
+  ])
+  await using observed = client
+  await using provider = server
+  assert.equal(await observed.request('echo', 'ready'), 'ready')
+  assert.ok(observedEvents > 0)
+} finally {
+  port1.close()
+  port2.close()
 }
 ```
 
@@ -782,4 +806,33 @@ probe.setStages(['frame', 'protected']) // 恢复选定阶段。
 
 `protected` 仅在认证保护路径存在时产生；没有该能力的路径不会伪造该阶段。内容捕获包括 protected 内容都必须显式启用。Descriptor 的 `stageMask` 描述 endpoint 能产生且当前已订阅的阶段，不证明所有路径都会经历每个阶段。
 
+`sizeBytes` 按当前层的真实表示计数：UTF-8 string transport 与字节 backing/view 返回精确长度。clone transport 的字符串没有物理 UTF-8 字节表示，encoded/frame/protected 的该项为 `-1`；Core 不为 metadata 观察再编码或扫描该字符串，捕获内容仍按引用传递。
+
 `setStages([])` 允许暂停，之后可以设置其它已知阶段。它更新私有状态的阶段选择，保留定义时的 `captureMask`；host 上不可写的 `stageMask` 仍为初始定义值，独立 handle 的 `stageMask` getter 反映当前私有值。非法阶段会抛出 `INVALID_CONFIG` 并保留旧 mask。阶段变更的 emitter 订阅机制由 Core 内部持有，不是公开 handle 方法。
+
+
+### 13.3 Endpoint 安装与生命周期
+
+Endpoint 用户在激活前安装 `probePlugin`。Peer 用户只需传入 `probe`。Core 在激活后交付一次 descriptor；只有载体实际提供 `observe` 才调用它，释放函数由现有 resource scope 在关闭时执行。Peer 阶段覆盖 handshake、ready、exit、restart、directory 与 closing。`setStages([])` 暂停后不再构造所选事件；关闭后不再发送事件。
+
+```ts doc-test=run group=useguide-probe-endpoint file=main.ts
+import assert from 'node:assert/strict'
+import { connect, createEndpoint } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+import { defineProbe, probePlugin } from '@migaia/rpc-core/probe'
+
+/** 在同步回调中读标量，不保留复用 view。 */
+let events = 0
+const probe = defineProbe({ stages: ['message'], emit() { events += 1 } })
+const [left, right] = createMemoryTransportPair()
+const server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })
+server.provide('echo', (context) => context.success(context.data))
+const client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [probePlugin(probe), connect({ transport: left })] })
+try {
+  assert.equal(await client.send('server', 'echo', 'ready'), 'ready')
+  assert.ok(events > 0)
+} finally {
+  await client.dispose()
+  await server.dispose()
+}
+```

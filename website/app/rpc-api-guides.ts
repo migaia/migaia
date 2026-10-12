@@ -4213,9 +4213,9 @@ const rpcProbeGuides = {
   }),
   'rpc-core:probe:defineProbe': guide({
     purposeEn:
-      'Validates and compiles Probe options. The optional host receives Probe fields and private registration, is frozen and returns unchanged by identity; no host copy is made. Runtime observation waits for probe-core.',
+      'Validates and compiles Probe options. The optional host receives Probe fields and private registration, is frozen and returns unchanged by identity; no host copy is made. Pass the handle to a Peer probe option or install it with probePlugin on an Endpoint.',
     purposeZh:
-      '验证并编译 Probe 配置；可选 host 直接接收 Probe 字段与私有注册，随后冻结并返回同一引用，不复制 host。观察事件仍须等 probe-core 实现合入后才产生。',
+      '验证并编译 Probe 配置；可选 host 直接接收 Probe 字段与私有注册，随后冻结并返回同一引用，不复制 host。把 handle 交给 Peer 的 probe 选项，或通过 probePlugin 在 Endpoint 上安装。',
     quickStart: `import { defineProbe, RpcProbeStageName } from '@migaia/rpc-core/probe'
 
 /** Existing extra members stay on this same object, which definition freezes. */
@@ -4237,11 +4237,11 @@ probe.setStages(['message', 'frame'])`,
       '显式配置 capture/redact；detail、error 与未转移的 content 按 SC9 保留引用。'
     ],
     avoidEn: [
-      'Expecting observation points or transport.observe behavior before their runtime children are installed.',
+      'Retaining a reusable view after emit returns without an explicit snapshotProbeEvent request.',
       'Applying methods to frame-level events: it filters only message and envelope; other stages use sampling.'
     ],
     avoidZh: [
-      '在运行时子任务合入之前，期待已经出现观察点或 transport.observe 行为。',
+      '在 emit 返回后直接保留复用 view，而没有显式调用 snapshotProbeEvent。',
       '把 methods 过滤应用到帧层：它只过滤 message/envelope，其它阶段只受采样控制。'
     ]
   }),
@@ -4307,31 +4307,42 @@ console.log(rpcProbeSampleKey('caller', 'request-1'))`,
   }),
   'rpc-core:probe:probePlugin': guide({
     purposeEn:
-      'Reserves the typed endpoint-level Probe plugin entry. In layer 1 it synchronously throws INVALID_CONFIG with probe runtime not installed; probe-core replaces the placeholder body.',
+      'Installs selected synchronous probes on the existing Endpoint before activation. Stage subscriptions compile once; metadata emission reuses one view and runtime callback failures report PROBE_FAILED without changing request flow.',
     purposeZh:
-      '保留 Endpoint 层带类型的 Probe 插件入口；layer 1 同步抛出 INVALID_CONFIG，文字为 probe runtime not installed，probe-core 合入后替换占位实现。',
-    quickStart: `import { defineProbe, probePlugin } from '@migaia/rpc-core/probe'
+      '在既有 Endpoint 激活前安装同步 Probe；订阅阶段在构造时编译，元数据事件复用同一个 view。运行时回调失败报告 PROBE_FAILED，不改变业务请求流程。',
+    quickStart: `import assert from 'node:assert/strict'
+import { connect, createEndpoint } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+import { defineProbe, probePlugin } from '@migaia/rpc-core/probe'
 
-/** The endpoint plugin receives this existing definition. */
-const probe = defineProbe({ stages: ['message'], emit(view) { console.log(view.seq) } })
-/** The layer 1 factory rejects until probe-core installs its runtime. */
-export function prepareProbePlugin() {
-  return probePlugin(probe) // Layer 1 throws INVALID_CONFIG.
+/** 在同步回调中读标量，不保留复用 view。 */
+let events = 0
+const probe = defineProbe({ stages: ['message'], emit() { events += 1 } })
+const [left, right] = createMemoryTransportPair()
+const server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })
+server.provide('echo', (context) => context.success(context.data))
+const client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [probePlugin(probe), connect({ transport: left })] })
+try {
+  assert.equal(await client.send('server', 'echo', 'ready'), 'ready')
+  assert.ok(events > 0)
+} finally {
+  await client.dispose()
+  await server.dispose()
 }`,
     useEn: [
-      'Compile endpoint integration against the frozen Probe contract before runtime installation.',
-      'After probe-core lands, install explicitly selected probes through the endpoint plugin boundary.'
+      'Observe metadata on an existing Endpoint using the same emitter as the Peer probe option.',
+      'Install probes before activation so describe and optional transport.observe share the original resource scope.'
     ],
     useZh: [
-      '运行时安装之前，按冻结的 Probe 契约编译 Endpoint 接入代码。',
-      'probe-core 合入后，通过 Endpoint 插件边界安装显式选择的 Probe。'
+      '通过与 Peer probe 选项相同的 emitter 观察既有 Endpoint 的元数据。',
+      '在激活前安装 Probe，让 describe 与可选 transport.observe 共享原有 resource scope。'
     ],
     avoidEn: [
-      'Calling the placeholder while expecting an operational observation plugin.',
+      'Installing an arbitrary object that was not registered by defineProbe; configuration rejects INVALID_CONFIG.',
       'Using the plugin as transport creation, trace propagation or business middleware.'
     ],
     avoidZh: [
-      '调用占位入口，却期待它已经返回能产生观察事件的插件。',
+      '安装未经 defineProbe 注册的任意对象；配置会以 INVALID_CONFIG 拒绝。',
       '把该插件用于创建 transport、自动传播 trace 或改变业务中间件。'
     ]
   })
