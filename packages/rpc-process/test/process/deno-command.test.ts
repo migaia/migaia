@@ -41,6 +41,8 @@ function denoFixture(
     exitOnKill?: boolean
     stdout?: Uint8Array
     keepStdoutOpen?: boolean
+    abort?: (reason: unknown) => void
+    cancel?: () => void
   } = {}
 ) {
   /** Constructor observations prove environment and stdio policy before spawn. */
@@ -67,6 +69,10 @@ function denoFixture(
     write(chunk) {
       writes.push(chunk)
       return options.write?.(chunk)
+    },
+    /** Observe physical channel retirement without replacing its real writer. */
+    abort(reason) {
+      options.abort?.(reason)
     }
   })
   /** Queue one physical chunk; optionally hold EOF until the channel's own cleanup cancels it. */
@@ -76,6 +82,10 @@ function denoFixture(
       start(controller) {
         controller.enqueue(bytes)
         if (finish) controller.close()
+      },
+      /** Retain cancellation of an open channel independently from native process exit. */
+      cancel() {
+        options.cancel?.()
       }
     })
   /** Channel mode does not start this reader before a business receiver subscribes. */
@@ -377,6 +387,52 @@ describe('Deno command native boundary', () => {
     expect(fixture.signals).toEqual(['SIGKILL', 'SIGKILL'])
     expect(fixture.child.stdin.locked).toBe(false)
     expect(remove).toHaveBeenCalledWith('abort', expect.any(Function))
+  })
+
+  /** Post-bootstrap cancellation must retire the constructed channel before rejecting launch. */
+  it('closes the channel once when cancellation follows bootstrap writer release', async () => {
+    /** Physical stream cleanup proves the real constructed channel retires exactly once. */
+    const abort = vi.fn()
+    /** An open stdout makes its cancellation observable rather than conflating it with EOF. */
+    const cancel = vi.fn()
+    /** Channel construction still uses the native stream locks and the existing byte adapter. */
+    const fixture = denoFixture({ keepStdoutOpen: true, abort, cancel })
+    /** The original native cancellation type and instance must survive CONNECT_FAILED. */
+    const reason = new DOMException('fixture post-bootstrap cancellation', 'AbortError')
+    /** Cancellation belongs to this startup request until activation transfers ownership. */
+    const controller = new AbortController()
+    /** The first real writer is the bootstrap writer; the channel acquires its own next writer. */
+    const bootstrapWriter = fixture.child.stdin.getWriter()
+    vi.spyOn(fixture.child.stdin, 'getWriter').mockReturnValueOnce(bootstrapWriter)
+    vi.spyOn(bootstrapWriter, 'releaseLock').mockImplementation(() => {
+      /** Release the native bootstrap lock before aborting at the precise activation boundary. */
+      Reflect.apply(WritableStreamDefaultWriter.prototype.releaseLock, bootstrapWriter, [])
+      controller.abort(reason)
+    })
+    /** Constructing the stdout reader distinguishes this case from cancellation before spawn. */
+    const getReader = vi.spyOn(fixture.child.stdout, 'getReader')
+    /** Handle rejection immediately while native rollback awaits its exit and stream cleanup. */
+    const error = await createDenoProcessLauncher()
+      .launch(
+        { ...spec(), bootstrap: { via: 'stdin', payload: new Uint8Array([1]) } },
+        { signal: controller.signal, output: () => undefined }
+      )
+      .then(
+        () => undefined,
+        (error: Error) => error
+      )
+    expect(error).toMatchObject({
+      source: RPC_PROCESS_ERROR_SOURCE,
+      code: RpcProcessErrorCode.connectFailed
+    })
+    expect(error?.cause).toBe(reason)
+    expect(error?.cause).toBeInstanceOf(DOMException)
+    expect(error?.cause).toMatchObject({ name: 'AbortError' })
+    expect(fixture.writes).toEqual([encodeRpcStreamFrame(new Uint8Array([1]))])
+    expect(getReader).toHaveBeenCalledOnce()
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(abort).toHaveBeenCalledOnce()
+    expect(fixture.signals).toEqual(['SIGKILL', 'SIGKILL'])
   })
 
   /** Canonical metadata rejection must happen before acquiring any native child or writer. */

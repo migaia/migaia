@@ -171,6 +171,8 @@ export function createDenoProcessLauncher(
         () => context.signal.removeEventListener('abort', onAbort),
         () => context.signal.removeEventListener('abort', onAbort)
       )
+      /** Until activation succeeds, rollback owns any newly acquired Web channel. */
+      let channel: IProcessByteChannel | undefined
       try {
         if (spec.bootstrap?.via === 'stdin') {
           const writer = child.stdin.getWriter()
@@ -183,7 +185,7 @@ export function createDenoProcessLauncher(
           }
         }
         /** Each physical stream is consumed by either channel or output, never both. */
-        const channel =
+        channel =
           spec.stdio.stdin === 'channel' && spec.stdio.stdout === 'channel'
             ? launch.createWebChannel(child.stdout, child.stdin)
             : undefined
@@ -203,6 +205,12 @@ export function createDenoProcessLauncher(
         })
       } catch (error) {
         terminate('force')
+        try {
+          await channel?.close()
+        } catch (closeError) {
+          /** Report cleanup failure without replacing the original launch cancellation cause. */
+          hostRethrowReporter(closeError, IpcReporterContext)
+        }
         await exited
         throw ((originalCause: unknown) =>
           attachErrorIdentity(
