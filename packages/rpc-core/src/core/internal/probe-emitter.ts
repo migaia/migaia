@@ -246,11 +246,11 @@ class ProbeEmitter {
     let any = false
     if (Array.isArray(entry)) {
       for (let i = 0; i < entry.length; i++) {
-        entry[i]!.selected = this.#select(entry[i]!, messageId, method, senderId)
+        entry[i]!.selected = this.#select(entry[i]!, messageId, method, senderId, stage)
         any = any || entry[i]!.selected
       }
     } else {
-      entry.selected = this.#select(entry, messageId, method, senderId)
+      entry.selected = this.#select(entry, messageId, method, senderId, stage)
       any = entry.selected
     }
     if (!any) return false
@@ -287,11 +287,16 @@ class ProbeEmitter {
     subscriber: ISubscriber,
     messageId: string | undefined,
     method: string | undefined,
-    senderId: string | undefined
+    senderId: string | undefined,
+    stage: number
   ): boolean {
     /** Compiled callback/filter record never depends on mutable host fields. */
     const state = subscriber.state
-    if (state.methods !== undefined && (method === undefined || !state.methods.has(method)))
+    if (
+      state.methods !== undefined &&
+      (stage === RpcProbeStage.message || stage === RpcProbeStage.envelope) &&
+      (method === undefined || !state.methods.has(method))
+    )
       return false
     if (state.sampleThreshold !== 0xffffffff && messageId !== undefined) {
       if (this.#lastId !== messageId || this.#lastSender !== senderId) {
