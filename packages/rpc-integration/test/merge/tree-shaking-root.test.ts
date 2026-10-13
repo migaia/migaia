@@ -7,14 +7,17 @@ import { describe, expect, it } from 'vitest'
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-core')
 
 /**
- * Root cost measured on main 9cd4497a: 207 modules, 1006331 raw bytes, 248781 gzip bytes. Caps
- * allow 3% growth so ordinary merges pass without a re-pin; growth past a cap needs review and a
- * new measured baseline.
+ * Root cost re-pinned on 2026-10-13 at rpc-devtools closure 52e0537d: 210 modules, 1051638 raw
+ * bytes, 257939 gzip bytes. The previous pin (main 9cd4497a: 207 / 1006331 / 248781) was exceeded
+ * by the devtools probe emit sites in Core (+28840 raw bytes at hub a3a4645c, +1165 at closure);
+ * root consumers carry them even without an installed probe. Reviewed and accepted by the user.
+ * Caps allow 3% growth so ordinary merges pass without a re-pin; growth past a cap needs review and
+ * a new measured baseline.
  */
 const rootCap = {
-  moduleCount: 213,
-  rawBytes: 1036520,
-  gzipBytes: 256244
+  moduleCount: 216,
+  rawBytes: 1083187,
+  gzipBytes: 265677
 } as const
 
 describe('A9 root tree-shaking cost', () => {
