@@ -491,7 +491,6 @@ describe('A1 merged public exports', () => {
           'createRemoteHost',
           'serveRemoteHost',
           'createCoroutinePlugin',
-          'createCoroutineHost',
           ...coreRefactorDelta.added['@migaia/rpc/remote']
         ])
       ].sort()
@@ -517,7 +516,11 @@ describe('A1 merged public exports', () => {
       pathToFileURL(join(coreRoot, './dist/remote/runtime-api/constants.js')).href
     )
     expect(remoteNamespace.RuntimePluginKey).toBe(runtimeConstants.RuntimePluginKey)
-    expect(remoteNamespace.RuntimePluginKey).toEqual({ process: 'process', thread: 'thread' })
+    expect(remoteNamespace.RuntimePluginKey).toEqual({
+      process: 'process',
+      thread: 'thread',
+      coroutine: 'coroutine'
+    })
     expect(remoteNamespace).not.toHaveProperty('RuntimePluginFamily')
     for (const [name, names] of Object.entries(jsonrpcBridgeDelta.added)) {
       const { owner, root: ownerRoot, key } = splitEntry(name)
@@ -636,6 +639,26 @@ describe('A1 merged public exports', () => {
     )
     expect(threads.RPC_THREAD_ERROR_SOURCE).toBe('@migaia/rpc/threads')
     expect(threads.RpcThreadErrorCode.usageSampleFailed).toBe('THREAD_USAGE_SAMPLE_FAILED')
+  })
+
+  it('A5 BC1 exports the runtime coroutine plugin and removes the legacy host', async () => {
+    /** BC1 keeps the public factory name while moving its owner to the runtime family. */
+    const coreRoot = join(packageRoot, 'rpc-core')
+    /** The built public entry is the surface consumed by applications and website manifests. */
+    const remoteNamespace = await import(pathToFileURL(join(coreRoot, 'dist/remote/index.js')).href)
+    expect(remoteNamespace.createCoroutinePlugin).toEqual(expect.any(Function))
+    expect.soft(remoteNamespace).not.toHaveProperty('createCoroutineHost')
+    expect.soft(remoteNamespace.RuntimePluginKey).toEqual({
+      process: 'process',
+      thread: 'thread',
+      coroutine: 'coroutine'
+    })
+    /** A same-named legacy factory cannot satisfy the new runtime family's ownership contract. */
+    const familyModule = join(coreRoot, 'dist/remote/runtime-api/coroutine-plugin.js')
+    expect(existsSync(familyModule)).toBe(true)
+    /** The public entry re-exports the canonical runtime factory without another wrapper. */
+    const coroutineFamily = await import(pathToFileURL(familyModule).href)
+    expect(remoteNamespace.createCoroutinePlugin).toBe(coroutineFamily.createCoroutinePlugin)
   })
 
   it('keeps contract protocol and normalizer implementations outside compiled core', () => {
