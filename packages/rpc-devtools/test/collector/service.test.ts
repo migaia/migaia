@@ -42,15 +42,17 @@ describe('collector A4 query, watch and service', () => {
       expect(remoteDescription.version).toBe(devtools.describe().version)
       expect(remoteDescription.limits).toEqual(devtools.describe().limits)
       expect(remoteDescription.now).toBeGreaterThan(0)
+      /** Real startup observations advance seq before the service learns its serving identity. */
+      const firstSequence = devtools.query().nextSeq + 1
       for (let i = 1; i <= 3; i++) {
         /** Three independent filters must all match the retained business event. */
-        const view = collectorView(i)
+        const view = collectorView(firstSequence + i - 1)
         if (i === 2) view.method = CollectorFixture.otherMethod
         if (i === 3) view.trace = CollectorFixture.otherTrace
         devtools.emit(view)
       }
       /** A captured encoded event must not leak content through the metadata service. */
-      const captured = collectorView(4)
+      const captured = collectorView(firstSequence + 3)
       captured.stage = RpcProbeStage.encoded
       captured.content = new Uint8Array([1, 2, 3])
       devtools.emit(captured)
@@ -63,7 +65,7 @@ describe('collector A4 query, watch and service', () => {
       expect((await pair.a.request('devtools.query', query)).events).toEqual(
         devtools.query(query).events
       )
-      expect(devtools.query(query).events.map((event) => event.seq)).toEqual([1])
+      expect(devtools.query(query).events.map((event) => event.seq)).toEqual([firstSequence])
       expect(await pair.a.request('devtools.stats')).toEqual(devtools.stats())
       for (const event of (await pair.a.request('devtools.query')).events)
         expect(event).not.toHaveProperty('content')
@@ -73,26 +75,26 @@ describe('collector A4 query, watch and service', () => {
       /** This pending request waits for the next qualifying collector batch. */
       const next = watch.next()
       await started
-      devtools.emit(collectorView(5))
+      devtools.emit(collectorView(firstSequence + 4))
       expect((await next).value).toMatchObject({
-        events: [{ seq: 5, method: CollectorFixture.method }],
+        events: [{ seq: firstSequence + 4, method: CollectorFixture.method }],
         dropped: 0
       })
       await watch.return!(undefined)
 
       await pair.a.request('devtools.pause')
       expect(devtools.describe().paused).toBe(true)
-      devtools.emit(collectorView(6))
+      devtools.emit(collectorView(firstSequence + 5))
       expect(devtools.query().counters.ignoredWhilePaused).toBe(1)
       await pair.a.request('devtools.resume')
       expect(devtools.describe().paused).toBe(false)
       await pair.a.request('devtools.record.start', { maxEvents: 3 })
-      devtools.emit(collectorView(7))
+      devtools.emit(collectorView(firstSequence + 6))
       expect(
         devtools
           .importRecord(await pair.a.request('devtools.record.stop'))
           .events.map((event) => event.seq)
-      ).toEqual([7])
+      ).toEqual([firstSequence + 6])
       await pair.a.request('devtools.clear')
       expect(devtools.query().events).toEqual([])
       expect(devtools.stats().methods).toEqual([])

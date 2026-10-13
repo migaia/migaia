@@ -342,4 +342,42 @@ describe('hub A2 correlation and timeline', () => {
     expect(aggregate.methods[0].p99Ms).toBeLessThanOrEqual(0.25)
     await hub.close()
   })
+
+  it('[closure A6] preserves observed maxima when summing open terminal histograms', async () => {
+    /** Two real contract rows share a method and each has one observed 300-second sample. */
+    const stats: IRpcDevtoolsStats = {
+      since: 0,
+      methods: [
+        {
+          endpointId: 'endpoint',
+          method: 'slow',
+          calls: 1,
+          failed: 0,
+          rejected: 0,
+          timedOut: 0,
+          aborted: 0,
+          latencyBucketsMs: Array.from({ length: 24 }, (_, index) => 0.0625 * 2 ** index),
+          latencyCounts: [...Array<number>(23).fill(0), 1],
+          latencyMaxMs: 300_000,
+          latencyOverflowFromMs: 262_144,
+          p50Ms: 300_000,
+          p95Ms: 300_000,
+          p99Ms: 300_000
+        }
+      ]
+    }
+    /** Aggregate interpolation must never exceed the actual maximum of either source. */
+    const hub = createRpcDevtoolsHub()
+    try {
+      await hub.addTarget('A', fakeTarget([], { stats }).client)
+      await hub.addTarget('B', fakeTarget([], { stats }).client)
+      const row = (await hub.stats()).methods[0]!
+      expect(row.calls).toBe(2)
+      expect(row.latencyMaxMs).toBe(300_000)
+      expect(row.latencyOverflowFromMs).toBe(262_144)
+      expect(row.p99Ms).toBeLessThanOrEqual(300_000)
+    } finally {
+      await hub.close()
+    }
+  })
 })

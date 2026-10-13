@@ -1,4 +1,4 @@
-import { RpcProbeStageName } from '@migaia/rpc-core/probe'
+import { RpcProbeStageName, RpcProbeOutcomeName } from '@migaia/rpc-core/probe'
 import type { IRpcDevtoolsQuery } from '../contract/service.js'
 import { RpcDevtoolsErrorCode } from '../error-code.js'
 import { identifyDevtoolsError } from '../errors.js'
@@ -9,6 +9,7 @@ import { CollectorLimit, CollectorText } from './text.js'
 /** Query compilation performs all string work once before scanning the numeric columns. */
 export type ICollectorFilter = {
   stages: number
+  outcomes: number
   methods: Uint8Array | undefined
   endpoints: Uint8Array | undefined
   trace: number | undefined
@@ -63,6 +64,20 @@ export function compileQuery(
   if (input?.trace !== undefined && typeof input.trace !== 'string') invalid()
   /** Empty stage selection intentionally matches no observations. */
   let stages = 127
+  /** Outcomes share the canonical numeric vocabulary; an empty filter selects no rows. */
+  let outcomes = (1 << RpcProbeOutcomeName.length) - 1
+  if (input?.outcomes !== undefined) {
+    if (!Array.isArray(input.outcomes)) invalid()
+    outcomes = 0
+    for (let i = 0; i < input.outcomes.length; i++) {
+      /** Cold name lookup never interns query input or mutates retained records. */
+      const outcome = RpcProbeOutcomeName.indexOf(
+        input.outcomes[i] as (typeof RpcProbeOutcomeName)[number]
+      )
+      if (outcome < 0) invalid()
+      outcomes |= 1 << outcome
+    }
+  }
   if (input?.stages !== undefined) {
     if (!Array.isArray(input.stages)) invalid()
     stages = 0
@@ -75,6 +90,7 @@ export function compileQuery(
   }
   return {
     stages,
+    outcomes,
     after,
     limit,
     methods: namesFilter(input?.methods, names),
@@ -89,6 +105,7 @@ export function matchesSlot(ring: EventRing, slot: number, filter: ICollectorFil
   const c = ring.columns
   return (
     (filter.stages & (1 << c.stage[slot]!)) !== 0 &&
+    (filter.outcomes & (1 << c.outcome[slot]!)) !== 0 &&
     c.seq[slot]! > filter.after &&
     (filter.methods === undefined || filter.methods[c.method[slot]!] === 1) &&
     (filter.endpoints === undefined || filter.endpoints[c.endpoint[slot]!] === 1) &&

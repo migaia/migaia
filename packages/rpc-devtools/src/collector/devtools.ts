@@ -1,5 +1,7 @@
 import {
   defineProbe,
+  readProbeStages,
+  subscribeProbeStages,
   rpcProbeSampleKey,
   RpcProbeStageName,
   RpcProbeStage,
@@ -7,6 +9,7 @@ import {
   type IRpcProbeEventView
 } from '@migaia/rpc-core/probe'
 import type { IRuntimePeerProvide } from '@migaia/rpc-core/remote'
+import type { IRpcAbortSignal } from '@migaia/rpc-core'
 import { encodeRpcDevtoolsRecord, decodeRpcDevtoolsRecord } from '../contract/record-codec.js'
 import type { IRpcDevtools, IRpcDevtoolsOptions } from '../collector-types.js'
 import type {
@@ -122,6 +125,12 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
   const watchers: CollectorWatcher[] = []
   /** Descriptor references come from the Core's cold construction callback. */
   const descriptors = new Map<string, IRpcProbeDescriptor>()
+  /** Actual serving endpoint identities exclude self traffic without guessing service method names. */
+  const serviceEndpoints = new Set<string>()
+  /** Pause restores the user's current cold selection, including stages added after construction. */
+  let pausedStages = stages
+  /** Direct host ingestion follows stage changes through the public cold subscription. */
+  let releaseStages: (() => void) | undefined
   /** Sequence stays monotonic across emitters with independent local sequence ids. */
   let sequence = 0
   /** Terminal closure never revives retained ownership. */
@@ -172,7 +181,10 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
       const slot = (ring.head + i) % ring.capacity
       if (ring.columns.seq[slot]! <= filter.after) continue
       nextSeq = ring.columns.seq[slot]!
-      if (matchesSlot(ring, slot, filter)) {
+      if (
+        !serviceEndpoints.has(names.name(ring.columns.endpoint[slot]!)!) &&
+        matchesSlot(ring, slot, filter)
+      ) {
         events.push(ring.event(slot, content) as IRpcDevtoolsWireEvent)
         if (events.length === filter.limit) break
       }
@@ -180,7 +192,11 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
     return { events, nextSeq, counters: counterSnapshot() }
   }
   /** Watch storage and generator Promises belong solely to the explicit watch boundary. */
-  const watch = (input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>, content = true) => {
+  const watch = (
+    input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>,
+    content = true,
+    signal?: IRpcAbortSignal
+  ) => {
     assertOpen()
     return new CollectorWatcher(
       names,
@@ -189,7 +205,8 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
       content,
       watchers,
       onError,
-      assertOpen
+      assertOpen,
+      signal
     ).iterate()
   }
   /** Describe retains descriptor elements by reference and supplies a fresh host clock sample. */
@@ -249,14 +266,21 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
   /** Pause removes Core dispatch subscriptions rather than changing the business pipeline. */
   const pause = (): void => {
     assertOpen()
+    if (paused) return
+    /** Stage names are reconstructed only at this cold lifecycle boundary (SC9b). */
+    const current = readProbeStages(devtools)
+    pausedStages = []
+    for (let i = 0; i < RpcProbeStageName.length; i++)
+      if ((current & (1 << i)) !== 0) (pausedStages as string[]).push(RpcProbeStageName[i]!)
     paused = true
     devtools.setStages([])
   }
-  /** Resume restores the original construction subscription. */
+  /** Resume restores the selection captured by the first pause, without reviving closed storage. */
   const resume = (): void => {
     assertOpen()
+    if (!paused) return
     paused = false
-    devtools.setStages(stages)
+    devtools.setStages(pausedStages)
   }
   /** Clear resets main retention and statistics; recorded windows and name ids keep ownership. */
   const clear = (): void => {
@@ -276,6 +300,7 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
     if (closed) return
     closed = true
     devtools.setStages([])
+    releaseStages?.()
     ring.clear()
     statistics.clear()
     recording?.clear()
@@ -296,6 +321,7 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
         return
       }
       if ((stageMask & (1 << view.stage)) === 0) return
+      if (serviceEndpoints.has(view.endpointId)) return
       if (ingesting) {
         counters.droppedReentrant++
         return
@@ -378,7 +404,7 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
     watch,
     stats: () => {
       assertOpen()
-      return statistics.snapshot()
+      return statistics.snapshot(serviceEndpoints)
     },
     describe,
     record,
@@ -401,7 +427,10 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
       pause,
       resume,
       exportRecord: encodeRpcDevtoolsRecord,
-      stopRecord
+      stopRecord,
+      excludeEndpoint: (endpointId: string) => {
+        serviceEndpoints.add(endpointId)
+      }
     },
     exposeContent
   )
@@ -423,7 +452,10 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
   } catch (cause) {
     invalid(cause)
   }
-  stageMask = devtools.stageMask
+  stageMask = readProbeStages(devtools)
+  releaseStages = subscribeProbeStages(devtools, () => {
+    stageMask = readProbeStages(devtools)
+  })
   captureMask = devtools.captureMask
   methods = devtools.methods
   threshold = devtools.sampleThreshold

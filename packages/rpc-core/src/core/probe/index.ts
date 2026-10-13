@@ -23,3 +23,4 @@ export { probePlugin } from './plugin.js'
 export { readProbeStages, subscribeProbeStages } from './internal.js'
 /** Canonical host reporter is exposed here so probes need no additional dependency or duplicate. */
 export { hostRethrowReporter } from '@migaia/utils/promise'
+export { IpcReporterContext } from '../plugins/reporter-context.js'

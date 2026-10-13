@@ -105,7 +105,7 @@ export class CollectorStats {
           bucket === 23
             ? Math.max(0.0625 * 2 ** bucket, this.#data[offset + 5]!)
             : 0.0625 * 2 ** bucket
-        return low + ((high - low) * (rank - before)) / count
+        return Math.min(this.#data[offset + 5]!, low + ((high - low) * (rank - before)) / count)
       }
       before += count
     }
@@ -113,12 +113,13 @@ export class CollectorStats {
   }
 
   /** Materialize statistics only at this public representation boundary (SC9b). */
-  snapshot(): IRpcDevtoolsStats {
+  snapshot(excluded?: ReadonlySet<string>): IRpcDevtoolsStats {
     /** Output rows are boundary projections, separate from the hot numeric aggregation blocks. */
     const methods: IRpcDevtoolsStats['methods'][number][] = []
     for (let slot = 0; slot < this.#slots.size; slot++) {
       /** Offset and fixed vectors reconstruct the one published histogram vocabulary. */
       const offset = slot * StatsWidth
+      if (excluded?.has(this.#names.name(this.#endpoints[slot]!)!)) continue
       /** Bucket boundaries are a public representation, constructed only for stats(). */
       const boundaries: number[] = []
       /** Counts leave numeric storage only when this boundary is requested. */
@@ -137,6 +138,8 @@ export class CollectorStats {
         aborted: this.#data[offset + 4]!,
         latencyBucketsMs: boundaries,
         latencyCounts: counts,
+        latencyOverflowFromMs: 0.0625 * 2 ** 22,
+        latencyMaxMs: this.#data[offset + 5]!,
         p50Ms: this.#percentile(offset, 0.5),
         p95Ms: this.#percentile(offset, 0.95),
         p99Ms: this.#percentile(offset, 0.99)
