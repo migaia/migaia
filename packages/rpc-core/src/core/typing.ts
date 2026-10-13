@@ -183,6 +183,8 @@ export type IRpcAuthenticationConfig = {
 }
 /** Executable per-frame protection installed by authentication middleware. */
 export type IRpcAuthenticationCapability = {
+  /** Immutable authentication owner reports its configured mode to endpoint probe descriptors. */
+  readonly mode?: import('./probe/types.js').IRpcProbeDescriptor['authentication']
   readonly enabled: true
   readonly encodedType: 'any' | 'string' | 'uint8array'
   readonly protect: IRpcAuthenticationTransform

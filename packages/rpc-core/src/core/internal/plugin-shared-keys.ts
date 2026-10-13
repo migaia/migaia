@@ -101,7 +101,8 @@ export const RpcFastMiddlewareNames: ReadonlySet<string> = new Set([
   'middleware:abort',
   'codec',
   'framer',
-  RpcPortName.protocol
+  RpcPortName.protocol,
+  RpcPortName.probe
 ])
 
 /** Stable protocol commands shared by protocol providers and frame consumers. */

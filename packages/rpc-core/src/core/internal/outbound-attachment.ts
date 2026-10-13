@@ -798,7 +798,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     if (this.#probe !== undefined) {
       this.#probe.fastPath = this.#fast
       if (this.#authentication && this.#probe.authentication === 'none')
-        this.#probe.authentication = 'sign'
+        this.#probe.authentication = this.#authentication.mode ?? 'sign'
     }
     if (this.#fast) enableFastTimePort(kernel.time)
     this.#outboundGate = readOutboundGate(kernel.transport)
