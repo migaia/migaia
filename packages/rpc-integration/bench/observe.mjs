@@ -148,8 +148,8 @@ export function snapshot(options = {}) {
 /**
  * Capture an explicitly enabled Node diagnostic boundary without changing synchronous snapshot().
  *
- * @param {{ diagnostic?: 'start' | 'stop'; mode?: 'cpu' | 'guard' }} [options] Existing OOB
- *   control.
+ * @param {{ diagnostic?: 'start' | 'stop'; mode?: 'cpu' | 'guard' | 'sampling' }} [options]
+ *   Existing OOB control.
  * @returns {Promise<object>} Ordinary snapshot plus a diagnostic receipt or full failure
  *   classification.
  * @throws {Error} A missing diagnostic helper remains an actual observation setup failure.

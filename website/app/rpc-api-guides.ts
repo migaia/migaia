@@ -4115,7 +4115,867 @@ try {
   'rpc-browser:index:RpcBrowserErrorCode': browserPeerErrorGuide
 } satisfies Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>>
 
+/** Documents one fixed Probe value or name table at its owning public entry. */
+function probeValueGuide(input: {
+  readonly name: string
+  readonly expression: string
+  readonly purposeEn: string
+  readonly purposeZh: string
+}): Readonly<Record<IGuideLocale, IApiGuide>> {
+  return guide({
+    purposeEn: input.purposeEn,
+    purposeZh: input.purposeZh,
+    quickStart: `import { ${input.name} } from '@migaia/rpc-core/probe'\n\nconsole.log(${input.expression})`,
+    useEn: [
+      'A synchronous Probe consumer reads the numeric event view without allocating a named event.',
+      'A diagnostic boundary converts the fixed numeric domain into its maintained public name.'
+    ],
+    useZh: [
+      '同步 Probe 消费者直接读取数值事件 view，避免为每个事件再分配对象。',
+      '诊断出口把固定数值域转换为统一维护的公开名称。'
+    ],
+    avoidEn: [
+      'Changing numeric members or table order would change the frozen version 1 Probe contract.',
+      'Reading a reusable event view after emit returns; retain an explicit snapshot instead.'
+    ],
+    avoidZh: [
+      '修改数值 member 或名称表顺序会改变已经冻结的版本 1 Probe 契约。',
+      '在 emit 返回后继续读取复用的事件 view；需要保留时显式创建快照。'
+    ]
+  })
+}
+
+/** Probe guides describe the installed Core observation boundary and its current control contract. */
+const rpcProbeGuides = {
+  'rpc-core:probe:readProbeStages': guide({
+    purposeEn:
+      "Reads the genuine Probe's current effective numeric mask after setStages, including frozen host-form handles whose public stageMask remains initial. This cold control reader adds no business-path work.",
+    purposeZh:
+      '读取真正 Probe 经 setStages 更新后的有效数值 mask，包含公开 stageMask 保留初值的冻结 host handle；该冷控制读取不增加业务路径工作。',
+    quickStart: `import { defineProbe, readProbeStages } from '@migaia/rpc-core/probe'
+
+/** Cold control inspects actual private selection. */
+const probe = defineProbe({ stages: ['message'], emit() {} }, {})
+probe.setStages(['message', 'carrier'])
+console.log(readProbeStages(probe))`,
+    useEn: [
+      'Read actual stage selection before pause or another explicit control operation.',
+      'Inspect a host-form handle without treating its frozen initial field as current state.'
+    ],
+    useZh: [
+      '在暂停或其它显式控制操作之前读取当前阶段选择。',
+      '检查 host handle 时不把被冻结的初始公开字段当作当前状态。'
+    ],
+    avoidEn: [
+      'Using this cold metadata contract as a new business-path validator.',
+      'Assuming diagnostic metadata replaces the original resource or error owner.'
+    ],
+    avoidZh: [
+      '把冷元数据契约作为新的业务路径验证器。',
+      '把诊断元数据当作原资源或错误 owner 的替代物。'
+    ]
+  }),
+  'rpc-core:probe:subscribeProbeStages': guide({
+    purposeEn:
+      'Subscribes to actual stage-mask changes at the canonical Probe owner. Each effective change notifies once; the original disposer is idempotent and does not add a per-message callback.',
+    purposeZh:
+      '在规范 Probe owner 订阅实际阶段 mask 变更；每次有效变更通知一次，原释放函数可重复调用，不添加逐消息 callback。',
+    quickStart: `import { defineProbe, subscribeProbeStages, readProbeStages } from '@migaia/rpc-core/probe'
+
+/** One cold subscription follows control changes. */
+const probe = defineProbe({ stages: ['message'], emit() {} })
+const release = subscribeProbeStages(probe, () => console.log(readProbeStages(probe)))
+probe.setStages(['message', 'frame'])
+release()`,
+    useEn: [
+      'Keep a collector control mask synchronized after genuine setStages changes.',
+      'Release a cold listener when its application-owned controller ends.'
+    ],
+    useZh: [
+      '在真正 setStages 变更后同步 collector 的控制 mask。',
+      '应用自己拥有的控制器结束时释放冷监听器。'
+    ],
+    avoidEn: [
+      'Using this cold metadata contract as a new business-path validator.',
+      'Assuming diagnostic metadata replaces the original resource or error owner.'
+    ],
+    avoidZh: [
+      '把冷元数据契约作为新的业务路径验证器。',
+      '把诊断元数据当作原资源或错误 owner 的替代物。'
+    ]
+  }),
+  'rpc-core:probe:hostRethrowReporter': guide({
+    purposeEn:
+      'Re-exports the existing utils promise host reporter so diagnostic failures retain their original owner rather than acquiring a duplicate rethrow bridge. Reporting does not create a devtools transport.',
+    purposeZh:
+      '重导出 utils promise 的既有宿主 reporter，使诊断失败保留原 owner，不另建重复 rethrow bridge；reporter 不创建 devtools transport。',
+    quickStart: `import { hostRethrowReporter, IpcReporterContext } from '@migaia/rpc-core/probe'
+
+/** Use only at an existing error reporting boundary. */
+export function reportDiagnostic(error: unknown) {
+  hostRethrowReporter(error, IpcReporterContext)
+}`,
+    useEn: [
+      'Report a diagnostic callback failure through the existing host boundary.',
+      'Reuse the canonical reporter when an application reporter cannot handle its own error.'
+    ],
+    useZh: [
+      '通过既有宿主边界报告诊断 callback 的失败。',
+      '应用 reporter 自身不能处理错误时复用规范宿主 reporter。'
+    ],
+    avoidEn: [
+      'Using this cold metadata contract as a new business-path validator.',
+      'Assuming diagnostic metadata replaces the original resource or error owner.'
+    ],
+    avoidZh: [
+      '把冷元数据契约作为新的业务路径验证器。',
+      '把诊断元数据当作原资源或错误 owner 的替代物。'
+    ]
+  }),
+  'rpc-core:probe:IpcReporterContext': guide({
+    purposeEn:
+      'Re-exports the package-owned IPC reporter context used by the canonical host reporter. Consumers pass this existing value instead of constructing divergent diagnostic source metadata.',
+    purposeZh:
+      '重导出包内维护的 IPC reporter context，供规范宿主 reporter 使用；消费者交入这个既有值，避免各自构造不一致的诊断来源元数据。',
+    quickStart: `import { IpcReporterContext } from '@migaia/rpc-core/probe'
+
+console.log(IpcReporterContext)`,
+    useEn: [
+      'Pass the existing IPC context to the canonical host error reporter.',
+      "Keep collector fallback reporting aligned with Core's current source ownership."
+    ],
+    useZh: [
+      '把既有 IPC context 交给规范宿主错误 reporter。',
+      '使 collector 的 fallback 报告与 Core 的来源所有权保持一致。'
+    ],
+    avoidEn: [
+      'Using this cold metadata contract as a new business-path validator.',
+      'Assuming diagnostic metadata replaces the original resource or error owner.'
+    ],
+    avoidZh: [
+      '把冷元数据契约作为新的业务路径验证器。',
+      '把诊断元数据当作原资源或错误 owner 的替代物。'
+    ]
+  }),
+  'rpc-core:adapter/internal-advanced:carrierSizeBytes': guide({
+    purposeEn:
+      'Reads already-known native ArrayBuffer or view byte extents with intrinsic slots. Strings and opaque containers return -1, avoiding payload scans, encoding and negative-brand exceptions in metadata observation.',
+    purposeZh:
+      '通过 intrinsic slot 读取已知 native ArrayBuffer 或 view 字节跨度；字符串与 opaque container 返回 -1，避免元数据观察中的 payload 扫描、编码与负向品牌探测异常。',
+    quickStart: `import { carrierSizeBytes } from '@migaia/rpc-core/adapter/internal-advanced'
+
+console.log(carrierSizeBytes(new Uint8Array([1, 2]))) // 2
+console.log(carrierSizeBytes('payload')) // -1`,
+    useEn: [
+      'Reuse the existing Core owner for carrier metadata without scanning payload members.',
+      'Read a native byte span that the physical layer already owns.'
+    ],
+    useZh: [
+      '复用 Core owner 读取载体元数据，不扫描 payload 成员。',
+      '读取物理层已经拥有的 native byte span。'
+    ],
+    avoidEn: [
+      'Using this cold metadata contract as a new business-path validator.',
+      'Assuming diagnostic metadata replaces the original resource or error owner.'
+    ],
+    avoidZh: [
+      '把冷元数据契约作为新的业务路径验证器。',
+      '把诊断元数据当作原资源或错误 owner 的替代物。'
+    ]
+  }),
+  'rpc-core:probe:RpcProbeStage': probeValueGuide({
+    name: 'RpcProbeStage',
+    expression: 'RpcProbeStage.message',
+    purposeEn:
+      'Defines the seven fixed numeric observation stages from peer through carrier. Use the values for mask bits; content capture is separately opt-in, including the protected stage.',
+    purposeZh:
+      '定义从 peer 到 carrier 的七个固定数值观察阶段，用于计算阶段掩码；内容捕获独立按阶段显式启用，protected 阶段也遵守该规则。'
+  }),
+  'rpc-core:probe:RpcProbeStageName': probeValueGuide({
+    name: 'RpcProbeStageName',
+    expression: 'RpcProbeStageName[1]',
+    purposeEn:
+      'Maps the fixed numeric stage index to its public name in the same order as RpcProbeStage. This table belongs at diagnostics and service boundaries rather than in Core event dispatch.',
+    purposeZh:
+      '按与 RpcProbeStage 相同的顺序，把固定数值阶段转换为公开名称；名称表用于诊断与 service 出口，Core 事件分发继续读取数值。'
+  }),
+  'rpc-core:probe:RpcProbeDirection': probeValueGuide({
+    name: 'RpcProbeDirection',
+    expression: 'RpcProbeDirection.outbound',
+    purposeEn:
+      'Defines the fixed outbound, inbound and local numeric directions of a Probe event. Direction records the observed side and does not infer an unseen remote event.',
+    purposeZh:
+      '定义 Probe 事件的 outbound、inbound 与 local 固定数值方向；方向描述实际观察到的一侧，不推断尚未观察到的远端事件。'
+  }),
+  'rpc-core:probe:RpcProbeDirectionName': probeValueGuide({
+    name: 'RpcProbeDirectionName',
+    expression: 'RpcProbeDirectionName[0]',
+    purposeEn:
+      'Converts a Probe direction index to its maintained outbound, inbound or local name. Preserve this order when producing a string event at a diagnostic or service boundary.',
+    purposeZh:
+      '把 Probe 方向索引转换为统一维护的 outbound、inbound 或 local 名称；诊断与 service 出口生成字符串事件时保持该固定顺序。'
+  }),
+  'rpc-core:probe:RpcProbeKind': probeValueGuide({
+    name: 'RpcProbeKind',
+    expression: 'RpcProbeKind.request',
+    purposeEn:
+      'Defines fixed numeric kinds for requests, responses, notifications, stream events, cancellation, control and lifecycle. A kind describes an observation and does not issue a business operation.',
+    purposeZh:
+      '定义请求、响应、通知、流事件、取消、控制与生命周期的固定数值种类；kind 只描述实际观察事件，读取它不会发起业务操作。'
+  }),
+  'rpc-core:probe:RpcProbeKindName': probeValueGuide({
+    name: 'RpcProbeKindName',
+    expression: 'RpcProbeKindName[0]',
+    purposeEn:
+      'Maps each Probe kind index to the stable request, response, stream or lifecycle name. Convert only at the consumer boundary so event dispatch can retain small integers.',
+    purposeZh:
+      '把每个 Probe kind 索引映射为固定的请求、响应、流或生命周期名称；只在消费者出口转换，事件分发继续使用小整数。'
+  }),
+  'rpc-core:probe:RpcProbeOutcome': probeValueGuide({
+    name: 'RpcProbeOutcome',
+    expression: 'RpcProbeOutcome.settled',
+    purposeEn:
+      'Defines the fixed numeric progress and terminal outcomes attached to observed events. An outcome is event metadata and never replaces the original RPC result or failure.',
+    purposeZh:
+      '定义观察事件携带的固定数值进展与终态结果；outcome 是事件元数据，不会替换原 RPC 返回值、错误身份或失败处理语义。'
+  }),
+  'rpc-core:probe:RpcProbeOutcomeName': probeValueGuide({
+    name: 'RpcProbeOutcomeName',
+    expression: 'RpcProbeOutcomeName[6]',
+    purposeEn:
+      'Converts an observed Probe outcome index into its stable public name. Keep the table aligned with RpcProbeOutcome when formatting service events and recordings.',
+    purposeZh:
+      '把实际观察到的 Probe outcome 索引转换为固定公开名称；生成 service 事件与录制数据时，名称表与 RpcProbeOutcome 始终保持对应。'
+  }),
+  'rpc-core:probe:defineProbe': guide({
+    purposeEn:
+      'Validates and compiles Probe options. The optional host receives Probe fields and private registration, is frozen and returns unchanged by identity; no host copy is made. Pass the handle to a Peer probe option or install it with probePlugin on an Endpoint.',
+    purposeZh:
+      '验证并编译 Probe 配置；可选 host 直接接收 Probe 字段与私有注册，随后冻结并返回同一引用，不复制 host。把 handle 交给 Peer 的 probe 选项，或通过 probePlugin 在 Endpoint 上安装。',
+    quickStart: `import { defineProbe, RpcProbeStageName } from '@migaia/rpc-core/probe'
+
+/** Existing extra members stay on this same object, which definition freezes. */
+const host = { name: 'metrics' }
+/** Select metadata stages before passing the handle to a Peer. */
+const probe = defineProbe({
+  stages: ['message', 'frame'], methods: ['math.double'], sample: 0.25,
+  emit(view) { console.log(RpcProbeStageName[view.stage], view.method) }
+}, host)
+console.log(probe === host, Object.isFrozen(host), probe.name)
+probe.setStages([]) // Private active mask changes; host.stageMask keeps its initial value.
+probe.setStages(['message', 'frame'])`,
+    useEn: [
+      'Attach the Probe to an existing extensible, non-frozen object while preserving its members and identity.',
+      'Use explicit capture and redaction; detail, error and untransferred content retain references under SC9.',
+      'Read IRpcProbeEventView.variation on message/envelope controls: abort keeps kind cancel, other variations use control, and request/response or other stages leave it undefined.'
+    ],
+    useZh: [
+      '把 Probe 附到可扩展且未冻结的已有对象，保留原有成员与对象身份。',
+      '显式配置 capture/redact；detail、error 与未转移的 content 按 SC9 保留引用。',
+      '从 message/envelope 的 IRpcProbeEventView.variation 读取 control subtype；abort 的 kind 为 cancel，其余 variation 为 control，request/response 与其它阶段为 undefined。'
+    ],
+    avoidEn: [
+      'Retaining a reusable view after emit returns without an explicit snapshotProbeEvent request.',
+      'Applying methods to frame-level events or expecting it to remove methodless variations: it filters only method-bearing message/envelope events; other stages use sampling.'
+    ],
+    avoidZh: [
+      '在 emit 返回后直接保留复用 view，而没有显式调用 snapshotProbeEvent。',
+      '把 methods 过滤应用到帧层或期望它删除没有 method 的 variation：它只过滤携带 method 的 message/envelope，其它阶段只受采样控制。'
+    ]
+  }),
+  'rpc-core:probe:snapshotProbeEvent': guide({
+    purposeEn:
+      'Explicitly copies reusable Probe metadata under SC9c so top-level fields, including variation, survive emit. Detail, error and content keep their original references; later caller mutation remains visible until a real codec boundary converts them.',
+    purposeZh:
+      '按 SC9c 显式复制复用 Probe 的顶层元数据，包括 variation，使字段在 emit 返回后有效；detail、error、content 保留原引用，调用方后续修改仍可见，直到真实 codec 边界转换表示。',
+    quickStart: `import { defineProbe, snapshotProbeEvent, type IRpcProbeEventView } from '@migaia/rpc-core/probe'
+
+/** Retained snapshots belong to this diagnostic consumer. */
+const saved: Readonly<IRpcProbeEventView>[] = []
+/** Allocate snapshots only at the consumer boundary. */
+const probe = defineProbe({
+  stages: ['message'],
+  emit(view) {
+    // SC9(c): explicitly retain top-level metadata, preserving nested references.
+    saved.push(snapshotProbeEvent(view))
+  }
+})
+console.log(probe.stageMask)`,
+    useEn: [
+      'Retain selected events after emit returns for a later diagnostic read.',
+      'Take an explicit object copy at a consumer boundary that allows allocation.'
+    ],
+    useZh: [
+      '需要在 emit 返回后保留选定事件，供稍后的诊断读取。',
+      '消费者出口允许分配对象，需要明确复制当前事件字段。'
+    ],
+    avoidEn: [
+      'Using snapshots for every collector ingest event defeats its allocation-free storage contract.',
+      'Assuming nested content or the referenced error becomes an independent deep copy.'
+    ],
+    avoidZh: [
+      '每次 collector 摄取事件都创建快照，会违反其不分配事件对象的存储契约。',
+      '认为嵌套 content 或引用的 error 已经变为完全独立的深复制。'
+    ]
+  }),
+  'rpc-core:probe:rpcProbeSampleKey': guide({
+    purposeEn:
+      'Returns the FNV-1a 32-bit key over UTF-8 senderId plus messageId. Both observed sides use the same identifiers to reach a deterministic sampling decision without shared state.',
+    purposeZh:
+      '对 UTF-8 的 senderId 与 messageId 拼接计算 FNV-1a 32 位键；两侧使用相同标识，在没有共享状态时也能得到一致的确定性采样决定。',
+    quickStart: `import { rpcProbeSampleKey } from '@migaia/rpc-core/probe'
+
+console.log(rpcProbeSampleKey('caller', 'request-1'))`,
+    useEn: [
+      'A Probe emitter needs the same sampling key at several observed stages of one message.',
+      'Independent caller and receiver consumers sample the same interaction identifiers.'
+    ],
+    useZh: [
+      'Probe emitter 需要在同一消息的多个观察阶段复用相同采样键。',
+      '独立的调用方与接收方需要按同一交互标识做一致采样。'
+    ],
+    avoidEn: [
+      'Treating a 32-bit non-cryptographic hash as authentication or a collision-free unique identifier.',
+      'Hashing method names or timestamps instead of the interaction identifiers used by both sides.'
+    ],
+    avoidZh: [
+      '把非密码学的 32 位 hash 当作认证依据或绝不碰撞的唯一标识。',
+      '改用方法名或时间戳取代两侧共同使用的交互标识计算采样键。'
+    ]
+  }),
+  'rpc-core:probe:probePlugin': guide({
+    purposeEn:
+      'Installs selected synchronous probes on the existing Endpoint before activation. Stage dispatch compiles at installation and rebuilds on effective stage changes; metadata emission reuses one view and runtime callback failures report PROBE_FAILED without changing request flow.',
+    purposeZh:
+      '在既有 Endpoint 激活前安装同步 Probe；阶段分发在安装时编译，有效阶段变更时重建，元数据事件复用同一个 view。运行时回调失败报告 PROBE_FAILED，不改变业务请求流程。',
+    quickStart: `import assert from 'node:assert/strict'
+import { connect, createEndpoint } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+import { defineProbe, probePlugin } from '@migaia/rpc-core/probe'
+
+/** 在同步回调中读标量，不保留复用 view。 */
+let events = 0
+const probe = defineProbe({ stages: ['message'], emit() { events += 1 } })
+const [left, right] = createMemoryTransportPair()
+const server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })
+server.provide('echo', (context) => context.success(context.data))
+const client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [probePlugin(probe), connect({ transport: left })] })
+try {
+  assert.equal(await client.send('server', 'echo', 'ready'), 'ready')
+  assert.ok(events > 0)
+} finally {
+  await client.dispose()
+  await server.dispose()
+}`,
+    useEn: [
+      'Observe metadata on an existing Endpoint using the same emitter as the Peer probe option.',
+      'Install probes before activation so describe and optional transport.observe share the original resource scope.'
+    ],
+    useZh: [
+      '通过与 Peer probe 选项相同的 emitter 观察既有 Endpoint 的元数据。',
+      '在激活前安装 Probe，让 describe 与可选 transport.observe 共享原有 resource scope。'
+    ],
+    avoidEn: [
+      'Installing an arbitrary object that was not registered by defineProbe; configuration rejects INVALID_CONFIG.',
+      'Using the plugin as transport creation, trace propagation or business middleware.'
+    ],
+    avoidZh: [
+      '安装未经 defineProbe 注册的任意对象；配置会以 INVALID_CONFIG 拒绝。',
+      '把该插件用于创建 transport、自动传播 trace 或改变业务中间件。'
+    ]
+  })
+} satisfies Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>>
+
+/** Both devtools entries publish the same canonical error identity. */
+const rpcDevtoolsErrorGuide = guide({
+  purposeEn:
+    'Provides the canonical rpc-devtools source and nine semantic error codes shared by codec, collector, portable service and hub. Configuration, lifecycle and conversion failures keep their registered identity and original cause.',
+  purposeZh:
+    '提供 codec、collector、portable service 与 hub 共用的 rpc-devtools source 和九个语义错误码；配置、生命周期与转换失败保留注册身份与原 cause。',
+  quickStart: `import { RPC_DEVTOOLS_SOURCE, RpcDevtoolsErrorCode } from '@migaia/rpc-devtools/contract'
+
+console.log(RPC_DEVTOOLS_SOURCE, RpcDevtoolsErrorCode)`,
+  useEn: [
+    'Branch on source and code when decoding a record, configuring the collector or converting a service result.',
+    'Keep the original parse, validation or runtime failure reachable through cause.'
+  ],
+  useZh: [
+    '解码录制数据、配置 collector 或转换 service 结果失败时，按 source 与 code 进行分支。',
+    '保留 cause，使原始解析、验证或运行时失败仍能追溯。'
+  ],
+  avoidEn: [
+    'Matching message text instead of the registered source and semantic code.',
+    'Treating a target lifecycle status as a thrown error code or replacing the original failure.'
+  ],
+  avoidZh: [
+    '匹配 message 文字，而不是已经注册的 source 与语义 code。',
+    '把 target 生命周期状态当作抛出的错误码，或替换原始失败。'
+  ]
+})
+
+/** Every runtime symbol is documented at each of the three devtools public entries. */
+const rpcDevtoolsGuides = {
+  'rpc-devtools:index:createRpcDevtools': guide({
+    purposeEn:
+      'Creates one RPC event collector per host, usable as a Probe. Defaults to message/peer; stages or setStages() enable physical observations.',
+    purposeZh:
+      '为每个宿主创建 RPC 事件 collector，可作为 Probe 接入。默认订阅 message/peer；物理阶段通过 stages 或 setStages() 显式启用。',
+    quickStart: `import { createRpcDevtools } from '@migaia/rpc-devtools'
+
+/** Attach default message/peer metadata observation to an existing host. */
+const devtools = createRpcDevtools({ maxEvents: 1_000 })
+/** Physical stages can be selected at construction without enabling content capture. */
+const diagnostic = createRpcDevtools({ stages: ['message', 'peer', 'frame', 'carrier'] })
+/** Runtime selection uses the same stage names and leaves capture disabled. */
+devtools.setStages(['message', 'peer', 'encoded', 'carrier'])
+/** Recording uses its own bounded ring until stop materializes an offline record. */
+const recording = devtools.record({ maxEvents: 100 })
+devtools.pause()
+console.log(devtools.describe().paused)
+devtools.resume()
+console.log(devtools.query({ stages: ['message'], limit: 100 }), devtools.stats())
+console.log(devtools.exportRecord(recording.stop()))
+diagnostic.close()
+devtools.close()`,
+    options: [
+      {
+        name: 'stages',
+        whenToUse:
+          'Select only observation layers needed by this collector. / 只选择当前 collector 需要观察的层。',
+        description:
+          'Defaults to message/peer. Opt into envelope/encoded/frame/protected/carrier through stages or setStages(); capture is separate. Resume restores the list saved at pause. / 默认 message/peer；通过 stages 或 setStages() 显式启用 envelope/encoded/frame/protected/carrier，capture 独立启用；resume 恢复 pause 时保存的列表。'
+      },
+      {
+        name: 'capture',
+        whenToUse:
+          'Enable payload inspection only when metadata is insufficient. / 仅在元数据不足时启用内容检查。',
+        description:
+          'Stages whose content may be retained by reference after redaction. / 显式捕获内容的阶段，脱敏后按引用保留。'
+      },
+      {
+        name: 'redact',
+        whenToUse:
+          'Remove private fields before captured content reaches storage. / 内容入库前删除隐私字段。',
+        description:
+          'Synchronous content redaction; failure reports and discards content. / 同步脱敏内容，失败时报告并丢弃内容。'
+      },
+      {
+        name: 'methods',
+        whenToUse:
+          'Observe a bounded set of message/envelope methods. / 只观察指定 message/envelope 方法。',
+        description:
+          'Compiled whitelist for method-bearing message/envelope events; methodless variations pass it and still obey sampling. Query/watch method filters select method-bearing rows separately. / 构造时编译携带 method 的 message/envelope 白名单；没有 method 的 variation 通过该过滤，仍受采样约束；query/watch 的方法筛选独立选择携带相应 method 的行。'
+      },
+      {
+        name: 'sample',
+        whenToUse:
+          'Reduce metadata volume with deterministic sampling. / 用确定性采样降低元数据量。',
+        description:
+          'Compiled sampling ratio, decided before ingestion. / 采集前使用构造时编译的采样比例。'
+      },
+      {
+        name: 'maxEvents',
+        whenToUse: 'Set the retained local history capacity. / 设置本地历史保留容量。',
+        description:
+          'Main ring capacity; defaults to 10,000 events. / 主环容量，默认 10,000 个事件。'
+      },
+      {
+        name: 'maxContentBytes',
+        whenToUse:
+          'Bound retained payloads whose byte length is known. / 限制已知字节长度的保留 payload。',
+        description:
+          'Known content byte budget; defaults to 8 MiB. Opaque objects with sizeBytes -1 charge zero. / 已知内容字节预算默认 8 MiB，sizeBytes 为 -1 的 opaque object 计为零。'
+      },
+      {
+        name: 'maxInterned',
+        whenToUse:
+          'Bound distinct diagnostic names in a long-lived collector. / 限制长期 collector 的不同诊断名称数。',
+        description:
+          'Read-time name table defaults to 65,536, with counted overflow id 0; ingestion stores raw string references. / 读取时的名称驻留上限默认 65,536，超限记为 id 0 并计数；摄取保存原始字符串引用。'
+      },
+      {
+        name: 'exposeContent',
+        whenToUse:
+          'Allow an authorized remote client to inspect captured payloads. / 允许已授权远端检查捕获内容。',
+        description:
+          'Explicitly allow content through the remote service; defaults false. / 明确允许远程 service 输出内容，默认 false。'
+      },
+      {
+        name: 'onError',
+        whenToUse:
+          'Connect collector failures to the application reporter. / 将采集失败交给应用 reporter。',
+        description:
+          'Report ingestion failures without throwing into business flow. / 报告采集失败，不向业务路径抛错。'
+      }
+    ],
+    useEn: [
+      'Inspect local pages, per-method latency histograms and independent bounded recordings without creating another transport.',
+      'Emit stores raw fields and string references; interning, carrier correlation and wire projection happen at read boundaries. Only measured method-bearing message settlements update independent statistics.',
+      'IRpcDevtoolsWireEvent.variation retains message/envelope control subtypes through portable service and recording. Outcomes filter query/watch, pause saves current stages, and terminal quantiles clamp to latencyMaxMs.',
+      'Mount devtools.service on a separate existing Peer without installing this collector as its probe; watch keeps the existing filtered queue of 64 batches with at most 256 events each.',
+      'Active watchers share 16,384 raw pending rows and one notification per synchronous burst; with no active watcher, nothing is scheduled. Raw overwrites happen before watch filtering and add raw row losses to dropped.',
+      'Read carrierSeq while an origin remains in main, record or watch retention. Learned links survive origin retirement while dependent rows remain; cold readers preserve observed generation cutoffs without retaining extra history.'
+    ],
+    useZh: [
+      '查看本地分页、按方法聚合的延迟直方图与独立有界录制，不创建新的 transport。',
+      'Emit 保存原始字段与字符串引用；驻留、carrier 关联及 wire 转换在读取边界执行。仅携带非负 duration 与 method 的 message 结算更新独立统计。',
+      'IRpcDevtoolsWireEvent.variation 保留 message/envelope control 的 subtype，portable service 与录制边界保留该字段。Outcomes 同时过滤 query/watch，pause 保存当前 stages，末桶分位数钳制到 latencyMaxMs。',
+      '把 devtools.service 挂到独立的已有 Peer，不把此 collector 安装为该 Peer 的 probe；watch 保留原有筛选后队列，最多 64 批、每批 256 个事件。',
+      '活跃 watcher 共用 16,384 行原始待通知窗口，每个同步 burst 最多一次通知；没有活跃 watcher 时零通知。原始覆盖发生在 watch 筛选前，按原始行损失计入 dropped。',
+      '在 origin 仍由主环、record 或 watch 保留时读取 carrierSeq；已知链接随仍保留的 dependent 行继续有效，冷读取保留实际观察到的 generation cutoff，不保留额外历史。'
+    ],
+    avoidEn: [
+      'Expecting detached copies of captured content, detail or errors: these retain references and later caller mutations can remain visible.',
+      'Capturing payloads without explicit capture/redact or exposing them without exposeContent.',
+      'Hosting business on an identified serving endpoint: localEndpointId exclusion hides that entire endpoint, so use a dedicated service Peer.',
+      'Reading frozen host.stageMask as the current selection; use readProbeStages and resume the actual paused selection.',
+      'Expecting a first read to reconstruct a carrier origin already evicted from every retention window; an unresolved link is omitted.'
+    ],
+    avoidZh: [
+      '期待 captured content、detail 或 error 是独立拷贝：它们保留引用，调用方后续修改仍可能可见。',
+      '未显式 capture/redact 就捕获 payload，或未设置 exposeContent 就暴露内容。',
+      '把业务放到已识别的 serving endpoint；localEndpointId 排除该 endpoint 的全部行，应使用独立 service Peer。',
+      '把冻结的 host.stageMask 当作当前选择；用 readProbeStages，并恢复实际暂停前的订阅。',
+      '期待首次读取恢复已经从所有保留窗口淘汰的 carrier origin；尚未解析的链接会省略。'
+    ]
+  }),
+  'rpc-devtools:log:createRpcLogProbe': guide({
+    purposeEn:
+      'Creates a first-party logging Probe for a structural debug/info/warn/error logger. Integer filtering precedes allocation, and qualifying events become independent fields objects before the reusable view changes; the logger owns all buffering, output and flush.',
+    purposeZh:
+      '为具有 debug/info/warn/error 的结构化 logger 创建日志 Probe。先用整数判断，再为合格事件提取独立字段对象，避免复用 view 被覆写；缓冲、输出与 flush 全部由 logger 拥有。',
+    quickStart: `import { createRpcLogProbe } from '@migaia/rpc-devtools/log'
+
+/** A recording sink demonstrates nonblocking admission without performing I/O. */
+const entries: object[] = []
+/** An existing logger owns this queue and its eventual output. */
+const logger = {
+  debug(_message: string, fields: object) { entries.push(fields) },
+  info(_message: string, fields: object) { entries.push(fields) },
+  warn(_message: string, fields: object) { entries.push(fields) },
+  error(_message: string, fields: object) { entries.push(fields) }
+}
+/** Pass this Probe to an existing host; successful calls under 200 ms stay silent. */
+const probe = createRpcLogProbe(logger, { slowMs: 200, levels: { rejected: 'off' } })
+console.log(probe.stageMask, entries.length)`,
+    options: [
+      {
+        name: 'slowMs',
+        whenToUse:
+          'Include settled calls that exceed the application latency budget. / 记录超过应用延迟预算的 settled 调用。',
+        description:
+          'Settled calls at or above this finite nonnegative threshold log warn. / settled 达到有限非负阈值后记 warn。'
+      },
+      {
+        name: 'sample',
+        whenToUse: 'Reduce admitted diagnostic events before logging. / 在日志决策前减少诊断事件。',
+        description:
+          'Compile sampling before fields objects are created. / 创建字段对象前使用编译后的采样。'
+      },
+      {
+        name: 'methods',
+        whenToUse: 'Restrict call logging to selected methods. / 限制日志涉及的方法。',
+        description: 'Compile a method whitelist at construction. / 构造时编译方法白名单。'
+      },
+      {
+        name: 'stages',
+        whenToUse:
+          'Select call observations, peer lifecycle, or both. / 选择调用观察、peer 生命周期或两者。',
+        description:
+          'Message/peer subscriptions; these are the default stages. / 订阅 message/peer，默认选择两者。'
+      },
+      {
+        name: 'capture',
+        whenToUse: 'Select explicit content stages before logging. / 在日志前明确选择内容阶段。',
+        description:
+          'Forward the original capture list to defineProbe; default content remains absent. / 把原 capture 列表交给 defineProbe，默认不输出内容。'
+      },
+      {
+        name: 'redact',
+        whenToUse:
+          'Remove sensitive fields in the canonical emitter before logging. / 在规范 emitter 中脱敏后再输出日志。',
+        description:
+          'Forward the original synchronous redactor without adding a parallel capture path. / 转发原同步 redactor，不添加平行捕获路径。'
+      },
+      {
+        name: 'content',
+        whenToUse:
+          'Include explicitly approved payload content in a diagnostic sink. / 将明确允许的内容输出给诊断 sink。',
+        description:
+          'Request capture for subscribed stages; emitter-owned capture/redaction supplies view.content. / 为订阅阶段请求捕获，view.content 来自 emitter 的捕获/脱敏路径。'
+      },
+      {
+        name: 'levels',
+        whenToUse:
+          'Adjust severity or suppress a known category with off. / 调整级别或用 off 抑制指定类别。',
+        description:
+          'Override failed/rejected/timeout/aborted/slow/lifecycle levels; off disables. / 覆盖对应事件日志级别，off 禁用。'
+      },
+      {
+        name: 'message',
+        whenToUse:
+          'Supply an application message while the view remains valid. / 在 view 有效期间生成应用 message。',
+        description:
+          'Build a custom message synchronously from the current view. / 同步读取当前 view 创建自定义 message。'
+      },
+      {
+        name: 'onError',
+        whenToUse:
+          'Observe logger failures without changing business settlement. / 观察 logger 失败，不改变业务结算。',
+        description:
+          'Report throws and rejected thenables without changing RPC flow. / 报告抛错及 rejected thenable，不改变 RPC 流程。'
+      }
+    ],
+    useEn: [
+      'Log failures and rejections by default, and opt in to slow settled calls with slowMs.',
+      'Use @migaia/logger level({ asyncOutput: true }), batch and file to enqueue asynchronously; put batch before file and await logger.flush/shutdown at application teardown.'
+    ],
+    useZh: [
+      '默认记录失败与拒绝，用 slowMs 显式记录慢 settled 调用。',
+      '使用 @migaia/logger level({ asyncOutput: true })、batch 与 file 异步入队；batch 放在 file 前，应用收尾等待 logger.flush/shutdown。'
+    ],
+    avoidEn: [
+      'Handing the reusable view to an asynchronous logger; later events overwrite its fields.',
+      'Using a synchronous file-writing logger on the RPC path, or adding another buffering/rotation/flush pipeline inside devtools.'
+    ],
+    avoidZh: [
+      '把复用 view 交给异步 logger；后续事件会覆写其字段。',
+      '在 RPC 路径使用同步文件 logger，或在 devtools 内另建缓冲、轮转与 flush 管线。'
+    ]
+  }),
+  'rpc-devtools:hub:createRpcDevtoolsHub': guide({
+    purposeEn:
+      'Aggregates supplied devtools service clients and offline recordings into aligned timelines and incrementally indexed interactions. It aligns live clocks using the smallest round trip of five samples, retains event references, and creates no transports or Peers.',
+    purposeZh:
+      '把调用方提供的 devtools service client 与离线录制聚合为对齐后的 timeline 和增量索引 interaction。实时连接从五次采样中选择最小 RTT 对齐时钟，保留事件引用，不创建 transport 或 Peer。',
+    quickStart: `import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'
+import { RpcDevtoolsRecordFormat, encodeRpcDevtoolsRecord } from '@migaia/rpc-devtools/contract'
+
+/** A codec-produced recording needs no live collector or transport. */
+const text = encodeRpcDevtoolsRecord({
+  header: RpcDevtoolsRecordFormat,
+  events: [{ seq: 1, at: 100, endpointId: 'parent', stage: 'message', direction: 'outbound', senderId: 'parent', messageId: 'm1', trace: 'T1' }]
+})
+/** The caller owns the hub lifetime; each target retains at most maxEvents. */
+const hub = createRpcDevtoolsHub({ maxEvents: 50_000 })
+try {
+  hub.importRecord('recording', text)
+  console.log(hub.timeline({ trace: 'T1' })[0]?.alignedAt) // 100
+  console.log(hub.interactions('T1')[0]?.oneSided) // true
+} finally {
+  await hub.close()
+}`,
+    options: [
+      {
+        name: 'maxEvents',
+        description:
+          'Maximum retained events per target; eviction removes the oldest events from correlation indexes.',
+        defaultValue: '50_000',
+        whenToUse: 'Set a smaller retention bound when several targets share the hub memory budget.'
+      },
+      {
+        name: 'realignMs',
+        description:
+          'Optional clock realignment period in milliseconds; stored timeline references receive updated alignedAt values.',
+        whenToUse:
+          'Enable periodic samples when a long-lived target needs its clock offset refreshed.'
+      },
+      {
+        name: 'onError',
+        description:
+          'Reports original client, watch and listener failures and collected watch-release errors without replacing their identity.',
+        whenToUse:
+          'Route hub runtime failures to the application reporter while preserving original errors.'
+      }
+    ],
+    examplesEn: [
+      {
+        id: 'existing-service-clients',
+        title: 'Aggregate existing service clients',
+        description:
+          'Supply bound clients whose request/stream method names match IRpcDevtoolsServiceApi. The hub catches up through query before watch and never creates the underlying connections.',
+        code: `import { createRpcDevtoolsHub, type IRpcDevtoolsTargetClient } from '@migaia/rpc-devtools/hub'
+
+/** Existing clients already map describe/query/stats/watch to their service. */
+export async function inspectHosts(parent: IRpcDevtoolsTargetClient, worker: IRpcDevtoolsTargetClient) {
+  /** Report runtime failures while the caller owns hub cleanup. */
+  const hub = createRpcDevtoolsHub({ realignMs: 30_000, onError: (error) => console.error(error) })
+  /** Unsubscribe before closing the hub. */
+  const unsubscribe = hub.on('status', (name, status) => console.log(name, status))
+  try {
+    await hub.addTarget('parent', parent)
+    await hub.addTarget('worker', worker)
+    console.log(hub.timeline({ trace: 'T1', limit: 100 }))
+    console.log(hub.interactions('T1'))
+    console.log(await hub.stats())
+  } finally {
+    unsubscribe()
+    await hub.close()
+  }
+}`
+      }
+    ],
+    examplesZh: [
+      {
+        id: 'existing-service-clients',
+        title: '聚合已有 service client',
+        description:
+          '交入 request/stream 方法名符合 IRpcDevtoolsServiceApi 的已绑定 client。Hub 先用 query 追上，再跟随 watch；底层连接始终由调用方管理。',
+        code: `import { createRpcDevtoolsHub, type IRpcDevtoolsTargetClient } from '@migaia/rpc-devtools/hub'
+
+/** 已有 client 把 describe/query/stats/watch 映射到各自 service。 */
+export async function inspectHosts(parent: IRpcDevtoolsTargetClient, worker: IRpcDevtoolsTargetClient) {
+  /** 报告运行时失败，hub 关闭由调用方负责。 */
+  const hub = createRpcDevtoolsHub({ realignMs: 30_000, onError: (error) => console.error(error) })
+  /** 关闭前解除状态监听。 */
+  const unsubscribe = hub.on('status', (name, status) => console.log(name, status))
+  try {
+    await hub.addTarget('parent', parent)
+    await hub.addTarget('worker', worker)
+    console.log(hub.timeline({ trace: 'T1', limit: 100 }))
+    console.log(hub.interactions('T1'))
+    console.log(await hub.stats())
+  } finally {
+    unsubscribe()
+    await hub.close()
+  }
+}`
+      }
+    ],
+    useEn: [
+      'Inspect explicit traces across already-created service clients, with uncertaintyMs retained alongside each aligned event.',
+      'Import codec-produced NDJSON as offline targets, query stored timeline references, or merge live target histograms bucket by bucket.'
+    ],
+    useZh: [
+      '通过已有 service client 检查跨宿主显式 trace，每个对齐事件保留 uncertaintyMs。',
+      '把 codec 生成的 NDJSON 导入 offline target，查询已存储 timeline 引用，或逐桶合并实时 target 的直方图。'
+    ],
+    avoidEn: [
+      'Expecting the hub to create transports, reconnect a broken watch, invent a missing observation side or propagate trace automatically.',
+      'Treating results as immutable snapshots: captured content/detail/error retain references, and realignment updates stored alignedAt values.'
+    ],
+    avoidZh: [
+      '期待 hub 创建 transport、重连中断的 watch、补造缺失侧的观察事件或自动传播 trace。',
+      '把结果当成不可变快照：content/detail/error 保留引用，重新对齐会更新已存储的 alignedAt。'
+    ]
+  }),
+  'rpc-devtools:hub:RpcDevtoolsTargetStatus': guide({
+    purposeEn:
+      'Defines the connecting, connected, disconnected, offline and removed target states shared by hub consumers. These values describe lifecycle events and never stand in for thrown error codes.',
+    purposeZh:
+      '定义 hub 消费者共用的 connecting、connected、disconnected、offline 与 removed 状态；这些值描述生命周期事件，不作为抛出的错误码。',
+    quickStart: `import { RpcDevtoolsTargetStatus } from '@migaia/rpc-devtools/hub'
+
+console.log(RpcDevtoolsTargetStatus.offline)`,
+    useEn: [
+      "Render or branch on states returned by hub.status or published through hub.on('status').",
+      'Distinguish imported offline records from live connected targets.'
+    ],
+    useZh: [
+      "显示 hub.status 返回或 hub.on('status') 发布的 target 状态，或据此进行分支。",
+      '区分导入的离线录制与实时连接中的 target。'
+    ],
+    avoidEn: [
+      'Throwing lifecycle status values as semantic error codes.',
+      'Inferring unseen events or successful reconnection from a disconnected state.'
+    ],
+    avoidZh: [
+      '把生命周期状态值作为语义错误码抛出。',
+      '根据 disconnected 状态推断未观察到的事件或已经重连成功。'
+    ]
+  }),
+  'rpc-devtools:contract:RpcDevtoolsRecordFormat': guide({
+    purposeEn:
+      'Owns the exact NDJSON header format migaia-rpc-devtools and version 1. Collector export and hub offline import reuse this object rather than maintaining separate recording format identifiers.',
+    purposeZh:
+      '统一维护 NDJSON header 的准确格式名 migaia-rpc-devtools 与版本 1；collector 导出及 hub 离线导入复用该对象，避免各自维护格式标识。',
+    quickStart: `import { RpcDevtoolsRecordFormat } from '@migaia/rpc-devtools/contract'
+
+console.log(RpcDevtoolsRecordFormat.format, RpcDevtoolsRecordFormat.version)`,
+    useEn: [
+      'Construct a version 1 recording header from its canonical package-owned value.',
+      'Identify the supported codec format before passing recording data to another consumer.'
+    ],
+    useZh: [
+      '使用包内唯一维护的规范值构造版本 1 的录制 header。',
+      '在向其它消费者交入录制数据之前，明确所支持的 codec 格式。'
+    ],
+    avoidEn: [
+      'Changing version or format to make incompatible input appear supported.',
+      'Adding private metadata requirements that the frozen minimal header does not define.'
+    ],
+    avoidZh: [
+      '修改版本或格式名，使不兼容的输入表面上看起来受到支持。',
+      '为冻结的最小 header 增加没有定义的私有元数据要求。'
+    ]
+  }),
+  'rpc-devtools:contract:encodeRpcDevtoolsRecord': guide({
+    purposeEn:
+      'Purely encodes a version 1 offline record as UTF-8 NDJSON text, one header followed by event lines. Native and already-serialized errors reuse the RPC codec; bytes use base64 markers without a collector or transport.',
+    purposeZh:
+      '把版本 1 离线 record 纯函数编码为 UTF-8 NDJSON 文本，第一行为 header，后续每行一个事件；原生与已序列化错误复用 RPC codec，字节使用 base64 标记，不创建 collector 或 transport。',
+    quickStart: `import { encodeRpcDevtoolsRecord, RpcDevtoolsRecordFormat } from '@migaia/rpc-devtools/contract'
+
+/** The caller owns storage of this pure codec result. */
+const text = encodeRpcDevtoolsRecord({ header: RpcDevtoolsRecordFormat, events: [] })
+console.log(text)`,
+    useEn: [
+      'Export already-collected events for the same offline sequence on another machine.',
+      'Keep source, code, name, message, stack and the cause chain when recording errors.',
+      'Preserve the optional IRpcDevtoolsWireEvent.variation subtype on message/envelope controls through record export and import.'
+    ],
+    useZh: [
+      '导出已经采集的事件，在另一台机器还原同一离线序列。',
+      '录制错误时保留 source、code、name、message、stack 与 cause 链。',
+      '录制导出与导入保留 message/envelope control 上可选的 IRpcDevtoolsWireEvent.variation subtype。'
+    ],
+    avoidEn: [
+      'Expecting the codec to collect events, write files or open a remote service.',
+      'Assuming a recording export redacts payloads that were already captured without redaction.'
+    ],
+    avoidZh: [
+      '期待 codec 采集事件、写入文件或打开远程 service。',
+      '认为录制导出会自动脱敏此前未经 redact 就已捕获的 payload。'
+    ]
+  }),
+  'rpc-devtools:contract:decodeRpcDevtoolsRecord': guide({
+    purposeEn:
+      'Purely decodes version 1 NDJSON into offline record events with restored bytes and native errors. It rejects invalid format, version, header or JSON with RECORD_FORMAT_INVALID and keeps the original failure on cause.',
+    purposeZh:
+      '把版本 1 NDJSON 纯函数解码为离线 record 事件，还原字节与原生错误；非法格式、版本、header 或 JSON 以 RECORD_FORMAT_INVALID 拒绝，原始失败保留在 cause。',
+    quickStart: `import { decodeRpcDevtoolsRecord, encodeRpcDevtoolsRecord, RpcDevtoolsRecordFormat } from '@migaia/rpc-devtools/contract'
+
+/** Offline event errors are restored without a live collector. */
+const record = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord({
+  header: RpcDevtoolsRecordFormat, events: []
+}))
+console.log(record.header.version)`,
+    useEn: [
+      'Import a recording for offline inspection while retaining its original event sequence.',
+      'Restore recorded errors without regenerating their original stack or cause-chain diagnostics.'
+    ],
+    useZh: [
+      '导入录制数据进行离线检查，并保持其原始事件序列。',
+      '还原录制错误时不重新生成原始 stack 或 cause 链诊断。'
+    ],
+    avoidEn: [
+      'Accepting a different format or version by silently rewriting its header.',
+      'Treating an offline native Error as a service wire error without explicit RPC serialization.'
+    ],
+    avoidZh: [
+      '通过静默改写 header，接纳其它格式或版本的数据。',
+      '没有显式 RPC 序列化，就把离线原生 Error 当作 service wire error。'
+    ]
+  }),
+  'rpc-devtools:index:RpcDevtoolsErrorCode': rpcDevtoolsErrorGuide,
+  'rpc-devtools:index:RPC_DEVTOOLS_SOURCE': rpcDevtoolsErrorGuide,
+  'rpc-devtools:contract:RpcDevtoolsErrorCode': rpcDevtoolsErrorGuide,
+  'rpc-devtools:contract:RPC_DEVTOOLS_SOURCE': rpcDevtoolsErrorGuide
+} satisfies Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>>
+
 export const rpcApiGuides = {
+  ...rpcProbeGuides,
+  ...rpcDevtoolsGuides,
   ...rpcBrowserPeerGuides,
   ...rpcAdapterGuides,
   ...rpcDxRoadmapGuides,

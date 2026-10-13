@@ -105,6 +105,7 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
       {
         self,
         provide: options.provide,
+        probe: options.probe,
         providerLimits: options.providerLimits,
         authentication: options.authentication,
         defaultTimeoutMs: options.defaultTimeoutMs,
@@ -124,6 +125,7 @@ export function createProcessSourcePeer<THandle extends IProcessHandle>(
       {
         self,
         provide: options.provide,
+        probe: options.probe,
         providerLimits: options.providerLimits,
         authentication: options.authentication,
         defaultTimeoutMs: options.defaultTimeoutMs,

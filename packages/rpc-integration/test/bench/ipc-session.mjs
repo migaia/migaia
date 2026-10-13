@@ -49,7 +49,7 @@ let snapshotSequence = 0
  * @param {{
  *   heapSnapshot?: 'start' | 'end'
  *   diagnostic?: 'start' | 'stop'
- *   mode?: 'cpu' | 'guard'
+ *   mode?: 'cpu' | 'guard' | 'sampling'
  * }} [options]
  *   Profile boundary, outside business exchanges.
  * @returns {Promise<object>} Actual peer isolate snapshot and any native heap file path.
@@ -184,6 +184,8 @@ async function serveRpc(source) {
   const { createProcessPeer } = await rpcApi()
   /** The public factory owns the directory, provider and exact accepted endpoint lifecycle. */
   const runtime = await createProcessPeer({
+    /** Existing bench preload supplies the installed identity; ordinary peers leave it absent. */
+    probe: globalThis.__PROBE_BENCH_PROBE,
     self: { name: 'peer', instanceId: 'peer' },
     provide: echoProvide,
     providerLimits: nativeProviderLimits,
@@ -352,6 +354,8 @@ export async function createIpcSession({
           /** Owned Worker execution retains the original supervision lease and close owner. */
           const { createUnitBudget } = await import('@migaia/supervision')
           runtime = await api.createThreadPeer({
+            /** The genuine handle follows public managed forwarding instead of a Core loader edit. */
+            probe: globalThis.__PROBE_BENCH_PROBE,
             self: { name: 'parent', instanceId: 'parent' },
             providerLimits: nativeProviderLimits,
             report,
@@ -465,6 +469,15 @@ export async function createIpcSession({
             process.env[IpcBenchObservation.forcePeerGcEnvironment] === '1'
               ? ['--expose-gc']
               : []),
+            // Node's stdio peer rebuilds argv, so native CPU flags must be forwarded explicitly.
+            ...(!deno && !process.versions.bun
+              ? process.execArgv.filter(
+                  (argument) =>
+                    argument === IpcBenchDiagnostic.cpuFlag ||
+                    argument.startsWith(IpcBenchDiagnostic.cpuDirectoryPrefix) ||
+                    argument.startsWith(IpcBenchDiagnostic.cpuIntervalPrefix)
+                )
+              : []),
             entry,
             '--child',
             side,
@@ -524,6 +537,8 @@ export async function createIpcSession({
     } else throw new Error(IpcBenchErrorText.carrier(carrier))
     if (raw && side === 'rpc') {
       runtime = await api.createProcessPeer({
+        /** Existing bench preload supplies the installed handle through the public factory. */
+        probe: globalThis.__PROBE_BENCH_PROBE,
         self: { name: 'parent', instanceId: 'parent' },
         providerLimits: nativeProviderLimits,
         connect: (context) =>
@@ -880,6 +895,8 @@ async function childMain(side, carrier, address) {
       )
     else
       await api.createThreadPeer({
+        /** This peer isolate receives its own genuine preloaded probe, matching the parent arm. */
+        probe: globalThis.__PROBE_BENCH_PROBE,
         provide:
           process.versions.bun || deno
             ? { bench: { ...echoProvide.bench, snapshot } }

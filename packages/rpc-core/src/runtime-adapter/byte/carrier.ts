@@ -12,6 +12,12 @@ import {
 } from '@migaia/rpc-contract/framing/stream'
 import { RpcCoreErrorCode } from '../../core/index.js'
 import { tagRpcError } from '../../core/errors.js'
+import { createRpcTransportError } from '../../core/errors.js'
+import { RpcAdapterErrorText } from '../../core/adapters/error-text.js'
+import { RpcCarrierDetailKey } from '../../core/adapters/probe-detail.js'
+import { carrierSizeBytes } from '../../core/adapters/probe-content.js'
+import { RpcProbeDirection } from '../../core/probe/constants.js'
+import type { IRpcCarrierProbe } from '../../core/probe/types.js'
 import type { IRpcTransport } from '../../core/index.js'
 import {
   RpcTransportEncoding,
@@ -122,8 +128,8 @@ export function bindRuntimeByteWire(
   const pendingListeners = deferred
     ? new Set<(message: { data: unknown; peerId: string }) => void>()
     : undefined
-  /** Frames received after activation wait for the first endpoint subscriber. */
-  const earlyBusiness: string[] = []
+  /** Existing startup FIFO uses text/frame pairs, retaining the original physical span without rows. */
+  const earlyBusiness: (string | Uint8Array)[] = []
   /** The queue's byte total is released with its frames on delivery or close. */
   let earlyBusinessBytes = 0
   /** Core observes the first physical terminal reason. */
@@ -137,6 +143,19 @@ export function bindRuntimeByteWire(
   /** Closed is monotonic and its reason is replayed to late core subscribers. */
   /** Physical retirement is monotonic even when close and abort arrive together. */
   let closed = false
+  /** The byte carrier owns one observation installation and its raw writer subscription. */
+  let probe: IRpcCarrierProbe | undefined
+  /** Each installation owns its disposer even when the same probe object is reused. */
+  let probeGeneration = 0
+  /**
+   * The canonical raw writer reports actual drain while this carrier retains installation
+   * ownership.
+   */
+  let removeWrite: (() => void) | undefined
+  /** Borrowed direction-local details avoid allocating an object for each physical observation. */
+  const outboundDetail = { [RpcCarrierDetailKey.frameBytes]: 0, [RpcCarrierDetailKey.drainMs]: -1 }
+  /** Receive facts are independent from an outstanding outbound native drain. */
+  const inboundDetail = { [RpcCarrierDetailKey.frameBytes]: 0, [RpcCarrierDetailKey.drainMs]: 0 }
   /** Late subscribers receive the same first terminal object rather than a reconstructed error. */
   let terminalError: unknown
   /** Closing shares a single physical teardown Promise. */
@@ -158,10 +177,37 @@ export function bindRuntimeByteWire(
     }
   }
 
+  /** Known frame bytes and native drain facts enter the same carrier callback without re-encoding. */
+  const observeFrame = (direction: number, frame: Uint8Array, drainMs: number): void => {
+    if (probe === undefined || closed) return
+    /** A consumer must explicitly snapshot these borrowed details before retaining their values. */
+    const detail = direction === RpcProbeDirection.outbound ? outboundDetail : inboundDetail
+    detail[RpcCarrierDetailKey.frameBytes] = frame.byteLength
+    detail[RpcCarrierDetailKey.drainMs] = drainMs
+    try {
+      probe.emit(
+        direction,
+        frame.byteLength,
+        options.platform,
+        detail,
+        probe.capturing ? frame : undefined
+      )
+    } catch (cause) {
+      report(createRpcTransportError(RpcAdapterErrorText.probeFailed, cause))
+    }
+  }
+  /** Native settlement updates the borrowed detail without a second asynchronous carrier event. */
+  const observeWrite = (_frame: Uint8Array, drainMs: number): void => {
+    if (probe !== undefined && !closed) outboundDetail[RpcCarrierDetailKey.drainMs] = drainMs
+  }
+
   /** Notify the single transport boundary and reject pending connection work. */
   const terminate = (reason?: unknown): Promise<void> => {
     if (closing) return closing
     closed = true
+    probe = undefined
+    removeWrite?.()
+    removeWrite = undefined
     drainedFrame = undefined
     terminalError = reason ?? createRuntimeDiagnosticError(diagnostics.closed)
     decoder.close()
@@ -191,7 +237,10 @@ export function bindRuntimeByteWire(
   }
 
   /** Deliver one frame to current subscribers while isolating callback failures. */
-  const deliverBusiness = (text: string): void => {
+  const deliverBusiness = (text: string, frame: Uint8Array): void => {
+    /** This transport receive boundary keeps its carrier sequence adjacent to the Core callback. */
+    if (probe !== undefined) observeFrame(RpcProbeDirection.inbound, frame, 0)
+    if (closed) return
     for (const listener of listeners) {
       try {
         listener({ data: text, peerId })
@@ -202,18 +251,18 @@ export function bindRuntimeByteWire(
   }
 
   /** Retain a bounded early frame; overflow is a reported connection failure. */
-  const queueBusiness = (text: string, bytes: number): void => {
+  const queueBusiness = (text: string, frame: Uint8Array): void => {
     if (
-      earlyBusiness.length === MAX_EARLY_BUSINESS_FRAMES ||
-      earlyBusinessBytes + bytes > MAX_EARLY_BUSINESS_BYTES
+      earlyBusiness.length === MAX_EARLY_BUSINESS_FRAMES * 2 ||
+      earlyBusinessBytes + frame.byteLength > MAX_EARLY_BUSINESS_BYTES
     ) {
       const error = createRuntimeDiagnosticError(diagnostics.closed)
       report(error)
       void terminate(error)
       return
     }
-    earlyBusiness.push(text)
-    earlyBusinessBytes += bytes
+    earlyBusiness.push(text, frame)
+    earlyBusinessBytes += frame.byteLength
   }
 
   /** Release queued frames only after both handshake activation and subscription. */
@@ -222,9 +271,9 @@ export function bindRuntimeByteWire(
     /** Clear before callbacks so reentrant subscriptions cannot replay frames. */
     const queued = earlyBusiness.splice(0)
     earlyBusinessBytes = 0
-    for (const text of queued) {
+    for (let index = 0; index < queued.length; index += 2) {
       if (closed) break
-      deliverBusiness(text)
+      deliverBusiness(queued[index] as string, queued[index + 1] as Uint8Array)
     }
   }
 
@@ -233,13 +282,17 @@ export function bindRuntimeByteWire(
     if (closed) return
     /** Role getter exceptions remain outside a catch, following the original decoder boundary. */
     const received = receiver.accept(frame)
-    if (received === undefined) return
+    if (received === undefined) {
+      if (probe !== undefined) observeFrame(RpcProbeDirection.inbound, frame, 0)
+      return
+    }
     if (typeof received !== 'string') {
+      if (probe !== undefined) observeFrame(RpcProbeDirection.inbound, frame, 0)
       void terminate(received)
       return
     }
-    if (!receiver.ready || listeners.size === 0) queueBusiness(received, frame.byteLength)
-    else deliverBusiness(received)
+    if (!receiver.ready || listeners.size === 0) queueBusiness(received, frame)
+    else deliverBusiness(received, frame)
   }
   /** A bootstrap reader can hand its existing decoder to this wire. */
   const frameSource = frameSources.get(channel)
@@ -301,6 +354,8 @@ export function bindRuntimeByteWire(
       textEncoder,
       available
     )
+    /** Emit before returning, while Core's original synchronous send context remains borrowed. */
+    if (probe !== undefined) observeFrame(RpcProbeDirection.outbound, bytes, -1)
     /** Actual write settlement is the sole release point, including late settlement after close. */
     const releaseFrame = (): void => {
       if (
@@ -355,6 +410,21 @@ export function bindRuntimeByteWire(
     topology: RpcTransportTopology.exclusive,
     ownership: RpcTransportOwnership.owned,
     encodedType: RpcTransportEncoding.string,
+    observe(next) {
+      /** Generation fences old disposers and pending native backpressure observations. */
+      const generation = ++probeGeneration
+      removeWrite?.()
+      if (!closed) {
+        probe = next
+        removeWrite = channel.onWrite?.(observeWrite)
+      }
+      return () => {
+        if (generation !== probeGeneration) return
+        probe = undefined
+        removeWrite?.()
+        removeWrite = undefined
+      }
+    },
     get peerId() {
       return peerId
     },
@@ -450,14 +520,38 @@ export function bindRuntimeMessageTransport(
   const errorListeners = new Set<(error: unknown) => void>()
   /** Physical retirement is monotonic even when close and abort arrive together. */
   let closed = false
+  /** Whole-message observation belongs to this physical transport, below logical delivery. */
+  let probe: IRpcCarrierProbe | undefined
+  /** Each installation owns its disposer even when the same probe object is reused. */
+  let probeGeneration = 0
   /** Late subscribers receive the same first terminal object rather than a reconstructed error. */
   let terminalError: unknown
   /** Every close caller shares the original physical teardown settlement. */
   let closing: Promise<void> | undefined
+  /** Opaque messages retain references and unknown size; the observer never serializes them. */
+  const observeMessage = (direction: number, value: unknown): void => {
+    if (probe === undefined || closed) return
+    try {
+      probe.emit(
+        direction,
+        carrierSizeBytes(value),
+        options.platform,
+        undefined,
+        probe.capturing ? value : undefined
+      )
+    } catch (cause) {
+      try {
+        options.report(createRpcTransportError(RpcAdapterErrorText.probeFailed, cause))
+      } catch (failure) {
+        hostRethrowReporter(failure, IpcReporterContext)
+      }
+    }
+  }
   /** Close releases both listener registrations before the underlying port. */
   const close = (reason?: unknown): Promise<void> => {
     if (closing) return closing
     closed = true
+    probe = undefined
     terminalError = reason ?? createRuntimeDiagnosticError(diagnostics.closed)
     for (const listener of errorListeners) listener(terminalError)
     closing = (async () => {
@@ -471,6 +565,7 @@ export function bindRuntimeMessageTransport(
   /** This adapter owns exactly one physical whole-message subscription. */
   const onMessage = (data: unknown): void => {
     if (closed) return
+    if (probe !== undefined) observeMessage(RpcProbeDirection.inbound, data)
     for (const listener of listeners) {
       try {
         listener({ data, peerId: options.peerId })
@@ -507,8 +602,17 @@ export function bindRuntimeMessageTransport(
     ownership: RpcTransportOwnership.owned,
     encodedType: RpcTransportEncoding.any,
     peerId: options.peerId,
+    observe(next) {
+      /** Reinstalling the same handle cannot give an old release ownership of this installation. */
+      const generation = ++probeGeneration
+      if (!closed) probe = next
+      return () => {
+        if (generation === probeGeneration) probe = undefined
+      }
+    },
     send(value) {
       if (closed) return Promise.reject(terminalError)
+      if (probe !== undefined) observeMessage(RpcProbeDirection.outbound, value)
       return channel.send(value)
     },
     subscribe(listener) {

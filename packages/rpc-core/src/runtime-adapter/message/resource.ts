@@ -400,6 +400,10 @@ class AdapterMessageResource implements IAdapterMessageResource {
     const transport = this.#eventTarget
       ? createBrowserMessagePortTransport(
           {
+            observe:
+              (this.#port as IAdapterEventTargetMessagePort).observe === undefined
+                ? undefined
+                : (probe) => (this.#port as IAdapterEventTargetMessagePort).observe!(probe),
             postMessage: (message, transfer) => port.postMessage(message, transfer),
             addEventListener: (event, listener) =>
               (port as IAdapterEventTargetMessagePort).addEventListener(event, listener),

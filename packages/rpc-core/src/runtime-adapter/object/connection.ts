@@ -118,6 +118,7 @@ export function holdAdapterObjectChannel(io: IRuntimeObjectIO): IRuntimeObjectCo
         ownership: RpcTransportOwnership.owned,
         encodedType: RpcTransportEncoding.string,
         peerId: options.peerId,
+        observe: io.observe === undefined ? undefined : (probe) => io.observe!(probe),
         send: (value, sendOptions) => io.writeText(value, sendOptions),
         subscribe: (listener) => io.subscribeText(listener),
         onTransportError: (listener) => io.onTransportError(listener),

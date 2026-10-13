@@ -1,3 +1,4 @@
+import { BrowserCarrierObservation, BrowserRpcCarrier } from '../probe-detail.js'
 import type { IRpcTransport } from '@migaia/rpc-core/transport-kit'
 import {
   RpcPlatform,
@@ -31,6 +32,10 @@ export function createWebTransportDatagramTransport(
   const listenerErrors = new Set<(error: unknown) => void>()
   const transportErrors = new Set<(error: unknown) => void>()
   const secondaryFailures = createListenerFailureState()
+  /** Observation failures use listener reporting so Endpoint never rejects pending business calls. */
+  const observation = new BrowserCarrierObservation(BrowserRpcCarrier.webTransport, (error) =>
+    reportListenerFailure(error, listenerErrors, secondaryFailures)
+  )
   let reading = false
   let readPromise: Promise<void> | undefined
   let activeReader: ReadableStreamDefaultReader<Uint8Array> | undefined
@@ -46,6 +51,7 @@ export function createWebTransportDatagramTransport(
     terminalOccurred = true
     terminalError = error
     closed = true
+    observation.close()
     listeners.clear(() => undefined)
     reportListenerFailure(error, transportErrors, secondaryFailures)
   }
@@ -71,6 +77,9 @@ export function createWebTransportDatagramTransport(
           )
           break
         }
+        /** Datagram content is observed by reference before existing business dispatch. */
+        const probe = observation.probe
+        if (probe !== undefined) observation.emit(probe, 1, result.value)
         listeners.dispatch({ data: result.value }, (listener, message) =>
           observeListener(
             () => listener(message),
@@ -107,7 +116,14 @@ export function createWebTransportDatagramTransport(
           new TypeError(BrowserRpcErrorText.webTransportRequiresUint8ArrayEncodedMessages),
           { source: RPC_CORE_ERROR_SOURCE, code: RpcCoreErrorCode.invalidConfig }
         )
+      /** Return the exact native write Promise; observation adds no asynchronous boundary. */
+      const probe = observation.probe
+      if (probe !== undefined) observation.emit(probe, 0, message)
       return writer.write(message)
+    },
+    /** Replace the single endpoint probe; disposal is generation-safe and idempotent. */
+    observe(probe) {
+      return observation.observe(probe)
     },
     subscribe(listener) {
       if (closed) throw createBrowserTransportError(BrowserRpcErrorText.webTransportIsClosed)
@@ -129,6 +145,7 @@ export function createWebTransportDatagramTransport(
     close() {
       if (closePromise) return closePromise
       closed = true
+      observation.close()
       terminalReported = true
       listeners.clear(() => undefined)
       const readOwner = readPromise

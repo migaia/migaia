@@ -208,6 +208,25 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
     ]
   },
   'rpc-core': {
+    /** Revision 3 adds current-stage control and canonical reporter exports to the Probe entry. */
+    './probe': [
+      'RpcProbeStage',
+      'RpcProbeStageName',
+      'RpcProbeDirection',
+      'RpcProbeDirectionName',
+      'RpcProbeKind',
+      'RpcProbeKindName',
+      'RpcProbeOutcome',
+      'RpcProbeOutcomeName',
+      'defineProbe',
+      'snapshotProbeEvent',
+      'rpcProbeSampleKey',
+      'probePlugin',
+      'readProbeStages',
+      'subscribeProbeStages',
+      'hostRethrowReporter',
+      'IpcReporterContext'
+    ],
     /** P5 SDK exposes only the two task-level factories to ordinary adapter authors. */
     './adapter': ['defineByteAdapter', 'defineMessageAdapter'],
     /** Only real native owners retain the moved low-level runtime operations. */
@@ -220,6 +239,7 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'JsonRpcProfile',
       'assembleAdapterPlugin',
       'captureAdapterTask',
+      'carrierSizeBytes',
       'createAdapterBindingDrain',
       'createAdapterConfigurationError',
       'createAdapterConfigurationTypeError',
@@ -367,7 +387,7 @@ describe('A1 merged public exports', () => {
     for (const [owner, entries] of Object.entries(ordinaryEntries))
       currentEntries.push(...Object.keys(entries).map((key) => `${owner}:${key}`))
     currentEntries.push('rpc-contract:./schema/wire-error')
-    expect(currentEntries).toHaveLength(66)
+    expect(currentEntries).toHaveLength(67)
     expect(
       Object.entries(manifests)
         .flatMap(([owner, entry]) => Object.keys(entry.exports).map((key) => `${owner}:${key}`))

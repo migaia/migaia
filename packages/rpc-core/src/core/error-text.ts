@@ -1,5 +1,27 @@
 /** Stable text retained by the core endpoint graph and its shared contracts. */
 export const RpcCoreErrorText = {
+  /** Contract-only installation refuses activation until the probe-core runtime is available. */
+  probeRuntimeNotInstalled: 'probe runtime not installed',
+  /** The probe compiler requires one definition object before reading its configuration. */
+  probeDefinitionInvalid: 'Probe definition must be an object',
+  /** Probe stage compilation rejects empty initial subscriptions and unknown stage names. */
+  probeStagesInvalid: 'Probe stages must contain known stage names',
+  /** Initial captured content must belong to an explicitly subscribed observation stage. */
+  probeCaptureInvalid: 'Probe capture must be a subset of stages',
+  /** The synchronous observation sink is required before a probe can be compiled. */
+  probeEmitInvalid: 'Probe emit must be a function',
+  /** An optional redactor must be callable before content can cross the observation boundary. */
+  probeRedactInvalid: 'Probe redact must be a function',
+  /** An optional descriptor receiver must be callable before cold endpoint metadata is published. */
+  probeDescribeInvalid: 'Probe describe must be a function',
+  /** An optional error reporter must be callable before emitter failures can be reported. */
+  probeOnErrorInvalid: 'Probe onError must be a function',
+  /** Deterministic sampling requires a finite fraction greater than zero and at most one. */
+  probeSampleInvalid: 'Probe sample must be in (0, 1]',
+  /** Method filtering accepts only a list of method names at definition time. */
+  probeMethodsInvalid: 'Probe methods must be an array of strings',
+  /** D7 requires an extensible unregistered host with no own probe fields before any attachment. */
+  probeHostInvalid: 'Probe host must be an extensible unregistered object without own probe fields',
   /** BCPS1 retains one stable collision diagnostic for every separately guarded RPC owner. */
   duplicateModuleInstance: 'Duplicate @migaia/rpc module instance detected',
   /** Original process transfer rejection occurs before getters or first caller admission. */

@@ -22,6 +22,7 @@ const PACKAGES = [
   'rpc-threads',
   'rpc-bridge-jsonrpc',
   'rpc-browser',
+  'rpc-devtools',
   'logger',
   'storage-web'
 ]

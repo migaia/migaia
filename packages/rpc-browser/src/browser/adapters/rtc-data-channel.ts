@@ -1,3 +1,4 @@
+import { BrowserCarrierObservation, BrowserRpcCarrier } from '../probe-detail.js'
 import type { IRpcTransport } from '@migaia/rpc-core/transport-kit'
 import {
   RpcPlatform,
@@ -58,7 +59,12 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTra
   const listenerErrors = new Set<(error: unknown) => void>()
   const transportErrors = new Set<(error: unknown) => void>()
   const secondaryFailures = createListenerFailureState()
+  /** Observation failures use listener reporting so Endpoint never rejects pending business calls. */
+  const observation = new BrowserCarrierObservation(BrowserRpcCarrier.rtcDataChannel, (error) =>
+    reportListenerFailure(error, listenerErrors, secondaryFailures)
+  )
   let closed = channel.readyState === 'closed'
+  if (closed) observation.close()
   let terminalReported = closed
   let terminalError: unknown = closed
     ? attachErrorIdentity(new Error(BrowserRpcErrorText.rtcClosed), {
@@ -100,6 +106,9 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTra
       return undefined
     })
     if (readFailed) return
+    /** Capture physical channel data before any business decoding. */
+    const probe = observation.probe
+    if (probe !== undefined) observation.emit(probe, 1, data)
     listeners.dispatch({ data }, (listener, message) => {
       observeListener(
         () => listener(message),
@@ -112,6 +121,7 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTra
     if (terminalReported) return
     terminalReported = true
     closed = true
+    observation.close()
     listeners.clear(() => undefined)
     const cleanupErrors = collectListenerCleanupFailures([
       () => channel.removeEventListener('closing', onTerminal),
@@ -166,7 +176,16 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTra
     encodedType: 'string',
     send(message) {
       if (closed) throw createBrowserTransportError(BrowserRpcErrorText.rtcDataChannelIsClosed)
-      channel.send(typeof message === 'string' ? message : JSON.stringify(message))
+      /** SC9b: the existing physical wire boundary serializes only non-string messages. */
+      const data = typeof message === 'string' ? message : JSON.stringify(message)
+      /** Observation sees the same physical string passed to the native channel. */
+      const probe = observation.probe
+      if (probe !== undefined) observation.emit(probe, 0, data)
+      channel.send(data)
+    },
+    /** Replace the single endpoint probe; disposal is generation-safe and idempotent. */
+    observe(probe) {
+      return observation.observe(probe)
     },
     subscribe(listener) {
       if (closed) throw createBrowserTransportError(BrowserRpcErrorText.rtcDataChannelIsClosed)

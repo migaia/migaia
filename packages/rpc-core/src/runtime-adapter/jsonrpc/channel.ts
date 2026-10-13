@@ -47,6 +47,7 @@ export async function createAdapterJsonRpcChannel<TOptions extends IAdapterJsonR
   let received: unknown
   /** Raw operations address held bytes and logical views; none accepts a transport qualification. */
   const io: IRuntimeObjectIO = Object.freeze({
+    observe: (probe) => wire.observe!(probe),
     async exchange(hello) {
       received = await wire.exchangeHello(hello)
       return readJsonRpcReply(received)

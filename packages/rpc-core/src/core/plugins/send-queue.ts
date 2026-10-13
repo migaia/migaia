@@ -335,6 +335,8 @@ export function createIpcSendQueueTransport(
       return closed || transport.closed
     },
     ipcSendGate: gate,
+    /** Retain the inner capability and receiver; absence must remain observable as absence. */
+    observe: transport.observe === undefined ? undefined : (probe) => transport.observe!(probe),
     send(message, options) {
       return transport.send(message, options)
     },

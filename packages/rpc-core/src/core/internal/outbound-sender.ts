@@ -1,3 +1,4 @@
+import { carrierSizeBytes } from '../adapters/probe-content.js'
 import {
   createRpcAuthenticationError,
   createRpcError,
@@ -68,6 +69,8 @@ import { runtimeOperationCapabilities, wrapRuntimeCarrier } from '@migaia/rpc-co
 import { RpcRuntimeKind } from '@migaia/rpc-contract/framing/v1'
 import type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract'
 import { bindRpcFrameIngress } from '@migaia/rpc-contract/framing'
+import { RpcProbeDirection, RpcProbeOutcome, RpcProbeStage } from '../probe/constants.js'
+import { envelopeProbeKind, runtimeProbeKind, type IProbeEmitter } from './probe-emitter.js'
 
 /** Fixed native selector/wrapper JSON geometry excludes only the protected metadata slot. */
 const nativeBinaryJsonOverhead =
@@ -150,6 +153,8 @@ type IPhysicalWriteRecord = {
   admissionFailure: unknown
   /** Runtime preparation supplies its existing start admission without a per-frame callback. */
   runtimeStart?: IRuntimeWriteRecord
+  /** Only the first physical chunk carries its existing logical envelope's sent observation. */
+  message?: IRpcEnvelope
 }
 
 /** One runtime frame retains captured codec/auth/backing facts through its actual write. */
@@ -187,6 +192,8 @@ export class RpcOutboundSender {
   readonly id: string
   readonly components: IRpcSelectedComponents
   readonly authentication: IRpcAuthenticationCapability | undefined
+  /** Cold installation supplies the one endpoint emitter; stage checks never query plugin ports. */
+  readonly #probe: IProbeEmitter | undefined
   /** Captures the validated transport payload discriminant for every outbound frame. */
   readonly #transportEncodedType: IRpcTransport['encodedType']
   /** Captures the kernel lifecycle once so every asynchronous send phase shares one generation. */
@@ -240,7 +247,8 @@ export class RpcOutboundSender {
     batch = false,
     physicalLimit = RpcBatchPhysical.maxBytes,
     receiverId = id,
-    cloneTransfer = false
+    cloneTransfer = false,
+    probe?: IProbeEmitter
   ) {
     this.transport = transport
     this.id = id
@@ -248,6 +256,7 @@ export class RpcOutboundSender {
     this.#objectPort = selectedJsonObjectPort(components)
     this.#bridge = jsonObjectCandidate(components) !== undefined
     this.authentication = authentication
+    this.#probe = probe
     this.#transportEncodedType = transport.encodedType
     this.#gate = gate
     this.#reportConfiguration = reportConfiguration
@@ -425,6 +434,17 @@ export class RpcOutboundSender {
 
     this.#lifecycle?.assertActive(generation)
     admission?.assertCanSend()
+    /** Runtime normalization already produced the selected semantic envelope before preparation. */
+    const p = this.#probe
+    if (p !== undefined && (p.mask & (1 << RpcProbeStage.envelope)) !== 0)
+      p.envelope(
+        RpcProbeDirection.outbound,
+        envelope.id,
+        envelope.task.method,
+        -1,
+        (p.captureMask & (1 << RpcProbeStage.envelope)) !== 0 ? envelope : undefined,
+        envelope.route.senderId
+      )
     /** Codec descriptors encode data; this independent normalized union is never a legacy wrapper. */
     let encoded: unknown
     /** Native metadata retains these exact original buffers through protection and physical commit. */
@@ -529,6 +549,17 @@ export class RpcOutboundSender {
     } catch (cause) {
       throw createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
+    if (p !== undefined && (p.mask & (1 << RpcProbeStage.encoded)) !== 0)
+      p.encoded(
+        RpcProbeDirection.outbound,
+        envelope.id,
+        carrierSizeBytes(encoded),
+        (p.captureMask & (1 << RpcProbeStage.encoded)) !== 0
+          ? this.#probeContent(encoded, transfer)
+          : undefined,
+        envelope.task.method,
+        envelope.route.senderId
+      )
     /** Known string encodings reuse their preparation bound without a second character scan. */
     if (!(encodedByteUpperBound !== undefined && encodedByteUpperBound <= limit))
       assertRpcPhysicalFrameSize(encoded, limit)
@@ -544,8 +575,32 @@ export class RpcOutboundSender {
     bindAuthenticationOutboundFrame(context, undefined, this.#receiverId, undefined, envelope.route)
     /** Complete protection and selector construction precede the sole physical write. */
     const protectedValue = this.authentication
-      ? await this.#prepareTransportValue(frames[0], undefined, false, generation, context)
+      ? await this.#prepareTransportValue(
+          frames[0],
+          undefined,
+          false,
+          generation,
+          context,
+          envelope.id,
+          -1,
+          -1,
+          envelope.task.method,
+          envelope.route.senderId
+        )
       : this.#unprotectedTransportValue(frames[0], generation)
+    if (!this.authentication && p !== undefined && (p.mask & (1 << RpcProbeStage.frame)) !== 0)
+      p.frame(
+        RpcProbeDirection.outbound,
+        envelope.id,
+        carrierSizeBytes(frames[0]),
+        -1,
+        -1,
+        (p.captureMask & (1 << RpcProbeStage.frame)) !== 0
+          ? this.#probeContent(frames[0], transfer)
+          : undefined,
+        envelope.task.method,
+        envelope.route.senderId
+      )
     /** Selector overhead is charged after auth, without splitting or re-signing this frame. */
     if (
       native &&
@@ -799,11 +854,14 @@ export class RpcOutboundSender {
               [RpcBatchPhysical.members]: entries.map((entry) => entry.message)
             }
       /** Canonical codec owns portability; byte carriers reuse the resulting encoded bytes. */
-      let value = (this.#objectPort?.codec ?? this.components.codec).encode(
+      const encoded = (this.#objectPort?.codec ?? this.components.codec).encode(
         physical as IRpcEnvelope
       )
+      /** The physical preparation retains its actual encoded value for opted-in observation. */
+      let value = encoded
       if (!this.#objectPort) this.assertProtocolEncodedType(value)
-      if (
+      /** Fast singletons alone omit the actual framer call; a grouped batch retains it. */
+      const framed =
         !this.#fast ||
         this.authentication ||
         entries.length !== 1 ||
@@ -812,7 +870,7 @@ export class RpcOutboundSender {
             entries[0]!.message.data.route.dispatchOnly !== true) ||
           entries[0]!.message.kind === RpcEnvelopeKind.response
         )
-      ) {
+      if (framed) {
         /** Qualified whole-frame framers cannot chunk; retain their existing full-path invocation. */
         const frames = (this.#objectPort?.framer ?? this.components.framer).frame(value, {
           source: this.id,
@@ -838,6 +896,58 @@ export class RpcOutboundSender {
         if (inspection.bytes > this.#physicalLimit) return this.#splitBatch(entries, inspection)
         if (typeof value === 'string') bound = inspection.bytes
       }
+      /** Observe only this bounded physical group; recursive splits emit their own real members. */
+      const p = this.#probe
+      if (p !== undefined && (p.mask & (1 << RpcProbeStage.envelope)) !== 0)
+        for (const entry of entries)
+          p.envelope(
+            RpcProbeDirection.outbound,
+            entry.message.id,
+            entry.message.kind === RpcEnvelopeKind.request
+              ? entry.message.method
+              : entry.message.data.route.method,
+            entries.length > 1 ? entries.length : -1,
+            (p.captureMask & (1 << RpcProbeStage.envelope)) !== 0 ? entry.message : undefined,
+            entry.message.data.route.senderId,
+            undefined,
+            -1,
+            entry.message.kind === RpcEnvelopeKind.variation
+              ? entry.message.data.route.variation
+              : undefined
+          )
+      if (p !== undefined && (p.mask & (1 << RpcProbeStage.encoded)) !== 0)
+        p.encoded(
+          RpcProbeDirection.outbound,
+          entries[0]!.message.id,
+          carrierSizeBytes(encoded),
+          (p.captureMask & (1 << RpcProbeStage.encoded)) !== 0
+            ? this.#probeContent(encoded, entries[0]!.transfer)
+            : undefined,
+          entries[0]!.message.kind === RpcEnvelopeKind.request
+            ? entries[0]!.message.method
+            : entries[0]!.message.data.route.method,
+          entries[0]!.message.data.route.senderId
+        )
+      if (
+        framed &&
+        !this.authentication &&
+        p !== undefined &&
+        (p.mask & (1 << RpcProbeStage.frame)) !== 0
+      )
+        p.frame(
+          RpcProbeDirection.outbound,
+          entries[0]!.message.id,
+          carrierSizeBytes(value),
+          -1,
+          -1,
+          (p.captureMask & (1 << RpcProbeStage.frame)) !== 0
+            ? this.#probeContent(value, entries[0]!.transfer)
+            : undefined,
+          entries[0]!.message.kind === RpcEnvelopeKind.request
+            ? entries[0]!.message.method
+            : entries[0]!.message.data.route.method,
+          entries[0]!.message.data.route.senderId
+        )
       return [{ entries, value, ...(typeof value === 'string' ? { byteUpperBound: bound } : {}) }]
     } catch (cause) {
       /** Existing native contract/authentication errors retain their original instances and causes. */
@@ -886,7 +996,14 @@ export class RpcOutboundSender {
           frame.entries[0]!.transfer,
           undefined,
           undefined,
-          this.#frameContext(frame.entries[0]!.message)
+          this.#frameContext(frame.entries[0]!.message),
+          frame.entries[0]!.message.id,
+          -1,
+          -1,
+          frame.entries[0]!.message.kind === RpcEnvelopeKind.request
+            ? frame.entries[0]!.message.method
+            : frame.entries[0]!.message.data.route.method,
+          frame.entries[0]!.message.data.route.senderId
         )
           .then((value) => {
             const current = this.#admitBatch(frame.entries, false)
@@ -936,9 +1053,17 @@ export class RpcOutboundSender {
       entries[0]!.transfer,
       this.#lifecycle?.generation,
       () => {
-        for (const entry of entries) entry.onStarted?.()
+        /** The existing per-member start loop also owns exactly one sent event per semantic member. */
+        const p = this.#probe
+        for (const entry of entries) {
+          entry.onStarted?.()
+          if (p !== undefined && (p.mask & (1 << RpcProbeStage.message)) !== 0)
+            this.#probeSent(entry.message, p)
+        }
       },
-      true
+      true,
+      undefined,
+      entries[0]!.message
     )
     /** Both outcomes release busy identity before the logical member Promises settle. */
     const complete = () => {
@@ -970,6 +1095,20 @@ export class RpcOutboundSender {
     this.#lifecycle?.assertActive(generation)
     /** The original transfer owner retains once-read getter and immutable snapshot semantics. */
     const transfer = this.#snapshotTransfer(options)
+    /** The normalizer already owns this semantic object before the codec is selected. */
+    const p = this.#probe
+    if (p !== undefined && (p.mask & (1 << RpcProbeStage.envelope)) !== 0)
+      p.envelope(
+        RpcProbeDirection.outbound,
+        message.id,
+        message.kind === RpcEnvelopeKind.request ? message.method : message.data.route.method,
+        -1,
+        (p.captureMask & (1 << RpcProbeStage.envelope)) !== 0 ? message : undefined,
+        message.data.route.senderId,
+        undefined,
+        -1,
+        message.kind === RpcEnvelopeKind.variation ? message.data.route.variation : undefined
+      )
     /** The canonical codec keeps first-user portability and existing source/code/cause boundaries. */
     let encoded: unknown
     try {
@@ -978,6 +1117,17 @@ export class RpcOutboundSender {
     } catch (cause) {
       throw createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
+    if (p !== undefined && (p.mask & (1 << RpcProbeStage.encoded)) !== 0)
+      p.encoded(
+        RpcProbeDirection.outbound,
+        message.id,
+        carrierSizeBytes(encoded),
+        (p.captureMask & (1 << RpcProbeStage.encoded)) !== 0
+          ? this.#probeContent(encoded, transfer)
+          : undefined,
+        message.kind === RpcEnvelopeKind.request ? message.method : message.data.route.method,
+        message.data.route.senderId
+      )
     this.#lifecycle?.assertActive(generation)
     if (immediate) this.#assertPhysicalSize(encoded)
     /** Only qualified idle writes remove the old deferred handoff; foreign paths retain it. */
@@ -994,7 +1144,8 @@ export class RpcOutboundSender {
               onStarted?.()
             }
           : undefined,
-        immediate
+        immediate,
+        message
       )
     }
     return immediate ? write() : Promise.resolve().then(write)
@@ -1013,6 +1164,20 @@ export class RpcOutboundSender {
     this.#lifecycle?.assertActive(generation)
     const transfer = this.#snapshotTransfer(options)
     const hasTransfer = transfer !== undefined && transfer.length > 0
+    /** Envelope capture reuses the original normalized value rather than walking it again. */
+    const p = this.#probe
+    if (p !== undefined && (p.mask & (1 << RpcProbeStage.envelope)) !== 0)
+      p.envelope(
+        RpcProbeDirection.outbound,
+        message.id,
+        message.kind === RpcEnvelopeKind.request ? message.method : message.data.route.method,
+        -1,
+        (p.captureMask & (1 << RpcProbeStage.envelope)) !== 0 ? message : undefined,
+        message.data.route.senderId,
+        undefined,
+        -1,
+        message.kind === RpcEnvelopeKind.variation ? message.data.route.variation : undefined
+      )
     let encoded: unknown
     try {
       encoded = (this.#objectPort?.codec ?? this.components.codec).encode(message)
@@ -1020,6 +1185,17 @@ export class RpcOutboundSender {
     } catch (cause) {
       throw createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
+    if (p !== undefined && (p.mask & (1 << RpcProbeStage.encoded)) !== 0)
+      p.encoded(
+        RpcProbeDirection.outbound,
+        message.id,
+        carrierSizeBytes(encoded),
+        (p.captureMask & (1 << RpcProbeStage.encoded)) !== 0
+          ? this.#probeContent(encoded, transfer)
+          : undefined,
+        message.kind === RpcEnvelopeKind.request ? message.method : message.data.route.method,
+        message.data.route.senderId
+      )
     let frames: readonly unknown[]
     try {
       frames = (this.#objectPort?.framer ?? this.components.framer).frame(encoded, {
@@ -1048,11 +1224,25 @@ export class RpcOutboundSender {
             admission?.assertCanSend()
             onStarted?.()
           },
-          true
+          true,
+          message
         )
       }
       if (!this.authentication) {
         if (!this.#objectPort) this.assertTransportEncodedType(frames[0])
+        if (p !== undefined && (p.mask & (1 << RpcProbeStage.frame)) !== 0)
+          p.frame(
+            RpcProbeDirection.outbound,
+            message.id,
+            carrierSizeBytes(frames[0]),
+            -1,
+            -1,
+            (p.captureMask & (1 << RpcProbeStage.frame)) !== 0
+              ? this.#probeContent(frames[0], transfer)
+              : undefined,
+            message.kind === RpcEnvelopeKind.request ? message.method : message.data.route.method,
+            message.data.route.senderId
+          )
         return this.#sendPreparedTransport(
           frames[0],
           transfer,
@@ -1061,7 +1251,8 @@ export class RpcOutboundSender {
             admission?.assertCanSend()
             onStarted?.()
           },
-          true
+          true,
+          message
         )
       }
       return this.#prepareTransportValue(
@@ -1069,7 +1260,12 @@ export class RpcOutboundSender {
         transfer,
         hasTransfer,
         generation,
-        this.#frameContext(message)
+        this.#frameContext(message),
+        message.id,
+        -1,
+        -1,
+        message.kind === RpcEnvelopeKind.request ? message.method : message.data.route.method,
+        message.data.route.senderId
       ).then(write)
     }
     return this.#prepareFrames(
@@ -1077,12 +1273,22 @@ export class RpcOutboundSender {
       transfer,
       hasTransfer,
       generation,
-      this.authentication ? this.#frameContext(message) : undefined
+      this.authentication ? this.#frameContext(message) : undefined,
+      message.id,
+      message.kind === RpcEnvelopeKind.request ? message.method : message.data.route.method,
+      message.data.route.senderId
     ).then((preparedFrames) => {
       this.#lifecycle?.assertActive(generation)
       return gated || admission !== undefined
-        ? this.#sendPreparedFramesGated(preparedFrames, transfer, generation, admission, onStarted)
-        : this.#sendPreparedFrames(preparedFrames, transfer, generation)
+        ? this.#sendPreparedFramesGated(
+            preparedFrames,
+            transfer,
+            generation,
+            admission,
+            onStarted,
+            message
+          )
+        : this.#sendPreparedFrames(preparedFrames, transfer, generation, message)
     })
   }
 
@@ -1142,23 +1348,43 @@ export class RpcOutboundSender {
     }
   }
 
+  /** SC9(a): only bytes whose actual transfer backing will detach receive a capture copy. */
+  #probeContent(value: unknown, transfer: readonly unknown[] | undefined): unknown {
+    if (transfer === undefined || transfer.length === 0) return value
+    if (isUint8Array(value)) {
+      if (transfer.includes(value.buffer)) return new Uint8Array(value)
+      return value
+    }
+    if (isArrayBuffer(value) && transfer.includes(value))
+      return new Uint8Array(new Uint8Array(value)).buffer
+    return value
+  }
+
   /** Protects every frame before any transport send and preserves the first observed failure. */
   #prepareFrames(
     frames: readonly unknown[],
     transfer: readonly unknown[] | undefined,
     hasTransfer: boolean,
     generation: number | undefined,
-    authenticationContext?: IRpcAuthenticationContext
+    authenticationContext?: IRpcAuthenticationContext,
+    messageId?: string,
+    method?: string,
+    senderId?: string
   ): Promise<readonly unknown[]> {
     let hasFailure = false
     let firstFailure: unknown
-    const preparations = frames.map((frame) =>
+    const preparations = frames.map((frame, index) =>
       this.#prepareTransportValue(
         frame,
         transfer,
         hasTransfer,
         generation,
-        authenticationContext
+        authenticationContext,
+        messageId,
+        frames.length > 1 ? index : -1,
+        frames.length > 1 ? frames.length : -1,
+        method,
+        senderId
       ).catch((error: unknown) => {
         if (!hasFailure) {
           hasFailure = true
@@ -1188,12 +1414,21 @@ export class RpcOutboundSender {
   #sendPreparedFrames(
     frames: readonly unknown[],
     transfer: readonly unknown[] | undefined,
-    generation: number | undefined
+    generation: number | undefined,
+    message?: IRpcEnvelope
   ): Promise<void> {
     let hasFailure = false
     let firstFailure: unknown
-    const sends = frames.map((frame) =>
-      this.#sendPreparedTransport(frame, transfer, generation).catch((error: unknown) => {
+    const sends = frames.map((frame, index) =>
+      this.#sendPreparedTransport(
+        frame,
+        transfer,
+        generation,
+        undefined,
+        false,
+        index === 0 ? message : undefined,
+        message
+      ).catch((error: unknown) => {
         if (!hasFailure) {
           hasFailure = true
           firstFailure = error
@@ -1219,10 +1454,13 @@ export class RpcOutboundSender {
     transfer: readonly unknown[] | undefined,
     generation: number | undefined,
     admission?: IRpcOutboundAdmission,
-    onStarted?: () => void
+    onStarted?: () => void,
+    message?: IRpcEnvelope
   ): Promise<void> {
     let first = true
     for (const frame of frames) {
+      /** Logical sent belongs only to the first physical write of this existing envelope. */
+      const logical = first ? message : undefined
       const beforeSend = first
         ? () => {
             admission?.assertCanSend()
@@ -1230,7 +1468,15 @@ export class RpcOutboundSender {
           }
         : undefined
       first = false
-      await this.#sendPreparedTransport(frame, transfer, generation, beforeSend)
+      await this.#sendPreparedTransport(
+        frame,
+        transfer,
+        generation,
+        beforeSend,
+        false,
+        logical,
+        message
+      )
     }
   }
 
@@ -1252,7 +1498,12 @@ export class RpcOutboundSender {
     transfer?: readonly unknown[],
     hasTransfer = transfer !== undefined && transfer.length > 0,
     generation?: number,
-    authenticationContext = this.#authenticationContext
+    authenticationContext = this.#authenticationContext,
+    messageId?: string,
+    index = -1,
+    count = -1,
+    method?: string,
+    senderId?: string
   ): Promise<unknown> {
     if (this.authentication && hasTransfer)
       return Promise.reject(
@@ -1261,12 +1512,50 @@ export class RpcOutboundSender {
     const authentication = this.authentication
     if (!authentication)
       return Promise.resolve().then(() => {
+        /** Deferred unprotected preparation preserves the existing physical invocation timing. */
+        const p = this.#probe
+        if (
+          messageId !== undefined &&
+          p !== undefined &&
+          (p.mask & (1 << RpcProbeStage.frame)) !== 0
+        )
+          p.frame(
+            RpcProbeDirection.outbound,
+            messageId,
+            carrierSizeBytes(value),
+            index,
+            count,
+            (p.captureMask & (1 << RpcProbeStage.frame)) !== 0
+              ? this.#probeContent(value, transfer)
+              : undefined,
+            method,
+            senderId
+          )
         return this.#unprotectedTransportValue(value, generation)
       })
 
     return Promise.resolve()
       .then(() => {
         this.#lifecycle?.assertActive(generation)
+        /** Observe each actual protect invocation without serializing concurrent chunk work. */
+        const p = this.#probe
+        if (
+          messageId !== undefined &&
+          p !== undefined &&
+          (p.mask & (1 << RpcProbeStage.frame)) !== 0
+        )
+          p.frame(
+            RpcProbeDirection.outbound,
+            messageId,
+            carrierSizeBytes(value),
+            index,
+            count,
+            (p.captureMask & (1 << RpcProbeStage.frame)) !== 0
+              ? this.#probeContent(value, transfer)
+              : undefined,
+            method,
+            senderId
+          )
         return authentication.protect(value, authenticationContext)
       })
       .catch((cause) => {
@@ -1282,6 +1571,25 @@ export class RpcOutboundSender {
         try {
           this.#lifecycle?.assertActive(generation)
           this.assertTransportEncodedType(protectedValue)
+          /** Protection content is captured before any physical transport can detach its backing. */
+          const p = this.#probe
+          if (
+            messageId !== undefined &&
+            p !== undefined &&
+            (p.mask & (1 << RpcProbeStage.protected)) !== 0
+          )
+            p.protected(
+              RpcProbeDirection.outbound,
+              messageId,
+              carrierSizeBytes(protectedValue),
+              index,
+              count,
+              (p.captureMask & (1 << RpcProbeStage.protected)) !== 0
+                ? this.#probeContent(protectedValue, transfer)
+                : undefined,
+              method,
+              senderId
+            )
           return protectedValue
         } catch (cause) {
           if (isLocalRpcError(cause, RpcAuthenticationError)) throw cause
@@ -1300,20 +1608,29 @@ export class RpcOutboundSender {
     transfer: readonly unknown[] | undefined,
     generation: number | undefined,
     beforeSend?: () => void,
-    immediate = false
+    immediate = false,
+    message?: IRpcEnvelope,
+    carrierContext = message
   ): Promise<void> {
-    return this.#writePreparedTransport({
-      value,
-      transfer,
-      generation,
-      beforeSend,
-      immediate,
-      admissionFailure: undefined
-    })
+    return this.#writePreparedTransport(
+      {
+        value,
+        transfer,
+        generation,
+        beforeSend,
+        immediate,
+        admissionFailure: undefined,
+        message
+      },
+      carrierContext
+    )
   }
 
   /** Only a real write or the original deferred invocation suspends this stable owner method. */
-  async #writePreparedTransport(record: IPhysicalWriteRecord): Promise<void> {
+  async #writePreparedTransport(
+    record: IPhysicalWriteRecord,
+    carrierContext?: IRpcEnvelope | IRpcRuntimeEnvelope
+  ): Promise<void> {
     /** Non-immediate callers retain their original deferred host invocation. */
     if (!record.immediate) await undefined
     try {
@@ -1329,10 +1646,43 @@ export class RpcOutboundSender {
         record.admissionFailure = error
         throw error
       }
+      /** Existing physical admission has won; observe once before a writer can synchronously reply. */
+      const p = this.#probe
+      if (p !== undefined && (p.mask & (1 << RpcProbeStage.message)) !== 0) {
+        if (record.message) this.#probeSent(record.message, p)
+        else if (record.runtimeStart) {
+          /** Runtime task identity remains the original captured owner through native preparation. */
+          const envelope = record.runtimeStart.envelope
+          p.message(
+            RpcProbeDirection.outbound,
+            runtimeProbeKind(envelope),
+            RpcProbeOutcome.sent,
+            envelope.id,
+            envelope.task.method,
+            envelope.route.senderId,
+            envelope.route.targetId,
+            undefined,
+            -1,
+            undefined,
+            undefined
+          )
+        }
+      }
       /** The actual transport method keeps its receiver and remains adjacent to admission/start. */
-      await (this.#objectPort
-        ? this.#objectPort.send(record.value, { transfer: record.transfer })
-        : this.transport.send(record.value, { transfer: record.transfer }))
+      /** Only an installed carrier stage borrows context; the two assignments allocate nothing. */
+      const observeCarrier = p !== undefined && (p.mask & (1 << RpcProbeStage.carrier)) !== 0
+      if (observeCarrier)
+        p.sendContext = carrierContext ?? record.message ?? record.runtimeStart?.envelope
+      /** The original returned Promise is awaited after the synchronous context lifetime ends. */
+      let sent: void | Promise<void>
+      try {
+        sent = this.#objectPort
+          ? this.#objectPort.send(record.value, { transfer: record.transfer })
+          : this.transport.send(record.value, { transfer: record.transfer })
+      } finally {
+        if (observeCarrier) p.sendContext = undefined
+      }
+      await sent
       /** A late physical completion cannot commit across the captured endpoint generation. */
       this.#lifecycle?.assertActive(record.generation)
     } catch (cause) {
@@ -1342,5 +1692,23 @@ export class RpcOutboundSender {
       if (isLocalRpcError(cause, RpcLifecycleError)) throw cause
       throw createRpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
     }
+  }
+
+  /** Sends share the envelope's original identity and explicit trace without a new logical record. */
+  #probeSent(message: IRpcEnvelope, p: IProbeEmitter): void {
+    p.message(
+      RpcProbeDirection.outbound,
+      envelopeProbeKind(message),
+      RpcProbeOutcome.sent,
+      message.id,
+      message.kind === RpcEnvelopeKind.request ? message.method : message.data.route.method,
+      message.data.route.senderId,
+      message.data.route.targetId,
+      message.data.route.trace,
+      -1,
+      undefined,
+      undefined,
+      message.kind === RpcEnvelopeKind.variation ? message.data.route.variation : undefined
+    )
   }
 }

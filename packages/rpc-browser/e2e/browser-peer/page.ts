@@ -1,4 +1,5 @@
 import { createBrowserPeer } from '@migaia/rpc-browser'
+import { defineProbe, RpcProbeStage, type IRpcProbe } from '@migaia/rpc-core/probe'
 import type { IBrowserFixtureApi } from './api.js'
 
 /**
@@ -21,7 +22,7 @@ function classify(error: unknown) {
  * Creates a real cross-origin child and waits only for native script readiness before Core
  * negotiation.
  */
-async function framePeer() {
+async function framePeer(probe?: IRpcProbe) {
   /** The second Vite origin proves Window source proof without same-origin property access. */
   const origin = 'http://127.0.0.1:4179'
   /** The test owns iframe attachment and removal; the Peer borrows its WindowProxy. */
@@ -46,10 +47,47 @@ async function framePeer() {
   await loaded
   /** Typed calls use the package root and existing adapter-owned Window checks. */
   const peer = await createBrowserPeer<IBrowserFixtureApi>({
+    probe,
     connect: { window: frame.contentWindow!, origin },
     defaultTimeoutMs: 1000
   })
   return { frame, peer }
+}
+
+/** A real Browser Peer must forward both lifecycle and its original Window carrier observations. */
+globalThis.runBrowserPeerProbe = async () => {
+  /** Only primitive fields cross Playwright; the reusable Core view never escapes the callback. */
+  const result = {
+    echo: '',
+    lifecycle: [] as string[],
+    carriers: [] as string[],
+    directions: [] as number[],
+    failures: [] as unknown[]
+  }
+  /** The source probe is installed through the public Peer option rather than a transport hook. */
+  const probe = defineProbe({
+    stages: ['peer', 'carrier'],
+    onError: (error) => {
+      result.failures.push(classify(error))
+    },
+    emit: (view) => {
+      if (view.stage === RpcProbeStage.peer) result.lifecycle.push(view.lifecycle!)
+      else {
+        result.carriers.push(view.carrier!)
+        result.directions.push(view.direction)
+      }
+    }
+  })
+  /** The existing real cross-origin realm is the same source-proof and native delivery owner. */
+  const fixture = await framePeer(probe)
+  try {
+    result.echo = await fixture.peer.request('echo', 'observed-window-peer')
+    await fixture.peer.close()
+    return result
+  } finally {
+    await fixture.peer.close()
+    fixture.frame.remove()
+  }
 }
 
 globalThis.runBrowserPeerWindow = async (unload = false) => {
@@ -148,6 +186,14 @@ globalThis.closeBrowserPeerShared = async (physical = false) => {
 }
 
 declare global {
+  /** Closure oracle calls the public Peer fixture and receives only scalar observation receipts. */
+  var runBrowserPeerProbe: () => Promise<{
+    echo: string
+    lifecycle: string[]
+    carriers: string[]
+    directions: number[]
+    failures: unknown[]
+  }>
   var runBrowserPeerWindow: (unload?: boolean) => Promise<unknown>
   var connectBrowserPeerShared: () => Promise<void>
   var runBrowserPeerShared: (

@@ -13,6 +13,7 @@
     "test:suite-parity": "vitest run --config vitest.suite-parity.config.ts --coverage.enabled=false",
     "test:packed": "pnpm --filter @migaia/rpc-contract --filter @migaia/rpc-core --filter @migaia/rpc-process --filter @migaia/rpc-threads --filter @migaia/rpc-bridge-jsonrpc --filter @migaia/rpc-browser run build && node test/core/packed-export-smoke.mjs",
     "bench:ipc": "node bench/ipc.mjs",
+    "bench:probe": "node bench/probe.mjs",
     "test:coverage:family": "vitest run --config vitest.family.config.ts --coverage"
   },
   "devDependencies": {
@@ -32,6 +33,7 @@
     "@migaia/utils": "workspace:^",
     "@migaia/rpc-contract": "workspace:*",
     "@migaia/rpc-core": "workspace:*",
+    "@migaia/rpc-devtools": "workspace:*",
     "@migaia/rpc-process": "workspace:*",
     "@migaia/rpc-threads": "workspace:*",
     "@migaia/rpc-bridge-jsonrpc": "workspace:*",

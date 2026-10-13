@@ -43,10 +43,14 @@ export type IRpcPoolOptions = Readonly<{
 export type IThreadPoolOptions = IRpcPoolOptions &
   Readonly<{
     spawn: NonNullable<IRuntimeThreadPeerOptions['spawn']>
+    /** Every member receives the same source probe without cloning its handle. */
+    probe?: IRuntimeThreadPeerOptions['probe']
   }>
 
 /** Every Process member receives this exact original source value. */
 export type IProcessPoolOptions = IRpcPoolOptions &
   Readonly<{
     spawn: NonNullable<IRuntimeProcessPeerOptions['spawn']>
+    /** Every member receives the same source probe without cloning its handle. */
+    probe?: IRuntimeProcessPeerOptions['probe']
   }>

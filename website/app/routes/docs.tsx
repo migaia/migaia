@@ -2566,7 +2566,9 @@ const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
   /** Pool references describe the public composition layer and its client-side scheduling role. */
   'rpc-pool': '以公开线程和进程 Peer 组成池，管理有限 FIFO、成员调用槽与资源回收。',
   'rpc-bridge-jsonrpc': '把外部语言的 JSON-RPC peer 接到实际有序字节通道，保留协商和错误链。',
-  'rpc-browser': '提供 Window、共享 Worker、ServiceWorker、广播与浏览器网络通道适配器。'
+  'rpc-browser': '提供 Window、共享 Worker、ServiceWorker、广播与浏览器网络通道适配器。',
+  'rpc-devtools':
+    '提供 RPC 观察工具的 service 与录制契约、NDJSON codec；当前 collector 与 hub 工厂仍为占位入口。'
 } as const satisfies Readonly<Record<string, string>>
 
 /** Architecture-page summaries explain the pain, core capability, and governing design up front. */
@@ -2636,7 +2638,9 @@ const LIBRARY_ARCHITECTURE_LEDES_ZH = {
   'rpc-bridge-jsonrpc':
     '用于与 Python、Go、Rust 等外部语言 peer 进行 JSON-RPC 调用的场景。桥接器使用 Process 提供的实际有序字节通道，完成原握手、帧解析、请求相关与取消规则，并传递有界错误链；业务按已协商的能力调用，不为对端缺失的模式增加隐式降级。',
   'rpc-browser':
-    '用于 Window、共享 Worker、ServiceWorker、BroadcastChannel、WebTransport 或 RTCDataChannel 两端需要 RPC 的场景。各适配器持有实际浏览器通道及其监听器，保留来源校验、传输能力与关闭边界；Endpoint 和协议工具由 Core、Contract 复用，应用按实际通道选择适配器。'
+    '用于 Window、共享 Worker、ServiceWorker、BroadcastChannel、WebTransport 或 RTCDataChannel 两端需要 RPC 的场景。各适配器持有实际浏览器通道及其监听器，保留来源校验、传输能力与关闭边界；Endpoint 和协议工具由 Core、Contract 复用，应用按实际通道选择适配器。',
+  'rpc-devtools':
+    '用于让 RPC 观察工具共享同一套 service、事件与离线录制契约。当前 layer 1 提供版本 1 的 NDJSON 纯函数 codec，复用 Core 的 Probe 类型与 Contract 的错误链编解码，不依赖载体包，也不创建 transport；Core 观察点、collector 与 hub 运行时由后续实现提供，当前两个 devtools 工厂均以 CLOSED 拒绝。'
 } as const satisfies Readonly<Record<string, string>>
 
 /** Missing English package descriptions are explicit instead of slogan fallbacks. */
