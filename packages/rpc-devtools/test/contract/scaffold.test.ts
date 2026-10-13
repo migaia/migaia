@@ -55,12 +55,16 @@ const service: IRpcDevtoolsServiceApi = {
 }
 
 describe('A3 public scaffold', () => {
-  it('imports all three entries with the collector installed and the hub still uninstalled', () => {
-    /** Layer 2 replaces only the collector placeholder; its live public host now owns closure. */
+  it('imports the implemented collector and hub entries and preserves their CLOSED identity', async () => {
+    /** The integrated layer replaces both placeholders with live owners and real closure. */
     const collector = createRpcDevtools()
     expect(collector.query().events).toEqual([])
     collector.close()
-    expect(() => createRpcDevtoolsHub()).toThrowError(
+    /** An empty live hub is usable before its idempotent close, then rejects cold queries. */
+    const hub = createRpcDevtoolsHub()
+    expect(hub.timeline()).toEqual([])
+    await hub.close()
+    expect(() => hub.timeline()).toThrowError(
       expect.objectContaining({ source: RPC_DEVTOOLS_SOURCE, code: RpcDevtoolsErrorCode.closed })
     )
     expect(RpcDevtoolsTargetStatus.offline).toBe('offline')

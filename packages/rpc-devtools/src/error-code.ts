@@ -3,6 +3,11 @@ export const ERROR_SOURCE = '@migaia/rpc/devtools'
 
 /** Public code owner for contract R5/S5 and the collector/hub lifecycle clauses. */
 export const RpcDevtoolsErrorCode = {
+  /**
+   * Captured service data cannot be encoded (closure R5); inspect cause or disable content
+   * exposure.
+   */
+  serviceResultInvalid: 'SERVICE_RESULT_INVALID',
   /** Collector/hub options violate their supported domain; fix the option before construction (R5). */
   invalidOption: 'INVALID_OPTION',
   /**

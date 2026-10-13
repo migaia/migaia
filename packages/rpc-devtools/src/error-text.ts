@@ -1,5 +1,7 @@
 /** Stable devtools diagnostics; consumers must classify codes rather than parse these messages. */
 export const RpcDevtoolsErrorText = {
+  /** Portable service conversion retains the original failure on cause for the remote caller. */
+  serviceResultInvalid: 'rpc devtools service result cannot be encoded',
   /** Root factory placeholder remains terminal until the collector replaces it (contract S6). */
   collectorNotInstalled: 'rpc devtools collector runtime not installed',
   /** Hub factory placeholder remains terminal until the hub replaces it (contract S6). */

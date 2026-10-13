@@ -1,4 +1,5 @@
 import { RpcProbeStageName, type IRpcProbeEventView } from '@migaia/rpc-core/probe'
+import type { IRpcAbortSignal } from '@migaia/rpc-core'
 import type { IRpcDevtoolsQuery, IRpcDevtoolsWatchBatch } from '../contract/service.js'
 import type { IRpcDevtoolsWireEvent } from '../contract/wire.js'
 import { RpcDevtoolsErrorCode } from '../error-code.js'
@@ -35,6 +36,8 @@ export class CollectorWatcher {
   #exposeContent: boolean
   /** Cold stage compilation makes the common filter decision one numeric mask check. */
   #stageMask = (1 << RpcProbeStageName.length) - 1
+  /** Cold outcome compilation keeps watch filtering numeric during ingestion. */
+  #outcomeMask: number
   /** Existing method ids use direct indexed membership after cold compilation. */
   #methodMask: Uint8Array | undefined
   /** Future method names remain supported when their ids do not yet exist at construction. */
@@ -51,6 +54,8 @@ export class CollectorWatcher {
   #onError: ((error: unknown) => void) | undefined
   /** The collector's original lifetime guard covers handles whose first next follows close. */
   #assertOpen: (() => void) | undefined
+  /** A mounted service borrows its existing stream scope to wake this owner on remote cancellation. */
+  #signal: IRpcAbortSignal | undefined
 
   /** Allocate bounded storage and compile filters once, before any watcher joins ingestion. */
   constructor(
@@ -60,7 +65,8 @@ export class CollectorWatcher {
     exposeContent: boolean,
     active: CollectorWatcher[],
     onError?: (error: unknown) => void,
-    assertOpen?: () => void
+    assertOpen?: () => void,
+    signal?: IRpcAbortSignal
   ) {
     /** Watch uses the same cold validation domain as query before allocating retained storage. */
     const filter = compileQuery(input, names)
@@ -75,8 +81,10 @@ export class CollectorWatcher {
     this.#active = active
     this.#onError = onError
     this.#assertOpen = assertOpen
+    this.#signal = signal
     this.#trace = input?.trace
     this.#stageMask = filter.stages
+    this.#outcomeMask = filter.outcomes
     if (input?.methods !== undefined) {
       this.#methods = new Set(input.methods)
       this.#methodMask = filter.methods
@@ -96,6 +104,7 @@ export class CollectorWatcher {
   /** Snapshot qualifying views into columns; no event object, closure or Promise is created. */
   push(view: IRpcProbeEventView, seq: number, content: unknown, bytes: number): void {
     if (this.#closed || (this.#stageMask & (1 << view.stage)) === 0) return
+    if ((this.#outcomeMask & (1 << view.outcome)) === 0) return
     if (this.#trace !== undefined && view.trace !== this.#trace) return
     if (this.#endpoints !== undefined && !this.#endpoints.has(view.endpointId)) return
     if (this.#methods !== undefined) {
@@ -161,19 +170,27 @@ export class CollectorWatcher {
   async *iterate(): AsyncGenerator<IRpcDevtoolsWatchBatch> {
     this.#assertOpen?.()
     this.#active.push(this)
+    /** Stream cancellation wakes the existing pending read; it creates no second lifetime owner. */
+    const onAbort = (): void => this.close()
+    this.#signal?.addEventListener('abort', onAbort, { once: true })
+    if (this.#signal?.aborted) this.close()
     try {
       while (true) {
-        if (this.#closed)
+        if (this.#closed) {
+          if (this.#signal?.aborted) return
           throw identifyDevtoolsError(new Error(CollectorText.closed), RpcDevtoolsErrorCode.closed)
+        }
         if (this.#count === 0) {
           await new Promise<void>((resolve) => {
             this.#wake = resolve
           })
-          if (this.#closed)
+          if (this.#closed) {
+            if (this.#signal?.aborted) return
             throw identifyDevtoolsError(
               new Error(CollectorText.closed),
               RpcDevtoolsErrorCode.closed
             )
+          }
           if (this.#count === 0) continue
         }
         /** Result array and its event projections are the watch representation boundary (SC9b). */
@@ -194,6 +211,7 @@ export class CollectorWatcher {
         yield { events, dropped }
       }
     } finally {
+      this.#signal?.removeEventListener('abort', onAbort)
       /** Unregistration runs at the iterator boundary, outside synchronous event ingestion. */
       const index = this.#active.indexOf(this)
       if (index >= 0) this.#active.splice(index, 1)

@@ -14,6 +14,10 @@ type IHubMethodAggregate = {
   aborted: number
   latencyBucketsMs: readonly number[]
   latencyCounts: number[]
+  /** Extent is known only when every contributing target supplied its observed maximum. */
+  latencyMaxMs?: number
+  /** The common terminal bucket's lower boundary is open above this measured range. */
+  latencyOverflowFromMs?: number
   p50Ms: number
   p95Ms: number
   p99Ms: number
@@ -44,6 +48,8 @@ function createMethodAggregate(row: IHubMethodStats): IHubMethodAggregate {
     aborted: row.aborted,
     latencyBucketsMs: row.latencyBucketsMs,
     latencyCounts: counts,
+    latencyMaxMs: row.latencyMaxMs,
+    latencyOverflowFromMs: row.latencyOverflowFromMs,
     p50Ms: 0,
     p95Ms: 0,
     p99Ms: 0
@@ -57,6 +63,11 @@ function addMethodStats(aggregate: IHubMethodAggregate, row: IHubMethodStats): v
   aggregate.rejected += row.rejected
   aggregate.timedOut += row.timedOut
   aggregate.aborted += row.aborted
+  aggregate.latencyMaxMs =
+    aggregate.latencyMaxMs !== undefined && row.latencyMaxMs !== undefined
+      ? Math.max(aggregate.latencyMaxMs, row.latencyMaxMs)
+      : undefined
+  aggregate.latencyOverflowFromMs ??= row.latencyOverflowFromMs
   for (let index = 0; index < aggregate.latencyCounts.length; index++) {
     aggregate.latencyCounts[index]! += row.latencyCounts[index]!
   }
@@ -76,8 +87,14 @@ function histogramPercentile(row: IHubMethodAggregate, total: number, percentile
       /** The first bucket begins at zero; later buckets begin at their preceding boundary. */
       const lower = index === 0 ? 0 : row.latencyBucketsMs[index - 1]!
       /** The current boundary caps interpolation within the bucket's documented width. */
-      const upper = row.latencyBucketsMs[index]!
-      return lower + ((upper - lower) * (rank - previous)) / count
+      const upper =
+        index === row.latencyCounts.length - 1 && row.latencyMaxMs !== undefined
+          ? Math.max(lower, row.latencyMaxMs)
+          : row.latencyBucketsMs[index]!
+      return Math.min(
+        row.latencyMaxMs ?? Infinity,
+        lower + ((upper - lower) * (rank - previous)) / count
+      )
     }
     previous += count
   }
