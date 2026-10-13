@@ -151,6 +151,12 @@ function createActualPackageFixture() {
     'wasm',
     'lifecycle',
     'middleware-pipeline',
+    'serialize',
+    'supervision',
+    'rpc-contract',
+    'rpc-core',
+    'rpc-process',
+    'rpc-threads',
     'utils',
     'capability',
     'event-subscriber'
@@ -537,21 +543,35 @@ test('closure packet proves exact exclusions, frozen budgets, browser wasm, and 
         packageCase.name,
         sourceEntry
       )
-      const packedModule = await import(pathToFileURL(packedPath).href)
-      assert.deepEqual(Object.keys(packedModule).sort(), Object.keys(sourceModule).sort())
-      for (const key of Object.keys(sourceModule)) {
-        const sourceDescriptor = Object.getOwnPropertyDescriptor(sourceModule, key)
-        const packedDescriptor = Object.getOwnPropertyDescriptor(packedModule, key)
-        assert.equal(packedDescriptor?.enumerable, sourceDescriptor?.enumerable)
-        assert.equal(typeof packedModule[key], typeof sourceModule[key])
-      }
-      const repeated = await import(pathToFileURL(packedPath).href)
-      for (const key of Object.keys(packedModule))
-        assert.equal(
-          repeated[key],
-          packedModule[key],
-          `${packageCase.name} export identity changed`
+      /** An independent packed consumer owns its RPC realm, as in the matrix identity oracle. */
+      const packedExports = JSON.parse(
+        execFileSync(
+          process.execPath,
+          [
+            '--input-type=module',
+            '--eval',
+            `import { strict as assert } from 'node:assert'
+/** The consumer loads exactly one package publication in this realm. */
+const packed = await import(${JSON.stringify(pathToFileURL(packedPath).href)})
+/** A repeated import must retain every exported value's identity. */
+const repeated = await import(${JSON.stringify(pathToFileURL(packedPath).href)})
+console.log(JSON.stringify(Object.keys(packed).sort().map((key) => {
+  assert.equal(repeated[key], packed[key], key + ' export identity changed')
+  return { key, enumerable: Object.getOwnPropertyDescriptor(packed, key)?.enumerable, kind: typeof packed[key] }
+})))`
+          ],
+          { cwd: fixture.consumer, encoding: 'utf8', stdio: 'pipe' }
         )
+      )
+      assert.deepEqual(
+        packedExports.map(({ key }) => key),
+        Object.keys(sourceModule).sort()
+      )
+      for (const { key, enumerable, kind } of packedExports) {
+        const sourceDescriptor = Object.getOwnPropertyDescriptor(sourceModule, key)
+        assert.equal(enumerable, sourceDescriptor?.enumerable)
+        assert.equal(kind, typeof sourceModule[key])
+      }
     }
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })

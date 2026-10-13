@@ -233,7 +233,7 @@ describe('conformance toolchain and platform evidence boundaries', () => {
         'peerDependencies',
         'optionalDependencies'
       ]) {
-        /** C3 reroutes these two existing consumers; every unrelated dependency stays frozen. */
+        /** C3 reroutes two consumers; Tray hosts add only their declared RPC runtime edges. */
         const expected =
           (path === 'packages/storage-web/package.json' && key === 'devDependencies') ||
           (path === 'packages/store-worker/package.json' && key === 'dependencies')
@@ -247,6 +247,14 @@ describe('conformance toolchain and platform evidence boundaries', () => {
           expected['@migaia/rpc-contract'] = 'workspace:*'
           expected['@migaia/rpc-core'] = 'workspace:*'
         }
+        if (path === 'packages/tray/package.json' && key === 'dependencies') {
+          expected['@migaia/rpc-contract'] = 'workspace:^'
+          expected['@migaia/rpc-core'] = 'workspace:^'
+          expected['@migaia/rpc-process'] = 'workspace:^'
+          expected['@migaia/rpc-threads'] = 'workspace:^'
+        }
+        if (path === 'packages/tray/package.json' && key === 'devDependencies')
+          expected['@migaia/supervision'] = 'workspace:^'
         expect(after[key], `${path} ${key}`).toEqual(expected)
       }
     }
