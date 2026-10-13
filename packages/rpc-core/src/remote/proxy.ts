@@ -666,6 +666,9 @@ class RemoteRegistration<TUnit, TSpec> {
       this.#runtimeDirectory?.description && directory?.description
         ? runtimeDirectoryDiff(this.#runtimeDirectory.description, directory.description)
         : undefined
+    /** A reaped-late native unit can retain its receipt until this accepted successor commits. */
+    if (this.#current && this.#current.number !== generation.number)
+      this.#leave(this.#current.number, undefined)
     this.#current = generation
     if (directory) this.#runtimeDirectory = directory
     if (diff) {
@@ -1377,7 +1380,12 @@ export function createRemoteGenerationHolder<
       if (pendingRebind) return pendingRebind
       /** An accepted generation already published its original pointer and outlet receipt. */
       const current = registration.events.current()
-      if (current.active) return Promise.resolve(current.generation)
+      if (
+        current.active &&
+        (!('supervisor' in registration) ||
+          current.generation === registration.supervisor.generation)
+      )
+        return Promise.resolve(current.generation)
       pendingRebind = prepare(signal, true, true).finally(() => {
         pendingRebind = undefined
       })
