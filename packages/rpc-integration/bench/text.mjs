@@ -97,6 +97,26 @@ export const IpcBenchDiagnostic = Object.freeze({
     'V8 allocation samples including collected objects and OOB control work; excludes external/native allocation; not exact event counts'
 })
 
+/** Explicit revision-2 stage modes retain the original probe CLI behavior when omitted. */
+export const IpcProbeBenchStages = Object.freeze({
+  /** One CLI option selects a fixed stage set for both Core and genuine collector arms. */
+  option: '--stage-mode',
+  /** Actual parent, Worker and process isolates inherit this same fixture selection. */
+  environment: 'PROBE_BENCH_STAGE_MODE',
+  /** Production collector defaults are exercised without supplying a stages override. */
+  default: 'default',
+  /** Explicit physical-stage measurements report small-cell overhead without changing guards. */
+  all: 'all',
+  /** Omitted selection preserves revision-1 all-stage fixed-budget CLI behavior. */
+  legacy: 'legacy-all',
+  /** This declared default is shared by the near-noop Core sink and collector mask assertion. */
+  defaultStages: Object.freeze(['message', 'peer']),
+  /** Report receipts distinguish optional small-cell overhead from fixed acceptance budgets. */
+  reportOnly: 'REPORT_ONLY',
+  /** Default-stage cells and every 1 MiB cell retain the fixed acceptance budgets. */
+  fixedBudget: 'FIXED_BUDGET'
+})
+
 /** Frozen reference ownership is retained in every W3 result so primitive history stays distinct. */
 export const IpcW3Reference = Object.freeze({
   /** Explicit final-source collection still reports the unchanged old primitive guard separately. */
