@@ -61,15 +61,22 @@ export function runtimeSupervisorEvent(
   if (
     event.type !== RuntimeEventName.exit &&
     event.type !== RuntimeEventName.restart &&
-    event.type !== RuntimeEventName.degraded
+    event.type !== RuntimeEventName.degraded &&
+    event.type !== RuntimeEventName.terminal
   )
     return undefined
+  /** Terminal has no event generation; the original supervisor exposes its last launch attempt. */
+  const generation =
+    event.type === RuntimeEventName.terminal ? registration.supervisor.generation : event.generation
   return Object.freeze({
     type: event.type,
     name,
-    generation: event.generation,
-    instanceId: registration.runtimeInstanceId(event.generation),
-    timestamp: event.observedAt ?? runtimeUnavailable(RuntimeQueryReason.owner),
+    generation: generation || runtimeUnavailable(RuntimeQueryReason.owner),
+    instanceId: registration.runtimeInstanceId(generation),
+    timestamp:
+      event.type === RuntimeEventName.terminal
+        ? runtimeUnavailable(RuntimeQueryReason.owner)
+        : (event.observedAt ?? runtimeUnavailable(RuntimeQueryReason.owner)),
     clock: RuntimeQueryClock.scheduler,
     ...(event.type === RuntimeEventName.exit
       ? {
@@ -78,11 +85,13 @@ export function runtimeSupervisorEvent(
           signal: event.status?.signal ?? runtimeUnavailable(RuntimeQueryReason.native),
           ...(event.error === undefined ? {} : { error: runtimeErrorIdentity(event.error, report) })
         }
-      : event.type === RuntimeEventName.restart
-        ? { count: event.count }
-        : {
-            degraded: Object.freeze([...event.degraded])
-          })
+      : event.type === RuntimeEventName.terminal
+        ? { error: runtimeErrorIdentity(event.error, report) }
+        : event.type === RuntimeEventName.restart
+          ? { count: event.count }
+          : {
+              degraded: Object.freeze([...event.degraded])
+            })
   })
 }
 
