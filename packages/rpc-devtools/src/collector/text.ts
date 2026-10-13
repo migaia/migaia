@@ -1,3 +1,5 @@
+import { RpcProbeStage, RpcProbeStageName } from '@migaia/rpc-core/probe'
+
 /** Collector-owned diagnostics and service vocabulary stay stable across local and remote calls. */
 export const CollectorText = {
   /** Construction and query validation report a domain failure without exposing input values. */
@@ -34,3 +36,12 @@ export const CollectorLimit = {
   batches: 64,
   histogram: 24
 } as const
+
+/**
+ * Default observation keeps message/control and peer lifecycle events; physical stages are explicit
+ * opt-in.
+ */
+export const CollectorDefaultStages = [
+  RpcProbeStageName[RpcProbeStage.message],
+  RpcProbeStageName[RpcProbeStage.peer]
+] as const

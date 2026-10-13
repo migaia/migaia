@@ -91,3 +91,58 @@ describe('collector A2 statistics', () => {
     }
   })
 })
+
+it('[closure A6 revision 2] merges cold intern-overflow pairs before histogram quantiles', () => {
+  /**
+   * Endpoint and first method exhaust this table; later raw methods share the public overflow
+   * identity.
+   */
+  const devtools = createRpcDevtools({ maxInterned: 2, maxEvents: 1 })
+  /** One reusable input also proves raw aggregates survive event and view retirement. */
+  const view = collectorView()
+  try {
+    devtools.emit(view)
+    view.method = 'overflow-first'
+    view.durationMs = 4
+    view.outcome = RpcProbeOutcome.failed
+    view.error = new DOMException('overflow timeout fixture', 'TimeoutError')
+    devtools.emit(view)
+    view.method = 'overflow-second'
+    view.durationMs = 8
+    view.outcome = RpcProbeOutcome.rejected
+    view.error = undefined
+    devtools.emit(view)
+    view.method = 'overflow-third'
+    view.durationMs = 16
+    view.outcome = RpcProbeOutcome.failed
+    view.error = new DOMException('overflow abort fixture', 'AbortError')
+    devtools.emit(view)
+    /** Three raw pairs collapse to one row, exactly as prior hot numeric pair keys did. */
+    const stats = devtools.stats()
+    expect(stats.methods).toHaveLength(2)
+    expect(stats.methods[0]!.calls).toBe(1)
+    /** This merged row owns all five count categories and one combined latency distribution. */
+    const overflow = stats.methods[1]!
+    expect(overflow).toMatchObject({
+      endpointId: CollectorFixture.endpoint,
+      method: '<overflow>',
+      calls: 3,
+      failed: 2,
+      rejected: 1,
+      timedOut: 1,
+      aborted: 1,
+      latencyMaxMs: 16
+    })
+    expect(overflow.latencyCounts.reduce((total, count) => total + count, 0)).toBe(3)
+    expect(overflow.latencyCounts[6]).toBe(1)
+    expect(overflow.latencyCounts[7]).toBe(1)
+    expect(overflow.latencyCounts[8]).toBe(1)
+    expect(overflow.p50Ms).toBe(6)
+    expect(overflow.p95Ms).toBeCloseTo(14.8)
+    expect(overflow.p99Ms).toBeCloseTo(15.76)
+    expect(devtools.stats()).toEqual(stats)
+    expect(devtools.query().events).toHaveLength(1)
+  } finally {
+    devtools.close()
+  }
+})

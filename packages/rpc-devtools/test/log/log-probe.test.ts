@@ -24,6 +24,7 @@ function event(): IRpcProbeEventView {
   return {
     seq: 1,
     carrierSeq: -1,
+    variation: undefined,
     at: 100,
     endpointId: 'endpoint',
     stage: RpcProbeStage.message,

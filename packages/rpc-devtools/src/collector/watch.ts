@@ -1,57 +1,40 @@
-import { RpcProbeStageName, type IRpcProbeEventView } from '@migaia/rpc-core/probe'
+import { type IRpcProbeEventView } from '@migaia/rpc-core/probe'
 import type { IRpcAbortSignal } from '@migaia/rpc-core'
 import type { IRpcDevtoolsQuery, IRpcDevtoolsWatchBatch } from '../contract/service.js'
 import type { IRpcDevtoolsWireEvent } from '../contract/wire.js'
 import { RpcDevtoolsErrorCode } from '../error-code.js'
 import { identifyDevtoolsError } from '../errors.js'
 import { EventRing } from './ring.js'
-import { NameTable, MessageTable } from './intern.js'
-import { enqueueBatch, reportFailure } from './report.js'
-import { compileQuery } from './query.js'
+import { NameTable } from './intern.js'
+import { compileQuery, type ICollectorFilter } from './query.js'
 import { CollectorLimit, CollectorText } from './text.js'
 
 /** A watcher retains numeric columns and materializes wire events only when a consumer reads. */
 export class CollectorWatcher {
   /** The extra pending batch permits a full queue to retire its oldest batch atomically. */
   #ring: EventRing
-  /** Name ids are read without interning query inputs or changing collector retention counters. */
-  #names: NameTable
   /** Each committed entry holds at most 256 events; the queue contains at most 64 entries. */
   #lengths = new Uint16Array(CollectorLimit.batches)
   /** Oldest committed batch is addressed without shifting any retained events. */
   #head = 0
   /** Committed queue length remains bounded independently of the collector's query ring. */
   #count = 0
-  /** Uncommitted events share the construction-time microtask flush callback. */
+  /** Scheduled reader events accumulate until their bounded batch commits. */
   #pending = 0
   /** Lost event count is transferred into the next consumer-visible batch. */
   #dropped = 0
-  /** A pending flush is queued once until that callback runs. */
-  #scheduled = false
   /** Terminal watchers wake a pending consumer and discard all retained references. */
   #closed = false
   /** Iterator registration belongs to the collector's existing indexed active watcher array. */
   #active: CollectorWatcher[]
   /** Service exposure applies at the one representation boundary owned by iterate. */
   #exposeContent: boolean
-  /** Cold stage compilation makes the common filter decision one numeric mask check. */
-  #stageMask = (1 << RpcProbeStageName.length) - 1
-  /** Cold outcome compilation keeps watch filtering numeric during ingestion. */
-  #outcomeMask: number
-  /** Existing method ids use direct indexed membership after cold compilation. */
-  #methodMask: Uint8Array | undefined
-  /** Future method names remain supported when their ids do not yet exist at construction. */
-  #methods: ReadonlySet<string> | undefined
-  /** Trace matching uses the caller's explicit trace only; no correlation identity is invented. */
-  #trace: string | undefined
-  /** Endpoint identities can arrive after watch starts, so cold membership retains their names. */
-  #endpoints: ReadonlySet<string> | undefined
+  /** All filtering happens in the scheduled reader, after the raw burst has been retained. */
+  #filter: ICollectorFilter
+  /** First next samples sequence so a handle created earlier never receives historical rows. */
+  #readSequence: () => number
   /** Only iterator reads allocate a waiting Promise; ingestion resolves its existing notifier. */
   #wake: (() => void) | undefined
-  /** One preconstructed callback commits partial batches without per-event closures. */
-  #flush: () => void
-  /** Unexpected batch failures follow the collector's existing write-time reporting route. */
-  #onError: ((error: unknown) => void) | undefined
   /** The collector's original lifetime guard covers handles whose first next follows close. */
   #assertOpen: (() => void) | undefined
   /** A mounted service borrows its existing stream scope to wake this owner on remote cancellation. */
@@ -60,69 +43,63 @@ export class CollectorWatcher {
   /** Allocate bounded storage and compile filters once, before any watcher joins ingestion. */
   constructor(
     names: NameTable,
-    messages: MessageTable,
     input: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'> | undefined,
     exposeContent: boolean,
     active: CollectorWatcher[],
+    readSequence: () => number,
     onError?: (error: unknown) => void,
     assertOpen?: () => void,
     signal?: IRpcAbortSignal
   ) {
     /** Watch uses the same cold validation domain as query before allocating retained storage. */
-    const filter = compileQuery(input, names)
-    this.#names = names
-    this.#ring = new EventRing(
-      (CollectorLimit.batches + 1) * CollectorLimit.batch,
-      names,
-      messages,
-      onError
-    )
+    const filter = compileQuery(input)
+    this.#ring = new EventRing((CollectorLimit.batches + 1) * CollectorLimit.batch, names, onError)
     this.#exposeContent = exposeContent
     this.#active = active
-    this.#onError = onError
     this.#assertOpen = assertOpen
     this.#signal = signal
-    this.#trace = input?.trace
-    this.#stageMask = filter.stages
-    this.#outcomeMask = filter.outcomes
-    if (input?.methods !== undefined) {
-      this.#methods = new Set(input.methods)
-      this.#methodMask = filter.methods
-    }
-    if (input?.endpointIds !== undefined) this.#endpoints = new Set(input.endpointIds)
-    this.#flush = () => {
-      this.#scheduled = false
-      if (this.#closed) return
-      try {
-        this.#commit()
-      } catch (failure) {
-        reportFailure(failure, this.#onError)
-      }
-    }
+    this.#filter = filter
+    this.#readSequence = readSequence
   }
 
-  /** Snapshot qualifying views into columns; no event object, closure or Promise is created. */
-  push(view: IRpcProbeEventView, seq: number, content: unknown, bytes: number): void {
-    if (this.#closed || (this.#stageMask & (1 << view.stage)) === 0) return
-    if ((this.#outcomeMask & (1 << view.outcome)) === 0) return
-    if (this.#trace !== undefined && view.trace !== this.#trace) return
-    if (this.#endpoints !== undefined && !this.#endpoints.has(view.endpointId)) return
-    if (this.#methods !== undefined) {
-      if (view.method === undefined) return
-      /** Existing intern ids take the reduced-dimension path; newly observed names use cold Set. */
-      const id = this.#names.find(view.method)
-      if (id === undefined || id >= this.#methodMask!.length || this.#methodMask![id] === 0) {
-        if (!this.#methods.has(view.method)) return
-        if (id !== undefined && id < this.#methodMask!.length) this.#methodMask![id] = 1
-      }
-    }
-    this.#ring.write(view, seq, content, bytes)
+  /** Existing watcher retention participates in cold origin lookup, independently of the main ring. */
+  get ring(): EventRing {
+    return this.#ring
+  }
+
+  /** Scheduled delivery filters raw rows; the collector never invokes this on its emit stack. */
+  push(
+    view: IRpcProbeEventView,
+    seq: number,
+    content: unknown,
+    bytes: number,
+    carrierSequences: ReadonlyMap<number, number>
+  ): void {
+    if (this.#closed || seq <= this.#filter.after) return
+    if ((this.#filter.stages & (1 << view.stage)) === 0) return
+    if ((this.#filter.outcomes & (1 << view.outcome)) === 0) return
+    if (this.#filter.trace !== undefined && view.trace !== this.#filter.trace) return
+    if (this.#filter.endpoints !== undefined && !this.#filter.endpoints.has(view.endpointId)) return
+    if (
+      this.#filter.methods !== undefined &&
+      (view.method === undefined || !this.#filter.methods.has(view.method))
+    )
+      return
+    /** Raw queue ownership and resolved numeric joins survive shared-burst retirement. */
+    const slot = this.#ring.write(view, seq, content, bytes)
+    this.#ring.resolveCarrier(slot, carrierSequences)
     this.#pending++
     if (this.#pending === CollectorLimit.batch) this.#commit()
-    else if (!this.#scheduled) {
-      this.#scheduled = true
-      enqueueBatch(this.#flush)
-    }
+  }
+
+  /**
+   * Raw burst loss counts overwritten input rows, including rows whose filter can no longer be
+   * known.
+   */
+  finishBurst(dropped: number): void {
+    if (this.#closed) return
+    this.#dropped += dropped
+    this.#commit()
   }
 
   /** Commit one bounded batch; a slow consumer loses exactly the oldest committed batch. */
@@ -163,12 +140,12 @@ export class CollectorWatcher {
     this.#count = 0
     this.#pending = 0
     this.#dropped = 0
-    this.#methodMask?.fill(0)
   }
 
   /** Activate before the first await; conversion, batching objects and Promises belong here. */
   async *iterate(): AsyncGenerator<IRpcDevtoolsWatchBatch> {
     this.#assertOpen?.()
+    this.#filter.after = this.#readSequence()
     this.#active.push(this)
     /** Stream cancellation wakes the existing pending read; it creates no second lifetime owner. */
     const onAbort = (): void => this.close()
