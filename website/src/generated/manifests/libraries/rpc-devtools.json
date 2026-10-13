@@ -51,11 +51,19 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRpcDevtools } from '@migaia/rpc-devtools'\n\n/** 默认只采集元数据；调用方拥有 collector 生命周期。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 1_000 })\n/** 独立录制环不受主查询环的淘汰影响。 */\nconst recording = devtools.record({ maxEvents: 100 })\ndevtools.pause()\nconsole.log(devtools.describe().paused) // true\ndevtools.resume()\nconsole.log(devtools.query().events.length, devtools.stats().methods.length) // 0 0\nconsole.log(devtools.importRecord(devtools.exportRecord(recording.stop())).header.version) // 1\ndevtools.close()"
+                "code": "import { createRpcDevtools } from '@migaia/rpc-devtools'\n\n/** 默认订阅 message 与 peer，只采集元数据；调用方拥有 collector 生命周期。 */\nconst devtools = createRpcDevtools({ maxEvents: 1_000 })\n/** 需要物理载体诊断时，显式扩展当前订阅；内容捕获仍关闭。 */\ndevtools.setStages(['message', 'peer', 'carrier'])\n/** 独立录制环不受主查询环的淘汰影响。 */\nconst recording = devtools.record({ maxEvents: 100 })\ndevtools.pause()\nconsole.log(devtools.describe().paused) // true\ndevtools.resume()\nconsole.log(devtools.query().events.length, devtools.stats().methods.length) // 0 0\nconsole.log(devtools.importRecord(devtools.exportRecord(recording.stop())).header.version) // 1\ndevtools.close()"
               },
               {
                 "type": "paragraph",
-                "text": "默认保留最近 10,000 个事件，内容预算 8 MiB，字符串驻留上限 65,536。`stats()` 按 endpoint/method 聚合；查询环淘汰不清除统计，`clear()` 同时清空事件与统计。`watch()` 每批最多 256 个事件，每个消费者最多排队 64 批；过慢时丢弃最旧批次，并在下一批报告 `dropped`。"
+                "text": "默认阶段为 `message` 与 `peer`。`envelope`、`encoded`、`frame`、`protected` 与 `carrier` 必须显式启用，例如构造时传入 `stages: ['message', 'peer', 'carrier']`，或调用上面的 `setStages()`；选择阶段不会开启内容捕获。"
+              },
+              {
+                "type": "paragraph",
+                "text": "默认保留最近 10,000 个事件，内容预算 8 MiB，读取时的字符串驻留上限 65,536。仅携带非负 durationMs 和 method 的 settled/failed/rejected `message` 事件同步更新 endpoint/method 统计；查询环淘汰不清除累计值，`clear()` 同时清空主环与统计。"
+              },
+              {
+                "type": "paragraph",
+                "text": "活跃 watcher 共用 16,384 行的原始待通知窗口。一个同步 burst 最多安排一次通知，没有活跃 watcher 时不安排通知；通知阶段才执行各 watcher 的过滤与入队。`watch()` 每批最多 256 个事件，每个消费者最多排队 64 批，保留原有筛选后的队列与最旧批次淘汰规则。共享原始窗口先于 watch 过滤发生的覆盖计入 `dropped`，因此该部分是原始丢失行数，不能还原为筛选后命中数。"
               },
               {
                 "type": "paragraph",
@@ -71,7 +79,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "顶层元数据在 `emit(view)` 返回前写入列，不保留复用 view。`detail`、error 与未转移的 captured content 保留引用；发送后修改这些对象可能影响后续读取。用 `capture` 显式选阶段，再用 `redact` 清理敏感内容。"
+                "text": "顶层元数据在 `emit(view)` 返回前写入原始列，字符串按引用保存，不保留复用 view。摄取时不做字符串驻留、refcount 或 carrier 序号翻译；驻留、关联与 wire 表示在 query、watch 交付、stats、record.stop、export 与 service 等读取边界执行。录制环遵循同一原始保存规则。`detail`、error 与未转移的 captured content 保留引用；发送后修改这些对象可能影响后续读取。用 `capture` 显式选阶段，再用 `redact` 清理敏感内容。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`message` 与 `envelope` 的 `variation` 保留原 route subtype（如 ping、pong、close、abort）；abort 的 kind 为 cancel，其余为 control。没有 method 的 variation 通过构造时的 `methods` 过滤；request、response 与其它阶段没有 variation。Wire、录制导出与导入保留该可选字段。"
               },
               {
                 "type": "paragraph",
@@ -135,7 +147,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "Revision 3 的 carrierSeq 是同一 target 内的 carrier 链接；collector 转换 Core 的本地序号，hub 在真实 decode 身份到达后增量关联。仓库 carrier 都同步在 send 内 emit，第三方异步 emit 没有 outbound context。Native Peer 不自动携带 trace，应用通过自己的 Endpoint.send 显式传递。前序匿名 chunks 当前不能全部归入 interaction，详见 Core USEGUIDE 和 closure handoff。"
+                "text": "Revision 3 的 carrierSeq 是同一 target 内的 carrier 链接；collector 在读取时转换 Core 的本地序号，hub 在真实 decode 身份到达后增量关联。首次解析前已在所有保留窗口中淘汰的 origin 不再恢复；已知链接在 dependent 行仍保留时继续有效。冷读取观察到 source 重置后保留旧 origin 的 cutoff，阻止其关联后续 generation 的新行。仓库 carrier 都同步在 send 内 emit，第三方异步 emit 没有 outbound context。Native Peer 不自动携带 trace，应用通过自己的 Endpoint.send 显式传递。前序匿名 chunks 当前不能全部归入 interaction，详见 Core USEGUIDE 和 closure handoff。"
               },
               {
                 "type": "paragraph",
@@ -190,7 +202,16 @@
               },
               {
                 "type": "paragraph",
-                "text": "选项包括 `stages`（默认所有阶段）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 过滤 message/envelope，`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。"
+                "text": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。"
+              },
+              {
+                "type": "paragraph",
+                "text": "物理阶段 `envelope`、`encoded`、`frame`、`protected`、`carrier` 均显式启用，构造选项与运行时订阅使用同一阶段域："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport { readProbeStages } from '@migaia/rpc-core/probe'\n\n/** 常规采集默认保留 message 与 peer。 */\nconst devtools = createRpcDevtools()\n/** 此独立诊断 collector 在构造时选择需要的物理阶段。 */\nconst diagnostic = createRpcDevtools({ stages: ['message', 'peer', 'frame', 'carrier'] })\n/** 原 collector 也可在运行时扩展物理订阅，内容捕获仍保持关闭。 */\ndevtools.setStages(['message', 'peer', 'encoded', 'carrier'])\nconsole.log(readProbeStages(devtools) !== 0) // true\ndiagnostic.close()\ndevtools.close()"
               },
               {
                 "type": "paragraph",
@@ -209,11 +230,19 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport {\n  RpcProbeStage,\n  RpcProbeDirection,\n  RpcProbeKind,\n  RpcProbeOutcome,\n  type IRpcProbeEventView\n} from '@migaia/rpc-core/probe'\n\n/** 每个宿主一个 collector，主查询环保留最近事件。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 4 })\n/** 仅本例手填元数据；真实 emitter 在同步调用间复用同一 view。 */\nconst view: IRpcProbeEventView = {\n  seq: 0,\n  carrierSeq: -1,\n  at: 0,\n  endpointId: 'client',\n  stage: RpcProbeStage.message,\n  direction: RpcProbeDirection.outbound,\n  kind: RpcProbeKind.request,\n  outcome: RpcProbeOutcome.settled,\n  messageId: 'call-1',\n  method: 'math.double',\n  senderId: 'client',\n  targetId: 'server',\n  receiverId: undefined,\n  peerId: undefined,\n  trace: 'trace-1',\n  sizeBytes: -1,\n  chunkIndex: -1,\n  chunkCount: -1,\n  members: -1,\n  durationMs: 2,\n  rejection: undefined,\n  lifecycle: undefined,\n  error: undefined,\n  carrier: undefined,\n  detail: undefined,\n  content: undefined\n}\n/** 录制使用独立容量，停止时才物化离线事件。 */\nconst recording = devtools.record({ maxEvents: 8 })\ndevtools.emit(view)\nview.method = 'math.changed' // 已写入的顶层元数据不再读取 view。\nconsole.log(devtools.query({ methods: ['math.double'] }).events[0]?.method)\nconsole.log(devtools.stats().methods[0]?.calls) // 1\n/** next() 开始订阅，后续写入唤醒当前消费者。 */\nconst watcher = devtools.watch({ stages: ['message'] })\nconst next = watcher.next()\ndevtools.emit(view)\nconsole.log((await next).value?.events.length) // 1\nawait watcher.return(undefined)\ndevtools.pause()\ndevtools.emit(view) // 计入 ignoredWhilePaused。\ndevtools.resume()\nconsole.log(devtools.query().counters.ignoredWhilePaused) // 1\n/** Codec 边界把录制转成独立 NDJSON 表示。 */\nconst text = devtools.exportRecord(recording.stop())\nconsole.log(devtools.importRecord(text).events.length) // 2\ndevtools.clear()\nconsole.log(devtools.stats().methods.length) // 0\ndevtools.close()"
+                "code": "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport {\n  RpcProbeStage,\n  RpcProbeDirection,\n  RpcProbeKind,\n  RpcProbeOutcome,\n  type IRpcProbeEventView\n} from '@migaia/rpc-core/probe'\n\n/** 每个宿主一个 collector，主查询环保留最近事件。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 4 })\n/** 仅本例手填元数据；真实 emitter 在同步调用间复用同一 view。 */\nconst view: IRpcProbeEventView = {\n  seq: 0,\n  carrierSeq: -1,\n  at: 0,\n  endpointId: 'client',\n  stage: RpcProbeStage.message,\n  direction: RpcProbeDirection.outbound,\n  kind: RpcProbeKind.request,\n  outcome: RpcProbeOutcome.settled,\n  messageId: 'call-1',\n  method: 'math.double',\n  variation: undefined,\n  senderId: 'client',\n  targetId: 'server',\n  receiverId: undefined,\n  peerId: undefined,\n  trace: 'trace-1',\n  sizeBytes: -1,\n  chunkIndex: -1,\n  chunkCount: -1,\n  members: -1,\n  durationMs: 2,\n  rejection: undefined,\n  lifecycle: undefined,\n  error: undefined,\n  carrier: undefined,\n  detail: undefined,\n  content: undefined\n}\n/** 录制使用独立容量，停止时才物化离线事件。 */\nconst recording = devtools.record({ maxEvents: 8 })\ndevtools.emit(view)\nview.method = 'math.changed' // 已写入的顶层元数据不再读取 view。\nconsole.log(devtools.query({ methods: ['math.double'] }).events[0]?.method)\nconsole.log(devtools.stats().methods[0]?.calls) // 1\n/** next() 开始订阅，后续写入唤醒当前消费者。 */\nconst watcher = devtools.watch({ stages: ['message'] })\nconst next = watcher.next()\ndevtools.emit(view)\nconsole.log((await next).value?.events.length) // 1\nawait watcher.return(undefined)\ndevtools.pause()\ndevtools.emit(view) // 计入 ignoredWhilePaused。\ndevtools.resume()\nconsole.log(devtools.query().counters.ignoredWhilePaused) // 1\n/** Codec 边界把录制转成独立 NDJSON 表示。 */\nconst text = devtools.exportRecord(recording.stop())\nconsole.log(devtools.importRecord(text).events.length) // 2\ndevtools.clear()\nconsole.log(devtools.stats().methods.length) // 0\ndevtools.close()"
               },
               {
                 "type": "paragraph",
-                "text": "`query({ afterSeq, limit, stages, outcomes, methods, trace, endpointIds })` 在保留环上单次扫描；`limit` 最大为 1,000，`nextSeq` 是下页 cursor。驻留表满后，新名称使用溢出 id 0 并增加 `internOverflow`；已有名称仍可还原。Watch 每批最多 256 个事件，每个消费者最多排队 64 批；过慢时丢弃最旧批次，下一批的 `dropped` 报告损失。`close()` 使等待中的 watch 以 `CLOSED` 结束，重复 close 安全。"
+                "text": "`emit(view)` 同步把字段写入主环、活跃录制环及共享 watch 原始窗口，字符串保留原引用，不保留复用 view，不在摄取时做字符串驻留、refcount、carrier 序号翻译或逐 watcher 入队。query、watch 交付、stats、record.stop、export 与 service 在需要结果时执行驻留、关联与表示转换；这是延迟读取派生，没有 sync/async 选项。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`query({ afterSeq, limit, stages, outcomes, methods, trace, endpointIds })` 在保留环上单次扫描；`limit` 最大为 1,000，`nextSeq` 是下页 cursor。读取时驻留表满后，新名称使用溢出 id 0 并增加 `internOverflow`；已有名称仍可还原。构造时的 `methods` 是采集过滤，query/watch 的 `methods` 则选择实际携带相应 method 的行，因此 reader 的方法筛选不会包含没有 method 的 control。"
+              },
+              {
+                "type": "paragraph",
+                "text": "只有活跃 watcher 才启用共享原始待通知窗口；每个同步 burst 最多安排一次通知，没有活跃 watcher 时零通知。该窗口最多保存 16,384 行，先保留原始事件，再在通知时执行每个 watcher 的筛选。窗口覆盖计入原始行损失，发生在筛选前，不能恢复丢失行原本是否命中某个过滤器。通知后仍使用每个消费者原有的筛选后队列：每批最多 256 个事件，最多排队 64 批；过慢时丢弃最旧批次。下一批 `dropped` 同时报告原始窗口覆盖与该消费者队列淘汰的损失。`close()` 使等待中的 watch 以 `CLOSED` 结束，重复 close 安全。"
               },
               {
                 "type": "paragraph",
@@ -225,6 +254,10 @@
               },
               {
                 "type": "paragraph",
+                "text": "`IRpcDevtoolsWireEvent.variation` 是 message/envelope 事件上可选的原 `route.variation` 字符串，保留 ping、pong、close、abort 与已注册用户 subtype 的身份。Abort 的 kind 为 cancel，其余 variation 为 control；request、response 与其它阶段省略该字段。Query、watch 与 record v1 codec 保留同一名称。"
+              },
+              {
+                "type": "paragraph",
                 "text": "内容预算只计入已知大小：字符串按 UTF-8 长度、ArrayBuffer/View 按 byteLength、opaque object 按事件提供的 sizeBytes。Opaque object 的 sizeBytes 为 -1 时计为 0；collector 不编码或遍历其对象图。因此 maxContentBytes 不保证约束任意 opaque object 的真实堆大小。需要可核算预算时，提供已有编码层的大小，或捕获 bytes/string。"
               },
               {
@@ -233,7 +266,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`stats()` 按 endpoint 和 method 提供调用、失败、拒绝、超时、取消计数，以及 24 个固定 log2 延迟桶：公开边界为 `0.0625 ms × 2^k`，`k = 0…23`。末桶从 `latencyOverflowFromMs = 262144` ms 向上开放，`latencyMaxMs` 给出实际最大样本。p50/p95/p99 在桶内插值并钳制到观察到的最大值；末桶没有固定宽度误差承诺。Hub 汇总所有带最大值的行时保留同一上界；旧 target 未提供最大值时不伪造它。仅携带非负 durationMs 的 settled/failed/rejected message 事件更新统计；环淘汰不影响累计值，`clear()` 同时重置环与统计。"
+                "text": "`stats()` 按 endpoint 和 method 提供调用、失败、拒绝、超时、取消计数，以及 24 个固定 log2 延迟桶：公开边界为 `0.0625 ms × 2^k`，`k = 0…23`。末桶从 `latencyOverflowFromMs = 262144` ms 向上开放，`latencyMaxMs` 给出实际最大样本。p50/p95/p99 在桶内插值并钳制到观察到的最大值；末桶没有固定宽度误差承诺。Hub 汇总所有带最大值的行时保留同一上界；旧 target 未提供最大值时不伪造它。仅携带非负 durationMs 与 method 的 settled/failed/rejected message 事件同步更新统计，每个合格事件一次；环淘汰不影响累计值，`clear()` 同时重置主环与统计。"
               }
             ]
           },
@@ -364,7 +397,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "`carrierSeq` 在 wire 中引用同一 collector/target 的 carrier 行；hub 不混用不同 target 的序号。Outbound 直接按 senderId:messageId 入索引；inbound 匿名 protected/frame 保留数字链接，真实 decode envelope 提供身份后加入该 interaction。摄取关联行时若原 carrier 已在所有环中淘汰，链接省略；之后淘汰可留下已记录的序号，hub 不补造丢失的 carrier。Frame 内容与 nested transfer 都按引用保存；Byte detail 的 drainMs 在原生 drain 后可更新，显式顶层快照也不会深复制 detail。"
+                "text": "`carrierSeq` 在 wire 中引用同一 collector/target 的 carrier 行；hub 不混用不同 target 的序号。Outbound 直接按 senderId:messageId 入索引；inbound 匿名 protected/frame 保留数字链接，真实 decode envelope 提供身份后加入该 interaction。Collector 按原 endpoint 字符串与 source 序号，在读取时合并主环、录制及 watch 的保留 origin。尚未解析的 origin 若已从所有保留窗口淘汰，首次读取省略链接；已知链接在 dependent 行仍保留时继续有效，查询、watch 与 record 的保留副本共享该已知值。"
+              },
+              {
+                "type": "paragraph",
+                "text": "冷读取观察到同一 endpoint 的 source 序号重置时，给旧 origin 记录 cutoff；之后即使重置行淘汰，旧 origin 也不能关联 cutoff 后的新行，历史链接继续保留。这些 cutoff 只来自实际读取过的重置，不在摄取时维护额外 generation 历史，hub 不补造已丢失的 carrier。Frame 内容与 nested transfer 都按引用保存；Byte detail 的 drainMs 在原生 drain 后可更新，显式顶层快照也不会深复制 detail。"
               }
             ]
           }
@@ -410,9 +447,10 @@
           "errors": ["No documented errors are declared for createRpcDevtools."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRpcDevtools.",
           "examples": [
-            "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport {\n  RpcProbeStage,\n  RpcProbeDirection,\n  RpcProbeKind,\n  RpcProbeOutcome,\n  type IRpcProbeEventView\n} from '@migaia/rpc-core/probe'\n\n/** 每个宿主一个 collector，主查询环保留最近事件。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 4 })\n/** 仅本例手填元数据；真实 emitter 在同步调用间复用同一 view。 */\nconst view: IRpcProbeEventView = {\n  seq: 0,\n  carrierSeq: -1,\n  at: 0,\n  endpointId: 'client',\n  stage: RpcProbeStage.message,\n  direction: RpcProbeDirection.outbound,\n  kind: RpcProbeKind.request,\n  outcome: RpcProbeOutcome.settled,\n  messageId: 'call-1',\n  method: 'math.double',\n  senderId: 'client',\n  targetId: 'server',\n  receiverId: undefined,\n  peerId: undefined,\n  trace: 'trace-1',\n  sizeBytes: -1,\n  chunkIndex: -1,\n  chunkCount: -1,\n  members: -1,\n  durationMs: 2,\n  rejection: undefined,\n  lifecycle: undefined,\n  error: undefined,\n  carrier: undefined,\n  detail: undefined,\n  content: undefined\n}\n/** 录制使用独立容量，停止时才物化离线事件。 */\nconst recording = devtools.record({ maxEvents: 8 })\ndevtools.emit(view)\nview.method = 'math.changed' // 已写入的顶层元数据不再读取 view。\nconsole.log(devtools.query({ methods: ['math.double'] }).events[0]?.method)\nconsole.log(devtools.stats().methods[0]?.calls) // 1\n/** next() 开始订阅，后续写入唤醒当前消费者。 */\nconst watcher = devtools.watch({ stages: ['message'] })\nconst next = watcher.next()\ndevtools.emit(view)\nconsole.log((await next).value?.events.length) // 1\nawait watcher.return(undefined)\ndevtools.pause()\ndevtools.emit(view) // 计入 ignoredWhilePaused。\ndevtools.resume()\nconsole.log(devtools.query().counters.ignoredWhilePaused) // 1\n/** Codec 边界把录制转成独立 NDJSON 表示。 */\nconst text = devtools.exportRecord(recording.stop())\nconsole.log(devtools.importRecord(text).events.length) // 2\ndevtools.clear()\nconsole.log(devtools.stats().methods.length) // 0\ndevtools.close()",
+            "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport { readProbeStages } from '@migaia/rpc-core/probe'\n\n/** 常规采集默认保留 message 与 peer。 */\nconst devtools = createRpcDevtools()\n/** 此独立诊断 collector 在构造时选择需要的物理阶段。 */\nconst diagnostic = createRpcDevtools({ stages: ['message', 'peer', 'frame', 'carrier'] })\n/** 原 collector 也可在运行时扩展物理订阅，内容捕获仍保持关闭。 */\ndevtools.setStages(['message', 'peer', 'encoded', 'carrier'])\nconsole.log(readProbeStages(devtools) !== 0) // true\ndiagnostic.close()\ndevtools.close()",
+            "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport {\n  RpcProbeStage,\n  RpcProbeDirection,\n  RpcProbeKind,\n  RpcProbeOutcome,\n  type IRpcProbeEventView\n} from '@migaia/rpc-core/probe'\n\n/** 每个宿主一个 collector，主查询环保留最近事件。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 4 })\n/** 仅本例手填元数据；真实 emitter 在同步调用间复用同一 view。 */\nconst view: IRpcProbeEventView = {\n  seq: 0,\n  carrierSeq: -1,\n  at: 0,\n  endpointId: 'client',\n  stage: RpcProbeStage.message,\n  direction: RpcProbeDirection.outbound,\n  kind: RpcProbeKind.request,\n  outcome: RpcProbeOutcome.settled,\n  messageId: 'call-1',\n  method: 'math.double',\n  variation: undefined,\n  senderId: 'client',\n  targetId: 'server',\n  receiverId: undefined,\n  peerId: undefined,\n  trace: 'trace-1',\n  sizeBytes: -1,\n  chunkIndex: -1,\n  chunkCount: -1,\n  members: -1,\n  durationMs: 2,\n  rejection: undefined,\n  lifecycle: undefined,\n  error: undefined,\n  carrier: undefined,\n  detail: undefined,\n  content: undefined\n}\n/** 录制使用独立容量，停止时才物化离线事件。 */\nconst recording = devtools.record({ maxEvents: 8 })\ndevtools.emit(view)\nview.method = 'math.changed' // 已写入的顶层元数据不再读取 view。\nconsole.log(devtools.query({ methods: ['math.double'] }).events[0]?.method)\nconsole.log(devtools.stats().methods[0]?.calls) // 1\n/** next() 开始订阅，后续写入唤醒当前消费者。 */\nconst watcher = devtools.watch({ stages: ['message'] })\nconst next = watcher.next()\ndevtools.emit(view)\nconsole.log((await next).value?.events.length) // 1\nawait watcher.return(undefined)\ndevtools.pause()\ndevtools.emit(view) // 计入 ignoredWhilePaused。\ndevtools.resume()\nconsole.log(devtools.query().counters.ignoredWhilePaused) // 1\n/** Codec 边界把录制转成独立 NDJSON 表示。 */\nconst text = devtools.exportRecord(recording.stop())\nconsole.log(devtools.importRecord(text).events.length) // 2\ndevtools.clear()\nconsole.log(devtools.stats().methods.length) // 0\ndevtools.close()",
             "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport type { IRpcDevtoolsServiceApi } from '@migaia/rpc-devtools/contract'\nimport { createPeerPair } from '@migaia/rpc-core/testing'\n\n/** Service 专用 Peer 不安装 collector 作为 probe，避免观察自己的查询流量。 */\nconst devtools = createRpcDevtools({ maxEvents: 32 })\n/** 这里的类型断言公开冻结的 service 契约，供 typed Peer 推断方法。 */\nconst pair = await createPeerPair({\n  a: { provide: {} },\n  b: { provide: { devtools: devtools.service as IRpcDevtoolsServiceApi } }\n})\ntry {\n  console.log((await pair.a.request('devtools.describe')).limits.maxEvents) // 32\n  console.log((await pair.a.request('devtools.query', { stages: ['message'] })).events.length)\n  await pair.a.request('devtools.record.start', { maxEvents: 8 })\n  console.log(devtools.importRecord(await pair.a.request('devtools.record.stop')).header.version)\n  await pair.a.request('devtools.pause')\n  await pair.a.request('devtools.resume')\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n  devtools.close()\n}",
-            "import { createRpcDevtools } from '@migaia/rpc-devtools'\n\n/** 默认只采集元数据；调用方拥有 collector 生命周期。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 1_000 })\n/** 独立录制环不受主查询环的淘汰影响。 */\nconst recording = devtools.record({ maxEvents: 100 })\ndevtools.pause()\nconsole.log(devtools.describe().paused) // true\ndevtools.resume()\nconsole.log(devtools.query().events.length, devtools.stats().methods.length) // 0 0\nconsole.log(devtools.importRecord(devtools.exportRecord(recording.stop())).header.version) // 1\ndevtools.close()"
+            "import { createRpcDevtools } from '@migaia/rpc-devtools'\n\n/** 默认订阅 message 与 peer，只采集元数据；调用方拥有 collector 生命周期。 */\nconst devtools = createRpcDevtools({ maxEvents: 1_000 })\n/** 需要物理载体诊断时，显式扩展当前订阅；内容捕获仍关闭。 */\ndevtools.setStages(['message', 'peer', 'carrier'])\n/** 独立录制环不受主查询环的淘汰影响。 */\nconst recording = devtools.record({ maxEvents: 100 })\ndevtools.pause()\nconsole.log(devtools.describe().paused) // true\ndevtools.resume()\nconsole.log(devtools.query().events.length, devtools.stats().methods.length) // 0 0\nconsole.log(devtools.importRecord(devtools.exportRecord(recording.stop())).header.version) // 1\ndevtools.close()"
           ],
           "members": [],
           "aliasOf": "createRpcDevtools",
@@ -467,7 +505,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-devtools/dist/collector/devtools.d.ts:createRpcDevtools:export declare function createRpcDevtools(options?: IRpcDevtoolsOptions): IRpcDevtools;",
           "guidance": [],
-          "usageScore": 46,
+          "usageScore": 64,
           "configuration": [],
           "fragment": "rpc-devtools-index--createRpcDevtools"
         },
@@ -475,7 +513,7 @@
           "name": "IRpcDevtools",
           "kind": "type",
           "signature": "export type IRpcDevtools = IRpcProbe & Readonly<{ /** Collector-owned ingestion exists before host-form defineProbe attaches the compiled fields. */ emit(view: IRpcProbeEventView): void; query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; stats(): IRpcDevtoolsStats; describe(): IRpcDevtoolsDescribe; record(options?: Readonly<{ maxEvents?: number; }>): Readonly<{ stop(): IRpcDevtoolsRecord; }>; exportRecord(record: IRpcDevtoolsRecord): string; importRecord(text: string): IRpcDevtoolsRecord; pause(): void; resume(): void; clear(): void; close(): void; readonly service: IRuntimePeerProvide; }>;",
-          "declarationLine": 19,
+          "declarationLine": 21,
           "source": "packages/rpc-devtools/dist/collector-types.d.ts",
           "purpose": "A collector is directly installable as a probe; callers own its serving Peer and its lifetime.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtools.",
@@ -538,7 +576,7 @@
         {
           "name": "IRpcDevtoolsOptions",
           "kind": "type",
-          "signature": "export type IRpcDevtoolsOptions = Readonly<{ stages?: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; methods?: readonly string[]; sample?: number; maxEvents?: number; maxContentBytes?: number; maxInterned?: number; exposeContent?: boolean; onError?(error: unknown): void; }>;",
+          "signature": "export type IRpcDevtoolsOptions = Readonly<{ /** Defaults to message and peer; pass physical stages here or use setStages() to enable them. */ stages?: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; methods?: readonly string[]; sample?: number; maxEvents?: number; maxContentBytes?: number; /** Bounds the reader name table; ingestion retains raw string references without interning. */ maxInterned?: number; exposeContent?: boolean; onError?(error: unknown): void; }>;",
           "declarationLine": 6,
           "source": "packages/rpc-devtools/dist/collector-types.d.ts",
           "purpose": "Collector construction options are frozen now; defaults and ingestion belong to layer 2.",
@@ -554,7 +592,7 @@
           "aliasOf": "IRpcDevtoolsOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRpcDevtoolsOptions = Readonly<{ stages?: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; methods?: readonly string[]; sample?: number; maxEvents?: number; maxContentBytes?: number; maxInterned?: number; exposeContent?: boolean; onError?(error: unknown): void; }>;"
+            "export type IRpcDevtoolsOptions = Readonly<{ /** Defaults to message and peer; pass physical stages here or use setStages() to enable them. */ stages?: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; methods?: readonly string[]; sample?: number; maxEvents?: number; maxContentBytes?: number; /** Bounds the reader name table; ingestion retains raw string references without interning. */ maxInterned?: number; exposeContent?: boolean; onError?(error: unknown): void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -593,7 +631,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/collector-types.d.ts:IRpcDevtoolsOptions:export type IRpcDevtoolsOptions = Readonly<{ stages?: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; methods?: readonly string[]; sample?: number; maxEvents?: number; maxContentBytes?: number; maxInterned?: number; exposeContent?: boolean; onError?(error: unknown): void; }>;",
+          "identity": "packages/rpc-devtools/dist/collector-types.d.ts:IRpcDevtoolsOptions:export type IRpcDevtoolsOptions = Readonly<{ /** Defaults to message and peer; pass physical stages here or use setStages() to enable them. */ stages?: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; methods?: readonly string[]; sample?: number; maxEvents?: number; maxContentBytes?: number; /** Bounds the reader name table; ingestion retains raw string references without interning. */ maxInterned?: number; exposeContent?: boolean; onError?(error: unknown): void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -1517,7 +1555,7 @@
         {
           "name": "IRpcDevtoolsWireEvent",
           "kind": "type",
-          "signature": "export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;",
+          "signature": "export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; /** Original variation route name retained by message/envelope events and offline records. */ variation?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;",
           "declarationLine": 5,
           "source": "packages/rpc-devtools/dist/contract/wire.d.ts",
           "purpose": "String names appear only at query/export boundaries; the collector retains numeric columns.",
@@ -1532,7 +1570,7 @@
           "members": [],
           "exportPath": "./contract",
           "overloadSignatures": [
-            "export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;"
+            "export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; /** Original variation route name retained by message/envelope events and offline records. */ variation?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1571,9 +1609,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/contract/wire.d.ts:IRpcDevtoolsWireEvent:export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;",
+          "identity": "packages/rpc-devtools/dist/contract/wire.d.ts:IRpcDevtoolsWireEvent:export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; /** Original variation route name retained by message/envelope events and offline records. */ variation?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 8,
           "configuration": [],
           "fragment": "rpc-devtools-contract--IRpcDevtoolsWireEvent"
         },

@@ -43,9 +43,26 @@ Bytes 表示为 `{ "$bytes": base64 }`。录制错误使用 `serializeRpcError` 
 
 `createRpcDevtools(options)` 返回 collector 自己的 `IRpcProbe` 对象。`defineProbe(definition, host)` 将 Probe 附到同一对象上并冻结，保留对象身份。将其传给已有 Peer 的 `probe`，调用方负责 Peer 与 collector 的生命周期；collector 不创建 transport。
 
-选项包括 `stages`（默认所有阶段）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 过滤 message/envelope，`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。
+选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。
 
-容量必须为正整数；内容预算允许 0。`maxEvents`（含录制容量）不超过 JavaScript Array 的长度上限 4,294,967,295；`maxInterned` 不超过 94,906,264，保证 endpoint/method 数值组合键仍是精确整数。这些是索引表示上限；实际可分配容量取决于宿主内存。
+物理阶段 `envelope`、`encoded`、`frame`、`protected`、`carrier` 均显式启用，构造选项与运行时订阅使用同一阶段域：
+
+```ts doc-test=run
+import { createRpcDevtools } from '@migaia/rpc-devtools'
+import { readProbeStages } from '@migaia/rpc-core/probe'
+
+/** 常规采集默认保留 message 与 peer。 */
+const devtools = createRpcDevtools()
+/** 此独立诊断 collector 在构造时选择需要的物理阶段。 */
+const diagnostic = createRpcDevtools({ stages: ['message', 'peer', 'frame', 'carrier'] })
+/** 原 collector 也可在运行时扩展物理订阅，内容捕获仍保持关闭。 */
+devtools.setStages(['message', 'peer', 'encoded', 'carrier'])
+console.log(readProbeStages(devtools) !== 0) // true
+diagnostic.close()
+devtools.close()
+```
+
+容量必须为正整数；内容预算允许 0。`maxEvents`（含录制容量）不超过 JavaScript Array 的长度上限 4,294,967,295；`maxInterned` 的当前配置上限为 94,906,264。这些是配置表示上限；实际可分配容量取决于宿主内存。
 
 ### 本地查询、统计、watch 与录制
 
@@ -75,6 +92,7 @@ const view: IRpcProbeEventView = {
   outcome: RpcProbeOutcome.settled,
   messageId: 'call-1',
   method: 'math.double',
+  variation: undefined,
   senderId: 'client',
   targetId: 'server',
   receiverId: undefined,
@@ -116,17 +134,27 @@ console.log(devtools.stats().methods.length) // 0
 devtools.close()
 ```
 
-`query({ afterSeq, limit, stages, outcomes, methods, trace, endpointIds })` 在保留环上单次扫描；`limit` 最大为 1,000，`nextSeq` 是下页 cursor。驻留表满后，新名称使用溢出 id 0 并增加 `internOverflow`；已有名称仍可还原。Watch 每批最多 256 个事件，每个消费者最多排队 64 批；过慢时丢弃最旧批次，下一批的 `dropped` 报告损失。`close()` 使等待中的 watch 以 `CLOSED` 结束，重复 close 安全。
+`emit(view)` 同步把字段写入主环、活跃录制环及共享 watch 原始窗口，字符串保留原引用，不保留复用 view，不在摄取时做字符串驻留、refcount、carrier 序号翻译或逐 watcher 入队。query、watch 交付、stats、record.stop、export 与 service 在需要结果时执行驻留、关联与表示转换；这是延迟读取派生，没有 sync/async 选项。
+
+`query({ afterSeq, limit, stages, outcomes, methods, trace, endpointIds })` 在保留环上单次扫描；`limit` 最大为 1,000，`nextSeq` 是下页 cursor。读取时驻留表满后，新名称使用溢出 id 0 并增加 `internOverflow`；已有名称仍可还原。构造时的 `methods` 是采集过滤，query/watch 的 `methods` 则选择实际携带相应 method 的行，因此 reader 的方法筛选不会包含没有 method 的 control。
+
+只有活跃 watcher 才启用共享原始待通知窗口；每个同步 burst 最多安排一次通知，没有活跃 watcher 时零通知。该窗口最多保存 16,384 行，先保留原始事件，再在通知时执行每个 watcher 的筛选。窗口覆盖计入原始行损失，发生在筛选前，不能恢复丢失行原本是否命中某个过滤器。通知后仍使用每个消费者原有的筛选后队列：每批最多 256 个事件，最多排队 64 批；过慢时丢弃最旧批次。下一批 `dropped` 同时报告原始窗口覆盖与该消费者队列淘汰的损失。`close()` 使等待中的 watch 以 `CLOSED` 结束，重复 close 安全。
+
+当前共享原始丢失计数在通知时分发给届时活跃的 watcher；若某个 watcher 在 burst 已安排通知、尚未交付时首次调用 `next()`，其后续批次可能包含订阅前的原始丢失计数。这是源码审查确认的限制，尚未运行对应的复现。
 
 `pause()` 保存暂停前最新订阅并清空 emitter mask，重复暂停不覆盖保存值；`resume()` 恢复该列表。构造后 `setStages()` 增加的阶段保留。Query 与 watch 的 `outcomes` 使用同一公开 outcome 名称域，空列表匹配零行。
 
 按照 SC9，采集时保留 `detail`、error 与未实际转移的 content 引用，发送后对这些对象的修改可能反映在后续读取中。`snapshotProbeEvent` 只按显式请求复制顶层事件元数据（SC9c），内部引用仍可变；codec 在编码/解码边界转为独立 wire/text 表示（SC9b）。
 
+`IRpcDevtoolsWireEvent.variation` 是 message/envelope 事件上可选的原 `route.variation` 字符串，保留 ping、pong、close、abort 与已注册用户 subtype 的身份。Abort 的 kind 为 cancel，其余 variation 为 control；request、response 与其它阶段省略该字段。Query、watch 与 record v1 codec 保留同一名称。
+
 内容预算只计入已知大小：字符串按 UTF-8 长度、ArrayBuffer/View 按 byteLength、opaque object 按事件提供的 sizeBytes。Opaque object 的 sizeBytes 为 -1 时计为 0；collector 不编码或遍历其对象图。因此 maxContentBytes 不保证约束任意 opaque object 的真实堆大小。需要可核算预算时，提供已有编码层的大小，或捕获 bytes/string。
 
 `watch` 的批次类型是 `{ events, dropped }`。`record().stop()` 返回离线 record；service 的 `record.stop()` 返回编码文本。Service 默认不暴露 content，须由 `exposeContent` 明确启用。`IRpcDevtoolsCounters` 包含环形存储淘汰、内容丢弃、重入丢弃、采样丢弃、暂停/关闭忽略与字符串驻留溢出的计数。
 
-`stats()` 按 endpoint 和 method 提供调用、失败、拒绝、超时、取消计数，以及 24 个固定 log2 延迟桶：公开边界为 `0.0625 ms × 2^k`，`k = 0…23`。末桶从 `latencyOverflowFromMs = 262144` ms 向上开放，`latencyMaxMs` 给出实际最大样本。p50/p95/p99 在桶内插值并钳制到观察到的最大值；末桶没有固定宽度误差承诺。Hub 汇总所有带最大值的行时保留同一上界；旧 target 未提供最大值时不伪造它。仅携带非负 durationMs 的 settled/failed/rejected message 事件更新统计；环淘汰不影响累计值，`clear()` 同时重置环与统计。
+`stats()` 按 endpoint 和 method 提供调用、失败、拒绝、超时、取消计数，以及 24 个固定 log2 延迟桶：公开边界为 `0.0625 ms × 2^k`，`k = 0…23`。末桶从 `latencyOverflowFromMs = 262144` ms 向上开放，`latencyMaxMs` 给出实际最大样本。p50/p95/p99 在桶内插值并钳制到观察到的最大值；末桶没有固定宽度误差承诺。Hub 汇总所有带最大值的行时保留同一上界；旧 target 未提供最大值时不伪造它。仅携带非负 durationMs 与 method 的 settled/failed/rejected message 事件同步更新统计，每个合格事件一次；环淘汰不影响累计值，`clear()` 同时重置主环与统计。
+
+`maxInterned` 只限制读取时的名称驻留表；累计统计保留原始 endpoint/method 对，直到 `clear()` 释放这些身份。唯一 endpoint/method 组合持续增加时，这部分状态可以持续增长，不受 `maxEvents` 或 `maxInterned` 限制。
 
 ### 已有 Peer 上的远程 service
 
@@ -274,4 +302,4 @@ try {
 }
 ```
 
-`carrierSeq` 在 wire 中引用同一 collector/target 的 carrier 行；hub 不混用不同 target 的序号。Outbound 直接按 senderId:messageId 入索引；inbound 匿名 protected/frame 保留数字链接，真实 decode envelope 提供身份后加入该 interaction。摄取关联行时若原 carrier 已在所有环中淘汰，链接省略；之后淘汰可留下已记录的序号，hub 不补造丢失的 carrier。Frame 内容与 nested transfer 都按引用保存；Byte detail 的 drainMs 在原生 drain 后可更新，显式顶层快照也不会深复制 detail。
+`carrierSeq` 在 wire 中引用同一 collector/target 的 carrier 行；hub 不混用不同 target 的序号。Outbound 直接按 senderId:messageId 入索引；inbound 匿名 protected/frame 保留数字链接，真实 decode envelope 提供身份后加入该 interaction。Collector 按原 endpoint 字符串与 source 序号，在读取时合并主环、录制及 watch 的保留 origin。尚未解析的 origin 若已从所有保留窗口淘汰，首次读取省略链接；已知链接在 dependent 行仍保留时继续有效，查询、watch 与 record 的保留副本共享该已知值。冷读取观察到同一 endpoint 的 source 序号重置时，给旧 origin 记录 cutoff；之后即使重置行淘汰，旧 origin 也不能关联 cutoff 后的新行，历史链接继续保留。这些 cutoff 只来自实际读取过的重置，不在摄取时维护额外 generation 历史，hub 不补造已丢失的 carrier。Frame 内容与 nested transfer 都按引用保存；Byte detail 的 drainMs 在原生 drain 后可更新，显式顶层快照也不会深复制 detail。

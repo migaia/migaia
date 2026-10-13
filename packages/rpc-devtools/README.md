@@ -16,8 +16,10 @@ RPC 元数据采集、统计、录制与跨宿主 hub。Collector 可作为 Prob
 ```ts doc-test=run
 import { createRpcDevtools } from '@migaia/rpc-devtools'
 
-/** 默认只采集元数据；调用方拥有 collector 生命周期。 */
-const devtools = createRpcDevtools({ stages: ['message'], maxEvents: 1_000 })
+/** 默认订阅 message 与 peer，只采集元数据；调用方拥有 collector 生命周期。 */
+const devtools = createRpcDevtools({ maxEvents: 1_000 })
+/** 需要物理载体诊断时，显式扩展当前订阅；内容捕获仍关闭。 */
+devtools.setStages(['message', 'peer', 'carrier'])
 /** 独立录制环不受主查询环的淘汰影响。 */
 const recording = devtools.record({ maxEvents: 100 })
 devtools.pause()
@@ -28,7 +30,11 @@ console.log(devtools.importRecord(devtools.exportRecord(recording.stop())).heade
 devtools.close()
 ```
 
-默认保留最近 10,000 个事件，内容预算 8 MiB，字符串驻留上限 65,536。`stats()` 按 endpoint/method 聚合；查询环淘汰不清除统计，`clear()` 同时清空事件与统计。`watch()` 每批最多 256 个事件，每个消费者最多排队 64 批；过慢时丢弃最旧批次，并在下一批报告 `dropped`。
+默认阶段为 `message` 与 `peer`。`envelope`、`encoded`、`frame`、`protected` 与 `carrier` 必须显式启用，例如构造时传入 `stages: ['message', 'peer', 'carrier']`，或调用上面的 `setStages()`；选择阶段不会开启内容捕获。
+
+默认保留最近 10,000 个事件，内容预算 8 MiB，读取时的字符串驻留上限 65,536。仅携带非负 durationMs 和 method 的 settled/failed/rejected `message` 事件同步更新 endpoint/method 统计；查询环淘汰不清除累计值，`clear()` 同时清空主环与统计。
+
+活跃 watcher 共用 16,384 行的原始待通知窗口。一个同步 burst 最多安排一次通知，没有活跃 watcher 时不安排通知；通知阶段才执行各 watcher 的过滤与入队。`watch()` 每批最多 256 个事件，每个消费者最多排队 64 批，保留原有筛选后的队列与最旧批次淘汰规则。共享原始窗口先于 watch 过滤发生的覆盖计入 `dropped`，因此该部分是原始丢失行数，不能还原为筛选后命中数。
 
 把 `devtools.service` 挂到已有 Peer 的 `provide: { devtools: devtools.service }`；远端使用 `devtools.describe/query/watch/stats/record.start/record.stop/clear/pause/resume`。为 service 使用独立 Peer。Service 默认隐藏 content；只有 `exposeContent: true` 才允许内容跨 service 边界。
 
@@ -36,7 +42,9 @@ Service 使用实际 `IRpcContext.localEndpointId` 排除 serving endpoint；独
 
 `pause()` 保存最新有效 stages，`resume()` 恢复该选择；构造后 setStages 的修改保留。Query 与 watch 支持 `outcomes`，空列表不匹配任何事件。
 
-顶层元数据在 `emit(view)` 返回前写入列，不保留复用 view。`detail`、error 与未转移的 captured content 保留引用；发送后修改这些对象可能影响后续读取。用 `capture` 显式选阶段，再用 `redact` 清理敏感内容。
+顶层元数据在 `emit(view)` 返回前写入原始列，字符串按引用保存，不保留复用 view。摄取时不做字符串驻留、refcount 或 carrier 序号翻译；驻留、关联与 wire 表示在 query、watch 交付、stats、record.stop、export 与 service 等读取边界执行。录制环遵循同一原始保存规则。`detail`、error 与未转移的 captured content 保留引用；发送后修改这些对象可能影响后续读取。用 `capture` 显式选阶段，再用 `redact` 清理敏感内容。
+
+`message` 与 `envelope` 的 `variation` 保留原 route subtype（如 ping、pong、close、abort）；abort 的 kind 为 cancel，其余为 control。没有 method 的 variation 通过构造时的 `methods` 过滤；request、response 与其它阶段没有 variation。Wire、录制导出与导入保留该可选字段。
 
 内容预算计入字符串的 UTF-8 长度、ArrayBuffer/View 的 byteLength，或 opaque object 的 `view.sizeBytes`。Opaque object 在 sizeBytes 为 -1 时计为 0；collector 不在采集时编码对象来估算大小，因此该预算不保证限制任意对象图的真实堆占用。
 
@@ -111,6 +119,6 @@ try {
 
 返回数组中的事件是已存储引用。未转移的 content、`detail` 与 error 保留引用；发送后修改原对象可能改变后续读取。详见 [USEGUIDE](./USEGUIDE.md) 的生命周期、时钟误差与引用语义。
 
-Revision 3 的 carrierSeq 是同一 target 内的 carrier 链接；collector 转换 Core 的本地序号，hub 在真实 decode 身份到达后增量关联。仓库 carrier 都同步在 send 内 emit，第三方异步 emit 没有 outbound context。Native Peer 不自动携带 trace，应用通过自己的 Endpoint.send 显式传递。前序匿名 chunks 当前不能全部归入 interaction，详见 Core USEGUIDE 和 closure handoff。
+Revision 3 的 carrierSeq 是同一 target 内的 carrier 链接；collector 在读取时转换 Core 的本地序号，hub 在真实 decode 身份到达后增量关联。首次解析前已在所有保留窗口中淘汰的 origin 不再恢复；已知链接在 dependent 行仍保留时继续有效。冷读取观察到 source 重置后保留旧 origin 的 cutoff，阻止其关联后续 generation 的新行。仓库 carrier 都同步在 send 内 emit，第三方异步 emit 没有 outbound context。Native Peer 不自动携带 trace，应用通过自己的 Endpoint.send 显式传递。前序匿名 chunks 当前不能全部归入 interaction，详见 Core USEGUIDE 和 closure handoff。
 
 `capture` 默认关闭；log probe 支持 capture/redact。Nested transferable 保留引用，可能分离；不深扫描或复制容器，也不额外读取 getter。Metadata 的未知字符串/容器大小为 -1，直接 native bytes 保留已知长度。

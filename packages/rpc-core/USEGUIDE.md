@@ -821,16 +821,18 @@ console.log(probe === host, Object.isFrozen(host), probe.name)
 
 `host` 必须为可扩展、未冻结的非 null 对象，不能已经拥有 `stageMask`、`captureMask`、`methods`、`sampleThreshold`、`setStages`，也不能已经注册为 Probe。所有验证在修改对象之前完成；失败以 `TypeError` / `INVALID_CONFIG` 拒绝，`host` 不变。已有 `host.emit` 允许保留，附加操作不会覆盖它；Probe 私有状态使用 `definition.emit`。后续 emitter 在安装时从私有 WeakMap 读取编译状态，放入自己的固定形状记录；热路径读取该记录，不读取带额外成员的 `host`。
 
-| 配置                          | 契约                                                 |
-| ----------------------------- | ---------------------------------------------------- |
-| `stages`                      | 定义时必须为非空的已知阶段名称数组                   |
-| `capture`                     | 默认关闭；定义时必须为 `stages` 子集                 |
-| `redact`                      | 处理显式捕获的内容；不会因此开启未选择阶段的 capture |
-| `methods`                     | 只过滤 `message` 与 `envelope`，其它阶段只按采样过滤 |
-| `sample`                      | 范围 `(0, 1]`，默认全部；阈值在定义时计算            |
-| `describe`、`emit`、`onError` | 描述、同步事件消费者与错误报告 callback              |
+| 配置                          | 契约                                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `stages`                      | 定义时必须为非空的已知阶段名称数组                                                                      |
+| `capture`                     | 默认关闭；定义时必须为 `stages` 子集                                                                    |
+| `redact`                      | 处理显式捕获的内容；不会因此开启未选择阶段的 capture                                                    |
+| `methods`                     | 只过滤携带 method 的 `message` 与 `envelope`；没有 method 的 variation 通过该过滤，其它阶段只按采样过滤 |
+| `sample`                      | 范围 `(0, 1]`，默认全部；阈值在定义时计算                                                               |
+| `describe`、`emit`、`onError` | 描述、同步事件消费者与错误报告 callback                                                                 |
 
 `rpcProbeSampleKey(senderId, messageId)` 对二者拼接后的 UTF-8 字节计算 FNV-1a 32 位键。调用方与接收方使用相同标识，所以同一交互的两侧采样决定一致；它不是认证机制或唯一身份。
+
+`IRpcProbeEventView.variation` 在 variation envelope 的 `message` 与 `envelope` 事件中保留原 `route.variation` 字符串引用，包括 `ping`、`pong`、`close`、`abort` 与已注册的用户 subtype。`abort` 的 kind 仍为 `cancel`，其余 variation 为 `control`；request、response 与其它阶段的 variation 为 `undefined`。`methods: ['echo']` 保留 echo 的方法事件及没有 method 的 variation，排除其它 method；variation 仍受已配置的采样规则约束。
 
 ### 13.2 View 生命周期与内容捕获
 
@@ -908,7 +910,7 @@ try {
 
 ### 13.4 Revision 3 的关联边界
 
-`IRpcProbeEventView.carrierSeq` 是同一 emitter 的 inbound carrier 序号；没有链接时为 `-1`。Core 在同步 receive 入口取走它，并沿原 physical record 穿过异步 unprotect/decode。Collector 将其转换为自己的全局 wire 序号，wire 的无链接字段省略。只有原 carrier 仍被主环、record 或 watch 保留且 endpoint 未驻留溢出时才可还原链接。
+`IRpcProbeEventView.carrierSeq` 是同一 emitter 的 inbound carrier 序号；没有链接时为 `-1`。Core 在同步 receive 入口取走它，并沿原 physical record 穿过异步 unprotect/decode。Collector 在读取时，按原 endpoint 字符串及 source 序号转换为自己的全局 wire 序号，无链接字段省略。尚未解析的 origin 若已从主环、record 与 watch 的所有保留窗口淘汰，首次读取不能恢复该链接；已读取解析的链接在其 dependent 行仍保留时继续有效。读取时观察到同一 endpoint 的 source 序号重置，会给旧 origin 保留 cutoff，阻止其关联 cutoff 后的新行，同时保留历史链接；collector 不在摄取时维护额外 generation 历史。
 
 Outbound carrier 借用本次 send 的原 envelope，携带 messageId、senderId、targetId、trace；同步 send 返回后立即清空。仓库载体都在 send 内同步 emit；第三方载体若跨异步间隙再 emit，没有这份 context。Physical batch 使用其第一个实际成员作代表，不展开 payload 成员。
 

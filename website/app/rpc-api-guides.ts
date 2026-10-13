@@ -4366,26 +4366,28 @@ probe.setStages([]) // Private active mask changes; host.stageMask keeps its ini
 probe.setStages(['message', 'frame'])`,
     useEn: [
       'Attach the Probe to an existing extensible, non-frozen object while preserving its members and identity.',
-      'Use explicit capture and redaction; detail, error and untransferred content retain references under SC9.'
+      'Use explicit capture and redaction; detail, error and untransferred content retain references under SC9.',
+      'Read IRpcProbeEventView.variation on message/envelope controls: abort keeps kind cancel, other variations use control, and request/response or other stages leave it undefined.'
     ],
     useZh: [
       '把 Probe 附到可扩展且未冻结的已有对象，保留原有成员与对象身份。',
-      '显式配置 capture/redact；detail、error 与未转移的 content 按 SC9 保留引用。'
+      '显式配置 capture/redact；detail、error 与未转移的 content 按 SC9 保留引用。',
+      '从 message/envelope 的 IRpcProbeEventView.variation 读取 control subtype；abort 的 kind 为 cancel，其余 variation 为 control，request/response 与其它阶段为 undefined。'
     ],
     avoidEn: [
       'Retaining a reusable view after emit returns without an explicit snapshotProbeEvent request.',
-      'Applying methods to frame-level events: it filters only message and envelope; other stages use sampling.'
+      'Applying methods to frame-level events or expecting it to remove methodless variations: it filters only method-bearing message/envelope events; other stages use sampling.'
     ],
     avoidZh: [
       '在 emit 返回后直接保留复用 view，而没有显式调用 snapshotProbeEvent。',
-      '把 methods 过滤应用到帧层：它只过滤 message/envelope，其它阶段只受采样控制。'
+      '把 methods 过滤应用到帧层或期望它删除没有 method 的 variation：它只过滤携带 method 的 message/envelope，其它阶段只受采样控制。'
     ]
   }),
   'rpc-core:probe:snapshotProbeEvent': guide({
     purposeEn:
-      'Explicitly copies reusable Probe metadata under SC9c so top-level fields survive emit. Detail, error and content keep their original references; later caller mutation remains visible until a real codec boundary converts them.',
+      'Explicitly copies reusable Probe metadata under SC9c so top-level fields, including variation, survive emit. Detail, error and content keep their original references; later caller mutation remains visible until a real codec boundary converts them.',
     purposeZh:
-      '按 SC9c 显式复制复用 Probe 的顶层元数据，使字段在 emit 返回后有效；detail、error、content 保留原引用，调用方后续修改仍可见，直到真实 codec 边界转换表示。',
+      '按 SC9c 显式复制复用 Probe 的顶层元数据，包括 variation，使字段在 emit 返回后有效；detail、error、content 保留原引用，调用方后续修改仍可见，直到真实 codec 边界转换表示。',
     quickStart: `import { defineProbe, snapshotProbeEvent, type IRpcProbeEventView } from '@migaia/rpc-core/probe'
 
 /** Retained snapshots belong to this diagnostic consumer. */
@@ -4515,13 +4517,17 @@ console.log(RPC_DEVTOOLS_SOURCE, RpcDevtoolsErrorCode)`,
 const rpcDevtoolsGuides = {
   'rpc-devtools:index:createRpcDevtools': guide({
     purposeEn:
-      'Creates one bounded RPC collector per host, directly usable as a Probe. Numeric ring columns preserve reusable-view metadata, independent statistics survive eviction, outcomes filter query/watch, and pause saves current stages. Service converts portable results at its existing boundary; terminal quantiles clamp to latencyMaxMs.',
+      'Creates one bounded RPC collector per host, directly usable as a Probe. Defaults to message/peer; physical stages are opt-in. Emit stores raw fields and string references; interning, carrier correlation and wire projection happen at read boundaries. Only measured method-bearing message settlements update independent statistics. IRpcDevtoolsWireEvent.variation retains the route subtype for message/envelope controls; portable service and record boundaries preserve it. Outcomes filter query/watch, pause saves current stages, and terminal quantiles clamp to latencyMaxMs.',
     purposeZh:
-      '为每个宿主创建有界 RPC collector，可直接作为 Probe 接入。数值环列保留复用 view 的顶层元数据，独立统计不受淘汰影响；outcomes 同时过滤 query/watch，pause 保存当前 stages。Service 在既有边界转换 portable 结果，末桶分位数钳制到 latencyMaxMs。',
+      '为每个宿主创建有界 RPC collector，可直接作为 Probe 接入。默认订阅 message/peer，物理阶段显式启用。Emit 保存原始字段与字符串引用；驻留、carrier 关联及 wire 转换在读取边界执行。仅携带非负 duration 与 method 的 message 结算更新独立统计。IRpcDevtoolsWireEvent.variation 保留 message/envelope control 的 route subtype，portable service 与录制边界保留该字段。Outcomes 同时过滤 query/watch，pause 保存当前 stages，末桶分位数钳制到 latencyMaxMs。',
     quickStart: `import { createRpcDevtools } from '@migaia/rpc-devtools'
 
-/** Attach devtools directly to an existing host's probe option. */
-const devtools = createRpcDevtools({ stages: ['message'], maxEvents: 1_000 })
+/** Attach default message/peer metadata observation to an existing host. */
+const devtools = createRpcDevtools({ maxEvents: 1_000 })
+/** Physical stages can be selected at construction without enabling content capture. */
+const diagnostic = createRpcDevtools({ stages: ['message', 'peer', 'frame', 'carrier'] })
+/** Runtime selection uses the same stage names and leaves capture disabled. */
+devtools.setStages(['message', 'peer', 'encoded', 'carrier'])
 /** Recording uses its own bounded ring until stop materializes an offline record. */
 const recording = devtools.record({ maxEvents: 100 })
 devtools.pause()
@@ -4529,6 +4535,7 @@ console.log(devtools.describe().paused)
 devtools.resume()
 console.log(devtools.query({ stages: ['message'], limit: 100 }), devtools.stats())
 console.log(devtools.exportRecord(recording.stop()))
+diagnostic.close()
 devtools.close()`,
     options: [
       {
@@ -4536,7 +4543,7 @@ devtools.close()`,
         whenToUse:
           'Select only observation layers needed by this collector. / 只选择当前 collector 需要观察的层。',
         description:
-          'Metadata stages to observe; content capture is separately opt-in. Resume restores the effective list saved at pause. / 订阅元数据阶段；内容捕获独立启用，resume 恢复 pause 时保存的有效列表。'
+          'Defaults to message/peer. Opt into envelope/encoded/frame/protected/carrier through stages or setStages(); capture is separate. Resume restores the list saved at pause. / 默认 message/peer；通过 stages 或 setStages() 显式启用 envelope/encoded/frame/protected/carrier，capture 独立启用；resume 恢复 pause 时保存的列表。'
       },
       {
         name: 'capture',
@@ -4557,7 +4564,7 @@ devtools.close()`,
         whenToUse:
           'Observe a bounded set of message/envelope methods. / 只观察指定 message/envelope 方法。',
         description:
-          'Compiled message/envelope method whitelist. / 构造时编译的 message/envelope 方法白名单。'
+          'Compiled whitelist for method-bearing message/envelope events; methodless variations pass it and still obey sampling. Query/watch method filters select method-bearing rows separately. / 构造时编译携带 method 的 message/envelope 白名单；没有 method 的 variation 通过该过滤，仍受采样约束；query/watch 的方法筛选独立选择携带相应 method 的行。'
       },
       {
         name: 'sample',
@@ -4584,7 +4591,7 @@ devtools.close()`,
         whenToUse:
           'Bound distinct diagnostic names in a long-lived collector. / 限制长期 collector 的不同诊断名称数。',
         description:
-          'Bounded name table; defaults to 65,536, with counted overflow id 0. / 名称驻留上限默认 65,536，超限记为 id 0 并计数。'
+          'Read-time name table defaults to 65,536, with counted overflow id 0; ingestion stores raw string references. / 读取时的名称驻留上限默认 65,536，超限记为 id 0 并计数；摄取保存原始字符串引用。'
       },
       {
         name: 'exposeContent',
@@ -4603,23 +4610,29 @@ devtools.close()`,
     ],
     useEn: [
       'Inspect local pages, per-method latency histograms and independent bounded recordings without creating another transport.',
-      'Mount devtools.service on a separate existing Peer without installing this collector as its probe; watch yields at most 256 events per batch and reports loss after its 64-batch queue overflows.'
+      'Mount devtools.service on a separate existing Peer without installing this collector as its probe; watch keeps the existing filtered queue of 64 batches with at most 256 events each.',
+      'Active watchers share 16,384 raw pending rows and one notification per synchronous burst; with no active watcher, nothing is scheduled. Raw overwrites happen before watch filtering and add raw row losses to dropped.',
+      'Read carrierSeq while an origin remains in main, record or watch retention. Learned links survive origin retirement while dependent rows remain; cold readers preserve observed generation cutoffs without retaining extra history.'
     ],
     useZh: [
       '查看本地分页、按方法聚合的延迟直方图与独立有界录制，不创建新的 transport。',
-      '把 devtools.service 挂到独立的已有 Peer，不把此 collector 安装为该 Peer 的 probe；watch 每批最多 256 个事件，64 批队列溢出后报告 dropped。'
+      '把 devtools.service 挂到独立的已有 Peer，不把此 collector 安装为该 Peer 的 probe；watch 保留原有筛选后队列，最多 64 批、每批 256 个事件。',
+      '活跃 watcher 共用 16,384 行原始待通知窗口，每个同步 burst 最多一次通知；没有活跃 watcher 时零通知。原始覆盖发生在 watch 筛选前，按原始行损失计入 dropped。',
+      '在 origin 仍由主环、record 或 watch 保留时读取 carrierSeq；已知链接随仍保留的 dependent 行继续有效，冷读取保留实际观察到的 generation cutoff，不保留额外历史。'
     ],
     avoidEn: [
       'Expecting detached copies of captured content, detail or errors: these retain references and later caller mutations can remain visible.',
       'Capturing payloads without explicit capture/redact or exposing them without exposeContent.',
       'Hosting business on an identified serving endpoint: localEndpointId exclusion hides that entire endpoint, so use a dedicated service Peer.',
-      'Reading frozen host.stageMask as the current selection; use readProbeStages and resume the actual paused selection.'
+      'Reading frozen host.stageMask as the current selection; use readProbeStages and resume the actual paused selection.',
+      'Expecting a first read to reconstruct a carrier origin already evicted from every retention window; an unresolved link is omitted.'
     ],
     avoidZh: [
       '期待 captured content、detail 或 error 是独立拷贝：它们保留引用，调用方后续修改仍可能可见。',
       '未显式 capture/redact 就捕获 payload，或未设置 exposeContent 就暴露内容。',
       '把业务放到已识别的 serving endpoint；localEndpointId 排除该 endpoint 的全部行，应使用独立 service Peer。',
-      '把冻结的 host.stageMask 当作当前选择；用 readProbeStages，并恢复实际暂停前的订阅。'
+      '把冻结的 host.stageMask 当作当前选择；用 readProbeStages，并恢复实际暂停前的订阅。',
+      '期待首次读取恢复已经从所有保留窗口淘汰的 carrier origin；尚未解析的链接会省略。'
     ]
   }),
   'rpc-devtools:log:createRpcLogProbe': guide({
@@ -4904,11 +4917,13 @@ const text = encodeRpcDevtoolsRecord({ header: RpcDevtoolsRecordFormat, events: 
 console.log(text)`,
     useEn: [
       'Export already-collected events for the same offline sequence on another machine.',
-      'Keep source, code, name, message, stack and the cause chain when recording errors.'
+      'Keep source, code, name, message, stack and the cause chain when recording errors.',
+      'Preserve the optional IRpcDevtoolsWireEvent.variation subtype on message/envelope controls through record export and import.'
     ],
     useZh: [
       '导出已经采集的事件，在另一台机器还原同一离线序列。',
-      '录制错误时保留 source、code、name、message、stack 与 cause 链。'
+      '录制错误时保留 source、code、name、message、stack 与 cause 链。',
+      '录制导出与导入保留 message/envelope control 上可选的 IRpcDevtoolsWireEvent.variation subtype。'
     ],
     avoidEn: [
       'Expecting the codec to collect events, write files or open a remote service.',
