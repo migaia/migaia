@@ -23,6 +23,8 @@ export type IRpcProviderResult =
   | { readonly ok: true; readonly data?: unknown; readonly transfer?: readonly unknown[] }
   | { readonly ok: false; readonly message: string; readonly code: string }
 export type IRpcContext = {
+  /** Serving endpoint identity lets mounted services exclude their own observation traffic. */
+  readonly localEndpointId: string
   /** Present only after generation@1 directory admission for this actual runtime-profile task. */
   readonly callerGeneration?: import('@migaia/rpc-contract').IRpcRuntimeGeneration
   /** The final provider fence is the selected accepted identity, never an attempt counter. */

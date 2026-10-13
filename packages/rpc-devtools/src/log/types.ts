@@ -1,4 +1,4 @@
-import type { IRpcProbeEventView } from '@migaia/rpc-core/probe'
+import type { IRpcProbeDefinition, IRpcProbeEventView } from '@migaia/rpc-core/probe'
 import type { RpcLogCategory, RpcLogLevel } from './text.js'
 
 /** Structural logger boundary: each method should enqueue work without blocking the RPC caller. */
@@ -17,6 +17,10 @@ export type IRpcLogProbeOptions = Readonly<{
   stages?: readonly ('message' | 'peer')[]
   /** Opts subscribed stages into capture; emit receives already-redacted caller-owned content. */
   content?: boolean
+  /** Explicit subscribed stages whose captured content may be passed to the logger. */
+  capture?: IRpcProbeDefinition['capture']
+  /** Redacts captured content at the canonical emitter before logger fields are constructed. */
+  redact?: IRpcProbeDefinition['redact']
   levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>
   /** Called synchronously for qualifying events; the reusable view must never be retained. */
   message?(view: IRpcProbeEventView): string

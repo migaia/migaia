@@ -327,6 +327,7 @@ export class ProviderExecutor<TTargetId extends string> {
       this.#now = owner.options.now
       this.#senderId = request.route.route.senderId
       this.value = {
+        localEndpointId: owner.options.id,
         data: request.route.payload,
         senderId: request.route.route.senderId,
         route: request.route.route.forwardRoute,
