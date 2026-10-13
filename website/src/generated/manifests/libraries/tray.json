@@ -54,7 +54,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
+                "code": "import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTrayGraph(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
               },
               {
                 "type": "paragraph",
@@ -63,7 +63,7 @@
               {
                 "type": "list",
                 "items": [
-                  "`createTray()` 只接收完整数组；key 必须是非空字符串且不能重复，`requires` 只能引用同一数组内的其他 entry。",
+                  "`createTrayGraph()` 只接收完整数组；key 必须是非空字符串且不能重复，`requires` 只能引用同一数组内的其他 entry。",
                   "`start()` 必须返回或 resolve 为 `{ value, release }`；依赖可通过 `context.get()` 读取。",
                   "必须先 `await tray.ready()` 再 `get()`。未就绪、失败、未知 key 或已释放时都会显式失败，不返回半初始化值。",
                   "`dispose()` 由 Graph 按依赖逆序释放，幂等并保留清理失败。"
@@ -101,7 +101,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { PluginHost, type IPlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = {\n  name: 'provider',\n  install: () => ({ providerValue: 1 })\n} satisfies IPlugin<AppHost, { readonly providerValue: number }>\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use({ name: 'late', requires: ['provider'], install: () => ({ late: true }) })\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
+                "code": "import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = definePlugin({\n  name: 'provider',\n  features: { value: defineFeature(() => ({ value: 1 })) },\n  install: () => ({ providerValue: 1 })\n})\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use(definePlugin({\n  name: 'late',\n  features: {\n    value: defineFeature(() => ({}), { provider: provider.getFeature('value') })\n  },\n  install: () => ({ late: true })\n}))\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
               },
               {
                 "type": "paragraph",
@@ -157,7 +157,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'"
+                "code": "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'"
               },
               {
                 "type": "paragraph",
@@ -184,7 +184,7 @@
                 "items": [
                   "`key`：必填、trim 后非空、全 Tray 唯一。",
                   "`kind`：必填；用于 Graph 诊断和拓扑语义，不改变 `value` 的 TypeScript 类型。",
-                  "`requires`：可选；每个 key 必须存在于同一次 `createTray()` 的 entry 数组，不能引用自身。",
+                  "`requires`：可选；每个 key 必须存在于同一次 `createTrayGraph()` 的 entry 数组，不能引用自身。",
                   "`readiness`：可选的外部门状态快照，只接受 `ready | blocked | failed`。它在首次 `ready()` 时读取一次并缓存结果。",
                   "`start`：必填；Graph 在依赖就绪后调用。返回值必须包含 `value` 与可调用的 `release`。"
                 ]
@@ -204,13 +204,13 @@
             ]
           },
           {
-            "id": "3-createtray-与-admission",
-            "heading": "3. createTray() 与 admission",
+            "id": "3-createtraygraph-与-admission",
+            "heading": "3. createTrayGraph() 与 admission",
             "blocks": [
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray"
+                "code": "function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph"
               },
               {
                 "type": "paragraph",
@@ -246,13 +246,13 @@
             ]
           },
           {
-            "id": "5-itray-api",
-            "heading": "5. ITray API",
+            "id": "5-itraygraph-api",
+            "heading": "5. ITrayGraph API",
             "blocks": [
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type ITray = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
+                "code": "type ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
               },
               {
                 "type": "list",
@@ -434,7 +434,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "`await createHost(options)` 的唯一 concrete Host 由 `options.create()` 构造。Tray 随后一次性快照 plugin、`requires`、config 与 disposer，建立 Dynamic Capability Graph，再通过 PluginHost prepared admission 发布 ready definition。任何 factory/admission/setup/commit 失败都会回滚未发布候选；失败的 duplicate/cycle/replacement candidate 不会成为以后 restart 的隐式来源。"
+                "text": "`await createHost(options)` 的唯一 concrete Host 由 `options.create()` 构造。Tray 随后一次性快照 plugin 的 Feature、config 与 disposer，使用 PluginHost 的公开 `readPluginDependencies(admission)` 读取同一个 admission 快照的 provider 与 required/optional 强度，建立 Dynamic Capability Graph，再通过 PluginHost prepared admission 发布 ready definition。任何 factory/admission/setup/commit 失败都会回滚未发布候选；失败的 duplicate/cycle/replacement candidate 不会成为以后 restart 的隐式来源。"
+              },
+              {
+                "type": "paragraph",
+                "text": "必需的 Feature provider 缺失时 consumer 保持 `blocked`；可选 provider 缺失不阻塞 consumer， 存在时先于 consumer 安装。插件依赖只由 Feature references 声明，不接受旧插件依赖字段。 `createHost`、`use` 和 `replace` 在图变更之前完成 admission；非法描述子以 `TRAY_INVALID_ENTRY` 拒绝，PluginHost 的原始错误直接保留在 `cause`。进入图变更后的失败继续返回 mutation result。"
               },
               {
                 "type": "paragraph",
@@ -471,7 +475,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "类型策略以稳定性优先：有限、literal、最多 128 个 definition 时，`ITrayResolvedHost` 推导 exact ready closure；widened name、widened `requires` 或超过预算时返回 `ITrayHostDynamic`。dynamic view 仍保留 concrete Host 的 constructor baseline extension/config 类型，运行期管理的未知 key 为 `unknown`。"
+                "text": "类型策略以稳定性优先：有限、literal、最多 128 个 definition 时，`ITrayResolvedHost` 推导 exact ready closure；widened name、任意 widened Feature provider 或超过预算时返回 `ITrayHostDynamic`。dynamic view 仍保留 concrete Host 的 constructor baseline extension/config 类型，运行期管理的未知 key 为 `unknown`。"
               },
               {
                 "type": "paragraph",
@@ -541,14 +545,14 @@
       "architecturePath": "/en/architecture/tray",
       "symbols": [
         {
-          "name": "createTray",
+          "name": "createTrayGraph",
           "kind": "function",
-          "signature": "export declare function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray;",
+          "signature": "export declare function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph;",
           "declarationLine": 3,
           "source": "packages/tray/dist/tray.d.ts",
           "purpose": "Creates one immutable static composition root over one Capability Graph.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createTray.",
-          "advanced": "No additional advanced behavior is declared for createTray.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createTrayGraph.",
+          "advanced": "No additional advanced behavior is declared for createTrayGraph.",
           "parameters": ["entries: readonly ITrayEntryDefinition<unknown>[]"],
           "parameterDetails": [
             {
@@ -557,17 +561,17 @@
               "optional": false
             }
           ],
-          "returns": "ITray",
-          "errors": ["No documented errors are declared for createTray."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createTray.",
+          "returns": "ITrayGraph",
+          "errors": ["No documented errors are declared for createTrayGraph."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createTrayGraph.",
           "examples": [
-            "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
+            "import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTrayGraph(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
           ],
           "members": [],
-          "aliasOf": "createTray",
+          "aliasOf": "createTrayGraph",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray;"
+            "export declare function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph;"
           ],
           "overloadParameterDetails": [
             [
@@ -578,9 +582,9 @@
               }
             ]
           ],
-          "overloadReturns": ["ITray"],
-          "whenToUse": "Use createTray when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createTray does not match the required inputs or return contract.",
+          "overloadReturns": ["ITrayGraph"],
+          "whenToUse": "Use createTrayGraph when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createTrayGraph does not match the required inputs or return contract.",
           "sections": [
             {
               "id": "introduction",
@@ -590,12 +594,12 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import createTray from @migaia/tray, then follow a maintained task example for your use case."
+              "content": "Import createTrayGraph from @migaia/tray, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
               "title": "适用场景",
-              "content": "Use createTray when its function contract and declared inputs match the result you need. Choose a different public symbol when createTray does not match the required inputs or return contract."
+              "content": "Use createTrayGraph when its function contract and declared inputs match the result you need. Choose a different public symbol when createTrayGraph does not match the required inputs or return contract."
             },
             {
               "id": "quick-implementation",
@@ -605,88 +609,20 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createTray."
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createTrayGraph."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createTray."
+              "content": "No additional advanced behavior is declared for createTrayGraph."
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/tray.d.ts:createTray:export declare function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray;",
+          "identity": "packages/tray/dist/tray.d.ts:createTrayGraph:export declare function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph;",
           "guidance": [],
           "usageScore": 48,
           "configuration": [],
-          "fragment": "tray-index--createTray"
-        },
-        {
-          "name": "ITray",
-          "kind": "type",
-          "signature": "export type ITray = { readonly keys: readonly ITrayKey[]; readonly state: ITrayState; readonly error: unknown | undefined; ready(): Promise<void>; get<T>(key: ITrayKey): T; entryState(key: ITrayKey): IGraphNodeState; dispose(): Promise<void>; };",
-          "declarationLine": 24,
-          "source": "packages/tray/dist/contract.d.ts",
-          "purpose": "ITray is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITray.",
-          "advanced": "No additional advanced behavior is declared for ITray.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for ITray."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITray.",
-          "examples": [
-            "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
-            "function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray",
-            "type ITray = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
-          ],
-          "members": [],
-          "aliasOf": "ITray",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type ITray = { readonly keys: readonly ITrayKey[]; readonly state: ITrayState; readonly error: unknown | undefined; ready(): Promise<void>; get<T>(key: ITrayKey): T; entryState(key: ITrayKey): IGraphNodeState; dispose(): Promise<void>; };"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use ITray when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when ITray does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "ITray is part of this module's public type contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import ITray from @migaia/tray, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use ITray when its type contract and declared inputs match the result you need. Choose a different public symbol when ITray does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITray."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for ITray."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/tray/dist/contract.d.ts:ITray:export type ITray = { readonly keys: readonly ITrayKey[]; readonly state: ITrayState; readonly error: unknown | undefined; ready(): Promise<void>; get<T>(key: ITrayKey): T; entryState(key: ITrayKey): IGraphNodeState; dispose(): Promise<void>; };",
-          "guidance": [],
-          "usageScore": 42,
-          "configuration": [],
-          "fragment": "tray-index--ITray"
+          "fragment": "tray-index--createTrayGraph"
         },
         {
           "name": "ITrayEntryContext",
@@ -703,7 +639,7 @@
           "errors": ["No documented errors are declared for ITrayEntryContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayEntryContext.",
           "examples": [
-            "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
+            "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
           ],
           "members": [],
@@ -770,10 +706,10 @@
           "errors": ["No documented errors are declared for ITrayEntryDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayEntryDefinition.",
           "examples": [
-            "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
+            "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}",
-            "function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray",
-            "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
+            "function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph",
+            "import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTrayGraph(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
           ],
           "members": [],
           "aliasOf": "ITrayEntryDefinition",
@@ -839,7 +775,7 @@
           "errors": ["No documented errors are declared for ITrayEntryInstance."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayEntryInstance.",
           "examples": [
-            "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
+            "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
           ],
           "members": [],
@@ -906,7 +842,7 @@
           "errors": ["No documented errors are declared for ITrayEntryKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayEntryKind.",
           "examples": [
-            "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
+            "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
           ],
           "members": [],
@@ -973,7 +909,7 @@
           "errors": ["No documented errors are declared for ITrayErrorCode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayErrorCode.",
           "examples": [
-            "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'"
+            "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'"
           ],
           "members": [],
           "aliasOf": "ITrayErrorCode",
@@ -1025,6 +961,74 @@
           "fragment": "tray-index--ITrayErrorCode"
         },
         {
+          "name": "ITrayGraph",
+          "kind": "type",
+          "signature": "export type ITrayGraph = { readonly keys: readonly ITrayKey[]; readonly state: ITrayState; readonly error: unknown | undefined; ready(): Promise<void>; get<T>(key: ITrayKey): T; entryState(key: ITrayKey): IGraphNodeState; dispose(): Promise<void>; };",
+          "declarationLine": 24,
+          "source": "packages/tray/dist/contract.d.ts",
+          "purpose": "ITrayGraph is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayGraph.",
+          "advanced": "No additional advanced behavior is declared for ITrayGraph.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ITrayGraph."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayGraph.",
+          "examples": [
+            "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
+            "function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph",
+            "type ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
+          ],
+          "members": [],
+          "aliasOf": "ITrayGraph",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ITrayGraph = { readonly keys: readonly ITrayKey[]; readonly state: ITrayState; readonly error: unknown | undefined; ready(): Promise<void>; get<T>(key: ITrayKey): T; entryState(key: ITrayKey): IGraphNodeState; dispose(): Promise<void>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ITrayGraph when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ITrayGraph does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "ITrayGraph is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ITrayGraph from @migaia/tray, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ITrayGraph when its type contract and declared inputs match the result you need. Choose a different public symbol when ITrayGraph does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayGraph."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ITrayGraph."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/tray/dist/contract.d.ts:ITrayGraph:export type ITrayGraph = { readonly keys: readonly ITrayKey[]; readonly state: ITrayState; readonly error: unknown | undefined; ready(): Promise<void>; get<T>(key: ITrayKey): T; entryState(key: ITrayKey): IGraphNodeState; dispose(): Promise<void>; };",
+          "guidance": [],
+          "usageScore": 42,
+          "configuration": [],
+          "fragment": "tray-index--ITrayGraph"
+        },
+        {
           "name": "ITrayKey",
           "kind": "type",
           "signature": "export type ITrayKey = string & { readonly __trayKey: unique symbol; };",
@@ -1039,11 +1043,11 @@
           "errors": ["No documented errors are declared for ITrayKey."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayKey.",
           "examples": [
-            "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
+            "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "const trayKey = (value: string): ITrayKey => value as ITrayKey\nexport const AppTrayKey = {\n  config: trayKey('config'),\n  api: trayKey('api')\n} as const",
             "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}",
-            "type ITray = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}",
-            "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
+            "type ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}",
+            "import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTrayGraph(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
           ],
           "members": [],
           "aliasOf": "ITrayKey",
@@ -1109,8 +1113,8 @@
           "errors": ["No documented errors are declared for ITrayState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayState.",
           "examples": [
-            "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
-            "type ITray = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
+            "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
+            "type ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
           ],
           "members": [],
           "aliasOf": "ITrayState",
@@ -1174,7 +1178,7 @@
           "errors": ["No documented errors are declared for TRAY_SOURCE."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for TRAY_SOURCE.",
           "examples": [
-            "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
+            "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "import { TRAY_SOURCE, TrayErrorCode } from '@migaia/tray'\n\ntry {\n  tray.get(apiKey)\n} catch (error) {\n  const diagnostic = error as { source?: string; code?: string }\n  if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n    // 等待 ready()，或处理启动/就绪门失败。\n  } else {\n    throw error\n  }\n}"
           ],
           "members": [],
@@ -1369,7 +1373,7 @@
           "errors": ["No documented errors are declared for TrayErrorCode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for TrayErrorCode.",
           "examples": [
-            "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
+            "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "import { TRAY_SOURCE, TrayErrorCode } from '@migaia/tray'\n\ntry {\n  tray.get(apiKey)\n} catch (error) {\n  const diagnostic = error as { source?: string; code?: string }\n  if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n    // 等待 ready()，或处理启动/就绪门失败。\n  } else {\n    throw error\n  }\n}"
           ],
           "members": [],
@@ -1818,7 +1822,7 @@
           "errors": ["No documented errors are declared for createHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createHost.",
           "examples": [
-            "import { PluginHost, type IPlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = {\n  name: 'provider',\n  install: () => ({ providerValue: 1 })\n} satisfies IPlugin<AppHost, { readonly providerValue: number }>\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use({ name: 'late', requires: ['provider'], install: () => ({ late: true }) })\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
+            "import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = definePlugin({\n  name: 'provider',\n  features: { value: defineFeature(() => ({ value: 1 })) },\n  install: () => ({ providerValue: 1 })\n})\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use(definePlugin({\n  name: 'late',\n  features: {\n    value: defineFeature(() => ({}), { provider: provider.getFeature('value') })\n  },\n  install: () => ({ late: true })\n}))\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
           ],
           "members": [],
           "aliasOf": "createHost",
@@ -1916,15 +1920,15 @@
           ],
           "identity": "packages/tray/dist/host/create-host.d.ts:createHost:export declare function createHost<THost extends PluginHost<any, any, any>, const TPlugins extends readonly ITrayPluginConstraint<THost>[]>(options: ICreateHostOptions<THost, TPlugins>): Promise<ITrayResolvedHost<THost, TPlugins>>;",
           "guidance": [],
-          "usageScore": 26,
+          "usageScore": 30,
           "configuration": [
             {
               "name": "create",
               "type": "() => THost",
               "optional": false,
-              "description": "`await createHost(options)` 的唯一 concrete Host 由 `options.create()` 构造。Tray 随后一次性快照 plugin、`requires`、config 与 disposer，建立 Dynamic Capability Graph，再通过 PluginHost prepared admission 发布 ready definition。任何 factory/admission/setup/commit 失败都会回滚未发布候选；失败的 duplicate/cycle/replacement candidate 不会成为以后 restart 的隐式来源。",
+              "description": "`await createHost(options)` 的唯一 concrete Host 由 `options.create()` 构造。Tray 随后一次性快照 plugin 的 Feature、config 与 disposer，使用 PluginHost 的公开 `readPluginDependencies(admission)` 读取同一个 admission 快照的 provider 与 required/optional 强度，建立 Dynamic Capability Graph，再通过 PluginHost prepared admission 发布 ready definition。任何 factory/admission/setup/commit 失败都会回滚未发布候选；失败的 duplicate/cycle/replacement candidate 不会成为以后 restart 的隐式来源。",
               "descriptionEn": "Constructs the one PluginHost instance owned by the resulting Tray host.",
-              "descriptionZh": "`await createHost(options)` 的唯一 concrete Host 由 `options.create()` 构造。Tray 随后一次性快照 plugin、`requires`、config 与 disposer，建立 Dynamic Capability Graph，再通过 PluginHost prepared admission 发布 ready definition。任何 factory/admission/setup/commit 失败都会回滚未发布候选；失败的 duplicate/cycle/replacement candidate 不会成为以后 restart 的隐式来源。"
+              "descriptionZh": "`await createHost(options)` 的唯一 concrete Host 由 `options.create()` 构造。Tray 随后一次性快照 plugin 的 Feature、config 与 disposer，使用 PluginHost 的公开 `readPluginDependencies(admission)` 读取同一个 admission 快照的 provider 与 required/optional 强度，建立 Dynamic Capability Graph，再通过 PluginHost prepared admission 发布 ready definition。任何 factory/admission/setup/commit 失败都会回滚未发布候选；失败的 duplicate/cycle/replacement candidate 不会成为以后 restart 的隐式来源。"
             },
             {
               "name": "plugins",
@@ -1980,8 +1984,8 @@
         {
           "name": "ICanResolveReadyDefinitions",
           "kind": "type",
-          "signature": "export type ICanResolveReadyDefinitions<TDefinitions extends readonly unknown[]> = number extends TDefinitions['length'] ? false : string extends ITrayDefinitionNames<TDefinitions> ? false : IReadyInferenceExceeded<TDefinitions> extends true ? false : IHasWidenedRequires<TDefinitions> extends true ? false : true;",
-          "declarationLine": 47,
+          "signature": "export type ICanResolveReadyDefinitions<TDefinitions extends readonly unknown[]> = number extends TDefinitions['length'] ? false : string extends ITrayDefinitionNames<TDefinitions> ? false : IReadyInferenceExceeded<TDefinitions> extends true ? false : IHasWidenedProviders<TDefinitions> extends true ? false : true;",
+          "declarationLine": 55,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Whether the public resolver may safely retain an exact finite readiness tuple.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICanResolveReadyDefinitions.",
@@ -1996,7 +2000,7 @@
           "aliasOf": "ICanResolveReadyDefinitions",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type ICanResolveReadyDefinitions<TDefinitions extends readonly unknown[]> = number extends TDefinitions['length'] ? false : string extends ITrayDefinitionNames<TDefinitions> ? false : IReadyInferenceExceeded<TDefinitions> extends true ? false : IHasWidenedRequires<TDefinitions> extends true ? false : true;"
+            "export type ICanResolveReadyDefinitions<TDefinitions extends readonly unknown[]> = number extends TDefinitions['length'] ? false : string extends ITrayDefinitionNames<TDefinitions> ? false : IReadyInferenceExceeded<TDefinitions> extends true ? false : IHasWidenedProviders<TDefinitions> extends true ? false : true;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2035,7 +2039,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/host/typing.d.ts:ICanResolveReadyDefinitions:export type ICanResolveReadyDefinitions<TDefinitions extends readonly unknown[]> = number extends TDefinitions['length'] ? false : string extends ITrayDefinitionNames<TDefinitions> ? false : IReadyInferenceExceeded<TDefinitions> extends true ? false : IHasWidenedRequires<TDefinitions> extends true ? false : true;",
+          "identity": "packages/tray/dist/host/typing.d.ts:ICanResolveReadyDefinitions:export type ICanResolveReadyDefinitions<TDefinitions extends readonly unknown[]> = number extends TDefinitions['length'] ? false : string extends ITrayDefinitionNames<TDefinitions> ? false : IReadyInferenceExceeded<TDefinitions> extends true ? false : IHasWidenedProviders<TDefinitions> extends true ? false : true;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -2045,7 +2049,7 @@
           "name": "ICreateHostOptions",
           "kind": "type",
           "signature": "export type ICreateHostOptions<THost extends PluginHost<any, any, any>, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: 'bounded' | 'strict-drain'; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;",
-          "declarationLine": 171,
+          "declarationLine": 177,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Host creation options.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICreateHostOptions.",
@@ -2175,7 +2179,7 @@
           "name": "IPluginWithSynchronousShared",
           "kind": "type",
           "signature": "export type IPluginWithSynchronousShared<TPlugin> = TPlugin & { readonly shared?: (core: unknown) => Record<PropertyKey, unknown>; };",
-          "declarationLine": 61,
+          "declarationLine": 67,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Awaitable values accepted at lifecycle boundaries.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginWithSynchronousShared.",
@@ -2238,8 +2242,8 @@
         {
           "name": "IResolveReadyTrayPlugins",
           "kind": "type",
-          "signature": "export type IResolveReadyTrayPlugins<TDefinitions extends readonly unknown[]> = number extends TDefinitions['length'] ? readonly [] : string extends ITrayDefinitionNames<TDefinitions> ? readonly [] : IReadyInferenceExceeded<TDefinitions> extends true ? readonly [] : IAllDefinitionsIndependent<TDefinitions> extends true ? TDefinitions : IHasWidenedRequires<TDefinitions> extends true ? readonly [] : IResolveReadyWithFuel<TDefinitions>;",
-          "declarationLine": 59,
+          "signature": "export type IResolveReadyTrayPlugins<TDefinitions extends readonly unknown[]> = number extends TDefinitions['length'] ? readonly [] : string extends ITrayDefinitionNames<TDefinitions> ? readonly [] : IReadyInferenceExceeded<TDefinitions> extends true ? readonly [] : IAllDefinitionsIndependent<TDefinitions> extends true ? TDefinitions : IHasWidenedProviders<TDefinitions> extends true ? readonly [] : IResolveReadyWithFuel<TDefinitions>;",
+          "declarationLine": 65,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Exact readiness is selected only for finite, literal, at-most-128 definition tuples.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResolveReadyTrayPlugins.",
@@ -2254,7 +2258,7 @@
           "aliasOf": "IResolveReadyTrayPlugins",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type IResolveReadyTrayPlugins<TDefinitions extends readonly unknown[]> = number extends TDefinitions['length'] ? readonly [] : string extends ITrayDefinitionNames<TDefinitions> ? readonly [] : IReadyInferenceExceeded<TDefinitions> extends true ? readonly [] : IAllDefinitionsIndependent<TDefinitions> extends true ? TDefinitions : IHasWidenedRequires<TDefinitions> extends true ? readonly [] : IResolveReadyWithFuel<TDefinitions>;"
+            "export type IResolveReadyTrayPlugins<TDefinitions extends readonly unknown[]> = number extends TDefinitions['length'] ? readonly [] : string extends ITrayDefinitionNames<TDefinitions> ? readonly [] : IReadyInferenceExceeded<TDefinitions> extends true ? readonly [] : IAllDefinitionsIndependent<TDefinitions> extends true ? TDefinitions : IHasWidenedProviders<TDefinitions> extends true ? readonly [] : IResolveReadyWithFuel<TDefinitions>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2293,7 +2297,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/host/typing.d.ts:IResolveReadyTrayPlugins:export type IResolveReadyTrayPlugins<TDefinitions extends readonly unknown[]> = number extends TDefinitions['length'] ? readonly [] : string extends ITrayDefinitionNames<TDefinitions> ? readonly [] : IReadyInferenceExceeded<TDefinitions> extends true ? readonly [] : IAllDefinitionsIndependent<TDefinitions> extends true ? TDefinitions : IHasWidenedRequires<TDefinitions> extends true ? readonly [] : IResolveReadyWithFuel<TDefinitions>;",
+          "identity": "packages/tray/dist/host/typing.d.ts:IResolveReadyTrayPlugins:export type IResolveReadyTrayPlugins<TDefinitions extends readonly unknown[]> = number extends TDefinitions['length'] ? readonly [] : string extends ITrayDefinitionNames<TDefinitions> ? readonly [] : IReadyInferenceExceeded<TDefinitions> extends true ? readonly [] : IAllDefinitionsIndependent<TDefinitions> extends true ? TDefinitions : IHasWidenedProviders<TDefinitions> extends true ? readonly [] : IResolveReadyWithFuel<TDefinitions>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -2303,7 +2307,7 @@
           "name": "ITrayHost",
           "kind": "type",
           "signature": "export type ITrayHost<THost extends PluginHost<any, any, any>, TDefinitions extends readonly ITrayPluginConstraint<THost>[], TReady extends readonly ITrayPluginConstraint<THost>[] = Extract<IResolveReadyTrayPlugins<TDefinitions>, readonly ITrayPluginConstraint<THost>[]>> = Readonly<{ readonly plugins: readonly string[]; readonly readyPlugins: readonly string[]; readonly state: ITrayHostState; readonly isActive: boolean; readonly error: unknown | undefined; readonly extensions: Readonly<IMergePluginExts<readonly [...IHostBaselinePlugins<THost>, ...TReady]>>; readonly config: IPluginHostConfigFor<readonly [...IHostBaselinePlugins<THost>, ...TReady]>; pluginState(name: string): string; on<TKey extends keyof ITrayHostEventMap>(type: TKey, listener: (event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>): IUnsubscribe; use<TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin): Promise<ITrayPluginMutationResult<ITrayHost<THost, TDefinitions, TReady>, ITrayResolvedHost<THost, readonly [...TDefinitions, TPlugin]>, ITrayHostDynamic<THost>>>; unUse<const TName extends string>(name: TName): Promise<TName extends ITrayDefinitionNames<TDefinitions> ? ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, IRemoveTrayDefinition<TDefinitions, TName> extends readonly ITrayPluginConstraint<THost>[] ? ITrayResolvedHost<THost, IRemoveTrayDefinition<TDefinitions, TName>> : ITrayHostDynamic<THost>> : ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>; replace<TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin): Promise<ITrayPluginMutationResult<ITrayHost<THost, TDefinitions, TReady>, ITrayMutationView<THost, TDefinitions, TReady, TPlugin>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>; dispose(): Promise<ITrayHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }>;",
-          "declarationLine": 150,
+          "declarationLine": 156,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Public managed Host surface.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHost.",
@@ -2367,7 +2371,7 @@
           "name": "ITrayHostCreationError",
           "kind": "type",
           "signature": "export type ITrayHostCreationError = Error & Readonly<{ readonly detail: ITrayHostCreationFailureDetail; }>;",
-          "declarationLine": 203,
+          "declarationLine": 209,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayHostCreationError is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostCreationError.",
@@ -2431,7 +2435,7 @@
           "name": "ITrayHostCreationFailureDetail",
           "kind": "type",
           "signature": "export type ITrayHostCreationFailureDetail = Readonly<{ readonly phase: 'factory' | 'admission' | 'graph' | 'setup' | 'commit'; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<ITrayPluginPhysicalCleanupResult>; }>;",
-          "declarationLine": 197,
+          "declarationLine": 203,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayHostCreationFailureDetail is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostCreationFailureDetail.",
@@ -2495,7 +2499,7 @@
           "name": "ITrayHostDisposalResult",
           "kind": "type",
           "signature": "export type ITrayHostDisposalResult = Readonly<{ readonly state: 'terminal'; readonly termination: 'managed' | 'external-host'; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<ITrayPluginPhysicalCleanupResult>; readonly error?: Error; }>;",
-          "declarationLine": 189,
+          "declarationLine": 195,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayHostDisposalResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostDisposalResult.",
@@ -2559,7 +2563,7 @@
           "name": "ITrayHostDynamic",
           "kind": "type",
           "signature": "export type ITrayHostDynamic<THost extends PluginHost<any, any, any>, TManagedBaseline extends object = object> = Omit<ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>, 'extensions'> & Readonly<{ readonly extensions: Readonly<IHostBaselineExtensions<THost> & TManagedBaseline & Record<PropertyKey, unknown>>; }>;",
-          "declarationLine": 167,
+          "declarationLine": 173,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Conservative dynamic view returned after widened or committed-failure mutations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostDynamic.",
@@ -2623,7 +2627,7 @@
           "name": "ITrayHostEventMap",
           "kind": "type",
           "signature": "export type ITrayHostEventMap = { readonly use: Readonly<Record<string, unknown>>; readonly unUse: Readonly<Record<string, unknown>>; readonly replace: Readonly<Record<string, unknown>>; /** Settled lifecycle aliases describe the logical operation without exposing Graph authority. */ readonly registered: Readonly<Record<string, unknown>>; readonly removed: Readonly<Record<string, unknown>>; readonly replaced: Readonly<Record<string, unknown>>; readonly mutationFailed: Readonly<{ readonly operation: 'use' | 'unUse' | 'replace'; readonly name: string; readonly error: Error; }>; readonly disposing: Readonly<{ readonly state: 'closing'; }>; readonly disposed: Readonly<{ readonly state: 'terminal'; readonly cleanupComplete: boolean; }>; };",
-          "declarationLine": 73,
+          "declarationLine": 79,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Event payloads published after settled managed mutations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostEventMap.",
@@ -2687,7 +2691,7 @@
           "name": "ITrayHostState",
           "kind": "type",
           "signature": "export type ITrayHostState = (typeof TrayHostState)[keyof typeof TrayHostState];",
-          "declarationLine": 71,
+          "declarationLine": 77,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayHostState is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostState.",
@@ -2750,7 +2754,7 @@
         {
           "name": "ITrayPluginConstraint",
           "kind": "type",
-          "signature": "export type ITrayPluginConstraint<THost extends PluginHost<any, any, any>> = IPluginConstraint<THost> & Readonly<{ readonly requires?: readonly string[]; }>;",
+          "signature": "export type ITrayPluginConstraint<THost extends PluginHost<any, any, any>> = IPluginConstraint<THost>;",
           "declarationLine": 9,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Plugin descriptor accepted by the managed Tray Host.",
@@ -2766,7 +2770,7 @@
           "aliasOf": "ITrayPluginConstraint",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type ITrayPluginConstraint<THost extends PluginHost<any, any, any>> = IPluginConstraint<THost> & Readonly<{ readonly requires?: readonly string[]; }>;"
+            "export type ITrayPluginConstraint<THost extends PluginHost<any, any, any>> = IPluginConstraint<THost>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2805,7 +2809,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/host/typing.d.ts:ITrayPluginConstraint:export type ITrayPluginConstraint<THost extends PluginHost<any, any, any>> = IPluginConstraint<THost> & Readonly<{ readonly requires?: readonly string[]; }>;",
+          "identity": "packages/tray/dist/host/typing.d.ts:ITrayPluginConstraint:export type ITrayPluginConstraint<THost extends PluginHost<any, any, any>> = IPluginConstraint<THost>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -2815,7 +2819,7 @@
           "name": "ITrayPluginMutationObservation",
           "kind": "type",
           "signature": "export type ITrayPluginMutationObservation<TView> = Readonly<{ readonly operation: 'use' | 'replace'; readonly name: string; readonly affected: readonly string[]; readonly topologyChanged: boolean; readonly view: TView; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<ITrayPluginPhysicalCleanupResult>; }>;",
-          "declarationLine": 100,
+          "declarationLine": 106,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayPluginMutationObservation is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginMutationObservation.",
@@ -2879,7 +2883,7 @@
           "name": "ITrayPluginMutationResult",
           "kind": "type",
           "signature": "export type ITrayPluginMutationResult<TPreviousView, TSuccessView, TCommittedFailureView> = (ITrayPluginMutationObservation<TSuccessView> & Readonly<{ readonly ok: true; readonly committed: true; }>) | (ITrayPluginMutationObservation<TPreviousView> & Readonly<{ readonly ok: false; readonly committed: false; readonly error: Error; }>) | (ITrayPluginMutationObservation<TCommittedFailureView> & Readonly<{ readonly ok: false; readonly committed: true; readonly error: Error; }>);",
-          "declarationLine": 110,
+          "declarationLine": 116,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayPluginMutationResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginMutationResult.",
@@ -2943,7 +2947,7 @@
           "name": "ITrayPluginPhysicalCleanupResult",
           "kind": "type",
           "signature": "export type ITrayPluginPhysicalCleanupResult = Readonly<{ readonly cleanupErrors: readonly unknown[]; }>;",
-          "declarationLine": 97,
+          "declarationLine": 103,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Cleanup observation returned by managed mutations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginPhysicalCleanupResult.",
@@ -3007,7 +3011,7 @@
           "name": "ITrayPluginRemovalObservation",
           "kind": "type",
           "signature": "export type ITrayPluginRemovalObservation<TView> = Readonly<{ readonly name: string; readonly affected: readonly string[]; readonly view: TView; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<ITrayPluginPhysicalCleanupResult>; }>;",
-          "declarationLine": 122,
+          "declarationLine": 128,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayPluginRemovalObservation is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginRemovalObservation.",
@@ -3071,7 +3075,7 @@
           "name": "ITrayPluginRemovalResult",
           "kind": "type",
           "signature": "export type ITrayPluginRemovalResult<TPreviousView, TCommittedView> = (ITrayPluginRemovalObservation<TPreviousView> & Readonly<{ readonly ok: true; readonly committed: false; readonly removed: false; }>) | (ITrayPluginRemovalObservation<TCommittedView> & Readonly<{ readonly ok: true; readonly committed: true; readonly removed: true; }>) | (ITrayPluginRemovalObservation<TPreviousView> & Readonly<{ readonly ok: false; readonly committed: false; readonly removed: false; readonly error: Error; }>) | (ITrayPluginRemovalObservation<TCommittedView> & Readonly<{ readonly ok: false; readonly committed: true; readonly removed: true; readonly error: Error; }>);",
-          "declarationLine": 130,
+          "declarationLine": 136,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayPluginRemovalResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginRemovalResult.",
@@ -3135,7 +3139,7 @@
           "name": "ITrayResolvedHost",
           "kind": "type",
           "signature": "export type ITrayResolvedHost<THost extends PluginHost<any, any, any>, TDefinitions extends readonly ITrayPluginConstraint<THost>[]> = ICanResolveReadyDefinitions<TDefinitions> extends true ? ITrayHost<THost, TDefinitions> : ITrayHostDynamic<THost>;",
-          "declarationLine": 188,
+          "declarationLine": 194,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayResolvedHost is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayResolvedHost.",
@@ -3201,7 +3205,7 @@
           "name": "IUnsubscribe",
           "kind": "type",
           "signature": "export type IUnsubscribe = () => void;",
-          "declarationLine": 95,
+          "declarationLine": 101,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Minimal unsubscribe contract shared with event-subscriber without a runtime dependency.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IUnsubscribe.",
@@ -3263,7 +3267,7 @@
           "name": "TrayHostState",
           "kind": "const",
           "signature": "export declare const TrayHostState: { readonly active: \"active\"; readonly closing: \"closing\"; readonly terminal: \"terminal\"; readonly failed: \"failed\"; };",
-          "declarationLine": 65,
+          "declarationLine": 71,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Public lifecycle states for a managed Host.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for TrayHostState.",

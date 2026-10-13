@@ -1,6 +1,6 @@
 /* oxlint-disable unicorn/no-thenable -- this suite intentionally models foreign thenables. */
 import { describe, expect, it } from 'vitest'
-import { PluginHost } from '@migaia/plugin-host'
+import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createAbortController } from '@migaia/lifecycle'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createHost } from '../src/host/index.js'
@@ -67,7 +67,15 @@ describe('@migaia/tray/runtime', () => {
     await installPlugin(host)
     await host.use({
       name: 'blocked-plugin',
-      requires: ['missing-provider'],
+      features: {
+        value: defineFeature(() => ({}), {
+          missing: definePlugin({
+            name: 'missing-provider',
+            features: { value: defineFeature(() => ({})) },
+            install: () => ({})
+          }).getFeature('value')
+        })
+      },
       install: () => ({ blocked: true })
     })
     const runtime = createRuntime(host) as any

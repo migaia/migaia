@@ -349,9 +349,9 @@ test('root consumer exercises actual packed package matrix', async () => {
     {
       name: '@migaia/tray',
       minimal: 'TrayErrorCode',
-      full: 'createTray',
+      full: 'createTrayGraph',
       minimalMarker: 'TRAY',
-      fullMarker: 'createTray'
+      fullMarker: 'createTrayGraph'
     },
     {
       name: '@migaia/wasm',
@@ -399,7 +399,7 @@ test('closure packet proves exact exclusions, frozen budgets, browser wasm, and 
   const cases = [
     { name: 'plugin-host', minimal: 'PluginHostErrorCode', full: 'PluginHost' },
     { name: 'logger', minimal: 'LoggerErrorCode', full: 'Logger' },
-    { name: 'tray', minimal: 'TrayErrorCode', full: 'createTray' },
+    { name: 'tray', minimal: 'TrayErrorCode', full: 'createTrayGraph' },
     { name: 'wasm', minimal: 'byte_len_of', full: 'ConversionResult' }
   ]
   try {
