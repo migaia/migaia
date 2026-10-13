@@ -14,3 +14,5 @@ export const PROCESS_LOCAL_DIRECTORY_PREFIX = '/tmp/migaia-rpc-'
 export const PROCESS_LOCAL_PIPE_PREFIX = '\\\\.\\pipe\\migaia-rpc-'
 /** Stable defaults keep launcher diagnostics and child namespaces within the Process owner. */
 export const PROCESS_SHORT_CHILD_NAME = 'process-child'
+/** Wrap validation shares one public option path across preparation and per-launch errors. */
+export const PROCESS_SHORT_WRAP_FIELD = 'wrap'
