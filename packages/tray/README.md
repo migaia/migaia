@@ -226,3 +226,22 @@ Runtime callback 同时收到只绑定当前 run、插件名称与 generation �
 等待同一 ticket 的 completion 会立即得到 `RUNTIME_CONTRACT_INVALID`，而 callback 返回 ticket
 后可在外层等待 `ticket.completion`。外部 `host.unUse/replace` 继续遵循原有 queue 与 lease
 语义；callback 不应捕获 concrete Host 做 self mutation。
+
+
+## Routing and publish/subscribe
+
+`tray.routing.roundRobin(host)` and `tray.routing('roundRobin', host)` share one
+sequence and select a ready instance for each request, notify or stream.
+`leastInFlight` selects the fewest pending business calls, with spawn order breaking
+ties. Custom policies use `defineRoutingPolicy(name, pick)` and are registered by
+`createTray({ routing })` or a host DSL's `routing` tuple. Child plugins declare
+custom names in their own host DSL and call both forms through `deps.tray.routing`.
+The picker runs synchronously on the parent. Calls never retry or fail over.
+
+`tray.publish(topic, payload)` and `deps.tray.publish(topic, payload)` fan out to
+current subscribers at most once. `subscribe(topic, (payload, meta) => ...)` keeps
+business topics separate from lifecycle events. Frozen `meta.from` is authenticated
+by the parent: `{ id, host, generation }` for an instance, `{ parent: true }` for a
+parent publication. Payload fields cannot impersonate the sender. Subscriptions
+end with their admission and generation; messages sent while an instance is not
+ready are missed. There is no replay, persistence or delivery acknowledgement.
