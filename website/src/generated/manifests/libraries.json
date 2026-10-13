@@ -11668,7 +11668,7 @@
                     ],
                     [
                       "`./probe`",
-                      "Probe 类型、数值常量与名称表、`defineProbe`、`snapshotProbeEvent`、`rpcProbeSampleKey`；`probePlugin` 当前为占位入口"
+                      "Probe 类型、数值常量与名称表、`defineProbe`、`snapshotProbeEvent`、`rpcProbeSampleKey` 与 Endpoint 安装入口 `probePlugin`"
                     ]
                   ]
                 }
@@ -11704,12 +11704,21 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`@migaia/rpc-core/probe` 定义同步观察接口。当前交付只包含契约：Peer 接受 `probe` 选项，但在 probe-core 实现合入之前不会产生观察事件；`probePlugin` 当前抛出 `INVALID_CONFIG`（`probe runtime not installed`）。"
+                  "text": "`@migaia/rpc-core/probe` 在 Core Peer 或 Endpoint 上安装同步观察。默认只读元数据；请求、返回值与错误保持原有语义。下面的 `connect` 示例使用实际 MessagePort。当前 managed Thread spawn 与 Process `spawn: true` 的选项重建没有转发 `probe`，这些路径的跨包观察仍待补齐。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineProbe, RpcProbeStageName } from '@migaia/rpc-core/probe'\n\n/** 调用方已有的对象保留同一身份，定义 Probe 后被冻结。 */\nconst host = { name: 'metrics' }\n/** 此 Probe 只读 message 元数据，不捕获业务内容。 */\nconst probe = defineProbe({\n  stages: ['message'],\n  sample: 0.25,\n  emit(view) {\n    console.log(RpcProbeStageName[view.stage], view.method, view.durationMs)\n  }\n}, host)\nconsole.log(probe === host, Object.isFrozen(host), probe.name) // true, true, 'metrics'\n\n/** 平台 Peer 工厂可接收同一个 probe；运行时观察由 probe-core 提供。 */\nexport const peerProbeOptions = { probe }"
+                  "code": "import assert from 'node:assert/strict'\nimport { MessageChannel } from 'node:worker_threads'\nimport { createThreadPeer, createNodeThreadChannel } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { defineProbe, RpcProbeStageName } from '@migaia/rpc-core/probe'\n\n/** 调用方已有的对象保留同一身份，定义 Probe 后被冻结。 */\nconst host = { name: 'metrics' }\n/** 同步计数确认示例实际收到了元数据，未保留复用 view。 */\nlet observedEvents = 0\n/** 此 Probe 只读 message 元数据，不捕获业务内容。 */\nconst probe = defineProbe({\n  stages: ['message'],\n  emit(view) {\n    observedEvents += 1\n    console.log(RpcProbeStageName[view.stage], view.method, view.durationMs)\n  }\n}, host)\nconsole.log(probe === host, Object.isFrozen(host), probe.name) // true, true, 'metrics'\n\n/** 创建方拥有实际 MessagePort；Peer 只负责自己的 Endpoint。 */\nconst { port1, port2 } = new MessageChannel()\ntry {\n  const [client, server] = await Promise.all([\n    createThreadPeer<{ echo(value: string): string }>({\n      self: { name: 'client', instanceId: 'probe-client' }, probe,\n      connect: async (context) => createNodeThreadChannel(port1, 'probe-server', {\n        scheduler: systemScheduler, capabilities: context.capabilities\n      })\n    }),\n    createThreadPeer({\n      self: { name: 'server', instanceId: 'probe-server' }, provide: { echo: (value: string) => value },\n      connect: async (context) => createNodeThreadChannel(port2, 'probe-client', {\n        scheduler: systemScheduler, capabilities: context.capabilities\n      })\n    })\n  ])\n  await using observed = client\n  await using provider = server\n  assert.equal(await observed.request('echo', 'ready'), 'ready')\n  assert.ok(observedEvents > 0)\n} finally {\n  port1.close()\n  port2.close()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Endpoint 用户把 `probePlugin` 放进既有 `middlewares`；它不会创建 transport："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import assert from 'node:assert/strict'\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { defineProbe, probePlugin } from '@migaia/rpc-core/probe'\n\n/** 在同步回调中读标量，不保留复用 view。 */\nlet events = 0\nconst probe = defineProbe({ stages: ['message'], emit() { events += 1 } })\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })\nserver.provide('echo', (context) => context.success(context.data))\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [probePlugin(probe), connect({ transport: left })] })\ntry {\n  assert.equal(await client.send('server', 'echo', 'ready'), 'ready')\n  assert.ok(events > 0)\n} finally {\n  await client.dispose()\n  await server.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -11722,6 +11731,10 @@
                 {
                   "type": "paragraph",
                   "text": "`capture` 默认关闭，必须显式列出需要捕获内容的阶段，且定义时为 `stages` 的子集。`protected` 内容也须显式启用，并只在认证保护路径存在时产生。`setStages([])` 暂停；恢复时设置所需阶段，原 `captureMask` 保持不变。host 的公开 `stageMask` 为初始定义值，后续选择保存在私有状态；独立 handle 的 getter 则反映当前值。详细契约见 USEGUIDE 的 Probe 节。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`sizeBytes` 只表示当前层已知的字节表示。UTF-8 string transport 与字节 buffer/view 提供精确长度；clone transport 中的字符串没有物理 UTF-8 字节表示，因此使用 `-1`，不为观察额外编码或扫描业务内容。"
                 }
               ]
             },
@@ -12025,7 +12038,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { MessageChannel } from 'node:worker_threads'\nimport { createNodeThreadChannel, createThreadPeer } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IRemoteApi = {\n  math: { double: (value: number) => number }\n  feed: { count: (limit: number) => AsyncIterableIterator<number> }\n}\n/** 真实 MessagePort 是业务载体；创建方在最外层释放它们。 */\nconst { port1, port2 } = new MessageChannel()\ntry {\n  /** 双方在实际端口上确认能力，Peer 仍使用 Core 的同一套调用与类型规则。 */\n  const [peer, server] = await Promise.all([\n    createThreadPeer<IRemoteApi>({\n      self: { name: 'client', instanceId: 'client-1' },\n      connect: async (context) => createNodeThreadChannel(port1, 'server-1', {\n        scheduler: systemScheduler,\n        capabilities: context.capabilities\n      })\n    }),\n    createThreadPeer({\n      self: { name: 'server', instanceId: 'server-1' },\n      provide: {\n        math: { double: (value: number) => value * 2 },\n        feed: { count: async function* (limit: number) {\n          for (let index = 1; index <= limit; index++) yield index\n        } }\n      },\n      connect: async (context) => createNodeThreadChannel(port2, 'client-1', {\n        scheduler: systemScheduler,\n        capabilities: context.capabilities\n      })\n    })\n  ])\n  try {\n    console.log(await peer.request('math.double', 21)) // number：42\n    await peer.notify('math.double', 21) // 只确认发出，不确认业务完成\n    for await (const value of peer.stream('feed.count', 3)) console.log(value) // number：1、2、3\n    console.log(await peer.group([\n      { method: 'math.double', payload: 2 },\n      { method: 'math.double', payload: 3 }\n    ])) // 顺序执行，得到两个步骤结果\n    console.log(await peer.outcome('not-issued')) // unknown 不能证明某个业务操作没有执行\n  } finally {\n    await Promise.all([peer.close(), server.close()])\n  }\n} finally {\n  port1.close()\n  port2.close()\n}"
+                  "code": "import { MessageChannel } from 'node:worker_threads'\nimport { createNodeThreadChannel, createThreadPeer } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IRemoteApi = {\n  math: { double: (value: number) => number }\n  feed: { count: (limit: number) => AsyncIterableIterator<number> }\n}\n/** 真实 MessagePort 是业务载体；创建方在最外层释放它们。 */\nconst { port1, port2 } = new MessageChannel()\ntry {\n  /** 双方在实际端口上确认能力，Peer 仍使用 Core 的同一套调用与类型规则。 */\n  const [peer, server] = await Promise.all([\n    createThreadPeer<IRemoteApi>({\n      self: { name: 'client', instanceId: 'client-1' },\n      connect: async (context) =>\n        createNodeThreadChannel(port1, 'server-1', {\n          scheduler: systemScheduler,\n          capabilities: context.capabilities\n        })\n    }),\n    createThreadPeer({\n      self: { name: 'server', instanceId: 'server-1' },\n      provide: {\n        math: { double: (value: number) => value * 2 },\n        feed: {\n          count: async function* (limit: number) {\n            for (let index = 1; index <= limit; index++) yield index\n          }\n        }\n      },\n      connect: async (context) =>\n        createNodeThreadChannel(port2, 'client-1', {\n          scheduler: systemScheduler,\n          capabilities: context.capabilities\n        })\n    })\n  ])\n  try {\n    console.log(await peer.request('math.double', 21)) // number：42\n    await peer.notify('math.double', 21) // 只确认发出，不确认业务完成\n    for await (const value of peer.stream('feed.count', 3)) console.log(value) // number：1、2、3\n    console.log(\n      await peer.group([\n        { method: 'math.double', payload: 2 },\n        { method: 'math.double', payload: 3 }\n      ])\n    ) // 顺序执行，得到两个步骤结果\n    console.log(await peer.outcome('not-issued')) // unknown 不能证明某个业务操作没有执行\n  } finally {\n    await Promise.all([peer.close(), server.close()])\n  }\n} finally {\n  port1.close()\n  port2.close()\n}"
                 },
                 {
                   "type": "list",
@@ -12153,7 +12166,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({\n  id: 'server', transport: right, middlewares: [connect({ transport: right })]\n})\nserver.provide('add', (context) => {\n  const [a, b] = context.data as [number, number]\n  return context.success(a + b) // 或 context.failed(error)\n})\nconst client = await createEndpoint({\n  id: 'client', targetIds: ['server'],\n  transport: left, middlewares: [connect({ transport: left })]\n})\ntry {\n  const sum = await client.send<number>('server', 'add', [20, 22])\n  console.log(sum) // 42；data 必填，没有参数时传 null\n} finally {\n  await client.dispose()\n  await server.dispose()\n}"
+                  "code": "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({\n  id: 'server',\n  transport: right,\n  middlewares: [connect({ transport: right })]\n})\nserver.provide('add', (context) => {\n  const [a, b] = context.data as [number, number]\n  return context.success(a + b) // 或 context.failed(error)\n})\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['server'],\n  transport: left,\n  middlewares: [connect({ transport: left })]\n})\ntry {\n  const sum = await client.send<number>('server', 'add', [20, 22])\n  console.log(sum) // 42；data 必填，没有参数时传 null\n} finally {\n  await client.dispose()\n  await server.dispose()\n}"
                 },
                 {
                   "type": "table",
@@ -12431,7 +12444,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { MessageChannel, type MessagePort } from 'node:worker_threads'\nimport { defineMessageAdapter } from '@migaia/rpc-core/adapter'\n\n/** 把调用方实际持有的端口交给 Core 的现有消息 owner。 */\nconst adapter = defineMessageAdapter({ open: (port: MessagePort) => port })\n/** 原生端口由创建方持有，Peer.close() 释放借用的监听器。 */\nconst { port1, port2 } = new MessageChannel()\n/** 显式地址用于这两个独立端口的对称路由。 */\nconst [left, right] = await Promise.all([\n  adapter.peer<{ echo(value: number): number }>({\n    self: { name: 'left', instanceId: 'left' }, connect: port1, peerId: 'right'\n  }),\n  adapter.peer({\n    self: { name: 'right', instanceId: 'right' }, connect: port2, peerId: 'left',\n    provide: { echo: (value: number) => value }\n  })\n])\ntry {\n  console.log(await left.request('echo', 42)) // 42\n} finally {\n  await Promise.all([left.close(), right.close()])\n  port1.close()\n  port2.close()\n}"
+                  "code": "import { MessageChannel, type MessagePort } from 'node:worker_threads'\nimport { defineMessageAdapter } from '@migaia/rpc-core/adapter'\n\n/** 把调用方实际持有的端口交给 Core 的现有消息 owner。 */\nconst adapter = defineMessageAdapter({ open: (port: MessagePort) => port })\n/** 原生端口由创建方持有，Peer.close() 释放借用的监听器。 */\nconst { port1, port2 } = new MessageChannel()\n/** 显式地址用于这两个独立端口的对称路由。 */\nconst [left, right] = await Promise.all([\n  adapter.peer<{ echo(value: number): number }>({\n    self: { name: 'left', instanceId: 'left' },\n    connect: port1,\n    peerId: 'right'\n  }),\n  adapter.peer({\n    self: { name: 'right', instanceId: 'right' },\n    connect: port2,\n    peerId: 'left',\n    provide: { echo: (value: number) => value }\n  })\n])\ntry {\n  console.log(await left.request('echo', 42)) // 42\n} finally {\n  await Promise.all([left.close(), right.close()])\n  port1.close()\n  port2.close()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -12440,7 +12453,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { MessageChannel, type MessagePort } from 'node:worker_threads'\nimport { defineHost } from '@migaia/plugin-host'\nimport { defineMessageAdapter } from '@migaia/rpc-core/adapter'\n\n/** 这个第三方定义只负责取得真实端口。 */\nconst adapter = defineMessageAdapter({ open: (port: MessagePort) => port })\n/** 两个端口的物理生命周期仍由创建方持有。 */\nconst { port1, port2 } = new MessageChannel()\n/** 服务端与 Host 安装并发开始，让原消息 owner 完成双向 ACK。 */\nconst serving = adapter.peer({\n  self: { name: 'service', instanceId: 'service' }, connect: port2, peerId: 'host',\n  provide: { echo: (value: number) => value }\n})\n/** 这个定义产生的真实 Plugin 交给原 Host 安装批次。 */\nconst plugin = adapter.plugin<{ echo(value: number): number }>({\n  name: 'custom', self: { name: 'host', instanceId: 'host' },\n  connect: port1, peerId: 'service'\n})\n/** Plugin 元组把实际 thread 出口保留在 Host 类型上。 */\nconst host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n/** 与已经开始的服务端 Peer 并发安装，完成原双向握手。 */\nconst installed = host.use(plugin)\n/** 服务端 Peer 与实际安装都完成后才发业务调用。 */\nconst right = await serving\ntry {\n  await installed\n  console.log(await host.thread!.request('custom', 'echo', 42)) // 42\n} finally {\n  await host.dispose()\n  await right.close()\n  port1.close()\n  port2.close()\n}"
+                  "code": "import { MessageChannel, type MessagePort } from 'node:worker_threads'\nimport { defineHost } from '@migaia/plugin-host'\nimport { defineMessageAdapter } from '@migaia/rpc-core/adapter'\n\n/** 这个第三方定义只负责取得真实端口。 */\nconst adapter = defineMessageAdapter({ open: (port: MessagePort) => port })\n/** 两个端口的物理生命周期仍由创建方持有。 */\nconst { port1, port2 } = new MessageChannel()\n/** 服务端与 Host 安装并发开始，让原消息 owner 完成双向 ACK。 */\nconst serving = adapter.peer({\n  self: { name: 'service', instanceId: 'service' },\n  connect: port2,\n  peerId: 'host',\n  provide: { echo: (value: number) => value }\n})\n/** 这个定义产生的真实 Plugin 交给原 Host 安装批次。 */\nconst plugin = adapter.plugin<{ echo(value: number): number }>({\n  name: 'custom',\n  self: { name: 'host', instanceId: 'host' },\n  connect: port1,\n  peerId: 'service'\n})\n/** Plugin 元组把实际 thread 出口保留在 Host 类型上。 */\nconst host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n/** 与已经开始的服务端 Peer 并发安装，完成原双向握手。 */\nconst installed = host.use(plugin)\n/** 服务端 Peer 与实际安装都完成后才发业务调用。 */\nconst right = await serving\ntry {\n  await installed\n  console.log(await host.thread!.request('custom', 'echo', 42)) // 42\n} finally {\n  await host.dispose()\n  await right.close()\n  port1.close()\n  port2.close()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -12449,7 +12462,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PassThrough } from 'node:stream'\nimport { defineByteAdapter } from '@migaia/rpc-core/adapter'\n\n/** 一端持有实际读流和写流，关闭时释放自己持有的两条流。 */\ntype IStreams = Readonly<{ input: PassThrough; output: PassThrough }>\n/** 标准库流只提供字节读写；Core 负责协议和能力判断。 */\nconst adapter = defineByteAdapter({\n  open: (streams: IStreams) => ({\n    kind: 'byte' as const,\n    write: (chunk: Uint8Array) => new Promise<void>((resolve, reject) => {\n      streams.output.write(chunk, (error) => error ? reject(error) : resolve())\n    }),\n    onData: (listener: (chunk: Uint8Array) => void) => {\n      streams.input.on('data', listener)\n      return () => { streams.input.off('data', listener) }\n    },\n    onClose: (listener: (reason?: unknown) => void) => {\n      streams.input.on('end', listener)\n      return () => { streams.input.off('end', listener) }\n    },\n    close: () => { streams.input.destroy(); streams.output.destroy() }\n  }),\n  listen: (streams: IStreams) => ({\n    kind: 'byte' as const,\n    write: (chunk: Uint8Array) => new Promise<void>((resolve, reject) => {\n      streams.output.write(chunk, (error) => error ? reject(error) : resolve())\n    }),\n    onData: (listener: (chunk: Uint8Array) => void) => {\n      streams.input.on('data', listener)\n      return () => { streams.input.off('data', listener) }\n    },\n    onClose: (listener: (reason?: unknown) => void) => {\n      streams.input.on('end', listener)\n      return () => { streams.input.off('end', listener) }\n    },\n    close: () => { streams.input.destroy(); streams.output.destroy() }\n  })\n})\n/** 两条真实流分别承载两个方向，顺序由标准库保持。 */\nconst toLeft = new PassThrough()\nconst toRight = new PassThrough()\n/** 一端发 hello，另一端在自己实际接收的流上 accept。 */\nconst [left, right] = await Promise.all([\n  adapter.peer<{ double(value: number): number }>({\n    self: { name: 'left', instanceId: 'left' }, peerId: 'right',\n    connect: { input: toLeft, output: toRight }\n  }),\n  adapter.peer({\n    self: { name: 'right', instanceId: 'right' }, peerId: 'left',\n    listen: { input: toRight, output: toLeft },\n    provide: { double: (value: number) => value * 2 }\n  })\n])\ntry {\n  console.log(await left.request('double', 21)) // 42\n} finally {\n  await Promise.all([left.close(), right.close()])\n}"
+                  "code": "import { PassThrough } from 'node:stream'\nimport { defineByteAdapter } from '@migaia/rpc-core/adapter'\n\n/** 一端持有实际读流和写流，关闭时释放自己持有的两条流。 */\ntype IStreams = Readonly<{ input: PassThrough; output: PassThrough }>\n/** 标准库流只提供字节读写；Core 负责协议和能力判断。 */\nconst adapter = defineByteAdapter({\n  open: (streams: IStreams) => ({\n    kind: 'byte' as const,\n    write: (chunk: Uint8Array) =>\n      new Promise<void>((resolve, reject) => {\n        streams.output.write(chunk, (error) => (error ? reject(error) : resolve()))\n      }),\n    onData: (listener: (chunk: Uint8Array) => void) => {\n      streams.input.on('data', listener)\n      return () => {\n        streams.input.off('data', listener)\n      }\n    },\n    onClose: (listener: (reason?: unknown) => void) => {\n      streams.input.on('end', listener)\n      return () => {\n        streams.input.off('end', listener)\n      }\n    },\n    close: () => {\n      streams.input.destroy()\n      streams.output.destroy()\n    }\n  }),\n  listen: (streams: IStreams) => ({\n    kind: 'byte' as const,\n    write: (chunk: Uint8Array) =>\n      new Promise<void>((resolve, reject) => {\n        streams.output.write(chunk, (error) => (error ? reject(error) : resolve()))\n      }),\n    onData: (listener: (chunk: Uint8Array) => void) => {\n      streams.input.on('data', listener)\n      return () => {\n        streams.input.off('data', listener)\n      }\n    },\n    onClose: (listener: (reason?: unknown) => void) => {\n      streams.input.on('end', listener)\n      return () => {\n        streams.input.off('end', listener)\n      }\n    },\n    close: () => {\n      streams.input.destroy()\n      streams.output.destroy()\n    }\n  })\n})\n/** 两条真实流分别承载两个方向，顺序由标准库保持。 */\nconst toLeft = new PassThrough()\nconst toRight = new PassThrough()\n/** 一端发 hello，另一端在自己实际接收的流上 accept。 */\nconst [left, right] = await Promise.all([\n  adapter.peer<{ double(value: number): number }>({\n    self: { name: 'left', instanceId: 'left' },\n    peerId: 'right',\n    connect: { input: toLeft, output: toRight }\n  }),\n  adapter.peer({\n    self: { name: 'right', instanceId: 'right' },\n    peerId: 'left',\n    listen: { input: toRight, output: toLeft },\n    provide: { double: (value: number) => value * 2 }\n  })\n])\ntry {\n  console.log(await left.request('double', 21)) // 42\n} finally {\n  await Promise.all([left.close(), right.close()])\n}"
                 },
                 {
                   "type": "paragraph",
@@ -12480,7 +12493,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\nimport { createPeerPair } from '@migaia/rpc-core/testing'\n\n/** 可执行的对端让超时例子不依赖未定义 peer。 */\nconst pair = await createPeerPair({\n  a: { provide: {} },\n  b: { provide: { math: { slow: async (ms: number) => {\n    await new Promise<void>((resolve) => setTimeout(resolve, ms))\n    return ms\n  } } } }\n})\ntry {\n  await pair.a.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    console.error(code) // DEADLINE_EXCEEDED：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    console.error(code) // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n}"
+                  "code": "import { isRpcTimeoutError, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'\nimport { createPeerPair } from '@migaia/rpc-core/testing'\n\n/** 可执行的对端让超时例子不依赖未定义 peer。 */\nconst pair = await createPeerPair({\n  a: { provide: {} },\n  b: {\n    provide: {\n      math: {\n        slow: async (ms: number) => {\n          await new Promise<void>((resolve) => setTimeout(resolve, ms))\n          return ms\n        }\n      }\n    }\n  }\n})\ntry {\n  await pair.a.request('math.slow', 300, { timeoutMs: 50 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (isRpcTimeoutError(error)) {\n    console.error(code) // DEADLINE_EXCEEDED：对端可能仍在执行\n  } else if (source === RPC_CORE_ERROR_SOURCE && code === RpcCoreErrorCode.overloaded) {\n    console.error(code) // 对端额度已满，函数未执行，可以退避重试\n  } else throw error\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n}"
                 },
                 {
                   "type": "list",
@@ -12737,11 +12750,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`@migaia/rpc-core/probe` 是运行时无关的观察契约入口，导出阶段、方向、kind、outcome 的数值常量与同顺序名称表，以及 `defineProbe`、`snapshotProbeEvent`、`rpcProbeSampleKey` 和 `probePlugin`。"
+                  "text": "`@migaia/rpc-core/probe` 是运行时无关的观察契约入口，导出阶段、方向、kind、outcome 的数值常量与同顺序名称表，以及 `defineProbe`、`snapshotProbeEvent`、`rpcProbeSampleKey`、`probePlugin`、`readProbeStages`、`subscribeProbeStages`，以及既有 `hostRethrowReporter` / `IpcReporterContext` reporter。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "当前状态： layer 1 只定义 Probe 与 Peer 的 `probe` 选项、transport 的可选 `observe` 类型。Peer 会接收选项，但 probe-core 实现合入之前不产生观察事件，也不调用 `transport.observe`。`probePlugin` 当前同步抛出 `INVALID_CONFIG`，文字为 `probe runtime not installed`。"
+                  "text": "Core Peer 的 `probe` 与 Endpoint 的 `probePlugin` 安装同一 emitter。事件同步交给所订阅的 Probe；throw、reject、redact 或 describe 失败通过 `onError` 报告 `PROBE_FAILED`，原始错误留在 `cause`，不进入业务管道。没有 `onError` 时使用宿主 reporter。Process、Thread、Browser Peer、pool member 与 managed spawn 均转发原 Probe 引用；监督退出与重启由既有生命周期 owner 发出 peer 事件。"
                 }
               ]
             },
@@ -12752,7 +12765,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntimePeer, type IRuntimePeerSource } from '@migaia/rpc-core/remote'\nimport { defineProbe, RpcProbeStageName } from '@migaia/rpc-core/probe'\n\n/** 只记录所选方法的元数据，不读取业务 payload。 */\nconst probe = defineProbe({\n  stages: ['message', 'envelope', 'frame'],\n  methods: ['math.double'],\n  sample: 0.25,\n  emit(view) {\n    console.log(RpcProbeStageName[view.stage], view.method, view.durationMs)\n  },\n  onError(error) {\n    console.error(error)\n  }\n})\n\n/** connect 来源仍由调用方拥有；probe 不创建任何 transport。 */\nexport function createObservedPeer(connect: IRuntimePeerSource) {\n  return createRuntimePeer({ connect, probe })\n}"
+                  "code": "import assert from 'node:assert/strict'\nimport { MessageChannel } from 'node:worker_threads'\nimport { createThreadPeer, createNodeThreadChannel } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { defineProbe, RpcProbeStageName } from '@migaia/rpc-core/probe'\n\n/** 调用方已有的对象保留同一身份，定义 Probe 后被冻结。 */\nconst host = { name: 'metrics' }\n/** 同步计数确认示例实际收到了元数据，未保留复用 view。 */\nlet observedEvents = 0\n/** 此 Probe 只读 message 元数据，不捕获业务内容。 */\nconst probe = defineProbe(\n  {\n    stages: ['message'],\n    emit(view) {\n      observedEvents += 1\n      console.log(RpcProbeStageName[view.stage], view.method, view.durationMs)\n    }\n  },\n  host\n)\nconsole.log(probe === host, Object.isFrozen(host), probe.name) // true, true, 'metrics'\n\n/** 创建方拥有实际 MessagePort；Peer 只负责自己的 Endpoint。 */\nconst { port1, port2 } = new MessageChannel()\ntry {\n  const [client, server] = await Promise.all([\n    createThreadPeer<{ echo(value: string): string }>({\n      self: { name: 'client', instanceId: 'probe-client' },\n      probe,\n      connect: async (context) =>\n        createNodeThreadChannel(port1, 'probe-server', {\n          scheduler: systemScheduler,\n          capabilities: context.capabilities\n        })\n    }),\n    createThreadPeer({\n      self: { name: 'server', instanceId: 'probe-server' },\n      provide: { echo: (value: string) => value },\n      connect: async (context) =>\n        createNodeThreadChannel(port2, 'probe-client', {\n          scheduler: systemScheduler,\n          capabilities: context.capabilities\n        })\n    })\n  ])\n  await using observed = client\n  await using provider = server\n  assert.equal(await observed.request('echo', 'ready'), 'ready')\n  assert.ok(observedEvents > 0)\n} finally {\n  port1.close()\n  port2.close()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -12765,7 +12778,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineProbe } from '@migaia/rpc-core/probe'\n\n/** 已有对象的额外成员不参与 Core 热路径的状态读取。 */\nconst host = { name: 'metrics' }\n/** definition 与 host 直接注册在同一对象身份下，不复制 host。 */\nconst probe = defineProbe({\n  stages: ['message'],\n  emit(view) {\n    console.log(view.seq)\n  }\n}, host)\nconsole.log(probe === host, Object.isFrozen(host), probe.name)"
+                  "code": "import { defineProbe } from '@migaia/rpc-core/probe'\n\n/** 已有对象的额外成员不参与 Core 热路径的状态读取。 */\nconst host = { name: 'metrics' }\n/** definition 与 host 直接注册在同一对象身份下，不复制 host。 */\nconst probe = defineProbe(\n  {\n    stages: ['message'],\n    emit(view) {\n      console.log(view.seq)\n    }\n  },\n  host\n)\nconsole.log(probe === host, Object.isFrozen(host), probe.name)"
                 },
                 {
                   "type": "paragraph",
@@ -12812,7 +12825,61 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`setStages([])` 允许暂停，之后可以设置其它已知阶段。它更新私有状态的阶段选择，保留定义时的 `captureMask`；host 上不可写的 `stageMask` 仍为初始定义值，独立 handle 的 `stageMask` getter 反映当前私有值。非法阶段会抛出 `INVALID_CONFIG` 并保留旧 mask。阶段变更的 emitter 订阅机制由 Core 内部持有，不是公开 handle 方法。"
+                  "text": "`sizeBytes` 只读取已知的原生字节 backing/view 长度。所有字符串与 opaque container 均为 `-1`，包括 string transport；metadata 不扫描、编码或规范化 payload。Byte carrier 复用其现成 frame 长度。各载体与 Core 复用 `adapter/internal-advanced` 的 `carrierSizeBytes` owner。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`setStages([])` 允许暂停，之后可以设置其它已知阶段。它更新私有状态的阶段选择，保留定义时的 `captureMask`；host 上不可写的 `stageMask` 仍为初始定义值，独立 handle 的 `stageMask` getter 反映当前私有值。非法阶段会抛出 `INVALID_CONFIG` 并保留旧 mask。`readProbeStages(probe)` 读取当前有效 mask；`subscribeProbeStages(probe, listener)` 在每次实际变更后通知一次，返回可重复调用的释放函数。两者用于冷控制边界，不加入消息热路径。"
+                }
+              ]
+            },
+            {
+              "id": "13-3-endpoint-安装与生命周期",
+              "heading": "13.3 Endpoint 安装与生命周期",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Endpoint 用户在激活前安装 `probePlugin`。Peer 用户只需传入 `probe`。Core 在激活后交付一次 descriptor；只有载体实际提供 `observe` 才调用它，释放函数由现有 resource scope 在关闭时执行。Peer 阶段覆盖 handshake、ready、exit、restart、directory 与 closing。`setStages([])` 暂停后不再构造所选事件；关闭后不再发送事件。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import assert from 'node:assert/strict'\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { defineProbe, probePlugin } from '@migaia/rpc-core/probe'\n\n/** 在同步回调中读标量，不保留复用 view。 */\nlet events = 0\nconst probe = defineProbe({\n  stages: ['message'],\n  emit() {\n    events += 1\n  }\n})\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({\n  id: 'server',\n  transport: right,\n  middlewares: [connect({ transport: right })]\n})\nserver.provide('echo', (context) => context.success(context.data))\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['server'],\n  transport: left,\n  middlewares: [probePlugin(probe), connect({ transport: left })]\n})\ntry {\n  assert.equal(await client.send('server', 'echo', 'ready'), 'ready')\n  assert.ok(events > 0)\n} finally {\n  await client.dispose()\n  await server.dispose()\n}"
+                }
+              ]
+            },
+            {
+              "id": "13-4-revision-3-的关联边界",
+              "heading": "13.4 Revision 3 的关联边界",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`IRpcProbeEventView.carrierSeq` 是同一 emitter 的 inbound carrier 序号；没有链接时为 `-1`。Core 在同步 receive 入口取走它，并沿原 physical record 穿过异步 unprotect/decode。Collector 将其转换为自己的全局 wire 序号，wire 的无链接字段省略。只有原 carrier 仍被主环、record 或 watch 保留且 endpoint 未驻留溢出时才可还原链接。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Outbound carrier 借用本次 send 的原 envelope，携带 messageId、senderId、targetId、trace；同步 send 返回后立即清空。仓库载体都在 send 内同步 emit；第三方载体若跨异步间隙再 emit，没有这份 context。Physical batch 使用其第一个实际成员作代表，不展开 payload 成员。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Byte 业务 receive 的 carrier 事件在实际交付 Core 前发出。启动时排队的帧在交付时各发一次，时间是交付时间；关闭或溢出前未交付的业务帧不发业务 carrier 事件。Byte detail 是复用引用：`frameBytes` 是当前帧跨度，`drainMs` 初始 `-1`，native writer 的真实 false/drain 随后更新最近借用 detail；观察本身不改变原 write settlement，也不追加异步 carrier 事件。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`probePlugin` 保留 fast/native/batch/chunk 选择。Fast-capable descriptor 仍包含可能产生的 frame 阶段，单次 fast send 不伪造 frame。认证 descriptor 从既有配置读取 sign 或 encrypt-sign。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "采样在解密前没有 sender/message identity；不能保证与后续逻辑阶段采用相同 key。Native Peer 调用选项不携带 trace，应用在自己的 Endpoint.send 边界显式传递已有 trace。多块消息完成解码前的匿名 carrier/protected/frame 当前不能全部归入 hub interaction；完成解码的最后一块可通过 carrierSeq 关联，前序原始记录保留，不猜测身份。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "捕获容器中的 nested transferable 保留原引用，不遍历 getter、不深扫描或复制；其成员可能在实际 transfer 后分离。只有直接捕获且确会分离的 backing/view 按 SC9(a) 保存字节。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineProbe, readProbeStages, subscribeProbeStages } from '@migaia/rpc-core/probe'\n\n/** 冷控制读取实际订阅；host 的初始公开字段不作为当前状态。 */\nconst probe = defineProbe({ stages: ['message'], emit() {} }, {})\n/** 解除控制订阅不改变业务资源或 Probe 身份。 */\nconst release = subscribeProbeStages(probe, () => console.log(readProbeStages(probe)))\nprobe.setStages(['message', 'carrier'])\nconsole.log(readProbeStages(probe)) // 66\nrelease()"
                 }
               ]
             }

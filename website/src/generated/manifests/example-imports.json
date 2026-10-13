@@ -513,6 +513,7 @@
       "defineProbe": "@migaia/rpc-core/probe",
       "drainListenerFailures": "@migaia/rpc-core/transport-kit",
       "drainTerminalListenerFailures": "@migaia/rpc-core/transport-kit",
+      "hostRethrowReporter": "@migaia/rpc-core/probe",
       "IAdapterDefinition": "@migaia/rpc-core/adapter",
       "IAdapterDefinitionPeerOptions": "@migaia/rpc-core/adapter",
       "IAdapterDefinitionPluginOptions": "@migaia/rpc-core/adapter",
@@ -537,6 +538,7 @@
       "IOneWaySurface": "@migaia/rpc-core/features/one-way",
       "IOutboundSurface": "@migaia/rpc-core/features/outbound",
       "IpcLogEventName": "@migaia/rpc-core/plugins/flow-control",
+      "IpcReporterContext": "@migaia/rpc-core/probe",
       "IpcSendClass": "@migaia/rpc-core/plugins/flow-control",
       "IPeerPairOptions": "@migaia/rpc-core/testing",
       "IProviderAdmissionScope": "@migaia/rpc-core/features/provider",
@@ -629,6 +631,7 @@
       "normalizeRemoteHostCatalog": "@migaia/rpc-core/remote",
       "observeListener": "@migaia/rpc-core/transport-kit",
       "probePlugin": "@migaia/rpc-core/probe",
+      "readProbeStages": "@migaia/rpc-core/probe",
       "registerListeners": "@migaia/rpc-core/transport-kit",
       "releaseListenerRegistration": "@migaia/rpc-core/transport-kit",
       "REMOTE_METHOD_MAX_LENGTH": "@migaia/rpc-core/remote",
@@ -668,7 +671,8 @@
       "sameRemoteContract": "@migaia/rpc-core/remote",
       "serveRemoteHost": "@migaia/rpc-core/remote",
       "serveRemotePlugin": "@migaia/rpc-core/remote",
-      "snapshotProbeEvent": "@migaia/rpc-core/probe"
+      "snapshotProbeEvent": "@migaia/rpc-core/probe",
+      "subscribeProbeStages": "@migaia/rpc-core/probe"
     },
     "@migaia/rpc-devtools": {
       "createRpcDevtoolsHub": "@migaia/rpc-devtools/hub",
