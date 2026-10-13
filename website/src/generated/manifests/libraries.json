@@ -6622,6 +6622,10 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "`readPluginDependencies(pluginOrAdmission)` 从 Feature 引用读取 `{ provider, required }` 列表，包含本地 Feature 的完整依赖闭包，按首次引用排序，同一 provider 的必需引用优先。它接受 `definePlugin` 结果、有效原始描述符和 composition admission；admission 形式直接读取已捕获的定义，不再调用 getter，其他输入经标准 admission 快照读取一次。读取不会执行 setup、install 或 Feature 工厂，非法输入保留 admission 的原生错误。根入口也导出 `IPluginDependency`、`IPluginFeatureName` 和 `IPluginFeatureOutput`；`getFeature()` 引用类型保留 provider 的名称字面量。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "`install()` 返回值只有可枚举的 data property 会被挂载到 host；非枚举 key 会被有意忽略并经 `diagnostic` 上报（`EXTENSION_NON_ENUMERABLE_IGNORED`）；getter/setter 形式的属性直接抛 `TypeError`。保留键不能作为 extension key：`then`（否则 `await host.use(plugin)` 会把返回值误当成 thenable 解包）、本包的 `disposeKey`/`asyncDisposeKey`（及宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`，若存在），命中会抛 `EXTENSION_RESERVED`；与 Host 上已有属性冲突抛 `EXTENSION_DUPLICATE`；与 `Object."
                 },
                 {
@@ -7530,6 +7534,19 @@
                 {
                   "type": "paragraph",
                   "text": "Feature 引用同时表达能力与依赖。Host 会按引用拓扑排序，所以调用方传入顺序不影响安装；必需 provider 缺失、禁用或移除时分别抛前置条件错误。可选依赖用 `provider.getFeature('format', { optional: true })` 声明。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`readPluginDependencies(input)` 与 Host 共用 Feature 依赖解析，返回只读的 `{ provider, required }` 列表。它遍历本地 Feature 的完整闭包，按 provider 首次引用排序；同一 provider 同时被必需和可选引用时，`required` 为 `true`。输入可以是 `definePlugin` 结果、有效原始描述符，或 `openComposition(host).createPluginAdmission(plugin)` 创建的 admission。admission 形式读取安装使用的同一快照，不会再次读取 getter；其他输入只经标准 admission 快照读取一次。读取不会运行 setup、install 或 Feature 工厂，非法输入直接抛 admission 的原生错误。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { readPluginDependencies } from '@migaia/plugin-host'\nimport type {\n  IPluginDependency,\n  IPluginFeatureName,\n  IPluginFeatureOutput\n} from '@migaia/plugin-host'\nimport { openComposition } from '@migaia/plugin-host/composition'\n\nconst dependencies: readonly IPluginDependency[] = readPluginDependencies(consumer)\n// [{ provider: 'provider', required: true }]\nconst admission = openComposition(host).createPluginAdmission(consumer)\nreadPluginDependencies(admission)"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`IPluginFeatureName<TPlugin>` 和 `IPluginFeatureOutput<TPlugin, TName>` 从根入口导出。`IFeatureReference<TOutput, TOptional, TProvider>` 的第三个参数默认 `string`；`getFeature()` 的两个重载都保留 provider 的名称字面量，供组合层推导依赖。"
                 }
               ]
             },
@@ -13371,7 +13388,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createThreadPool } from '@migaia/rpc-pool'\n\nconst pool = await createThreadPool<{ double(value: number): number }>({\n  spawn: new URL('./worker.js', import.meta.url), size: 2\n})\ntry {\n  console.log(await Promise.all([pool.request('double', 21), pool.request('double', 10)]))\n  await pool.resize(3)\n  console.log(pool.stats())\n} finally {\n  await pool.close()\n}"
+                  "code": "import { createThreadPool } from '@migaia/rpc-pool'\n\nconst pool = await createThreadPool<{ double(value: number): number }>({\n  spawn: new URL('./worker.js', import.meta.url),\n  size: 2\n})\ntry {\n  console.log(await Promise.all([pool.request('double', 21), pool.request('double', 10)]))\n  await pool.resize(3)\n  console.log(pool.stats())\n} finally {\n  await pool.close()\n}"
                 }
               ]
             },
@@ -13386,12 +13403,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({ provide: { add: (value: { a: number; b: number }) => value.a + value.b } })"
+                  "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: { add: (value: { a: number; b: number }) => value.a + value.b }\n})"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createProcessPool } from '@migaia/rpc-pool'\n\nconst pool = await createProcessPool<{ add(value: { a: number; b: number }): number }>({\n  spawn: new URL('./service.js', import.meta.url), size: 2, maxQueue: 16\n})\ntry {\n  console.log(await pool.request('add', { a: 20, b: 22 }))\n} finally {\n  await pool.close()\n}"
+                  "code": "import { createProcessPool } from '@migaia/rpc-pool'\n\nconst pool = await createProcessPool<{ add(value: { a: number; b: number }): number }>({\n  spawn: new URL('./service.js', import.meta.url),\n  size: 2,\n  maxQueue: 16\n})\ntry {\n  console.log(await pool.request('add', { a: 20, b: 22 }))\n} finally {\n  await pool.close()\n}"
                 }
               ]
             },
@@ -13412,6 +13429,7 @@
                     "`resize(size)` 按调用顺序增减成员，缩容等正在使用的成员完成。`close()` 停止新接纳并排空已接受的队列，重复调用返回同一 Promise。",
                     "`idleTimeoutMs` 设置为不超过 2147483647 毫秒的有限正数时，闲置成员通过原 `peer.close()` 退役，下一个任务通过原公开工厂补回目标大小。",
                     "原 supervisor 负责崩溃重启与重新绑定。默认裸 spawn 使用原 on-failure 策略和五次预算；不重置用户预算。恢复期间原 Peer 可以拒绝 `CLOSED`；恢复后未来新调用使用同一个 Peer。池不自动重放失败业务调用。",
+                    "`probe` 接受 `@migaia/rpc-core/probe` 的一个 Probe 或只读 Probe 数组，并原样交给每个成员的公开 Peer 工厂；真实握手、ready 和重启仍由原 Peer 发出。多个成员共享 Probe 时用事件的 `endpointId` 区分成员。",
                     "派发后的 call options 和 signal 原样传给 Peer；排队阶段取消为 DOMException AbortError，`CALL_ABORTED` 的 cause 是原 reason。`timeoutMs` 从原 Peer 接收操作时起算，池不另建队列 deadline。"
                   ]
                 },
@@ -13450,7 +13468,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: {\n    double: (value: number) => value * 2,\n    mark: (_value: number) => undefined,\n    values: async function* (count: number) { for (let index = 0; index < count; index++) yield index }\n  }\n})"
+                  "code": "import { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: {\n    double: (value: number) => value * 2,\n    mark: (_value: number) => undefined,\n    values: async function* (count: number) {\n      for (let index = 0; index < count; index++) yield index\n    }\n  }\n})"
                 },
                 {
                   "type": "code",
@@ -13465,7 +13483,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。"
+                  "text": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "两个池工厂都接受 `defineProbe()` 返回的原始 Probe 或只读 Probe 数组。`probe` 原样进入每个成员的 `createThreadPeer` / `createProcessPeer`，握手、ready 和监督重启事件沿原 Peer 路径发出。共享 Probe 的回调用 `endpointId` 区分成员；`seq` 仍属于对应端点，而非整个池的统一序号。"
                 }
               ]
             },
@@ -33419,7 +33441,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTrayGraph(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -33428,7 +33450,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "`createTray()` 只接收完整数组；key 必须是非空字符串且不能重复，`requires` 只能引用同一数组内的其他 entry。",
+                    "`createTrayGraph()` 只接收完整数组；key 必须是非空字符串且不能重复，`requires` 只能引用同一数组内的其他 entry。",
                     "`start()` 必须返回或 resolve 为 `{ value, release }`；依赖可通过 `context.get()` 读取。",
                     "必须先 `await tray.ready()` 再 `get()`。未就绪、失败、未知 key 或已释放时都会显式失败，不返回半初始化值。",
                     "`dispose()` 由 Graph 按依赖逆序释放，幂等并保留清理失败。"
@@ -33466,7 +33488,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, type IPlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = {\n  name: 'provider',\n  install: () => ({ providerValue: 1 })\n} satisfies IPlugin<AppHost, { readonly providerValue: number }>\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use({ name: 'late', requires: ['provider'], install: () => ({ late: true }) })\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
+                  "code": "import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = definePlugin({\n  name: 'provider',\n  features: { value: defineFeature(() => ({ value: 1 })) },\n  install: () => ({ providerValue: 1 })\n})\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use(definePlugin({\n  name: 'late',\n  features: {\n    value: defineFeature(() => ({}), { provider: provider.getFeature('value') })\n  },\n  install: () => ({ late: true })\n}))\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
                 },
                 {
                   "type": "paragraph",
@@ -33522,7 +33544,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'"
+                  "code": "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'"
                 },
                 {
                   "type": "paragraph",
@@ -33549,7 +33571,7 @@
                   "items": [
                     "`key`：必填、trim 后非空、全 Tray 唯一。",
                     "`kind`：必填；用于 Graph 诊断和拓扑语义，不改变 `value` 的 TypeScript 类型。",
-                    "`requires`：可选；每个 key 必须存在于同一次 `createTray()` 的 entry 数组，不能引用自身。",
+                    "`requires`：可选；每个 key 必须存在于同一次 `createTrayGraph()` 的 entry 数组，不能引用自身。",
                     "`readiness`：可选的外部门状态快照，只接受 `ready | blocked | failed`。它在首次 `ready()` 时读取一次并缓存结果。",
                     "`start`：必填；Graph 在依赖就绪后调用。返回值必须包含 `value` 与可调用的 `release`。"
                   ]
@@ -33569,13 +33591,13 @@
               ]
             },
             {
-              "id": "3-createtray-与-admission",
-              "heading": "3. createTray() 与 admission",
+              "id": "3-createtraygraph-与-admission",
+              "heading": "3. createTrayGraph() 与 admission",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray"
+                  "code": "function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph"
                 },
                 {
                   "type": "paragraph",
@@ -33611,13 +33633,13 @@
               ]
             },
             {
-              "id": "5-itray-api",
-              "heading": "5. ITray API",
+              "id": "5-itraygraph-api",
+              "heading": "5. ITrayGraph API",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ITray = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
+                  "code": "type ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
                 },
                 {
                   "type": "list",
@@ -33799,7 +33821,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`await createHost(options)` 的唯一 concrete Host 由 `options.create()` 构造。Tray 随后一次性快照 plugin、`requires`、config 与 disposer，建立 Dynamic Capability Graph，再通过 PluginHost prepared admission 发布 ready definition。任何 factory/admission/setup/commit 失败都会回滚未发布候选；失败的 duplicate/cycle/replacement candidate 不会成为以后 restart 的隐式来源。"
+                  "text": "`await createHost(options)` 的唯一 concrete Host 由 `options.create()` 构造。Tray 随后一次性快照 plugin 的 Feature、config 与 disposer，使用 PluginHost 的公开 `readPluginDependencies(admission)` 读取同一个 admission 快照的 provider 与 required/optional 强度，建立 Dynamic Capability Graph，再通过 PluginHost prepared admission 发布 ready definition。任何 factory/admission/setup/commit 失败都会回滚未发布候选；失败的 duplicate/cycle/replacement candidate 不会成为以后 restart 的隐式来源。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "必需的 Feature provider 缺失时 consumer 保持 `blocked`；可选 provider 缺失不阻塞 consumer， 存在时先于 consumer 安装。插件依赖只由 Feature references 声明，不接受旧插件依赖字段。 `createHost`、`use` 和 `replace` 在图变更之前完成 admission；非法描述子以 `TRAY_INVALID_ENTRY` 拒绝，PluginHost 的原始错误直接保留在 `cause`。进入图变更后的失败继续返回 mutation result。"
                 },
                 {
                   "type": "paragraph",
@@ -33838,7 +33864,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "类型策略以稳定性优先：有限、literal、最多 128 个 definition 时，`ITrayResolvedHost` 推导 exact ready closure；widened name、widened `requires` 或超过预算时返回 `ITrayHostDynamic`。dynamic view 仍保留 concrete Host 的 constructor baseline extension/config 类型，运行期管理的未知 key 为 `unknown`。"
+                  "text": "类型策略以稳定性优先：有限、literal、最多 128 个 definition 时，`ITrayResolvedHost` 推导 exact ready closure；widened name、任意 widened Feature provider 或超过预算时返回 `ITrayHostDynamic`。dynamic view 仍保留 concrete Host 的 constructor baseline extension/config 类型，运行期管理的未知 key 为 `unknown`。"
                 },
                 {
                   "type": "paragraph",

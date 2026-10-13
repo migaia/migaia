@@ -19,7 +19,7 @@ pnpm add @migaia/tray
 ## 最小可运行示例
 
 ```ts
-import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'
+import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'
 
 const key = (value: string): ITrayKey => value as ITrayKey
 const configKey = key('config')
@@ -43,7 +43,7 @@ const entries: readonly ITrayEntryDefinition<unknown>[] = [
   }
 ]
 
-const tray = createTray(entries)
+const tray = createTrayGraph(entries)
 await tray.ready()
 const api = tray.get<{ baseUrl: string }>(apiKey)
 
@@ -56,7 +56,7 @@ try {
 
 关键规则：
 
-- `createTray()` 只接收完整数组；key 必须是非空字符串且不能重复，`requires` 只能引用同一数组内的其他 entry。
+- `createTrayGraph()` 只接收完整数组；key 必须是非空字符串且不能重复，`requires` 只能引用同一数组内的其他 entry。
 - `start()` 必须返回或 resolve 为 `{ value, release }`；依赖可通过 `context.get()` 读取。
 - 必须先 `await tray.ready()` 再 `get()`。未就绪、失败、未知 key 或已释放时都会显式失败，不返回半初始化值。
 - `dispose()` 由 Graph 按依赖逆序释放，幂等并保留清理失败。

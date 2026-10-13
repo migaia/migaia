@@ -6,7 +6,7 @@ import {
 import { TrayErrorCode } from './error-code.js'
 import { attachTrayError, createTrayError } from './errors.js'
 import type {
-  ITray,
+  ITrayGraph,
   ITrayEntryDefinition,
   ITrayEntryContext,
   ITrayKey,
@@ -25,7 +25,7 @@ type IAdmittedEntry = {
 }
 
 /** Creates one immutable static composition root over one Capability Graph. */
-export function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray {
+export function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph {
   if (!Array.isArray(entries)) throw createTrayError(TrayErrorCode.invalidEntry)
   const admitted: IAdmittedEntry[] = []
   const definitions = new Map<ITrayKey, IAdmittedEntry>()
