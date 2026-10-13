@@ -320,6 +320,7 @@ describe('probe contract A1', () => {
     /** One complete view exercises every fixed-shape field and all reference-bearing payloads. */
     const view: IRpcProbeEventView = {
       seq: 1,
+      carrierSeq: -1,
       at: 123,
       endpointId: 'left',
       stage: 1,

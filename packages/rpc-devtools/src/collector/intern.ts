@@ -69,6 +69,16 @@ export class MessageTable {
   #refs: number[] = []
   /** Released numeric ids are reused without allocating a freelist node. */
   #free: number[] = []
+  /** Endpoint-scoped numeric source sequences share this existing retained-identity pool. */
+  #carriers = new Map<number, Map<number, number>>()
+  /** Nonnegative endpoint ids distinguish carrier aliases from ordinary message-name slots. */
+  #carrierEndpoints: number[] = []
+  /** Original emitter ordinals stay numeric until their last retained carrier row retires. */
+  #carrierSources: number[] = []
+  /** Collector ordinals bridge independently sequenced emitters without modifying their views. */
+  #carrierSequences: number[] = []
+  /** A replacement generation may restart its emitter ordinal while old recorded rows remain. */
+  #carrierLastSources = new Map<number, number>()
 
   /** Acquire before eviction, keeping repeated ids stable even in a one-slot ring. */
   acquire(value: string | undefined): number {
@@ -79,6 +89,7 @@ export class MessageTable {
       id = this.#free.length === 0 ? this.#names.length : this.#free.pop()!
       this.#names[id] = value
       this.#refs[id] = 0
+      this.#carrierEndpoints[id] = -1
       this.#ids.set(value, id)
     }
     this.#refs[id]!++
@@ -88,9 +99,60 @@ export class MessageTable {
   /** The final ring owner releases both the string and its Map entry in O(1). */
   release(id: number): void {
     if (id < 0 || --this.#refs[id]! !== 0) return
-    this.#ids.delete(this.#names[id]!)
+    /** Each carrier row in main/record/watch owns the same alias, so independent retention survives. */
+    const endpoint = this.#carrierEndpoints[id] ?? -1
+    if (endpoint >= 0) {
+      /** Old-generation retirement cannot delete a same-ordinal alias in a replacement generation. */
+      const entries = this.#carriers.get(endpoint)!
+      if (entries.get(this.#carrierSources[id]!) === id) entries.delete(this.#carrierSources[id]!)
+      this.#carrierEndpoints[id] = -1
+    } else this.#ids.delete(this.#names[id]!)
     this.#names[id] = undefined
     this.#free.push(id)
+  }
+
+  /** Acquire one numeric carrier alias before eviction; all rings retain the same global sequence. */
+  acquireCarrier(endpoint: number, sourceSeq: number, sequence: number): number {
+    // Overflow has no unique endpoint identity and must never correlate unrelated sources.
+    if (endpoint <= 0) return -1
+    /** Only the first real endpoint allocates its numeric lookup; later rows use its existing map. */
+    let entries = this.#carriers.get(endpoint)
+    if (entries === undefined) {
+      entries = new Map()
+      this.#carriers.set(endpoint, entries)
+    }
+    /** Repeated ring writers retain the same alias rather than assigning another sequence. */
+    let id = entries.get(sourceSeq)
+    if (id !== undefined && this.#carrierSequences[id] !== sequence) {
+      // Existing retained aliases belong to an earlier emitter generation, not this new event.
+      entries = new Map()
+      this.#carriers.set(endpoint, entries)
+      id = undefined
+    } else if (id === undefined && sourceSeq <= (this.#carrierLastSources.get(endpoint) ?? -1)) {
+      entries = new Map()
+      this.#carriers.set(endpoint, entries)
+    }
+    if (id === undefined) {
+      id = this.#free.length === 0 ? this.#names.length : this.#free.pop()!
+      if (id === this.#names.length) this.#names.push(undefined)
+      this.#refs[id] = 0
+      this.#carrierEndpoints[id] = endpoint
+      this.#carrierSources[id] = sourceSeq
+      this.#carrierSequences[id] = sequence
+      entries.set(sourceSeq, id)
+      this.#carrierLastSources.set(endpoint, sourceSeq)
+    }
+    this.#refs[id]!++
+    return id
+  }
+
+  /** Restore the collector-domain link only while an originating carrier row remains retained. */
+  carrierSequence(endpoint: number, sourceSeq: number): number {
+    /** Source -1 denotes no physical observation; overflow identities cannot disambiguate aliases. */
+    if (sourceSeq < 0 || endpoint <= 0) return -1
+    /** Numeric lookup creates neither an event object nor a concatenated key. */
+    const id = this.#carriers.get(endpoint)?.get(sourceSeq)
+    return id === undefined ? -1 : this.#carrierSequences[id]!
   }
 
   /** Restore the retained message identity at a representation boundary. */

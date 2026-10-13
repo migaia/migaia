@@ -7,6 +7,7 @@ import type { IRpcProbeEventView } from './types.js'
 export function snapshotProbeEvent(view: IRpcProbeEventView): Readonly<IRpcProbeEventView> {
   return Object.freeze({
     seq: view.seq,
+    carrierSeq: view.carrierSeq,
     at: view.at,
     endpointId: view.endpointId,
     stage: view.stage,

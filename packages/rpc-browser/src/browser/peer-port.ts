@@ -30,6 +30,7 @@ export function projectBrowserPeerPort(
   /** The projection retains only registrations belonging to its exact Core raw resource. */
   const subscriptions = new Map<IBrowserPeerPortListener, () => void>()
   return {
+    observe: transport.observe === undefined ? undefined : (probe) => transport.observe!(probe),
     postMessage: (message, transfer) => {
       void transport.send(message, { transfer: transfer as readonly Transferable[] | undefined })
     },

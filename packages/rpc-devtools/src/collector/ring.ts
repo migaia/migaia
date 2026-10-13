@@ -1,5 +1,7 @@
 import {
   RpcProbeDirectionName,
+  RpcProbeDirection,
+  RpcProbeStage,
   RpcProbeKindName,
   RpcProbeOutcomeName,
   RpcProbeStageName,
@@ -14,6 +16,8 @@ import { reportFailure } from './report.js'
 /** Numeric columns snapshot the reusable view; sparse arrays retain caller-owned references. */
 type IRingColumns = {
   seq: Float64Array
+  carrierSeq: Float64Array
+  carrierAlias: Int32Array
   at: Float64Array
   stage: Uint8Array
   direction: Uint8Array
@@ -81,6 +85,8 @@ export class EventRing {
     this.#metadata.length = capacity
     this.columns = {
       seq: new Float64Array(capacity),
+      carrierSeq: new Float64Array(capacity),
+      carrierAlias: new Int32Array(capacity),
       at: new Float64Array(capacity),
       stage: new Uint8Array(capacity),
       direction: new Uint8Array(capacity),
@@ -118,6 +124,7 @@ export class EventRing {
     /** One old slot holds exactly the references released by this retirement. */
     const slot = this.head
     this.#messages.release(this.columns.message[slot]!)
+    this.#messages.release(this.columns.carrierAlias[slot]!)
     this.bytes -= this.columns.contentBytes[slot]!
     this.columns.content[slot] = undefined
     this.columns.error[slot] = undefined
@@ -139,18 +146,30 @@ export class EventRing {
   ): number {
     /** Acquire first so a repeated id cannot disappear during its own eviction. */
     const message = this.#messages.acquire(view.messageId)
+    /** One existing endpoint id also scopes the emitter's local carrier sequence. */
+    const endpointId = endpoint ?? this.#names.id(view.endpointId)
+    /** Acquisition precedes eviction so a one-slot ring cannot retire its own current alias. */
+    const carrierAlias =
+      view.stage === RpcProbeStage.carrier && view.direction === RpcProbeDirection.inbound
+        ? this.#messages.acquireCarrier(endpointId, view.seq, seq)
+        : -1
+    /** Translate once per writer without touching the publisher-owned reusable view. */
+    const carrierSeq =
+      view.carrierSeq >= 0 ? this.#messages.carrierSequence(endpointId, view.carrierSeq) : -1
     if (this.count === this.capacity) this.drop()
     /** All writes share one physical slot, calculated without allocating a row. */
     const slot = (this.head + this.count) % this.capacity
     /** Fixed-shape columns keep field dispatch outside the hot path. */
     const c = this.columns
     c.seq[slot] = seq
+    c.carrierSeq[slot] = carrierSeq
+    c.carrierAlias[slot] = carrierAlias
     c.at[slot] = view.at
     c.stage[slot] = view.stage
     c.direction[slot] = view.direction
     c.kind[slot] = view.kind
     c.outcome[slot] = view.outcome
-    c.endpoint[slot] = endpoint ?? this.#names.id(view.endpointId)
+    c.endpoint[slot] = endpointId
     c.method[slot] = method ?? this.#names.id(view.method)
     c.message[slot] = message
     c.sender[slot] = this.#names.id(view.senderId)
@@ -194,6 +213,7 @@ export class EventRing {
     }
     /** Cold projection mutation completes before the object is exposed to a caller. */
     const result = event as Record<string, unknown>
+    if (c.carrierSeq[slot]! >= 0) result.carrierSeq = c.carrierSeq[slot]
     if (c.message[slot]! >= 0) result.messageId = this.#messages.name(c.message[slot]!)
     if (c.method[slot]! >= 0) result.method = this.#names.name(c.method[slot]!)
     if (c.sender[slot]! >= 0) result.senderId = this.#names.name(c.sender[slot]!)

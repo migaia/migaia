@@ -8,6 +8,8 @@ import type { IRuntimeByteConnection, IRuntimeConnectionOptions } from '../byte/
  * reads the actual handshake reply through exchange; activate receives Core's result.
  */
 export type IRuntimeObjectIO = Readonly<{
+  /** The JSON-RPC physical owner retains observation and its own disposer. */
+  observe?: import('../../core/transport.js').IRpcTransport['observe']
   exchange(hello: string): Promise<string>
   activate(capabilities: readonly string[]): void
   writeText(value: unknown, options?: IRpcSendOptions): void | Promise<void>

@@ -8,6 +8,8 @@ import type { IRuntimePeerSourceResult } from '../../remote/index.js'
 export type IRuntimeByteIO = Readonly<{
   kind: 'byte'
   write(chunk: Uint8Array): Promise<void>
+  /** Observes native writes and actual backpressure drain without changing write settlement. */
+  onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void
   onData(listener: (chunk: Uint8Array) => void): () => void
   onClose(listener: (reason?: unknown) => void): () => void
   close(): void | Promise<void>

@@ -1,5 +1,22 @@
 import { expect, test } from '@playwright/test'
 
+test('[closure A2/A3] Browser Peer forwards peer and original Window carrier events', async ({
+  page
+}) => {
+  await page.goto('/browser-peer/index.html')
+  /**
+   * Original carrier identity distinguishes real raw-port forwarding from replacement MessagePort
+   * events.
+   */
+  const result = await page.evaluate(() => globalThis.runBrowserPeerProbe())
+  expect(result.echo).toBe('observed-window-peer')
+  expect(result.lifecycle).toEqual(expect.arrayContaining(['handshake', 'ready', 'closing']))
+  expect(result.carriers.length).toBeGreaterThan(0)
+  expect(new Set(result.carriers)).toEqual(new Set(['window']))
+  expect(result.directions).toEqual(expect.arrayContaining([0, 1]))
+  expect(result.failures).toEqual([])
+})
+
 test('[BP-E1] cross-origin Window Peer carries request, notify and stream and borrows its iframe', async ({
   page
 }) => {

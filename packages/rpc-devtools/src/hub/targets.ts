@@ -26,6 +26,12 @@ export type IHubTarget = {
   iterator: AsyncIterator<IRpcDevtoolsWatchBatch> | undefined
   interval: unknown
   realigning: boolean
+  /** The existing target ring is the sole event owner; this numeric index finds its retained slots. */
+  sequences: Map<number, number>
+  /** Each inbound carrier slot owns a pending physical-stage chain until decode supplies identity. */
+  carrierHeads: Float64Array
+  /** Numeric links reuse ring storage instead of allocating a child array for every physical event. */
+  carrierNext: Float64Array
   release: Promise<void> | undefined
 }
 
@@ -53,6 +59,9 @@ export function createHubTarget(
     iterator: undefined,
     interval: undefined,
     realigning: false,
+    sequences: new Map(),
+    carrierHeads: new Float64Array(maxEvents).fill(-1),
+    carrierNext: new Float64Array(maxEvents).fill(-1),
     release: undefined
   }
 }

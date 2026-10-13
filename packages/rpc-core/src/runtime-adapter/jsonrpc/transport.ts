@@ -1,4 +1,9 @@
 import { materializeAdapterJson } from '../object/pipeline.js'
+import type { IRpcCarrierProbe } from '../../core/probe/types.js'
+import { RpcProbeDirection } from '../../core/probe/constants.js'
+import { RpcCarrierDetailKey } from '../../core/adapters/probe-detail.js'
+import { RpcAdapterErrorText } from '../../core/adapters/error-text.js'
+import { createRpcTransportError } from '../../core/errors.js'
 import { readAdapterAbortReason } from '../data.js'
 import { deferred } from '@migaia/utils/promise'
 import { deserializeRpcError, serializeRpcError } from '../../core/internal/error-wire-metadata.js'
@@ -42,6 +47,7 @@ export type IJsonRpcWire = Pick<
   | 'subscribeObject'
   | 'onTransportError'
   | 'onClosing'
+  | 'observe'
 > &
   Readonly<{
     /** Completed hello intersection alone enables JSON-RPC arrays after negotiation. */
@@ -90,6 +96,18 @@ export function bindJsonRpcWire(
   const decoder = createJsonRpcFrameDecoder()
   /** The monotonic terminal state is shared by all subscriptions and write settlements. */
   let closed = false
+  /** Physical JSON-RPC observation uses already translated or parsed values, never another encoding. */
+  let probe: IRpcCarrierProbe | undefined
+  /** Replacement keeps each observer release scoped to its exact installation. */
+  let probeGeneration = 0
+  /** Both directions borrow fixed detail storage; parser-owned values are never copied or scanned. */
+  const outboundDetail: Record<string, string | number | boolean> = {
+    [RpcCarrierDetailKey.batchSize]: 0
+  }
+  /** Receiving cannot overwrite an outbound observation while its synchronous callback is active. */
+  const inboundDetail: Record<string, string | number | boolean> = {
+    [RpcCarrierDetailKey.batchSize]: 0
+  }
   /** Preserve the first terminal reason, especially the caller abort instance. */
   let terminal: unknown
   /** Concurrent close callers join the same resource cleanup Promise. */
@@ -101,11 +119,38 @@ export function bindJsonRpcWire(
 
   /** Observe report failures without replacing the primary protocol failure. */
   const report = (error: unknown): void => reportListenerFailure(error, [options.report], failures)
+  /** One physical batch emits one event; individual ids are available only for ordinary objects. */
+  const observe = (direction: number, value: unknown, size: number): void => {
+    if (probe === undefined || closed) return
+    /** Existing parser/translation values supply these public wire fields at the real boundary. */
+    const message = value as { id?: unknown; method?: unknown }
+    try {
+      /** Fixed public detail fields are assembled without spreads or per-member traversal. */
+      const detail = direction === RpcProbeDirection.outbound ? outboundDetail : inboundDetail
+      detail[RpcCarrierDetailKey.batchSize] = Array.isArray(value) ? value.length : 1
+      if (typeof message.id === 'string' || typeof message.id === 'number')
+        detail[RpcCarrierDetailKey.jsonrpcId] = message.id
+      else delete detail[RpcCarrierDetailKey.jsonrpcId]
+      if (typeof message.method === 'string')
+        detail[RpcCarrierDetailKey.jsonrpcMethod] = message.method
+      else delete detail[RpcCarrierDetailKey.jsonrpcMethod]
+      probe.emit(
+        direction,
+        size,
+        JsonRpcProfile.carrier,
+        detail,
+        probe.capturing ? value : undefined
+      )
+    } catch (cause) {
+      report(createRpcTransportError(RpcAdapterErrorText.probeFailed, cause))
+    }
+  }
 
   /** Commit terminal state before callbacks, then release every physical resource exactly once. */
   const close = (reason?: unknown): Promise<void> => {
     if (closing) return closing
     closed = true
+    probe = undefined
     closingObserver?.()
     closingObserver = undefined
     terminal = reason ?? closedError()
@@ -150,6 +195,7 @@ export function bindJsonRpcWire(
     if (closed) return Promise.reject(terminal)
     /** Frame encoding happens once before handing the whole object to the writer. */
     const frame = encodeJsonRpcFrame(value)
+    if (probe !== undefined) observe(RpcProbeDirection.outbound, value, frame.byteLength)
     return new Promise<void>((resolve, reject) => {
       /** The terminal callback stays registered until the physical Promise has settled. */
       const abortWrite = (error: unknown): void => reject(error)
@@ -489,6 +535,7 @@ export function bindJsonRpcWire(
 
   /** Negotiated arrays preserve each original IB1–IB7 admission and isolate malformed siblings. */
   const receive = (value: unknown): void => {
+    if (probe !== undefined) observe(RpcProbeDirection.inbound, value, -1)
     if (!Array.isArray(value)) return receiveOne(value)
     if (!batch || helloPending || value.length === 0)
       throw createJsonRpcBridgeError(JsonRpcBridgeErrorCode.profileInvalid)
@@ -637,6 +684,14 @@ export function bindJsonRpcWire(
   }
 
   return {
+    observe(next) {
+      /** The same probe can be reinstalled without transferring ownership to old disposers. */
+      const generation = ++probeGeneration
+      if (!closed) probe = next
+      return () => {
+        if (generation === probeGeneration) probe = undefined
+      }
+    },
     writeText: (value, sendOptions) => send(value, sendOptions),
     writeObject: (value, sendOptions) => send(value, sendOptions, true),
     subscribeText(listener) {

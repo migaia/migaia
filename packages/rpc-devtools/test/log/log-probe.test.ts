@@ -21,6 +21,7 @@ type IEmittingProbe = IRpcProbe & { emit(view: IRpcProbeEventView): void }
 function event(): IRpcProbeEventView {
   return {
     seq: 1,
+    carrierSeq: -1,
     at: 100,
     endpointId: 'endpoint',
     stage: RpcProbeStage.message,

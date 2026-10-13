@@ -2,6 +2,8 @@ import { RpcCapability } from '@migaia/rpc-contract'
 
 /** Stable profile version and hello correlation id used by every external peer. */
 export const JsonRpcProfile = {
+  /** Stable carrier label identifies physical JSON-RPC objects and batches in probe records. */
+  carrier: 'jsonrpc',
   version: '2.0',
   capability: 'jsonrpc-bridge@1',
   wireError: 'wire-error@1',
