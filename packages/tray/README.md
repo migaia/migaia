@@ -90,15 +90,16 @@ try {
 异步完成 admission、依赖图启动与 Host 发布后才返回；返回值实现异步显式资源管理：
 
 ```ts
-import { PluginHost, type IPlugin } from '@migaia/plugin-host'
+import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createHost } from '@migaia/tray/host'
 
 class AppHost extends PluginHost<Record<string, never>, string> {}
 
-const provider = {
+const provider = definePlugin({
   name: 'provider',
+  features: { value: defineFeature(() => ({ value: 1 })) },
   install: () => ({ providerValue: 1 })
-} satisfies IPlugin<AppHost, { readonly providerValue: number }>
+})
 
 await using host = await createHost({
   create: () =>
@@ -109,7 +110,13 @@ await using host = await createHost({
   shutdown: { mode: 'bounded' }
 })
 
-await host.use({ name: 'late', requires: ['provider'], install: () => ({ late: true }) })
+await host.use(definePlugin({
+  name: 'late',
+  features: {
+    value: defineFeature(() => ({}), { provider: provider.getFeature('value') })
+  },
+  install: () => ({ late: true })
+}))
 await host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。
 ```
 

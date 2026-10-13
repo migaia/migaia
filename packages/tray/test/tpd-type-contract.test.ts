@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { defineFeature, PluginHost, type IPlugin } from '@migaia/plugin-host'
+import {
+  defineFeature,
+  definePlugin,
+  PluginHost,
+  type IFeatureReference,
+  type IPlugin
+} from '@migaia/plugin-host'
 import {
   createHost,
+  type ICanResolveReadyDefinitions,
   type IHostBaselinePlugins,
   type IResolveReadyTrayPlugins,
   type ITrayHost,
@@ -29,7 +36,6 @@ type IBaselinePlugins = IHostBaselinePlugins<BaselineTypeHost>
 const baselineTupleLength: IBaselinePlugins['length'] = 1
 type IWidenedManagedDefinitions = readonly (IPlugin<BaselineTypeHost> & {
   readonly name: string
-  readonly requires?: readonly string[]
 })[]
 type IWidenedResolvedHost = ITrayResolvedHost<BaselineTypeHost, IWidenedManagedDefinitions>
 const widenedBaselineExtension: boolean =
@@ -68,47 +74,162 @@ if (exactRuntime)
     return widened
   })
 
+/** Captures exact empty Feature dependencies before a plugin descriptor contextualizes its roots. */
+const providerCapability = defineFeature(() => ({}))
+
+/** Declares the provider identity without admitting it to the managed Host. */
+const missingProvider = definePlugin({
+  name: 'missing',
+  features: { capability: providerCapability },
+  install: () => ({})
+})
+
+/** Required Feature references keep this consumer outside the initial ready closure. */
 const blockedPlugin = {
-  name: 'blocked',
-  requires: ['missing'] as const,
+  name: 'blocked' as const,
+  features: {
+    blocked: defineFeature(() => ({}), { missing: missingProvider.getFeature('capability') })
+  },
   install: (_core: TypeHost) => ({ blockedExtension: true })
-} satisfies IPlugin<TypeHost, { readonly blockedExtension: boolean }> & {
-  readonly requires: readonly ['missing']
-}
+} satisfies IPlugin<TypeHost, { readonly blockedExtension: boolean }>
 
 const latePlugin = {
-  name: 'late',
+  name: 'late' as const,
   install: (_core: TypeHost) => ({ lateExtension: true })
 } satisfies IPlugin<TypeHost, { readonly lateExtension: boolean }>
 
-const providerPlugin = {
+/** Public references carry this provider's literal name into exact Tray inference. */
+const providerPlugin = definePlugin({
   name: 'provider',
+  features: { capability: providerCapability },
   install: (_core: TypeHost) => ({ providerExtension: true })
-} satisfies IPlugin<TypeHost, { readonly providerExtension: boolean }>
+})
 
+/** The dependent follows the same Feature edge at runtime and in mutation view types. */
 const dependentPlugin = {
-  name: 'dependent',
-  requires: ['provider'] as const,
+  name: 'dependent' as const,
+  features: {
+    dependent: defineFeature(() => ({}), { provider: providerPlugin.getFeature('capability') })
+  },
   install: (_core: TypeHost) => ({ dependentExtension: true })
-} satisfies IPlugin<TypeHost, { readonly dependentExtension: boolean }> & {
-  readonly requires: readonly ['provider']
-}
+} satisfies IPlugin<TypeHost, { readonly dependentExtension: boolean }>
 
+/** Separate definitions mint the references needed to declare a cross-plugin cycle. */
+const cycleAProvider = definePlugin({
+  name: 'cycle-a' as const,
+  features: { capability: providerCapability },
+  install: () => ({})
+})
+/** Only the cycle consumer definitions below are admitted by the cycle oracle. */
+const cycleBProvider = definePlugin({
+  name: 'cycle-b' as const,
+  features: { capability: providerCapability },
+  install: () => ({})
+})
+
+/** This admitted definition depends on the other side of the cycle. */
 const cycleA = {
-  name: 'cycle-a',
-  requires: ['cycle-b'] as const,
+  name: 'cycle-a' as const,
+  features: {
+    capability: defineFeature(() => ({}), { b: cycleBProvider.getFeature('capability') })
+  },
   install: (_core: TypeHost) => ({ cycleAExtension: true })
-} satisfies IPlugin<TypeHost, { readonly cycleAExtension: boolean }> & {
-  readonly requires: readonly ['cycle-b']
-}
+} satisfies IPlugin<TypeHost, { readonly cycleAExtension: boolean }>
 
+/** This admitted definition closes the required cycle. */
 const cycleB = {
-  name: 'cycle-b',
-  requires: ['cycle-a'] as const,
+  name: 'cycle-b' as const,
+  features: {
+    capability: defineFeature(() => ({}), { a: cycleAProvider.getFeature('capability') })
+  },
   install: (_core: TypeHost) => ({ cycleBExtension: true })
-} satisfies IPlugin<TypeHost, { readonly cycleBExtension: boolean }> & {
-  readonly requires: readonly ['cycle-a']
-}
+} satisfies IPlugin<TypeHost, { readonly cycleBExtension: boolean }>
+
+/** An optional absent provider contributes ordering without excluding its consumer. */
+const optionalPlugin = {
+  name: 'optional' as const,
+  features: {
+    optional: defineFeature(() => ({}), {
+      missing: missingProvider.getFeature('capability', { optional: true })
+    })
+  },
+  install: (_core: TypeHost) => ({ optionalExtension: true })
+} satisfies IPlugin<TypeHost, { readonly optionalExtension: boolean }>
+
+/** Local Feature closures must retain dependencies even when only the outer Feature is a root. */
+const nestedDependency = defineFeature(() => ({}), {
+  missing: missingProvider.getFeature('capability')
+})
+/** A nested dependency prevents the independent-definition fast path from inventing readiness. */
+const nestedPlugin = {
+  name: 'nested' as const,
+  features: { outer: defineFeature(() => ({}), { inner: nestedDependency }) },
+  install: (_core: TypeHost) => ({ nestedExtension: true })
+} satisfies IPlugin<TypeHost, { readonly nestedExtension: boolean }>
+
+/** Erasing a required provider literal forces a conservative dynamic view. */
+const widenedRequiredReference: IFeatureReference<object> = providerPlugin.getFeature('capability')
+/** Optional references with erased provider literals require the same dynamic fallback. */
+const widenedOptionalReference: IFeatureReference<object, true> = providerPlugin.getFeature(
+  'capability',
+  { optional: true }
+)
+/** This literal plugin name cannot compensate for an unknown required provider. */
+const widenedRequiredPlugin = {
+  name: 'widened-required' as const,
+  features: { capability: defineFeature(() => ({}), { provider: widenedRequiredReference }) },
+  install: (_core: TypeHost) => ({ widenedRequiredExtension: true })
+} satisfies IPlugin<TypeHost, { readonly widenedRequiredExtension: boolean }>
+/** Unknown optional providers cannot claim an exact independent-definition view either. */
+const widenedOptionalPlugin = {
+  name: 'widened-optional' as const,
+  features: { capability: defineFeature(() => ({}), { provider: widenedOptionalReference }) },
+  install: (_core: TypeHost) => ({ widenedOptionalExtension: true })
+} satisfies IPlugin<TypeHost, { readonly widenedOptionalExtension: boolean }>
+
+type IFeatureChainHost = ITrayResolvedHost<
+  TypeHost,
+  readonly [typeof dependentPlugin, typeof providerPlugin]
+>
+/** A4: readiness resolves a literal two-plugin chain even in consumer-first order. */
+const featureChainProviderExtension: boolean =
+  {} as IFeatureChainHost['extensions']['providerExtension']
+/** A4: the consumer extension appears only after its required provider resolves. */
+const featureChainDependentExtension: boolean =
+  {} as IFeatureChainHost['extensions']['dependentExtension']
+type IMissingRequiredReady = IResolveReadyTrayPlugins<readonly [typeof blockedPlugin]>
+/** A4: required missing providers exclude their consumer from the inferred ready tuple. */
+const missingRequiredReadyLength: IMissingRequiredReady['length'] = 0
+type IAbsentOptionalHost = ITrayResolvedHost<TypeHost, readonly [typeof optionalPlugin]>
+/** A4: optional missing providers preserve an exact consumer extension. */
+const absentOptionalExtension: boolean =
+  {} as IAbsentOptionalHost['extensions']['optionalExtension']
+type INestedReady = IResolveReadyTrayPlugins<readonly [typeof nestedPlugin]>
+/** A4: traversing a local Feature closure finds the absent required provider. */
+const nestedReadyLength: INestedReady['length'] = 0
+/** A4: required references without literal providers disable exact inference. */
+const widenedRequiredExact: ICanResolveReadyDefinitions<readonly [typeof widenedRequiredPlugin]> =
+  false
+/** A4: optional references without literal providers also disable exact inference. */
+const widenedOptionalExact: ICanResolveReadyDefinitions<readonly [typeof widenedOptionalPlugin]> =
+  false
+type IWidenedRequiredHost = ITrayResolvedHost<TypeHost, readonly [typeof widenedRequiredPlugin]>
+type IWidenedOptionalHost = ITrayResolvedHost<TypeHost, readonly [typeof widenedOptionalPlugin]>
+// @ts-expect-error A4: a widened required provider exposes managed extension keys only as unknown.
+const widenedRequiredExtension: boolean =
+  {} as IWidenedRequiredHost['extensions']['widenedRequiredExtension']
+// @ts-expect-error A4: an optional widened provider cannot take the exact independent fast path.
+const widenedOptionalExtension: boolean =
+  {} as IWidenedOptionalHost['extensions']['widenedOptionalExtension']
+void featureChainProviderExtension
+void featureChainDependentExtension
+void missingRequiredReadyLength
+void absentOptionalExtension
+void nestedReadyLength
+void widenedRequiredExact
+void widenedOptionalExact
+void widenedRequiredExtension
+void widenedOptionalExtension
 
 const replacementPlugin = {
   name: 'ready',
@@ -315,9 +436,7 @@ describe('TPD-T45 through TPD-T49 managed Host declaration contract', () => {
     const host = await createHost(hostOptions)
     expect(host.config.get('ready.enabled')).toBe(true)
     expect(host.extensions.readyExtension).toBe(true)
-    const added = await host.use({
-      ...latePlugin
-    } as never)
+    const added = await host.use(latePlugin)
     if (added.ok) {
       expect(added.view.extensions.readyExtension).toBe(true)
       expect(added.view.extensions.lateExtension).toBe(true)
@@ -330,7 +449,7 @@ describe('TPD-T45 through TPD-T49 managed Host declaration contract', () => {
     const result = await host.use({
       name: 'branch',
       install: (_core: TypeHost) => ({ branchExtension: true })
-    } as never)
+    })
     if (result.ok) {
       expect(result.committed).toBe(true)
       expect(result.view.extensions.branchExtension).toBe(true)
@@ -352,12 +471,12 @@ describe('TPD-T45 through TPD-T49 managed Host declaration contract', () => {
     expect(literalRemoval.affected).toEqual(['provider', 'dependent'])
     expect(host.pluginState('provider')).toBe('blocked')
     expect(host.pluginState('dependent')).toBe('blocked')
-    expect(literalRemoval.view.extensions.providerExtension).toBeUndefined()
-    expect(literalRemoval.view.extensions.dependentExtension).toBeUndefined()
+    expect(Reflect.get(literalRemoval.view.extensions, 'providerExtension')).toBeUndefined()
+    expect(Reflect.get(literalRemoval.view.extensions, 'dependentExtension')).toBeUndefined()
     const widenedName: string = 'missing'
     const noCommit = await host.unUse(widenedName)
     expect(noCommit.committed).toBe(false)
-    expect(noCommit.view.extensions.unknown).toBeUndefined()
+    expect(Reflect.get(noCommit.view.extensions, 'unknown')).toBeUndefined()
     await host.dispose()
   })
 
@@ -397,10 +516,7 @@ type IBuildDefinitions<
   : IBuildDefinitions<
       TCount,
       readonly [...TIndex, unknown],
-      readonly [
-        ...TResult,
-        { readonly name: `budget-${TIndex['length']}`; readonly requires: readonly [] }
-      ]
+      readonly [...TResult, { readonly name: `budget-${TIndex['length']}` }]
     >
 
 type IReady64 = IResolveReadyTrayPlugins<IBuildDefinitions<64>>

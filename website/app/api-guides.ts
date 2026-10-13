@@ -25232,6 +25232,60 @@ try {
       ]
     }
   },
+  /** The public dependency reader projects the same Feature graph used by admission and install. */
+  'plugin-host:index:readPluginDependencies': {
+    en: {
+      purpose:
+        'Reads a readonly provider dependency list from a plugin or its composition admission, including nested local Feature dependencies. Providers keep first-reference order and required references win over optional references. An admission reuses its captured definition without calling getters; other inputs use one canonical admission snapshot. Reading runs no setup, install, or Feature factory, and admission errors pass through unchanged.',
+      quickStart: `import { defineFeature, definePlugin, PluginHost, readPluginDependencies } from '@migaia/plugin-host'\nimport { openComposition } from '@migaia/plugin-host/composition'\n\nconst config = definePlugin({\n  name: 'config',\n  features: { value: defineFeature(() => ({ value: 'ready' })) },\n  install: () => ({})\n})\nconst metrics = definePlugin({\n  name: 'metrics',\n  features: { value: defineFeature(() => ({ value: 0 })) },\n  install: () => ({})\n})\nconst required = defineFeature(() => ({}), { config: config.getFeature('value') })\nconst optional = defineFeature(() => ({}), {\n  config: config.getFeature('value', { optional: true }),\n  metrics: metrics.getFeature('value', { optional: true })\n})\nconst descriptor = { name: 'consumer', features: { required, optional }, install: () => ({}) }\nconst consumer = definePlugin(descriptor)\nconsole.log(readPluginDependencies(consumer))\nconsole.log(readPluginDependencies(descriptor))\n// Both return [{ provider: 'config', required: true }, { provider: 'metrics', required: false }].\n\nconst host = new PluginHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n})\ntry {\n  const admission = openComposition(host).createPluginAdmission(descriptor)\n  console.log(readPluginDependencies(admission))\n} finally {\n  await host.dispose()\n}`,
+      scenarios: [
+        'Inspect required and optional providers before installing a plugin, using the same Feature closure as PluginHost.',
+        'A composition layer already captured an admission and must read its dependencies without reading a stateful descriptor getter again.'
+      ],
+      avoidWhen: [
+        'You need current provider availability or plugin readiness; this list describes declared dependencies, not live Host state.',
+        'You need to run a Feature or install a plugin; use the Host lifecycle and Feature operations for those actions.'
+      ],
+      options: [
+        {
+          name: 'plugin',
+          description:
+            'A definePlugin result, a valid raw plugin descriptor, or an admission returned by openComposition(host).createPluginAdmission(plugin). Invalid input throws the canonical admission error with its native type, identity, stack, source, and code unchanged.',
+          defaultValue: 'required',
+          optional: false,
+          type: 'unknown',
+          whenToUse:
+            'Pass the admission when dependency projection and installation must share one snapshot; otherwise pass the plugin input directly.',
+          example: 'readPluginDependencies(admission)'
+        }
+      ]
+    },
+    zh: {
+      purpose:
+        '从插件或其 composition admission 读取只读 provider 依赖列表，包含本地 Feature 的完整依赖闭包。结果按首次引用排序，同一 provider 的必需引用优先于可选引用。admission 形式复用已捕获的定义，不调用 getter；其他输入使用一次规范 admission 快照。读取不会执行 setup、install 或 Feature 工厂，admission 错误原样传出。',
+      quickStart: `import { defineFeature, definePlugin, PluginHost, readPluginDependencies } from '@migaia/plugin-host'\nimport { openComposition } from '@migaia/plugin-host/composition'\n\nconst config = definePlugin({\n  name: 'config',\n  features: { value: defineFeature(() => ({ value: 'ready' })) },\n  install: () => ({})\n})\nconst metrics = definePlugin({\n  name: 'metrics',\n  features: { value: defineFeature(() => ({ value: 0 })) },\n  install: () => ({})\n})\nconst required = defineFeature(() => ({}), { config: config.getFeature('value') })\nconst optional = defineFeature(() => ({}), {\n  config: config.getFeature('value', { optional: true }),\n  metrics: metrics.getFeature('value', { optional: true })\n})\nconst descriptor = { name: 'consumer', features: { required, optional }, install: () => ({}) }\nconst consumer = definePlugin(descriptor)\nconsole.log(readPluginDependencies(consumer))\nconsole.log(readPluginDependencies(descriptor))\n// 两种输入都返回 [{ provider: 'config', required: true }, { provider: 'metrics', required: false }]。\n\nconst host = new PluginHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n})\ntry {\n  const admission = openComposition(host).createPluginAdmission(descriptor)\n  console.log(readPluginDependencies(admission))\n} finally {\n  await host.dispose()\n}`,
+      scenarios: [
+        '安装插件前，使用 PluginHost 相同的 Feature 闭包检查必需与可选 provider。',
+        '组合层已捕获 admission，需要读取其依赖，又不能再次触发原始描述符的有状态 getter。'
+      ],
+      avoidWhen: [
+        '需要查询 provider 当前可用性或插件就绪状态；列表描述声明的依赖，不代表 Host 的实时状态。',
+        '需要执行 Feature 或安装插件；这些操作应使用 Host 生命周期与 Feature 入口。'
+      ],
+      options: [
+        {
+          name: 'plugin',
+          description:
+            'definePlugin 结果、有效原始插件描述符，或 openComposition(host).createPluginAdmission(plugin) 返回的 admission。无效输入直接抛规范 admission 错误，保留原生类型、对象身份、stack、source 和 code。',
+          defaultValue: '必填',
+          optional: false,
+          type: 'unknown',
+          whenToUse: '依赖投影与安装必须共享同一快照时传 admission；否则直接传插件输入。',
+          example: 'readPluginDependencies(admission)'
+        }
+      ]
+    }
+  },
   'plugin-host:index:PluginHostError': {
     en: {
       purpose:

@@ -1,18 +1,21 @@
 import {
   createDynamicCapabilityGraph,
-  type IDynamicCapabilityGraph
+  type IDynamicCapabilityGraph,
+  type IDynamicGraphNodeDefinition
 } from '@migaia/capability/graph/dynamic'
-import type { IGraphNodeDefinition, IGraphNodeId } from '@migaia/capability/graph'
+import type { IGraphNodeId } from '@migaia/capability/graph'
 import { createEventHub } from '@migaia/event-subscriber'
 import type { IEventContext } from '@migaia/event-subscriber'
 import {
   PluginHost,
+  readPluginDependencies,
   asyncDisposeKey,
   type IPluginConstraint,
   type IPluginAdmission,
   type IPluginDataOrderSlot,
   type IPluginRegistrationReceipt,
-  type IPluginHostDisposalResult
+  type IPluginHostDisposalResult,
+  type IPluginDependency
 } from '@migaia/plugin-host'
 import { TrayErrorCode } from '../error-code.js'
 import { attachTrayError, createTrayError } from '../errors.js'
@@ -124,13 +127,15 @@ export async function createHost<
       }
     }
     const admissions = captured.plugins.map((plugin) => {
-      const snapshot = snapshotTrayPlugin(plugin as unknown as IPluginBinding)
+      /** One canonical admission owns both installation and Feature dependency projection. */
+      const { snapshot, admission } = admitTrayPlugin(
+        plugin as unknown as IPluginBinding,
+        composition!
+      )
       return {
         plugin: plugin as unknown as IPluginBinding,
         snapshot,
-        admission: composition!.createPluginAdmission<IPluginConstraint<any>>(
-          plugin as IPluginConstraint<any>
-        ),
+        admission,
         slot: composition!.createDataOrderSlot(snapshot.name)
       }
     })
@@ -398,15 +403,14 @@ function snapshotOptions<
 }
 
 /** Converts one Tray descriptor into the sole Graph lifecycle node projection. */
-function toGraphNode(admission: IAdmissionRecord): IGraphNodeDefinition<unknown> {
+function toGraphNode(admission: IAdmissionRecord): IDynamicGraphNodeDefinition<unknown> {
   const id = admission.snapshot.name as IGraphId
-  const requires = admission.snapshot.requires
   return {
     id,
     kind: 'plugin',
-    dependencies: requires.map((provider) => ({
+    dependencies: admission.snapshot.dependencies.map(({ provider, required }) => ({
       provider: provider as IGraphId,
-      required: true as const
+      required
     })),
     start: async () => {
       return {
@@ -417,7 +421,7 @@ function toGraphNode(admission: IAdmissionRecord): IGraphNodeDefinition<unknown>
   }
 }
 
-/** Orders admissions by available required providers while preserving input order ties. */
+/** Orders all present Feature providers first; absent optional providers do not delay admission. */
 function orderAdmissions(records: readonly IAdmissionRecord[]): IAdmissionRecord[] {
   const byName = new Map(records.map((record) => [record.snapshot.name, record] as const))
   const remaining = new Set(records)
@@ -426,15 +430,17 @@ function orderAdmissions(records: readonly IAdmissionRecord[]): IAdmissionRecord
     const ready = records.filter(
       (record) =>
         remaining.has(record) &&
-        record.snapshot.requires.every(
-          (provider) =>
+        record.snapshot.dependencies.every(
+          ({ provider }) =>
             !byName.has(provider) || ordered.some((item) => item.snapshot.name === provider)
         )
     )
     if (ready.length === 0) {
       if (
         [...remaining].some((record) =>
-          record.snapshot.requires.some((provider) => !byName.has(provider))
+          record.snapshot.dependencies.some(
+            ({ provider, required }) => required && !byName.has(provider)
+          )
         )
       ) {
         ordered.push(...remaining)
@@ -460,7 +466,9 @@ function computeReadyAdmissions(records: readonly IAdmissionRecord[]): IAdmissio
     for (const record of records) {
       if (
         !ready.has(record.snapshot.name) &&
-        record.snapshot.requires.every((provider) => names.has(provider) && ready.has(provider))
+        record.snapshot.dependencies.every(
+          ({ provider, required }) => !required || (names.has(provider) && ready.has(provider))
+        )
       ) {
         ready.add(record.snapshot.name)
         changed = true
@@ -558,13 +566,14 @@ function createManagedHost(
     ): Promise<ITrayPluginMutationResult<unknown, unknown, unknown>> {
       assertActive()
       assertOwned()
-      const snapshot = snapshotTrayPlugin(plugin)
+      /** Validate and capture before entering the graph mutation result channel. */
+      const { snapshot, admission } = admitTrayPlugin(plugin, composition)
       const name = snapshot.name
       const existedBefore = graph.nodes.some((id) => String(id) === name)
       let candidate: IAdmissionRecord | undefined
       try {
         resetCleanup()
-        candidate = createAdmissionRecord(plugin, snapshot)
+        candidate = createAdmissionRecord(plugin, snapshot, admission)
         publicationPending = true
         const result = await graph.register(toGraphNode(candidate), candidate)
         publicationPending = false
@@ -634,7 +643,8 @@ function createManagedHost(
     ): Promise<ITrayPluginMutationResult<unknown, unknown, unknown>> {
       assertActive()
       assertOwned()
-      const snapshot = snapshotTrayPlugin(plugin)
+      /** Invalid replacements reject while their existing generation still serves. */
+      const { snapshot, admission } = admitTrayPlugin(plugin, composition)
       const name = snapshot.name
       const runtimeBridge = readRuntimeBridge(facade)
       try {
@@ -648,7 +658,7 @@ function createManagedHost(
       let candidate: IAdmissionRecord | undefined
       try {
         resetCleanup()
-        candidate = createAdmissionRecord(plugin, snapshot, previous?.slot)
+        candidate = createAdmissionRecord(plugin, snapshot, admission, previous?.slot)
         publicationPending = true
         const result = await graph.replace(toGraphNode(candidate), candidate)
         publicationPending = false
@@ -814,14 +824,13 @@ function createManagedHost(
   function createAdmissionRecord(
     plugin: IPluginBinding,
     snapshot: IPluginSnapshot,
+    admission: IPluginAdmission<IPluginConstraint<any>>,
     slot?: IPluginDataOrderSlot
   ): IAdmissionRecord {
     const record = {
       plugin,
       snapshot,
-      admission: composition.createPluginAdmission<IPluginConstraint<any>>(
-        plugin as IPluginConstraint<any>
-      ),
+      admission,
       slot: slot ?? composition!.createDataOrderSlot(snapshot.name),
       artifactCustody: claimArtifactCustody(plugin as object)
     }
@@ -829,26 +838,31 @@ function createManagedHost(
   }
 }
 
-type IPluginSnapshot = Readonly<{ readonly name: string; readonly requires: readonly string[] }>
+/** Tray stores only the graph projection of the PluginHost-owned admission. */
+type IPluginSnapshot = Readonly<{
+  readonly name: string
+  readonly dependencies: readonly IPluginDependency[]
+}>
 
-/** Reads and validates lifecycle edge metadata once at the Tray boundary. */
-function snapshotTrayPlugin(plugin: IPluginBinding): IPluginSnapshot {
-  const name = plugin?.name
-  if (typeof name !== 'string' || name.length === 0 || name.includes('.'))
+/** Rejects stale descriptors, captures one admission and preserves producer errors on cause. */
+function admitTrayPlugin(
+  plugin: IPluginBinding,
+  composition: IPluginHostCompositionIntegration<object>
+): Readonly<{
+  readonly snapshot: IPluginSnapshot
+  readonly admission: IPluginAdmission<IPluginConstraint<any>>
+}> {
+  if (plugin !== null && plugin !== undefined && Object.hasOwn(plugin, 'requires'))
     throw createTrayError(TrayErrorCode.invalidEntry)
-  const requires = plugin.requires
-  if (requires === undefined) return Object.freeze({ name, requires: Object.freeze([]) })
-  if (!Array.isArray(requires)) throw createTrayError(TrayErrorCode.invalidEntry)
-  const edges = [...requires]
-  if (
-    edges.some(
-      (provider) => typeof provider !== 'string' || provider.length === 0 || provider.includes('.')
-    )
-  )
-    throw createTrayError(TrayErrorCode.invalidEntry)
-  if (new Set(edges).size !== edges.length || edges.includes(name))
-    throw createTrayError(TrayErrorCode.invalidEntry)
-  return Object.freeze({ name, requires: Object.freeze(edges) })
+  try {
+    /** PluginHost validates the name and install field while capturing Feature getters once. */
+    const admission = composition.createPluginAdmission<IPluginConstraint<any>>(plugin)
+    /** The reader inspects that exact snapshot without touching the descriptor again. */
+    const dependencies = readPluginDependencies(admission)
+    return { admission, snapshot: Object.freeze({ name: plugin.name, dependencies }) }
+  } catch (original) {
+    throw createTrayError(TrayErrorCode.invalidEntry, original)
+  }
 }
 
 /** Creates a successful settled mutation observation. */

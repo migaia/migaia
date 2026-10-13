@@ -160,9 +160,15 @@ import { createHost, type ICreateHostOptions, type ITrayResolvedHost } from '@mi
 ```
 
 `await createHost(options)` 的唯一 concrete Host 由 `options.create()` 构造。Tray 随后一次性快照
-plugin、`requires`、config 与 disposer，建立 Dynamic Capability Graph，再通过 PluginHost prepared
+plugin 的 Feature、config 与 disposer，使用 PluginHost 的公开 `readPluginDependencies(admission)`
+读取同一个 admission 快照的 provider 与 required/optional 强度，建立 Dynamic Capability Graph，再通过 PluginHost prepared
 admission 发布 ready definition。任何 factory/admission/setup/commit 失败都会回滚未发布候选；失败的
 duplicate/cycle/replacement candidate 不会成为以后 restart 的隐式来源。
+
+必需的 Feature provider 缺失时 consumer 保持 `blocked`；可选 provider 缺失不阻塞 consumer，
+存在时先于 consumer 安装。插件依赖只由 Feature references 声明，不接受旧插件依赖字段。
+`createHost`、`use` 和 `replace` 在图变更之前完成 admission；非法描述子以
+`TRAY_INVALID_ENTRY` 拒绝，PluginHost 的原始错误直接保留在 `cause`。进入图变更后的失败继续返回 mutation result。
 
 公开 mutation：
 
@@ -179,7 +185,7 @@ duplicate/cycle/replacement candidate 不会成为以后 restart 的隐式来源
 只缩短调用方等待，不授权提前启动 disposer，也不取消仍在运行的 Promise。
 
 类型策略以稳定性优先：有限、literal、最多 128 个 definition 时，`ITrayResolvedHost` 推导 exact ready
-closure；widened name、widened `requires` 或超过预算时返回 `ITrayHostDynamic`。dynamic view 仍保留 concrete
+closure；widened name、任意 widened Feature provider 或超过预算时返回 `ITrayHostDynamic`。dynamic view 仍保留 concrete
 Host 的 constructor baseline extension/config 类型，运行期管理的未知 key 为 `unknown`。
 
 不要绕过 facade 调用 escaped concrete Host mutation。Tray 会以
