@@ -260,7 +260,9 @@ const service = createCoroutinePlugin<{ math: { double(value: number): number } 
       provide: { math: { double: (value: number) => value * 2 } }
     })
     /** Task 负责释放自己创建的子 Host。 */
-    const childHost = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: {} })
+    const childHost = defineHost<Record<string, never>, never, readonly [typeof parent]>({
+      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+    })
     try {
       await childHost.use(parent)
       /** Task settlement 就是退出；收到协作取消前持续提供服务。 */
@@ -274,7 +276,9 @@ const service = createCoroutinePlugin<{ math: { double(value: number): number } 
   }
 })
 /** 父 Host 释放时停止它拥有的 coroutine task。 */
-const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: {} })
+const host = defineHost<Record<string, never>, never, readonly [typeof service]>({
+  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+})
 try {
   await host.use(service)
   console.log(await host.coroutine!.request('math', 'math.double', 21)) // 42
