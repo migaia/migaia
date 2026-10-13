@@ -1,6 +1,7 @@
 import { Session } from 'node:inspector/promises'
 import { promiseHooks } from 'node:v8'
 import { performance } from 'node:perf_hooks'
+import { threadId } from 'node:worker_threads'
 import { IpcBenchDiagnostic } from './text.mjs'
 import { IpcBenchErrorText } from './error-text.mjs'
 
@@ -141,15 +142,37 @@ function allocationTrace(heap) {
 }
 
 /**
- * Start or stop one isolate's separate CPU/guard capture through its existing OOB snapshot owner.
+ * Project native sampling call frames into the existing redacted diagnostic representation.
+ *
+ * @param {import('node:inspector').HeapProfiler.SamplingHeapProfileNode} node Native allocation
+ *   node.
+ * @returns {import('node:inspector').HeapProfiler.SamplingHeapProfileNode} Redacted call tree.
+ */
+function redactSamplingNode(node) {
+  // SC9(b): the inspector call tree becomes a redacted OOB representation, never a business copy.
+  return {
+    ...node,
+    callFrame: {
+      ...node.callFrame,
+      functionName: redact(node.callFrame.functionName),
+      url: redact(node.callFrame.url)
+    },
+    children: node.children.map(redactSamplingNode)
+  }
+}
+
+/**
+ * Start or stop one isolate's separate CPU/guard/sampling capture through its OOB snapshot owner.
  *
  * @param {'start' | 'stop'} boundary Warmed interval boundary.
- * @param {'cpu' | 'guard'} mode Separate diagnostic lane, never formal timing.
- * @returns {Promise<object>} Start receipt or full CPU/guard raw data, with explicit scope.
+ * @param {'cpu' | 'guard' | 'sampling'} mode Separate diagnostic lane, never formal timing.
+ * @returns {Promise<object>} Start receipt or CPU/guard/sampling raw data, with explicit scope.
  * @throws {Error} Original inspector failure remains observable; native session always disconnects.
  */
 export async function captureDiagnostic(boundary, mode) {
-  if (![IpcBenchDiagnostic.cpu, IpcBenchDiagnostic.guard].includes(mode))
+  if (
+    ![IpcBenchDiagnostic.cpu, IpcBenchDiagnostic.guard, IpcBenchDiagnostic.sampling].includes(mode)
+  )
     throw new TypeError(IpcBenchErrorText.diagnosticMode)
   if (boundary === IpcBenchDiagnostic.start) {
     if (active) throw new Error(IpcBenchErrorText.diagnosticState)
@@ -157,12 +180,34 @@ export async function captureDiagnostic(boundary, mode) {
     const session = new Session()
     session.connect()
     /** Scalar Promise state avoids stack capture or per-event allocation from the observer itself. */
-    const capture = { session, mode, created: 0, startEpochMs: 0, stopPromiseHook: undefined }
+    const capture = {
+      session,
+      mode,
+      created: 0,
+      startEpochMs: 0,
+      stopPromiseHook: undefined,
+      /** Exact native CPU flags establish whether this actual parent/peer isolate was profiled. */
+      cpuProfilingArguments: process.execArgv.filter(
+        (argument) =>
+          argument === IpcBenchDiagnostic.cpuFlag ||
+          argument.startsWith(IpcBenchDiagnostic.cpuDirectoryPrefix) ||
+          argument.startsWith(IpcBenchDiagnostic.cpuIntervalPrefix)
+      )
+    }
     active = capture
     try {
-      await session.post(IpcBenchDiagnostic.profilerEnable)
-      if (mode === IpcBenchDiagnostic.cpu) await session.post(IpcBenchDiagnostic.profilerStart)
-      else {
+      if (mode === IpcBenchDiagnostic.cpu) {
+        await session.post(IpcBenchDiagnostic.profilerEnable)
+        await session.post(IpcBenchDiagnostic.profilerStart)
+      } else if (mode === IpcBenchDiagnostic.sampling) {
+        await session.post(IpcBenchDiagnostic.heapEnable)
+        await session.post(IpcBenchDiagnostic.heapSamplingStart, {
+          samplingInterval: IpcBenchDiagnostic.samplingInterval,
+          includeObjectsCollectedByMajorGC: true,
+          includeObjectsCollectedByMinorGC: true
+        })
+      } else {
+        await session.post(IpcBenchDiagnostic.profilerEnable)
         /** Function-count mode keeps already-warmed functions from reoptimizing past the counter. */
         await session.post(IpcBenchDiagnostic.preciseStart, { callCount: true, detailed: false })
         await session.post(IpcBenchDiagnostic.heapEnable)
@@ -172,7 +217,14 @@ export async function captureDiagnostic(boundary, mode) {
         })
       }
       capture.startEpochMs = performance.timeOrigin + performance.now()
-      return { mode, status: IpcBenchDiagnostic.started, startEpochMs: capture.startEpochMs }
+      return {
+        mode,
+        status: IpcBenchDiagnostic.started,
+        startEpochMs: capture.startEpochMs,
+        pid: process.pid,
+        threadId,
+        cpuProfilingArguments: capture.cpuProfilingArguments
+      }
     } catch (error) {
       capture.stopPromiseHook?.()
       active = undefined
@@ -197,6 +249,9 @@ export async function captureDiagnostic(boundary, mode) {
         status: IpcBenchDiagnostic.captured,
         startEpochMs: capture.startEpochMs,
         stopEpochMs,
+        pid: process.pid,
+        threadId,
+        cpuProfilingArguments: capture.cpuProfilingArguments,
         cpuProfile: {
           ...profile,
           nodes: profile.nodes.map((node) => ({
@@ -207,6 +262,31 @@ export async function captureDiagnostic(boundary, mode) {
               url: redact(node.callFrame.url)
             }
           }))
+        }
+      }
+    }
+    if (mode === IpcBenchDiagnostic.sampling) {
+      /** Native ids and samples retain the join needed for per-owner allocation attribution. */
+      const { profile } = await capture.session.post(IpcBenchDiagnostic.heapSamplingStop)
+      // SC9(b): only native numeric samples and redacted call frames cross the OOB boundary.
+      return {
+        mode,
+        status: IpcBenchDiagnostic.captured,
+        startEpochMs: capture.startEpochMs,
+        stopEpochMs,
+        pid: process.pid,
+        threadId,
+        cpuProfilingArguments: capture.cpuProfilingArguments,
+        allocationSampling: {
+          status: IpcBenchDiagnostic.samplingStatus,
+          scope: IpcBenchDiagnostic.samplingScope,
+          samplingInterval: IpcBenchDiagnostic.samplingInterval,
+          includeObjectsCollectedByMajorGC: true,
+          includeObjectsCollectedByMinorGC: true,
+          profile: {
+            ...profile,
+            head: redactSamplingNode(profile.head)
+          }
         }
       }
     }
