@@ -12170,6 +12170,16 @@
               ]
             },
             {
+              "id": "calls-during-install",
+              "heading": "Calls during install",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "A local Feature method in `expose` is callable from the moment the peer can reach it; calls that arrive during install are held until the plugin commits, and are refused with `TARGET_UNKNOWN` if it does not. This guarantee covers local Feature `expose` entries only; forward and catalog entries are not covered."
+                }
+              ]
+            },
+            {
               "id": "4-endpoint",
               "heading": "4. Endpoint",
               "blocks": [
