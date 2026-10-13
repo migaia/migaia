@@ -13,7 +13,12 @@ import {
   unindexInteraction
 } from './interactions.js'
 import { mergeStats } from './stats.js'
-import { createHubTarget, retainTargetEvent, type IHubTarget } from './targets.js'
+import {
+  createHubTarget,
+  retainTargetEvent,
+  type IHubTarget,
+  type IHubTimelineEvent
+} from './targets.js'
 import { HubErrorText, HubEventName, HubServiceMethod } from './text.js'
 import { mergeTimeline } from './timeline.js'
 import {
@@ -155,6 +160,26 @@ export function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevt
   }
 
   /** Ingest once by sequence, maintaining retention and correlation before listener callbacks run. */
+  function attachCarrierEvent(
+    item: IRpcDevtoolsTimelineEvent,
+    identity: IRpcDevtoolsTimelineEvent,
+    indexed = true
+  ): void {
+    if (item.interaction !== undefined || identity.interaction === undefined) return
+    /**
+     * Only this original stored wrapper changes; its wire event and captured content stay
+     * references.
+     */
+    const linked = item as IHubTimelineEvent
+    linked.interaction = identity.interaction
+    linked.trace = identity.trace
+    if (indexed) indexInteraction(interactions, linked)
+  }
+
+  /**
+   * Ingest once by sequence; deferred physical stages join only after actual decode reveals
+   * identity.
+   */
   function accept(target: IHubTarget, event: IRpcDevtoolsWireEvent): void {
     if (!target.active || event.seq <= target.lastSeq) return
     target.lastSeq = event.seq
@@ -171,8 +196,45 @@ export function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevt
       event
     }
     /** Ring displacement removes exactly the old stored reference from both incremental indexes. */
+    /** The next ring position also owns its fixed pending-link cells. */
+    const slot =
+      target.count < target.events.length
+        ? (target.head + target.count) % target.events.length
+        : target.head
     const evicted = retainTargetEvent(target, item)
-    if (evicted !== undefined) unindexInteraction(interactions, evicted)
+    if (evicted !== undefined) {
+      unindexInteraction(interactions, evicted)
+      target.sequences.delete(evicted.event.seq)
+    }
+    target.sequences.set(event.seq, slot)
+    target.carrierHeads[slot] = -1
+    target.carrierNext[slot] = -1
+    if (event.carrierSeq !== undefined) {
+      /** Collector-domain ordinals scope this lookup to the exact same target. */
+      const carrierSlot = target.sequences.get(event.carrierSeq)
+      if (carrierSlot !== undefined) {
+        /** No evicted carrier is reconstructed and no event from another target can be substituted. */
+        const carrier = target.events[carrierSlot]!
+        if (item.interaction !== undefined) {
+          attachCarrierEvent(carrier, item)
+          /** Every waiting physical wrapper is indexed exactly once, preserving target/trace counts. */
+          let sequence = target.carrierHeads[carrierSlot]!
+          target.carrierHeads[carrierSlot] = -1
+          while (sequence >= 0) {
+            /** Ring retention preserves all newer children while their originating carrier remains. */
+            const linkedSlot = target.sequences.get(sequence)
+            if (linkedSlot === undefined) break
+            attachCarrierEvent(target.events[linkedSlot]!, item)
+            sequence = target.carrierNext[linkedSlot]!
+            target.carrierNext[linkedSlot] = -1
+          }
+        } else if (carrier.interaction !== undefined) attachCarrierEvent(item, carrier, false)
+        else {
+          target.carrierNext[slot] = target.carrierHeads[carrierSlot]!
+          target.carrierHeads[carrierSlot] = event.seq
+        }
+      }
+    }
     indexInteraction(interactions, item)
     /** Current dispatch remains valid even when an earlier listener removes this target. */
     const length = eventListeners.length
@@ -201,6 +263,9 @@ export function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevt
     }
     target.count = 0
     target.head = 0
+    target.sequences.clear()
+    target.carrierHeads.fill(-1)
+    target.carrierNext.fill(-1)
     setStatus(target, RpcDevtoolsTargetStatus.removed)
   }
 

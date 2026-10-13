@@ -96,6 +96,10 @@ export function createProbeEmitter(
 
 /** Owns dispatch, filtering, redaction and one reusable view for one endpoint. */
 class ProbeEmitter {
+  /** Borrowed original envelope exists only during one synchronous physical send; no context copy. */
+  sendContext: IRpcEnvelope | IRpcRuntimeEnvelope | undefined
+  /** A carrier's synchronous receive hands this sequence once to the existing physical record. */
+  #inboundCarrierSeq = -1
   /** Current stage bits are rebuilt when a genuine probe updates its subscription. */
   mask = 0
   /** Capture bits allow call sites to avoid reading content on metadata-only paths. */
@@ -151,6 +155,7 @@ class ProbeEmitter {
     this.#now = now
     this.#view = {
       seq: 0,
+      carrierSeq: -1,
       at: 0,
       endpointId,
       stage: 0,
@@ -195,12 +200,28 @@ class ProbeEmitter {
         return capturing()
       },
       emit: (direction, sizeBytes, carrier, detail, content) => {
-        if (!this.#begin(RpcProbeStage.carrier, undefined, undefined)) return
+        /** Dropped nested receives must not borrow a preceding control or physical frame's ordinal. */
+        if (direction === RpcProbeDirection.inbound) this.#inboundCarrierSeq = -1
+        /** Only an outbound synchronous send can borrow the original caller routing context. */
+        const context = direction === RpcProbeDirection.outbound ? this.sendContext : undefined
+        /** Both runtime and legacy envelopes already own their admitted route; no parsing is added. */
+        const route =
+          context === undefined
+            ? undefined
+            : 'route' in context
+              ? context.route
+              : context.data.route
+        if (!this.#begin(RpcProbeStage.carrier, context?.id, undefined, route?.senderId)) return
         this.#view.direction = direction
+        this.#view.senderId = route?.senderId
+        this.#view.targetId = route?.targetId
+        this.#view.trace = route !== undefined && 'trace' in route ? route.trace : undefined
         this.#view.sizeBytes = sizeBytes
         this.#view.carrier = carrier
         this.#view.detail = detail
         this.#dispatch(RpcProbeStage.carrier, content)
+        // Publish after callbacks so dropped reentrant receives cannot consume this outer event.
+        if (direction === RpcProbeDirection.inbound) this.#inboundCarrierSeq = this.#view.seq
       }
     }
     this.#rebuild()
@@ -257,6 +278,7 @@ class ProbeEmitter {
     /** All optional fields are reset so another stage cannot inherit stale content or errors. */
     const view = this.#view
     view.seq = ++this.#seq
+    view.carrierSeq = -1
     view.at = this.#now()
     view.stage = stage
     view.direction = RpcProbeDirection.local
@@ -431,11 +453,15 @@ class ProbeEmitter {
     method: string | undefined,
     members: number,
     value: unknown,
-    senderId?: string
+    senderId?: string,
+    trace?: string,
+    carrierSeq = -1
   ): void {
     if (!this.#begin(RpcProbeStage.envelope, messageId, method, senderId)) return
     this.#view.direction = direction
     this.#view.senderId = senderId
+    this.#view.trace = trace
+    this.#view.carrierSeq = carrierSeq
     this.#view.members = members
     this.#dispatch(RpcProbeStage.envelope, value)
   }
@@ -463,7 +489,8 @@ class ProbeEmitter {
     count: number,
     value: unknown,
     method?: string,
-    senderId?: string
+    senderId?: string,
+    carrierSeq = -1
   ): void {
     this.#bytes(
       RpcProbeStage.frame,
@@ -474,7 +501,8 @@ class ProbeEmitter {
       count,
       value,
       method,
-      senderId
+      senderId,
+      carrierSeq
     )
   }
   /** Observes one protected physical frame without awaiting an additional transform. */
@@ -486,7 +514,8 @@ class ProbeEmitter {
     count: number,
     value: unknown,
     method?: string,
-    senderId?: string
+    senderId?: string,
+    carrierSeq = -1
   ): void {
     this.#bytes(
       RpcProbeStage.protected,
@@ -497,7 +526,8 @@ class ProbeEmitter {
       count,
       value,
       method,
-      senderId
+      senderId,
+      carrierSeq
     )
   }
   /** Writes only frame fields into the common reusable view. */
@@ -510,7 +540,8 @@ class ProbeEmitter {
     count: number,
     value: unknown,
     method: string | undefined,
-    senderId: string | undefined
+    senderId: string | undefined,
+    carrierSeq: number
   ): void {
     if (!this.#begin(stage, messageId, method, senderId)) return
     this.#view.direction = direction
@@ -518,11 +549,19 @@ class ProbeEmitter {
     this.#view.chunkIndex = index
     this.#view.chunkCount = count
     this.#view.senderId = senderId
+    this.#view.carrierSeq = carrierSeq
     this.#dispatch(stage, value)
   }
   /** Returns the one transport observation adapter, never a per-send object. */
   carrier(): IRpcCarrierProbe {
     return this.#carrier
+  }
+  /** Consume the synchronous arrival once; the existing physical record then owns it across awaits. */
+  takeInboundCarrierSeq(): number {
+    /** A consumed marker cannot be reused by a later receive that emitted no carrier event. */
+    const sequence = this.#inboundCarrierSeq
+    this.#inboundCarrierSeq = -1
+    return sequence
   }
   /** Revokes stage subscriptions and drops retained view references exactly once. */
   dispose(): void {
@@ -530,6 +569,8 @@ class ProbeEmitter {
     this.#closed = true
     this.mask = 0
     this.captureMask = 0
+    this.sendContext = undefined
+    this.#inboundCarrierSeq = -1
     for (let i = 0; i < this.#subscribers.length; i++) this.#subscribers[i]!.release()
     this.#table.fill(undefined)
     this.#view.content = undefined

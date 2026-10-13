@@ -912,11 +912,19 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       this.kernel.transport,
       {
         receive: async (message) => {
+          /**
+           * Snapshot the synchronous carrier arrival before any native or authentication work
+           * yields.
+           */
+          const carrierSeq =
+            this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.carrier)) !== 0
+              ? this.#probe.takeInboundCarrierSeq()
+              : -1
           const generation = this.kernel.generation
           if (this.kernel.state !== 'active') return
           this.#native?.observeOwner()
           if (this.#native && !this.#native.active) return
-          const physical = this.inboundIdentity.prepareSource(message)
+          const physical = this.inboundIdentity.prepareSource(message, carrierSeq)
           if (!physical) return
           /** Default traffic never probes a new selector unless the actual base was negotiated. */
           const carrier = this.#runtimeCapabilities ? readRuntimeCarrier(physical.data) : undefined
@@ -985,7 +993,12 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                 probeSize(frame, this.#probeUtf8String),
                 -1,
                 -1,
-                (this.#probe.captureMask & (1 << RpcProbeStage.protected)) !== 0 ? frame : undefined
+                (this.#probe.captureMask & (1 << RpcProbeStage.protected)) !== 0
+                  ? frame
+                  : undefined,
+                undefined,
+                undefined,
+                physical.carrierSeq
               )
             if (carrier) {
               /**
@@ -1153,7 +1166,10 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
                   typeof fragment?.count === 'number' ? fragment.count : -1,
                   (this.#probe.captureMask & (1 << RpcProbeStage.frame)) !== 0
                     ? preparedFrame.frame
-                    : undefined
+                    : undefined,
+                  undefined,
+                  undefined,
+                  physical.carrierSeq
                 )
               }
               const accepted = this.#runtimeComponents.framer.accept(preparedFrame.frame, {
@@ -1316,7 +1332,9 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         envelope.task.method,
         -1,
         (this.#probe.captureMask & (1 << RpcProbeStage.envelope)) !== 0 ? envelope : undefined,
-        envelope.route.senderId
+        envelope.route.senderId,
+        undefined,
+        physical.carrierSeq
       )
     /** Every explicitly requested capability must be present in the actual completed intersection. */
     const required = runtimeOperationCapabilities(
@@ -1793,7 +1811,9 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         envelope.kind === RpcEnvelopeKind.request ? envelope.method : route.route.method,
         members,
         (this.#probe.captureMask & (1 << RpcProbeStage.envelope)) !== 0 ? envelope : undefined,
-        route.route.senderId
+        route.route.senderId,
+        route.route.trace,
+        physical.carrierSeq
       )
     const pendingAdmission = this.inboundIdentity.admitPrepared(
       physical,

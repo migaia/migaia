@@ -13,6 +13,8 @@ export type IAdapterEventEmitterMessagePort = INodeMessagePortLike &
 
 /** Raw EventTarget messaging borrows lifecycle from the held runtime resource. */
 export type IAdapterEventTargetMessagePort = Readonly<{
+  /** Forward the existing physical carrier observer through the raw Browser Peer resource. */
+  observe?: import('../../core/transport.js').IRpcTransport['observe']
   postMessage(message: unknown, transfer?: readonly unknown[]): void
   addEventListener(type: string, listener: (event: any) => void): void
   removeEventListener(type: string, listener: (event: any) => void): void

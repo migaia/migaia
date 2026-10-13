@@ -77,6 +77,41 @@ function hops(): ReadonlyMap<string, readonly IRpcDevtoolsWireEvent[]> {
 }
 
 describe('hub A2 correlation and timeline', () => {
+  it('[closure A3] joins deferred inbound physical events once within their own target and releases indexes', async () => {
+    /** Decrypt cannot identify the carrier until its later admitted envelope has routing identity. */
+    const events = [
+      event(1, 1, { stage: 'carrier', direction: 'inbound' }),
+      event(2, 2, { stage: 'protected', direction: 'inbound', carrierSeq: 1 }),
+      event(3, 3, { stage: 'frame', direction: 'inbound', carrierSeq: 1 }),
+      event(4, 4, {
+        stage: 'envelope',
+        direction: 'inbound',
+        carrierSeq: 1,
+        senderId: 'caller',
+        messageId: 'request',
+        trace: 'T1'
+      }),
+      event(5, 5, { stage: 'frame', direction: 'inbound', carrierSeq: 1 }),
+      event(6, 6, { stage: 'carrier', senderId: 'caller', messageId: 'request', trace: 'T1' })
+    ]
+    /** Identical ordinal in another target must never acquire this request's identity. */
+    const hub = createRpcDevtoolsHub({ maxEvents: 8 })
+    try {
+      await hub.addTarget('linked', fakeTarget(events).client)
+      await hub.addTarget('unrelated', fakeTarget([event(1, 1, { stage: 'carrier' })]).client)
+      expect(hub.timeline({ trace: 'T1' })).toHaveLength(6)
+      expect(hub.interactions('T1')[0]!.events).toHaveLength(6)
+      expect(hub.timeline({ trace: 'T1' }).map((item) => item.event.seq)).toEqual([
+        1, 2, 3, 4, 5, 6
+      ])
+      expect(events[0]!.trace).toBeUndefined()
+      await hub.removeTarget('linked')
+      expect(hub.interactions('T1')).toEqual([])
+      expect(hub.timeline()).toHaveLength(1)
+    } finally {
+      await hub.close()
+    }
+  })
   it('derives sides from request and response roles across same-host endpoints and duplicate targets', async () => {
     /** Same-host endpoints witness the request at both business roles in one collector. */
     const sameHost = [

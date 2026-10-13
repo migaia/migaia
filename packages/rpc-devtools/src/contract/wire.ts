@@ -7,6 +7,8 @@ export type IRpcWireError = IRpcSerializedError
 export type IRpcDevtoolsWireEvent = Readonly<{
   target?: string
   seq: number
+  /** Collector-domain sequence of the originating inbound carrier event, when retained. */
+  carrierSeq?: number
   at: number
   endpointId: string
   stage: string

@@ -1063,7 +1063,9 @@ export class RpcOutboundSender {
             this.#probeSent(entry.message, p)
         }
       },
-      true
+      true,
+      undefined,
+      entries[0]!.message
     )
     /** Both outcomes release busy identity before the logical member Promises settle. */
     const complete = () => {
@@ -1420,7 +1422,8 @@ export class RpcOutboundSender {
         generation,
         undefined,
         false,
-        index === 0 ? message : undefined
+        index === 0 ? message : undefined,
+        message
       ).catch((error: unknown) => {
         if (!hasFailure) {
           hasFailure = true
@@ -1461,7 +1464,15 @@ export class RpcOutboundSender {
           }
         : undefined
       first = false
-      await this.#sendPreparedTransport(frame, transfer, generation, beforeSend, false, logical)
+      await this.#sendPreparedTransport(
+        frame,
+        transfer,
+        generation,
+        beforeSend,
+        false,
+        logical,
+        message
+      )
     }
   }
 
@@ -1594,21 +1605,28 @@ export class RpcOutboundSender {
     generation: number | undefined,
     beforeSend?: () => void,
     immediate = false,
-    message?: IRpcEnvelope
+    message?: IRpcEnvelope,
+    carrierContext = message
   ): Promise<void> {
-    return this.#writePreparedTransport({
-      value,
-      transfer,
-      generation,
-      beforeSend,
-      immediate,
-      admissionFailure: undefined,
-      message
-    })
+    return this.#writePreparedTransport(
+      {
+        value,
+        transfer,
+        generation,
+        beforeSend,
+        immediate,
+        admissionFailure: undefined,
+        message
+      },
+      carrierContext
+    )
   }
 
   /** Only a real write or the original deferred invocation suspends this stable owner method. */
-  async #writePreparedTransport(record: IPhysicalWriteRecord): Promise<void> {
+  async #writePreparedTransport(
+    record: IPhysicalWriteRecord,
+    carrierContext?: IRpcEnvelope | IRpcRuntimeEnvelope
+  ): Promise<void> {
     /** Non-immediate callers retain their original deferred host invocation. */
     if (!record.immediate) await undefined
     try {
@@ -1647,9 +1665,20 @@ export class RpcOutboundSender {
         }
       }
       /** The actual transport method keeps its receiver and remains adjacent to admission/start. */
-      await (this.#objectPort
-        ? this.#objectPort.send(record.value, { transfer: record.transfer })
-        : this.transport.send(record.value, { transfer: record.transfer }))
+      /** Only an installed carrier stage borrows context; the two assignments allocate nothing. */
+      const observeCarrier = p !== undefined && (p.mask & (1 << RpcProbeStage.carrier)) !== 0
+      if (observeCarrier)
+        p.sendContext = carrierContext ?? record.message ?? record.runtimeStart?.envelope
+      /** The original returned Promise is awaited after the synchronous context lifetime ends. */
+      let sent: void | Promise<void>
+      try {
+        sent = this.#objectPort
+          ? this.#objectPort.send(record.value, { transfer: record.transfer })
+          : this.transport.send(record.value, { transfer: record.transfer })
+      } finally {
+        if (observeCarrier) p.sendContext = undefined
+      }
+      await sent
       /** A late physical completion cannot commit across the captured endpoint generation. */
       this.#lifecycle?.assertActive(record.generation)
     } catch (cause) {

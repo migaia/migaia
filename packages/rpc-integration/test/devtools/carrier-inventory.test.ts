@@ -6,7 +6,7 @@ import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import type { IRpcTransport } from '@migaia/rpc-core'
-import type { IRpcCarrierProbe } from '@migaia/rpc-core/probe'
+import { RpcProbeDirection, type IRpcCarrierProbe } from '@migaia/rpc-core/probe'
 import type { IRuntimePeerSourceResult } from '@migaia/rpc-core/remote'
 import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
 import {
@@ -23,7 +23,7 @@ import {
   createRuntimeMessageConnection,
   createAdapterJsonRpcChannel
 } from '@migaia/rpc-core/adapter/internal-advanced'
-import { RpcPlatform } from '@migaia/rpc-core/transport-constants'
+import { RpcPlatform, RpcTransportEncoding } from '@migaia/rpc-core/transport-constants'
 import {
   createProcessTransport,
   createAdapterChannel,
@@ -45,7 +45,7 @@ import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-
 import { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'
 import { createJsonRpcAdapterChannel, createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'
 import { ProcessChannelDiagnostics } from '../../../rpc-process/src/process/diagnostics.js'
-import { bridgeFixture } from '../bridge/fixture.js'
+import { bridgeFixture, request } from '../bridge/fixture.js'
 
 /** Inventory counts public callable factories that return transports, pairs, or transport channels. */
 type IInventoryEntry = Readonly<{
@@ -55,7 +55,7 @@ type IInventoryEntry = Readonly<{
 }>
 /** Each construction retains its actual transports and its original physical cleanup. */
 type IInventoryInstance = Readonly<{
-  transports: readonly Pick<IRpcTransport, 'observe'>[]
+  transports: readonly Pick<IRpcTransport, 'observe' | 'send' | 'encodedType'>[]
   close(): void | Promise<void>
 }>
 /** The five carrier owners have no explicit exclusions in carriers R2. */
@@ -68,12 +68,9 @@ const packages = [
 ] as const
 /** Repository root resolves package export metadata independently of the process working directory. */
 const root = fileURLToPath(new URL('../../../../', import.meta.url))
-/** Metadata-only fake probe drives the capability directly, without the probe-core plugin. */
-const probe: IRpcCarrierProbe = { capturing: false, emit: () => undefined }
-
 /** Keep actual transport cleanup when a direct public factory returns only one transport. */
 function transportInstance(
-  transport: Pick<IRpcTransport, 'observe' | 'close'>
+  transport: Pick<IRpcTransport, 'observe' | 'close' | 'send' | 'encodedType'>
 ): IInventoryInstance {
   return { transports: [transport], close: () => transport.close?.() }
 }
@@ -477,9 +474,26 @@ describe('carriers A2: complete public transport inventory', () => {
         expect(instance.transports.length).toBeGreaterThan(0)
         for (const transport of instance.transports) {
           expect(transport.observe).toBeTypeOf('function')
+          /** Outbound observation must run inside send, before its original settlement is awaited. */
+          let outbound = 0
+          /** Direction filtering excludes physical responses from this constructor's send proof. */
+          const probe: IRpcCarrierProbe = {
+            capturing: false,
+            emit(direction) {
+              if (direction === RpcProbeDirection.outbound) outbound++
+            }
+          }
           /** Observe is exercised directly, and its real disposer must be callable and idempotent. */
           const dispose = transport.observe!(probe)
           expect(dispose).toBeTypeOf('function')
+          /** The bridge receives its supported envelope; all other text/message ports accept it too. */
+          const payload =
+            transport.encodedType === RpcTransportEncoding.uint8Array
+              ? new Uint8Array([1])
+              : JSON.stringify(request('inventory-request'))
+          const sending = transport.send(payload)
+          expect(outbound, `${entry.symbol} synchronous send observation`).toBe(1)
+          await sending
           dispose()
           dispose()
         }

@@ -3,6 +3,8 @@ import type { IRpcProbeStageName, RpcProbeStage } from './constants.js'
 /** Fixed-shape mutable view reused by one emitter; valid only during its synchronous emit call. */
 export type IRpcProbeEventView = {
   seq: number
+  /** Inbound physical carrier sequence carried through this frame; -1 means no carrier link. */
+  carrierSeq: number
   at: number
   endpointId: string
   stage: number

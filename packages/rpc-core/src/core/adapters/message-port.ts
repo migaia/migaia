@@ -44,6 +44,8 @@ export type INodeMessagePortLike = {
 
 /** Browser MessagePort surface with EventTarget lifecycle. */
 export type IBrowserMessagePortLike<TTransfer = unknown, TEvent = unknown> = {
+  /** A projected Browser Peer preserves its original Window/RTC/Worker physical observer. */
+  observe?: IRpcTransport['observe']
   postMessage(message: unknown, transfer?: readonly TTransfer[]): void
   start(): void
   close(): void
@@ -143,6 +145,8 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
   const ownership = options.ownership ?? 'owned'
   /** This transport owns only its raw error subscription, never the borrowed physical port. */
   let removeRawError: (() => void) | undefined
+  /** Raw carrier observation is released by this adapter's existing close owner. */
+  let removeRawProbe: (() => void) | undefined
   const onMessage = (event: TEvent): void => {
     let readFailed = false
     const data = safeRead<unknown>(event, 'data', ({ error }) => {
@@ -199,10 +203,19 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
     observe(next) {
       /** Registration remains inert after this adapter's terminal boundary. */
       const generation = ++probeGeneration
-      if (!closed) probe = next
+      removeRawProbe?.()
+      removeRawProbe = undefined
+      if (!closed) {
+        if (port.observe !== undefined) {
+          probe = undefined
+          removeRawProbe = port.observe(next)
+        } else probe = next
+      }
       return () => {
         if (generation !== probeGeneration) return
         probe = undefined
+        removeRawProbe?.()
+        removeRawProbe = undefined
       }
     },
     send(message, options?: IRpcSendOptions<TTransfer>) {
@@ -285,6 +298,10 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
       probe = undefined
       messageListeners.clear(() => undefined)
       const cleanupErrors = collectListenerCleanupFailures([
+        () => {
+          removeRawProbe?.()
+          removeRawProbe = undefined
+        },
         () => port.removeEventListener('message', onMessage),
         () => port.removeEventListener('messageerror', onMessageError),
         () => {
