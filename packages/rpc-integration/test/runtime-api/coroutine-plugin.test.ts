@@ -100,7 +100,27 @@ describe('coroutine runtime plugin modes', () => {
         source: '@migaia/rpc/remote',
         code: 'REMOTE_CLOSED'
       })
-      expect((await host.coroutine!.restart('c')).state).toBe('ready')
+      /** The ready callback starts its call synchronously before the restart caller can resume. */
+      const immediateCalls: Promise<{ value: unknown } | { error: unknown }>[] = []
+      /** This payload independently identifies the call sent inside ready publication. */
+      const immediatePayload = 'ready-immediate'
+      /** Expected callback failures remain observed instead of becoming unhandled rejections. */
+      const removeReady = host.coroutine!.on('ready', (event) => {
+        if (event.name !== 'c') return
+        immediateCalls.push(
+          host.coroutine!.request('c', 'service.read', immediatePayload).then(
+            (value) => ({ value }),
+            (error) => ({ error: coroutineFailure(error) })
+          )
+        )
+      })
+      try {
+        expect((await host.coroutine!.restart('c')).state).toBe('ready')
+        expect(immediateCalls).toHaveLength(1)
+        expect(await Promise.all(immediateCalls)).toEqual([{ value: ['first', immediatePayload] }])
+      } finally {
+        removeReady()
+      }
       expect(await host.coroutine!.request('c', 'service.read', 'restarted')).toEqual([
         'first',
         'restarted'
