@@ -429,6 +429,7 @@ function createAuthenticationCapability(
   /** Test counter access stays private to this exact capability and never enters public exports. */
   const capability: IRpcAuthenticationCapability = Object.freeze({
     enabled: true as const,
+    mode: encrypt === undefined ? 'sign' : 'encrypt-sign',
     encodedType: encodedType ?? 'any',
     protect,
     unprotect
