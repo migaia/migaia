@@ -1,6 +1,6 @@
 # `@migaia/rpc-devtools` 使用手册
 
-Collector、log probe 和 hub 已提供本地实现，codec 保持既有契约。Core 的直接观察路径已提供；各 leaf 的未闭合验收与 managed Peer 转发限制保留在 handoff 中。
+Collector、log probe 和 hub 已提供本地实现，codec 保持既有契约。Core 的直接观察路径已提供；Peer 转发、service 便携结果与 carrier 关联已接通；数值性能门禁及匿名前序 chunk 的限制见 closure handoff。
 
 ## 1. 高阶用法 · 离线录制编解码
 
@@ -66,6 +66,7 @@ const devtools = createRpcDevtools({ stages: ['message'], maxEvents: 4 })
 /** 仅本例手填元数据；真实 emitter 在同步调用间复用同一 view。 */
 const view: IRpcProbeEventView = {
   seq: 0,
+  carrierSeq: -1,
   at: 0,
   endpointId: 'client',
   stage: RpcProbeStage.message,
@@ -115,9 +116,9 @@ console.log(devtools.stats().methods.length) // 0
 devtools.close()
 ```
 
-`query({ afterSeq, limit, stages, methods, trace, endpointIds })` 在保留环上单次扫描；`limit` 最大为 1,000，`nextSeq` 是下页 cursor。驻留表满后，新名称使用溢出 id 0 并增加 `internOverflow`；已有名称仍可还原。Watch 每批最多 256 个事件，每个消费者最多排队 64 批；过慢时丢弃最旧批次，下一批的 `dropped` 报告损失。`close()` 使等待中的 watch 以 `CLOSED` 结束，重复 close 安全。
+`query({ afterSeq, limit, stages, outcomes, methods, trace, endpointIds })` 在保留环上单次扫描；`limit` 最大为 1,000，`nextSeq` 是下页 cursor。驻留表满后，新名称使用溢出 id 0 并增加 `internOverflow`；已有名称仍可还原。Watch 每批最多 256 个事件，每个消费者最多排队 64 批；过慢时丢弃最旧批次，下一批的 `dropped` 报告损失。`close()` 使等待中的 watch 以 `CLOSED` 结束，重复 close 安全。
 
-`pause()` 清空 emitter 订阅，`resume()` 当前只恢复构造时传入的 stages。如果构造后使用公开 `setStages()` 修改过订阅，pause/resume 后需要重新调用 `setStages()` 应用该列表。D4 要求恢复暂停前的最新订阅；当前 host 的公开 stageMask 仍是初始值，也没有当前订阅读取入口，因此该要求尚未完成。
+`pause()` 保存暂停前最新订阅并清空 emitter mask，重复暂停不覆盖保存值；`resume()` 恢复该列表。构造后 `setStages()` 增加的阶段保留。Query 与 watch 的 `outcomes` 使用同一公开 outcome 名称域，空列表匹配零行。
 
 按照 SC9，采集时保留 `detail`、error 与未实际转移的 content 引用，发送后对这些对象的修改可能反映在后续读取中。`snapshotProbeEvent` 只按显式请求复制顶层事件元数据（SC9c），内部引用仍可变；codec 在编码/解码边界转为独立 wire/text 表示（SC9b）。
 
@@ -125,7 +126,7 @@ devtools.close()
 
 `watch` 的批次类型是 `{ events, dropped }`。`record().stop()` 返回离线 record；service 的 `record.stop()` 返回编码文本。Service 默认不暴露 content，须由 `exposeContent` 明确启用。`IRpcDevtoolsCounters` 包含环形存储淘汰、内容丢弃、重入丢弃、采样丢弃、暂停/关闭忽略与字符串驻留溢出的计数。
 
-`stats()` 按 endpoint 和 method 提供调用、失败、拒绝、超时、取消计数，以及 24 个固定 log2 延迟桶：公开边界为 `0.0625 ms × 2^k`，`k = 0…23`。p50/p95/p99 在桶内插值；超出末边界的延迟进入最后一桶，其插值上限扩展为观察到的最大值，因此末桶误差不能按固定边界宽度承诺。仅携带非负 durationMs 的 settled/failed/rejected message 事件更新统计；环淘汰不影响累计值，`clear()` 同时重置环与统计。
+`stats()` 按 endpoint 和 method 提供调用、失败、拒绝、超时、取消计数，以及 24 个固定 log2 延迟桶：公开边界为 `0.0625 ms × 2^k`，`k = 0…23`。末桶从 `latencyOverflowFromMs = 262144` ms 向上开放，`latencyMaxMs` 给出实际最大样本。p50/p95/p99 在桶内插值并钳制到观察到的最大值；末桶没有固定宽度误差承诺。Hub 汇总所有带最大值的行时保留同一上界；旧 target 未提供最大值时不伪造它。仅携带非负 durationMs 的 settled/failed/rejected message 事件更新统计；环淘汰不影响累计值，`clear()` 同时重置环与统计。
 
 ### 已有 Peer 上的远程 service
 
@@ -156,7 +157,9 @@ try {
 }
 ```
 
-远端 `devtools.watch` 用 Peer 的 `stream('devtools.watch', filters)` 消费；停止消费时关闭流。不要把同一个 collector 也作为 probe 安装到 serving Peer，service 流量会进入采集并可能反馈到 watch。自动识别并过滤自身 service endpoint 的 R4/D5 尚未完成：公开 provider context 缺少本地 endpoint identity。使用独立 service Peer 是当前的调用方限制，不是自动过滤的实现。合法业务 method 可以使用 `devtools.*` 名称，collector 不通过名称前缀删除事件。
+远端 `devtools.watch` 用 Peer 的 `stream('devtools.watch', filters)` 消费；远程取消通过原 stream signal 唤醒并释放 collector 等待。Service 从 provider 的 `localEndpointId` 识别 serving endpoint，排除其后续摄取以及 query/stats 中已有的该 endpoint 行。使用独立 service Peer，使业务 endpoint 保持可观察；合法业务 method 可以使用 `devtools.*` 名称，collector 不按方法前缀删除事件。
+
+Service 在真实边界转换结果为 portable wire：原生 Error 通过 serializeRpcError 保留 source/code/name/message/stack/cause 链；bytes 使用既有 portable 表示，functions、undefined 与类 prototype 不跨线。无法编码时抛出带原 cause 的 TypeError / SERVICE_RESULT_INVALID。
 
 Service 默认不输出 content；设 `exposeContent: true` 前应先配置 capture/redact，并确认远端有权读取。主环与录制独立；同一时刻只允许一个 recording，重复启动抛 `RECORD_ACTIVE`，重复 stop 抛 `RECORD_NOT_ACTIVE`。关闭时丢弃正在录制的数据；关闭后的查询、统计与控制调用抛 `CLOSED`。
 
@@ -167,10 +170,7 @@ Service 默认不输出 content；设 `exposeContent: true` 前应先配置 capt
 调用方提供实现 `IRpcDevtoolsTargetClient` 的已有 client。Hub 只调用该 client 的 `request('describe')`、`request('query', input)`、`request('stats')` 与 `stream('watch', input)`，不创建 transport、Peer 或重连机制。如果现有 Peer 使用嵌套 service 路径，由调用方在 client 边界映射为这些方法名。
 
 ```ts doc-test=check
-import {
-  createRpcDevtoolsHub,
-  type IRpcDevtoolsTargetClient
-} from '@migaia/rpc-devtools/hub'
+import { createRpcDevtoolsHub, type IRpcDevtoolsTargetClient } from '@migaia/rpc-devtools/hub'
 
 /** 聚合调用方已经建立的两个 devtools service client。 */
 export async function inspectHosts(
@@ -217,7 +217,7 @@ export async function inspectHosts(
 
 ## 4. 错误身份
 
-错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE` 与 `TARGET_UNKNOWN`。Collector 与 hub 的配置和生命周期错误已实现；hub client 的运行时错误按原身份报告，不被 target 状态值替换。
+错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE`、`TARGET_UNKNOWN` 与 `SERVICE_RESULT_INVALID`。Collector 与 hub 的配置和生命周期错误已实现；hub client 的运行时错误按原身份报告，不被 target 状态值替换。
 
 ## 5. 日志接入
 
@@ -227,7 +227,7 @@ export async function inspectHosts(
 
 `levels` 可按 failed/rejected/timeout/aborted/slow/lifecycle 覆盖级别，`off` 禁用对应日志；`methods`、`sample`、`stages` 在构造时编译。
 
-不要在自定义 `emit` 中把 `view` 本身放进异步 logger。View 只在同步 emit 期间有效，异步输出时常已变成下一事件。Log probe 先按整数 outcome/kind 做决定，再同步提取 method、messageId、senderId、targetId、trace、durationMs、outcome、kind、rejection、lifecycle、peerId 与 error。字段对象不随 view 复用变化；error 保留原实例，content 默认不记录。`content: true` 为订阅阶段请求捕获；view 的 content 来自 emitter 已完成的捕获/脱敏路径，嵌套引用仍可能被调用方修改。冻结的 log options 没有自定义 `redact` 参数；需要专门脱敏策略时先在 owning Probe/emitter 配置。
+不要在自定义 `emit` 中把 `view` 本身放进异步 logger。View 只在同步 emit 期间有效，异步输出时常已变成下一事件。Log probe 先按整数 outcome/kind 做决定，再同步提取 method、messageId、senderId、targetId、trace、durationMs、outcome、kind、rejection、lifecycle、peerId 与 error。字段对象不随 view 复用变化；error 保留原实例，content 默认不记录。`content: true` 为订阅阶段请求捕获；view 的 content 来自 emitter 已完成的捕获/脱敏路径，嵌套引用仍可能被调用方修改。`capture` 与 `redact` 原样传给 defineProbe；`content: true` 保留旧便利选项。异步 logger thenable 的拒绝观察使用一个 reaction Promise，这是授权的 logger 路径，默认 collector/业务路径不添加 Promise。
 
 Logger 方法必须不阻塞，只把日志交给现有缓冲。同步文件写入会把 I/O 放到 RPC 调用路径。Log probe 每个合格事件只同步调用一次 logger；不另建缓冲、分块、锁、文件写入、轮转或 flush。Logger 抛错或返回 rejected thenable 时，错误进入 `onError`，不会改变业务结果；未配置 reporter 时使用 host reporter。`onError` 自身失败仍交给 host reporter。
 
@@ -273,3 +273,5 @@ try {
   restore()
 }
 ```
+
+`carrierSeq` 在 wire 中引用同一 collector/target 的 carrier 行；hub 不混用不同 target 的序号。Outbound 直接按 senderId:messageId 入索引；inbound 匿名 protected/frame 保留数字链接，真实 decode envelope 提供身份后加入该 interaction。摄取关联行时若原 carrier 已在所有环中淘汰，链接省略；之后淘汰可留下已记录的序号，hub 不补造丢失的 carrier。Frame 内容与 nested transfer 都按引用保存；Byte detail 的 drainMs 在原生 drain 后可更新，显式顶层快照也不会深复制 detail。

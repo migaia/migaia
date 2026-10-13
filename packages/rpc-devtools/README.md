@@ -1,13 +1,13 @@
 # `@migaia/rpc-devtools`
 
-RPC 元数据采集、统计、录制与跨宿主 hub。Collector 可作为 Probe 接入已有宿主，也可用手填 view 驱动本地采集。Hub 聚合已有 service client 与离线录制；Core 的直接观察路径已提供，managed Peer 转发限制见 Core 文档。
+RPC 元数据采集、统计、录制与跨宿主 hub。Collector 可作为 Probe 接入已有宿主，也可用手填 view 驱动本地采集。Hub 聚合已有 service client 与离线录制；Core 的直接观察路径已提供，Peer、managed source 与 pool member 均转发 probe。
 
-| 入口                            | 当前能力                                                                             |
-| ------------------------------- | ------------------------------------------------------------------------------------ |
-| `@migaia/rpc-devtools`          | `createRpcDevtools`：有界采集、查询、统计、录制、暂停与 service                      |
-| `@migaia/rpc-devtools/contract` | service/wire/record 类型、`RpcDevtoolsRecordFormat`、录制 codec、错误码与错误 source |
-| `@migaia/rpc-devtools/hub`      | `createRpcDevtoolsHub`、target 管理、时钟对齐、timeline、interactions、stats 与离线导入             |
-| `@migaia/rpc-devtools/log`      | `createRpcLogProbe`：提取当前事件字段并交给调用方的 logger                           |
+| 入口                            | 当前能力                                                                                |
+| ------------------------------- | --------------------------------------------------------------------------------------- |
+| `@migaia/rpc-devtools`          | `createRpcDevtools`：有界采集、查询、统计、录制、暂停与 service                         |
+| `@migaia/rpc-devtools/contract` | service/wire/record 类型、`RpcDevtoolsRecordFormat`、录制 codec、错误码与错误 source    |
+| `@migaia/rpc-devtools/hub`      | `createRpcDevtoolsHub`、target 管理、时钟对齐、timeline、interactions、stats 与离线导入 |
+| `@migaia/rpc-devtools/log`      | `createRpcLogProbe`：提取当前事件字段并交给调用方的 logger                              |
 
 `createRpcDevtools()` 返回 collector 自己的 Probe 对象，不创建 Peer、transport 或持久化资源。包为 workspace-private，peer 依赖 `@migaia/rpc-core` 与 `@migaia/rpc-contract`，版本保持一致。Hub 接收调用方已有的 target client 或离线录制，不创建连接。
 
@@ -32,9 +32,9 @@ devtools.close()
 
 把 `devtools.service` 挂到已有 Peer 的 `provide: { devtools: devtools.service }`；远端使用 `devtools.describe/query/watch/stats/record.start/record.stop/clear/pause/resume`。为 service 使用独立 Peer。Service 默认隐藏 content；只有 `exposeContent: true` 才允许内容跨 service 边界。
 
-自动排除自身 service 流量尚未完成（R4/D5）：公开 provider context 没有 serving endpoint identity。不要把同一个 collector 也作为 probe 安装到 serving Peer；独立 service Peer 是调用方当前必须遵守的限制，不能代替自动过滤验收。
+Service 使用实际 `IRpcContext.localEndpointId` 排除 serving endpoint；独立 service Peer 使业务 endpoint 仍可观察。结果在 service 边界转换为 portable wire，保留 Error 链与 byte 标签，失败为 `SERVICE_RESULT_INVALID`。远程 watch 取消通过既有 stream signal 释放等待。
 
-`resume()` 当前恢复构造时的 stages。如果后来通过 `setStages()` 修改订阅，pause/resume 不保留这次修改；恢复暂停前最新订阅（D4）仍缺少可读取当前有效订阅的公开契约。恢复后由调用方重新应用需要的 stages。
+`pause()` 保存最新有效 stages，`resume()` 恢复该选择；构造后 setStages 的修改保留。Query 与 watch 支持 `outcomes`，空列表不匹配任何事件。
 
 顶层元数据在 `emit(view)` 返回前写入列，不保留复用 view。`detail`、error 与未转移的 captured content 保留引用；发送后修改这些对象可能影响后续读取。用 `capture` 显式选阶段，再用 `redact` 清理敏感内容。
 
@@ -68,7 +68,7 @@ console.log(decodeRpcDevtoolsRecord(text).header.version) // 1
 
 录制格式为 UTF-8 NDJSON：第一行为 `{ format: 'migaia-rpc-devtools', version: 1 }`，后续每行一个事件。Bytes 用 base64 标记保存；错误沿用 RPC 错误 codec 保留 source、code、name、message、stack 与 cause 链。Service wire event 使用已序列化错误；record 输入同时接受原生 Error 与已序列化 wire error，解码输出还原为原生 Error。
 
-统计使用 24 个固定 log2 延迟桶，公开边界为 `0.0625 ms × 2^k`，`k = 0…23`。分位数在桶内插值；末桶接收超出最后边界的延迟，其插值上限扩展到已观察到的最大延迟。末桶的误差不能按固定边界宽度承诺。
+统计使用 24 个固定 log2 延迟桶，公开边界为 `0.0625 ms × 2^k`，`k = 0…23`。分位数在桶内插值；末桶从 `latencyOverflowFromMs = 262144` ms 向上开放，公开实际 `latencyMaxMs`；所有分位数钳制到该最大值，末桶没有固定宽度误差承诺。
 
 ## Hub · 实时聚合与离线查询
 
@@ -76,25 +76,24 @@ Hub 不创建 transport 或 Peer。调用方把已有的 `request`/`stream` clie
 
 ```ts doc-test=check
 import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'
-import {
-  RpcDevtoolsRecordFormat,
-  encodeRpcDevtoolsRecord
-} from '@migaia/rpc-devtools/contract'
+import { RpcDevtoolsRecordFormat, encodeRpcDevtoolsRecord } from '@migaia/rpc-devtools/contract'
 
 /** 离线录制复用 contract codec，不依赖实时 collector。 */
 const text = encodeRpcDevtoolsRecord({
   header: RpcDevtoolsRecordFormat,
-  events: [{
-    seq: 1,
-    at: 100,
-    endpointId: 'parent',
-    stage: 'message',
-    direction: 'outbound',
-    senderId: 'parent',
-    messageId: 'm1',
-    method: 'read',
-    trace: 'T1'
-  }]
+  events: [
+    {
+      seq: 1,
+      at: 100,
+      endpointId: 'parent',
+      stage: 'message',
+      direction: 'outbound',
+      senderId: 'parent',
+      messageId: 'm1',
+      method: 'read',
+      trace: 'T1'
+    }
+  ]
 })
 /** 每个 target 最多保留 50,000 个事件；关闭由调用方负责。 */
 const hub = createRpcDevtoolsHub({ maxEvents: 50_000 })
@@ -108,6 +107,10 @@ try {
 }
 ```
 
-`timeline()` 以 k-way merge 合并 target 序列，按对齐时间排序，同时间按 target 名及 `seq` 决定顺序。`interactions(trace?)` 仅按显式 `trace` 与 `(senderId, messageId)` 关联；只有一侧的观察标记为 `oneSided`，不会补造缺失事件。`stats(name?)` 转发实时 target 的统计，省略名称时逐桶汇总各 target 的直方图。
+`timeline()` 以 k-way merge 合并 target 序列，按对齐时间排序，同时间按 target 名及 `seq` 决定顺序。`interactions(trace?)` 按显式 `trace` 与 `(senderId, messageId)` 关联，并通过同一 target 的 `carrierSeq` 加入对应 carrier；只有一侧的观察标记为 `oneSided`，不会补造缺失事件。`stats(name?)` 转发实时 target 的统计，省略名称时逐桶汇总各 target 的直方图。
 
 返回数组中的事件是已存储引用。未转移的 content、`detail` 与 error 保留引用；发送后修改原对象可能改变后续读取。详见 [USEGUIDE](./USEGUIDE.md) 的生命周期、时钟误差与引用语义。
+
+Revision 3 的 carrierSeq 是同一 target 内的 carrier 链接；collector 转换 Core 的本地序号，hub 在真实 decode 身份到达后增量关联。仓库 carrier 都同步在 send 内 emit，第三方异步 emit 没有 outbound context。Native Peer 不自动携带 trace，应用通过自己的 Endpoint.send 显式传递。前序匿名 chunks 当前不能全部归入 interaction，详见 Core USEGUIDE 和 closure handoff。
+
+`capture` 默认关闭；log probe 支持 capture/redact。Nested transferable 保留引用，可能分离；不深扫描或复制容器，也不额外读取 getter。Metadata 的未知字符串/容器大小为 -1，直接 native bytes 保留已知长度。
