@@ -104619,6 +104619,8 @@
             "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: {\n    math: { double: (value: number) => value * 2 },\n    feed: {\n      // async generator 方法可以被对端用 stream() 逐项读取\n      count: async function* (limit: number) {\n        for (let index = 1; index <= limit; index++) yield index\n      }\n    }\n  },\n  report: (error) => console.error(error)\n})",
             "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IServiceApi = { math: { double(value: number): number }; feed: { count(limit: number): AsyncIterableIterator<number> } }\nconst service = await createProcessPeer<IServiceApi>({ spawn: new URL('./service.ts', import.meta.url) })\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  for await (const value of service.stream('feed.count', 3)) console.log(value) // 1 2 3\n} finally { await service.close() }",
             "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IEchoApi = { echo(value: string): string }\nif (isProcessChild()) await createProcessPeer({ provide: { echo: (value: string) => value } })\nelse {\n  const child = await createProcessPeer<IEchoApi>({ spawn: true })\n  try { console.log(await child.request('echo', 'hello')) } finally { await child.close() }\n}",
+            "import { createProcessPeer } from '@migaia/rpc-process'\n\n/** The application owns this profile and its permitted filesystem operations. */\nconst profile = '/absolute/path/to/application.sb'\n/** The peer owns the sandboxed child and closes it with the original launcher. */\nconst child = await createProcessPeer<{ echo(value: string): string }>({\n  spawn: {\n    entry: new URL('./service.ts', import.meta.url),\n    /** Keep runtime detection and wrap only the resulting command. */\n    wrap: (command) => ({\n      ...command,\n      command: '/usr/bin/sandbox-exec',\n      args: ['-f', profile, command.command, ...command.args]\n    })\n  }\n})\ntry { console.log(await child.request('echo', 'hello')) } finally { await child.close() }",
+            "import { createProcessPeer } from '@migaia/rpc-process'\n\n/** The peer owns the child launched through the application's bubblewrap policy. */\nconst child = await createProcessPeer<{ echo(value: string): string }>({\n  spawn: {\n    entry: new URL('./service.ts', import.meta.url),\n    /** Preserve the original runtime arguments, cwd and environment. */\n    wrap: (command) => ({\n      ...command,\n      command: '/usr/bin/bwrap',\n      args: [\n        '--ro-bind', '/', '/', '--proc', '/proc', '--dev', '/dev',\n        '--unshare-net', '--die-with-parent', '--', command.command, ...command.args\n      ]\n    })\n  }\n})\ntry { console.log(await child.request('echo', 'hello')) } finally { await child.close() }",
             "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IServiceApi = {\n  math: { double(value: number): number }\n  feed: { count(limit: number): AsyncIterableIterator<number> }\n}\nif (isProcessChild()) {\n  await createProcessPeer({ provide: {\n    math: { double: (value: number) => value * 2 },\n    feed: { count: async function* (limit: number) { for (let value = 1; value <= limit; value++) yield value } }\n  } })\n} else {\n  const service = await createProcessPeer<IServiceApi>({ spawn: true })\n  try {\n    const result: number = await service.request('math.double', 21)\n    console.log(result) // 42\n    for await (const value of service.stream('feed.count', 3)) console.log(value) // 1 2 3\n  } finally { await service.close() }\n}",
             "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nconst server = await createProcessPeer({ listen: 'math-service', provide: { math: { double: (value: number) => value * 2 } } })\nconst client = await createProcessPeer<IMathApi>({ connect: 'math-service' })\ntry { console.log(await client.request('math.double', 21)) } finally { await client.close(); await server.close() }",
             "import { createProcessPeer } from '@migaia/rpc-process'\n\nconst token = 'local-example-secret'\nconst server = await createProcessPeer({ listen: 'tcp://127.0.0.1:4000', token, provide: { echo: (value: string) => value } })\nconst client = await createProcessPeer<{ echo(value: string): string }>({ connect: 'tcp://127.0.0.1:4000', token })\ntry { console.log(await client.request('echo', 'hello')) } finally { await client.close(); await server.close() }",
@@ -104686,7 +104688,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-process/dist/process/peer.d.ts:createProcessPeer:export declare function createProcessPeer<TRemote = Record<never, never>>(options: IRuntimeProcessPeerOptions): Promise<IRuntimeTypedPeer<TRemote, IRuntimeFlatten<TRemote>, typeof RuntimePluginKey.process>>;",
           "guidance": [],
-          "usageScore": 198,
+          "usageScore": 220,
           "configuration": [],
           "fragment": "rpc-process-index--createProcessPeer"
         },
@@ -106039,6 +106041,70 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-process-index--IProcessHostRegistrations"
+        },
+        {
+          "name": "IProcessLaunchCommand",
+          "kind": "type",
+          "signature": "export type IProcessLaunchCommand = Readonly<{\n  command: string;\n  args: readonly string[];\n  cwd?: string;\n  env: Readonly<IProcessEnv>;\n}>;",
+          "declarationLine": 10,
+          "source": "packages/rpc-process/dist/process/adapters/short-source.d.ts",
+          "purpose": "Caller-owned command data excludes the channel, bootstrap and supervision authority.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessLaunchCommand.",
+          "advanced": "No additional advanced behavior is declared for IProcessLaunchCommand.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IProcessLaunchCommand."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IProcessLaunchCommand.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IProcessLaunchCommand",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IProcessLaunchCommand = Readonly<{ command: string; args: readonly string[]; cwd?: string; env: Readonly<IProcessEnv>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IProcessLaunchCommand when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IProcessLaunchCommand does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Caller-owned command data excludes the channel, bootstrap and supervision authority."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IProcessLaunchCommand from @migaia/rpc-process, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IProcessLaunchCommand when its type contract and declared inputs match the result you need. Choose a different public symbol when IProcessLaunchCommand does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessLaunchCommand."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IProcessLaunchCommand."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/adapters/short-source.d.ts:IProcessLaunchCommand:export type IProcessLaunchCommand = Readonly<{ command: string; args: readonly string[]; cwd?: string; env: Readonly<IProcessEnv>; }>;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "rpc-process-index--IProcessLaunchCommand"
         },
         {
           "name": "IProcessLiquidationOwner",
@@ -107578,7 +107644,7 @@
           "name": "IProcessShortSourceOptions",
           "kind": "type",
           "signature": "export type IProcessShortSourceOptions = Readonly<{\n  token?: string;\n  verify?: IProcessServeListenerIngress['verify'];\n  connectTimeoutMs?: number;\n}>;",
-          "declarationLine": 29,
+          "declarationLine": 38,
           "source": "packages/rpc-process/dist/process/adapters/short-source.d.ts",
           "purpose": "Plugin closures forward only source configuration after Core captures the original Host identity.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessShortSourceOptions.",
@@ -107641,8 +107707,8 @@
         {
           "name": "IProcessShortSpawn",
           "kind": "type",
-          "signature": "export type IProcessShortSpawn = Readonly<{\n  entry?: string | URL;\n  base?: string | URL;\n  command?: string;\n  args?: readonly string[];\n  cwd?: string;\n  env?: Partial<IProcessEnv>;\n  stdio?: IProcessSpec['stdio'];\n  limits?: IProcessSpec['limits'];\n  permissions?: IProcessSpec['permissions'];\n  wire?: ProcessPluginWire;\n  contract?: IRemoteContract;\n  token?: string;\n  offer?: IRpcHandshakeOffer;\n  establish?: IProcessPluginEstablish;\n  supervision?: Partial<IProcessSupervisorOptions<INodeProcessHandle>>;\n  onNotice?(notice: unknown): void;\n}>;",
-          "declarationLine": 10,
+          "signature": "export type IProcessShortSpawn = Readonly<{\n  entry?: string | URL;\n  base?: string | URL;\n  command?: string;\n  args?: readonly string[];\n  cwd?: string;\n  env?: Partial<IProcessEnv>;\n  /** Rewrite the computed command once per launch; rpc retains the channel and bootstrap. */ wrap?: (\n    command: IProcessLaunchCommand,\n  ) => IProcessLaunchCommand;\n  stdio?: IProcessSpec['stdio'];\n  limits?: IProcessSpec['limits'];\n  permissions?: IProcessSpec['permissions'];\n  wire?: ProcessPluginWire;\n  contract?: IRemoteContract;\n  token?: string;\n  offer?: IRpcHandshakeOffer;\n  establish?: IProcessPluginEstablish;\n  supervision?: Partial<IProcessSupervisorOptions<INodeProcessHandle>>;\n  onNotice?(notice: unknown): void;\n}>;",
+          "declarationLine": 17,
           "source": "packages/rpc-process/dist/process/adapters/short-source.d.ts",
           "purpose": "Ordinary launch configuration overrides defaults without granting launch or handshake authority.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessShortSpawn.",
@@ -107657,7 +107723,7 @@
           "aliasOf": "IProcessShortSpawn",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IProcessShortSpawn = Readonly<{ entry?: string | URL; base?: string | URL; command?: string; args?: readonly string[]; cwd?: string; env?: Partial<IProcessEnv>; stdio?: IProcessSpec['stdio']; limits?: IProcessSpec['limits']; permissions?: IProcessSpec['permissions']; wire?: ProcessPluginWire; contract?: IRemoteContract; token?: string; offer?: IRpcHandshakeOffer; establish?: IProcessPluginEstablish; supervision?: Partial<IProcessSupervisorOptions<INodeProcessHandle>>; onNotice?(notice: unknown): void; }>;"
+            "export type IProcessShortSpawn = Readonly<{ entry?: string | URL; base?: string | URL; command?: string; args?: readonly string[]; cwd?: string; env?: Partial<IProcessEnv>; /** Rewrite the computed command once per launch; rpc retains the channel and bootstrap. */ wrap?: (command: IProcessLaunchCommand) => IProcessLaunchCommand; stdio?: IProcessSpec['stdio']; limits?: IProcessSpec['limits']; permissions?: IProcessSpec['permissions']; wire?: ProcessPluginWire; contract?: IRemoteContract; token?: string; offer?: IRpcHandshakeOffer; establish?: IProcessPluginEstablish; supervision?: Partial<IProcessSupervisorOptions<INodeProcessHandle>>; onNotice?(notice: unknown): void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -107696,7 +107762,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/adapters/short-source.d.ts:IProcessShortSpawn:export type IProcessShortSpawn = Readonly<{ entry?: string | URL; base?: string | URL; command?: string; args?: readonly string[]; cwd?: string; env?: Partial<IProcessEnv>; stdio?: IProcessSpec['stdio']; limits?: IProcessSpec['limits']; permissions?: IProcessSpec['permissions']; wire?: ProcessPluginWire; contract?: IRemoteContract; token?: string; offer?: IRpcHandshakeOffer; establish?: IProcessPluginEstablish; supervision?: Partial<IProcessSupervisorOptions<INodeProcessHandle>>; onNotice?(notice: unknown): void; }>;",
+          "identity": "packages/rpc-process/dist/process/adapters/short-source.d.ts:IProcessShortSpawn:export type IProcessShortSpawn = Readonly<{ entry?: string | URL; base?: string | URL; command?: string; args?: readonly string[]; cwd?: string; env?: Partial<IProcessEnv>; /** Rewrite the computed command once per launch; rpc retains the channel and bootstrap. */ wrap?: (command: IProcessLaunchCommand) => IProcessLaunchCommand; stdio?: IProcessSpec['stdio']; limits?: IProcessSpec['limits']; permissions?: IProcessSpec['permissions']; wire?: ProcessPluginWire; contract?: IRemoteContract; token?: string; offer?: IRpcHandshakeOffer; establish?: IProcessPluginEstablish; supervision?: Partial<IProcessSupervisorOptions<INodeProcessHandle>>; onNotice?(notice: unknown): void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -109361,7 +109427,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-process/dist/process/constants.d.ts:PROCESS_RUNTIME_API_ENV:export declare const PROCESS_RUNTIME_API_ENV = \"MIGAIA_RPC_RUNTIME_API_BOOTSTRAP\";",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 8,
           "configuration": [],
           "fragment": "rpc-process-index--PROCESS_RUNTIME_API_ENV"
         },
