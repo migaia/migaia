@@ -208,7 +208,7 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
     ]
   },
   'rpc-core': {
-    /** Layer-1 probing adds one explicit namespace without changing the existing entries. */
+    /** Revision 3 adds current-stage control and canonical reporter exports to the Probe entry. */
     './probe': [
       'RpcProbeStage',
       'RpcProbeStageName',
@@ -221,7 +221,11 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'defineProbe',
       'snapshotProbeEvent',
       'rpcProbeSampleKey',
-      'probePlugin'
+      'probePlugin',
+      'readProbeStages',
+      'subscribeProbeStages',
+      'hostRethrowReporter',
+      'IpcReporterContext'
     ],
     /** P5 SDK exposes only the two task-level factories to ordinary adapter authors. */
     './adapter': ['defineByteAdapter', 'defineMessageAdapter'],
@@ -235,6 +239,7 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'JsonRpcProfile',
       'assembleAdapterPlugin',
       'captureAdapterTask',
+      'carrierSizeBytes',
       'createAdapterBindingDrain',
       'createAdapterConfigurationError',
       'createAdapterConfigurationTypeError',
