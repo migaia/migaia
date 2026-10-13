@@ -16,7 +16,8 @@ await createThreadPeer({ provide: { double: (value: number) => value * 2 } })
 import { createThreadPool } from '@migaia/rpc-pool'
 
 const pool = await createThreadPool<{ double(value: number): number }>({
-  spawn: new URL('./worker.js', import.meta.url), size: 2
+  spawn: new URL('./worker.js', import.meta.url),
+  size: 2
 })
 try {
   console.log(await Promise.all([pool.request('double', 21), pool.request('double', 10)]))
@@ -34,14 +35,18 @@ try {
 ```ts doc-test=run group=pool-process file=service.ts
 import { createProcessPeer } from '@migaia/rpc-process'
 
-await createProcessPeer({ provide: { add: (value: { a: number; b: number }) => value.a + value.b } })
+await createProcessPeer({
+  provide: { add: (value: { a: number; b: number }) => value.a + value.b }
+})
 ```
 
 ```ts doc-test=run group=pool-process file=main.ts
 import { createProcessPool } from '@migaia/rpc-pool'
 
 const pool = await createProcessPool<{ add(value: { a: number; b: number }): number }>({
-  spawn: new URL('./service.js', import.meta.url), size: 2, maxQueue: 16
+  spawn: new URL('./service.js', import.meta.url),
+  size: 2,
+  maxQueue: 16
 })
 try {
   console.log(await pool.request('add', { a: 20, b: 22 }))
@@ -60,6 +65,7 @@ try {
 - `resize(size)` 按调用顺序增减成员，缩容等正在使用的成员完成。`close()` 停止新接纳并排空已接受的队列，重复调用返回同一 Promise。
 - `idleTimeoutMs` 设置为不超过 2147483647 毫秒的有限正数时，闲置成员通过原 `peer.close()` 退役，下一个任务通过原公开工厂补回目标大小。
 - 原 supervisor 负责崩溃重启与重新绑定。默认裸 spawn 使用原 on-failure 策略和五次预算；不重置用户预算。恢复期间原 Peer 可以拒绝 `CLOSED`；恢复后未来新调用使用同一个 Peer。池不自动重放失败业务调用。
+- `probe` 接受 `@migaia/rpc-core/probe` 的一个 Probe 或只读 Probe 数组，并原样交给每个成员的公开 Peer 工厂；真实握手、ready 和重启仍由原 Peer 发出。多个成员共享 Probe 时用事件的 `endpointId` 区分成员。
 - 派发后的 call options 和 signal 原样传给 Peer；排队阶段取消为 DOMException AbortError，`CALL_ABORTED` 的 cause 是原 reason。`timeoutMs` 从原 Peer 接收操作时起算，池不另建队列 deadline。
 
 `spawn: true` 会重跑整个主入口，使用原 `isProcessChild()` / `await isThreadChild()` guard。相对字符串基于主入口目录；URL 精确。浏览器线程沿原 URL 规则；Node `.ts` 去类型不重写 `.js` 导入，使用编译输出或 loader。详细入口、认证与运行时边界见 rpc-process / rpc-threads 使用手册。
