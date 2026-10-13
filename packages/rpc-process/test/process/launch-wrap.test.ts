@@ -154,7 +154,7 @@ class RecordingLauncher implements IProcessLauncher<INodeProcessHandle> {
   }
 }
 
-describe('launch-wrap revision 4', () => {
+describe('launch-wrap revision 5', () => {
   it('[A1][R1][R1a] wraps start, restart and replacement without replacing channel or bootstrap', async () => {
     /** The Host owns all three real child generations. */
     const host = createHost()
@@ -535,28 +535,52 @@ describe('launch-wrap revision 4', () => {
         )
       } else {
         expect(outcome.error).toMatchObject(hostFailure)
-        /** Launch may fail while writing the original stdin bootstrap. */
-        const failed = layer(outcome.error, '@migaia/supervision', 'LAUNCH_FAILED')
-        expect(failed.cause).toMatchObject({
-          source: '@migaia/rpc/process',
-          code: 'PROCESS_CHANNEL_CONNECT_FAILED',
-          cause: expect.any(Error)
-        })
-        console.info(
-          '[A2 immediate wrapper]',
-          JSON.stringify({
-            phase: 'LAUNCH_FAILED',
-            chain: diagnostic(outcome.error),
-            reports: reports.map(diagnostic)
-          })
+        /** Bootstrap write failure and pre-commit channel closure retain distinct owner chains. */
+        const failed = causes(outcome.error).find(
+          (error) => error.source === '@migaia/supervision' && error.code === 'LAUNCH_FAILED'
         )
+        if (failed) {
+          expect(failed.cause).toMatchObject({
+            source: '@migaia/rpc/process',
+            code: 'PROCESS_CHANNEL_CONNECT_FAILED',
+            cause: expect.any(Error)
+          })
+          console.info(
+            '[A2 immediate wrapper]',
+            JSON.stringify({
+              phase: 'LAUNCH_FAILED',
+              chain: diagnostic(outcome.error),
+              reports: reports.map(diagnostic)
+            })
+          )
+        } else {
+          /** A returned handle can lose its channel before Host installation commits. */
+          const start = layer(outcome.error, '@migaia/rpc/remote', 'REMOTE_START_FAILED')
+          expect(start.cause).toMatchObject({
+            source: '@migaia/rpc/process',
+            code: 'PROCESS_CHANNEL_CLOSED',
+            cause: {
+              source: '@migaia/rpc/process',
+              code: 'PROCESS_CHANNEL_CLOSED'
+            }
+          })
+          expect(exits).toEqual([])
+          console.info(
+            '[A2 immediate wrapper]',
+            JSON.stringify({
+              phase: 'PROCESS_CHANNEL_CLOSED',
+              chain: diagnostic(outcome.error),
+              reports: reports.map(diagnostic)
+            })
+          )
+        }
       }
     } finally {
       await host.dispose()
     }
   })
 
-  it('[A2][R2] emits launch-failed when wrap throws on the second launch', async () => {
+  it('[A2][R2] records a failed second launch without emitting a native exit', async () => {
     /** First launch establishes the Host outlet; second launch fails inside the same supervisor. */
     const host = createHost()
     /** Invocation count selects the actual restart rather than initial preparation. */
@@ -571,6 +595,11 @@ describe('launch-wrap revision 4', () => {
           }
         })
       )
+      /** Public detail identifies the old handle's supervisor generation before retirement. */
+      const started = await host.process!.get('service')
+      /** Only this already launched generation may contribute a native stopped event. */
+      const oldGeneration = 'generation' in started.unit ? started.unit.generation : undefined
+      expect(oldGeneration).toBeTypeOf('number')
       /** Ignore retirement of the old handle and observe the restart's failed launch. */
       const exits: IRuntimeEvent[] = []
       host.process!.on('exit', (event) => {
@@ -578,18 +607,40 @@ describe('launch-wrap revision 4', () => {
       })
       /** The returned state and original report chain explain a failed restart's observed phase. */
       const outcome = await host.process!.restart('service')
-      console.info('[A2 restart wrapper observed]', JSON.stringify({ outcome, calls, exits }))
-      await vi.waitFor(
-        () =>
-          expect(exits).toContainEqual(
-            expect.objectContaining({
-              reason: 'launch-failed',
-              error: { source: '@migaia/supervision', code: 'LAUNCH_FAILED' }
-            })
-          ),
-        { timeout: 2000 }
-      )
+      expect(outcome.state).not.toBe('ready')
       expect(calls).toBe(2)
+      /** Lookup rejection is recorded separately so it cannot swallow a detail assertion failure. */
+      const detail = await host.process!.get('service').then(
+        (value) => ({ found: true as const, value }),
+        (error: unknown) => ({ found: false as const, error })
+      )
+      if (detail.found) {
+        expect(detail.value.lastExit).toMatchObject({
+          reason: 'launch-failed',
+          error: { source: '@migaia/supervision', code: 'LAUNCH_FAILED' }
+        })
+      } else {
+        expect(detail.error).toBeInstanceOf(Error)
+      }
+      /** Only retirement of the old handle has a native exit; the failed attempt has no handle. */
+      expect(
+        exits.filter(
+          (event) =>
+            event.type === 'exit' &&
+            (event.reason !== 'stopped' || event.generation !== oldGeneration)
+        )
+      ).toEqual([])
+      console.info(
+        '[A2 restart wrapper observed]',
+        JSON.stringify({
+          outcome,
+          calls,
+          exits,
+          ...(detail.found
+            ? { lastExit: detail.value.lastExit }
+            : { getRejection: diagnostic(detail.error) })
+        })
+      )
     } finally {
       await host.dispose()
     }
