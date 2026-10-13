@@ -4517,9 +4517,9 @@ console.log(RPC_DEVTOOLS_SOURCE, RpcDevtoolsErrorCode)`,
 const rpcDevtoolsGuides = {
   'rpc-devtools:index:createRpcDevtools': guide({
     purposeEn:
-      'Creates one bounded RPC collector per host, directly usable as a Probe. Defaults to message/peer; physical stages are opt-in. Emit stores raw fields and string references; interning, carrier correlation and wire projection happen at read boundaries. Only measured method-bearing message settlements update independent statistics. IRpcDevtoolsWireEvent.variation retains the route subtype for message/envelope controls; portable service and record boundaries preserve it. Outcomes filter query/watch, pause saves current stages, and terminal quantiles clamp to latencyMaxMs.',
+      'Creates one RPC event collector per host, usable as a Probe. Defaults to message/peer; stages or setStages() enable physical observations.',
     purposeZh:
-      '为每个宿主创建有界 RPC collector，可直接作为 Probe 接入。默认订阅 message/peer，物理阶段显式启用。Emit 保存原始字段与字符串引用；驻留、carrier 关联及 wire 转换在读取边界执行。仅携带非负 duration 与 method 的 message 结算更新独立统计。IRpcDevtoolsWireEvent.variation 保留 message/envelope control 的 route subtype，portable service 与录制边界保留该字段。Outcomes 同时过滤 query/watch，pause 保存当前 stages，末桶分位数钳制到 latencyMaxMs。',
+      '为每个宿主创建 RPC 事件 collector，可作为 Probe 接入。默认订阅 message/peer；物理阶段通过 stages 或 setStages() 显式启用。',
     quickStart: `import { createRpcDevtools } from '@migaia/rpc-devtools'
 
 /** Attach default message/peer metadata observation to an existing host. */
@@ -4610,12 +4610,16 @@ devtools.close()`,
     ],
     useEn: [
       'Inspect local pages, per-method latency histograms and independent bounded recordings without creating another transport.',
+      'Emit stores raw fields and string references; interning, carrier correlation and wire projection happen at read boundaries. Only measured method-bearing message settlements update independent statistics.',
+      'IRpcDevtoolsWireEvent.variation retains message/envelope control subtypes through portable service and recording. Outcomes filter query/watch, pause saves current stages, and terminal quantiles clamp to latencyMaxMs.',
       'Mount devtools.service on a separate existing Peer without installing this collector as its probe; watch keeps the existing filtered queue of 64 batches with at most 256 events each.',
       'Active watchers share 16,384 raw pending rows and one notification per synchronous burst; with no active watcher, nothing is scheduled. Raw overwrites happen before watch filtering and add raw row losses to dropped.',
       'Read carrierSeq while an origin remains in main, record or watch retention. Learned links survive origin retirement while dependent rows remain; cold readers preserve observed generation cutoffs without retaining extra history.'
     ],
     useZh: [
       '查看本地分页、按方法聚合的延迟直方图与独立有界录制，不创建新的 transport。',
+      'Emit 保存原始字段与字符串引用；驻留、carrier 关联及 wire 转换在读取边界执行。仅携带非负 duration 与 method 的 message 结算更新独立统计。',
+      'IRpcDevtoolsWireEvent.variation 保留 message/envelope control 的 subtype，portable service 与录制边界保留该字段。Outcomes 同时过滤 query/watch，pause 保存当前 stages，末桶分位数钳制到 latencyMaxMs。',
       '把 devtools.service 挂到独立的已有 Peer，不把此 collector 安装为该 Peer 的 probe；watch 保留原有筛选后队列，最多 64 批、每批 256 个事件。',
       '活跃 watcher 共用 16,384 行原始待通知窗口，每个同步 burst 最多一次通知；没有活跃 watcher 时零通知。原始覆盖发生在 watch 筛选前，按原始行损失计入 dropped。',
       '在 origin 仍由主环、record 或 watch 保留时读取 carrierSeq；已知链接随仍保留的 dependent 行继续有效，冷读取保留实际观察到的 generation cutoff，不保留额外历史。'
