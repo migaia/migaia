@@ -44,7 +44,7 @@ export const RuntimeApiErrorText = {
   targetUnknown: 'Runtime outlet target is not a live connection',
   /** Canonical indexes preserve all matches and reject ambiguity instead of selecting one. */
   targetAmbiguous: 'Runtime outlet target identifies multiple connections',
-  /** Passive subscriptions admit only the five declared lifecycle events and actual callbacks. */
+  /** Passive subscriptions admit only the declared lifecycle events and actual callbacks. */
   eventInvalid: 'Runtime event subscription is invalid',
   /** Native mutations require an original spawn/create lease, never a local channel ownership claim. */
   controlBorrowed: 'Runtime target does not own native execution',
@@ -159,6 +159,7 @@ export const RuntimeEventName = {
   exit: 'exit',
   degraded: 'degraded',
   restart: 'restart',
+  terminal: 'terminal',
   liquidated: 'liquidated'
 } as const
 export type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName]
