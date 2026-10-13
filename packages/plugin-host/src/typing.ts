@@ -489,11 +489,11 @@ export type IDefinedPluginConstraint<
     readonly name: TName
     getFeature<TKey extends Extract<keyof TFeatures, string>>(
       name: TKey
-    ): IFeatureReference<IFeatureOutput<TFeatures[TKey]>, false>
+    ): IFeatureReference<IFeatureOutput<TFeatures[TKey]>, false, TName>
     getFeature<TKey extends Extract<keyof TFeatures, string>>(
       name: TKey,
       options: Readonly<{ readonly optional: true }>
-    ): IFeatureReference<IFeatureOutput<TFeatures[TKey]>, true>
+    ): IFeatureReference<IFeatureOutput<TFeatures[TKey]>, true, TName>
     /** Required only in declarations; runtime authority remains the private WeakMap. */
     readonly [definedPluginBrand]: { readonly core: TCore; readonly value: TValue }
   }>

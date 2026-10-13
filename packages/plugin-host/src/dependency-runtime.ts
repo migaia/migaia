@@ -5,7 +5,10 @@ import {
   type IDependencyPlan
 } from '@migaia/capability/graph/dependency'
 import type { ITopologyIndexNode } from '@migaia/capability/graph/topology'
-import { isFeatureReference, readDefinedFeature } from './define-feature.js'
+import {
+  collectPluginFeatureDependencies,
+  readDefinitionDependencies
+} from './dependency-reader.js'
 import { PluginHostErrorCode } from './error-code.js'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import type { IFeatureReference } from './feature-types.js'
@@ -14,12 +17,6 @@ import type { IInstallEntry, IPluginDefinition, IRegistration } from './registry
 import type { IPluginDependencyPlan } from './typing.js'
 
 /** Graph ownership stays in capability; this module only adapts plugin definitions and errors. */
-
-/** Cross-plugin reference plus the local feature that consumes it. */
-type IPluginFeatureDependency = Readonly<{
-  readonly consumer: string
-  readonly reference: IFeatureReference<object, boolean>
-}>
 
 /** Controls how a committed but not yet activated lazy provider is treated during validation. */
 export const PluginInactiveProviderPolicy = {
@@ -63,27 +60,6 @@ export const admitDependencyMutationOptions = (
   return Object.freeze({ policy, dryRun: options.dryRun ?? false })
 }
 
-/** Collects trusted cross-plugin references from one plugin's complete local feature closure. */
-const collectPluginFeatureDependencies = (
-  plugin: IPluginDefinition<any>
-): readonly IPluginFeatureDependency[] => {
-  const found: IPluginFeatureDependency[] = []
-  const pending = Object.values(plugin.features)
-  const visited = new Set<object>()
-  for (const feature of pending) {
-    if (visited.has(feature)) continue
-    visited.add(feature)
-    const definition = readDefinedFeature(feature)
-    if (!definition) continue
-    for (const dependency of Object.values(definition.dependencies)) {
-      if (isFeatureReference(dependency)) {
-        found.push(Object.freeze({ consumer: plugin.name, reference: dependency }))
-      } else pending.push(dependency)
-    }
-  }
-  return Object.freeze(found)
-}
-
 /** Creates the prerequisite error for one required provider that is absent from the host. */
 const createAbsentProviderError = (
   reference: IFeatureReference<object, boolean>,
@@ -101,15 +77,9 @@ const createAbsentProviderError = (
 
 /** Converts one plugin definition into the capability index's canonical node shape. */
 export const toIndexNode = (name: string, plugin: IPluginDefinition<any>): ITopologyIndexNode => {
-  /** Required wins when several local Features reference the same provider. */
-  const strength = new Map<string, boolean>()
-  for (const { reference } of collectPluginFeatureDependencies(plugin))
-    strength.set(reference.plugin, (strength.get(reference.plugin) ?? false) || !reference.optional)
   return Object.freeze({
     id: name,
-    dependencies: Object.freeze(
-      [...strength].map(([provider, required]) => Object.freeze({ provider, required }))
-    )
+    dependencies: readDefinitionDependencies(plugin)
   })
 }
 

@@ -906,7 +906,7 @@ test('SITE-T-TRAY-COVERAGE separates static composition from managed Host mutati
   const targets = [
     [
       'index',
-      'createTray',
+      'createTrayGraph',
       [
         'entries',
         'entries[].key',

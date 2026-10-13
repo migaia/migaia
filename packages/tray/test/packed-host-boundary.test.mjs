@@ -305,8 +305,8 @@ void createRuntime
 
 /** Emits a root-only ES2024 probe with no explicit-resource-management lib dependency. */
 function staticTypeSource() {
-  return `import { createTray, type ITray, type ITrayKey } from '@migaia/tray'
-const tray: ITray = createTray([])
+  return `import { createTrayGraph, type ITrayGraph, type ITrayKey } from '@migaia/tray'
+const tray: ITrayGraph = createTrayGraph([])
 const keys: readonly ITrayKey[] = tray.keys
 void keys
 `
@@ -334,19 +334,20 @@ async function runTreeShakingConsumers(consumerDirectory) {
   const consumers = [
     {
       name: 'root-only',
-      source: "import { createTray } from '@migaia/tray'\nexport default createTray([])\n",
+      source:
+        "import { createTrayGraph } from '@migaia/tray'\nexport default createTrayGraph([])\n",
       forbidden: ['defineLoader', 'defineAdapter', 'createRuntime', 'loadIntoHost']
     },
     {
       name: 'loader-only',
       source: "import { defineLoader } from '@migaia/tray/loader'\nexport default defineLoader\n",
-      forbidden: ['defineAdapter', 'createRuntime', 'createTray']
+      forbidden: ['defineAdapter', 'createRuntime', 'createTrayGraph']
     },
     {
       name: 'adapter-only',
       source:
         "import { defineAdapter } from '@migaia/tray/adapter'\nexport default defineAdapter\n",
-      forbidden: ['defineLoader', 'createRuntime', 'createTray']
+      forbidden: ['defineLoader', 'createRuntime', 'createTrayGraph']
     },
     {
       name: 'runtime-only',
@@ -356,7 +357,7 @@ async function runTreeShakingConsumers(consumerDirectory) {
         'defineLoader',
         'defineAdapter',
         'loadIntoHost',
-        'createTray',
+        'createTrayGraph',
         'createDynamicCapabilityGraph'
       ]
     }

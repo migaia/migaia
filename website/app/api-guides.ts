@@ -23418,7 +23418,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Takes one immutable admission snapshot from an external readiness source, reading state before error exactly once. It is a low-level Host-to-Graph bridge, not a live subscription.',
-      quickStart: `import { snapshotGraphReadiness } from '@migaia/capability'\nimport { createTray } from '@migaia/tray'\n\nconst remoteHealth = { ok: true, error: undefined }\nconst serviceEntry = { key: 'service', kind: 'service', start: () => ({ value: 'ready', release: () => undefined }) }\nconst readiness = snapshotGraphReadiness({\n  state: remoteHealth.ok ? 'ready' : 'blocked',\n  error: remoteHealth.error\n})\n\nconst tray = createTray([{ ...serviceEntry, readiness }])\nconsole.log(tray)`,
+      quickStart: `import { snapshotGraphReadiness } from '@migaia/capability'\nimport { createTrayGraph } from '@migaia/tray'\n\nconst remoteHealth = { ok: true, error: undefined }\nconst serviceEntry = { key: 'service', kind: 'service', start: () => ({ value: 'ready', release: () => undefined }) }\nconst readiness = snapshotGraphReadiness({\n  state: remoteHealth.ok ? 'ready' : 'blocked',\n  error: remoteHealth.error\n})\n\nconst tray = createTrayGraph([{ ...serviceEntry, readiness }])\nconsole.log(tray)`,
       scenarios: [
         'A composition root must admit an external readiness fact before starting its graph.',
         'Getter order and one-time reads matter because the source can be stateful or cross a proxy boundary.',
@@ -23434,7 +23434,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '从外部 readiness source 取得一次不可变准入快照，严格先读 state、再读 error，且各读一次。它是 Host 到 Graph 的低层桥接，不是实时订阅。',
-      quickStart: `import { snapshotGraphReadiness } from '@migaia/capability'\nimport { createTray } from '@migaia/tray'\n\nconst remoteHealth = { ok: true, error: undefined }\nconst serviceEntry = { key: 'service', kind: 'service', start: () => ({ value: 'ready', release: () => undefined }) }\nconst readiness = snapshotGraphReadiness({\n  state: remoteHealth.ok ? 'ready' : 'blocked',\n  error: remoteHealth.error\n})\n\nconst tray = createTray([{ ...serviceEntry, readiness }])\nconsole.log(tray)`,
+      quickStart: `import { snapshotGraphReadiness } from '@migaia/capability'\nimport { createTrayGraph } from '@migaia/tray'\n\nconst remoteHealth = { ok: true, error: undefined }\nconst serviceEntry = { key: 'service', kind: 'service', start: () => ({ value: 'ready', release: () => undefined }) }\nconst readiness = snapshotGraphReadiness({\n  state: remoteHealth.ok ? 'ready' : 'blocked',\n  error: remoteHealth.error\n})\n\nconst tray = createTrayGraph([{ ...serviceEntry, readiness }])\nconsole.log(tray)`,
       scenarios: [
         '组合根启动 Graph 前必须接纳一份外部 readiness 事实。',
         'source 可能有状态或跨 Proxy 边界，因此 getter 顺序和只读一次必须固定。',
@@ -23669,11 +23669,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       options: []
     }
   },
-  'tray:index:createTray': {
+  'tray:index:createTrayGraph': {
     en: {
       purpose:
         'Creates one immutable static composition root. It admits the complete entry graph synchronously, starts entries only after the first ready() call, and releases owned values and auxiliary resources in reverse dependency order.',
-      quickStart: `import { createTray, type ITrayKey } from '@migaia/tray'\n\nconst createClient = (config: { baseUrl: string }) => ({\n  run: async () => fetch(\`\${config.baseUrl}/health\`).then((response) => response.json())\n})\nconst configKey = 'config' as ITrayKey\nconst serviceKey = 'service' as ITrayKey\n\nconst tray = createTray([\n  { key: configKey, kind: 'value', start: () => ({ value: { baseUrl: '/api' }, release: () => undefined }) },\n  {\n    key: serviceKey,\n    kind: 'service',\n    requires: [configKey],\n    start: ({ get }) => ({ value: createClient(get(configKey)), release: () => undefined })\n  }\n])\n\ntry {\n  await tray.ready()\n  const service = tray.get(serviceKey)\n  await service.run()\n} finally {\n  await tray.dispose()\n}`,
+      quickStart: `import { createTrayGraph, type ITrayKey } from '@migaia/tray'\n\nconst createClient = (config: { baseUrl: string }) => ({\n  run: async () => fetch(\`\${config.baseUrl}/health\`).then((response) => response.json())\n})\nconst configKey = 'config' as ITrayKey\nconst serviceKey = 'service' as ITrayKey\n\nconst tray = createTrayGraph([\n  { key: configKey, kind: 'value', start: () => ({ value: { baseUrl: '/api' }, release: () => undefined }) },\n  {\n    key: serviceKey,\n    kind: 'service',\n    requires: [configKey],\n    start: ({ get }) => ({ value: createClient(get(configKey)), release: () => undefined })\n  }\n])\n\ntry {\n  await tray.ready()\n  const service = tray.get(serviceKey)\n  await service.run()\n} finally {\n  await tray.dispose()\n}`,
       scenarios: [
         'The complete set of configuration, services, resources, and derived values is known before startup.',
         'Entries must start after their declared dependencies and release in reverse dependency order.',
@@ -23692,8 +23692,8 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'required',
           optional: false,
           type: 'readonly ITrayEntryDefinition<unknown>[]',
-          whenToUse: 'Declare the entire static composition root before calling createTray().',
-          example: 'createTray([configEntry, serviceEntry])'
+          whenToUse: 'Declare the entire static composition root before calling createTrayGraph().',
+          example: 'createTrayGraph([configEntry, serviceEntry])'
         },
         {
           name: 'entries[].key',
@@ -23751,7 +23751,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '创建一个不可变静态组合根。它同步接纳完整 entry graph，只在首次 ready() 后启动，并按依赖逆序释放主 value 与辅助资源。',
-      quickStart: `import { createTray, type ITrayKey } from '@migaia/tray'\n\nconst createClient = (config: { baseUrl: string }) => ({\n  run: async () => fetch(\`\${config.baseUrl}/health\`).then((response) => response.json())\n})\nconst configKey = 'config' as ITrayKey\nconst serviceKey = 'service' as ITrayKey\n\nconst tray = createTray([\n  { key: configKey, kind: 'value', start: () => ({ value: { baseUrl: '/api' }, release: () => undefined }) },\n  {\n    key: serviceKey,\n    kind: 'service',\n    requires: [configKey],\n    start: ({ get }) => ({ value: createClient(get(configKey)), release: () => undefined })\n  }\n])\n\ntry {\n  await tray.ready()\n  const service = tray.get(serviceKey)\n  await service.run()\n} finally {\n  await tray.dispose()\n}`,
+      quickStart: `import { createTrayGraph, type ITrayKey } from '@migaia/tray'\n\nconst createClient = (config: { baseUrl: string }) => ({\n  run: async () => fetch(\`\${config.baseUrl}/health\`).then((response) => response.json())\n})\nconst configKey = 'config' as ITrayKey\nconst serviceKey = 'service' as ITrayKey\n\nconst tray = createTrayGraph([\n  { key: configKey, kind: 'value', start: () => ({ value: { baseUrl: '/api' }, release: () => undefined }) },\n  {\n    key: serviceKey,\n    kind: 'service',\n    requires: [configKey],\n    start: ({ get }) => ({ value: createClient(get(configKey)), release: () => undefined })\n  }\n])\n\ntry {\n  await tray.ready()\n  const service = tray.get(serviceKey)\n  await service.run()\n} finally {\n  await tray.dispose()\n}`,
       scenarios: [
         '配置、服务、资源与派生值的完整集合在启动前已经确定。',
         'entry 必须在声明依赖后启动，并按依赖逆序释放。',
@@ -23770,8 +23770,8 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: '必填',
           optional: false,
           type: 'readonly ITrayEntryDefinition<unknown>[]',
-          whenToUse: '调用 createTray() 前声明完整静态组合根。',
-          example: 'createTray([configEntry, serviceEntry])'
+          whenToUse: '调用 createTrayGraph() 前声明完整静态组合根。',
+          example: 'createTrayGraph([configEntry, serviceEntry])'
         },
         {
           name: 'entries[].key',
@@ -23833,7 +23833,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         'The application needs exact inferred extensions for a bounded literal plugin tuple and a dynamic facade beyond that budget.'
       ],
       avoidWhen: [
-        'The complete capability set is static before startup; createTray() is smaller and has no mutation layer.',
+        'The complete capability set is static before startup; createTrayGraph() is smaller and has no mutation layer.',
         'Callers intend to mutate the escaped concrete Host directly; that breaks Graph and Host receipt identity and fails closed.',
         'The host requires process isolation or forced termination rather than cooperative cancellation and cleanup.'
       ],
@@ -23925,7 +23925,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         '有限 literal 插件 tuple 需要 exact extension 推导，超出预算后需要 dynamic facade。'
       ],
       avoidWhen: [
-        '完整能力集合在启动前固定；createTray() 更小且没有 mutation 层。',
+        '完整能力集合在启动前固定；createTrayGraph() 更小且没有 mutation 层。',
         '调用方准备直接 mutation escaped concrete Host；这会破坏 Graph 与 Host receipt 身份并 fail closed。',
         '宿主需要进程隔离或强制终止，而不是协作取消与清理。'
       ],
@@ -24430,7 +24430,7 @@ try {
         'Shutdown must either wait for real callback settlement or return a bounded physical-completion observation.'
       ],
       avoidWhen: [
-        'The composition is immutable and callers only need createTray(), ready(), and get().',
+        'The composition is immutable and callers only need createTrayGraph(), ready(), and get().',
         'Work can ignore cancellation forever; same-realm JavaScript cannot be forcibly terminated by Runtime.',
         'The caller intends Runtime disposal to dispose the managed Host; those ownership boundaries are separate.'
       ],
@@ -24524,7 +24524,7 @@ try {
         '关闭时需要等待任务真实结束，或在有界等待后继续观察物理清理结果。'
       ],
       avoidWhen: [
-        '组合在启动前已经固定，调用方只需要 createTray()、ready() 与 get()。',
+        '组合在启动前已经固定，调用方只需要 createTrayGraph()、ready() 与 get()。',
         '任务会永久忽略取消；Runtime 无法强制终止同一 JavaScript realm 内不合作的代码。',
         '调用方希望释放 Runtime 时顺便释放 Host；二者的所有权边界彼此独立。'
       ],
@@ -25228,6 +25228,60 @@ try {
           type: 'ILoggerRuntimeManager["fetch"]',
           whenToUse: '没有合适全局 fetch 的宿主在安装 HTTP 插件前提供。',
           example: 'setLoggerRuntimeManager({ ...manager, fetch: (url, init) => fetch(url, init) })'
+        }
+      ]
+    }
+  },
+  /** The public dependency reader projects the same Feature graph used by admission and install. */
+  'plugin-host:index:readPluginDependencies': {
+    en: {
+      purpose:
+        'Reads a readonly provider dependency list from a plugin or its composition admission, including nested local Feature dependencies. Providers keep first-reference order and required references win over optional references. An admission reuses its captured definition without calling getters; other inputs use one canonical admission snapshot. Reading runs no setup, install, or Feature factory, and admission errors pass through unchanged.',
+      quickStart: `import { defineFeature, definePlugin, PluginHost, readPluginDependencies } from '@migaia/plugin-host'\nimport { openComposition } from '@migaia/plugin-host/composition'\n\nconst config = definePlugin({\n  name: 'config',\n  features: { value: defineFeature(() => ({ value: 'ready' })) },\n  install: () => ({})\n})\nconst metrics = definePlugin({\n  name: 'metrics',\n  features: { value: defineFeature(() => ({ value: 0 })) },\n  install: () => ({})\n})\nconst required = defineFeature(() => ({}), { config: config.getFeature('value') })\nconst optional = defineFeature(() => ({}), {\n  config: config.getFeature('value', { optional: true }),\n  metrics: metrics.getFeature('value', { optional: true })\n})\nconst descriptor = { name: 'consumer', features: { required, optional }, install: () => ({}) }\nconst consumer = definePlugin(descriptor)\nconsole.log(readPluginDependencies(consumer))\nconsole.log(readPluginDependencies(descriptor))\n// Both return [{ provider: 'config', required: true }, { provider: 'metrics', required: false }].\n\nconst host = new PluginHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n})\ntry {\n  const admission = openComposition(host).createPluginAdmission(descriptor)\n  console.log(readPluginDependencies(admission))\n} finally {\n  await host.dispose()\n}`,
+      scenarios: [
+        'Inspect required and optional providers before installing a plugin, using the same Feature closure as PluginHost.',
+        'A composition layer already captured an admission and must read its dependencies without reading a stateful descriptor getter again.'
+      ],
+      avoidWhen: [
+        'You need current provider availability or plugin readiness; this list describes declared dependencies, not live Host state.',
+        'You need to run a Feature or install a plugin; use the Host lifecycle and Feature operations for those actions.'
+      ],
+      options: [
+        {
+          name: 'plugin',
+          description:
+            'A definePlugin result, a valid raw plugin descriptor, or an admission returned by openComposition(host).createPluginAdmission(plugin). Invalid input throws the canonical admission error with its native type, identity, stack, source, and code unchanged.',
+          defaultValue: 'required',
+          optional: false,
+          type: 'unknown',
+          whenToUse:
+            'Pass the admission when dependency projection and installation must share one snapshot; otherwise pass the plugin input directly.',
+          example: 'readPluginDependencies(admission)'
+        }
+      ]
+    },
+    zh: {
+      purpose:
+        '从插件或其 composition admission 读取只读 provider 依赖列表，包含本地 Feature 的完整依赖闭包。结果按首次引用排序，同一 provider 的必需引用优先于可选引用。admission 形式复用已捕获的定义，不调用 getter；其他输入使用一次规范 admission 快照。读取不会执行 setup、install 或 Feature 工厂，admission 错误原样传出。',
+      quickStart: `import { defineFeature, definePlugin, PluginHost, readPluginDependencies } from '@migaia/plugin-host'\nimport { openComposition } from '@migaia/plugin-host/composition'\n\nconst config = definePlugin({\n  name: 'config',\n  features: { value: defineFeature(() => ({ value: 'ready' })) },\n  install: () => ({})\n})\nconst metrics = definePlugin({\n  name: 'metrics',\n  features: { value: defineFeature(() => ({ value: 0 })) },\n  install: () => ({})\n})\nconst required = defineFeature(() => ({}), { config: config.getFeature('value') })\nconst optional = defineFeature(() => ({}), {\n  config: config.getFeature('value', { optional: true }),\n  metrics: metrics.getFeature('value', { optional: true })\n})\nconst descriptor = { name: 'consumer', features: { required, optional }, install: () => ({}) }\nconst consumer = definePlugin(descriptor)\nconsole.log(readPluginDependencies(consumer))\nconsole.log(readPluginDependencies(descriptor))\n// 两种输入都返回 [{ provider: 'config', required: true }, { provider: 'metrics', required: false }]。\n\nconst host = new PluginHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n})\ntry {\n  const admission = openComposition(host).createPluginAdmission(descriptor)\n  console.log(readPluginDependencies(admission))\n} finally {\n  await host.dispose()\n}`,
+      scenarios: [
+        '安装插件前，使用 PluginHost 相同的 Feature 闭包检查必需与可选 provider。',
+        '组合层已捕获 admission，需要读取其依赖，又不能再次触发原始描述符的有状态 getter。'
+      ],
+      avoidWhen: [
+        '需要查询 provider 当前可用性或插件就绪状态；列表描述声明的依赖，不代表 Host 的实时状态。',
+        '需要执行 Feature 或安装插件；这些操作应使用 Host 生命周期与 Feature 入口。'
+      ],
+      options: [
+        {
+          name: 'plugin',
+          description:
+            'definePlugin 结果、有效原始插件描述符，或 openComposition(host).createPluginAdmission(plugin) 返回的 admission。无效输入直接抛规范 admission 错误，保留原生类型、对象身份、stack、source 和 code。',
+          defaultValue: '必填',
+          optional: false,
+          type: 'unknown',
+          whenToUse: '依赖投影与安装必须共享同一快照时传 admission；否则直接传插件输入。',
+          example: 'readPluginDependencies(admission)'
         }
       ]
     }

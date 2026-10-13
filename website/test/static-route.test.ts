@@ -555,7 +555,10 @@ test('SITE-T-PLUGIN-HOST-ERROR renders identity, cause, and detail as separate c
 })
 
 test('SITE-T-TRAY-ENTRYPOINTS render distinct static and dynamic ownership paths', () => {
-  const staticHtml = readFileSync(join(buildRoot, 'zh/docs/tray/createTray/index.html'), 'utf8')
+  const staticHtml = readFileSync(
+    join(buildRoot, 'zh/docs/tray/createTrayGraph/index.html'),
+    'utf8'
+  )
   const hostHtml = readFileSync(join(buildRoot, 'zh/docs/tray/host/createHost/index.html'), 'utf8')
   assert.match(staticHtml, /不可变静态组合根/)
   assert.match(staticHtml, /await tray\.ready\(\)/)
