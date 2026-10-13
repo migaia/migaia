@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os'
 import { basename, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 import { build } from 'vite'
 import { describe, it } from 'vitest'
 
@@ -12,7 +13,14 @@ const packageDirectory = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const repositoryDirectory = resolve(packageDirectory, '../..')
 /** Fresh disposable directory for every packed-consumer probe. */
 const smokeDirectory = mkdtempSync(join(tmpdir(), 'migaia-tray-packed-'))
+/** Read the owning installed environment packages only to produce isolated local tarballs. */
+const toolchainRequire = createRequire(import.meta.url)
+/** Node declarations come from this worktree's frozen install, never a consumer typeRoots escape. */
+const nodeTypesManifest = toolchainRequire.resolve('@types/node/package.json')
+/** Node's only declaration dependency is packed through the same explicit local closure. */
+const undiciTypesManifest = createRequire(nodeTypesManifest).resolve('undici-types/package.json')
 
+/** Explicit tarball closure includes the declared managed host runtime dependencies. */
 const packageSources = [
   ['tray', packageDirectory],
   ['capability', resolve(packageDirectory, '../capability')],
@@ -20,7 +28,15 @@ const packageSources = [
   ['event-subscriber', resolve(packageDirectory, '../event-subscriber')],
   ['lifecycle', resolve(packageDirectory, '../lifecycle')],
   ['middleware-pipeline', resolve(packageDirectory, '../middleware-pipeline')],
-  ['utils', resolve(packageDirectory, '../utils')]
+  ['utils', resolve(packageDirectory, '../utils')],
+  ['serialize', resolve(packageDirectory, '../serialize')],
+  ['supervision', resolve(packageDirectory, '../supervision')],
+  ['rpc-contract', resolve(packageDirectory, '../rpc-contract')],
+  ['rpc-core', resolve(packageDirectory, '../rpc-core')],
+  ['rpc-process', resolve(packageDirectory, '../rpc-process')],
+  ['rpc-threads', resolve(packageDirectory, '../rpc-threads')],
+  ['node-types', resolve(nodeTypesManifest, '..')],
+  ['undici-types', resolve(undiciTypesManifest, '..')]
 ]
 
 describe('TPD-T60 packed consumer boundary', () => {
@@ -88,7 +104,8 @@ function installTarballs() {
         target: 'ES2022',
         module: 'NodeNext',
         moduleResolution: 'NodeNext',
-        lib: ['ES2022', 'ESNext.Disposable'],
+        lib: ['ES2022', 'DOM', 'ESNext.Disposable'],
+        types: ['node'],
         skipLibCheck: false,
         noEmit: true
       }
@@ -103,7 +120,8 @@ function installTarballs() {
         target: 'ES2024',
         module: 'NodeNext',
         moduleResolution: 'NodeNext',
-        lib: ['ES2024'],
+        lib: ['ES2024', 'DOM'],
+        types: ['node'],
         skipLibCheck: false,
         noEmit: true
       },
@@ -303,7 +321,10 @@ void createRuntime
 `
 }
 
-/** Emits a root-only ES2024 probe with no explicit-resource-management lib dependency. */
+/**
+ * Emits a root-only ES2024 probe with the Node/DOM ambient environment required by host
+ * declarations.
+ */
 function staticTypeSource() {
   return `import { createTrayGraph, type ITrayGraph, type ITrayKey } from '@migaia/tray'
 const tray: ITrayGraph = createTrayGraph([])

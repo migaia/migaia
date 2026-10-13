@@ -37,7 +37,7 @@ describe('TLAR-T19 closed-world architecture boundary', () => {
     expect(capability).not.toMatch(/@migaia\/(?:tray|plugin-host)/)
     expect(pluginHost).not.toMatch(/@migaia\/tray/)
     expect(tray).not.toMatch(
-      /(?:node:|window\.|document\.|\bWorker\b|fetch\(|@migaia\/(?:store|reactive))/
+      /(?:node:|window\.|document\.|\bnew\s+Worker\b|fetch\(|@migaia\/(?:store|reactive))/
     )
     expect(runtime).not.toMatch(/(?:setTimeout\s*\(|setInterval\s*\(|runPipeline\s*\()/)
     expect(runtime).not.toMatch(/\b(?:rawHost|concreteHost|hostEscape)\b/)
