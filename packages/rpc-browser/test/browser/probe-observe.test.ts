@@ -409,8 +409,8 @@ describe('carriers A1: browser observe', () => {
     expect(reads).toBe(0)
   })
 
-  it('window: nested transferred bytes remain capturable while unrelated data keeps its reference', async () => {
-    /** This native-supported payload exposes the canonical selective-copy integration gap. */
+  it('window: nested transferred members retain the original container reference and may detach', async () => {
+    /** This native-supported payload follows the closure ruling against deep transfer scans. */
     const native = fixture('window', true)
     native.transport.subscribe(() => undefined)
     /** Retaining content reveals native detachment after the synchronous probe returns. */
@@ -420,15 +420,22 @@ describe('carriers A1: browser observe', () => {
     const untouched = { value: 'reference-only' }
     /** The byte descendant is supported by native postMessage's structured-clone boundary. */
     const bytes = new Uint8Array([4, 5, 6])
-    await native.transport.send({ bytes, untouched }, { transfer: [bytes.buffer] })
+    /** The original container is retained without a selective clone. */
+    const payload = { bytes, untouched }
+    await native.transport.send(payload, { transfer: [bytes.buffer] })
     expect(bytes.byteLength).toBe(0)
-    /** Required captured bytes must survive detachment without cloning unrelated descendants. */
+    /**
+     * Only directly captured transferables are preserved; nested members remain borrowed
+     * references.
+     */
     const content = events.find((event) => event.direction === 0)!.content as {
       bytes: Uint8Array
       untouched: typeof untouched
     }
     expect(content.untouched).toBe(untouched)
-    expect(Array.from(content.bytes)).toEqual([4, 5, 6])
+    expect(content).toBe(payload)
+    expect(content.bytes).toBe(bytes)
+    expect(content.bytes.byteLength).toBe(0)
     await native.close()
   })
 
