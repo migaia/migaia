@@ -349,3 +349,49 @@ managed Host mutation。callback 内等待 `ticket.completion` 会 fail fast 并
 Loader/Adapter/Runtime 契约错误分别使用 `LOADER_*`、`ADAPTER_*`、`RUNTIME_*` 码；原始 native
 error 保留 identity、type、stack 与 cause。artifact secondary cleanup 使用
 `ARTIFACT_CLEANUP_FAILED` 作为观察码，不能替换更早 mutation primary。
+
+
+## Routing
+
+Both namespace forms select a ready instance for every operation:
+`tray.routing.roundRobin(host)` and `tray.routing('roundRobin', host)` use one
+shared cursor. `leastInFlight` picks the fewest pending request, notify and stream
+operations; spawn order breaks ties. A routed remote has `host` and no fixed `id`.
+Call `request|notify|stream(path, payload, options?)`; signal and timeoutMs occupy
+only the third slot, with `undefined` payload for a zero-argument method.
+Cancellation and the remaining deadline reach the selected target.
+
+Define custom policies with `defineRoutingPolicy('first', candidates =>
+candidates[0]!.id)`. The parent registers the union of `createTray({ routing })`
+and every host DSL's `routing` tuple. Child plugins declare the policies they use
+in that host tuple and call `deps.tray.routing.first(host)` or
+`deps.tray.routing('first', host)`. Built-ins require no declaration. Only the
+name crosses RPC; the synchronous picker runs on the parent and must be short.
+
+Unregistered or undeclared names fail with `TRAY_ROUTING_UNKNOWN`. Invalid names,
+duplicate names from different policy identities, non-candidate results and thrown
+pickers fail with `TRAY_ROUTING_INVALID`; a thrown picker stays on `cause`.
+An empty ready set fails with `TRAY_HOST_UNAVAILABLE`. Calls never move to another
+instance or retry. `inFlight` on `list()` and `get()` counts pending business sends
+for one admission; init and topic delivery are excluded.
+
+## Publish/subscribe
+
+Parent `tray.subscribe(topic, listener)` returns a synchronous unsubscribe receipt.
+Child `await deps.tray.subscribe(topic, listener)` returns an asynchronous,
+idempotent receipt; the first local listener registers one parent membership and
+the last release removes it. Reinstalling plugins after restart re-subscribes in
+the new generation. Old sender operations cannot affect that membership.
+
+The listener receives `(payload, meta)`. Frozen `meta.from` is authenticated by
+the parent and equals `{ id, host, generation }` for an instance publisher or
+`{ parent: true }` for `tray.publish`. Metadata is separate from payload, so
+payload fields cannot forge the sender. A topic named `spawned` remains a business
+topic and does not trigger lifecycle listeners.
+
+Delivery is at most once to each current subscription. A non-ready subscriber
+misses a publication. There is no persistence, replay or delivery acknowledgement.
+Topics are non-empty strings and payloads must be portable. Synchronous listener
+throws and async rejections are reported on their side; later listeners still run.
+A rejected delivery send is reported on the parent, and a failed delivery handler
+is reported on the child. Neither failure rejects the publisher.

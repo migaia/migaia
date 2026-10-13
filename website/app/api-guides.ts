@@ -24123,10 +24123,68 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       ]
     }
   },
+  'tray:index:leastInFlight': {
+    en: {
+      purpose:
+        'Routes each operation to the ready instance with the fewest pending business sends. Spawn order breaks ties; init and topic delivery never contribute to inFlight.',
+      quickStart:
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, leastInFlight } from '@migaia/tray'\n\nconst node = definePlugin({\n  name: 'node',\n  features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n  install: () => ({})\n})\nconst agent = defineTrayHost({\n  name: 'agent', plugins: () => [node] as const, exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\nawait tray.spawn('agent', { id: 'agent-1' })\nconsole.log(leastInFlight.name, await tray.routing.leastInFlight(agent).request('node.svc.hello'))\nconsole.log(await tray.routing('leastInFlight', agent).request('node.svc.hello'))\nawait tray.dispose()",
+      scenarios: [
+        'Distribute requests among ready instances of one host.',
+        'Use the same built-in policy from parent code or deps.tray without declaration.'
+      ],
+      avoidWhen: [
+        'The application requires failover or automatic retries.',
+        'The application requires durable or replayed topic delivery.'
+      ],
+      options: []
+    },
+    zh: {
+      purpose:
+        '选择待完成业务调用最少的 ready 实例，同数量时按生成顺序选择。init 和 topic delivery 不计入 inFlight。',
+      quickStart:
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, leastInFlight } from '@migaia/tray'\n\nconst node = definePlugin({\n  name: 'node',\n  features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n  install: () => ({})\n})\nconst agent = defineTrayHost({\n  name: 'agent', plugins: () => [node] as const, exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\nawait tray.spawn('agent', { id: 'agent-1' })\nconsole.log(leastInFlight.name, await tray.routing.leastInFlight(agent).request('node.svc.hello'))\nconsole.log(await tray.routing('leastInFlight', agent).request('node.svc.hello'))\nawait tray.dispose()",
+      scenarios: [
+        '在同一 host 的多个 ready 实例之间分配业务调用。',
+        '父侧和 deps.tray 使用同一内置策略，无需在 DSL 声明。'
+      ],
+      avoidWhen: ['需要自动故障转移或重试。', '需要持久化或重放 topic 消息。'],
+      options: []
+    }
+  },
+  'tray:index:roundRobin': {
+    en: {
+      purpose:
+        'Routes each operation cyclically through ready instances in spawn order. Both callable namespace forms share one host/policy sequence; no call is retried.',
+      quickStart:
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, roundRobin } from '@migaia/tray'\n\nconst node = definePlugin({\n  name: 'node',\n  features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n  install: () => ({})\n})\nconst agent = defineTrayHost({\n  name: 'agent', plugins: () => [node] as const, exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\nawait tray.spawn('agent', { id: 'agent-1' })\nconsole.log(roundRobin.name, await tray.routing.roundRobin(agent).request('node.svc.hello'))\nconsole.log(await tray.routing('roundRobin', agent).request('node.svc.hello'))\nawait tray.dispose()",
+      scenarios: [
+        'Distribute requests among ready instances of one host.',
+        'Use the same built-in policy from parent code or deps.tray without declaration.'
+      ],
+      avoidWhen: [
+        'The application requires failover or automatic retries.',
+        'The application requires durable or replayed topic delivery.'
+      ],
+      options: []
+    },
+    zh: {
+      purpose:
+        '按生成顺序循环选择 ready 实例。成员形式和 callable 形式共享同一 host/policy 顺序，每次业务操作选一次，不重试。',
+      quickStart:
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, roundRobin } from '@migaia/tray'\n\nconst node = definePlugin({\n  name: 'node',\n  features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n  install: () => ({})\n})\nconst agent = defineTrayHost({\n  name: 'agent', plugins: () => [node] as const, exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\nawait tray.spawn('agent', { id: 'agent-1' })\nconsole.log(roundRobin.name, await tray.routing.roundRobin(agent).request('node.svc.hello'))\nconsole.log(await tray.routing('roundRobin', agent).request('node.svc.hello'))\nawait tray.dispose()",
+      scenarios: [
+        '在同一 host 的多个 ready 实例之间分配业务调用。',
+        '父侧和 deps.tray 使用同一内置策略，无需在 DSL 声明。'
+      ],
+      avoidWhen: ['需要自动故障转移或重试。', '需要持久化或重放 topic 消息。'],
+      options: []
+    }
+  },
   'tray:index:defineRoutingPolicy': {
     en: {
       purpose:
-        'Defines a frozen, branded ITrayRoutingPolicy<TName> identity with a private synchronous picker. Host routing tuples consume this pure contract; mesh owns execution and namespaces.',
+        'Defines a frozen, branded ITrayRoutingPolicy<TName> identity with a private synchronous picker. Register it in createTray routing or a host DSL routing tuple; both namespace call forms execute the picker only on the parent.',
       quickStart:
         "import { defineRoutingPolicy, defineTrayHost } from '@migaia/tray'\n\nconst first = defineRoutingPolicy('first', (candidates) => candidates[0]!.id)\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [] as const,\n  exposes: [],\n  routing: [first]\n})\nconsole.log(first.name, agent.routing?.[0]?.name)",
       scenarios: [
@@ -24134,7 +24192,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         'Retain a literal policy name in a host routing tuple while keeping its picker private.'
       ],
       avoidWhen: [
-        'The application needs routing execution or pub/sub before the mesh layer is available.',
+        'The application needs automatic failover or retries; routing keeps one selected instance.',
         'A policy needs an asynchronous picker; pick must return an instance id synchronously.'
       ],
       options: [
@@ -24152,19 +24210,19 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         {
           name: 'pick',
           description:
-            'Synchronous callback returns a candidate instance id. Context contains host and sequence. Definition does not invoke it; parent-side execution belongs to mesh.',
+            'Synchronous callback returns a candidate instance id. Context contains host and sequence. Definition does not invoke it; the parent invokes it once per routed operation.',
           defaultValue: 'required',
           optional: false,
           type: '(candidates: readonly ITrayInstance[], context: ITrayRoutingContext) => string',
           whenToUse:
-            'Synchronous callback returns a candidate instance id. Context contains host and sequence. Definition does not invoke it; parent-side execution belongs to mesh.',
+            'Synchronous callback returns a candidate instance id. Context contains host and sequence. Definition does not invoke it; the parent invokes it once per routed operation.',
           example: '(candidates, context) => candidates[context.sequence % candidates.length]!.id'
         }
       ]
     },
     zh: {
       purpose:
-        '定义冻结且带身份标记的 ITrayRoutingPolicy<TName>，内部保存同步选择回调。host 的 routing 元组使用此纯契约；执行与命名空间由 mesh 负责。',
+        '定义冻结且带身份标记的 ITrayRoutingPolicy<TName>，内部保存同步选择回调。host 的 routing 元组使用此纯契约；在 createTray 的 routing 或 host DSL 元组注册后，两种命名空间形式都只在父侧执行回调。',
       quickStart:
         "import { defineRoutingPolicy, defineTrayHost } from '@migaia/tray'\n\nconst first = defineRoutingPolicy('first', (candidates) => candidates[0]!.id)\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [] as const,\n  exposes: [],\n  routing: [first]\n})\nconsole.log(first.name, agent.routing?.[0]?.name)",
       scenarios: [
@@ -24172,7 +24230,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         '在 host 的 routing 元组中保留字面量 policy 名称，同时隐藏其选择回调。'
       ],
       avoidWhen: [
-        'mesh 层尚未提供时，应用需要立即执行路由或发布订阅。',
+        '应用需要自动故障转移或重试；路由始终保留本次选择。',
         'policy 需要异步选择回调；pick 必须同步返回实例 id。'
       ],
       options: [
@@ -24190,12 +24248,12 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         {
           name: 'pick',
           description:
-            '同步返回候选实例 id；context 包含 host 与 sequence。定义阶段不调用回调，父侧执行由 mesh 实现。',
+            '同步返回候选实例 id；context 包含 host 与 sequence。定义阶段不调用回调，每次路由业务操作由父侧调用一次。',
           defaultValue: '必填',
           optional: false,
           type: '(candidates: readonly ITrayInstance[], context: ITrayRoutingContext) => string',
           whenToUse:
-            '同步返回候选实例 id；context 包含 host 与 sequence。定义阶段不调用回调，父侧执行由 mesh 实现。',
+            '同步返回候选实例 id；context 包含 host 与 sequence。定义阶段不调用回调，每次路由业务操作由父侧调用一次。',
           example: '(candidates, context) => candidates[context.sequence % candidates.length]!.id'
         }
       ]

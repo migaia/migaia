@@ -1,9 +1,26 @@
 import { appendFileSync, writeFileSync } from 'node:fs'
 import { resourceLimits, threadId } from 'node:worker_threads'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
-import { defineTrayHost } from '@migaia/tray'
+import { defineTrayHost, defineRoutingPolicy } from '@migaia/tray'
 import { defineProbe } from '@migaia/rpc-core/probe'
 import { FixtureText, fixtureError } from './fixture-text.mjs'
+
+/** Pick counts stay realm-local; native child never invokes its declared callback. */
+let routingPicks = 0
+/** Shared declaration is automatically registered by its host DSL. */
+export const toB = defineRoutingPolicy('toB', () => {
+  routingPicks += 1
+  return 'b'
+})
+
+/**
+ * Reads this realm's actual picker invocations without introducing a production diagnostic.
+ *
+ * @returns {number} Picks executed by this realm's shared fixture policy.
+ */
+export function routingPickCount() {
+  return routingPicks
+}
 
 /** Every runtime exposes the same Feature; the hidden Feature proves dispatch admission. */
 export const fixtureExposes = Object.freeze(['node.svc'])
@@ -79,6 +96,12 @@ export function nodePlugins(info, trayPlugin) {
   let captured
   /** Feature creation proves init executes once for each generation. */
   let initCount = 0
+  /** Business topic observations belong to this native generation's real child hub. */
+  const topicMessages = []
+  /** Each fixture subscription retains its actual asynchronous off receipt. */
+  const topicOffs = new Map()
+  /** Init cannot finish until its configured business subscription is accepted by the parent. */
+  let topicInit
   /** First plugin registers cleanup before a requested second admission fails. */
   const plugin = definePlugin({
     name: 'node',
@@ -86,7 +109,47 @@ export function nodePlugins(info, trayPlugin) {
       svc: defineFeature(
         (_core, deps) => {
           initCount += 1
+          /**
+           * Registers a real Tray listener and stores the parent's authenticated metadata.
+           *
+           * @param {any} input Topic, receipt key and optional user failure mode.
+           * @returns {Promise<void>} Resolves after relay membership admission.
+           */
+          const subscribeTopic = async (input) => {
+            /** The key identifies this local listener, never the remote generation membership. */
+            const key = input.key ?? input.topic
+            /** User callback failures pass through the same Tray wrapper as application listeners. */
+            const off = await deps.tray.subscribe(input.topic, (payload, meta) => {
+              topicMessages.push({ payload, meta, frozen: Object.isFrozen(meta) })
+              if (input.throwSync)
+                throw fixtureError(FixtureText.businessCode, FixtureText.businessMessage)
+              if (input.rejectAsync)
+                return Promise.reject(fixtureError(FixtureText.causeCode, FixtureText.causeMessage))
+            })
+            topicOffs.set(key, off)
+          }
+          if (info.config?.topic) topicInit = subscribeTopic({ topic: info.config.topic })
           return {
+            /**
+             * @param {any} input Business topic and portable payload. @returns {Promise<void>}
+             *   Parent publish result.
+             */
+            topicPublish: (input) => deps.tray.publish(input.topic, input.payload),
+            /**
+             * @param {any} input Topic and local receipt identity. @returns {Promise<void>}
+             *   Subscription result.
+             */
+            topicSubscribe: subscribeTopic,
+            /**
+             * @param {string} key Local receipt identity. @returns {Promise<void>} Idempotent local
+             *   off result.
+             */
+            topicOff: async (key) => {
+              await topicOffs.get(key)?.()
+              topicOffs.delete(key)
+            },
+            /** @returns {readonly object[]} Current generation's genuine business deliveries. */
+            topicMessages: () => [...topicMessages],
             /** @returns {object} Current generation, validated config and real native identity. */
             hello: () => ({
               ...info,
@@ -222,6 +285,37 @@ export function nodePlugins(info, trayPlugin) {
             },
             /** @returns {Promise<unknown>} Calls the original captured receipt without rebinding. */
             captured: () => captured.request('node.svc.hello'),
+            /** @returns {object} Child namespace shape and local pick count. */
+            routingInfo: () => ({
+              picks: routingPicks,
+              balanced: 'balanced' in deps.tray,
+              names: Object.keys(deps.tray.routing)
+            }),
+            /**
+             * @param {any} input Portable route. @param {any} context Provider deadline. @returns
+             *   {Promise<unknown>} Routed target response.
+             */
+            route: (input, context) => {
+              const remote = input.member
+                ? deps.tray.routing[input.policy](hostByName(input.host))
+                : deps.tray.routing(input.policy, hostByName(input.host))
+              return remote.request(input.path ?? 'node.svc.hello', input.payload, {
+                signal: context.signal,
+                timeoutMs: context.timeoutMs
+              })
+            },
+            /** @param {any} input Portable route. @returns {Promise<void>} One-way target send. */
+            routeNotify: (input) =>
+              deps.tray.routing(input.policy, hostByName(input.host)).notify('node.svc.noted'),
+            /**
+             * @param {any} input Portable route. @param {any} context Provider deadline. @returns
+             *   {AsyncIterableIterator<number>} Routed target stream.
+             */
+            routeStream: (input, context) =>
+              deps.tray.routing(input.policy, hostByName(input.host)).stream('node.svc.count', 3, {
+                signal: context.signal,
+                timeoutMs: context.timeoutMs
+              }),
             /** @returns {void} Ends this generation as a crash using Tray's public child Feature. */
             exitCrash: () => {
               deps.tray.exit(fixtureError(FixtureText.crashCode, FixtureText.crashMessage))
@@ -255,6 +349,7 @@ export function nodePlugins(info, trayPlugin) {
      *   init delay is configured.
      */
     install: async (core) => {
+      await topicInit
       core.onDispose(() => {
         if (info.config?.cleanupMarker)
           appendFileSync(info.config.cleanupMarker, `cleanup:${info.id}:${info.generation}\n`)
@@ -306,6 +401,7 @@ export const nodeCo = defineTrayHost({ ...base, name: 'node-co' })
 /** Genuine Node Worker loads only the child serve entry. */
 export const nodeTh = defineTrayHost({
   ...base,
+  routing: [toB],
   name: 'node-th',
   runtime: 'thread',
   entry: new URL('./thread-entry.mjs', import.meta.url)
