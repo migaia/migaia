@@ -6,11 +6,11 @@ README 负责快速上手；本文给出公开契约、失败语义与生产边�
 
 ```ts
 import {
-  createTray,
+  createTrayGraph,
   TRAY_SOURCE,
   TrayErrorCode,
   type IGraphReadinessSnapshot,
-  type ITray,
+  type ITrayGraph,
   type ITrayEntryContext,
   type ITrayEntryDefinition,
   type ITrayEntryInstance,
@@ -49,7 +49,7 @@ type ITrayEntryDefinition<T> = {
 
 - `key`：必填、trim 后非空、全 Tray 唯一。
 - `kind`：必填；用于 Graph 诊断和拓扑语义，不改变 `value` 的 TypeScript 类型。
-- `requires`：可选；每个 key 必须存在于同一次 `createTray()` 的 entry 数组，不能引用自身。
+- `requires`：可选；每个 key 必须存在于同一次 `createTrayGraph()` 的 entry 数组，不能引用自身。
 - `readiness`：可选的外部门状态快照，只接受 `ready | blocked | failed`。它在首次 `ready()` 时读取一次并缓存结果。
 - `start`：必填；Graph 在依赖就绪后调用。返回值必须包含 `value` 与可调用的 `release`。
 
@@ -59,10 +59,10 @@ type ITrayEntryDefinition<T> = {
 - `get(key)`：读取已就绪的声明依赖；不要读取未列入 `requires` 的隐式依赖。
 - `own(resource, descriptor)`：把辅助资源交给当前 Graph 节点，节点释放时统一清理。
 
-## 3. `createTray()` 与 admission
+## 3. `createTrayGraph()` 与 admission
 
 ```ts
-function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray
+function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph
 ```
 
 构造阶段只做同步 admission，不启动 entry。数组、entry 字段、kind、key、requires 与 readiness 外形不合法时立即抛 `TRAY_INVALID_ENTRY`；重复 key 抛 `TRAY_DUPLICATE_ENTRY`。任何 admission 失败都发生在第一个 `start()` 之前，不会留下半启动组合根。
@@ -80,10 +80,10 @@ function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray
 
 同一 Tray 的重复 `ready()` 返回同一个稳定 Promise，不会重读 gate 或重复启动。gate 失败时 `state === 'failed'`，`error` 暴露缓存的原始原因。
 
-## 5. `ITray` API
+## 5. `ITrayGraph` API
 
 ```ts
-type ITray = {
+type ITrayGraph = {
   readonly keys: readonly ITrayKey[]
   readonly state: ITrayState
   readonly error: unknown | undefined

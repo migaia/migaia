@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CapabilityGraphErrorCode } from '@migaia/capability/graph'
+import * as trayRoot from '@migaia/tray'
 import {
-  createTray,
+  createTrayGraph,
   TrayErrorCode,
   type ITrayEntryDefinition,
   type ITrayKey
@@ -17,6 +18,11 @@ const deferred = <T>() => {
   return { promise, resolve }
 }
 describe('tray', () => {
+  it('A5 exports createTrayGraph without the retired static root name', () => {
+    expect(trayRoot).not.toHaveProperty('createTray')
+    expect(trayRoot).toHaveProperty('createTrayGraph', expect.any(Function))
+  })
+
   it('admits static entries and releases value before callback', async () => {
     const events: string[] = []
     const entry: ITrayEntryDefinition<unknown> = {
@@ -29,7 +35,7 @@ describe('tray', () => {
         }
       })
     }
-    const tray = createTray([entry])
+    const tray = createTrayGraph([entry])
     await tray.ready()
     expect(tray.get(key('value'))).toBe(1)
     await tray.dispose()
@@ -43,7 +49,7 @@ describe('tray', () => {
       kind: 'value',
       start: () => ({ value: 1, release: () => undefined })
     }
-    expect(() => createTray([entry, entry])).toThrow()
+    expect(() => createTrayGraph([entry, entry])).toThrow()
   })
 
   it.each([
@@ -69,7 +75,7 @@ describe('tray', () => {
       }
     ]
   ])('rejects %s at admission with the Tray invalid-entry code', (_label, entry) => {
-    expect(() => createTray([entry as never])).toThrow(
+    expect(() => createTrayGraph([entry as never])).toThrow(
       expect.objectContaining({ code: TrayErrorCode.invalidEntry })
     )
   })
@@ -77,7 +83,7 @@ describe('tray', () => {
   it('rejects an unknown dependency before any start callback', () => {
     const start = vi.fn(() => ({ value: 1, release: () => undefined }))
     expect(() =>
-      createTray([{ key: key('consumer'), kind: 'value', requires: [key('missing')], start }])
+      createTrayGraph([{ key: key('consumer'), kind: 'value', requires: [key('missing')], start }])
     ).toThrow(expect.objectContaining({ code: TrayErrorCode.invalidEntry }))
     expect(start).not.toHaveBeenCalled()
   })
@@ -90,7 +96,7 @@ describe('tray', () => {
       }
     })
     expect(() =>
-      createTray([
+      createTrayGraph([
         {
           key: key('hostile-requires'),
           kind: 'value',
@@ -102,14 +108,14 @@ describe('tray', () => {
   })
 
   it('rejects invalid start results through the Graph error boundary', async () => {
-    const tray = createTray([
+    const tray = createTrayGraph([
       { key: key('invalid-result'), kind: 'value', start: () => ({ value: 1 }) as never }
     ])
     await expect(tray.ready()).rejects.toMatchObject({ code: 'GRAPH_INVALID_NODE' })
   })
 
   it('keeps get unavailable before readiness', () => {
-    const tray = createTray([
+    const tray = createTrayGraph([
       { key: key('pending'), kind: 'value', start: () => ({ value: 1, release: () => undefined }) }
     ])
     expect(() => tray.get(key('pending'))).toThrow(
@@ -119,7 +125,7 @@ describe('tray', () => {
 
   it('fails closed for an invalid readiness state without starting Graph', async () => {
     const start = vi.fn(() => ({ value: 1, release: () => undefined }))
-    const tray = createTray([
+    const tray = createTrayGraph([
       {
         key: key('invalid-readiness'),
         kind: 'value',
@@ -133,7 +139,7 @@ describe('tray', () => {
 
   it('does not read error after invalid readiness state', async () => {
     let errorReads = 0
-    const tray = createTray([
+    const tray = createTrayGraph([
       {
         key: key('invalid-order'),
         kind: 'value',
@@ -153,7 +159,7 @@ describe('tray', () => {
 
   it('projects gate failure locally without starting Graph', async () => {
     const error = new Error('blocked')
-    const tray = createTray([
+    const tray = createTrayGraph([
       {
         key: key('blocked'),
         kind: 'value',
@@ -170,7 +176,7 @@ describe('tray', () => {
     'treats a falsey readiness error %s as a real gate failure',
     async (error) => {
       const start = vi.fn(() => ({ value: 1, release: () => undefined }))
-      const tray = createTray([
+      const tray = createTrayGraph([
         { key: key('falsey-gate'), kind: 'value', readiness: { state: 'failed', error }, start }
       ])
       await expect(tray.ready()).rejects.toBe(error)
@@ -181,7 +187,7 @@ describe('tray', () => {
 
   it('preserves native readiness getter error identity and type', async () => {
     const error = new TypeError('hostile')
-    const tray = createTray([
+    const tray = createTrayGraph([
       {
         key: key('hostile'),
         kind: 'value',
@@ -218,7 +224,7 @@ describe('tray', () => {
   ] as const)(
     'caches actual gate rejection for hostile %s without replacing it',
     async (_label, thrown) => {
-      const tray = createTray([
+      const tray = createTrayGraph([
         {
           key: key('hostile-gate'),
           kind: 'value',
@@ -252,7 +258,7 @@ describe('tray', () => {
       kind: 'value' as const,
       start: () => ({ value: 1, release: () => undefined })
     }
-    const tray = createTray([entry])
+    const tray = createTrayGraph([entry])
     expect(reads).toBe(1)
     expect(tray.keys).toEqual([key('stable')])
     expect(reads).toBe(1)
@@ -260,7 +266,7 @@ describe('tray', () => {
 
   it('projects Graph after gate failure and never rereads readiness on dispose/ready', async () => {
     let stateReads = 0
-    const tray = createTray([
+    const tray = createTrayGraph([
       {
         key: key('blocked'),
         kind: 'value',
@@ -288,7 +294,7 @@ describe('tray', () => {
 
   it('preserves Graph ready and dispose Promise identity after gate success', async () => {
     const readiness = { state: 'ready' as const, error: undefined }
-    const tray = createTray([
+    const tray = createTrayGraph([
       {
         key: key('promise-identity'),
         kind: 'value',
@@ -309,7 +315,7 @@ describe('tray', () => {
       state: 'ready',
       error: undefined
     }
-    const tray = createTray([
+    const tray = createTrayGraph([
       {
         key: key('frozen-readiness'),
         kind: 'value',
@@ -326,7 +332,7 @@ describe('tray', () => {
 
   it('cold dispose prevents readiness access and projects one Graph handoff', async () => {
     let reads = 0
-    const tray = createTray([
+    const tray = createTrayGraph([
       {
         key: key('cold'),
         kind: 'value',
@@ -392,7 +398,7 @@ describe('tray', () => {
   it('keeps declared direct dependency reads isolated from transitive lookup', async () => {
     const providerKey = key('provider')
     const consumerKey = key('consumer')
-    const tray = createTray([
+    const tray = createTrayGraph([
       {
         key: providerKey,
         kind: 'value',
@@ -416,10 +422,10 @@ describe('tray', () => {
   })
 
   it('keeps multiple Tray instances isolated', async () => {
-    const first = createTray([
+    const first = createTrayGraph([
       { key: key('shared'), kind: 'value', start: () => ({ value: 1, release: () => undefined }) }
     ])
-    const second = createTray([
+    const second = createTrayGraph([
       { key: key('shared'), kind: 'value', start: () => ({ value: 2, release: () => undefined }) }
     ])
     await Promise.all([first.ready(), second.ready()])
@@ -430,7 +436,7 @@ describe('tray', () => {
   })
 
   it('preserves Graph admission errors without Tray rewrapping', async () => {
-    const tray = createTray([
+    const tray = createTrayGraph([
       {
         key: key('a'),
         kind: 'value',
@@ -451,7 +457,7 @@ describe('tray', () => {
 
   it('assimilates a foreign start thenable once through Graph', async () => {
     let thenReads = 0
-    const tray = createTray([
+    const tray = createTrayGraph([
       {
         key: key('thenable'),
         kind: 'resource',
@@ -472,7 +478,7 @@ describe('tray', () => {
 
   it('forwards auxiliary ownership to lifecycle without Tray timeout policy', async () => {
     const force = vi.fn()
-    const tray = createTray([
+    const tray = createTrayGraph([
       {
         key: key('owned'),
         kind: 'resource',
@@ -491,7 +497,7 @@ describe('tray', () => {
     const custom = vi.fn(() => undefined)
     const graceful = vi.fn(() => undefined)
     const force = vi.fn(() => undefined)
-    const tray = createTray([
+    const tray = createTrayGraph([
       {
         key: key('descriptor'),
         kind: 'resource',
@@ -513,7 +519,7 @@ describe('tray', () => {
 
   it('keeps an unresolved same-realm release in quiescing state', async () => {
     const pending = deferred<void>()
-    const tray = createTray([
+    const tray = createTrayGraph([
       {
         key: key('never-settles'),
         kind: 'resource',
@@ -533,7 +539,7 @@ describe('tray', () => {
   it('does not expose values when a later entry fails startup', async () => {
     const goodKey = key('good')
     const badKey = key('bad')
-    const tray = createTray([
+    const tray = createTrayGraph([
       { key: goodKey, kind: 'value', start: () => ({ value: 1, release: () => undefined }) },
       {
         key: badKey,
@@ -551,7 +557,7 @@ describe('tray', () => {
 
   it('does not expose a late start result after dispose races startup', async () => {
     const result = deferred<unknown>()
-    const tray = createTray([
+    const tray = createTrayGraph([
       {
         key: key('late'),
         kind: 'resource',
@@ -568,9 +574,9 @@ describe('tray', () => {
   })
 
   it('revokes value visibility before invoking the primary release callback', async () => {
-    let tray!: ReturnType<typeof createTray>
+    let tray!: ReturnType<typeof createTrayGraph>
     const visibleDuringRelease: boolean[] = []
-    tray = createTray([
+    tray = createTrayGraph([
       {
         key: key('release-order'),
         kind: 'value',
