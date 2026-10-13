@@ -1,15 +1,55 @@
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
-import { createRemote } from '../remote.js'
+import { createRemote, createRoutedRemote } from '../remote.js'
 import { readHost } from '../define-host.js'
-import { TrayInternal } from '../constants.js'
+import { TrayInternal, TrayCallKind } from '../constants.js'
+import { createRoutingNamespace, builtInRouting } from '../routing.js'
 import type { ITrayRuntimeOutlet } from '../runtime.js'
 import type { IAnyTrayHost, ITrayInstanceInfo, ITrayClientPlugin } from '../typing.js'
+import type { IChildTopics } from './topics.js'
 /** Every init owns a new Feature definition and binds calls to that child's accepted outlet. */
 export function createTrayPlugin(
   outlet: () => ITrayRuntimeOutlet,
   info: ITrayInstanceInfo<string, unknown>,
-  exit: (error?: unknown) => void
+  exit: (error?: unknown) => void,
+  topics: IChildTopics,
+  definition: IAnyTrayHost
 ): ITrayClientPlugin<any> {
+  /** Child declaration grants names only; the callback remains unused in this realm. */
+  const names = [...builtInRouting, ...(definition.routing ?? [])].map((policy) => policy.name)
+  /** Options apply to the caller's RPC operation and never become portable envelope fields. */
+  const routing = createRoutingNamespace(names, (policy, target) => {
+    const admitted = readHost(target)
+    const envelope = (kind: TrayCallKind, input: { path: string; payload?: unknown }) => ({
+      host: admitted.name,
+      policy,
+      kind,
+      ...input
+    })
+    return createRoutedRemote(admitted.name, {
+      request: (input, options) =>
+        outlet().request(
+          TrayInternal.connection,
+          TrayInternal.routed,
+          envelope(TrayCallKind.request, input),
+          options
+        ),
+      notify: async (input, options) => {
+        await outlet().request(
+          TrayInternal.connection,
+          TrayInternal.routed,
+          envelope(TrayCallKind.notify, input),
+          options
+        )
+      },
+      stream: (input, options) =>
+        outlet().stream(
+          TrayInternal.connection,
+          TrayInternal.routed,
+          envelope(TrayCallKind.stream, input),
+          options
+        )
+    })
+  })
   return definePlugin({
     name: TrayInternal.clientPlugin,
     features: {
@@ -54,7 +94,10 @@ export function createTrayPlugin(
                 )
             })
           },
-          exit
+          exit,
+          routing,
+          publish: topics.publish,
+          subscribe: topics.subscribe
         })
       )
     },

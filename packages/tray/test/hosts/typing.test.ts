@@ -28,8 +28,11 @@ const host = defineTrayHost({
   config: (input) => input as { language: string },
   plugins: (info, trayPlugin) => {
     /** Native references must expose exact tray methods to dependent Feature factories. */
-    const reference: IFeatureReference<ITrayClient, false, 'trayClient'> =
-      trayPlugin.getFeature('tray')
+    const reference: IFeatureReference<
+      ITrayClient<readonly [typeof aaa]>,
+      false,
+      'trayClient'
+    > = trayPlugin.getFeature('tray')
     /** Validator result remains visible at the DSL callback. */
     const language: string = info.config.language
     void reference

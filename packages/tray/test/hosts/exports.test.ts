@@ -3,6 +3,20 @@ import { describe, expect, it } from 'vitest'
 import { fixture } from './helper.js'
 
 describe('Tray public boundary and lifecycle events', () => {
+  it('[mesh A5] exports routing capabilities and registered mesh diagnostics', async () => {
+    /** The built package root is the public consumer boundary. */
+    const api = await fixture()
+    for (const name of ['defineRoutingPolicy', 'roundRobin', 'leastInFlight'])
+      expect(api[name]).toBeDefined()
+    expect('defineLoadBalanceStrategy' in api).toBe(false)
+    for (const code of [
+      'TRAY_ROUTING_INVALID',
+      'TRAY_ROUTING_UNKNOWN',
+      'TRAY_HOST_UNAVAILABLE',
+      'TRAY_TOPIC_INVALID'
+    ])
+      expect(Object.values(api.TrayErrorCode)).toContain(code)
+  })
   it('[A8] exposes the complete instances runtime API, coded messages and listed native child fixtures', async () => {
     /** Built root is the package boundary also used by Node fixtures. */
     const api = await fixture()

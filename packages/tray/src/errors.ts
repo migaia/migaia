@@ -26,6 +26,9 @@ export function attachTrayError(error: unknown, code: ITrayErrorCode): unknown {
 /** Creates a new Tray-owned Error for non-Error failures or local diagnostics. */
 export function createTrayError(code: ITrayErrorCode, cause?: unknown): Error {
   const messages: Record<ITrayErrorCode, string> = {
+    [TrayErrorCode.hostUnavailable]: TrayErrorText.hostUnavailable,
+    [TrayErrorCode.routingUnknown]: TrayErrorText.routingUnknown,
+    [TrayErrorCode.topicInvalid]: TrayErrorText.topicInvalid,
     [TrayErrorCode.routingInvalid]: TrayErrorText.routingInvalid,
     [TrayErrorCode.hostInvalid]: TrayErrorText.hostInvalid,
     [TrayErrorCode.hostUnknown]: TrayErrorText.hostUnknown,

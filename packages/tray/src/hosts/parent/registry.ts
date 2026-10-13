@@ -1,8 +1,9 @@
 import { createConcurrencyLimiter, type IConcurrencyLimiter } from '@migaia/utils/promise'
 import { createTrayError } from '../../errors.js'
 import { TrayErrorCode } from '../../error-code.js'
-import { TrayInstanceState, type TrayManagementMode } from '../constants.js'
+import { TrayInstanceState, TrayCallKind, type TrayManagementMode } from '../constants.js'
 import type { IAnyTrayHost, ITrayInstance } from '../typing.js'
+import type { ITrayInvocation, ITraySender } from '../remote.js'
 /** Metadata belongs to one id admission; RPC remains the connection and generation owner. */
 export type ITrayRecord = {
   definition: IAnyTrayHost
@@ -18,9 +19,14 @@ export type ITrayRecord = {
   install?: Promise<void>
   inits: Map<number, Promise<void>>
   receipts: Set<string>
+  /** Pending business sends belong to this admission even after its id is re-admitted. */
+  inFlight: number
 }
 /** Keep admitted metadata and relay receipts together so ended admissions cannot be revived. */
-export function createRegistry(report: (error: unknown) => void) {
+export function createRegistry(
+  report: (error: unknown) => void,
+  send: (record: ITrayRecord) => ITraySender
+) {
   /** This table stores business metadata only, never RPC native state. */
   const records = new Map<string, ITrayRecord>()
   /** Sender identity is the single projection from the accepted outlet detail. */
@@ -35,7 +41,8 @@ export function createRegistry(report: (error: unknown) => void) {
       runtime: record.definition.runtime,
       state: record.state,
       generation: record.generation,
-      config: record.config
+      config: record.config,
+      inFlight: record.inFlight
     })
   /** Validate a captured admission before every new call or lifecycle result. */
   const assertCurrent = (record: ITrayRecord): void => {
@@ -57,6 +64,55 @@ export function createRegistry(report: (error: unknown) => void) {
     for (const receipt of record.receipts) receipts.delete(receipt)
     record.receipts.clear()
   }
+  /** One counted business send owner covers all modes and both direct and relayed callers. */
+  function sendCounted(
+    record: ITrayRecord,
+    kind: 'request',
+    input: ITrayInvocation,
+    options?: Parameters<ITraySender['request']>[1]
+  ): Promise<unknown>
+  function sendCounted(
+    record: ITrayRecord,
+    kind: 'notify',
+    input: ITrayInvocation,
+    options?: Parameters<ITraySender['notify']>[1]
+  ): Promise<void>
+  function sendCounted(
+    record: ITrayRecord,
+    kind: 'stream',
+    input: ITrayInvocation,
+    options?: Parameters<ITraySender['stream']>[1]
+  ): AsyncIterableIterator<unknown>
+  function sendCounted(
+    record: ITrayRecord,
+    kind: TrayCallKind,
+    input: ITrayInvocation,
+    options?: Parameters<ITraySender['request']>[1]
+  ): Promise<unknown> | AsyncIterableIterator<unknown> {
+    if (kind === TrayCallKind.stream) {
+      /**
+       * Laziness and finally preserve stream completion, return, throw and failed-first-send
+       * accounting.
+       */
+      return (async function* () {
+        record.inFlight += 1
+        try {
+          return yield* send(record).stream(input, options)
+        } finally {
+          record.inFlight -= 1
+        }
+      })()
+    }
+    /** Promise settlement, including a synchronous send failure, releases this admission only. */
+    return (async () => {
+      record.inFlight += 1
+      try {
+        return await send(record)[kind](input, options)
+      } finally {
+        record.inFlight -= 1
+      }
+    })()
+  }
   return {
     records,
     instanceIds,
@@ -65,6 +121,7 @@ export function createRegistry(report: (error: unknown) => void) {
     assertCurrent,
     get,
     revoke,
+    sendCounted,
     /** A limiter supplies the existing FIFO operation owner rather than a second scheduler. */
     admit(definition: IAnyTrayHost, id: string, config: unknown): ITrayRecord {
       if (records.has(id)) throw createTrayError(TrayErrorCode.instanceDuplicate)
@@ -78,7 +135,8 @@ export function createRegistry(report: (error: unknown) => void) {
         removed: false,
         queue: createConcurrencyLimiter({ concurrency: 1, report }),
         inits: new Map(),
-        receipts: new Set()
+        receipts: new Set(),
+        inFlight: 0
       }
       records.set(id, record)
       return record
@@ -90,6 +148,13 @@ export function createRegistry(report: (error: unknown) => void) {
       record.generation = generation
       record.instanceId = instanceId
       instanceIds.set(instanceId, { record, generation })
+    },
+    /** Raw departure revokes only this generation's authenticated sender projection. */
+    depart(record: ITrayRecord, generation: number): void {
+      if (!record.instanceId) return
+      const identity = instanceIds.get(record.instanceId)
+      if (identity?.record === record && identity.generation === generation)
+        instanceIds.delete(record.instanceId)
     },
     /** A receipt is meaningful only to this registry admission and never grants a native handle. */
     bind(host: string, id: string): string {

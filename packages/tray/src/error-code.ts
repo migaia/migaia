@@ -1,5 +1,11 @@
 /** Stable error codes exposed by the Tray admission and lookup boundary. */
 export const TrayErrorCode = {
+  /** Mesh R1 has no ready host candidate; await a ready instance before calling again. */
+  hostUnavailable: 'TRAY_HOST_UNAVAILABLE',
+  /** Mesh R1 policy is absent from registration or declaration; register its branded definition. */
+  routingUnknown: 'TRAY_ROUTING_UNKNOWN',
+  /** Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing. */
+  topicInvalid: 'TRAY_TOPIC_INVALID',
   /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */
   routingInvalid: 'TRAY_ROUTING_INVALID',
   /** Host definition violates instances R1; provide an admitted host DSL. */
