@@ -96,6 +96,8 @@ if (isProcessChild()) {
 
 REPL、`--eval`、单文件可执行程序、Electron 或测试运行器没有可用的自派生主入口时，会以注册的配置错误拒绝，不猜测调用位置。Deno 默认子入口只获得 bootstrap 所需的 env 权限；需要额外运行权限时使用显式 command/args。
 
+需要把子进程放进外部沙箱时，短对象的 `wrap(command)` 可包装运行时计算出的启动命令，重启与替换时同样生效。库不提供沙箱工具或配置；`sandbox-exec`、`bwrap` 示例及 stdin/stdout、环境与退出码转发要求见 [Running the child in an external sandbox](./USEGUIDE.md#running-the-child-in-an-external-sandbox)。
+
 ## 独立进程按名称连接
 
 名称不含 `/` 或协议。双方按 OS 用户与名称派生相同的本机端点，无需端口或通信文件。Unix 目录为 0700，socket 为 0600；当前 Node-compatible socket API 没有公开 peer-credential 读取接口，访问控制由这些 OS 权限完成。**同一用户的任何进程都能连接**；需要区分同用户程序时，双方显式设置 `token`。TCP、显式 socket 路径及没有 ACL 保证的 Windows named pipe 必须设置 token。
