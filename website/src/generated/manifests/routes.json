@@ -13187,6 +13187,36 @@
       "library": "tray"
     },
     {
+      "path": "/en/docs/tray/IAnyTrayHost",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITray",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayCallOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayClient",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayClientPlugin",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/en/docs/tray/ITrayEntryContext",
       "locale": "en",
       "domain": "docs",
@@ -13217,7 +13247,49 @@
       "library": "tray"
     },
     {
+      "path": "/en/docs/tray/ITrayExposePath",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/en/docs/tray/ITrayGraph",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayHost",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayHostDefinition",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayInstance",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayInstanceDetail",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayInstanceEventRecord",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayInstanceInfo",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
@@ -13229,7 +13301,67 @@
       "library": "tray"
     },
     {
+      "path": "/en/docs/tray/ITrayMethodPath",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayPlugins",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayRemote",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayRoutingContext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayRoutingPolicy",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayRuntime",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayRuntimeOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITraySandbox",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITraySpawnOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/en/docs/tray/ITrayState",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITraySupervisorPolicy",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
@@ -13242,6 +13374,36 @@
     },
     {
       "path": "/en/docs/tray/TrayErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/TrayInstanceEvent-const",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/TrayInstanceEvent-type",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/TrayInstanceState-const",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/TrayInstanceState-type",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/TrayRuntime",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
@@ -13271,7 +13433,25 @@
       "library": "tray"
     },
     {
+      "path": "/en/docs/tray/createTray",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/en/docs/tray/createTrayGraph",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/defineRoutingPolicy",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/defineTrayHost",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
@@ -13524,6 +13704,12 @@
     },
     {
       "path": "/en/docs/tray/runtime/createRuntime",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/serveTrayHost",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
@@ -29321,6 +29507,36 @@
       "library": "tray"
     },
     {
+      "path": "/zh/docs/tray/IAnyTrayHost",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITray",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayCallOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayClient",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayClientPlugin",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/zh/docs/tray/ITrayEntryContext",
       "locale": "zh",
       "domain": "docs",
@@ -29351,7 +29567,49 @@
       "library": "tray"
     },
     {
+      "path": "/zh/docs/tray/ITrayExposePath",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/zh/docs/tray/ITrayGraph",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayHost",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayHostDefinition",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayInstance",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayInstanceDetail",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayInstanceEventRecord",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayInstanceInfo",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
@@ -29363,7 +29621,67 @@
       "library": "tray"
     },
     {
+      "path": "/zh/docs/tray/ITrayMethodPath",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayPlugins",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayRemote",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayRoutingContext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayRoutingPolicy",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayRuntime",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayRuntimeOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITraySandbox",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITraySpawnOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/zh/docs/tray/ITrayState",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITraySupervisorPolicy",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
@@ -29376,6 +29694,36 @@
     },
     {
       "path": "/zh/docs/tray/TrayErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/TrayInstanceEvent-const",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/TrayInstanceEvent-type",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/TrayInstanceState-const",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/TrayInstanceState-type",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/TrayRuntime",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
@@ -29405,7 +29753,25 @@
       "library": "tray"
     },
     {
+      "path": "/zh/docs/tray/createTray",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/zh/docs/tray/createTrayGraph",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/defineRoutingPolicy",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/defineTrayHost",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
@@ -29658,6 +30024,12 @@
     },
     {
       "path": "/zh/docs/tray/runtime/createRuntime",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/serveTrayHost",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
