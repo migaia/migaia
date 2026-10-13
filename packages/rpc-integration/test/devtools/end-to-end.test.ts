@@ -1,8 +1,9 @@
 import { execFile } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
+import { FixtureMethod } from './fixtures/text.mjs'
 
-/** Partial A-total evidence separates supported public plugin installation from frozen API gaps. */
+/** Native identities and trace evidence come from the same actual three-host standalone program. */
 type IProgramResult = {
   scope: 'managed-business-and-direct-Core'
   result: number
@@ -20,8 +21,22 @@ type IProgramResult = {
     orderedTimeline: boolean
     recordingEvents: number
     recordingSequencePreserved: boolean
+    metadataContentHidden: boolean
     result: number
     afterCollectorClose: number
+  }
+  trace?: {
+    hops: readonly {
+      method: string
+      stages: readonly string[]
+      outboundCarriers: number
+      inboundCarriers: number
+      frameContentDiffers: boolean
+    }[]
+    orderedTimeline: boolean
+    recordingEvents: number
+    recordingSequencePreserved: boolean
+    selfFiltered: boolean
   }
 }
 
@@ -51,7 +66,7 @@ function program(mode: 'baseline' | 'observed'): Promise<IProgramResult> {
   })
 }
 
-it('[A-total partial] real signed/encrypted three-host business, direct-Core local capture and remote metadata recording preserve results', async () => {
+it('[A-total] actual T1 crosses signed/encrypted parent-child-worker hops with live services, both carrier directions and unchanged business results', async () => {
   /** The business baseline executes in three genuine hosts with no devtools instances. */
   const baseline = await program('baseline')
   /** Real-host collector close is separate from the directly supported Core observation scope. */
@@ -74,16 +89,32 @@ it('[A-total partial] real signed/encrypted three-host business, direct-Core loc
   expect(observed.core?.orderedTimeline).toBe(true)
   expect(observed.core?.recordingEvents).toBeGreaterThan(0)
   expect(observed.core?.recordingSequencePreserved).toBe(true)
+  expect(observed.core?.metadataContentHidden).toBe(true)
   expect(observed.core?.result).toBe(41)
   expect(observed.core?.afterCollectorClose).toBe(41)
+  expect(observed.trace?.hops).toHaveLength(2)
+  expect(observed.trace?.hops.map((hop) => hop.method).sort()).toEqual(
+    [FixtureMethod.cascade, FixtureMethod.increment].sort()
+  )
+  for (const hop of observed.trace!.hops) {
+    expect(hop.stages).toEqual(
+      expect.arrayContaining(['envelope', 'encoded', 'frame', 'protected', 'carrier'])
+    )
+    expect(hop.outboundCarriers).toBeGreaterThan(0)
+    expect(hop.inboundCarriers).toBeGreaterThan(0)
+    expect(hop.frameContentDiffers).toBe(true)
+  }
+  expect(observed.trace?.orderedTimeline).toBe(true)
+  expect(observed.trace?.recordingEvents).toBeGreaterThan(0)
+  expect(observed.trace?.recordingSequencePreserved).toBe(true)
+  expect(observed.trace?.selfFiltered).toBe(true)
   console.info(
     JSON.stringify({
-      acceptance: 'A-total partial',
+      acceptance: 'A-total',
       managedBusiness: baseline.result,
       afterCollectorClose: observed.afterCollectorClose,
-      directCore: observed.core
+      directCore: observed.core,
+      trace: observed.trace
     })
   )
-  // Full A-total remains pending: native Peer options omit trace; managed probe forwarding,
-  // Process carrier observe and protected-stage sender/message correlation are sibling gaps.
 }, 90_000)
