@@ -11,6 +11,7 @@ import { createTrayError } from '../../errors.js'
 import { TrayErrorCode } from '../../error-code.js'
 import { TrayInternal } from '../constants.js'
 import { createTrayPlugin } from './client.js'
+import { createChildTopics } from './topics.js'
 import type { ITrayRuntimeHost, ITrayRuntimeOutlet } from '../runtime.js'
 import type { IAnyTrayHost, ITrayInstanceInfo } from '../typing.js'
 import type { ITrayInvocation } from '../remote.js'
@@ -29,6 +30,8 @@ export function createChildDispatcher(
    * ordering.
    */
   const installed: string[] = []
+  /** One local business topic hub belongs to this dispatcher generation. */
+  const topics = createChildTopics(outlet, report)
   /** Init admission stays closed after failure or shutdown; a new native generation gets a new Host. */
   let initialized = false
   /** Repeated cleanup callers share the same PluginHost removal sequence. */
@@ -68,7 +71,7 @@ export function createChildDispatcher(
             config: definition.config ? definition.config(input.config) : input.config
           })
           /** Feature dependencies refer to this exact per-init plugin definition. */
-          const client = createTrayPlugin(outlet, info, exit)
+          const client = createTrayPlugin(outlet, info, exit, topics, definition)
           /** Parent never invokes this DSL factory; execution belongs entirely to the child. */
           const plugins = definition.plugins(info, client)
           /** Internal plugin names cannot be shadowed by business plugins. */
@@ -91,11 +94,12 @@ export function createChildDispatcher(
         },
         invoke,
         stream: (input: ITrayInvocation, context?: IRpcContext) => invoke(input, context),
-        /** Mesh later supplies the business topic owner; lifecycle events never enter this path. */
-        deliver: () => undefined,
+        /** Business events stay separate from the parent's read-only lifecycle channel. */
+        deliver: topics.deliver,
         /** Bounded logical wait lets the caller terminate a hung realm; cleanup keeps its owner. */
         shutdown: async ({ graceMs }: { graceMs: number }) => {
           shutdown ??= (async () => {
+            topics.close()
             for (const name of [...installed].reverse()) {
               if (!handles.has(name)) continue
               const result = await host.unUse(name, { policy: DependencyPolicy.cascade })

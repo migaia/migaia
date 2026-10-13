@@ -1,5 +1,11 @@
 /** Stable Tray boundary messages used by callers and tests. */
 export const TrayErrorText = {
+  /** Stable mesh R1 diagnostic for a host without a ready candidate. */
+  hostUnavailable: 'tray host has no ready instance',
+  /** Stable mesh R1 diagnostic shared by parent registration and child declaration checks. */
+  routingUnknown: 'tray routing policy is unknown',
+  /** Stable mesh R3 diagnostic for invalid publish and subscribe topic names. */
+  topicInvalid: 'tray topic is invalid',
   /** Stable host-management diagnostic consumed by the instances boundary. */
   routingInvalid: 'tray routing policy is invalid',
   /** Stable host-management diagnostic consumed by the instances boundary. */

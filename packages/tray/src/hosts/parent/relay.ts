@@ -1,10 +1,13 @@
 import { defineFeature, definePlugin, type IPluginConstraint } from '@migaia/plugin-host'
 import type { IRpcContext } from '@migaia/rpc-core'
-import { TrayInternal } from '../constants.js'
+import { TrayInternal, TrayCallKind } from '../constants.js'
 import { createTrayError } from '../../errors.js'
 import { TrayErrorCode } from '../../error-code.js'
 import type { ITrayRegistry, ITrayRecord } from './registry.js'
 import type { ITraySender } from '../remote.js'
+import type { createRoutingRegistry } from '../routing.js'
+import type { IAnyTrayHost } from '../typing.js'
+import type { createParentTopics } from './topics.js'
 /** Relay envelope carries an admission receipt and omits an absent application payload. */
 type IRelayCall = Readonly<{
   host: string
@@ -16,7 +19,11 @@ type IRelayCall = Readonly<{
 /** Parent relay authenticates the sender through the outlet's accepted instance id projection. */
 export function createRelay(
   registry: ITrayRegistry,
-  send: (record: ITrayRecord) => ITraySender
+  send: (record: ITrayRecord) => ITraySender,
+  routing: ReturnType<typeof createRoutingRegistry>,
+  hosts: ReadonlyMap<string, IAnyTrayHost>,
+  topics: ReturnType<typeof createParentTopics>,
+  assertActive: () => void
 ): IPluginConstraint<any, any, any> {
   /** A removed or superseded child cannot originate new relayed calls. */
   const sender = (context: IRpcContext): void => {
@@ -51,7 +58,41 @@ export function createRelay(
           target(input, context).stream(input, {
             signal: context.signal,
             timeoutMs: context.timeoutMs
-          })
+          }),
+        /** Only portable routing data crosses the relay; options come from provider context. */
+        routed: (
+          input: {
+            host: string
+            policy: string
+            kind: TrayCallKind
+            path: string
+            payload?: unknown
+          },
+          context: IRpcContext
+        ) => {
+          assertActive()
+          sender(context)
+          if (!hosts.has(input.host)) throw createTrayError(TrayErrorCode.hostUnknown)
+          const record = routing.pick(input.host, input.policy)
+          const options = { signal: context.signal, timeoutMs: context.timeoutMs }
+          if (input.kind === TrayCallKind.request)
+            return registry.sendCounted(record, TrayCallKind.request, input, options)
+          if (input.kind === TrayCallKind.notify)
+            return registry.sendCounted(record, TrayCallKind.notify, input, options)
+          return registry.sendCounted(record, TrayCallKind.stream, input, options)
+        },
+        /** Authenticated metadata is attached only by the parent topic owner. */
+        publish: (input: { topic: string; payload?: unknown }, context: IRpcContext) => {
+          assertActive()
+          topics.publishChild(input, context)
+        },
+        /** First and last child listeners share one generation-bound parent membership. */
+        subscribe: (input: { topic: string }, context: IRpcContext) => {
+          assertActive()
+          topics.register(input.topic, context)
+        },
+        unsubscribe: (input: { topic: string }, context: IRpcContext) =>
+          topics.unregister(input.topic, context)
       }))
     },
     install: () => ({})
