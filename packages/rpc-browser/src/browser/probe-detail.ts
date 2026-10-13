@@ -1,5 +1,6 @@
+import { carrierSizeBytes } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IRpcCarrierProbe } from '@migaia/rpc-core/probe'
-import { isArrayBuffer, isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
+import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
 import { BrowserRpcErrorText } from './error-text.js'
 import { createBrowserTransportError } from './error.js'
 
@@ -108,13 +109,8 @@ export class BrowserCarrierObservation {
       this.#detail.transfers = direction === 1 ? -1 : (transfer?.length ?? 0)
       this.#detail.rejectedSource = direction === 1 ? this.#rejectedSource : 0
       if (direction === 1) this.#rejectedSource = 0
-      /** Native byte and string representations provide exact sizes without wire serialization. */
-      const size =
-        typeof message === 'string'
-          ? utf8ByteLength(message)
-          : isArrayBuffer(message) || ArrayBuffer.isView(message)
-            ? message.byteLength
-            : -1
+      /** Only intrinsic byte extents are already known; strings and containers stay unknown. */
+      const size = carrierSizeBytes(message)
       /** Metadata-only observation never copies or retains the payload. */
       let content: unknown
       if (probe.capturing) {

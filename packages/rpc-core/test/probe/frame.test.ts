@@ -1,3 +1,4 @@
+import { carrierSizeBytes } from '../../dist/adapter/internal-advanced.js'
 import { describe, expect, it, vi } from 'vitest'
 import { identityCodecV1 } from '@migaia/serialize/codec'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
@@ -14,7 +15,7 @@ import {
   type IRpcProbeEventView,
   type IRpcProbeStageName
 } from '../../dist/core/probe/index.js'
-import { createProbeEmitter, probeSize } from '../../dist/core/internal/probe-emitter.js'
+import { createProbeEmitter } from '../../dist/core/internal/probe-emitter.js'
 import { RpcOutboundSender } from '../../dist/core/internal/outbound-sender.js'
 import type { IRpcSelectedComponents } from '../../dist/core/internal/endpoint-options.js'
 import type { IRpcOutboundTransport } from '../../dist/core/internal/outbound-sender.js'
@@ -123,17 +124,16 @@ function observedSender(options: {
 }
 
 describe('probe-core A3 outbound frames', () => {
-  it('counts physical UTF-8 strings while clone-friendly string size stays unknown', async () => {
-    expect(probeSize('ascii', true)).toBe(5)
-    expect(probeSize('é😀\ud800', true)).toBe(9)
-    expect(probeSize('é😀\ud800', false)).toBe(-1)
+  it('[closure A7] keeps every string size unknown while intrinsic byte extents stay exact', async () => {
+    expect(carrierSizeBytes('ascii')).toBe(-1)
+    expect(carrierSizeBytes('é😀\ud800')).toBe(-1)
     /** Byte views retain their exact selected span independently of string wire representation. */
     const backing = new ArrayBuffer(8)
-    expect(probeSize(backing, false)).toBe(8)
-    expect(probeSize(new Uint8Array(backing, 2, 3), false)).toBe(3)
-    expect(probeSize(new DataView(backing, 1, 4), true)).toBe(4)
+    expect(carrierSizeBytes(backing)).toBe(8)
+    expect(carrierSizeBytes(new Uint8Array(backing, 2, 3))).toBe(3)
+    expect(carrierSizeBytes(new DataView(backing, 1, 4))).toBe(4)
     for (const encodedType of ['string', 'any'] as const) {
-      /** Owner construction selects the physical representation once for every later stage call. */
+      /** String sizes remain unknown in both supported transport representations. */
       const events: IRpcProbeEventView[] = []
       /** This representation includes non-ASCII UTF-8 and a lone surrogate's replacement width. */
       const fixture = observedSender({
@@ -148,7 +148,7 @@ describe('probe-core A3 outbound frames', () => {
             (event) => event.stage === RpcProbeStage.encoded || event.stage === RpcProbeStage.frame
           )
           .map((event) => event.sizeBytes)
-      ).toEqual(encodedType === 'string' ? [9, 9] : [-1, -1])
+      ).toEqual([-1, -1])
       fixture.emitter.dispose()
     }
   })
