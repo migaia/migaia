@@ -221,16 +221,16 @@ console.log((await exited).type) // exit
 
 ## 3. Plugin 与 Host 出口
 
-`createRuntimePlugin`（以及平台包的 `createProcessPlugin`、`createThreadPlugin`）返回一个可以用 `@migaia/plugin-host` 安装的插件。安装后，同一平台的所有连接共享一个出口：`host.process` 或 `host.thread`（名称见 `RuntimePluginKey`）。
+`createRuntimePlugin`、本包的 `createCoroutinePlugin`，以及平台包的 `createProcessPlugin`、`createThreadPlugin` 返回可以用 `@migaia/plugin-host` 安装的插件。同一运行时家族的连接共享一个出口：`host.process`、`host.thread` 或 `host.coroutine`（名称见 `RuntimePluginKey`）。
 
 | 出口方法                                              | 说明                                                                                                                  |
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `request` / `notify` / `stream` / `group` / `outcome` | 第一个参数是目标：连接名，或 `{ name, instanceId }` 精确指定实例；同名多实例无法唯一确定时拒绝                        |
 | `list(options?)`、`get(target, options?)`             | 本地查询连接、身份、代次、健康、退出信息；拿不到的事实返回 `unavailable`，不伪造为 0                                  |
-| `on(event, listener)`                                 | 订阅事件，返回可重复调用的取消函数。事件名见 `RuntimeEventName`：`ready`、`exit`、`degraded`、`restart`、`liquidated` |
+| `on(event, listener)`                                 | 订阅事件，返回可重复调用的取消函数。事件名见 `RuntimeEventName`：`ready`、`exit`、`degraded`、`restart`、`terminal`、`liquidated` |
 | `watch(options?)`                                     | 有界的事件异步迭代器；积压超过 100 条时报告 `RUNTIME_EVENT_OVERFLOW` 并结束                                           |
 | `broadcast(method, payload?, options?)`               | 对所有目标调用并汇总各自结果；不保证全部成功                                                                          |
-| `stop` / `kill` / `restart` / `replace`               | 只对由 spawn 创建的连接有效；对 connect / listen 连接以 `CAPABILITY_CONFLICT` 拒绝                                    |
+| `stop` / `kill` / `restart` / `replace`               | 只对由 spawn 或 coroutine task 创建的执行单元有效；对 connect / listen 连接以 `CAPABILITY_CONFLICT` 拒绝              |
 
 - **`expose`**：插件默认不向对端公开本端 Host 的任何方法。用 `expose: ['feature.method', …]` 显式列出；只有列出的方法可见。
 - **目录就绪 ≠ 远端安装完成**：连接 ready 只说明方法目录已交换，不说明对端 Host 的某个插件安装事务已提交。需要等待远端安装完成时，用应用自己的确认信号。
@@ -240,6 +240,52 @@ console.log((await exited).type) // exit
 
 A local Feature method in `expose` is callable from the moment the peer can reach it; calls that arrive during install are held until the plugin commits, and are refused with `TARGET_UNKNOWN` if it does not.
 This guarantee covers local Feature `expose` entries only; forward and catalog entries are not covered.
+
+### 3.1 Coroutine task
+
+`createCoroutinePlugin({ name, task, supervisor? })` 是父模式：创建受监督的 task，每个代次拥有自己的 `MessageChannel`。Task 收到 `signal`、`heartbeat()` 与 opaque `connect`；子模式 `createCoroutinePlugin({ name, connect })` 只接入该连接，不创建执行单元。两模式都支持 `provide` 与 `expose`；使用 `expose` 时先安装本端 provider 插件，再安装 runtime 插件。
+
+```ts doc-test=run group=useguide-coroutine file=main.ts
+import { defineHost } from '@migaia/plugin-host'
+import { createCoroutinePlugin } from '@migaia/rpc-core/remote'
+
+/** 父模式拥有 task 与每个代次的消息端口。 */
+const service = createCoroutinePlugin<{ math: { double(value: number): number } }>({
+  name: 'math',
+  task: async ({ connect, signal }) => {
+    /** 子模式通过 task 的 opaque connect 发布本端 provider。 */
+    const parent = createCoroutinePlugin({
+      name: 'parent',
+      connect,
+      provide: { math: { double: (value: number) => value * 2 } }
+    })
+    /** Task 负责释放自己创建的子 Host。 */
+    const childHost = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: {} })
+    try {
+      await childHost.use(parent)
+      /** Task settlement 就是退出；收到协作取消前持续提供服务。 */
+      await new Promise<void>((resolve) => {
+        if (signal.aborted) resolve()
+        else signal.addEventListener('abort', () => resolve(), { once: true })
+      })
+    } finally {
+      await childHost.dispose()
+    }
+  }
+})
+/** 父 Host 释放时停止它拥有的 coroutine task。 */
+const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: {} })
+try {
+  await host.use(service)
+  console.log(await host.coroutine!.request('math', 'math.double', 21)) // 42
+} finally {
+  await host.dispose()
+}
+```
+
+`task` 与 `connect` 必须二选一；`connect` 只能使用当前 task 收到的值，不能传 `MessagePort`。父模式可通过 `supervisor` 配置现有监督策略，默认预算为每个插件一个 coroutine 单元。`host.coroutine.replace('math', { task: nextTask })` 更换任务；非函数 task 在替换前以 `INVALID_CONFIG` 拒绝，旧单元继续提供服务。
+
+Task resolve 产生正常退出，reason 为 `exited`；reject 产生崩溃，reason 为 `crashed`，后续处理遵循监督策略。终止重启链的错误通过 `terminal` 事件提供 `{ source, code }`，`name` 是插件连接名。Stop 的 signal 取消是协作式的，端口在 task 结束后关闭；忽略取消的 task 可延迟结束，预算租约保留到实际 settlement。Coroutine 共享父事件循环，无法强制停止阻塞事件循环的 task。
 
 ## 4. Endpoint
 

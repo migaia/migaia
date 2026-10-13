@@ -5,7 +5,7 @@
 - **Runtime Peer**（`@migaia/rpc-core/remote`）：`request` / `notify` / `stream` / `group` / `outcome`，按方法路径调用，带类型推导。进程、线程、浏览器、桥接包都在这一层上构建。
 - **Endpoint**（包根）：`createEndpoint` + 中间件，`send` / `provide`，用于在任意载体（iframe、BroadcastChannel、MessagePort 等）上自行组装。
 
-本包不包含任何平台代码：没有 `node:` 导入，也不依赖 DOM。启动进程、创建 Worker 由其它包负责。
+本包没有 `node:` 导入。Coroutine 使用支持宿主的全局 `MessageChannel`，在当前事件循环运行；启动进程、创建 Worker 由其它包负责。
 
 ## 我应该用哪个包？
 
@@ -13,6 +13,7 @@
 | ------------------------------------------------- | ------------------------------------------------------------------------ |
 | 调用子进程或本机其它进程                          | [`@migaia/rpc-process`](../rpc-process/README.md)                        |
 | 调用 Worker 线程                                  | [`@migaia/rpc-threads`](../rpc-threads/README.md)                        |
+| 在同进程运行受监督的 task                        | 本包 `./remote` 的 `createCoroutinePlugin`                             |
 | iframe、SharedWorker、可靠有序的 RTCDataChannel   | [`@migaia/rpc-browser`](../rpc-browser/README.md) 的 `createBrowserPeer` |
 | 标签页广播、Service Worker、WebTransport datagram | `rpc-browser` transport + 本包的 Endpoint                                |
 | 调用 Python / Go / Rust 服务                      | [`@migaia/rpc-bridge-jsonrpc`](../rpc-bridge-jsonrpc/README.md)          |
@@ -35,7 +36,7 @@ pnpm add @migaia/rpc-core @migaia/rpc-contract
 | 入口                                                              | 内容                                                                                                                                                                                           |
 | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@migaia/rpc-core`                                                | `createEndpoint`、中间件（`connect`、`contract`、`protocol`、`codec`、`framer`、`abort`、`timeout`、`ping`、`authentication`、`hooks`、`uuid`）、错误码与错误守卫、`createRpcIdempotencyStore` |
-| `./remote`                                                        | `createRuntimePeer`、`createManagedRuntimePeer`、`createRuntimePlugin`、出口与事件常量、`RPC_REMOTE_ERROR_SOURCE`                                                                              |
+| `./remote`                                                        | `createRuntimePeer`、`createManagedRuntimePeer`、`createRuntimePlugin`、`createCoroutinePlugin`、出口与事件常量、`RPC_REMOTE_ERROR_SOURCE`                                                     |
 | `./testing`                                                       | `createPeerPair`：内存中两个真实 Peer，用于测试                                                                                                                                                |
 | `./adapters/memory`                                               | `createMemoryTransportPair`                                                                                                                                                                    |
 | `./adapters/message-port`                                         | `createNodeMessagePortTransport`、`createBrowserMessagePortTransport`                                                                                                                          |
@@ -94,6 +95,12 @@ console.log(await client.send<number>('server', 'add', [20, 22])) // 42
 await client.dispose()
 await server.dispose()
 ```
+
+## Coroutine task
+
+`createCoroutinePlugin({ name, task })` 创建受监督的同进程 task；task 内通过 `createCoroutinePlugin({ name, connect })` 把子 Host 接入当前代次的连接。两端使用 `host.coroutine` 调用，并沿用出口的事件与管理 API。`connect` 是 task 收到的 opaque 值；task 与 connect 必须二选一。
+
+Task resolve 表示正常退出，reject 表示崩溃。Stop 通过 task 的 `signal` 协作取消，task 在 `finally` 中释放子 Host 后才结束；阻塞事件循环的 task 无法强制终止。`replace(name, { task })` 更换下一代任务。完整例子见 [USEGUIDE 的 Coroutine 节](./USEGUIDE.md#31-coroutine-task)。
 
 ## Probe
 

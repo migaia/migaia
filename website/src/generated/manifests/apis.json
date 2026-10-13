@@ -77140,7 +77140,9 @@
           "returns": "No explicit return annotation is declared for this const.",
           "errors": ["No documented errors are declared for abort."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for abort.",
-          "examples": [],
+          "examples": [
+            "import { defineHost } from '@migaia/plugin-host'\nimport { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\n/** 父模式拥有 task 与每个代次的消息端口。 */\nconst service = createCoroutinePlugin<{ math: { double(value: number): number } }>({\n  name: 'math',\n  task: async ({ connect, signal }) => {\n    /** 子模式通过 task 的 opaque connect 发布本端 provider。 */\n    const parent = createCoroutinePlugin({\n      name: 'parent',\n      connect,\n      provide: { math: { double: (value: number) => value * 2 } }\n    })\n    /** Task 负责释放自己创建的子 Host。 */\n    const childHost = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: {} })\n    try {\n      await childHost.use(parent)\n      /** Task settlement 就是退出；收到协作取消前持续提供服务。 */\n      await new Promise<void>((resolve) => {\n        if (signal.aborted) resolve()\n        else signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n    } finally {\n      await childHost.dispose()\n    }\n  }\n})\n/** 父 Host 释放时停止它拥有的 coroutine task。 */\nconst host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: {} })\ntry {\n  await host.use(service)\n  console.log(await host.coroutine!.request('math', 'math.double', 21)) // 42\n} finally {\n  await host.dispose()\n}"
+          ],
           "members": [],
           "aliasOf": "abort",
           "exportPath": ".",
@@ -77184,7 +77186,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/middleware/abort.d.ts:abort:export declare const abort: () => IRpcPlugin;",
           "guidance": [],
-          "usageScore": 14,
+          "usageScore": 24,
           "configuration": [],
           "fragment": "rpc-core-index--abort"
         },
@@ -77451,6 +77453,7 @@
           "examples": [
             "import { createRuntimePeer, type IRuntimePeerSource } from '@migaia/rpc-core/remote'\n\n/** 调用方交入实际协议通道的来源；握手和资源仍由该来源的 owner 完成。 */\nexport function createClientPeer(connect: IRuntimePeerSource) {\n  return createRuntimePeer({\n    provide: { ping: () => 'pong' },\n    connect\n  })\n}",
             "import { MessageChannel } from 'node:worker_threads'\nimport { createNodeThreadChannel, createThreadPeer } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IRemoteApi = {\n  math: { double: (value: number) => number }\n  feed: { count: (limit: number) => AsyncIterableIterator<number> }\n}\n/** 真实 MessagePort 是业务载体；创建方在最外层释放它们。 */\nconst { port1, port2 } = new MessageChannel()\ntry {\n  /** 双方在实际端口上确认能力，Peer 仍使用 Core 的同一套调用与类型规则。 */\n  const [peer, server] = await Promise.all([\n    createThreadPeer<IRemoteApi>({\n      self: { name: 'client', instanceId: 'client-1' },\n      connect: async (context) =>\n        createNodeThreadChannel(port1, 'server-1', {\n          scheduler: systemScheduler,\n          capabilities: context.capabilities\n        })\n    }),\n    createThreadPeer({\n      self: { name: 'server', instanceId: 'server-1' },\n      provide: {\n        math: { double: (value: number) => value * 2 },\n        feed: {\n          count: async function* (limit: number) {\n            for (let index = 1; index <= limit; index++) yield index\n          }\n        }\n      },\n      connect: async (context) =>\n        createNodeThreadChannel(port2, 'client-1', {\n          scheduler: systemScheduler,\n          capabilities: context.capabilities\n        })\n    })\n  ])\n  try {\n    console.log(await peer.request('math.double', 21)) // number：42\n    await peer.notify('math.double', 21) // 只确认发出，不确认业务完成\n    for await (const value of peer.stream('feed.count', 3)) console.log(value) // number：1、2、3\n    console.log(\n      await peer.group([\n        { method: 'math.double', payload: 2 },\n        { method: 'math.double', payload: 3 }\n      ])\n    ) // 顺序执行，得到两个步骤结果\n    console.log(await peer.outcome('not-issued')) // unknown 不能证明某个业务操作没有执行\n  } finally {\n    await Promise.all([peer.close(), server.close()])\n  }\n} finally {\n  port1.close()\n  port2.close()\n}",
+            "import { defineHost } from '@migaia/plugin-host'\nimport { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\n/** 父模式拥有 task 与每个代次的消息端口。 */\nconst service = createCoroutinePlugin<{ math: { double(value: number): number } }>({\n  name: 'math',\n  task: async ({ connect, signal }) => {\n    /** 子模式通过 task 的 opaque connect 发布本端 provider。 */\n    const parent = createCoroutinePlugin({\n      name: 'parent',\n      connect,\n      provide: { math: { double: (value: number) => value * 2 } }\n    })\n    /** Task 负责释放自己创建的子 Host。 */\n    const childHost = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: {} })\n    try {\n      await childHost.use(parent)\n      /** Task settlement 就是退出；收到协作取消前持续提供服务。 */\n      await new Promise<void>((resolve) => {\n        if (signal.aborted) resolve()\n        else signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n    } finally {\n      await childHost.dispose()\n    }\n  }\n})\n/** 父 Host 释放时停止它拥有的 coroutine task。 */\nconst host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: {} })\ntry {\n  await host.use(service)\n  console.log(await host.coroutine!.request('math', 'math.double', 21)) // 42\n} finally {\n  await host.dispose()\n}",
             "import { connect, createEndpoint, type IRpcTransport } from '@migaia/rpc-core'\n\n/** transport 由实际载体提供；返回的 Endpoint 由调用方 dispose。 */\nexport function createClientEndpoint(transport: IRpcTransport) {\n  return createEndpoint({\n    id: 'client',\n    targetIds: ['server'],\n    transport,\n    middlewares: [connect({ transport })]\n  })\n}",
             "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({\n  id: 'server',\n  transport: right,\n  middlewares: [connect({ transport: right })]\n})\nserver.provide('add', (context) => {\n  const [a, b] = context.data as [number, number]\n  return context.success(a + b) // 或 context.failed(error)\n})\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['server'],\n  transport: left,\n  middlewares: [connect({ transport: left })]\n})\ntry {\n  const sum = await client.send<number>('server', 'add', [20, 22])\n  console.log(sum) // 42；data 必填，没有参数时传 null\n} finally {\n  await client.dispose()\n  await server.dispose()\n}",
             "import { MessageChannel, type MessagePort } from 'node:worker_threads'\nimport { defineMessageAdapter } from '@migaia/rpc-core/adapter'\n\n/** 把调用方实际持有的端口交给 Core 的现有消息 owner。 */\nconst adapter = defineMessageAdapter({ open: (port: MessagePort) => port })\n/** 原生端口由创建方持有，Peer.close() 释放借用的监听器。 */\nconst { port1, port2 } = new MessageChannel()\n/** 显式地址用于这两个独立端口的对称路由。 */\nconst [left, right] = await Promise.all([\n  adapter.peer<{ echo(value: number): number }>({\n    self: { name: 'left', instanceId: 'left' },\n    connect: port1,\n    peerId: 'right'\n  }),\n  adapter.peer({\n    self: { name: 'right', instanceId: 'right' },\n    connect: port2,\n    peerId: 'left',\n    provide: { echo: (value: number) => value }\n  })\n])\ntry {\n  console.log(await left.request('echo', 42)) // 42\n} finally {\n  await Promise.all([left.close(), right.close()])\n  port1.close()\n  port2.close()\n}",
@@ -77523,7 +77526,7 @@
               ]
             }
           ],
-          "usageScore": 162,
+          "usageScore": 202,
           "configuration": [],
           "fragment": "rpc-core-index--connect"
         },
@@ -91963,127 +91966,55 @@
       "architecturePath": "/en/architecture/rpc-core",
       "symbols": [
         {
-          "name": "createCoroutineHost",
-          "kind": "function",
-          "signature": "export declare function createCoroutineHost(\n  options: IRemoteCoroutineHostOptions,\n): IRemoteHostHandle;",
-          "declarationLine": 47,
-          "source": "packages/rpc-core/dist/remote/coroutine.d.ts",
-          "purpose": "Runs a Host catalog inside one cooperative in-memory unit.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createCoroutineHost.",
-          "advanced": "No additional advanced behavior is declared for createCoroutineHost.",
-          "parameters": ["options: IRemoteCoroutineHostOptions"],
-          "parameterDetails": [
-            {
-              "name": "options",
-              "type": "IRemoteCoroutineHostOptions",
-              "optional": false
-            }
-          ],
-          "returns": "IRemoteHostHandle",
-          "errors": ["No documented errors are declared for createCoroutineHost."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createCoroutineHost.",
-          "examples": [],
-          "members": [],
-          "aliasOf": "createCoroutineHost",
-          "exportPath": "./remote",
-          "overloadSignatures": [
-            "export declare function createCoroutineHost(options: IRemoteCoroutineHostOptions): IRemoteHostHandle;"
-          ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "options",
-                "type": "IRemoteCoroutineHostOptions",
-                "optional": false
-              }
-            ]
-          ],
-          "overloadReturns": ["IRemoteHostHandle"],
-          "whenToUse": "Use createCoroutineHost when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createCoroutineHost does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Runs a Host catalog inside one cooperative in-memory unit."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import createCoroutineHost from @migaia/rpc-core/remote, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use createCoroutineHost when its function contract and declared inputs match the result you need. Choose a different public symbol when createCoroutineHost does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createCoroutineHost."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createCoroutineHost."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/remote/coroutine.d.ts:createCoroutineHost:export declare function createCoroutineHost(options: IRemoteCoroutineHostOptions): IRemoteHostHandle;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-core-remote--createCoroutineHost"
-        },
-        {
           "name": "createCoroutinePlugin",
           "kind": "function",
-          "signature": "export declare function createCoroutinePlugin(\n  options: IRemoteCoroutinePluginOptions,\n): IRemotePluginDefinition;",
-          "declarationLine": 45,
-          "source": "packages/rpc-core/dist/remote/coroutine.d.ts",
-          "purpose": "Runs a Plugin contract inside one cooperative in-memory unit.",
+          "signature": "export declare function createCoroutinePlugin<\n  TRemote = Record<never, never>,\n  const TProvide extends IRuntimePeerProvide = Record<never, never>,\n  const TName extends string = string,\n  const TExpose extends readonly string[] = readonly [],\n  THost = unknown,\n>(\n  options: (ICoroutineParentOptions | ICoroutineChildOptions) &\n    Readonly<{\n      name: TName;\n      provide?: TProvide;\n      expose?: TExpose &\n        (unknown extends THost\n          ? unknown\n          : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]);\n    }>,\n): ReturnType<typeof createRuntimePlugin> &\n  IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'coroutine'>;",
+          "declarationLine": 21,
+          "source": "packages/rpc-core/dist/remote/runtime-api/coroutine-plugin.d.ts",
+          "purpose": "Install one parent or child connection into the canonical coroutine Host slot.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createCoroutinePlugin.",
           "advanced": "No additional advanced behavior is declared for createCoroutinePlugin.",
-          "parameters": ["options: IRemoteCoroutinePluginOptions"],
+          "parameters": [
+            "options: (ICoroutineParentOptions | ICoroutineChildOptions) & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>"
+          ],
           "parameterDetails": [
             {
               "name": "options",
-              "type": "IRemoteCoroutinePluginOptions",
+              "type": "(ICoroutineParentOptions | ICoroutineChildOptions) & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>",
               "optional": false
             }
           ],
-          "returns": "IRemotePluginDefinition",
+          "returns": "ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'coroutine'>",
           "errors": ["No documented errors are declared for createCoroutinePlugin."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createCoroutinePlugin.",
-          "examples": [],
+          "examples": [
+            "import { defineHost } from '@migaia/plugin-host'\nimport { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\n/** 父模式拥有 task 与每个代次的消息端口。 */\nconst service = createCoroutinePlugin<{ math: { double(value: number): number } }>({\n  name: 'math',\n  task: async ({ connect, signal }) => {\n    /** 子模式通过 task 的 opaque connect 发布本端 provider。 */\n    const parent = createCoroutinePlugin({\n      name: 'parent',\n      connect,\n      provide: { math: { double: (value: number) => value * 2 } }\n    })\n    /** Task 负责释放自己创建的子 Host。 */\n    const childHost = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: {} })\n    try {\n      await childHost.use(parent)\n      /** Task settlement 就是退出；收到协作取消前持续提供服务。 */\n      await new Promise<void>((resolve) => {\n        if (signal.aborted) resolve()\n        else signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n    } finally {\n      await childHost.dispose()\n    }\n  }\n})\n/** 父 Host 释放时停止它拥有的 coroutine task。 */\nconst host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: {} })\ntry {\n  await host.use(service)\n  console.log(await host.coroutine!.request('math', 'math.double', 21)) // 42\n} finally {\n  await host.dispose()\n}"
+          ],
           "members": [],
           "aliasOf": "createCoroutinePlugin",
           "exportPath": "./remote",
           "overloadSignatures": [
-            "export declare function createCoroutinePlugin(options: IRemoteCoroutinePluginOptions): IRemotePluginDefinition;"
+            "export declare function createCoroutinePlugin<TRemote = Record<never, never>, const TProvide extends IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: (ICoroutineParentOptions | ICoroutineChildOptions) & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'coroutine'>;"
           ],
           "overloadParameterDetails": [
             [
               {
                 "name": "options",
-                "type": "IRemoteCoroutinePluginOptions",
+                "type": "(ICoroutineParentOptions | ICoroutineChildOptions) & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>",
                 "optional": false
               }
             ]
           ],
-          "overloadReturns": ["IRemotePluginDefinition"],
+          "overloadReturns": [
+            "ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'coroutine'>"
+          ],
           "whenToUse": "Use createCoroutinePlugin when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createCoroutinePlugin does not match the required inputs or return contract.",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Runs a Plugin contract inside one cooperative in-memory unit."
+              "content": "Install one parent or child connection into the canonical coroutine Host slot."
             },
             {
               "id": "getting-started",
@@ -92112,9 +92043,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/remote/coroutine.d.ts:createCoroutinePlugin:export declare function createCoroutinePlugin(options: IRemoteCoroutinePluginOptions): IRemotePluginDefinition;",
+          "identity": "packages/rpc-core/dist/remote/runtime-api/coroutine-plugin.d.ts:createCoroutinePlugin:export declare function createCoroutinePlugin<TRemote = Record<never, never>, const TProvide extends IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: (ICoroutineParentOptions | ICoroutineChildOptions) & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'coroutine'>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 38,
           "configuration": [],
           "fragment": "rpc-core-remote--createCoroutinePlugin"
         },
@@ -92997,6 +92928,454 @@
           "fragment": "rpc-core-remote--DEFAULT_DRAIN_MS"
         },
         {
+          "name": "ICoroutineChildOptions",
+          "kind": "type",
+          "signature": "export type ICoroutineChildOptions = ICoroutineCommonOptions &\n  Readonly<{ connect: ICoroutineConnect; task?: never; supervisor?: never }>;",
+          "declarationLine": 15,
+          "source": "packages/rpc-core/dist/remote/runtime-api/coroutine-plugin.d.ts",
+          "purpose": "Child installation connects its task generation and creates no additional unit.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICoroutineChildOptions.",
+          "advanced": "No additional advanced behavior is declared for ICoroutineChildOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ICoroutineChildOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICoroutineChildOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "ICoroutineChildOptions",
+          "exportPath": "./remote",
+          "overloadSignatures": [
+            "export type ICoroutineChildOptions = ICoroutineCommonOptions & Readonly<{ connect: ICoroutineConnect; task?: never; supervisor?: never; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ICoroutineChildOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ICoroutineChildOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Child installation connects its task generation and creates no additional unit."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICoroutineChildOptions from @migaia/rpc-core/remote, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICoroutineChildOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when ICoroutineChildOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICoroutineChildOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ICoroutineChildOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-core/dist/remote/runtime-api/coroutine-plugin.d.ts:ICoroutineChildOptions:export type ICoroutineChildOptions = ICoroutineCommonOptions & Readonly<{ connect: ICoroutineConnect; task?: never; supervisor?: never; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-core-remote--ICoroutineChildOptions"
+        },
+        {
+          "name": "ICoroutineConnect",
+          "kind": "type",
+          "signature": "export type ICoroutineConnect = Readonly<{\n  readonly __coroutineConnect: unique symbol;\n}>;",
+          "declarationLine": 4,
+          "source": "packages/rpc-core/dist/remote/runtime-api/coroutine-task.d.ts",
+          "purpose": "Opaque connection belongs to one task generation and reveals no physical port operation.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICoroutineConnect.",
+          "advanced": "No additional advanced behavior is declared for ICoroutineConnect.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ICoroutineConnect."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICoroutineConnect.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "ICoroutineConnect",
+          "exportPath": "./remote",
+          "overloadSignatures": [
+            "export type ICoroutineConnect = Readonly<{ readonly __coroutineConnect: unique symbol; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ICoroutineConnect when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ICoroutineConnect does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Opaque connection belongs to one task generation and reveals no physical port operation."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICoroutineConnect from @migaia/rpc-core/remote, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICoroutineConnect when its type contract and declared inputs match the result you need. Choose a different public symbol when ICoroutineConnect does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICoroutineConnect."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ICoroutineConnect."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-core/dist/remote/runtime-api/coroutine-task.d.ts:ICoroutineConnect:export type ICoroutineConnect = Readonly<{ readonly __coroutineConnect: unique symbol; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-core-remote--ICoroutineConnect"
+        },
+        {
+          "name": "ICoroutineParentOptions",
+          "kind": "type",
+          "signature": "export type ICoroutineParentOptions = ICoroutineCommonOptions &\n  Readonly<{\n    task: ICoroutineUserTask;\n    supervisor?: ICoroutineSupervisorPolicy;\n    connect?: never;\n  }>;",
+          "declarationLine": 9,
+          "source": "packages/rpc-core/dist/remote/runtime-api/coroutine-plugin.d.ts",
+          "purpose": "Parent installation creates one managed cooperative unit using existing supervision.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICoroutineParentOptions.",
+          "advanced": "No additional advanced behavior is declared for ICoroutineParentOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ICoroutineParentOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICoroutineParentOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "ICoroutineParentOptions",
+          "exportPath": "./remote",
+          "overloadSignatures": [
+            "export type ICoroutineParentOptions = ICoroutineCommonOptions & Readonly<{ task: ICoroutineUserTask; supervisor?: ICoroutineSupervisorPolicy; connect?: never; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ICoroutineParentOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ICoroutineParentOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Parent installation creates one managed cooperative unit using existing supervision."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICoroutineParentOptions from @migaia/rpc-core/remote, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICoroutineParentOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when ICoroutineParentOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICoroutineParentOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ICoroutineParentOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-core/dist/remote/runtime-api/coroutine-plugin.d.ts:ICoroutineParentOptions:export type ICoroutineParentOptions = ICoroutineCommonOptions & Readonly<{ task: ICoroutineUserTask; supervisor?: ICoroutineSupervisorPolicy; connect?: never; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-core-remote--ICoroutineParentOptions"
+        },
+        {
+          "name": "ICoroutineReplaceSpec",
+          "kind": "type",
+          "signature": "export type ICoroutineReplaceSpec = Readonly<{ task: ICoroutineUserTask }>;",
+          "declarationLine": 16,
+          "source": "packages/rpc-core/dist/remote/runtime-api/coroutine-task.d.ts",
+          "purpose": "Replacements select a new user task while the supervisor owns generation and admission.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICoroutineReplaceSpec.",
+          "advanced": "No additional advanced behavior is declared for ICoroutineReplaceSpec.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ICoroutineReplaceSpec."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICoroutineReplaceSpec.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "ICoroutineReplaceSpec",
+          "exportPath": "./remote",
+          "overloadSignatures": [
+            "export type ICoroutineReplaceSpec = Readonly<{ task: ICoroutineUserTask; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ICoroutineReplaceSpec when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ICoroutineReplaceSpec does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Replacements select a new user task while the supervisor owns generation and admission."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICoroutineReplaceSpec from @migaia/rpc-core/remote, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICoroutineReplaceSpec when its type contract and declared inputs match the result you need. Choose a different public symbol when ICoroutineReplaceSpec does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICoroutineReplaceSpec."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ICoroutineReplaceSpec."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-core/dist/remote/runtime-api/coroutine-task.d.ts:ICoroutineReplaceSpec:export type ICoroutineReplaceSpec = Readonly<{ task: ICoroutineUserTask; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-core-remote--ICoroutineReplaceSpec"
+        },
+        {
+          "name": "ICoroutineSupervisorPolicy",
+          "kind": "type",
+          "signature": "export type ICoroutineSupervisorPolicy = Readonly<\n  Partial<\n    Pick<\n      ICoroutineSupervisorOptions<MessagePort>,\n      | 'restart'\n      | 'terminalPolicy'\n      | 'startupTimeoutMs'\n      | 'stop'\n      | 'budget'\n      | 'heartbeat'\n    >\n  >\n>;",
+          "declarationLine": 7,
+          "source": "packages/rpc-core/dist/remote/runtime-api/coroutine-binding.d.ts",
+          "purpose": "Coroutine policy borrows the existing profile's admission and cooperative teardown options.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICoroutineSupervisorPolicy.",
+          "advanced": "No additional advanced behavior is declared for ICoroutineSupervisorPolicy.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ICoroutineSupervisorPolicy."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICoroutineSupervisorPolicy.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "ICoroutineSupervisorPolicy",
+          "exportPath": "./remote",
+          "overloadSignatures": [
+            "export type ICoroutineSupervisorPolicy = Readonly<Partial<Pick<ICoroutineSupervisorOptions<MessagePort>, 'restart' | 'terminalPolicy' | 'startupTimeoutMs' | 'stop' | 'budget' | 'heartbeat'>>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ICoroutineSupervisorPolicy when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ICoroutineSupervisorPolicy does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Coroutine policy borrows the existing profile's admission and cooperative teardown options."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICoroutineSupervisorPolicy from @migaia/rpc-core/remote, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICoroutineSupervisorPolicy when its type contract and declared inputs match the result you need. Choose a different public symbol when ICoroutineSupervisorPolicy does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICoroutineSupervisorPolicy."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ICoroutineSupervisorPolicy."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-core/dist/remote/runtime-api/coroutine-binding.d.ts:ICoroutineSupervisorPolicy:export type ICoroutineSupervisorPolicy = Readonly<Partial<Pick<ICoroutineSupervisorOptions<MessagePort>, 'restart' | 'terminalPolicy' | 'startupTimeoutMs' | 'stop' | 'budget' | 'heartbeat'>>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-core-remote--ICoroutineSupervisorPolicy"
+        },
+        {
+          "name": "ICoroutineTaskContext",
+          "kind": "type",
+          "signature": "export type ICoroutineTaskContext = Readonly<{\n  signal: IAbortSignal;\n  heartbeat(): void;\n  connect: ICoroutineConnect;\n}>;",
+          "declarationLine": 8,
+          "source": "packages/rpc-core/dist/remote/runtime-api/coroutine-task.d.ts",
+          "purpose": "Cooperative task work shares the supervisor's original signal and heartbeat owner.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICoroutineTaskContext.",
+          "advanced": "No additional advanced behavior is declared for ICoroutineTaskContext.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ICoroutineTaskContext."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICoroutineTaskContext.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "ICoroutineTaskContext",
+          "exportPath": "./remote",
+          "overloadSignatures": [
+            "export type ICoroutineTaskContext = Readonly<{ signal: IAbortSignal; heartbeat(): void; connect: ICoroutineConnect; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ICoroutineTaskContext when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ICoroutineTaskContext does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Cooperative task work shares the supervisor's original signal and heartbeat owner."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICoroutineTaskContext from @migaia/rpc-core/remote, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICoroutineTaskContext when its type contract and declared inputs match the result you need. Choose a different public symbol when ICoroutineTaskContext does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICoroutineTaskContext."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ICoroutineTaskContext."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-core/dist/remote/runtime-api/coroutine-task.d.ts:ICoroutineTaskContext:export type ICoroutineTaskContext = Readonly<{ signal: IAbortSignal; heartbeat(): void; connect: ICoroutineConnect; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-core-remote--ICoroutineTaskContext"
+        },
+        {
+          "name": "ICoroutineUserTask",
+          "kind": "type",
+          "signature": "export type ICoroutineUserTask = (\n  context: ICoroutineTaskContext,\n) => PromiseLike<unknown> | void;",
+          "declarationLine": 14,
+          "source": "packages/rpc-core/dist/remote/runtime-api/coroutine-task.d.ts",
+          "purpose": "User task settlement is the native coroutine exit; a rejection keeps its original cause.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICoroutineUserTask.",
+          "advanced": "No additional advanced behavior is declared for ICoroutineUserTask.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ICoroutineUserTask."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICoroutineUserTask.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "ICoroutineUserTask",
+          "exportPath": "./remote",
+          "overloadSignatures": [
+            "export type ICoroutineUserTask = (context: ICoroutineTaskContext) => PromiseLike<unknown> | void;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ICoroutineUserTask when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ICoroutineUserTask does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "User task settlement is the native coroutine exit; a rejection keeps its original cause."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICoroutineUserTask from @migaia/rpc-core/remote, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICoroutineUserTask when its type contract and declared inputs match the result you need. Choose a different public symbol when ICoroutineUserTask does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICoroutineUserTask."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ICoroutineUserTask."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-core/dist/remote/runtime-api/coroutine-task.d.ts:ICoroutineUserTask:export type ICoroutineUserTask = (context: ICoroutineTaskContext) => PromiseLike<unknown> | void;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-core-remote--ICoroutineUserTask"
+        },
+        {
           "name": "IRemoteBinding",
           "kind": "type",
           "signature": "export type IRemoteBinding<TUnit, TSpec> = Readonly<{\n  ownership: 'owned' | 'borrowed';\n  supervisor: ISupervisor<TUnit, TSpec>;\n  scheduler: IScheduler;\n  openChannel(unit: TUnit, signal: IAbortSignal): Promise<IRemoteChannel>;\n  /** Existing native drain tracks runtime requests that bypass the legacy endpoint.send wrapper. */ trackRequest?: IRemoteRequestTracker;\n}>;",
@@ -93379,198 +93758,6 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-core-remote--IRemoteControlDefinition"
-        },
-        {
-          "name": "IRemoteCoroutineHostOptions",
-          "kind": "type",
-          "signature": "export type IRemoteCoroutineHostOptions = IRemoteCoroutineCommon &\n  Readonly<{ catalog: IRemoteHostCatalog }>;",
-          "declarationLine": 32,
-          "source": "packages/rpc-core/dist/remote/coroutine.d.ts",
-          "purpose": "Host mode supplies only a catalog; the task supplies its server Host on serve.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRemoteCoroutineHostOptions.",
-          "advanced": "No additional advanced behavior is declared for IRemoteCoroutineHostOptions.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRemoteCoroutineHostOptions."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRemoteCoroutineHostOptions.",
-          "examples": [],
-          "members": [],
-          "aliasOf": "IRemoteCoroutineHostOptions",
-          "exportPath": "./remote",
-          "overloadSignatures": [
-            "export type IRemoteCoroutineHostOptions = IRemoteCoroutineCommon & Readonly<{ catalog: IRemoteHostCatalog; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IRemoteCoroutineHostOptions when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRemoteCoroutineHostOptions does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Host mode supplies only a catalog; the task supplies its server Host on serve."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRemoteCoroutineHostOptions from @migaia/rpc-core/remote, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRemoteCoroutineHostOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IRemoteCoroutineHostOptions does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRemoteCoroutineHostOptions."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRemoteCoroutineHostOptions."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/remote/coroutine.d.ts:IRemoteCoroutineHostOptions:export type IRemoteCoroutineHostOptions = IRemoteCoroutineCommon & Readonly<{ catalog: IRemoteHostCatalog; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-core-remote--IRemoteCoroutineHostOptions"
-        },
-        {
-          "name": "IRemoteCoroutinePluginOptions",
-          "kind": "type",
-          "signature": "export type IRemoteCoroutinePluginOptions = IRemoteCoroutineCommon &\n  Readonly<{ name: string; contract: IRemoteContract; host: IRemotePluginHostPort }>;",
-          "declarationLine": 26,
-          "source": "packages/rpc-core/dist/remote/coroutine.d.ts",
-          "purpose": "Plugin mode needs a local Host enablement port for generation changes.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRemoteCoroutinePluginOptions.",
-          "advanced": "No additional advanced behavior is declared for IRemoteCoroutinePluginOptions.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRemoteCoroutinePluginOptions."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRemoteCoroutinePluginOptions.",
-          "examples": [],
-          "members": [],
-          "aliasOf": "IRemoteCoroutinePluginOptions",
-          "exportPath": "./remote",
-          "overloadSignatures": [
-            "export type IRemoteCoroutinePluginOptions = IRemoteCoroutineCommon & Readonly<{ name: string; contract: IRemoteContract; host: IRemotePluginHostPort; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IRemoteCoroutinePluginOptions when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRemoteCoroutinePluginOptions does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Plugin mode needs a local Host enablement port for generation changes."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRemoteCoroutinePluginOptions from @migaia/rpc-core/remote, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRemoteCoroutinePluginOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IRemoteCoroutinePluginOptions does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRemoteCoroutinePluginOptions."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRemoteCoroutinePluginOptions."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/remote/coroutine.d.ts:IRemoteCoroutinePluginOptions:export type IRemoteCoroutinePluginOptions = IRemoteCoroutineCommon & Readonly<{ name: string; contract: IRemoteContract; host: IRemotePluginHostPort; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-core-remote--IRemoteCoroutinePluginOptions"
-        },
-        {
-          "name": "IRemoteCoroutineTaskContext",
-          "kind": "type",
-          "signature": "export type IRemoteCoroutineTaskContext = Readonly<{\n  signal: IAbortSignal;\n  heartbeat(): void;\n  serve(\n    host: IRemoteServeHostOptions['host'],\n    resolvePlugin?: IRemoteHostPluginResolver,\n  ): Promise<void>;\n}>;",
-          "declarationLine": 11,
-          "source": "packages/rpc-core/dist/remote/coroutine.d.ts",
-          "purpose": "A cooperative task publishes one in-memory RPC channel per generation.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRemoteCoroutineTaskContext.",
-          "advanced": "No additional advanced behavior is declared for IRemoteCoroutineTaskContext.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IRemoteCoroutineTaskContext."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRemoteCoroutineTaskContext.",
-          "examples": [],
-          "members": [],
-          "aliasOf": "IRemoteCoroutineTaskContext",
-          "exportPath": "./remote",
-          "overloadSignatures": [
-            "export type IRemoteCoroutineTaskContext = Readonly<{ signal: IAbortSignal; heartbeat(): void; serve(host: IRemoteServeHostOptions['host'], resolvePlugin?: IRemoteHostPluginResolver): Promise<void>; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IRemoteCoroutineTaskContext when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IRemoteCoroutineTaskContext does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "A cooperative task publishes one in-memory RPC channel per generation."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRemoteCoroutineTaskContext from @migaia/rpc-core/remote, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRemoteCoroutineTaskContext when its type contract and declared inputs match the result you need. Choose a different public symbol when IRemoteCoroutineTaskContext does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRemoteCoroutineTaskContext."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IRemoteCoroutineTaskContext."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/remote/coroutine.d.ts:IRemoteCoroutineTaskContext:export type IRemoteCoroutineTaskContext = Readonly<{ signal: IAbortSignal; heartbeat(): void; serve(host: IRemoteServeHostOptions['host'], resolvePlugin?: IRemoteHostPluginResolver): Promise<void>; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-core-remote--IRemoteCoroutineTaskContext"
         },
         {
           "name": "IRemoteEndpointFactory",
@@ -95399,7 +95586,7 @@
           "name": "IRuntimeListFilter",
           "kind": "type",
           "signature": "export type IRuntimeListFilter = Readonly<{\n  state?: SupervisorState;\n  name?:\n    | Readonly<{ exact: string; prefix?: never }>\n    | Readonly<{ prefix: string; exact?: never }>;\n  kind?: RuntimeSourceKind;\n  direction?: RuntimeConnectionDirection;\n}>;",
-          "declarationLine": 44,
+          "declarationLine": 45,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Filters keep local source selection distinct from the connection's remote direction.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListFilter.",
@@ -95463,7 +95650,7 @@
           "name": "IRuntimeListOptions",
           "kind": "type",
           "signature": "export type IRuntimeListOptions = IRuntimeQueryOptions &\n  Readonly<{ filter?: IRuntimeListFilter }>;",
-          "declarationLine": 57,
+          "declarationLine": 58,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Formatting never changes which canonical registration records the filter selects.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListOptions.",
@@ -96169,7 +96356,7 @@
           "name": "IRuntimeProcessStopOptions",
           "kind": "type",
           "signature": "export type IRuntimeProcessStopOptions = Readonly<{\n  graceMs?: number;\n  signal?: 'SIGTERM';\n}>;",
-          "declarationLine": 81,
+          "declarationLine": 82,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Process signals are limited to the native graceful operation already owned by the launcher.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeProcessStopOptions.",
@@ -96489,7 +96676,7 @@
           "name": "IRuntimeThreadStopOptions",
           "kind": "type",
           "signature": "export type IRuntimeThreadStopOptions = Readonly<{ graceMs?: number }>;",
-          "declarationLine": 86,
+          "declarationLine": 87,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Threads have no OS signal and never terminate their shared PID.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeThreadStopOptions.",
@@ -97542,7 +97729,7 @@
           "name": "RuntimeApiMode",
           "kind": "const",
           "signature": "export declare const RuntimeApiMode: {\n  readonly request: 'request';\n  readonly notify: 'notify';\n  readonly stream: 'stream';\n};\nexport type RuntimeApiMode = (typeof RuntimeApiMode)[keyof typeof RuntimeApiMode];",
-          "declarationLine": 70,
+          "declarationLine": 75,
           "source": "packages/rpc-core/dist/remote/runtime-api/constants.d.ts",
           "purpose": "Routes describe actual installed call capabilities, never inferred handler return shapes.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RuntimeApiMode.",
@@ -97607,7 +97794,7 @@
           "name": "RuntimeConnectionDirection",
           "kind": "const",
           "signature": "export declare const RuntimeConnectionDirection: {\n  readonly spawned: 'spawned';\n  readonly spawnedBy: 'spawned-by';\n  readonly connect: 'connect';\n  readonly listen: 'listen';\n};\nexport type RuntimeConnectionDirection =\n  (typeof RuntimeConnectionDirection)[keyof typeof RuntimeConnectionDirection];",
-          "declarationLine": 90,
+          "declarationLine": 95,
           "source": "packages/rpc-core/dist/remote/runtime-api/constants.d.ts",
           "purpose": "Automatic children report the trusted bootstrap direction, never a guessed parent role.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RuntimeConnectionDirection.",
@@ -97671,8 +97858,8 @@
         {
           "name": "RuntimeEventName",
           "kind": "const",
-          "signature": "export declare const RuntimeEventName: {\n  readonly ready: 'ready';\n  readonly exit: 'exit';\n  readonly degraded: 'degraded';\n  readonly restart: 'restart';\n  readonly liquidated: 'liquidated';\n};\nexport type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];",
-          "declarationLine": 148,
+          "signature": "export declare const RuntimeEventName: {\n  readonly ready: 'ready';\n  readonly exit: 'exit';\n  readonly degraded: 'degraded';\n  readonly restart: 'restart';\n  readonly terminal: 'terminal';\n  readonly liquidated: 'liquidated';\n};\nexport type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];",
+          "declarationLine": 153,
           "source": "packages/rpc-core/dist/remote/runtime-api/constants.d.ts",
           "purpose": "Passive management events come only from original lifecycle and successful liquidation facts.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RuntimeEventName.",
@@ -97687,7 +97874,7 @@
           "aliasOf": "RuntimeEventName",
           "exportPath": "./remote",
           "overloadSignatures": [
-            "export declare const RuntimeEventName: { readonly ready: \"ready\"; readonly exit: \"exit\"; readonly degraded: \"degraded\"; readonly restart: \"restart\"; readonly liquidated: \"liquidated\"; };",
+            "export declare const RuntimeEventName: { readonly ready: \"ready\"; readonly exit: \"exit\"; readonly degraded: \"degraded\"; readonly restart: \"restart\"; readonly terminal: \"terminal\"; readonly liquidated: \"liquidated\"; };",
             "export type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];"
           ],
           "overloadParameterDetails": [[], []],
@@ -97727,7 +97914,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/remote/runtime-api/constants.d.ts:RuntimeEventName:export declare const RuntimeEventName: { readonly ready: \"ready\"; readonly exit: \"exit\"; readonly degraded: \"degraded\"; readonly restart: \"restart\"; readonly liquidated: \"liquidated\"; };\nexport type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];",
+          "identity": "packages/rpc-core/dist/remote/runtime-api/constants.d.ts:RuntimeEventName:export declare const RuntimeEventName: { readonly ready: \"ready\"; readonly exit: \"exit\"; readonly degraded: \"degraded\"; readonly restart: \"restart\"; readonly terminal: \"terminal\"; readonly liquidated: \"liquidated\"; };\nexport type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -97736,10 +97923,10 @@
         {
           "name": "RuntimePluginKey",
           "kind": "const",
-          "signature": "export declare const RuntimePluginKey: Readonly<{\n  readonly process: 'process';\n  readonly thread: 'thread';\n}>;",
-          "declarationLine": 59,
+          "signature": "export declare const RuntimePluginKey: Readonly<{\n  readonly process: 'process';\n  readonly thread: 'thread';\n  readonly coroutine: 'coroutine';\n}>;",
+          "declarationLine": 63,
           "source": "packages/rpc-core/dist/remote/runtime-api/constants.d.ts",
-          "purpose": "Applications use these scalar labels to identify process/thread Plugin and query metadata. A label grants no Host slot or native execution authority; those belong to held resources.",
+          "purpose": "Applications use these scalar labels to identify runtime Plugin and query metadata. A label grants no Host slot or native execution authority; those belong to held resources.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RuntimePluginKey.",
           "advanced": "No additional advanced behavior is declared for RuntimePluginKey.",
           "parameters": ["This const declaration has no parameters."],
@@ -97752,7 +97939,7 @@
           "aliasOf": "RuntimePluginKey",
           "exportPath": "./remote",
           "overloadSignatures": [
-            "export declare const RuntimePluginKey: Readonly<{ readonly process: \"process\"; readonly thread: \"thread\"; }>;"
+            "export declare const RuntimePluginKey: Readonly<{ readonly process: \"process\"; readonly thread: \"thread\"; readonly coroutine: \"coroutine\"; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -97762,7 +97949,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Applications use these scalar labels to identify process/thread Plugin and query metadata. A label grants no Host slot or native execution authority; those belong to held resources."
+              "content": "Applications use these scalar labels to identify runtime Plugin and query metadata. A label grants no Host slot or native execution authority; those belong to held resources."
             },
             {
               "id": "getting-started",
@@ -97791,7 +97978,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/remote/runtime-api/constants.d.ts:RuntimePluginKey:export declare const RuntimePluginKey: Readonly<{ readonly process: \"process\"; readonly thread: \"thread\"; }>;",
+          "identity": "packages/rpc-core/dist/remote/runtime-api/constants.d.ts:RuntimePluginKey:export declare const RuntimePluginKey: Readonly<{ readonly process: \"process\"; readonly thread: \"thread\"; readonly coroutine: \"coroutine\"; }>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -97801,7 +97988,7 @@
           "name": "RuntimeQueryStatus",
           "kind": "const",
           "signature": "export declare const RuntimeQueryStatus: {\n  readonly unavailable: 'unavailable';\n  readonly ready: 'ready';\n  readonly closed: 'closed';\n  readonly departed: 'departed';\n};",
-          "declarationLine": 98,
+          "declarationLine": 103,
           "source": "packages/rpc-core/dist/remote/runtime-api/constants.d.ts",
           "purpose": "Query absence is explicit and portable across all supported output formats.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RuntimeQueryStatus.",
@@ -97865,7 +98052,7 @@
           "name": "RuntimeSourceKind",
           "kind": "const",
           "signature": "export declare const RuntimeSourceKind: {\n  readonly spawn: 'spawn';\n  readonly connect: 'connect';\n  readonly listen: 'listen';\n};\nexport type RuntimeSourceKind =\n  (typeof RuntimeSourceKind)[keyof typeof RuntimeSourceKind];",
-          "declarationLine": 83,
+          "declarationLine": 88,
           "source": "packages/rpc-core/dist/remote/runtime-api/constants.d.ts",
           "purpose": "Source configuration and connection direction are separate local query axes.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RuntimeSourceKind.",
@@ -108092,7 +108279,7 @@
           "name": "IRuntimeListFilter",
           "kind": "type",
           "signature": "export type IRuntimeListFilter = Readonly<{\n  state?: SupervisorState;\n  name?:\n    | Readonly<{ exact: string; prefix?: never }>\n    | Readonly<{ prefix: string; exact?: never }>;\n  kind?: RuntimeSourceKind;\n  direction?: RuntimeConnectionDirection;\n}>;",
-          "declarationLine": 44,
+          "declarationLine": 45,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Filters keep local source selection distinct from the connection's remote direction.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListFilter.",
@@ -108156,7 +108343,7 @@
           "name": "IRuntimeListOptions",
           "kind": "type",
           "signature": "export type IRuntimeListOptions = IRuntimeQueryOptions &\n  Readonly<{ filter?: IRuntimeListFilter }>;",
-          "declarationLine": 57,
+          "declarationLine": 58,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Formatting never changes which canonical registration records the filter selects.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListOptions.",
@@ -108412,7 +108599,7 @@
           "name": "IRuntimeProcessStopOptions",
           "kind": "type",
           "signature": "export type IRuntimeProcessStopOptions = Readonly<{\n  graceMs?: number;\n  signal?: 'SIGTERM';\n}>;",
-          "declarationLine": 81,
+          "declarationLine": 82,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Process signals are limited to the native graceful operation already owned by the launcher.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeProcessStopOptions.",
@@ -109935,8 +110122,8 @@
         {
           "name": "RuntimeEventName",
           "kind": "const",
-          "signature": "export declare const RuntimeEventName: {\n  readonly ready: 'ready';\n  readonly exit: 'exit';\n  readonly degraded: 'degraded';\n  readonly restart: 'restart';\n  readonly liquidated: 'liquidated';\n};\nexport type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];",
-          "declarationLine": 148,
+          "signature": "export declare const RuntimeEventName: {\n  readonly ready: 'ready';\n  readonly exit: 'exit';\n  readonly degraded: 'degraded';\n  readonly restart: 'restart';\n  readonly terminal: 'terminal';\n  readonly liquidated: 'liquidated';\n};\nexport type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];",
+          "declarationLine": 153,
           "source": "packages/rpc-core/dist/remote/runtime-api/constants.d.ts",
           "purpose": "Passive management events come only from original lifecycle and successful liquidation facts.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RuntimeEventName.",
@@ -109951,7 +110138,7 @@
           "aliasOf": "RuntimeEventName",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const RuntimeEventName: { readonly ready: \"ready\"; readonly exit: \"exit\"; readonly degraded: \"degraded\"; readonly restart: \"restart\"; readonly liquidated: \"liquidated\"; };",
+            "export declare const RuntimeEventName: { readonly ready: \"ready\"; readonly exit: \"exit\"; readonly degraded: \"degraded\"; readonly restart: \"restart\"; readonly terminal: \"terminal\"; readonly liquidated: \"liquidated\"; };",
             "export type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];"
           ],
           "overloadParameterDetails": [[], []],
@@ -109991,7 +110178,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "@migaia/rpc-process:packages/rpc-core/dist/remote/runtime-api/constants.d.ts:RuntimeEventName:export declare const RuntimeEventName: { readonly ready: \"ready\"; readonly exit: \"exit\"; readonly degraded: \"degraded\"; readonly restart: \"restart\"; readonly liquidated: \"liquidated\"; };\nexport type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];",
+          "identity": "@migaia/rpc-process:packages/rpc-core/dist/remote/runtime-api/constants.d.ts:RuntimeEventName:export declare const RuntimeEventName: { readonly ready: \"ready\"; readonly exit: \"exit\"; readonly degraded: \"degraded\"; readonly restart: \"restart\"; readonly terminal: \"terminal\"; readonly liquidated: \"liquidated\"; };\nexport type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -113086,7 +113273,7 @@
           "name": "IRuntimeListFilter",
           "kind": "type",
           "signature": "export type IRuntimeListFilter = Readonly<{\n  state?: SupervisorState;\n  name?:\n    | Readonly<{ exact: string; prefix?: never }>\n    | Readonly<{ prefix: string; exact?: never }>;\n  kind?: RuntimeSourceKind;\n  direction?: RuntimeConnectionDirection;\n}>;",
-          "declarationLine": 44,
+          "declarationLine": 45,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Filters keep local source selection distinct from the connection's remote direction.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListFilter.",
@@ -113150,7 +113337,7 @@
           "name": "IRuntimeListOptions",
           "kind": "type",
           "signature": "export type IRuntimeListOptions = IRuntimeQueryOptions &\n  Readonly<{ filter?: IRuntimeListFilter }>;",
-          "declarationLine": 57,
+          "declarationLine": 58,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Formatting never changes which canonical registration records the filter selects.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeListOptions.",
@@ -113726,7 +113913,7 @@
           "name": "IRuntimeThreadStopOptions",
           "kind": "type",
           "signature": "export type IRuntimeThreadStopOptions = Readonly<{ graceMs?: number }>;",
-          "declarationLine": 86,
+          "declarationLine": 87,
           "source": "packages/rpc-core/dist/remote/runtime-api/outlet.d.ts",
           "purpose": "Threads have no OS signal and never terminate their shared PID.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeThreadStopOptions.",
@@ -114923,8 +115110,8 @@
         {
           "name": "RuntimeEventName",
           "kind": "const",
-          "signature": "export declare const RuntimeEventName: {\n  readonly ready: 'ready';\n  readonly exit: 'exit';\n  readonly degraded: 'degraded';\n  readonly restart: 'restart';\n  readonly liquidated: 'liquidated';\n};\nexport type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];",
-          "declarationLine": 148,
+          "signature": "export declare const RuntimeEventName: {\n  readonly ready: 'ready';\n  readonly exit: 'exit';\n  readonly degraded: 'degraded';\n  readonly restart: 'restart';\n  readonly terminal: 'terminal';\n  readonly liquidated: 'liquidated';\n};\nexport type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];",
+          "declarationLine": 153,
           "source": "packages/rpc-core/dist/remote/runtime-api/constants.d.ts",
           "purpose": "Passive management events come only from original lifecycle and successful liquidation facts.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RuntimeEventName.",
@@ -114939,7 +115126,7 @@
           "aliasOf": "RuntimeEventName",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const RuntimeEventName: { readonly ready: \"ready\"; readonly exit: \"exit\"; readonly degraded: \"degraded\"; readonly restart: \"restart\"; readonly liquidated: \"liquidated\"; };",
+            "export declare const RuntimeEventName: { readonly ready: \"ready\"; readonly exit: \"exit\"; readonly degraded: \"degraded\"; readonly restart: \"restart\"; readonly terminal: \"terminal\"; readonly liquidated: \"liquidated\"; };",
             "export type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];"
           ],
           "overloadParameterDetails": [[], []],
@@ -114979,7 +115166,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/remote/runtime-api/constants.d.ts:RuntimeEventName:export declare const RuntimeEventName: { readonly ready: \"ready\"; readonly exit: \"exit\"; readonly degraded: \"degraded\"; readonly restart: \"restart\"; readonly liquidated: \"liquidated\"; };\nexport type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];",
+          "identity": "@migaia/rpc-threads:packages/rpc-core/dist/remote/runtime-api/constants.d.ts:RuntimeEventName:export declare const RuntimeEventName: { readonly ready: \"ready\"; readonly exit: \"exit\"; readonly degraded: \"degraded\"; readonly restart: \"restart\"; readonly terminal: \"terminal\"; readonly liquidated: \"liquidated\"; };\nexport type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
