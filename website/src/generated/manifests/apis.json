@@ -95783,7 +95783,7 @@
           "name": "IRuntimePeerProvide",
           "kind": "type",
           "signature": "export type IRuntimePeerProvide = Readonly<{\n  [name: string]: IRuntimePeerMethod | IRuntimePeerProvide;\n}>;",
-          "declarationLine": 8,
+          "declarationLine": 18,
           "source": "packages/rpc-core/dist/remote/runtime-api/catalog.d.ts",
           "purpose": "Explicit own data members are the only methods admitted to the automatic directory.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimePeerProvide.",

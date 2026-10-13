@@ -595,6 +595,16 @@
             ]
           },
           {
+            "id": "calls-during-install",
+            "heading": "Calls during install",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "A local Feature method in `expose` is callable from the moment the peer can reach it; calls that arrive during install are held until the plugin commits, and are refused with `TARGET_UNKNOWN` if it does not. This guarantee covers local Feature `expose` entries only; forward and catalog entries are not covered."
+              }
+            ]
+          },
+          {
             "id": "4-endpoint",
             "heading": "4. Endpoint",
             "blocks": [
@@ -20025,7 +20035,7 @@
           "name": "IRuntimePeerProvide",
           "kind": "type",
           "signature": "export type IRuntimePeerProvide = Readonly<{ [name: string]: IRuntimePeerMethod | IRuntimePeerProvide; }>;",
-          "declarationLine": 8,
+          "declarationLine": 18,
           "source": "packages/rpc-core/dist/remote/runtime-api/catalog.d.ts",
           "purpose": "Explicit own data members are the only methods admitted to the automatic directory.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimePeerProvide.",
