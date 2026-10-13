@@ -7715,6 +7715,12 @@
       "library": "rpc-process"
     },
     {
+      "path": "/en/docs/rpc-process/IProcessLaunchCommand",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
       "path": "/en/docs/rpc-process/IProcessLiquidationOwner",
       "locale": "en",
       "domain": "docs",
@@ -23766,6 +23772,12 @@
     },
     {
       "path": "/zh/docs/rpc-process/IProcessHostRegistrations",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/zh/docs/rpc-process/IProcessLaunchCommand",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-process"

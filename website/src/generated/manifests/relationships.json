@@ -13112,6 +13112,16 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/docs/rpc-process/IProcessLaunchCommand",
+      "to": "/en/guides/rpc-process",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-process",
+      "to": "/en/docs/rpc-process/IProcessLaunchCommand",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/docs/rpc-process/IProcessLiquidationOwner",
       "to": "/en/guides/rpc-process",
       "type": "domain-peer"
@@ -39599,6 +39609,16 @@
     {
       "from": "/zh/guides/rpc-process",
       "to": "/zh/docs/rpc-process/IProcessHostRegistrations",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-process/IProcessLaunchCommand",
+      "to": "/zh/guides/rpc-process",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-process",
+      "to": "/zh/docs/rpc-process/IProcessLaunchCommand",
       "type": "domain-peer"
     },
     {
@@ -131733,6 +131753,36 @@
     },
     {
       "from": "/en/docs/rpc-process",
+      "to": "/en/docs/rpc-process#rpc-process-index--IProcessLaunchCommand",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-process#rpc-process-index--IProcessLaunchCommand",
+      "to": "/en/docs/rpc-process",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-process#rpc-process-index--IProcessLaunchCommand",
+      "to": "/en/guides/rpc-process/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-process/getting-started",
+      "to": "/en/docs/rpc-process#rpc-process-index--IProcessLaunchCommand",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-process#rpc-process-index--IProcessLaunchCommand",
+      "to": "/en/architecture/rpc-process",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-process",
+      "to": "/en/docs/rpc-process#rpc-process-index--IProcessLaunchCommand",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-process",
       "to": "/en/docs/rpc-process#rpc-process-index--IProcessLiquidationOwner",
       "type": "api-symbol"
     },
@@ -134269,6 +134319,36 @@
     {
       "from": "/zh/architecture/rpc-process",
       "to": "/zh/docs/rpc-process#rpc-process-index--IProcessHostRegistrations",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-process",
+      "to": "/zh/docs/rpc-process#rpc-process-index--IProcessLaunchCommand",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-process#rpc-process-index--IProcessLaunchCommand",
+      "to": "/zh/docs/rpc-process",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-process#rpc-process-index--IProcessLaunchCommand",
+      "to": "/zh/guides/rpc-process/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-process/getting-started",
+      "to": "/zh/docs/rpc-process#rpc-process-index--IProcessLaunchCommand",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-process#rpc-process-index--IProcessLaunchCommand",
+      "to": "/zh/architecture/rpc-process",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-process",
+      "to": "/zh/docs/rpc-process#rpc-process-index--IProcessLaunchCommand",
       "type": "architecture-symbol"
     },
     {
