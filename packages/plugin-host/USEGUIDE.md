@@ -295,6 +295,25 @@ consumerHandle.extensions.formatValue(' value ')
 
 Feature 引用同时表达能力与依赖。Host 会按引用拓扑排序，所以调用方传入顺序不影响安装；必需 provider 缺失、禁用或移除时分别抛前置条件错误。可选依赖用 `provider.getFeature('format', { optional: true })` 声明。
 
+`readPluginDependencies(input)` 与 Host 共用 Feature 依赖解析，返回只读的 `{ provider, required }` 列表。它遍历本地 Feature 的完整闭包，按 provider 首次引用排序；同一 provider 同时被必需和可选引用时，`required` 为 `true`。输入可以是 `definePlugin` 结果、有效原始描述符，或 `openComposition(host).createPluginAdmission(plugin)` 创建的 admission。admission 形式读取安装使用的同一快照，不会再次读取 getter；其他输入只经标准 admission 快照读取一次。读取不会运行 setup、install 或 Feature 工厂，非法输入直接抛 admission 的原生错误。
+
+```ts
+import { readPluginDependencies } from '@migaia/plugin-host'
+import type {
+  IPluginDependency,
+  IPluginFeatureName,
+  IPluginFeatureOutput
+} from '@migaia/plugin-host'
+import { openComposition } from '@migaia/plugin-host/composition'
+
+const dependencies: readonly IPluginDependency[] = readPluginDependencies(consumer)
+// [{ provider: 'provider', required: true }]
+const admission = openComposition(host).createPluginAdmission(consumer)
+readPluginDependencies(admission)
+```
+
+`IPluginFeatureName<TPlugin>` 和 `IPluginFeatureOutput<TPlugin, TName>` 从根入口导出。`IFeatureReference<TOutput, TOptional, TProvider>` 的第三个参数默认 `string`；`getFeature()` 的两个重载都保留 provider 的名称字面量，供组合层推导依赖。
+
 ---
 
 ## 7. Pipeline 处理管线

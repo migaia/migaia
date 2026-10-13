@@ -4,9 +4,10 @@ export type IFeatureRecord = Readonly<Record<string, IFeature<any, any, any>>>
 /** Opaque reference to one named feature owned by another plugin definition. */
 export type IFeatureReference<
   TOutput extends object,
-  TOptional extends boolean = false
+  TOptional extends boolean = false,
+  TProvider extends string = string
 > = Readonly<{
-  readonly plugin: string
+  readonly plugin: TProvider
   readonly feature: string
   readonly optional: TOptional
   readonly __output?: TOutput
