@@ -8,6 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { spawn } from 'node:child_process'
 import { loadavg } from 'node:os'
 import { IpcBenchErrorText } from './error-text.mjs'
+import { IpcBenchDiagnostic } from './text.mjs'
 
 /** One canonical fixture vocabulary keeps the four acceptance cells and arms unchanged. */
 const ProbeBench = {
@@ -16,6 +17,14 @@ const ProbeBench = {
   installed: 'installed',
   guard: 'guard',
   timing: 'timing',
+  /** Diagnostic launches never qualify formal latency, throughput or exact counter acceptance. */
+  diagnostic: 'diagnostic',
+  /** One CLI choice selects existing warmed OOB CPU capture or allocation sampling. */
+  diagnosticOption: '--diagnostic',
+  /** Current source audits stay strict while closure supplies its own explicitly named evidence. */
+  collectorAuditOption: '--collector-audit',
+  /** Compact diagnostic summaries reference full original launch receipts without timing verdicts. */
+  diagnosticSummary: 'diagnostic-summary.json',
   collectorEnabled: '1',
   coreAcceptance: 'A5',
   rootAcceptance: 'A-perf',
@@ -193,26 +202,6 @@ if (arm !== undefined) {
           "inherit: ['PATH', 'NODE_OPTIONS', 'PROBE_BENCH_ARM', 'PROBE_BENCH_LANE', 'PROBE_BENCH_BASE_DIST', 'PROBE_BENCH_COLLECTOR', 'PROBE_BENCH_COLLECTOR_RING_SHA', 'PROBE_BENCH_COLLECTOR_AUDIT_SHA']"
         )
       }
-      if (
-        url.endsWith('/rpc-core/dist/remote/runtime-api/peer.js') &&
-        arm === ProbeBench.installed
-      ) {
-        /**
-         * Carrier managed sources currently omit probe when reconstructing options (D4/A7 gap). A5
-         * and root A-perf install at the actual Core constructor/preparation, preserving this exact
-         * options identity and its private preparation context. Managed construction prepares the
-         * endpoint before creating its facade, so both entries need the same genuine handle. This
-         * diagnostic changes only loaded source; it never edits the closed carrier write sets.
-         */
-        const pattern =
-          /(export async function (?:createRuntimePeer|prepareRuntimePeerEndpoint)\(options,[\s\S]*?\)\s*\{)/gu
-        if (Array.from(source.matchAll(pattern)).length !== 2)
-          throw new Error(IpcBenchErrorText.configuration)
-        source = source.replace(
-          pattern,
-          '$1 if (options.probe === undefined) options.probe = globalThis.__PROBE_BENCH_PROBE;'
-        )
-      }
       if (url.endsWith('/rpc-integration/bench/observe.mjs')) {
         /**
          * Frozen-base selection and guard counters deliberately change loaded bytes, with
@@ -365,8 +354,8 @@ export function countDelta(receipt) {
  *
  * @param {object} cell Frozen carrier, portable payload and bounded concurrency.
  * @param {string} selectedArm Base, absent or installed Core probe/genuine default collector.
- * @param {string} lane Formal timing or separate exact counter guard.
- * @param {object} options Samples, warm-up, base dist and raw output folder.
+ * @param {string} lane Formal timing, exact counter guard or separate profiling.
+ * @param {object} options Samples, warm-up, base dist, raw output and optional diagnostic mode.
  * @param {string} stem Unique receipt name preserving every interleaved launch.
  * @returns {Promise<object>} Full IPC side receipt, with guard counts when selected.
  * @throws {Error} Child failure remains classified and retained before propagation.
@@ -385,9 +374,19 @@ async function launch(cell, selectedArm, lane, options, stem) {
     NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${pathToFileURL(entry).href}`
   }
   /** One JSON argument carries only public fixture data; no authentication is exposed. */
-  const input = JSON.stringify({ cell, samples: options.samples, warmup: options.warmup })
+  const input = JSON.stringify({
+    cell,
+    samples: options.samples,
+    warmup: options.warmup,
+    diagnostic: options.diagnostic
+  })
+  /** Native CPU profiling starts in the actual business parent and reaches its Worker via execArgv. */
+  const cpuArguments =
+    options.diagnostic === IpcBenchDiagnostic.cpu
+      ? [IpcBenchDiagnostic.cpuFlag, `${IpcBenchDiagnostic.cpuDirectoryPrefix}${options.output}`]
+      : []
   /** Child result preserves exact exit status, stderr and stdout as a reproducible raw receipt. */
-  const child = spawn(process.execPath, [entry, '--side', input], {
+  const child = spawn(process.execPath, [...cpuArguments, entry, '--side', input], {
     env,
     stdio: ['ignore', 'pipe', 'pipe']
   })
@@ -455,13 +454,13 @@ async function launch(cell, selectedArm, lane, options, stem) {
  *
  * @param {object[]} rounds Each round contains baseA, baseB, absent and installed receipts.
  * @param {object} guard Separate exact-counter receipts for the three arms.
- * @param {boolean} reportOnly True only for the 1 MiB cell.
+ * @param {boolean} largePayload True for the 1 MiB cell's fixed symmetric five-percent budget.
  * @param {boolean} [collector] Root D2 mode selects 5%; ordinary Core A5 remains fixed at 3%.
  * @param {object} [collectorAudit] Current source/compiled hashes covering the collector allocation
  *   site.
  * @returns {object} Raw ratios, exact medians, noise bounds and independent verdicts.
  */
-export function judgeProbe(rounds, guard, reportOnly = false, collector = false, collectorAudit) {
+export function judgeProbe(rounds, guard, largePayload = false, collector = false, collectorAudit) {
   /** SC9(b): analysis restores sorted scalar report data without changing the original raw series. */
   const median = (values) => {
     const sorted = values.toSorted((a, b) => a - b)
@@ -538,14 +537,15 @@ export function judgeProbe(rounds, guard, reportOnly = false, collector = false,
   }
   /** Root D2 and Core A5 are distinct fixed budgets; neither derives a looser limit from noise. */
   const budget = collector ? 0.05 : 0.03
-  /**
-   * The large cell still must meet absent/A/A and counter guards; only its installed timing
-   * reports.
-   */
+  /** The metadata-only 1 MiB cell has a symmetric fixed five-percent budget, never report-only. */
+  const installedWithinBudget = largePayload
+    ? Math.abs(deltas.installedP50) <= 0.05 && Math.abs(deltas.installedThroughput) <= 0.05
+    : deltas.installedP50 <= budget && deltas.installedThroughput >= -budget
+  /** Every cell also retains its same-window absent/A/A condition and exact counter guards. */
   const status =
     Math.abs(deltas.absentP50) <= noise.p50 &&
     Math.abs(deltas.absentThroughput) <= noise.throughput &&
-    (reportOnly || (deltas.installedP50 <= budget && deltas.installedThroughput >= -budget)) &&
+    installedWithinBudget &&
     counterGuard.status === 'PASS'
       ? 'PASS'
       : 'FAIL'
@@ -555,8 +555,13 @@ export function judgeProbe(rounds, guard, reportOnly = false, collector = false,
     noise,
     series,
     deltas,
-    installedBudget: reportOnly
-      ? 'REPORT_ONLY'
+    installedBudget: largePayload
+      ? {
+          p50Minimum: -0.05,
+          p50Maximum: 0.05,
+          throughputMinimum: -0.05,
+          throughputMaximum: 0.05
+        }
       : { p50Maximum: budget, throughputMinimum: -budget },
     counterGuard,
     collector: collector
@@ -568,8 +573,8 @@ export function judgeProbe(rounds, guard, reportOnly = false, collector = false,
 /**
  * Run each requested cell using interleaved base A/A, absent and installed arms, N>=5.
  *
- * @returns {Promise<void>} Raw series and recomputable A5/A-perf verdict written before exit
- *   status.
+ * @returns {Promise<void>} Formal series/verdict or separate diagnostic receipts, written before
+ *   exit status.
  * @throws {Error} Invalid options or failed fixture preparation remains ERROR, not a performance
  *   FAIL.
  */
@@ -586,6 +591,15 @@ async function main() {
   /** Defaults retain the original IPC fixture's 1000 requests and 100 warm-up calls. */
   const options = {
     collector: rootMode,
+    /** Diagnostic selection remains absent for every formal timing and exact-counter launch. */
+    diagnostic: value(ProbeBench.diagnosticOption, undefined),
+    /** The current audit must match every named source and compiled file before collector runs. */
+    collectorAuditPath: resolve(
+      value(
+        ProbeBench.collectorAuditOption,
+        join(workspace, 'docs/rpc-devtools/scratch/hub/collector-source-audit.json')
+      )
+    ),
     pairs: Number(value('--pairs', '5')),
     samples: Number(value('--samples', '1000')),
     warmup: Number(value('--warmup', '100')),
@@ -610,12 +624,15 @@ async function main() {
     !Number.isInteger(options.samples) ||
     options.samples < 1000 ||
     !Number.isInteger(options.warmup) ||
-    options.warmup < 1
+    options.warmup < 1 ||
+    (options.diagnostic !== undefined &&
+      (![IpcBenchDiagnostic.cpu, IpcBenchDiagnostic.sampling].includes(options.diagnostic) ||
+        cells.length !== 1))
   )
     throw new Error(IpcBenchErrorText.configuration)
   if (rootMode) {
     /** The bounded source audit names the existing six owners and their exact current emitted bytes. */
-    const path = join(workspace, 'docs/rpc-devtools/scratch/hub/collector-source-audit.json')
+    const path = options.collectorAuditPath
     /** Keep the complete original audit receipt; its byte hash binds every installed guard snapshot. */
     const bytes = readFileSync(path)
     /** Audit evidence covers source-defined event constructors, not unknown VM storage allocation. */
@@ -677,7 +694,7 @@ async function main() {
   const failureInventory = {
     observableCodes,
     installedPath:
-      'Core constructor/preparation diagnostic; this fixture does not prove public carrier Peer forwarding (D4/A7)',
+      'Existing public process/thread Peer options receive the genuine probe through their canonical forwarding owners',
     source: '@migaia/rpc/core',
     sharedCode: 'OVERLOADED',
     reasons: Object.values(RpcProviderRejectionReason),
@@ -700,6 +717,37 @@ async function main() {
   )
   /** The exclusive runner owns admission/end-load enforcement; this receipt also records raw loads. */
   const startLoad = loadavg()
+  if (options.diagnostic !== undefined) {
+    /** One explicit cell keeps the whole absent/installed diagnostic pair in its caller's window. */
+    const cell = cells[0]
+    /** Full native profiles remain in original launch receipts, separate from formal timing. */
+    const rawPaths = []
+    for (const selectedArm of [ProbeBench.absent, ProbeBench.installed]) {
+      /** Unique stems also separate before/after directories supplied by the caller. */
+      const stem = `${cell.id}-${options.diagnostic}-${selectedArm}`
+      await launch(cell, selectedArm, ProbeBench.diagnostic, options, stem)
+      rawPaths.push(join(options.output, `${stem}.json`))
+    }
+    /** This capture receipt states scope and evidence paths without claiming an acceptance pass. */
+    const summary = {
+      status: IpcBenchDiagnostic.captured,
+      diagnosticMode: options.diagnostic,
+      timingStatus: IpcBenchDiagnostic.timingStatus,
+      cell,
+      collector: rootMode,
+      runtime: process.version,
+      startLoad,
+      endLoad: loadavg(),
+      rawPaths,
+      collectorAudit: options.collectorAudit
+    }
+    writeFileSync(
+      join(options.output, ProbeBench.diagnosticSummary),
+      JSON.stringify(summary, null, 2)
+    )
+    console.log(JSON.stringify(summary))
+    return
+  }
   /** Per-cell receipts keep all failed launches and all actual loaded SHA rows. */
   const results = []
   for (const cell of cells) {
@@ -733,7 +781,7 @@ async function main() {
         options,
         `${cell.id}-guard-${selectedArm}`
       )
-    /** Large payload reports its installed timing; all other acceptance rules remain binding. */
+    /** The large cell uses its fixed symmetric budget; small-cell thresholds remain unchanged. */
     const verdict = judgeProbe(
       rounds,
       guard,
@@ -790,7 +838,7 @@ async function main() {
         recompute: {
           module: entry,
           export: 'judgeProbe',
-          arguments: 'rounds, guard, reportOnly, collector, collectorAudit',
+          arguments: 'rounds, guard, largePayload, collector, collectorAudit',
           collector: rootMode,
           collectorAudit: options.collectorAudit
         },
@@ -814,7 +862,8 @@ if (process.argv[1] === entry) {
       /** Formal timing retains its full original receipt; guard snapshots are separate launches. */
       const receipt = await runIpcSide(input.cell, 'rpc', {
         samples: input.samples,
-        warmup: input.warmup
+        warmup: input.warmup,
+        diagnostic: input.diagnostic
       })
       console.log(JSON.stringify(receipt))
     } catch (error) {

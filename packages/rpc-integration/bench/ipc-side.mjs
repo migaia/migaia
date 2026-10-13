@@ -12,7 +12,12 @@ import { IpcBenchDiagnostic } from './text.mjs'
  *
  * @param {object} unit Same payload, logical codec, carrier and concurrency for both sides.
  * @param {'bare' | 'rpc'} side Paired side; never changes the frozen unit.
- * @param {{ samples?: number; warmup?: number; check?: boolean; diagnostic?: 'cpu' | 'guard' }} options
+ * @param {{
+ *   samples?: number
+ *   warmup?: number
+ *   check?: boolean
+ *   diagnostic?: 'cpu' | 'guard' | 'sampling'
+ * }} options
  *   Check performs three echoes only.
  * @returns {Promise<object>} Full measurement or preparation receipt.
  * @throws {Error} Ready, observer, echo and cleanup failures retain their first cause.
@@ -22,7 +27,9 @@ export async function runIpcSide(unit, side, options = {}) {
   const diagnosticMode = options.diagnostic
   if (
     diagnosticMode &&
-    (!['cpu', 'guard'].includes(diagnosticMode) ||
+    (![IpcBenchDiagnostic.cpu, IpcBenchDiagnostic.guard, IpcBenchDiagnostic.sampling].includes(
+      diagnosticMode
+    ) ||
       typeof Deno !== 'undefined' ||
       process.versions.bun ||
       !['stdio-framed', 'worker'].includes(unit.carrier) ||

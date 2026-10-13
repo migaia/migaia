@@ -39,6 +39,14 @@ export const IpcBenchDiagnostic = Object.freeze({
   /** CPU samples and exact guards run separately because they change execution differently. */
   cpu: 'cpu',
   guard: 'guard',
+  /** Allocation sampling uses the same warmed OOB boundaries without the exact heap tracker. */
+  sampling: 'sampling',
+  /** Native Node CPU profiling must start in each business isolate, never only in the driver. */
+  cpuFlag: '--cpu-prof',
+  /** Each diagnostic output directory receives Node's native PID/thread-specific filenames. */
+  cpuDirectoryPrefix: '--cpu-prof-dir=',
+  /** CPU-profile argument recognition preserves an explicitly selected native sampling interval. */
+  cpuIntervalPrefix: '--cpu-prof-interval=',
   /** Boundaries enclose warmed business samples and the explicitly included control work. */
   start: 'start',
   stop: 'stop',
@@ -75,7 +83,18 @@ export const IpcBenchDiagnostic = Object.freeze({
   heapEnable: 'HeapProfiler.enable',
   heapStart: 'HeapProfiler.startTrackingHeapObjects',
   heapStop: 'HeapProfiler.stopTrackingHeapObjects',
-  heapChunk: 'HeapProfiler.addHeapSnapshotChunk'
+  heapChunk: 'HeapProfiler.addHeapSnapshotChunk',
+  /** V8's sampling API records allocation owners without disabling inline allocation. */
+  heapSamplingStart: 'HeapProfiler.startSampling',
+  /** Stop returns the sampled call tree and node-linked samples through the existing OOB receipt. */
+  heapSamplingStop: 'HeapProfiler.stopSampling',
+  /** A fixed byte interval keeps before/after allocation samples comparable across all six cells. */
+  samplingInterval: 32768,
+  /** Sampled counts and sizes are estimates, distinct from the existing exact-tracker status. */
+  samplingStatus: 'SAMPLED_V8_ALLOCATIONS',
+  /** Collected objects remain sampled; OOB controls are included and native allocations are absent. */
+  samplingScope:
+    'V8 allocation samples including collected objects and OOB control work; excludes external/native allocation; not exact event counts'
 })
 
 /** Frozen reference ownership is retained in every W3 result so primitive history stays distinct. */
