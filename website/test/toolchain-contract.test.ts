@@ -466,8 +466,8 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
    * Devtools retains its nine canonical runtime symbols. The contract entry's error-code/source
    * re-exports are alias-only and are not counted twice.
    */
-  /** Collector adds the log factory; probe-core and hub activate existing runtime exports. */
-  assert.equal(runtimeSymbols.length, 337)
+  /** Coroutine BC1 removes createCoroutineHost while keeping the createCoroutinePlugin export. */
+  assert.equal(runtimeSymbols.length, 336)
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)

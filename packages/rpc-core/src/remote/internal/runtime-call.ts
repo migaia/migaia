@@ -389,15 +389,15 @@ function streamBound(
       return this
     }
   }
-  if (options.orderKey !== undefined || options.cancel !== undefined)
-    retainRuntimeStreamPreparation(facade, async () => {
-      try {
-        await prepareRuntimeStreamConsumer(current())
-      } catch (error) {
-        unsubscribe?.()
-        throw retired ?? error
-      }
-    })
+  /** Forwarding prepares the same lazy consumer even when no ordering or cancellation opts in. */
+  retainRuntimeStreamPreparation(facade, async () => {
+    try {
+      await prepareRuntimeStreamConsumer(current())
+    } catch (error) {
+      unsubscribe?.()
+      throw retired ?? error
+    }
+  })
   return Object.freeze(facade)
 }
 

@@ -6533,6 +6533,48 @@
       "library": "rpc-core"
     },
     {
+      "path": "/en/docs/rpc-core/remote/ICoroutineChildOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
+      "path": "/en/docs/rpc-core/remote/ICoroutineConnect",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
+      "path": "/en/docs/rpc-core/remote/ICoroutineParentOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
+      "path": "/en/docs/rpc-core/remote/ICoroutineReplaceSpec",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
+      "path": "/en/docs/rpc-core/remote/ICoroutineSupervisorPolicy",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
+      "path": "/en/docs/rpc-core/remote/ICoroutineTaskContext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
+      "path": "/en/docs/rpc-core/remote/ICoroutineUserTask",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
       "path": "/en/docs/rpc-core/remote/IRemoteBinding",
       "locale": "en",
       "domain": "docs",
@@ -6564,24 +6606,6 @@
     },
     {
       "path": "/en/docs/rpc-core/remote/IRemoteControlDefinition",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/remote/IRemoteCoroutineHostOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/remote/IRemoteCoroutinePluginOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/remote/IRemoteCoroutineTaskContext",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-core"
@@ -6960,12 +6984,6 @@
     },
     {
       "path": "/en/docs/rpc-core/remote/RuntimeSourceKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/en/docs/rpc-core/remote/createCoroutineHost",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-core"
@@ -22595,6 +22613,48 @@
       "library": "rpc-core"
     },
     {
+      "path": "/zh/docs/rpc-core/remote/ICoroutineChildOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
+      "path": "/zh/docs/rpc-core/remote/ICoroutineConnect",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
+      "path": "/zh/docs/rpc-core/remote/ICoroutineParentOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
+      "path": "/zh/docs/rpc-core/remote/ICoroutineReplaceSpec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
+      "path": "/zh/docs/rpc-core/remote/ICoroutineSupervisorPolicy",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
+      "path": "/zh/docs/rpc-core/remote/ICoroutineTaskContext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
+      "path": "/zh/docs/rpc-core/remote/ICoroutineUserTask",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
       "path": "/zh/docs/rpc-core/remote/IRemoteBinding",
       "locale": "zh",
       "domain": "docs",
@@ -22626,24 +22686,6 @@
     },
     {
       "path": "/zh/docs/rpc-core/remote/IRemoteControlDefinition",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/remote/IRemoteCoroutineHostOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/remote/IRemoteCoroutinePluginOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/remote/IRemoteCoroutineTaskContext",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
@@ -23022,12 +23064,6 @@
     },
     {
       "path": "/zh/docs/rpc-core/remote/RuntimeSourceKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
-      "path": "/zh/docs/rpc-core/remote/createCoroutineHost",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
