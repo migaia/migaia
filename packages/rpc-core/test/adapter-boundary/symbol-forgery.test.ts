@@ -42,6 +42,7 @@ function copyActualSymbols(source: object, target: object): void {
 /** The private owner accepts its ordinary context shape; no external registration seam is added. */
 function context(): IRpcContext {
   return {
+    localEndpointId: 'fixture-local-endpoint',
     data: undefined,
     signal: new AbortController().signal,
     senderId: 'symbol-fixture-sender',
