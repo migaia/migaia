@@ -7,6 +7,7 @@
 1. [导入与平台适配器](#1-导入与平台适配器)
 2. [子进程端：自动连回父进程](#2-子进程端自动连回父进程)
 3. [spawn 来源：启动并拥有子进程](#3-spawn-来源启动并拥有子进程)
+   - [Running the child in an external sandbox](#running-the-child-in-an-external-sandbox)
 4. [调用 API](#4-调用-api)
 5. [连接已运行的服务：connect 与 listen](#5-连接已运行的服务connect-与-listen)
 6. [交给 PluginHost 管理：createProcessPlugin](#6-交给-pluginhost-管理createprocessplugin)
@@ -109,7 +110,67 @@ else {
 
 自派生不支持 REPL、eval、Electron、测试运行器及无可用主模块的单文件可执行程序；传精确 URL 或 `{ command, args }`。Deno 默认用 `run` 与 bootstrap 的 env 权限；额外权限通过显式 command/args 提供。
 
-短对象的 `args`、`cwd`、`env`、`stdio`、`limits`、`permissions`、`supervision` 可以覆盖默认值。默认每源创建一个 process budget、随机 stdin token、byte channel 与 best-effort supervisor。省略 `report` 使用 `console.error`；默认终止能力提示每进程只报一次，`onNotice` 接收原提示对象。完整来源不改变现有行为。
+短对象的 `args`、`cwd`、`env`、`stdio`、`limits`、`permissions`、`supervision` 可以覆盖默认值；`wrap` 可包装计算出的启动命令。默认每源创建一个 process budget、随机 stdin token、byte channel 与 best-effort supervisor。省略 `report` 使用 `console.error`；默认终止能力提示每进程只报一次，`onNotice` 接收原提示对象。完整来源不改变现有行为。
+
+### Running the child in an external sandbox
+
+短对象的 `wrap(command)` 接收 rpc 按当前 Node、Bun 或 Deno 运行时计算出的 `IProcessLaunchCommand`，返回新的 `command`、`args`、`cwd` 与 `env`。首次启动、每次 restart 和 replace 都调用一次；自定义 `supervision.launcher` 也经过这个回调。rpc 不导入沙箱工具，也不提供沙箱配置文件，安装与策略由应用负责。
+
+macOS 上可用 `sandbox-exec` 加载应用自己维护的 profile。下面保留原运行时命令、参数、工作目录与环境设置；应用的 profile 必须允许子入口及其依赖所需的读取：
+
+```ts
+import { createProcessPeer } from '@migaia/rpc-process'
+
+/** The application owns this profile and its permitted filesystem operations. */
+const profile = '/absolute/path/to/application.sb'
+/** The peer owns the sandboxed child and closes it with the original launcher. */
+const child = await createProcessPeer<{ echo(value: string): string }>({
+  spawn: {
+    entry: new URL('./service.ts', import.meta.url),
+    /** Keep runtime detection and wrap only the resulting command. */
+    wrap: (command) => ({
+      ...command,
+      command: '/usr/bin/sandbox-exec',
+      args: ['-f', profile, command.command, ...command.args]
+    })
+  }
+})
+try { console.log(await child.request('echo', 'hello')) } finally { await child.close() }
+```
+
+Linux 上可用 `bwrap`。这个例子把现有文件系统挂为只读，提供 `/proc` 与 `/dev`，并隔离网络；需要写入的应用应按自己的策略增加可写挂载：
+
+```ts
+import { createProcessPeer } from '@migaia/rpc-process'
+
+/** The peer owns the child launched through the application's bubblewrap policy. */
+const child = await createProcessPeer<{ echo(value: string): string }>({
+  spawn: {
+    entry: new URL('./service.ts', import.meta.url),
+    /** Preserve the original runtime arguments, cwd and environment. */
+    wrap: (command) => ({
+      ...command,
+      command: '/usr/bin/bwrap',
+      args: [
+        '--ro-bind', '/', '/', '--proc', '/proc', '--dev', '/dev',
+        '--unshare-net', '--die-with-parent', '--', command.command, ...command.args
+      ]
+    })
+  }
+})
+try { console.log(await child.request('echo', 'hello')) } finally { await child.close() }
+```
+
+`./service.ts` 使用第 2 节的自动来源模式，并在 `provide` 中声明 `echo`。以上都是平台示例，运行前由应用安装相应工具并准备自己的策略。
+
+包装器必须遵守两个规则：
+
+- **stdin/stdout 直接连到子进程。** stdin 承载 token bootstrap，随后 stdin/stdout 承载 RPC 字节通道；不要分离、消费这些流或把包装器日志写到 stdout。
+- **完整转发子进程环境与退出码。** 保留 `env.inherit` 和 `env.set`；原生 launcher 在 `wrap` 返回后才加入 `PROCESS_RUNTIME_API_ENV`（`MIGAIA_RPC_RUNTIME_API_BOOTSTRAP`）。容器包装器要用例如 `-e MIGAIA_RPC_RUNTIME_API_BOOTSTRAP` 把该变量转入容器，同时转发其余环境变量。包装器应返回子进程的原退出码，不能把非零退出改成成功；这让监督层正确区分正常退出与崩溃。
+
+`wrap` 不接收 `stdio`、`bootstrap`、`limits` 或 `permissions`，返回对象中的这些额外字段会被忽略。完整 `kind: 'spawn'` 来源继续由调用方直接持有 `supervision.launcher` 与 `spec`。
+
+非函数 `wrap` 在准备来源时拒绝。回调抛错或返回非法字段会使本次启动失败，带 `PROCESS_PLUGIN_INVALID_OPTION` 的原生 `TypeError` 位于 supervision 的 `LAUNCH_FAILED` cause 链上；回调抛出的原值保留在该 `TypeError.cause`。经 `host.use` 安装时，最外层仍是 `PLUGIN_INSTALL_FAILED`。
 
 `spawn` 对象把四件事组合在一起：**怎么启动**（`supervision`）、**拿哪条通道**（`rawChannel`）、**怎么握手**（`establish`）、**用什么凭据**（`token`）。README 的“高阶用法”直接展示完整来源对象，下表解释每个字段。
 
