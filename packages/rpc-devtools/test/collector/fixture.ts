@@ -32,6 +32,7 @@ export function collectorView(seq = 1): IRpcProbeEventView {
   return {
     seq,
     carrierSeq: -1,
+    variation: undefined,
     at: 1000 + seq,
     endpointId: CollectorFixture.endpoint,
     stage: RpcProbeStage.message,

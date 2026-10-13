@@ -5,6 +5,7 @@ import {
   rpcProbeSampleKey,
   RpcProbeStageName,
   RpcProbeStage,
+  RpcProbeOutcome,
   type IRpcProbeDescriptor,
   type IRpcProbeEventView
 } from '@migaia/rpc-core/probe'
@@ -20,15 +21,15 @@ import type {
 import type { IRpcDevtoolsWireEvent } from '../contract/wire.js'
 import { RpcDevtoolsErrorCode } from '../error-code.js'
 import { identifyDevtoolsError } from '../errors.js'
-import { NameTable, MessageTable } from './intern.js'
-import { EventRing } from './ring.js'
+import { NameTable } from './intern.js'
+import { EventRing, readCarrierSequences } from './ring.js'
 import { CollectorStats } from './stats.js'
 import { compileQuery, matchesSlot } from './query.js'
 import { finishRecord } from './record.js'
 import { createCollectorService } from './service.js'
-import { reportFailure } from './report.js'
+import { enqueueBatch, reportFailure } from './report.js'
 import { CollectorWatcher } from './watch.js'
-import { CollectorLimit, CollectorText } from './text.js'
+import { CollectorDefaultStages, CollectorLimit, CollectorText } from './text.js'
 
 /** Configuration errors preserve the native TypeError and the original failure as cause. */
 function invalid(cause?: unknown): never {
@@ -83,7 +84,7 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
   )
   /** Byte accounting never causes normalization or cloning on metadata ingestion. */
   const maxContentBytes = capacity(options.maxContentBytes, CollectorLimit.contentBytes, true)
-  /** Long-lived names are separate from recyclable message identities. */
+  /** The cold intern table retains its bounded public overflow vocabulary. */
   const maxInterned = capacity(
     options.maxInterned,
     CollectorLimit.interned,
@@ -94,7 +95,7 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
   if (options.redact !== undefined && typeof options.redact !== 'function') invalid()
   if (options.onError !== undefined && typeof options.onError !== 'function') invalid()
   /** Stage subscription is compiled at construction and restored by resume(). */
-  const stages = options.stages ?? RpcProbeStageName
+  const stages = options.stages ?? CollectorDefaultStages
   /** Each captured stage is explicitly opted in, including protected content. */
   const capture = options.capture
   /** Remote content exposure is a separate public boundary decision. */
@@ -113,16 +114,20 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
     ignoredAfterClose: 0,
     internOverflow: 0
   }
-  /** Numeric name identities remain alive while rings and statistics retain them. */
+  /** Reader projections share one bounded name table; raw ingestion never calls it. */
   const names = new NameTable(maxInterned, counters)
-  /** Reference-counted message ids span main, recording and watch storage. */
-  const messages = new MessageTable()
   /** Main retention consumes reusable views immediately into owned columns. */
-  const ring = new EventRing(maxEvents, names, messages, onError)
+  const ring = new EventRing(maxEvents, names, onError)
   /** Aggregates remain independent of all ring eviction. */
-  const statistics = new CollectorStats(names, maxInterned, onError)
-  /** Only active watch generators register with the synchronous writer. */
+  const statistics = new CollectorStats(names, onError)
+  /** Only active watch generators enable the shared raw burst writer. */
   const watchers: CollectorWatcher[] = []
+  /** One raw burst store preserves watcher ingestion independently of the main-ring capacity. */
+  let watchPending: EventRing | undefined
+  /** Pending overwrite counts raw rows whose filters are no longer recoverable. */
+  let watchDropped = 0
+  /** A single flag coalesces every active watcher notification within one synchronous burst. */
+  let watchScheduled = false
   /** Descriptor references come from the Core's cold construction callback. */
   const descriptors = new Map<string, IRpcProbeDescriptor>()
   /** Actual serving endpoint identities exclude self traffic without guessing service method names. */
@@ -167,13 +172,53 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
     ignoredAfterClose: counters.ignoredAfterClose,
     internOverflow: counters.internOverflow
   })
+  /** Cold origin lookup includes every current retention owner and an explicitly stopping record. */
+  const carrierSequences = (active?: EventRing): ReadonlyMap<number, number> => {
+    /** This array exists only at a reader boundary, never for an ingested event. */
+    const owners = [ring]
+    if (recording !== undefined) owners.push(recording)
+    if (active !== undefined && active !== recording) owners.push(active)
+    if (watchPending !== undefined) owners.push(watchPending)
+    for (const watcher of watchers) owners.push(watcher.ring)
+    return readCarrierSequences(owners)
+  }
+  /** One prebuilt notification callback does watcher filtering and queue work off the emit stack. */
+  const notifyWatchers = (): void => {
+    watchScheduled = false
+    if (closed || watchPending === undefined) return
+    /** Resolve links before any raw origin in this synchronous burst retires. */
+    const links = carrierSequences()
+    /** Raw overwrite loss is reported once to each watcher at this delivery boundary. */
+    const dropped = watchDropped
+    watchDropped = 0
+    while (watchPending.count !== 0) {
+      /** Raw rows are reconstructed once, then shared by the cold watcher fan-out. */
+      const slot = watchPending.head
+      /** The source view was consumed already; this object belongs to scheduled delivery. */
+      const view = watchPending.view(slot)
+      if (!serviceEndpoints.has(view.endpointId)) {
+        for (const watcher of watchers)
+          watcher.push(
+            view,
+            watchPending.columns.seq[slot]!,
+            watchPending.columns.content[slot],
+            watchPending.columns.contentBytes[slot]!,
+            links
+          )
+      }
+      watchPending.drop()
+    }
+    for (const watcher of watchers) watcher.finishBurst(dropped)
+  }
   /** Convert only matching rows at the query boundary, using one scan and cached projections. */
   const query = (input?: IRpcDevtoolsQuery, content = true): IRpcDevtoolsPage => {
     assertOpen()
-    /** All string matching compiles once into numeric masks before the scan starts. */
-    const filter = compileQuery(input, names)
+    /** Masks and string memberships compile once before scanning raw columns. */
+    const filter = compileQuery(input)
     /** Results retain cached boundary objects, without creating per-query row wrappers. */
     const events: IRpcDevtoolsWireEvent[] = []
+    /** Correlation is derived once from retained raw owners for this snapshot. */
+    const links = carrierSequences()
     /** Excluded rows advance the cursor while a filled page preserves the next unread row. */
     let nextSeq = filter.after
     for (let i = 0; i < ring.count; i++) {
@@ -181,11 +226,8 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
       const slot = (ring.head + i) % ring.capacity
       if (ring.columns.seq[slot]! <= filter.after) continue
       nextSeq = ring.columns.seq[slot]!
-      if (
-        !serviceEndpoints.has(names.name(ring.columns.endpoint[slot]!)!) &&
-        matchesSlot(ring, slot, filter)
-      ) {
-        events.push(ring.event(slot, content) as IRpcDevtoolsWireEvent)
+      if (!serviceEndpoints.has(ring.columns.endpoint[slot]!) && matchesSlot(ring, slot, filter)) {
+        events.push(ring.event(slot, content, false, links) as IRpcDevtoolsWireEvent)
         if (events.length === filter.limit) break
       }
     }
@@ -198,12 +240,14 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
     signal?: IRpcAbortSignal
   ) => {
     assertOpen()
+    if (watchPending === undefined)
+      watchPending = new EventRing(CollectorLimit.batches * CollectorLimit.batch, names, onError)
     return new CollectorWatcher(
       names,
-      messages,
       input,
       content,
       watchers,
+      () => sequence,
       onError,
       assertOpen,
       signal
@@ -232,7 +276,7 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
     /** Release active ownership before exposing the stopped record. */
     const active = recording
     recording = undefined
-    return finishRecord(active, content)
+    return finishRecord(active, content, carrierSequences(active))
   }
   /** A record handle can stop only the exact active ring it created. */
   const record = (input?: Readonly<{ maxEvents?: number }>) => {
@@ -243,11 +287,10 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
         RpcDevtoolsErrorCode.recordActive
       )
     if (input !== undefined && (typeof input !== 'object' || input === null)) invalid()
-    /** Record capacity is separate from main retention and uses the shared identity pools. */
+    /** Record capacity is separate from main retention and stores the same raw field references. */
     const active = new EventRing(
       capacity(input?.maxEvents, maxEvents, false, CollectorLimit.arrayCapacity),
       names,
-      messages,
       onError
     )
     recording = active
@@ -282,7 +325,7 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
     paused = false
     devtools.setStages(pausedStages)
   }
-  /** Clear resets main retention and statistics; recorded windows and name ids keep ownership. */
+  /** Clear resets main retention and statistics; recorded and watch windows keep their ownership. */
   const clear = (): void => {
     assertOpen()
     ring.clear()
@@ -304,6 +347,7 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
     ring.clear()
     statistics.clear()
     recording?.clear()
+    watchPending?.clear()
     recording = undefined
     for (let i = 0; i < watchers.length; i++) watchers[i]!.close()
     names.clear()
@@ -331,7 +375,8 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
         if (
           (view.stage === RpcProbeStage.message || view.stage === RpcProbeStage.envelope) &&
           methods !== undefined &&
-          (view.method === undefined || !methods.has(view.method))
+          view.method !== undefined &&
+          !methods.has(view.method)
         )
           return
         if (
@@ -341,10 +386,6 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
           counters.sampledOut++
           return
         }
-        /** Existing endpoint identities select the numeric warm path. */
-        const endpoint = names.id(view.endpointId)
-        /** Numeric method identity is shared by storage and statistics. */
-        const method = names.id(view.method)
         /** Content is unread in metadata mode, and remains a reference after redaction. */
         let content: unknown
         /** Byte charge follows the retained payload reference. */
@@ -389,11 +430,26 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
         if (ring.count === ring.capacity) counters.evicted++
         sequence = Math.max(sequence + 1, view.seq)
         /** The writer returns a numeric slot and allocates no event objects. */
-        const slot = ring.write(view, sequence, content, bytes, endpoint, method)
-        statistics.update(view, ring.columns.endpoint[slot]!, ring.columns.method[slot]!)
+        ring.write(view, sequence, content, bytes)
+        if (
+          view.stage === RpcProbeStage.message &&
+          view.durationMs >= 0 &&
+          view.method !== undefined &&
+          (view.outcome === RpcProbeOutcome.settled ||
+            view.outcome === RpcProbeOutcome.failed ||
+            view.outcome === RpcProbeOutcome.rejected)
+        )
+          statistics.update(view)
         if (closed || paused) return
-        recording?.write(view, sequence, content, bytes, endpoint, method)
-        for (let i = 0; i < watchers.length; i++) watchers[i]!.push(view, sequence, content, bytes)
+        recording?.write(view, sequence, content, bytes)
+        if (watchers.length !== 0) {
+          if (watchPending!.count === watchPending!.capacity) watchDropped++
+          watchPending!.write(view, sequence, content, bytes)
+          if (!watchScheduled) {
+            watchScheduled = true
+            enqueueBatch(notifyWatchers)
+          }
+        }
       } catch (error) {
         reportFailure(error, onError)
       } finally {

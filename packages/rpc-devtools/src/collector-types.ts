@@ -16,6 +16,7 @@ import type { IRpcDevtoolsRecord } from './contract/record.js'
 
 /** Collector construction options are frozen now; defaults and ingestion belong to layer 2. */
 export type IRpcDevtoolsOptions = Readonly<{
+  /** Defaults to message and peer; pass physical stages here or use setStages() to enable them. */
   stages?: readonly IRpcProbeStageName[]
   capture?: readonly IRpcProbeStageName[]
   redact?(stage: RpcProbeStage, content: unknown): unknown
@@ -23,6 +24,7 @@ export type IRpcDevtoolsOptions = Readonly<{
   sample?: number
   maxEvents?: number
   maxContentBytes?: number
+  /** Bounds the reader name table; ingestion retains raw string references without interning. */
   maxInterned?: number
   exposeContent?: boolean
   onError?(error: unknown): void

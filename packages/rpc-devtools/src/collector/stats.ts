@@ -10,17 +10,17 @@ const StatsWidth = 6 + CollectorLimit.histogram
 
 /** Numeric statistics grow only for a new endpoint/method pair, independent of ring eviction. */
 export class CollectorStats {
-  /** Stable numeric pair keys select a dense fixed-width statistics slot. */
-  #slots = new Map<number, number>()
+  /** Raw endpoint/method pairs select dense fixed-width statistics slots. */
+  #slots = new Map<string, Map<string, number>>()
+  /** Pair count indexes fixed-width counters independently of endpoint map size. */
+  #count = 0
   /** Numeric counts avoid per-event object or array allocation after warm-up. */
   #data = new Float64Array(16 * StatsWidth)
-  /** Export identities stay numeric until stats() crosses its public boundary. */
-  #endpoints = new Int32Array(16)
-  /** Dense method identities share the collector's bounded name table. */
-  #methods = new Int32Array(16)
-  /** Dense pair-key stride is compiled once from the supported name capacity. */
-  #stride: number
-  /** Name table owns restoration and remains alive while statistics retain ids. */
+  /** Endpoint references remain raw until stats() crosses its public boundary. */
+  #endpoints = Array.from<string | undefined>({ length: 16 })
+  /** Method references remain separate from the cold bounded name table. */
+  #methods = Array.from<string | undefined>({ length: 16 })
+  /** Name table normalizes strings only when statistics cross a public boundary. */
   #names: NameTable
   /** Failed application error getters are reported without interrupting histogram or other rings. */
   #onError: ((error: unknown) => void) | undefined
@@ -28,44 +28,42 @@ export class CollectorStats {
   #since = Date.now()
 
   /** Each pair's histogram is independent of retention in any event ring. */
-  constructor(names: NameTable, maxInterned: number, onError?: (error: unknown) => void) {
+  constructor(names: NameTable, onError?: (error: unknown) => void) {
     this.#names = names
-    this.#stride = maxInterned + 1
     this.#onError = onError
   }
 
   /** Count only completed logical messages that carry a measured nonnegative duration. */
-  update(view: IRpcProbeEventView, endpoint: number, method: number): void {
-    if (view.stage !== RpcProbeStage.message || view.durationMs < 0 || method < 0) return
+  update(view: IRpcProbeEventView): void {
+    if (view.stage !== RpcProbeStage.message || view.durationMs < 0 || view.method === undefined)
+      return
     if (
       view.outcome !== RpcProbeOutcome.settled &&
       view.outcome !== RpcProbeOutcome.failed &&
       view.outcome !== RpcProbeOutcome.rejected
     )
       return
-    /** One numeric key avoids a string concatenation on every observation. */
-    const key = endpoint * this.#stride + method
-    /** New pair discovery is the only statistics allocation after construction. */
-    let slot = this.#slots.get(key)
+    /** String pair lookup performs no concatenation or intern-table operation on settlement. */
+    let methods = this.#slots.get(view.endpointId)
+    if (methods === undefined) {
+      methods = new Map()
+      this.#slots.set(view.endpointId, methods)
+    }
+    /** First observation of a pair owns its raw identity and its aggregation slot. */
+    let slot = methods.get(view.method)
     if (slot === undefined) {
-      slot = this.#slots.size
+      slot = this.#count++
       if (slot === this.#endpoints.length) {
-        /** Growth is a necessary representation change for a newly observed pair (SC9b). */
+        /** Numeric growth occurs only on first observation of a new supported pair. */
         const data = new Float64Array(this.#data.length * 2)
         data.set(this.#data)
         this.#data = data
-        /** Growing numeric identities preserves all existing aggregation slots (SC9b). */
-        const endpoints = new Int32Array(this.#endpoints.length * 2)
-        endpoints.set(this.#endpoints)
-        this.#endpoints = endpoints
-        /** Method ids grow with their matching endpoint columns (SC9b). */
-        const methods = new Int32Array(this.#methods.length * 2)
-        methods.set(this.#methods)
-        this.#methods = methods
+        this.#endpoints.length *= 2
+        this.#methods.length *= 2
       }
-      this.#slots.set(key, slot)
-      this.#endpoints[slot] = endpoint
-      this.#methods[slot] = method
+      methods.set(view.method, slot)
+      this.#endpoints[slot] = view.endpointId
+      this.#methods[slot] = view.method
     }
     /** Offset selects the fixed counter block without constructing an aggregate object. */
     const offset = slot * StatsWidth
@@ -89,23 +87,21 @@ export class CollectorStats {
   }
 
   /** Interpolate a rank within its histogram bucket; no sorting or retained samples are needed. */
-  #percentile(offset: number, percentile: number): number {
+  #percentile(data: Float64Array, offset: number, percentile: number): number {
     /** Rank is defined over the completed-call count for this one method. */
-    const rank = this.#data[offset]! * percentile
+    const rank = data[offset]! * percentile
     /** Earlier bins contribute only a running count; the first nonempty rank bin terminates. */
     let before = 0
     for (let bucket = 0; bucket < 24; bucket++) {
       /** One stored bin determines the fraction of the bounded interpolation interval. */
-      const count = this.#data[offset + 6 + bucket]!
+      const count = data[offset + 6 + bucket]!
       if (count !== 0 && before + count >= rank) {
         /** Bucket zero starts at zero; following bins double their preceding upper boundary. */
         const low = bucket === 0 ? 0 : 0.0625 * 2 ** (bucket - 1)
         /** Last-bin overflow includes its observed maximum, rather than inventing a cutoff. */
         const high =
-          bucket === 23
-            ? Math.max(0.0625 * 2 ** bucket, this.#data[offset + 5]!)
-            : 0.0625 * 2 ** bucket
-        return Math.min(this.#data[offset + 5]!, low + ((high - low) * (rank - before)) / count)
+          bucket === 23 ? Math.max(0.0625 * 2 ** bucket, data[offset + 5]!) : 0.0625 * 2 ** bucket
+        return Math.min(data[offset + 5]!, low + ((high - low) * (rank - before)) / count)
       }
       before += count
     }
@@ -114,35 +110,81 @@ export class CollectorStats {
 
   /** Materialize statistics only at this public representation boundary (SC9b). */
   snapshot(excluded?: ReadonlySet<string>): IRpcDevtoolsStats {
+    /** Cold identity collisions retain the prior numeric-key semantics, including overflow id zero. */
+    const slots = new Map<number, Map<number, number>>()
+    /** One temporary block merges counters and histograms without altering raw settlement storage. */
+    const data = new Float64Array(this.#count * StatsWidth)
+    /** Projected endpoint ids are scoped to this snapshot and never enter ingestion. */
+    const endpoints: number[] = []
+    /**
+     * Projected method ids identify the same public aggregate domain as the previous hot intern
+     * keys.
+     */
+    const methodIds: number[] = []
+    for (let rawSlot = 0; rawSlot < this.#count; rawSlot++) {
+      if (excluded?.has(this.#endpoints[rawSlot]!)) continue
+      /**
+       * Service exclusion precedes projection so overflow cannot merge a hidden endpoint into a
+       * visible row.
+       */
+      const endpoint = this.#names.id(this.#endpoints[rawSlot])
+      /** Names are normalized only here, including methods whose raw events were already evicted. */
+      const method = this.#names.id(this.#methods[rawSlot])
+      /**
+       * Numeric membership groups pairs without concatenated keys or another persistent identity
+       * owner.
+       */
+      let endpointSlots = slots.get(endpoint)
+      if (endpointSlots === undefined) {
+        endpointSlots = new Map()
+        slots.set(endpoint, endpointSlots)
+      }
+      /** First projected pair preserves the original insertion order of public statistics rows. */
+      let slot = endpointSlots.get(method)
+      if (slot === undefined) {
+        slot = endpoints.length
+        endpointSlots.set(method, slot)
+        endpoints.push(endpoint)
+        methodIds.push(method)
+      }
+      /** Source and destination offsets share the existing fixed-width statistics layout. */
+      const rawOffset = rawSlot * StatsWidth
+      /** Only cold snapshot blocks merge identities that normalize to the same pair. */
+      const offset = slot * StatsWidth
+      for (let counter = 0; counter < 5; counter++)
+        data[offset + counter]! += this.#data[rawOffset + counter]!
+      data[offset + 5] = Math.max(data[offset + 5]!, this.#data[rawOffset + 5]!)
+      for (let bucket = 0; bucket < CollectorLimit.histogram; bucket++)
+        data[offset + 6 + bucket]! += this.#data[rawOffset + 6 + bucket]!
+    }
     /** Output rows are boundary projections, separate from the hot numeric aggregation blocks. */
     const methods: IRpcDevtoolsStats['methods'][number][] = []
-    for (let slot = 0; slot < this.#slots.size; slot++) {
-      /** Offset and fixed vectors reconstruct the one published histogram vocabulary. */
+    for (let slot = 0; slot < endpoints.length; slot++) {
+      /** Offset reconstructs the one published histogram vocabulary from the merged snapshot. */
       const offset = slot * StatsWidth
-      if (excluded?.has(this.#names.name(this.#endpoints[slot]!)!)) continue
       /** Bucket boundaries are a public representation, constructed only for stats(). */
       const boundaries: number[] = []
       /** Counts leave numeric storage only when this boundary is requested. */
       const counts: number[] = []
-      for (let bucket = 0; bucket < 24; bucket++) {
+      for (let bucket = 0; bucket < CollectorLimit.histogram; bucket++) {
         boundaries.push(0.0625 * 2 ** bucket)
-        counts.push(this.#data[offset + 6 + bucket]!)
+        counts.push(data[offset + 6 + bucket]!)
       }
       methods.push({
-        endpointId: this.#names.name(this.#endpoints[slot]!)!,
-        method: this.#names.name(this.#methods[slot]!)!,
-        calls: this.#data[offset]!,
-        failed: this.#data[offset + 1]!,
-        rejected: this.#data[offset + 2]!,
-        timedOut: this.#data[offset + 3]!,
-        aborted: this.#data[offset + 4]!,
+        endpointId: this.#names.name(endpoints[slot]!)!,
+        method: this.#names.name(methodIds[slot]!)!,
+        calls: data[offset]!,
+        failed: data[offset + 1]!,
+        rejected: data[offset + 2]!,
+        timedOut: data[offset + 3]!,
+        aborted: data[offset + 4]!,
         latencyBucketsMs: boundaries,
         latencyCounts: counts,
         latencyOverflowFromMs: 0.0625 * 2 ** 22,
-        latencyMaxMs: this.#data[offset + 5]!,
-        p50Ms: this.#percentile(offset, 0.5),
-        p95Ms: this.#percentile(offset, 0.95),
-        p99Ms: this.#percentile(offset, 0.99)
+        latencyMaxMs: data[offset + 5]!,
+        p50Ms: this.#percentile(data, offset, 0.5),
+        p95Ms: this.#percentile(data, offset, 0.95),
+        p99Ms: this.#percentile(data, offset, 0.99)
       })
     }
     return { since: this.#since, methods }
@@ -151,6 +193,9 @@ export class CollectorStats {
   /** Clear resets aggregates while preserving already allocated numeric capacity. */
   clear(): void {
     this.#slots.clear()
+    this.#count = 0
+    this.#endpoints.fill(undefined)
+    this.#methods.fill(undefined)
     this.#data.fill(0)
     this.#since = Date.now()
   }
