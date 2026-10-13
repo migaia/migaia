@@ -71,7 +71,23 @@ export type LogLevel = keyof typeof LogLevel;
 ```
 
 - New and modified code must follow these rules. Pre-existing violations are migration debt: fix them when their owning API is intentionally changed, but do not perform unrelated mass renames inside a scoped task.
-- **Relative import/export/dynamic-import specifiers must carry an explicit `.js` extension** (`from './foo.js'`, `from './bar/index.js'`), even though the source file is `.ts`/`.tsx`. `tsconfig.base.json` sets `moduleResolution: "bundler"`, which resolves `.js`-suffixed specifiers against `.ts`/`.tsx` sources at typecheck time and leaves the extension untouched in compiled output. Every package also sets `"type": "module"`, so a real Node ESM loader (as opposed to Vite/Vitest's own extension-tolerant resolver) requires the extension on the compiled `dist/*.js` — omitting it produces `ERR_MODULE_NOT_FOUND` for any consumer that isn't going through a bundler. This bug existed repo-wide (~640 specifiers across 19 packages) until it was fixed in bulk; do not reintroduce it.
+- **Every repository file is TypeScript.** This covers package source, tests, test fixtures, benches and `scripts/`. They use `.ts`, `.tsx` or `.mts`. Do not add `.js`, `.mjs` or `.cjs` files.
+  - **Exceptions.** A file may stay plain JavaScript (`.mjs`) only in these cases:
+    - **Node-invoked test scripts and fixtures.** Test-side scripts and fixtures that `node` runs directly, kept as `.mjs` so that `node <file>` works without a loader. This includes worker and child fixtures, bench drivers and repository `scripts/`.
+    - **Plain-JS consumers.** A fixture that deliberately proves a plain-JS consumer of built `dist/`.
+    - **Generated output.**
+
+    Each exception is listed with its reason in `scripts/fixtures/js-exceptions.json`. New `.mjs` files are added only under these cases.
+- **Relative import/export/dynamic-import specifiers name the real source file** (decided by the user on 2026-10-13; see `docs/repo/ts-specifier-decision.md`, option B).
+  - **Source form.** A TypeScript module imports `from './foo.ts'` or `from './bar/index.ts'`, and a `.tsx` module imports `'./view.tsx'`. Specifiers that are extensionless or that use `.js` for a TypeScript source are forbidden.
+  - **Compiler options.** `tsconfig.base.json` sets `allowImportingTsExtensions` and `rewriteRelativeImportExtensions`, so `tsc` rewrites `.ts`/`.tsx` specifiers to `.js` in the emitted `dist/`.
+  - **Why every specifier needs its extension.**
+    - Every package is `"type": "module"`. Node's ESM loader, Deno, and Node's native type stripping (for directly-run `.ts`) all require the full extension.
+    - `moduleResolution: "bundler"` alone only relaxes type checking. It never adds an extension to emitted output.
+    - An extensionless specifier therefore compiles cleanly and then fails at runtime with `ERR_MODULE_NOT_FOUND`. This bug once existed repo-wide (about 640 specifiers across 19 packages); do not reintroduce it.
+  - **Plain-JavaScript exceptions** (`.mjs`) keep their own real extensions.
+  - **Package entries.** Specifiers that name a package entry (`@migaia/foo/sub`) are unaffected.
+  - **Transition.** Until the TS-only migration (`docs/repo/codex-prompt-2026-10-13-ts-only-migration.md`) lands on `main` and sets the compiler options, code on branches that predate it keeps that branch's existing `.js` specifier style. Do not mix the two styles in one package.
 
 ## JSDoc for State and Behavior
 
