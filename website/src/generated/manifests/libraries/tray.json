@@ -195,6 +195,28 @@
                 "text": "unUse/replace` 继续遵循原有 queue 与 lease 语义；callback 不应捕获 concrete Host 做 self mutation。"
               }
             ]
+          },
+          {
+            "id": "routing-and-publish-subscribe",
+            "heading": "Routing and publish/subscribe",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`tray.routing.roundRobin(host)` and `tray.routing('roundRobin', host)` share one sequence and select a ready instance for each request, notify or stream. `leastInFlight` selects the fewest pending business calls, with spawn order breaking ties. Custom policies use `defineRoutingPolicy(name, pick)` and are registered by `createTray({ routing })` or a host DSL's `routing` tuple."
+              },
+              {
+                "type": "paragraph",
+                "text": "Child plugins declare custom names in their own host DSL and call both forms through `deps.tray.routing`. The picker runs synchronously on the parent. Calls never retry or fail over."
+              },
+              {
+                "type": "paragraph",
+                "text": "`tray.publish(topic, payload)` and `deps.tray.publish(topic, payload)` fan out to current subscribers at most once. `subscribe(topic, (payload, meta) => .)` keeps business topics separate from lifecycle events. Frozen `meta.from` is authenticated by the parent: `{ id, host, generation }` for an instance, `{ parent: true }` for a parent publication. Payload fields cannot impersonate the sender."
+              },
+              {
+                "type": "paragraph",
+                "text": "Subscriptions end with their admission and generation; messages sent while an instance is not ready are missed. There is no replay, persistence or delivery acknowledgement."
+              }
+            ]
           }
         ]
       },
@@ -750,6 +772,58 @@
                 "text": "Loader/Adapter/Runtime 契约错误分别使用 `LOADER_*`、`ADAPTER_*`、`RUNTIME_*` 码；原始 native error 保留 identity、type、stack 与 cause。artifact secondary cleanup 使用 `ARTIFACT_CLEANUP_FAILED` 作为观察码，不能替换更早 mutation primary。"
               }
             ]
+          },
+          {
+            "id": "routing",
+            "heading": "Routing",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Both namespace forms select a ready instance for every operation: `tray.routing.roundRobin(host)` and `tray.routing('roundRobin', host)` use one shared cursor. `leastInFlight` picks the fewest pending request, notify and stream operations; spawn order breaks ties. A routed remote has `host` and no fixed `id`. Call `request|notify|stream(path, payload, options?"
+              },
+              {
+                "type": "paragraph",
+                "text": ")`; signal and timeoutMs occupy only the third slot, with `undefined` payload for a zero-argument method. Cancellation and the remaining deadline reach the selected target."
+              },
+              {
+                "type": "paragraph",
+                "text": "Define custom policies with `defineRoutingPolicy('first', candidates => candidates[0]!id)`. The parent registers the union of `createTray({ routing })` and every host DSL's `routing` tuple. Child plugins declare the policies they use in that host tuple and call `deps.tray.routing.first(host)` or `deps.tray.routing('first', host)`. Built-ins require no declaration."
+              },
+              {
+                "type": "paragraph",
+                "text": "Only the name crosses RPC; the synchronous picker runs on the parent and must be short."
+              },
+              {
+                "type": "paragraph",
+                "text": "Unregistered or undeclared names fail with `TRAY_ROUTING_UNKNOWN`. Invalid names, duplicate names from different policy identities, non-candidate results and thrown pickers fail with `TRAY_ROUTING_INVALID`; a thrown picker stays on `cause`. An empty ready set fails with `TRAY_HOST_UNAVAILABLE`. Calls never move to another instance or retry."
+              },
+              {
+                "type": "paragraph",
+                "text": "`inFlight` on `list()` and `get()` counts pending business sends for one admission; init and topic delivery are excluded."
+              }
+            ]
+          },
+          {
+            "id": "publish-subscribe",
+            "heading": "Publish/subscribe",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Parent `tray.subscribe(topic, listener)` returns a synchronous unsubscribe receipt. Child `await deps.tray.subscribe(topic, listener)` returns an asynchronous, idempotent receipt; the first local listener registers one parent membership and the last release removes it. Reinstalling plugins after restart re-subscribes in the new generation. Old sender operations cannot affect that membership."
+              },
+              {
+                "type": "paragraph",
+                "text": "The listener receives `(payload, meta)`. Frozen `meta.from` is authenticated by the parent and equals `{ id, host, generation }` for an instance publisher or `{ parent: true }` for `tray.publish`. Metadata is separate from payload, so payload fields cannot forge the sender. A topic named `spawned` remains a business topic and does not trigger lifecycle listeners."
+              },
+              {
+                "type": "paragraph",
+                "text": "Delivery is at most once to each current subscription. A non-ready subscriber misses a publication. There is no persistence, replay or delivery acknowledgement. Topics are non-empty strings and payloads must be portable. Synchronous listener throws and async rejections are reported on their side; later listeners still run."
+              },
+              {
+                "type": "paragraph",
+                "text": "A rejected delivery send is reported on the parent, and a failed delivery handler is reported on the child. Neither failure rejects the publisher."
+              }
+            ]
           }
         ]
       }
@@ -1003,7 +1077,7 @@
               ]
             }
           ],
-          "usageScore": 38,
+          "usageScore": 44,
           "configuration": [],
           "fragment": "tray-index--createTray"
         },
@@ -1321,7 +1395,7 @@
               ]
             }
           ],
-          "usageScore": 6,
+          "usageScore": 12,
           "configuration": [],
           "fragment": "tray-index--defineRoutingPolicy"
         },
@@ -1566,7 +1640,7 @@
           "name": "IAnyTrayHost",
           "kind": "type",
           "signature": "export type IAnyTrayHost = ITrayHost<any, any, any, any, any>;",
-          "declarationLine": 114,
+          "declarationLine": 116,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Existential host used internally without erasing concrete consumer signatures.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAnyTrayHost.",
@@ -1626,8 +1700,8 @@
         {
           "name": "ITray",
           "kind": "type",
-          "signature": "export type ITray<THosts extends readonly IAnyTrayHost[], _TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ spawn<N extends THosts[number]['name']>(host: N, options: ITraySpawnOptions<IHostByName<THosts, N>>): Promise<ITrayRemote<IHostByName<THosts, N>>>; instance<H extends THosts[number]>(host: H, id: string): ITrayRemote<H>; remove(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; list(filter?: Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>): readonly ITrayInstance[]; get(id: string): Promise<ITrayInstanceDetail>; stop(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; restart(id: string): Promise<ITrayInstance>; replace(id: string, options?: Readonly<{ config?: unknown; }>): Promise<ITrayInstance>; on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void; watch(options?: Readonly<{ signal?: AbortSignal; }>): AsyncIterableIterator<ITrayInstanceEventRecord>; dispose(options?: Readonly<{ graceMs?: number; }>): Promise<void>; [Symbol.asyncDispose](): Promise<void>; }>;",
-          "declarationLine": 151,
+          "signature": "export type ITray<THosts extends readonly IAnyTrayHost[], TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ routing: ITrayRouting<ITrayParentRoutingNames<THosts, TRouting>, THosts>; publish(topic: string, payload?: unknown): void; subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): () => void; spawn<N extends THosts[number]['name']>(host: N, options: ITraySpawnOptions<IHostByName<THosts, N>>): Promise<ITrayRemote<IHostByName<THosts, N>>>; instance<H extends THosts[number]>(host: H, id: string): ITrayRemote<H>; remove(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; list(filter?: Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>): readonly ITrayInstance[]; get(id: string): Promise<ITrayInstanceDetail>; stop(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; restart(id: string): Promise<ITrayInstance>; replace(id: string, options?: Readonly<{ config?: unknown; }>): Promise<ITrayInstance>; on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void; watch(options?: Readonly<{ signal?: AbortSignal; }>): AsyncIterableIterator<ITrayInstanceEventRecord>; dispose(options?: Readonly<{ graceMs?: number; }>): Promise<void>; [Symbol.asyncDispose](): Promise<void>; }>;",
+          "declarationLine": 176,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Registry contract exposes lifecycle observations without any event trigger.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITray.",
@@ -1641,7 +1715,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ITray<THosts extends readonly IAnyTrayHost[], _TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ spawn<N extends THosts[number]['name']>(host: N, options: ITraySpawnOptions<IHostByName<THosts, N>>): Promise<ITrayRemote<IHostByName<THosts, N>>>; instance<H extends THosts[number]>(host: H, id: string): ITrayRemote<H>; remove(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; list(filter?: Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>): readonly ITrayInstance[]; get(id: string): Promise<ITrayInstanceDetail>; stop(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; restart(id: string): Promise<ITrayInstance>; replace(id: string, options?: Readonly<{ config?: unknown; }>): Promise<ITrayInstance>; on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void; watch(options?: Readonly<{ signal?: AbortSignal; }>): AsyncIterableIterator<ITrayInstanceEventRecord>; dispose(options?: Readonly<{ graceMs?: number; }>): Promise<void>; [Symbol.asyncDispose](): Promise<void>; }>;"
+            "export type ITray<THosts extends readonly IAnyTrayHost[], TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ routing: ITrayRouting<ITrayParentRoutingNames<THosts, TRouting>, THosts>; publish(topic: string, payload?: unknown): void; subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): () => void; spawn<N extends THosts[number]['name']>(host: N, options: ITraySpawnOptions<IHostByName<THosts, N>>): Promise<ITrayRemote<IHostByName<THosts, N>>>; instance<H extends THosts[number]>(host: H, id: string): ITrayRemote<H>; remove(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; list(filter?: Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>): readonly ITrayInstance[]; get(id: string): Promise<ITrayInstanceDetail>; stop(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; restart(id: string): Promise<ITrayInstance>; replace(id: string, options?: Readonly<{ config?: unknown; }>): Promise<ITrayInstance>; on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void; watch(options?: Readonly<{ signal?: AbortSignal; }>): AsyncIterableIterator<ITrayInstanceEventRecord>; dispose(options?: Readonly<{ graceMs?: number; }>): Promise<void>; [Symbol.asyncDispose](): Promise<void>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1680,7 +1754,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/hosts/typing.d.ts:ITray:export type ITray<THosts extends readonly IAnyTrayHost[], _TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ spawn<N extends THosts[number]['name']>(host: N, options: ITraySpawnOptions<IHostByName<THosts, N>>): Promise<ITrayRemote<IHostByName<THosts, N>>>; instance<H extends THosts[number]>(host: H, id: string): ITrayRemote<H>; remove(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; list(filter?: Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>): readonly ITrayInstance[]; get(id: string): Promise<ITrayInstanceDetail>; stop(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; restart(id: string): Promise<ITrayInstance>; replace(id: string, options?: Readonly<{ config?: unknown; }>): Promise<ITrayInstance>; on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void; watch(options?: Readonly<{ signal?: AbortSignal; }>): AsyncIterableIterator<ITrayInstanceEventRecord>; dispose(options?: Readonly<{ graceMs?: number; }>): Promise<void>; [Symbol.asyncDispose](): Promise<void>; }>;",
+          "identity": "packages/tray/dist/hosts/typing.d.ts:ITray:export type ITray<THosts extends readonly IAnyTrayHost[], TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ routing: ITrayRouting<ITrayParentRoutingNames<THosts, TRouting>, THosts>; publish(topic: string, payload?: unknown): void; subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): () => void; spawn<N extends THosts[number]['name']>(host: N, options: ITraySpawnOptions<IHostByName<THosts, N>>): Promise<ITrayRemote<IHostByName<THosts, N>>>; instance<H extends THosts[number]>(host: H, id: string): ITrayRemote<H>; remove(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; list(filter?: Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>): readonly ITrayInstance[]; get(id: string): Promise<ITrayInstanceDetail>; stop(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; restart(id: string): Promise<ITrayInstance>; replace(id: string, options?: Readonly<{ config?: unknown; }>): Promise<ITrayInstance>; on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void; watch(options?: Readonly<{ signal?: AbortSignal; }>): AsyncIterableIterator<ITrayInstanceEventRecord>; dispose(options?: Readonly<{ graceMs?: number; }>): Promise<void>; [Symbol.asyncDispose](): Promise<void>; }>;",
           "guidance": [
             {
               "id": "host-定义与构造选项",
@@ -1940,10 +2014,10 @@
         {
           "name": "ITrayClient",
           "kind": "type",
-          "signature": "export type ITrayClient = Readonly<{ self(): ITrayInstanceInfo; to<H extends IAnyTrayHost>(host: H, id: string): Promise<ITrayRemote<H>>; exit(error?: unknown): void; }>;",
-          "declarationLine": 129,
+          "signature": "export type ITrayClient<TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ self(): ITrayInstanceInfo; to<H extends IAnyTrayHost>(host: H, id: string): Promise<ITrayRemote<H>>; exit(error?: unknown): void; /** Existential internal host views erase callbacks; concrete tuples retain closed policy names. */ routing: 0 extends 1 & TRouting ? any : ITrayRouting<IBuiltInRoutingName | IPolicyNames<TRouting>, readonly IAnyTrayHost[]>; publish(topic: string, payload?: unknown): Promise<void>; subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): Promise<() => Promise<void>>; }>;",
+          "declarationLine": 150,
           "source": "packages/tray/dist/hosts/typing.d.ts",
-          "purpose": "Per-generation Feature methods; routing and pub/sub are extended by the mesh owner.",
+          "purpose": "Per-generation child Feature keeps its declared policy names.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayClient.",
           "advanced": "No additional advanced behavior is declared for ITrayClient.",
           "parameters": ["This type declaration has no parameters."],
@@ -1955,7 +2029,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ITrayClient = Readonly<{ self(): ITrayInstanceInfo; to<H extends IAnyTrayHost>(host: H, id: string): Promise<ITrayRemote<H>>; exit(error?: unknown): void; }>;"
+            "export type ITrayClient<TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ self(): ITrayInstanceInfo; to<H extends IAnyTrayHost>(host: H, id: string): Promise<ITrayRemote<H>>; exit(error?: unknown): void; /** Existential internal host views erase callbacks; concrete tuples retain closed policy names. */ routing: 0 extends 1 & TRouting ? any : ITrayRouting<IBuiltInRoutingName | IPolicyNames<TRouting>, readonly IAnyTrayHost[]>; publish(topic: string, payload?: unknown): Promise<void>; subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): Promise<() => Promise<void>>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1965,7 +2039,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Per-generation Feature methods; routing and pub/sub are extended by the mesh owner."
+              "content": "Per-generation child Feature keeps its declared policy names."
             },
             {
               "id": "getting-started",
@@ -1994,7 +2068,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayClient:export type ITrayClient = Readonly<{ self(): ITrayInstanceInfo; to<H extends IAnyTrayHost>(host: H, id: string): Promise<ITrayRemote<H>>; exit(error?: unknown): void; }>;",
+          "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayClient:export type ITrayClient<TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ self(): ITrayInstanceInfo; to<H extends IAnyTrayHost>(host: H, id: string): Promise<ITrayRemote<H>>; exit(error?: unknown): void; /** Existential internal host views erase callbacks; concrete tuples retain closed policy names. */ routing: 0 extends 1 & TRouting ? any : ITrayRouting<IBuiltInRoutingName | IPolicyNames<TRouting>, readonly IAnyTrayHost[]>; publish(topic: string, payload?: unknown): Promise<void>; subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): Promise<() => Promise<void>>; }>;",
           "guidance": [
             {
               "id": "hosts-实例发现与生命周期",
@@ -2064,8 +2138,8 @@
         {
           "name": "ITrayClientPlugin",
           "kind": "type",
-          "signature": "export type ITrayClientPlugin<_TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = IDefinedPluginConstraint<object, never, Record<never, never>, IPluginConfig, Record<never, never>, 'trayClient', Readonly<{ tray: IFeature<Record<never, never>, ITrayClient>; }>>;",
-          "declarationLine": 135,
+          "signature": "export type ITrayClientPlugin<TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = IDefinedPluginConstraint<object, never, Record<never, never>, IPluginConfig, Record<never, never>, 'trayClient', Readonly<{ tray: IFeature<Record<never, never>, ITrayClient<TRouting>>; }>>;",
+          "declarationLine": 160,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Per-init PluginHost definition exposes one precise native `tray` Feature.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayClientPlugin.",
@@ -2079,7 +2153,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ITrayClientPlugin<_TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = IDefinedPluginConstraint<object, never, Record<never, never>, IPluginConfig, Record<never, never>, 'trayClient', Readonly<{ tray: IFeature<Record<never, never>, ITrayClient>; }>>;"
+            "export type ITrayClientPlugin<TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = IDefinedPluginConstraint<object, never, Record<never, never>, IPluginConfig, Record<never, never>, 'trayClient', Readonly<{ tray: IFeature<Record<never, never>, ITrayClient<TRouting>>; }>>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2118,7 +2192,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayClientPlugin:export type ITrayClientPlugin<_TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = IDefinedPluginConstraint<object, never, Record<never, never>, IPluginConfig, Record<never, never>, 'trayClient', Readonly<{ tray: IFeature<Record<never, never>, ITrayClient>; }>>;",
+          "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayClientPlugin:export type ITrayClientPlugin<TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = IDefinedPluginConstraint<object, never, Record<never, never>, IPluginConfig, Record<never, never>, 'trayClient', Readonly<{ tray: IFeature<Record<never, never>, ITrayClient<TRouting>>; }>>;",
           "guidance": [
             {
               "id": "hosts-实例发现与生命周期",
@@ -2459,7 +2533,7 @@
           "name": "ITrayErrorCode",
           "kind": "type",
           "signature": "export type ITrayErrorCode = (typeof TrayErrorCode)[keyof typeof TrayErrorCode];",
-          "declarationLine": 60,
+          "declarationLine": 66,
           "source": "packages/tray/dist/error-code.d.ts",
           "purpose": "ITrayErrorCode is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayErrorCode.",
@@ -2656,7 +2730,7 @@
           "name": "ITrayHost",
           "kind": "type",
           "signature": "export type ITrayHost<TName extends string, TConfig, TPlugins extends ITrayPlugins, TExposes extends string, TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = ITrayHostDefinition<TName, TConfig, TPlugins, TExposes, TRouting> & Readonly<{ runtime: ITrayRuntime; [trayHostBrand]: true; }>;",
-          "declarationLine": 109,
+          "declarationLine": 111,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Frozen host DSL created only by defineTrayHost.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHost.",
@@ -2786,7 +2860,7 @@
           "name": "ITrayHostDefinition",
           "kind": "type",
           "signature": "export type ITrayHostDefinition<TName extends string, TConfig, TPlugins extends ITrayPlugins, TExposes extends string, TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = ITrayRuntimeOptions & Readonly<{ name: TName; config?: (input: unknown) => TConfig; plugins(instance: ITrayInstanceInfo<TName, TConfig>, trayPlugin: ITrayClientPlugin<TRouting>): TPlugins; exposes: readonly TExposes[]; supervisor?: ITraySupervisorPolicy; routing?: TRouting; }>;",
-          "declarationLine": 98,
+          "declarationLine": 100,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Public DSL definition preserves policy and plugin tuples for caller inference.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostDefinition.",
@@ -2848,7 +2922,7 @@
         {
           "name": "ITrayInstance",
           "kind": "type",
-          "signature": "export type ITrayInstance = ITrayInstanceInfo & Readonly<{ runtime: ITrayRuntime; state: TrayInstanceState; }>;",
+          "signature": "export type ITrayInstance = ITrayInstanceInfo & Readonly<{ runtime: ITrayRuntime; state: TrayInstanceState; /** Business operations sent by this admission and not yet ended. */ inFlight: number; }>;",
           "declarationLine": 49,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Public registry snapshot; admission tokens and queues remain private.",
@@ -2863,7 +2937,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ITrayInstance = ITrayInstanceInfo & Readonly<{ runtime: ITrayRuntime; state: TrayInstanceState; }>;"
+            "export type ITrayInstance = ITrayInstanceInfo & Readonly<{ runtime: ITrayRuntime; state: TrayInstanceState; /** Business operations sent by this admission and not yet ended. */ inFlight: number; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2902,7 +2976,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayInstance:export type ITrayInstance = ITrayInstanceInfo & Readonly<{ runtime: ITrayRuntime; state: TrayInstanceState; }>;",
+          "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayInstance:export type ITrayInstance = ITrayInstanceInfo & Readonly<{ runtime: ITrayRuntime; state: TrayInstanceState; /** Business operations sent by this admission and not yet ended. */ inFlight: number; }>;",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
@@ -2912,7 +2986,7 @@
           "name": "ITrayInstanceDetail",
           "kind": "type",
           "signature": "export type ITrayInstanceDetail = ITrayInstance & Omit<IRuntimeConnectionDetail, 'generation'>;",
-          "declarationLine": 54,
+          "declarationLine": 56,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Discovery merges rpc detail while retaining Tray's numeric unit generation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayInstanceDetail.",
@@ -2975,7 +3049,7 @@
           "name": "ITrayInstanceEventRecord",
           "kind": "type",
           "signature": "export type ITrayInstanceEventRecord = ITrayInstance & Readonly<{ event: TrayInstanceEvent; error?: Readonly<{ source?: string; code?: string; }>; }>;",
-          "declarationLine": 56,
+          "declarationLine": 58,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Frozen lifecycle record carries safe exit classification rather than crash object identity.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayInstanceEventRecord.",
@@ -3231,6 +3305,69 @@
           "fragment": "tray-index--ITrayMethodPath"
         },
         {
+          "name": "ITrayParentRoutingNames",
+          "kind": "type",
+          "signature": "export type ITrayParentRoutingNames<THosts, TRouting> = IBuiltInRoutingName | IPolicyNames<TRouting> | IHostRoutingNames<THosts>;",
+          "declarationLine": 144,
+          "source": "packages/tray/dist/hosts/typing.d.ts",
+          "purpose": "Parent registration combines explicit policies and all host declarations.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayParentRoutingNames.",
+          "advanced": "No additional advanced behavior is declared for ITrayParentRoutingNames.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ITrayParentRoutingNames."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayParentRoutingNames.",
+          "examples": [],
+          "members": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ITrayParentRoutingNames<THosts, TRouting> = IBuiltInRoutingName | IPolicyNames<TRouting> | IHostRoutingNames<THosts>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ITrayParentRoutingNames when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ITrayParentRoutingNames does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Parent registration combines explicit policies and all host declarations."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ITrayParentRoutingNames from @migaia/tray, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ITrayParentRoutingNames when its type contract and declared inputs match the result you need. Choose a different public symbol when ITrayParentRoutingNames does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayParentRoutingNames."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ITrayParentRoutingNames."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayParentRoutingNames:export type ITrayParentRoutingNames<THosts, TRouting> = IBuiltInRoutingName | IPolicyNames<TRouting> | IHostRoutingNames<THosts>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "tray-index--ITrayParentRoutingNames"
+        },
+        {
           "name": "ITrayPlugins",
           "kind": "type",
           "signature": "export type ITrayPlugins = readonly IPluginConstraint<any, any, any>[];",
@@ -3297,7 +3434,7 @@
           "name": "ITrayRemote",
           "kind": "type",
           "signature": "export type ITrayRemote<H extends IAnyTrayHost> = Readonly<{ id: string; request<P extends ITrayMethodPath<IHostPlugins<H>, IHostExposes<H>>>(path: P, ...args: IArgs<IMethodAt<IHostPlugins<H>, P>>): Promise<IResult<IMethodAt<IHostPlugins<H>, P>>>; notify<P extends ITrayMethodPath<IHostPlugins<H>, IHostExposes<H>>>(path: P, ...args: IArgs<IMethodAt<IHostPlugins<H>, P>>): Promise<void>; stream<P extends ITrayMethodPath<IHostPlugins<H>, IHostExposes<H>>>(path: P, ...args: IArgs<IMethodAt<IHostPlugins<H>, P>>): AsyncIterableIterator<IStreamItem<IMethodAt<IHostPlugins<H>, P>>>; }>;",
-          "declarationLine": 122,
+          "declarationLine": 124,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Typed methods bound to one registry record admission.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayRemote.",
@@ -3355,6 +3492,199 @@
           "usageScore": 4,
           "configuration": [],
           "fragment": "tray-index--ITrayRemote"
+        },
+        {
+          "name": "ITrayRoutedRemote",
+          "kind": "type",
+          "signature": "export type ITrayRoutedRemote<H extends IAnyTrayHost> = Readonly<{ host: string; }> & Omit<ITrayRemote<H>, 'id'>;",
+          "declarationLine": 132,
+          "source": "packages/tray/dist/hosts/typing.d.ts",
+          "purpose": "Routed remote retains the same method grammar but selects a candidate for every operation.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayRoutedRemote.",
+          "advanced": "No additional advanced behavior is declared for ITrayRoutedRemote.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ITrayRoutedRemote."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayRoutedRemote.",
+          "examples": [],
+          "members": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ITrayRoutedRemote<H extends IAnyTrayHost> = Readonly<{ host: string; }> & Omit<ITrayRemote<H>, 'id'>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ITrayRoutedRemote when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ITrayRoutedRemote does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Routed remote retains the same method grammar but selects a candidate for every operation."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ITrayRoutedRemote from @migaia/tray, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ITrayRoutedRemote when its type contract and declared inputs match the result you need. Choose a different public symbol when ITrayRoutedRemote does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayRoutedRemote."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ITrayRoutedRemote."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayRoutedRemote:export type ITrayRoutedRemote<H extends IAnyTrayHost> = Readonly<{ host: string; }> & Omit<ITrayRemote<H>, 'id'>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "tray-index--ITrayRoutedRemote"
+        },
+        {
+          "name": "ITrayRouting",
+          "kind": "type",
+          "signature": "export type ITrayRouting<TNames extends string, THosts extends readonly IAnyTrayHost[]> = (<N extends TNames, H extends THosts[number]>(name: N, host: H) => ITrayRoutedRemote<H>) & Readonly<{ [N in TNames]: <H extends THosts[number]>(host: H) => ITrayRoutedRemote<H>; }>;",
+          "declarationLine": 146,
+          "source": "packages/tray/dist/hosts/typing.d.ts",
+          "purpose": "The callable and member forms share the same host domain and routed remote signature.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayRouting.",
+          "advanced": "No additional advanced behavior is declared for ITrayRouting.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ITrayRouting."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayRouting.",
+          "examples": [],
+          "members": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ITrayRouting<TNames extends string, THosts extends readonly IAnyTrayHost[]> = (<N extends TNames, H extends THosts[number]>(name: N, host: H) => ITrayRoutedRemote<H>) & Readonly<{ [N in TNames]: <H extends THosts[number]>(host: H) => ITrayRoutedRemote<H>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ITrayRouting when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ITrayRouting does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The callable and member forms share the same host domain and routed remote signature."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ITrayRouting from @migaia/tray, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ITrayRouting when its type contract and declared inputs match the result you need. Choose a different public symbol when ITrayRouting does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayRouting."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ITrayRouting."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayRouting:export type ITrayRouting<TNames extends string, THosts extends readonly IAnyTrayHost[]> = (<N extends TNames, H extends THosts[number]>(name: N, host: H) => ITrayRoutedRemote<H>) & Readonly<{ [N in TNames]: <H extends THosts[number]>(host: H) => ITrayRoutedRemote<H>; }>;",
+          "guidance": [
+            {
+              "id": "host-定义与构造选项",
+              "heading": "Host 定义与构造选项",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`defineTrayHost(definition)` 返回冻结且带身份标记的 `ITrayHost<TName, TConfig, TPlugins, TExposes, TRouting>`。必填字段为 `name`、 `plugins(instance, trayPlugin)` 与 `exposes`；定义阶段不调用插件工厂或配置验证器。 `exposes` 是只读的 `plugin.feature` 路径数组；方法调用使用 `plugin.feature.method`。 结构复制品不具备原定义的身份，不能传给 registry 或 `instance()`。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["字段", "类型与默认值", "使用条件"],
+                  "rows": [
+                    [
+                      "`runtime`",
+                      "`'coroutine' \\",
+                      "'thread' \\",
+                      "'process'`；默认 `'coroutine'`",
+                      "选择实例运行方式"
+                    ],
+                    ["`entry`", "`string \\", "URL`", "thread / process 必填；coroutine 禁止"],
+                    [
+                      "`config`",
+                      "`(input: unknown) => TConfig`；默认无验证器",
+                      "每次初始化时验证并转换配置，输出交给 `plugins`"
+                    ],
+                    [
+                      "`supervisor`",
+                      "`ITraySupervisorPolicy`；默认使用运行时策略",
+                      "`restart` 支持 `mode`、`maxRestarts`、`windowMs`、`initialDelayMs`；另支持 `startupTimeoutMs`"
+                    ],
+                    [
+                      "`limits`",
+                      "`Readonly<{ heapBytes?: number }>`；默认未指定",
+                      "仅 thread 可用"
+                    ],
+                    [
+                      "`sandbox`",
+                      "`ITraySandbox`；默认未指定",
+                      "仅 process 可用；包含 `name` 与同步 `wrap(command)`"
+                    ],
+                    [
+                      "`routing`",
+                      "`TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定",
+                      "保存共享 policy 定义；执行与命名空间由 mesh 实现"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`supervisor.restart.mode` 接收 `'never' | 'on-failure' | 'always'`。 `sandbox.wrap` 的输入与输出均为 RPC Process 的 `IProcessLaunchCommand`： `{ command, args, cwd?, env }`；返回完整的新命令，保留所需环境与工作目录。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，当前只完成定义校验。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块，例如："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "// worker.mjs：共享定义模块已由应用提供。\nimport { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
+                }
+              ]
+            }
+          ],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "tray-index--ITrayRouting"
         },
         {
           "name": "ITrayRoutingContext",
@@ -3618,7 +3948,7 @@
           "name": "ITrayRuntimeOptions",
           "kind": "type",
           "signature": "export type ITrayRuntimeOptions = Readonly<{ runtime?: 'coroutine'; entry?: never; limits?: never; sandbox?: never; }> | Readonly<{ runtime: 'thread'; entry: URL | string; limits?: Readonly<{ heapBytes?: number; }>; sandbox?: never; }> | Readonly<{ runtime: 'process'; entry: URL | string; limits?: never; sandbox?: ITraySandbox; }>;",
-          "declarationLine": 69,
+          "declarationLine": 71,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Runtime-specific options reject launch fields outside their owning family.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayRuntimeOptions.",
@@ -3681,7 +4011,7 @@
           "name": "ITraySandbox",
           "kind": "type",
           "signature": "export type ITraySandbox = Readonly<{ name: string; wrap(command: IProcessLaunchCommand): IProcessLaunchCommand; }>;",
-          "declarationLine": 64,
+          "declarationLine": 66,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "External process command transformation; Tray ships no sandbox implementation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITraySandbox.",
@@ -3811,7 +4141,7 @@
           "name": "ITraySpawnOptions",
           "kind": "type",
           "signature": "export type ITraySpawnOptions<H extends IAnyTrayHost> = Readonly<{ id: string; } & (undefined extends IHostConfig<H> ? { config?: unknown; } : { config: unknown; })>;",
-          "declarationLine": 143,
+          "declarationLine": 168,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Spawn grammar requires input only when the validator output excludes undefined.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITraySpawnOptions.",
@@ -3939,7 +4269,7 @@
           "name": "ITraySupervisorPolicy",
           "kind": "type",
           "signature": "export type ITraySupervisorPolicy = Readonly<{ restart?: Readonly<{ mode?: 'never' | 'on-failure' | 'always'; maxRestarts?: number; windowMs?: number; initialDelayMs?: number; }>; startupTimeoutMs?: number; }>;",
-          "declarationLine": 88,
+          "declarationLine": 90,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Tray projects the canonical supervision names into each rpc runtime adapter.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITraySupervisorPolicy.",
@@ -4064,6 +4394,198 @@
           "usageScore": 4,
           "configuration": [],
           "fragment": "tray-index--ITraySupervisorPolicy"
+        },
+        {
+          "name": "ITrayTopicMeta",
+          "kind": "type",
+          "signature": "export type ITrayTopicMeta = Readonly<{ from: Readonly<{ id: string; host: string; generation: number; }> | Readonly<{ parent: true; }>; }>;",
+          "declarationLine": 3,
+          "source": "packages/tray/dist/hosts/topics.d.ts",
+          "purpose": "Authenticated publisher identity is separate from arbitrary business payloads.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayTopicMeta.",
+          "advanced": "No additional advanced behavior is declared for ITrayTopicMeta.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ITrayTopicMeta."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayTopicMeta.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "ITrayTopicMeta",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ITrayTopicMeta = Readonly<{ from: Readonly<{ id: string; host: string; generation: number; }> | Readonly<{ parent: true; }>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ITrayTopicMeta when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ITrayTopicMeta does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Authenticated publisher identity is separate from arbitrary business payloads."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ITrayTopicMeta from @migaia/tray, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ITrayTopicMeta when its type contract and declared inputs match the result you need. Choose a different public symbol when ITrayTopicMeta does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayTopicMeta."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ITrayTopicMeta."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/tray/dist/hosts/topics.d.ts:ITrayTopicMeta:export type ITrayTopicMeta = Readonly<{ from: Readonly<{ id: string; host: string; generation: number; }> | Readonly<{ parent: true; }>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "tray-index--ITrayTopicMeta"
+        },
+        {
+          "name": "leastInFlight",
+          "kind": "const",
+          "signature": "export declare const leastInFlight: Readonly<{ name: \"leastInFlight\"; [trayRoutingPolicyBrand]: true; }>;",
+          "declarationLine": 29,
+          "source": "packages/tray/dist/hosts/routing-policy.d.ts",
+          "purpose": "Stable ties retain spawn order; counters belong to current record admissions.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for leastInFlight.",
+          "advanced": "No additional advanced behavior is declared for leastInFlight.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for leastInFlight."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for leastInFlight.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "leastInFlight",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const leastInFlight: Readonly<{ name: \"leastInFlight\"; [trayRoutingPolicyBrand]: true; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use leastInFlight when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when leastInFlight does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Stable ties retain spawn order; counters belong to current record admissions."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import leastInFlight from @migaia/tray, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use leastInFlight when its const contract and declared inputs match the result you need. Choose a different public symbol when leastInFlight does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for leastInFlight."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for leastInFlight."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/tray/dist/hosts/routing-policy.d.ts:leastInFlight:export declare const leastInFlight: Readonly<{ name: \"leastInFlight\"; [trayRoutingPolicyBrand]: true; }>;",
+          "guidance": [],
+          "usageScore": 10,
+          "configuration": [],
+          "fragment": "tray-index--leastInFlight"
+        },
+        {
+          "name": "roundRobin",
+          "kind": "const",
+          "signature": "export declare const roundRobin: Readonly<{ name: \"roundRobin\"; [trayRoutingPolicyBrand]: true; }>;",
+          "declarationLine": 24,
+          "source": "packages/tray/dist/hosts/routing-policy.d.ts",
+          "purpose": "Always-available cyclic selection uses the registry's shared host/policy sequence.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for roundRobin.",
+          "advanced": "No additional advanced behavior is declared for roundRobin.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for roundRobin."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for roundRobin.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "roundRobin",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const roundRobin: Readonly<{ name: \"roundRobin\"; [trayRoutingPolicyBrand]: true; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use roundRobin when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when roundRobin does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Always-available cyclic selection uses the registry's shared host/policy sequence."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import roundRobin from @migaia/tray, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use roundRobin when its const contract and declared inputs match the result you need. Choose a different public symbol when roundRobin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for roundRobin."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for roundRobin."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/tray/dist/hosts/routing-policy.d.ts:roundRobin:export declare const roundRobin: Readonly<{ name: \"roundRobin\"; [trayRoutingPolicyBrand]: true; }>;",
+          "guidance": [],
+          "usageScore": 16,
+          "configuration": [],
+          "fragment": "tray-index--roundRobin"
         },
         {
           "name": "serveTrayHost",
@@ -4511,7 +5033,7 @@
         {
           "name": "TrayErrorCode",
           "kind": "const",
-          "signature": "export declare const TrayErrorCode: { /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */ readonly routingInvalid: \"TRAY_ROUTING_INVALID\"; /** Host definition violates instances R1; provide an admitted host DSL. */ readonly hostInvalid: \"TRAY_HOST_INVALID\"; /** Spawn names an unregistered host in R3; register the host before spawning. */ readonly hostUnknown: \"TRAY_HOST_UNKNOWN\"; /** Remote host differs from the admission in R6; select the record's host. */ readonly hostMismatch: \"TRAY_HOST_MISMATCH\"; /** Expose uses a reserved internal plugin in R1; rename the business plugin. */ readonly reservedName: \"TRAY_RESERVED_NAME\"; /** Config or payload violates R3/R6 portable data; remove unsupported values. */ readonly valueNotPortable: \"TRAY_VALUE_NOT_PORTABLE\"; /** Spawn reuses an admitted id in R3; choose a free id or remove the admission. */ readonly instanceDuplicate: \"TRAY_INSTANCE_DUPLICATE\"; /** Lookup or remote uses an ended admission in R6; obtain a fresh remote. */ readonly instanceUnknown: \"TRAY_INSTANCE_UNKNOWN\"; /** Call targets a non-ready instance in R6; await its ready transition. */ readonly instanceNotReady: \"TRAY_INSTANCE_NOT_READY\"; /** Install or generation init fails in R3/R5; inspect the preserved cause. */ readonly instanceStartFailed: \"TRAY_INSTANCE_START_FAILED\"; /** Dispatcher receives a path outside R2 exposure; use an exposed Feature method. */ readonly pathNotExposed: \"TRAY_PATH_NOT_EXPOSED\"; /** Child init repeats or names another host in R2; init once per generation. */ readonly childStateInvalid: \"TRAY_CHILD_STATE_INVALID\"; /** Operation enters a closing registry in R3; create a new Tray. */ readonly disposed: \"TRAY_DISPOSED\"; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: \"LOADER_CONTRACT_INVALID\"; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: \"LOADER_EXECUTION_FAILED\"; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: \"ADAPTER_CONTRACT_INVALID\"; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: \"ADAPTER_EXECUTION_FAILED\"; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: \"RUNTIME_CONTRACT_INVALID\"; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: \"RUNTIME_DISPOSED\"; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: \"RUNTIME_EXECUTION_FAILED\"; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: \"RUNTIME_ABORTED\"; /** Artifact cleanup failed after a primary mutation result; inspect cleanupErrors. */ readonly artifactCleanupFailed: \"ARTIFACT_CLEANUP_FAILED\"; /** Invalid entry descriptor or start result; caller must provide a complete static entry. */ readonly invalidEntry: \"TRAY_INVALID_ENTRY\"; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: \"TRAY_DUPLICATE_ENTRY\"; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: \"TRAY_UNKNOWN_ENTRY\"; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: \"TRAY_UNAVAILABLE\"; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: \"TRAY_GATE_READ_FAILED\"; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: \"HOST_MUTATION_BYPASS\"; };",
+          "signature": "export declare const TrayErrorCode: { /** Mesh R1 has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: \"TRAY_HOST_UNAVAILABLE\"; /** Mesh R1 policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: \"TRAY_ROUTING_UNKNOWN\"; /** Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: \"TRAY_TOPIC_INVALID\"; /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */ readonly routingInvalid: \"TRAY_ROUTING_INVALID\"; /** Host definition violates instances R1; provide an admitted host DSL. */ readonly hostInvalid: \"TRAY_HOST_INVALID\"; /** Spawn names an unregistered host in R3; register the host before spawning. */ readonly hostUnknown: \"TRAY_HOST_UNKNOWN\"; /** Remote host differs from the admission in R6; select the record's host. */ readonly hostMismatch: \"TRAY_HOST_MISMATCH\"; /** Expose uses a reserved internal plugin in R1; rename the business plugin. */ readonly reservedName: \"TRAY_RESERVED_NAME\"; /** Config or payload violates R3/R6 portable data; remove unsupported values. */ readonly valueNotPortable: \"TRAY_VALUE_NOT_PORTABLE\"; /** Spawn reuses an admitted id in R3; choose a free id or remove the admission. */ readonly instanceDuplicate: \"TRAY_INSTANCE_DUPLICATE\"; /** Lookup or remote uses an ended admission in R6; obtain a fresh remote. */ readonly instanceUnknown: \"TRAY_INSTANCE_UNKNOWN\"; /** Call targets a non-ready instance in R6; await its ready transition. */ readonly instanceNotReady: \"TRAY_INSTANCE_NOT_READY\"; /** Install or generation init fails in R3/R5; inspect the preserved cause. */ readonly instanceStartFailed: \"TRAY_INSTANCE_START_FAILED\"; /** Dispatcher receives a path outside R2 exposure; use an exposed Feature method. */ readonly pathNotExposed: \"TRAY_PATH_NOT_EXPOSED\"; /** Child init repeats or names another host in R2; init once per generation. */ readonly childStateInvalid: \"TRAY_CHILD_STATE_INVALID\"; /** Operation enters a closing registry in R3; create a new Tray. */ readonly disposed: \"TRAY_DISPOSED\"; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: \"LOADER_CONTRACT_INVALID\"; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: \"LOADER_EXECUTION_FAILED\"; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: \"ADAPTER_CONTRACT_INVALID\"; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: \"ADAPTER_EXECUTION_FAILED\"; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: \"RUNTIME_CONTRACT_INVALID\"; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: \"RUNTIME_DISPOSED\"; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: \"RUNTIME_EXECUTION_FAILED\"; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: \"RUNTIME_ABORTED\"; /** Artifact cleanup failed after a primary mutation result; inspect cleanupErrors. */ readonly artifactCleanupFailed: \"ARTIFACT_CLEANUP_FAILED\"; /** Invalid entry descriptor or start result; caller must provide a complete static entry. */ readonly invalidEntry: \"TRAY_INVALID_ENTRY\"; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: \"TRAY_DUPLICATE_ENTRY\"; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: \"TRAY_UNKNOWN_ENTRY\"; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: \"TRAY_UNAVAILABLE\"; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: \"TRAY_GATE_READ_FAILED\"; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: \"HOST_MUTATION_BYPASS\"; };",
           "declarationLine": 2,
           "source": "packages/tray/dist/error-code.d.ts",
           "purpose": "Stable error codes exposed by the Tray admission and lookup boundary.",
@@ -4530,7 +5052,7 @@
           "aliasOf": "TrayErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const TrayErrorCode: { /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */ readonly routingInvalid: \"TRAY_ROUTING_INVALID\"; /** Host definition violates instances R1; provide an admitted host DSL. */ readonly hostInvalid: \"TRAY_HOST_INVALID\"; /** Spawn names an unregistered host in R3; register the host before spawning. */ readonly hostUnknown: \"TRAY_HOST_UNKNOWN\"; /** Remote host differs from the admission in R6; select the record's host. */ readonly hostMismatch: \"TRAY_HOST_MISMATCH\"; /** Expose uses a reserved internal plugin in R1; rename the business plugin. */ readonly reservedName: \"TRAY_RESERVED_NAME\"; /** Config or payload violates R3/R6 portable data; remove unsupported values. */ readonly valueNotPortable: \"TRAY_VALUE_NOT_PORTABLE\"; /** Spawn reuses an admitted id in R3; choose a free id or remove the admission. */ readonly instanceDuplicate: \"TRAY_INSTANCE_DUPLICATE\"; /** Lookup or remote uses an ended admission in R6; obtain a fresh remote. */ readonly instanceUnknown: \"TRAY_INSTANCE_UNKNOWN\"; /** Call targets a non-ready instance in R6; await its ready transition. */ readonly instanceNotReady: \"TRAY_INSTANCE_NOT_READY\"; /** Install or generation init fails in R3/R5; inspect the preserved cause. */ readonly instanceStartFailed: \"TRAY_INSTANCE_START_FAILED\"; /** Dispatcher receives a path outside R2 exposure; use an exposed Feature method. */ readonly pathNotExposed: \"TRAY_PATH_NOT_EXPOSED\"; /** Child init repeats or names another host in R2; init once per generation. */ readonly childStateInvalid: \"TRAY_CHILD_STATE_INVALID\"; /** Operation enters a closing registry in R3; create a new Tray. */ readonly disposed: \"TRAY_DISPOSED\"; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: \"LOADER_CONTRACT_INVALID\"; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: \"LOADER_EXECUTION_FAILED\"; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: \"ADAPTER_CONTRACT_INVALID\"; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: \"ADAPTER_EXECUTION_FAILED\"; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: \"RUNTIME_CONTRACT_INVALID\"; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: \"RUNTIME_DISPOSED\"; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: \"RUNTIME_EXECUTION_FAILED\"; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: \"RUNTIME_ABORTED\"; /** Artifact cleanup failed after a primary mutation result; inspect cleanupErrors. */ readonly artifactCleanupFailed: \"ARTIFACT_CLEANUP_FAILED\"; /** Invalid entry descriptor or start result; caller must provide a complete static entry. */ readonly invalidEntry: \"TRAY_INVALID_ENTRY\"; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: \"TRAY_DUPLICATE_ENTRY\"; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: \"TRAY_UNKNOWN_ENTRY\"; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: \"TRAY_UNAVAILABLE\"; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: \"TRAY_GATE_READ_FAILED\"; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: \"HOST_MUTATION_BYPASS\"; };"
+            "export declare const TrayErrorCode: { /** Mesh R1 has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: \"TRAY_HOST_UNAVAILABLE\"; /** Mesh R1 policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: \"TRAY_ROUTING_UNKNOWN\"; /** Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: \"TRAY_TOPIC_INVALID\"; /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */ readonly routingInvalid: \"TRAY_ROUTING_INVALID\"; /** Host definition violates instances R1; provide an admitted host DSL. */ readonly hostInvalid: \"TRAY_HOST_INVALID\"; /** Spawn names an unregistered host in R3; register the host before spawning. */ readonly hostUnknown: \"TRAY_HOST_UNKNOWN\"; /** Remote host differs from the admission in R6; select the record's host. */ readonly hostMismatch: \"TRAY_HOST_MISMATCH\"; /** Expose uses a reserved internal plugin in R1; rename the business plugin. */ readonly reservedName: \"TRAY_RESERVED_NAME\"; /** Config or payload violates R3/R6 portable data; remove unsupported values. */ readonly valueNotPortable: \"TRAY_VALUE_NOT_PORTABLE\"; /** Spawn reuses an admitted id in R3; choose a free id or remove the admission. */ readonly instanceDuplicate: \"TRAY_INSTANCE_DUPLICATE\"; /** Lookup or remote uses an ended admission in R6; obtain a fresh remote. */ readonly instanceUnknown: \"TRAY_INSTANCE_UNKNOWN\"; /** Call targets a non-ready instance in R6; await its ready transition. */ readonly instanceNotReady: \"TRAY_INSTANCE_NOT_READY\"; /** Install or generation init fails in R3/R5; inspect the preserved cause. */ readonly instanceStartFailed: \"TRAY_INSTANCE_START_FAILED\"; /** Dispatcher receives a path outside R2 exposure; use an exposed Feature method. */ readonly pathNotExposed: \"TRAY_PATH_NOT_EXPOSED\"; /** Child init repeats or names another host in R2; init once per generation. */ readonly childStateInvalid: \"TRAY_CHILD_STATE_INVALID\"; /** Operation enters a closing registry in R3; create a new Tray. */ readonly disposed: \"TRAY_DISPOSED\"; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: \"LOADER_CONTRACT_INVALID\"; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: \"LOADER_EXECUTION_FAILED\"; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: \"ADAPTER_CONTRACT_INVALID\"; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: \"ADAPTER_EXECUTION_FAILED\"; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: \"RUNTIME_CONTRACT_INVALID\"; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: \"RUNTIME_DISPOSED\"; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: \"RUNTIME_EXECUTION_FAILED\"; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: \"RUNTIME_ABORTED\"; /** Artifact cleanup failed after a primary mutation result; inspect cleanupErrors. */ readonly artifactCleanupFailed: \"ARTIFACT_CLEANUP_FAILED\"; /** Invalid entry descriptor or start result; caller must provide a complete static entry. */ readonly invalidEntry: \"TRAY_INVALID_ENTRY\"; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: \"TRAY_DUPLICATE_ENTRY\"; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: \"TRAY_UNKNOWN_ENTRY\"; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: \"TRAY_UNAVAILABLE\"; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: \"TRAY_GATE_READ_FAILED\"; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: \"HOST_MUTATION_BYPASS\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4569,7 +5091,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/error-code.d.ts:TrayErrorCode:export declare const TrayErrorCode: { /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */ readonly routingInvalid: \"TRAY_ROUTING_INVALID\"; /** Host definition violates instances R1; provide an admitted host DSL. */ readonly hostInvalid: \"TRAY_HOST_INVALID\"; /** Spawn names an unregistered host in R3; register the host before spawning. */ readonly hostUnknown: \"TRAY_HOST_UNKNOWN\"; /** Remote host differs from the admission in R6; select the record's host. */ readonly hostMismatch: \"TRAY_HOST_MISMATCH\"; /** Expose uses a reserved internal plugin in R1; rename the business plugin. */ readonly reservedName: \"TRAY_RESERVED_NAME\"; /** Config or payload violates R3/R6 portable data; remove unsupported values. */ readonly valueNotPortable: \"TRAY_VALUE_NOT_PORTABLE\"; /** Spawn reuses an admitted id in R3; choose a free id or remove the admission. */ readonly instanceDuplicate: \"TRAY_INSTANCE_DUPLICATE\"; /** Lookup or remote uses an ended admission in R6; obtain a fresh remote. */ readonly instanceUnknown: \"TRAY_INSTANCE_UNKNOWN\"; /** Call targets a non-ready instance in R6; await its ready transition. */ readonly instanceNotReady: \"TRAY_INSTANCE_NOT_READY\"; /** Install or generation init fails in R3/R5; inspect the preserved cause. */ readonly instanceStartFailed: \"TRAY_INSTANCE_START_FAILED\"; /** Dispatcher receives a path outside R2 exposure; use an exposed Feature method. */ readonly pathNotExposed: \"TRAY_PATH_NOT_EXPOSED\"; /** Child init repeats or names another host in R2; init once per generation. */ readonly childStateInvalid: \"TRAY_CHILD_STATE_INVALID\"; /** Operation enters a closing registry in R3; create a new Tray. */ readonly disposed: \"TRAY_DISPOSED\"; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: \"LOADER_CONTRACT_INVALID\"; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: \"LOADER_EXECUTION_FAILED\"; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: \"ADAPTER_CONTRACT_INVALID\"; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: \"ADAPTER_EXECUTION_FAILED\"; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: \"RUNTIME_CONTRACT_INVALID\"; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: \"RUNTIME_DISPOSED\"; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: \"RUNTIME_EXECUTION_FAILED\"; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: \"RUNTIME_ABORTED\"; /** Artifact cleanup failed after a primary mutation result; inspect cleanupErrors. */ readonly artifactCleanupFailed: \"ARTIFACT_CLEANUP_FAILED\"; /** Invalid entry descriptor or start result; caller must provide a complete static entry. */ readonly invalidEntry: \"TRAY_INVALID_ENTRY\"; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: \"TRAY_DUPLICATE_ENTRY\"; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: \"TRAY_UNKNOWN_ENTRY\"; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: \"TRAY_UNAVAILABLE\"; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: \"TRAY_GATE_READ_FAILED\"; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: \"HOST_MUTATION_BYPASS\"; };",
+          "identity": "packages/tray/dist/error-code.d.ts:TrayErrorCode:export declare const TrayErrorCode: { /** Mesh R1 has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: \"TRAY_HOST_UNAVAILABLE\"; /** Mesh R1 policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: \"TRAY_ROUTING_UNKNOWN\"; /** Mesh R3 requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: \"TRAY_TOPIC_INVALID\"; /** Routing policy name or pick violates instances R1; provide a named synchronous policy. */ readonly routingInvalid: \"TRAY_ROUTING_INVALID\"; /** Host definition violates instances R1; provide an admitted host DSL. */ readonly hostInvalid: \"TRAY_HOST_INVALID\"; /** Spawn names an unregistered host in R3; register the host before spawning. */ readonly hostUnknown: \"TRAY_HOST_UNKNOWN\"; /** Remote host differs from the admission in R6; select the record's host. */ readonly hostMismatch: \"TRAY_HOST_MISMATCH\"; /** Expose uses a reserved internal plugin in R1; rename the business plugin. */ readonly reservedName: \"TRAY_RESERVED_NAME\"; /** Config or payload violates R3/R6 portable data; remove unsupported values. */ readonly valueNotPortable: \"TRAY_VALUE_NOT_PORTABLE\"; /** Spawn reuses an admitted id in R3; choose a free id or remove the admission. */ readonly instanceDuplicate: \"TRAY_INSTANCE_DUPLICATE\"; /** Lookup or remote uses an ended admission in R6; obtain a fresh remote. */ readonly instanceUnknown: \"TRAY_INSTANCE_UNKNOWN\"; /** Call targets a non-ready instance in R6; await its ready transition. */ readonly instanceNotReady: \"TRAY_INSTANCE_NOT_READY\"; /** Install or generation init fails in R3/R5; inspect the preserved cause. */ readonly instanceStartFailed: \"TRAY_INSTANCE_START_FAILED\"; /** Dispatcher receives a path outside R2 exposure; use an exposed Feature method. */ readonly pathNotExposed: \"TRAY_PATH_NOT_EXPOSED\"; /** Child init repeats or names another host in R2; init once per generation. */ readonly childStateInvalid: \"TRAY_CHILD_STATE_INVALID\"; /** Operation enters a closing registry in R3; create a new Tray. */ readonly disposed: \"TRAY_DISPOSED\"; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: \"LOADER_CONTRACT_INVALID\"; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: \"LOADER_EXECUTION_FAILED\"; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: \"ADAPTER_CONTRACT_INVALID\"; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: \"ADAPTER_EXECUTION_FAILED\"; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: \"RUNTIME_CONTRACT_INVALID\"; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: \"RUNTIME_DISPOSED\"; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: \"RUNTIME_EXECUTION_FAILED\"; /** Runtime cancellation or deadline was observed; callback settlement still owns the lease. */ readonly runtimeAborted: \"RUNTIME_ABORTED\"; /** Artifact cleanup failed after a primary mutation result; inspect cleanupErrors. */ readonly artifactCleanupFailed: \"ARTIFACT_CLEANUP_FAILED\"; /** Invalid entry descriptor or start result; caller must provide a complete static entry. */ readonly invalidEntry: \"TRAY_INVALID_ENTRY\"; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: \"TRAY_DUPLICATE_ENTRY\"; /** Unknown lookup or dependency key; caller must use an admitted key. */ readonly unknownEntry: \"TRAY_UNKNOWN_ENTRY\"; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: \"TRAY_UNAVAILABLE\"; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: \"TRAY_GATE_READ_FAILED\"; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: \"HOST_MUTATION_BYPASS\"; };",
           "guidance": [
             {
               "id": "7-错误码",
