@@ -136,7 +136,7 @@ export function createRpcLogProbe(
   /** Formatting runs only after the numeric qualification and off-level branches. */
   const message = options.message
   /** Captured content is opted in per subscribed stage through defineProbe. */
-  const content = options.content === true
+  const content = options.content === true || options.capture !== undefined
   /** The supplied reporter is fixed at construction like the other probe callbacks. */
   const onError = options.onError
   /** All sync and async logger failures share the parent collector's diagnostic boundary. */
@@ -180,7 +180,7 @@ export function createRpcLogProbe(
         peerId: view.peerId,
         error: view.error
       }
-      // The frozen view contract supplies content after emitter redaction; no log-specific redact exists.
+      // The canonical emitter supplies content only after the configured redactor runs.
       if (content && (probe.captureMask & (1 << view.stage)) !== 0) fields.content = view.content
       /** Logger invocation stays synchronous; no Promise is introduced for a synchronous sink. */
       const result = sinks[level]!(
@@ -201,7 +201,8 @@ export function createRpcLogProbe(
   try {
     probe = defineProbe({
       stages,
-      capture: content ? stages : undefined,
+      capture: options.capture ?? (content ? stages : undefined),
+      redact: options.redact,
       methods: options.methods,
       sample: options.sample,
       onError,
