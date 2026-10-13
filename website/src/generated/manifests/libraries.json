@@ -13135,7 +13135,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "容量必须为正整数；内容预算允许 0。`maxEvents`（含录制容量）不超过 JavaScript Array 的长度上限 4,294,967,295；`maxInterned` 不超过 94,906,264，保证 endpoint/method 数值组合键仍是精确整数。这些是索引表示上限；实际可分配容量取决于宿主内存。"
+                  "text": "容量必须为正整数；内容预算允许 0。`maxEvents`（含录制容量）不超过 JavaScript Array 的长度上限 4,294,967,295；`maxInterned` 的当前配置上限为 94,906,264。这些是配置表示上限；实际可分配容量取决于宿主内存。"
                 }
               ]
             },
@@ -13166,6 +13166,10 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "当前共享原始丢失计数在通知时分发给届时活跃的 watcher；若某个 watcher 在 burst 已安排通知、尚未交付时首次调用 `next()`，其后续批次可能包含订阅前的原始丢失计数。这是源码审查确认的限制，尚未运行对应的复现。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "`pause()` 保存暂停前最新订阅并清空 emitter mask，重复暂停不覆盖保存值；`resume()` 恢复该列表。构造后 `setStages()` 增加的阶段保留。Query 与 watch 的 `outcomes` 使用同一公开 outcome 名称域，空列表匹配零行。"
                 },
                 {
@@ -13187,6 +13191,10 @@
                 {
                   "type": "paragraph",
                   "text": "`stats()` 按 endpoint 和 method 提供调用、失败、拒绝、超时、取消计数，以及 24 个固定 log2 延迟桶：公开边界为 `0.0625 ms × 2^k`，`k = 0…23`。末桶从 `latencyOverflowFromMs = 262144` ms 向上开放，`latencyMaxMs` 给出实际最大样本。p50/p95/p99 在桶内插值并钳制到观察到的最大值；末桶没有固定宽度误差承诺。Hub 汇总所有带最大值的行时保留同一上界；旧 target 未提供最大值时不伪造它。仅携带非负 durationMs 与 method 的 settled/failed/rejected message 事件同步更新统计，每个合格事件一次；环淘汰不影响累计值，`clear()` 同时重置主环与统计。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`maxInterned` 只限制读取时的名称驻留表；累计统计保留原始 endpoint/method 对，直到 `clear()` 释放这些身份。唯一 endpoint/method 组合持续增加时，这部分状态可以持续增长，不受 `maxEvents` 或 `maxInterned` 限制。"
                 }
               ]
             },
