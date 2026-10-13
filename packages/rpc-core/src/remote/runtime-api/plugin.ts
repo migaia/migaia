@@ -399,6 +399,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
   /** Platform source selection and safe identity continue through the same public Peer factory. */
   const peerOptions: IRuntimePeerOptions = Object.freeze({
     self: options.self,
+    probe: options.probe,
     // Only the selected platform factory interprets its original deployment grammar.
     spawn: options.spawn as IRuntimePeerSource | undefined,
     connect: options.connect as IRuntimePeerSource | undefined,
