@@ -386,7 +386,7 @@ describe('A1 Core physical carrier observation', () => {
       await transport.close?.()
     }
   )
-  it('captures only transferred nested backings and retains unrelated references', async () => {
+  it('retains nested transfer containers by reference after native detachment', async () => {
     /** Exercise the final carrier boundary so observation assertions cover actual native I/O. */
     const transport = fixture('node')
     /**
@@ -400,31 +400,27 @@ describe('A1 Core physical carrier observation', () => {
      * closure.
      */
     const remove = transport.subscribe(() => undefined)
-    /** Native byte payload proves transfer detachment and captured byte preservation together. */
+    /** Nested native bytes detach without requiring a scan or copy of their captured container. */
     const bytes = new Uint8Array([2, 3, 4])
-    /**
-     * An unaffected sibling must keep its exact reference when a transferred backing requires
-     * capture.
-     */
+    /** Capture retains this sibling and its enclosing container under the nested-transfer ruling. */
     const retained = { safe: true }
     /** Native payload anchors content-reference assertions across physical send and receive. */
     const payload = { retained, bytes, nested: [bytes.buffer] }
     transport.send(payload, { transfer: [bytes.buffer] })
-    /**
-     * Captured content keeps backing aliases and unrelated reference identity observable after
-     * detachment.
-     */
+    /** The captured original container exposes native detachment through its unchanged aliases. */
     const content = observed.events[0]!.content as typeof payload
-    expect(content === payload).toBe(false)
+    expect(content).toBe(payload)
     expect(content.retained).toBe(retained)
+    expect(content.bytes).toBe(bytes)
+    expect(content.nested).toBe(payload.nested)
     expect(content.bytes.buffer).toBe(content.nested[0])
-    expect(Array.from(content.bytes)).toEqual([2, 3, 4])
+    expect(content.nested[0]!.byteLength).toBe(0)
     expect(bytes.byteLength).toBe(0)
     await Promise.resolve()
     remove()
     await transport.close?.()
   })
-  it('keeps transferred bytes reachable through cyclic Map and Set containers', async () => {
+  it('retains cyclic Map and Set container identities while nested backings detach', async () => {
     /** Exercise the final carrier boundary so observation assertions cover actual native I/O. */
     const transport = fixture('node')
     /**
@@ -438,12 +434,9 @@ describe('A1 Core physical carrier observation', () => {
      * closure.
      */
     const remove = transport.subscribe(() => undefined)
-    /** The transferred backing must detach natively while captured bytes remain readable. */
+    /** The nested backing detaches natively while its captured cyclic container remains original. */
     const buffer = new Uint8Array([5, 7]).buffer
-    /**
-     * An unaffected sibling must keep its exact reference when a transferred backing requires
-     * capture.
-     */
+    /** No captured sibling is copied when a nested transferable detaches at the native boundary. */
     const retained = { unchanged: true }
     /** Native payload anchors content-reference assertions across physical send and receive. */
     const payload: {
@@ -463,18 +456,19 @@ describe('A1 Core physical carrier observation', () => {
     payload.set.add(buffer)
     payload.set.add(payload)
     transport.send(payload, { transfer: [buffer] })
-    /**
-     * Captured content keeps backing aliases and unrelated reference identity observable after
-     * detachment.
-     */
+    /** Cycles and collection members retain their exact original references, including detachment. */
     const content = observed.events[0]!.content as typeof payload
     expect(buffer.byteLength).toBe(0)
+    expect(content).toBe(payload)
+    expect(content.buffer).toBe(buffer)
+    expect(content.map).toBe(payload.map)
+    expect(content.set).toBe(payload.set)
     expect(content.self === content).toBe(true)
     expect(content.map.get(content.buffer)).toBe(content)
     expect(content.set.has(content.buffer)).toBe(true)
     expect(content.set.has(content)).toBe(true)
     expect(content.retained).toBe(retained)
-    expect(Array.from(new Uint8Array(content.buffer))).toEqual([5, 7])
+    expect(content.buffer.byteLength).toBe(0)
     await Promise.resolve()
     remove()
     await transport.close?.()
