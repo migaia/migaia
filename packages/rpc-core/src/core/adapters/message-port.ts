@@ -1,3 +1,6 @@
+import type { IRpcCarrierProbe } from '../probe/types.js'
+import { RpcCarrierDetailKey } from './probe-detail.js'
+import { carrierSizeBytes, captureTransferredContent } from './probe-content.js'
 import { createRpcTransportError, RpcCoreErrorCode, tagRpcError } from '../errors.js'
 import { RpcAdapterErrorText } from './error-text.js'
 import { registerCloneTransferCarrier } from '../internal/batch-frame.js'
@@ -41,6 +44,8 @@ export type INodeMessagePortLike = {
 
 /** Browser MessagePort surface with EventTarget lifecycle. */
 export type IBrowserMessagePortLike<TTransfer = unknown, TEvent = unknown> = {
+  /** A projected Browser Peer preserves its original Window/RTC/Worker physical observer. */
+  observe?: IRpcTransport['observe']
   postMessage(message: unknown, transfer?: readonly TTransfer[]): void
   start(): void
   close(): void
@@ -129,11 +134,19 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
   const errorListeners = createErrorListenerChannel()
   const listenerErrors = createErrorListenerChannel()
   const secondaryFailures = createListenerFailureState()
+  /** The sole installed probe is replaced per observation generation. */
+  let probe: IRpcCarrierProbe | undefined
+  /** Disposers compare generations even when the same probe object is installed twice. */
+  let probeGeneration = 0
+  /** Reused detail belongs to this adapter; recipients consume it synchronously. */
+  const probeDetail = { [RpcCarrierDetailKey.transfers]: -1 }
   let closed = false
   let closeResult: void | Promise<void>
   const ownership = options.ownership ?? 'owned'
   /** This transport owns only its raw error subscription, never the borrowed physical port. */
   let removeRawError: (() => void) | undefined
+  /** Raw carrier observation is released by this adapter's existing close owner. */
+  let removeRawProbe: (() => void) | undefined
   const onMessage = (event: TEvent): void => {
     let readFailed = false
     const data = safeRead<unknown>(event, 'data', ({ error }) => {
@@ -145,6 +158,25 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
       return undefined
     })
     if (readFailed) return
+    if (probe !== undefined) {
+      /** One event retains the installed handle even if its callback replaces observation. */
+      const currentProbe = probe
+      try {
+        probeDetail[RpcCarrierDetailKey.transfers] = -1
+        currentProbe.emit(
+          1,
+          carrierSizeBytes(data),
+          RpcPlatform.messagePort,
+          probeDetail,
+          currentProbe.capturing ? data : undefined
+        )
+      } catch (error) {
+        listenerErrors.report(
+          createRpcTransportError(RpcAdapterErrorText.probeFailed, error),
+          secondaryFailures
+        )
+      }
+    }
     messageListeners.dispatch({ data }, (listener, message) => {
       observeListener(
         () => listener(message),
@@ -167,9 +199,49 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
     get closed() {
       return closed
     },
+    /** Replace observation; the returned disposer retires only its own installation generation. */
+    observe(next) {
+      /** Registration remains inert after this adapter's terminal boundary. */
+      const generation = ++probeGeneration
+      removeRawProbe?.()
+      removeRawProbe = undefined
+      if (!closed) {
+        if (port.observe !== undefined) {
+          probe = undefined
+          removeRawProbe = port.observe(next)
+        } else probe = next
+      }
+      return () => {
+        if (generation !== probeGeneration) return
+        probe = undefined
+        removeRawProbe?.()
+        removeRawProbe = undefined
+      }
+    },
     send(message, options?: IRpcSendOptions<TTransfer>) {
       if (closed) throw createRpcTransportError(RpcMessagePortErrorText.browserMessagePortClosed)
-      port.postMessage(message, options?.transfer)
+      /** Read the native transfer option once; observation cannot select a different list. */
+      const transfer = options?.transfer
+      if (probe !== undefined) {
+        /** One event retains the installed handle even if its callback replaces observation. */
+        const currentProbe = probe
+        try {
+          probeDetail[RpcCarrierDetailKey.transfers] = transfer?.length ?? 0
+          currentProbe.emit(
+            0,
+            carrierSizeBytes(message),
+            RpcPlatform.messagePort,
+            probeDetail,
+            currentProbe.capturing ? captureTransferredContent(message, transfer) : undefined
+          )
+        } catch (error) {
+          listenerErrors.report(
+            createRpcTransportError(RpcAdapterErrorText.probeFailed, error),
+            secondaryFailures
+          )
+        }
+      }
+      port.postMessage(message, transfer)
     },
     subscribe(listener) {
       if (closed) throw createRpcTransportError(RpcMessagePortErrorText.browserMessagePortClosed)
@@ -223,8 +295,13 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
     close() {
       if (closed) return closeResult
       closed = true
+      probe = undefined
       messageListeners.clear(() => undefined)
       const cleanupErrors = collectListenerCleanupFailures([
+        () => {
+          removeRawProbe?.()
+          removeRawProbe = undefined
+        },
         () => port.removeEventListener('message', onMessage),
         () => port.removeEventListener('messageerror', onMessageError),
         () => {
@@ -275,6 +352,17 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
   const errorListeners = createErrorListenerChannel()
   const listenerErrors = createErrorListenerChannel()
   const secondaryFailures = createListenerFailureState()
+  /** The sole installed probe is replaced per observation generation. */
+  let probe: IRpcCarrierProbe | undefined
+  /** Disposers compare generations even when the same probe object is installed twice. */
+  let probeGeneration = 0
+  /**
+   * Logical channel close retires observation without claiming that the borrowed native port
+   * closed.
+   */
+  let observationRetired = false
+  /** Reused detail belongs to this adapter; recipients consume it synchronously. */
+  const probeDetail = { [RpcCarrierDetailKey.transfers]: -1 }
   let closed = false
   let terminalReported = false
   let terminalError: Error | undefined
@@ -284,6 +372,25 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
   }
 
   const onMessage = (message: unknown): void => {
+    if (probe !== undefined) {
+      /** One event retains the installed handle even if its callback replaces observation. */
+      const currentProbe = probe
+      try {
+        probeDetail[RpcCarrierDetailKey.transfers] = -1
+        currentProbe.emit(
+          1,
+          carrierSizeBytes(message),
+          RpcPlatform.messagePort,
+          probeDetail,
+          currentProbe.capturing ? message : undefined
+        )
+      } catch (error) {
+        listenerErrors.report(
+          createRpcTransportError(RpcAdapterErrorText.probeFailed, error),
+          secondaryFailures
+        )
+      }
+    }
     messageListeners.dispatch({ data: message }, (listener, messageValue) => {
       observeListener(
         () => listener(messageValue),
@@ -319,6 +426,7 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
     if (terminalReported) return
     terminalReported = true
     closed = true
+    probe = undefined
     terminalError = tagRpcError(
       new Error(RpcMessagePortErrorText.messagePortTerminated),
       RpcCoreErrorCode.transport
@@ -334,9 +442,45 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
     get closed() {
       return closed
     },
+    /** Replace observation; the returned disposer retires only its own installation generation. */
+    observe(next) {
+      /** Registration remains inert after this adapter's terminal boundary. */
+      const generation = ++probeGeneration
+      if (!closed && !observationRetired) probe = next
+      return () => {
+        if (generation !== probeGeneration) return
+        probe = undefined
+      }
+    },
+    /** Retire only observation; the native close event keeps its original physical error ownership. */
+    close() {
+      observationRetired = true
+      probe = undefined
+    },
     send(message, options?: IRpcSendOptions) {
       if (closed) throw createRpcTransportError(RpcMessagePortErrorText.messagePortClosed)
-      port.postMessage(message, options?.transfer)
+      /** Read the native transfer option once; observation cannot select a different list. */
+      const transfer = options?.transfer
+      if (probe !== undefined) {
+        /** One event retains the installed handle even if its callback replaces observation. */
+        const currentProbe = probe
+        try {
+          probeDetail[RpcCarrierDetailKey.transfers] = transfer?.length ?? 0
+          currentProbe.emit(
+            0,
+            carrierSizeBytes(message),
+            RpcPlatform.messagePort,
+            probeDetail,
+            currentProbe.capturing ? captureTransferredContent(message, transfer) : undefined
+          )
+        } catch (error) {
+          listenerErrors.report(
+            createRpcTransportError(RpcAdapterErrorText.probeFailed, error),
+            secondaryFailures
+          )
+        }
+      }
+      port.postMessage(message, transfer)
     },
     // Lazily attached/detached the same way as the web-worker adapter —
     // a client that closes must not leave the underlying port still
@@ -366,7 +510,7 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
       }
     },
     onTransportError(listener) {
-      if (errorListeners.size === 0)
+      if (!closed && errorListeners.size === 0)
         registerListeners(
           [
             {

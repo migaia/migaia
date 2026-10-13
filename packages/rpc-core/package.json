@@ -50,6 +50,10 @@
       "types": "./dist/core/transport-kit.d.ts",
       "default": "./dist/core/transport-kit.js"
     },
+    "./probe": {
+      "types": "./dist/core/probe/index.d.ts",
+      "default": "./dist/core/probe/index.js"
+    },
     "./features/outbound": {
       "types": "./dist/core/features/outbound.d.ts",
       "default": "./dist/core/features/outbound.js"

@@ -12,7 +12,10 @@ export async function createThreadPool<TRemote = Record<never, never>>(
   return (await createPool(
     options,
     async () =>
-      (await createThreadPeer<TRemote>({ spawn: options.spawn })) as unknown as IRuntimePeer
+      (await createThreadPeer<TRemote>({
+        spawn: options.spawn,
+        probe: options.probe
+      })) as unknown as IRuntimePeer
   )) as unknown as IThreadPool<TRemote>
 }
 
@@ -24,7 +27,10 @@ export async function createProcessPool<TRemote = Record<never, never>>(
   return (await createPool(
     options,
     async () =>
-      (await createProcessPeer<TRemote>({ spawn: options.spawn })) as unknown as IRuntimePeer
+      (await createProcessPeer<TRemote>({
+        spawn: options.spawn,
+        probe: options.probe
+      })) as unknown as IRuntimePeer
   )) as unknown as IProcessPool<TRemote>
 }
 

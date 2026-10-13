@@ -15,6 +15,14 @@ import {
 import { runtimeUnavailable, runtimeErrorIdentity, type IRuntimeUnavailable } from './overview.js'
 import { readRuntimePeerConnection, type IRuntimePeer } from './peer.js'
 import type { IRemoteRuntimeRegistration } from '../proxy.js'
+import { readInstalledProbe, type IProbeEmitter } from '../../core/internal/probe-emitter.js'
+import { RpcProbeStage } from '../../core/probe/constants.js'
+/** Endpoint-owned lifecycle observations use these stable names beside native RuntimeEventName. */
+export const RuntimeProbeLifecycle = {
+  handshake: 'handshake',
+  directory: 'directory',
+  closing: 'closing'
+} as const
 
 /** Event shape comes from the original supervisor, without another native-state definition. */
 type IRuntimeSupervisorEvent = Parameters<
@@ -29,6 +37,10 @@ export function runtimeReadyEvent(
 ): IRuntimeEvent {
   /** The private connection reader admits only the original constructed Peer. */
   const accepted = readRuntimePeerConnection(peer)
+  /** Registration publishes this fact only after its actual current-generation pointer commits. */
+  const probe = readInstalledProbe(accepted.channel.transport)
+  if (probe && (probe.mask & (1 << RpcProbeStage.peer)) !== 0)
+    probe.peer(RuntimeEventName.ready, accepted.peerId, undefined)
   return Object.freeze({
     type: RuntimeEventName.ready,
     name,
@@ -109,7 +121,7 @@ type IRuntimeEventListener = Readonly<{
 }>
 
 /** Create only the local lifecycle subscriber adapter, with the prescribed bounded event buffer. */
-export function createRuntimeEventPublisher(): IRuntimeEventPublisher {
+export function createRuntimeEventPublisher(probe?: IProbeEmitter): IRuntimeEventPublisher {
   /**
    * Each subscription is an exact receipt; publication snapshots this Set before invoking
    * callbacks.
@@ -212,6 +224,12 @@ export function createRuntimeEventPublisher(): IRuntimeEventPublisher {
     },
     publish(event, report) {
       if (closed) return
+      if (probe && (probe.mask & (1 << RpcProbeStage.peer)) !== 0)
+        probe.peer(
+          event.type,
+          typeof event.instanceId === 'string' ? event.instanceId : undefined,
+          event.error
+        )
       for (const receipt of Array.from(listeners)) {
         if (receipt.event !== undefined && receipt.event !== event.type) continue
         try {

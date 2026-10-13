@@ -71,13 +71,13 @@
     {
       "slug": "rpc-bridge-jsonrpc",
       "description": "RPC bridge-jsonrpc owner.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": ["."]
     },
     {
       "slug": "rpc-browser",
       "description": "RPC browser owner.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [
         ".",
         "./adapters/broadcast-channel",
@@ -91,7 +91,7 @@
     {
       "slug": "rpc-contract",
       "description": "RPC contract owner.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [
         ".",
         "./binary",
@@ -117,7 +117,7 @@
     {
       "slug": "rpc-core",
       "description": "RPC core owner.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [
         ".",
         "./adapter",
@@ -135,6 +135,7 @@
         "./plugins/flow-control",
         "./plugins/log",
         "./plugins/send-queue",
+        "./probe",
         "./provider",
         "./remote",
         "./stream",
@@ -144,15 +145,21 @@
       ]
     },
     {
+      "slug": "rpc-devtools",
+      "description": "RPC probe, service and offline record contracts.",
+      "version": "0.0.9",
+      "exports": [".", "./contract", "./hub", "./log"]
+    },
+    {
       "slug": "rpc-pool",
       "description": "Thread and process pools composed from public RPC peers.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": ["."]
     },
     {
       "slug": "rpc-process",
       "description": "RPC process owner.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [
         ".",
         "./adapters/bun-socket",
@@ -168,7 +175,7 @@
     {
       "slug": "rpc-threads",
       "description": "RPC threads owner.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [
         ".",
         "./adapters/browser",

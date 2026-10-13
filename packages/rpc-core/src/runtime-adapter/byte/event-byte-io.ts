@@ -20,7 +20,9 @@ export type IRuntimeEventByteReader = Readonly<{
 export type IRuntimeEventByteWriter = Readonly<{
   destroyed: boolean
   write(chunk: Uint8Array, settled: (error?: Error | null) => void): unknown
-  once(event: 'error' | 'close', listener: (reason?: unknown) => void): unknown
+  once(event: 'error' | 'close' | 'drain', listener: (reason?: unknown) => void): unknown
+  /** Native stream removal releases an observed backpressure callback when its observer retires. */
+  off?(event: 'drain', listener: () => void): unknown
 }>
 
 /** A held cleanup resource preserves the adapter's exact physical close operation. */
@@ -57,6 +59,17 @@ export function createRuntimeEventByteIO(
   let terminal: unknown
   /** EOF, write errors and explicit close share one physical retirement. */
   let closed = false
+  /** Only an installed byte carrier observes native write/drain facts. */
+  let writeObserver: ((chunk: Uint8Array, drainMs: number) => void) | undefined
+  /** False-write callbacks belong to the current observer installation only. */
+  let writeGeneration = 0
+  /** Backpressure retains bytes only until native drain or observation retirement. */
+  const pendingDrains = new Set<() => void>()
+  /** Cold replacement and close release actual native callbacks without changing write Promises. */
+  const releaseDrains = (): void => {
+    for (const listener of pendingDrains) writer.off?.('drain', listener)
+    pendingDrains.clear()
+  }
   /** Core counts its actual byte subscribers rather than accepting an exclusivity callback. */
   const dataListeners = new Set<(chunk: Uint8Array) => void>()
   /** Terminal subscribers borrow the port and never acquire the underlying resources. */
@@ -66,6 +79,9 @@ export function createRuntimeEventByteIO(
   const end = (reason?: unknown): void => {
     if (closed) return
     closed = true
+    writeObserver = undefined
+    writeGeneration++
+    releaseDrains()
     terminal = reason ?? createRuntimeDiagnosticError(closedDiagnostic)
     physical.close()
     for (const listener of closeListeners) listener(terminal)
@@ -83,14 +99,48 @@ export function createRuntimeEventByteIO(
   /** The exact constructed identity owns its physical writer and original subscription count. */
   const channel: IRuntimeByteIO = {
     kind: 'byte',
+    onWrite(listener) {
+      /** Replacement retires only diagnostic drain callbacks, never native write settlement. */
+      const generation = ++writeGeneration
+      releaseDrains()
+      writeObserver = listener
+      return () => {
+        if (generation !== writeGeneration) return
+        writeObserver = undefined
+        writeGeneration++
+        releaseDrains()
+      }
+    },
     write(chunk) {
       if (closed) return Promise.reject(terminal)
       return new Promise<void>((resolve, reject) => {
-        writer.write(chunk, (error?: Error | null) => {
+        /** Only observed writes read the clock; absent observation leaves native behavior intact. */
+        const observer = writeObserver
+        /** A pending drain cannot be retargeted to a later installation of the same callback. */
+        const generation = writeGeneration
+        /**
+         * False writes measure through the native drain event, independently of callback
+         * settlement.
+         */
+        const started = observer === undefined ? 0 : performance.now()
+        /** Preserve the writer's existing callback and Promise; inspect only its returned boolean. */
+        const accepted = writer.write(chunk, (error?: Error | null) => {
           if (error) reject(error)
           else if (closed) reject(terminal)
           else resolve()
         })
+        if (observer !== undefined) {
+          if (accepted === false) {
+            /** This callback exists only on native backpressure, outside the normal write path. */
+            const drained = (): void => {
+              pendingDrains.delete(drained)
+              if (!closed && generation === writeGeneration)
+                observer(chunk, performance.now() - started)
+            }
+            pendingDrains.add(drained)
+            writer.once('drain', drained)
+          } else observer(chunk, 0)
+        }
       })
     },
     onData(listener) {

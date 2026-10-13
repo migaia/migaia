@@ -76,7 +76,11 @@ describe('public transport kit', () => {
           )
           continue
         }
-        expect(specifier, path).toMatch(/^(?:\.\.\/error(?:-text)?|\.\/shared-worker)\.js$/u)
+        // probe-detail is the package-owned carrier observation helper; it reaches Core only
+        // through the public `probe` and `adapter/internal-advanced` entries.
+        expect(specifier, path).toMatch(
+          /^(?:\.\.\/error(?:-text)?|\.\.\/probe-detail|\.\/shared-worker)\.js$/u
+        )
       }
     }
   })

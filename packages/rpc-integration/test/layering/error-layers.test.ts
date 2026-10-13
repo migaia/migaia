@@ -269,7 +269,9 @@ describe('layered error ownership', () => {
   it('A2 removes every dead core code while retaining a throw site for each declared code', () => {
     const contract = declaredCodes('contract')
     const core = declaredCodes('core')
-    expect(core.size).toBe(32)
+    expect(core.size).toBe(33)
+    /** Contract R5 declares this report code before probe-core installs its observation runtime. */
+    expect(core.get('probeFailed')).toBe('PROBE_FAILED')
     expect(core.get('duplicateModuleInstance')).toBe('DUPLICATE_MODULE_INSTANCE')
     for (const value of retired) expect([...core.values()]).not.toContain(value)
     const contractThrown = new Set(layerThrows('contract').map(({ key }) => key))
@@ -316,6 +318,7 @@ describe('layered error ownership', () => {
     /** Packed duplicate/version copies prove this exact compiler throw executes before acquisition. */
     coreThrown.add('duplicateModuleInstance')
     expect([...contract.keys()].filter((key) => !contractThrown.has(key))).toEqual([])
+    /** Probe runtime reports through its installed canonical site; no reserved Core code is pending. */
     expect([...core.keys()].filter((key) => !coreThrown.has(key))).toEqual([])
   })
 })

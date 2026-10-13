@@ -17,6 +17,8 @@ export type IInboundIdentityAdmission = {
 
 /** One-shot physical-source receipt consumed only by its creating identity owner. */
 export type IInboundIdentityPreparedSource = Readonly<{
+  /** The carrier's local sequence stays with this exact physical receive through async transforms. */
+  readonly carrierSeq: number
   readonly data: unknown
   readonly source: unknown
   readonly origin: string | undefined
@@ -100,7 +102,8 @@ export class InboundIdentityCoordinator {
 
   /** Snapshots physical inbound metadata and proves its source before framing allocates state. */
   prepareSource(
-    inbound: IInboundIdentityRequest['inbound']
+    inbound: IInboundIdentityRequest['inbound'],
+    carrierSeq = -1
   ): IInboundIdentityPreparedSource | undefined {
     this.#native?.observeOwner()
     if (this.#native && !this.#native.active) return undefined
@@ -112,6 +115,7 @@ export class InboundIdentityCoordinator {
     if (this.#sourceProof && !this.#sourceProof(source, origin)) return undefined
     if (this.#closed) return undefined
     const prepared = Object.freeze({
+      carrierSeq,
       data,
       source,
       origin,

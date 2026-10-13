@@ -90,3 +90,9 @@ try {
 | [`@migaia/rpc-contract`](../rpc-contract/README.md) | Content-Length 分帧工具、错误码常量、wire 错误转换 |
 
 完整的对端协议说明、Python 参考实现与错误处理见 [USEGUIDE](./USEGUIDE.md)。
+
+Carrier observation 仍待接入：计划通过 `transport.observe(probe)` 为每个实际 JSON-RPC 消息或 batch
+报告 `jsonrpcId`、`jsonrpcMethod`、`batchSize`，默认只采集 metadata，开启 capture 后保留内容引用。
+当前翻译与最终 transport 归 `rpc-core/src/runtime-adapter/jsonrpc` 和
+`rpc-core/src/runtime-adapter/object` 所有，公开 Bridge factory 委托这些唯一实现；最终 IPC 队列没有转发
+`observe`。在这些 owner 提供观察接入点前，本包不额外解析字节、不包装逻辑消息，也不宣称此能力已实现。

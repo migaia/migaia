@@ -50,8 +50,8 @@ describe('error boundary helpers', () => {
 
   it('keeps the (source, code) contract: 31 unique codes and a constant source (E-T1/E-T2)', () => {
     const codes = Object.values(RpcCoreErrorCode)
-    /** The frozen historical title is retained; C3 adds the registered duplicate-instance code. */
-    expect(codes).toHaveLength(32)
+    /** Contract R5 adds the registered probe failure code to the existing Core error inventory. */
+    expect(codes).toHaveLength(33)
     expect(new Set(codes).size).toBe(codes.length)
     const samples: ReadonlyArray<{ readonly source: string; readonly code: string }> = [
       new RpcError(RpcCoreErrorCode.internal, 'base'),

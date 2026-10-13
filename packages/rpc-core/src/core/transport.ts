@@ -1,4 +1,5 @@
 export type IRpcSendOptions<Transfer = unknown> = { readonly transfer?: readonly Transfer[] }
+import type { IRpcCarrierProbe } from './probe/types.js'
 import type {
   IRpcPlatformValue,
   IRpcTransportEncodingValue,
@@ -20,6 +21,8 @@ export type IRpcTransport<Message = unknown, Transfer = unknown> = {
   close?(): void | Promise<void>
   onTransportError?(listener: (error: unknown) => void): () => void
   onListenerError?(listener: (error: unknown) => void): () => void
+  /** Optional carrier observation capability; the contract layer never calls this slot. */
+  observe?(probe: IRpcCarrierProbe): () => void
   readonly peerId?: string
   readonly origin?: string
   readonly platform: IRpcPlatformValue

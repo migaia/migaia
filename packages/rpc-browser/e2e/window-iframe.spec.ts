@@ -1,5 +1,25 @@
 import { expect, test } from '@playwright/test'
 
+test('carriers A1: real Window observe preserves transfers and rejects sibling capture', async ({
+  page
+}) => {
+  await page.goto('/browser-peer/observe.html')
+  /** Real-realm observations expose detachment, source rejection and observer disposal together. */
+  const result = await page.evaluate(() => globalThis.runWindowObserve())
+  expect(result).toEqual({
+    directions: [0, 1],
+    carrier: ['window', 'window'],
+    sizes: [3, 3],
+    detached: true,
+    captured: [7, 8, 9],
+    received: [7, 8, 9],
+    transfers: 1,
+    rejectedSource: 1,
+    afterDispose: 2,
+    failures: []
+  })
+})
+
 test('Window iframe proves source/origin and rejects sibling spoof', async ({ page }) => {
   await page.goto('/e2e/fixtures/index.html?scenario=window-iframe')
   await page.evaluate(() => globalThis.e2eReady)

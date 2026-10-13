@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { createThreadPeer } from '@migaia/rpc-threads'
 import { createProcessPeer } from '@migaia/rpc-process'
 import type { IRuntimePeer } from '@migaia/rpc-core/remote'
+import { defineProbe, RpcProbeKind, RpcProbeStage } from '@migaia/rpc-core/probe'
 import { createThreadPool, createProcessPool } from '../dist/index.js'
 
 vi.mock('@migaia/rpc-threads', async (importOriginal) => {
@@ -36,7 +37,20 @@ it('[POOL-T02] preserves failed work once while the same real Peer restarts and 
   /** The public factory spy observes only construction; it never substitutes restart behavior. */
   const threadFactory = vi.mocked(createThreadPeer)
   threadFactory.mockClear()
-  const pool = await createThreadPool<IThreadApi>({ spawn, size: 1 })
+  /** Retain scalar lifecycle observations from the actual pooled Thread Peer synchronously. */
+  const threadLifecycle: string[] = []
+  /** The pool forwards this original peer-only handle without wrapping the native factory. */
+  const threadProbe = defineProbe({
+    stages: ['peer'],
+    /** Read the reused view during emit; no observation object escapes this callback. */
+    emit(view) {
+      expect(view.stage).toBe(RpcProbeStage.peer)
+      expect(view.kind).toBe(RpcProbeKind.lifecycle)
+      threadLifecycle.push(view.lifecycle!)
+    }
+  })
+  /** One actual Thread member retains the original pool business and supervision path. */
+  const pool = await createThreadPool<IThreadApi>({ spawn, size: 1, probe: threadProbe })
   /** This is the actual same Core-owned Peer later retained by the pool. */
   const peer: IRuntimePeer = await threadFactory.mock.results[0]!.value
   /** Later readiness comes from real generation/endpoint rebind rather than a pool ready flag. */
@@ -50,7 +64,9 @@ it('[POOL-T02] preserves failed work once while the same real Peer restarts and 
   try {
     expect(threadFactory).toHaveBeenCalledTimes(1)
     expect(threadFactory.mock.calls[0]![0].spawn).toBe(spawn)
-    expect(threadFactory.mock.calls[0]![0]).toEqual({ spawn })
+    expect(threadFactory.mock.calls[0]![0].probe).toBe(threadProbe)
+    expect(threadFactory.mock.calls[0]![0]).toEqual({ spawn, probe: threadProbe })
+    expect(threadLifecycle).toEqual(expect.arrayContaining(['handshake', 'ready']))
     const previous = await pool.request('identity')
     /** This failed business call remains failed; the pool does not replay it in the new unit. */
     const failure = await pool.request('crash', { journal }).catch((error: unknown) => error)
@@ -73,12 +89,31 @@ it('[POOL-T02] preserves failed work once while the same real Peer restarts and 
   const processSpawn = new URL('./fixtures/process-child.mjs', import.meta.url)
   const processFactory = vi.mocked(createProcessPeer)
   processFactory.mockClear()
-  const processes = await createProcessPool<IProcessApi>({ spawn: processSpawn, size: 1 })
+  /** Retain scalar lifecycle observations from the actual pooled Process Peer synchronously. */
+  const processLifecycle: string[] = []
+  /** The Process pool must forward this original peer-only handle through its public factory. */
+  const processProbe = defineProbe({
+    stages: ['peer'],
+    /** Read lifecycle metadata synchronously rather than retaining the reusable event view. */
+    emit(view) {
+      expect(view.stage).toBe(RpcProbeStage.peer)
+      expect(view.kind).toBe(RpcProbeKind.lifecycle)
+      processLifecycle.push(view.lifecycle!)
+    }
+  })
+  /** One actual Process member exercises probe forwarding alongside its existing typed calls. */
+  const processes = await createProcessPool<IProcessApi>({
+    spawn: processSpawn,
+    size: 1,
+    probe: processProbe
+  })
   try {
     expect(await processes.request('math.double', 21)).toBe(42)
     expect(await processes.request('identity')).toBeGreaterThan(0)
     expect(processFactory).toHaveBeenCalledTimes(1)
-    expect(processFactory.mock.calls[0]![0]).toEqual({ spawn: processSpawn })
+    expect(processFactory.mock.calls[0]![0].probe).toBe(processProbe)
+    expect(processFactory.mock.calls[0]![0]).toEqual({ spawn: processSpawn, probe: processProbe })
+    expect(processLifecycle).toEqual(expect.arrayContaining(['handshake', 'ready']))
   } finally {
     await processes.close()
   }

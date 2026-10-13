@@ -129,6 +129,7 @@ export function createThreadSourcePeer<THandle extends IThreadHandle>(
     {
       self,
       provide: options.provide,
+      probe: options.probe,
       providerLimits: options.providerLimits,
       defaultTimeoutMs: options.defaultTimeoutMs,
       report: options.report ?? source.report,
