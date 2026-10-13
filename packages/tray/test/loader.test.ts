@@ -1,6 +1,6 @@
 /* oxlint-disable unicorn/no-thenable -- this suite intentionally models foreign thenables. */
 import { describe, expect, it } from 'vitest'
-import { PluginHost } from '@migaia/plugin-host'
+import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createAbortController } from '@migaia/lifecycle'
 import { createHost } from '../src/host/index.js'
 import { defineAdapter } from '../src/adapter/index.js'
@@ -267,7 +267,19 @@ describe('@migaia/tray/loader', () => {
         })
       }),
       adapter: defineAdapter({
-        adapt: () => ({ name: 'blocked-plugin', requires: ['missing'], install: () => ({}) })
+        adapt: () => ({
+          name: 'blocked-plugin',
+          features: {
+            value: defineFeature(() => ({}), {
+              missing: definePlugin({
+                name: 'missing',
+                features: { value: defineFeature(() => ({})) },
+                install: () => ({})
+              }).getFeature('value')
+            })
+          },
+          install: () => ({})
+        })
       }),
       mutation: 'use',
       timeoutMs: false
