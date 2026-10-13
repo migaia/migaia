@@ -1,5 +1,31 @@
 /** Stable Tray boundary messages used by callers and tests. */
 export const TrayErrorText = {
+  /** Stable host-management diagnostic consumed by the instances boundary. */
+  routingInvalid: 'tray routing policy is invalid',
+  /** Stable host-management diagnostic consumed by the instances boundary. */
+  hostInvalid: 'tray host definition is invalid',
+  /** Stable host-management diagnostic consumed by the instances boundary. */
+  hostUnknown: 'tray host is unknown',
+  /** Stable host-management diagnostic consumed by the instances boundary. */
+  hostMismatch: 'tray instance belongs to another host',
+  /** Stable host-management diagnostic consumed by the instances boundary. */
+  reservedName: 'tray plugin name is reserved',
+  /** Stable host-management diagnostic consumed by the instances boundary. */
+  valueNotPortable: 'tray value is not portable',
+  /** Stable host-management diagnostic consumed by the instances boundary. */
+  instanceDuplicate: 'tray instance id is duplicated',
+  /** Stable host-management diagnostic consumed by the instances boundary. */
+  instanceUnknown: 'tray instance is unknown',
+  /** Stable host-management diagnostic consumed by the instances boundary. */
+  instanceNotReady: 'tray instance is not ready',
+  /** Stable host-management diagnostic consumed by the instances boundary. */
+  instanceStartFailed: 'tray instance start failed',
+  /** Stable host-management diagnostic consumed by the instances boundary. */
+  pathNotExposed: 'tray path is not exposed',
+  /** Stable host-management diagnostic consumed by the instances boundary. */
+  childStateInvalid: 'tray child state is invalid',
+  /** Stable host-management diagnostic consumed by the instances boundary. */
+  disposed: 'tray is disposed',
   /** Stable loader contract diagnostic used for invalid definitions and descriptors. */
   loaderContractInvalid: 'tray loader contract is invalid',
   /** Stable loader execution diagnostic attached without replacing the source error. */

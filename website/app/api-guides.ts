@@ -23669,6 +23669,538 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       options: []
     }
   },
+  'tray:index:defineTrayHost': {
+    en: {
+      purpose:
+        'Validates and freezes a branded host DSL, preserving PluginHost Feature types and declared routing policy names. Returns ITrayHost.',
+      quickStart:
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconsole.log(agent.name, agent.runtime)",
+      scenarios: [
+        'Declare a shared coroutine, Node Worker or child-process host before registry startup.',
+        'Configure typed exposed Features, instance config validation and runtime-specific launch options.'
+      ],
+      avoidWhen: [
+        'Cross-machine discovery or browser Workers are required.',
+        'The application only needs a static same-realm capability graph; use createTrayGraph.'
+      ],
+      options: [
+        {
+          name: 'definition.name',
+          description:
+            'Non-empty shared host identity retained in spawn names and instance snapshots.',
+          defaultValue: 'required',
+          optional: false,
+          type: 'TName extends string',
+          whenToUse:
+            'Non-empty shared host identity retained in spawn names and instance snapshots.',
+          example: "name: 'agent'"
+        },
+        {
+          name: 'definition.plugins',
+          description:
+            "Runs once during each child generation init. Declare deps.tray with trayPlugin.getFeature('tray'); the parent does not invoke this factory.",
+          defaultValue: 'required',
+          optional: false,
+          type: '(instance: ITrayInstanceInfo<TName, TConfig>, trayPlugin: ITrayClientPlugin<TRouting>) => TPlugins',
+          whenToUse:
+            "Runs once during each child generation init. Declare deps.tray with trayPlugin.getFeature('tray'); the parent does not invoke this factory.",
+          example: 'plugins: (info, trayPlugin) => [businessPlugin]'
+        },
+        {
+          name: 'definition.exposes',
+          description:
+            'Allowlist of plugin.feature paths; remote calls append the method name. Reserved internal plugin names and duplicate paths reject.',
+          defaultValue: 'required',
+          optional: false,
+          type: 'readonly TExposes[]',
+          whenToUse:
+            'Allowlist of plugin.feature paths; remote calls append the method name. Reserved internal plugin names and duplicate paths reject.',
+          example: "exposes: ['node.svc']"
+        },
+        {
+          name: 'definition.runtime',
+          description: 'Select a cooperative coroutine, Node Worker isolate or child process.',
+          defaultValue: "'coroutine'",
+          optional: true,
+          type: "'coroutine' | 'thread' | 'process'",
+          whenToUse: 'Select a cooperative coroutine, Node Worker isolate or child process.',
+          example: "runtime: 'thread'"
+        },
+        {
+          name: 'definition.entry',
+          description:
+            'Required for thread and process hosts; forbidden for coroutine hosts. The child entry calls serveTrayHost with the shared definition.',
+          defaultValue: 'required for thread/process',
+          optional: true,
+          type: 'string | URL',
+          whenToUse:
+            'Required for thread and process hosts; forbidden for coroutine hosts. The child entry calls serveTrayHost with the shared definition.',
+          example: "entry: new URL('./worker.mjs', import.meta.url)"
+        },
+        {
+          name: 'definition.config',
+          description:
+            'Validates and transforms config during child init; plugins receive the validator output.',
+          defaultValue: 'undefined',
+          optional: true,
+          type: '(input: unknown) => TConfig',
+          whenToUse:
+            'Validates and transforms config during child init; plugins receive the validator output.',
+          example: 'config: (input) => input as { language: string }'
+        },
+        {
+          name: 'definition.supervisor',
+          description:
+            'Projects restart.mode, maxRestarts, windowMs, initialDelayMs and startupTimeoutMs to the canonical rpc supervisor.',
+          defaultValue: 'undefined',
+          optional: true,
+          type: 'ITraySupervisorPolicy',
+          whenToUse:
+            'Projects restart.mode, maxRestarts, windowMs, initialDelayMs and startupTimeoutMs to the canonical rpc supervisor.',
+          example:
+            "supervisor: { restart: { mode: 'on-failure', maxRestarts: 2, windowMs: 60000 }, startupTimeoutMs: 5000 }"
+        },
+        {
+          name: 'definition.limits',
+          description: 'Thread-only heap limit; rejected on coroutine and process hosts.',
+          defaultValue: 'undefined',
+          optional: true,
+          type: 'Readonly<{ heapBytes?: number }>',
+          whenToUse: 'Thread-only heap limit; rejected on coroutine and process hosts.',
+          example: 'limits: { heapBytes: 64 * 1024 * 1024 }'
+        },
+        {
+          name: 'definition.sandbox',
+          description:
+            'Process-only external wrapper. wrap receives and returns IProcessLaunchCommand with command, args, cwd and env.',
+          defaultValue: 'undefined',
+          optional: true,
+          type: 'ITraySandbox',
+          whenToUse:
+            'Process-only external wrapper. wrap receives and returns IProcessLaunchCommand with command, args, cwd and env.',
+          example: "sandbox: { name: 'external', wrap: (command) => command }"
+        },
+        {
+          name: 'definition.routing',
+          description:
+            'Retains shared policy identities and literal names. Routing execution and namespaces are implemented by mesh.',
+          defaultValue: 'undefined',
+          optional: true,
+          type: 'TRouting extends readonly ITrayRoutingPolicy[]',
+          whenToUse:
+            'Retains shared policy identities and literal names. Routing execution and namespaces are implemented by mesh.',
+          example: 'routing: [first]'
+        }
+      ]
+    },
+    zh: {
+      purpose:
+        '验证并冻结带身份标记的 host DSL，保留 PluginHost Feature 类型与声明的路由 policy 名称；返回 ITrayHost。',
+      quickStart:
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconsole.log(agent.name, agent.runtime)",
+      scenarios: [
+        '在 registry 启动前声明共享的 coroutine、Node Worker 或子进程 host。',
+        '配置具有类型约束的公开 Feature、实例配置验证与运行时启动选项。'
+      ],
+      avoidWhen: [
+        '需要跨机器发现或浏览器 Worker。',
+        '应用只需要静态同 realm capability 图；应使用 createTrayGraph。'
+      ],
+      options: [
+        {
+          name: 'definition.name',
+          description: '非空的共享 host 身份；保留在 spawn 名称与实例快照中。',
+          defaultValue: '必填',
+          optional: false,
+          type: 'TName extends string',
+          whenToUse: '非空的共享 host 身份；保留在 spawn 名称与实例快照中。',
+          example: "name: 'agent'"
+        },
+        {
+          name: 'definition.plugins',
+          description:
+            "每个子实例 generation 初始化时调用一次。通过 trayPlugin.getFeature('tray') 声明 deps.tray 依赖；父 registry 不调用此工厂。",
+          defaultValue: '必填',
+          optional: false,
+          type: '(instance: ITrayInstanceInfo<TName, TConfig>, trayPlugin: ITrayClientPlugin<TRouting>) => TPlugins',
+          whenToUse:
+            "每个子实例 generation 初始化时调用一次。通过 trayPlugin.getFeature('tray') 声明 deps.tray 依赖；父 registry 不调用此工厂。",
+          example: 'plugins: (info, trayPlugin) => [businessPlugin]'
+        },
+        {
+          name: 'definition.exposes',
+          description:
+            '允许调用的 plugin.feature 路径；remote 调用再附加方法名。保留的内部插件名与重复路径会被拒绝。',
+          defaultValue: '必填',
+          optional: false,
+          type: 'readonly TExposes[]',
+          whenToUse:
+            '允许调用的 plugin.feature 路径；remote 调用再附加方法名。保留的内部插件名与重复路径会被拒绝。',
+          example: "exposes: ['node.svc']"
+        },
+        {
+          name: 'definition.runtime',
+          description: '选择合作式 coroutine、Node Worker 独立 isolate 或子进程。',
+          defaultValue: "'coroutine'",
+          optional: true,
+          type: "'coroutine' | 'thread' | 'process'",
+          whenToUse: '选择合作式 coroutine、Node Worker 独立 isolate 或子进程。',
+          example: "runtime: 'thread'"
+        },
+        {
+          name: 'definition.entry',
+          description:
+            'thread 与 process 必填，coroutine 禁止。子入口导入共享定义并调用 serveTrayHost。',
+          defaultValue: 'thread/process 必填',
+          optional: true,
+          type: 'string | URL',
+          whenToUse:
+            'thread 与 process 必填，coroutine 禁止。子入口导入共享定义并调用 serveTrayHost。',
+          example: "entry: new URL('./worker.mjs', import.meta.url)"
+        },
+        {
+          name: 'definition.config',
+          description: '子实例初始化时验证并转换配置；plugins 接收验证器的输出。',
+          defaultValue: '未指定',
+          optional: true,
+          type: '(input: unknown) => TConfig',
+          whenToUse: '子实例初始化时验证并转换配置；plugins 接收验证器的输出。',
+          example: 'config: (input) => input as { language: string }'
+        },
+        {
+          name: 'definition.supervisor',
+          description:
+            '把 restart.mode、maxRestarts、windowMs、initialDelayMs 与 startupTimeoutMs 传给 RPC 的 supervision。',
+          defaultValue: '使用运行时默认策略',
+          optional: true,
+          type: 'ITraySupervisorPolicy',
+          whenToUse:
+            '把 restart.mode、maxRestarts、windowMs、initialDelayMs 与 startupTimeoutMs 传给 RPC 的 supervision。',
+          example:
+            "supervisor: { restart: { mode: 'on-failure', maxRestarts: 2, windowMs: 60000 }, startupTimeoutMs: 5000 }"
+        },
+        {
+          name: 'definition.limits',
+          description: '仅 thread 可设置 heap 上限；coroutine 与 process 会拒绝此字段。',
+          defaultValue: '未指定',
+          optional: true,
+          type: 'Readonly<{ heapBytes?: number }>',
+          whenToUse: '仅 thread 可设置 heap 上限；coroutine 与 process 会拒绝此字段。',
+          example: 'limits: { heapBytes: 64 * 1024 * 1024 }'
+        },
+        {
+          name: 'definition.sandbox',
+          description:
+            '仅 process 可接入外部命令包装器。wrap 输入与输出均为 IProcessLaunchCommand，包含 command、args、cwd 与 env。',
+          defaultValue: '未指定',
+          optional: true,
+          type: 'ITraySandbox',
+          whenToUse:
+            '仅 process 可接入外部命令包装器。wrap 输入与输出均为 IProcessLaunchCommand，包含 command、args、cwd 与 env。',
+          example: "sandbox: { name: 'external', wrap: (command) => command }"
+        },
+        {
+          name: 'definition.routing',
+          description: '保留共享 policy 身份与字面量名称；路由执行和命名空间由 mesh 实现。',
+          defaultValue: '未指定',
+          optional: true,
+          type: 'TRouting extends readonly ITrayRoutingPolicy[]',
+          whenToUse: '保留共享 policy 身份与字面量名称；路由执行和命名空间由 mesh 实现。',
+          example: 'routing: [first]'
+        }
+      ]
+    }
+  },
+  'tray:index:createTray': {
+    en: {
+      purpose:
+        'Creates the central instance registry and returns ITray. Management runs in per-instance queues; remotes stay bound to their record admission.',
+      quickStart:
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent], report: (error) => console.error(error) })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello', { timeoutMs: 1000 }))\n  await tray.restart('alice')\n  console.log(tray.list({ host: 'agent', state: 'ready' }))\n} finally {\n  await tray.dispose({ graceMs: 5000 })\n}",
+      scenarios: [
+        'Spawn, discover, restart, replace and remove complete PluginHost instances.',
+        'Observe frozen lifecycle events and call exposed methods by instance id.'
+      ],
+      avoidWhen: [
+        'Use createTrayGraph(entries) for a static same-realm capability graph.',
+        'Cross-machine discovery, durable messaging or failover retries are required.'
+      ],
+      options: [
+        {
+          name: 'options.hosts',
+          description:
+            'Complete admitted host inventory from defineTrayHost. Structural copies and duplicate host names reject.',
+          defaultValue: 'required',
+          optional: false,
+          type: 'THosts extends readonly ITrayHost<any, any, any, any, any>[]',
+          whenToUse:
+            'Complete admitted host inventory from defineTrayHost. Structural copies and duplicate host names reject.',
+          example: 'hosts: [agent, worker]'
+        },
+        {
+          name: 'options.routing',
+          description:
+            'Accepts trusted shared policy definitions. This release validates the contract; mesh provides routing execution.',
+          defaultValue: 'undefined',
+          optional: true,
+          type: 'TRouting extends readonly ITrayRoutingPolicy[]',
+          whenToUse:
+            'Accepts trusted shared policy definitions. This release validates the contract; mesh provides routing execution.',
+          example: 'routing: [first]'
+        },
+        {
+          name: 'options.probe',
+          description:
+            'Observe parent-side rpc message and connection activity for managed instances.',
+          defaultValue: 'undefined',
+          optional: true,
+          type: 'IRpcProbe | readonly IRpcProbe[]',
+          whenToUse:
+            'Observe parent-side rpc message and connection activity for managed instances.',
+          example: 'probe: countingProbe'
+        },
+        {
+          name: 'options.report',
+          description:
+            'Receives contained supervision, cleanup, listener and relay diagnostics with their native classification.',
+          defaultValue: 'console.error',
+          optional: true,
+          type: '(error: unknown) => void',
+          whenToUse:
+            'Receives contained supervision, cleanup, listener and relay diagnostics with their native classification.',
+          example: 'report: (error) => console.error(error)'
+        }
+      ]
+    },
+    zh: {
+      purpose:
+        '创建中央实例 registry 并返回 ITray。每个实例按队列执行管理操作；remote 绑定其创建时的记录身份。',
+      quickStart:
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent], report: (error) => console.error(error) })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello', { timeoutMs: 1000 }))\n  await tray.restart('alice')\n  console.log(tray.list({ host: 'agent', state: 'ready' }))\n} finally {\n  await tray.dispose({ graceMs: 5000 })\n}",
+      scenarios: [
+        '创建、发现、重启、替换与移除完整 PluginHost 实例。',
+        '观察冻结的生命周期事件，并按实例 id 调用公开方法。'
+      ],
+      avoidWhen: [
+        '静态同 realm capability 图应使用 createTrayGraph(entries)。',
+        '需要跨机器发现、持久消息或失败重试切换。'
+      ],
+      options: [
+        {
+          name: 'options.hosts',
+          description: 'defineTrayHost 返回的完整定义集合。结构复制品与重复的 host 名称会被拒绝。',
+          defaultValue: '必填',
+          optional: false,
+          type: 'THosts extends readonly ITrayHost<any, any, any, any, any>[]',
+          whenToUse: 'defineTrayHost 返回的完整定义集合。结构复制品与重复的 host 名称会被拒绝。',
+          example: 'hosts: [agent, worker]'
+        },
+        {
+          name: 'options.routing',
+          description: '接收可信的共享 policy 定义；当前版本完成契约校验，路由执行由 mesh 提供。',
+          defaultValue: '未指定',
+          optional: true,
+          type: 'TRouting extends readonly ITrayRoutingPolicy[]',
+          whenToUse: '接收可信的共享 policy 定义；当前版本完成契约校验，路由执行由 mesh 提供。',
+          example: 'routing: [first]'
+        },
+        {
+          name: 'options.probe',
+          description: '观察实例父侧的 RPC 消息与连接活动。',
+          defaultValue: '未指定',
+          optional: true,
+          type: 'IRpcProbe | readonly IRpcProbe[]',
+          whenToUse: '观察实例父侧的 RPC 消息与连接活动。',
+          example: 'probe: countingProbe'
+        },
+        {
+          name: 'options.report',
+          description: '接收 supervision、清理、监听器与 relay 的运行诊断，并保留原有错误分类。',
+          defaultValue: 'console.error',
+          optional: true,
+          type: '(error: unknown) => void',
+          whenToUse: '接收 supervision、清理、监听器与 relay 的运行诊断，并保留原有错误分类。',
+          example: 'report: (error) => console.error(error)'
+        }
+      ]
+    }
+  },
+  'tray:index:serveTrayHost': {
+    en: {
+      purpose:
+        'Serves one Node Worker or child-process host through its parent connection. Returns Promise<void>; PluginHost cleanup completes before the realm exits.',
+      quickStart:
+        "import { defineTrayHost, serveTrayHost } from '@migaia/tray'\n\nconst worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.mjs', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})\nconsole.log(worker.name, worker.runtime)\n// Invoke this function only from the Node Worker entry.\nexport const runWorkerEntry = () => serveTrayHost(worker, { report: console.error })",
+      scenarios: [
+        'Invoke from a Node Worker or child-process entry after importing the shared host definition.',
+        'Configure child-side probes and report cleanup or crash diagnostics before realm exit.'
+      ],
+      avoidWhen: [
+        'The code runs in the parent registry or uses the coroutine runtime.',
+        'The entry is a browser Worker; this entry supports Node Worker and process realms.'
+      ],
+      options: [
+        {
+          name: 'definition',
+          description:
+            'Pass the trusted thread or process host imported from the same shared definition module in this realm. Coroutine definitions reject.',
+          defaultValue: 'required',
+          optional: false,
+          type: 'unknown (validated ITrayHost)',
+          whenToUse:
+            'Pass the trusted thread or process host imported from the same shared definition module in this realm. Coroutine definitions reject.',
+          example: 'serveTrayHost(worker)'
+        },
+        {
+          name: 'options.probe',
+          description:
+            'Observe the child-side rpc connection; parent-side probes are configured on createTray separately.',
+          defaultValue: 'undefined',
+          optional: true,
+          type: 'IRpcProbe | readonly IRpcProbe[]',
+          whenToUse:
+            'Observe the child-side rpc connection; parent-side probes are configured on createTray separately.',
+          example: 'serveTrayHost(worker, { probe: countingProbe })'
+        },
+        {
+          name: 'options.report',
+          description:
+            'Receives child cleanup and crash diagnostics before the realm exits. The first deps.tray.exit decides clean or crash outcome.',
+          defaultValue: 'console.error',
+          optional: true,
+          type: '(error: unknown) => void',
+          whenToUse:
+            'Receives child cleanup and crash diagnostics before the realm exits. The first deps.tray.exit decides clean or crash outcome.',
+          example: 'serveTrayHost(worker, { report: console.error })'
+        }
+      ]
+    },
+    zh: {
+      purpose:
+        '通过父侧连接服务一个 Node Worker 或子进程 host。返回 Promise<void>；PluginHost 清理完成后才结束该 realm。',
+      quickStart:
+        "import { defineTrayHost, serveTrayHost } from '@migaia/tray'\n\nconst worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.mjs', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})\nconsole.log(worker.name, worker.runtime)\n// 仅在 Node Worker 入口调用此函数。\nexport const runWorkerEntry = () => serveTrayHost(worker, { report: console.error })",
+      scenarios: [
+        '在 Node Worker 或子进程入口导入共享 host 定义后调用。',
+        '配置子侧 probe，并在 realm 退出前报告清理或崩溃诊断。'
+      ],
+      avoidWhen: [
+        '代码在父 registry 中运行，或 host 使用 coroutine runtime。',
+        '入口运行于浏览器 Worker；当前入口只支持 Node Worker 与进程 realm。'
+      ],
+      options: [
+        {
+          name: 'definition',
+          description:
+            '传入本 realm 从共享定义模块导入的可信 thread 或 process host；coroutine 定义会被拒绝。',
+          defaultValue: '必填',
+          optional: false,
+          type: 'unknown（运行时校验为 ITrayHost）',
+          whenToUse:
+            '传入本 realm 从共享定义模块导入的可信 thread 或 process host；coroutine 定义会被拒绝。',
+          example: 'serveTrayHost(worker)'
+        },
+        {
+          name: 'options.probe',
+          description: '观察子侧 RPC 连接；父侧 probe 在 createTray 上单独配置。',
+          defaultValue: '未指定',
+          optional: true,
+          type: 'IRpcProbe | readonly IRpcProbe[]',
+          whenToUse: '观察子侧 RPC 连接；父侧 probe 在 createTray 上单独配置。',
+          example: 'serveTrayHost(worker, { probe: countingProbe })'
+        },
+        {
+          name: 'options.report',
+          description:
+            '在 realm 退出前接收子侧清理与崩溃诊断。第一次 deps.tray.exit 决定正常退出或崩溃结果。',
+          defaultValue: 'console.error',
+          optional: true,
+          type: '(error: unknown) => void',
+          whenToUse:
+            '在 realm 退出前接收子侧清理与崩溃诊断。第一次 deps.tray.exit 决定正常退出或崩溃结果。',
+          example: 'serveTrayHost(worker, { report: console.error })'
+        }
+      ]
+    }
+  },
+  'tray:index:defineRoutingPolicy': {
+    en: {
+      purpose:
+        'Defines a frozen, branded ITrayRoutingPolicy<TName> identity with a private synchronous picker. Host routing tuples consume this pure contract; mesh owns execution and namespaces.',
+      quickStart:
+        "import { defineRoutingPolicy, defineTrayHost } from '@migaia/tray'\n\nconst first = defineRoutingPolicy('first', (candidates) => candidates[0]!.id)\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [] as const,\n  exposes: [],\n  routing: [first]\n})\nconsole.log(first.name, agent.routing?.[0]?.name)",
+      scenarios: [
+        'Share a policy definition between a host DSL and its parent registry.',
+        'Retain a literal policy name in a host routing tuple while keeping its picker private.'
+      ],
+      avoidWhen: [
+        'The application needs routing execution or pub/sub before the mesh layer is available.',
+        'A policy needs an asynchronous picker; pick must return an instance id synchronously.'
+      ],
+      options: [
+        {
+          name: 'name',
+          description:
+            'Matches ^[a-z][A-Za-z0-9]*$ and excludes roundRobin, leastInFlight and reserved function/object property names. Invalid names throw TRAY_ROUTING_INVALID.',
+          defaultValue: 'required',
+          optional: false,
+          type: 'TName extends string',
+          whenToUse:
+            'Matches ^[a-z][A-Za-z0-9]*$ and excludes roundRobin, leastInFlight and reserved function/object property names. Invalid names throw TRAY_ROUTING_INVALID.',
+          example: "'first'"
+        },
+        {
+          name: 'pick',
+          description:
+            'Synchronous callback returns a candidate instance id. Context contains host and sequence. Definition does not invoke it; parent-side execution belongs to mesh.',
+          defaultValue: 'required',
+          optional: false,
+          type: '(candidates: readonly ITrayInstance[], context: ITrayRoutingContext) => string',
+          whenToUse:
+            'Synchronous callback returns a candidate instance id. Context contains host and sequence. Definition does not invoke it; parent-side execution belongs to mesh.',
+          example: '(candidates, context) => candidates[context.sequence % candidates.length]!.id'
+        }
+      ]
+    },
+    zh: {
+      purpose:
+        '定义冻结且带身份标记的 ITrayRoutingPolicy<TName>，内部保存同步选择回调。host 的 routing 元组使用此纯契约；执行与命名空间由 mesh 负责。',
+      quickStart:
+        "import { defineRoutingPolicy, defineTrayHost } from '@migaia/tray'\n\nconst first = defineRoutingPolicy('first', (candidates) => candidates[0]!.id)\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [] as const,\n  exposes: [],\n  routing: [first]\n})\nconsole.log(first.name, agent.routing?.[0]?.name)",
+      scenarios: [
+        '在 host DSL 与父 registry 之间共享同一 policy 定义。',
+        '在 host 的 routing 元组中保留字面量 policy 名称，同时隐藏其选择回调。'
+      ],
+      avoidWhen: [
+        'mesh 层尚未提供时，应用需要立即执行路由或发布订阅。',
+        'policy 需要异步选择回调；pick 必须同步返回实例 id。'
+      ],
+      options: [
+        {
+          name: 'name',
+          description:
+            '须符合 ^[a-z][A-Za-z0-9]*$，且不能是 roundRobin、leastInFlight 或函数、对象的保留属性名；非法名称抛 TRAY_ROUTING_INVALID。',
+          defaultValue: '必填',
+          optional: false,
+          type: 'TName extends string',
+          whenToUse:
+            '须符合 ^[a-z][A-Za-z0-9]*$，且不能是 roundRobin、leastInFlight 或函数、对象的保留属性名；非法名称抛 TRAY_ROUTING_INVALID。',
+          example: "'first'"
+        },
+        {
+          name: 'pick',
+          description:
+            '同步返回候选实例 id；context 包含 host 与 sequence。定义阶段不调用回调，父侧执行由 mesh 实现。',
+          defaultValue: '必填',
+          optional: false,
+          type: '(candidates: readonly ITrayInstance[], context: ITrayRoutingContext) => string',
+          whenToUse:
+            '同步返回候选实例 id；context 包含 host 与 sequence。定义阶段不调用回调，父侧执行由 mesh 实现。',
+          example: '(candidates, context) => candidates[context.sequence % candidates.length]!.id'
+        }
+      ]
+    }
+  },
   'tray:index:createTrayGraph': {
     en: {
       purpose:

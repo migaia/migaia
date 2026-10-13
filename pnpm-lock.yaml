@@ -938,10 +938,25 @@ importers:
       '@migaia/plugin-host':
         specifier: workspace:^
         version: link:../plugin-host
+      '@migaia/rpc-contract':
+        specifier: workspace:^
+        version: link:../rpc-contract
+      '@migaia/rpc-core':
+        specifier: workspace:^
+        version: link:../rpc-core
+      '@migaia/rpc-process':
+        specifier: workspace:^
+        version: link:../rpc-process
+      '@migaia/rpc-threads':
+        specifier: workspace:^
+        version: link:../rpc-threads
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
     devDependencies:
+      '@migaia/supervision':
+        specifier: workspace:^
+        version: link:../supervision
       typescript:
         specifier: ~6.0.2
         version: 6.0.2

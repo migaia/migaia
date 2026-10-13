@@ -1,6 +1,126 @@
 # `@migaia/tray` 使用指南
 
-README 负责快速上手；本文给出公开契约、失败语义与生产边界。Tray 是 `@migaia/capability/graph` 的静态、同 realm 组合层，不复制 Graph 的生命周期或调度实现。
+README 负责快速上手；本文给出静态 Graph 和 Hosts 层的公开契约、失败语义与生产边界。Graph、PluginHost、RPC 与 supervision 分别保留原有生命周期与执行所有权。
+
+
+## Hosts：实例发现与生命周期
+
+根入口的 `defineTrayHost` / `createTray({ hosts })` 管理完整 PluginHost 实例；
+`createTrayGraph(entries)` 继续管理静态 capability 集合。每个实例与父 Host 独立。
+
+```ts
+import { defineFeature, definePlugin } from '@migaia/plugin-host'
+import { createTray, defineTrayHost } from '@migaia/tray'
+
+const echo = defineFeature(() => ({ echo: (value: string) => value }))
+const agent = defineTrayHost({
+  name: 'agent',
+  plugins: () => [definePlugin({
+    name: 'node', features: { svc: echo }, install: () => ({})
+  })] as const,
+  exposes: ['node.svc']
+})
+const tray = createTray({ hosts: [agent] })
+try {
+  const alice = await tray.spawn('agent', { id: 'alice' })
+  console.log(await alice.request('node.svc.echo', 'hello'))
+  await tray.restart('alice')
+} finally {
+  await tray.dispose()
+}
+```
+
+- 省略 runtime 使用 `coroutine`：共享事件循环，适合轻量 I/O host，停止是合作式的。
+- `thread` 使用独立 Worker isolate，必须提供 entry，可设置 `limits.heapBytes`。
+- `process` 使用子进程，必须提供 entry，可设置 `sandbox: { name, wrap }` 接入外部沙箱。
+- Node Worker/process entry 导入共享 host 定义后执行 `await serveTrayHost(host)`；
+  entry 只连接父 registry，不再 spawn。Bun/Deno 与 browser Worker 尚未验证。
+
+### Host 定义与构造选项
+
+`defineTrayHost(definition)` 返回冻结且带身份标记的
+`ITrayHost<TName, TConfig, TPlugins, TExposes, TRouting>`。必填字段为 `name`、
+`plugins(instance, trayPlugin)` 与 `exposes`；定义阶段不调用插件工厂或配置验证器。
+`exposes` 是只读的 `plugin.feature` 路径数组；方法调用使用 `plugin.feature.method`。
+结构复制品不具备原定义的身份，不能传给 registry 或 `instance()`。
+
+| 字段 | 类型与默认值 | 使用条件 |
+| --- | --- | --- |
+| `runtime` | `'coroutine' \| 'thread' \| 'process'`；默认 `'coroutine'` | 选择实例运行方式 |
+| `entry` | `string \| URL` | thread / process 必填；coroutine 禁止 |
+| `config` | `(input: unknown) => TConfig`；默认无验证器 | 每次初始化时验证并转换配置，输出交给 `plugins` |
+| `supervisor` | `ITraySupervisorPolicy`；默认使用运行时策略 | `restart` 支持 `mode`、`maxRestarts`、`windowMs`、`initialDelayMs`；另支持 `startupTimeoutMs` |
+| `limits` | `Readonly<{ heapBytes?: number }>`；默认未指定 | 仅 thread 可用 |
+| `sandbox` | `ITraySandbox`；默认未指定 | 仅 process 可用；包含 `name` 与同步 `wrap(command)` |
+| `routing` | `TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定 | 保存共享 policy 定义；执行与命名空间由 mesh 实现 |
+
+`supervisor.restart.mode` 接收 `'never' | 'on-failure' | 'always'`。
+`sandbox.wrap` 的输入与输出均为 RPC Process 的 `IProcessLaunchCommand`：
+`{ command, args, cwd?, env }`；返回完整的新命令，保留所需环境与工作目录。
+
+`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。
+`hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，当前只完成定义校验。
+`probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void`
+接收运行与清理诊断，默认使用 `console.error`。
+
+`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm
+导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。
+`probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。
+Worker 或子进程入口与父 registry 应导入同一个定义模块，例如：
+
+```ts
+// worker.mjs：共享定义模块已由应用提供。
+import { serveTrayHost } from '@migaia/tray'
+import { worker } from './hosts.js'
+
+await serveTrayHost(worker)
+```
+
+### Registry 与 remote 的返回类型
+
+- `spawn(name, { id, config? })` 返回 `Promise<ITrayRemote<H>>`；当 host 的配置类型不允许
+  `undefined` 时，`config` 必填。`instance(host, id)` 同步返回同类型的 remote。
+- `list(filter?)` 返回 `readonly ITrayInstance[]`；`get(id)` 返回 `Promise<ITrayInstanceDetail>`，
+  其中 `generation` 保留为 Tray 的数值 generation，其他连接详情由 RPC 提供。
+- `restart(id)`、`replace(id, { config? })` 返回 `Promise<ITrayInstance>`。
+  `stop(id, { graceMs? })`、`remove(id, { graceMs? })`、`dispose({ graceMs? })` 返回 `Promise<void>`。
+- `on(event, listener)` 返回取消订阅函数；`watch({ signal? })` 返回
+  `AsyncIterableIterator<ITrayInstanceEventRecord>`。
+- remote 的 `request` 返回方法结果的 `Promise`，`notify` 返回 `Promise<void>`，
+  `stream` 返回方法元素类型的 `AsyncIterableIterator`。
+
+`plugins(info, trayPlugin)` 在每次 generation init 时调用；`info` 包含 id、host、
+generation 和 validator 的 config 输出。插件通过
+`defineFeature(factory, { tray: trayPlugin.getFeature('tray') })` 声明依赖，
+从 `deps.tray.self()` 读取身份，`await deps.tray.to(otherHost, id)` 得到 admission-bound
+remote，`deps.tray.exit(error?)` 结束当前实例。第一次 exit 决定结果：无错误是 clean exit，
+有错误是 crash；PluginHost disposer 执行后才结束 task/realm。根入口只导出
+`ITrayClientPlugin` 类型，不提供 runtime client 单例。
+
+remote 的统一调用形式是 `request|notify|stream(path, payload, options?)`；
+`ITrayCallOptions` 只包含 `signal?: AbortSignal` 与 `timeoutMs?: number`。
+零 payload 可省略，带 options 时写 `request(path, undefined, { timeoutMs })`；
+业务对象中的 `undefined` 字段会被拒绝，只有 wire envelope 的 absent payload/config 被省略。
+Uint8Array 可跨所有三个 runtime；非 portable config 在创建连接前拒绝。
+
+`list({ host?, runtime?, state? })` 返回冻结 snapshot，`get(id)` 合并 RPC unit detail。
+`on(event, listener)` / `watch({ signal? })` 仅观察生命周期；记录冻结，没有 emit。
+watch 保留最近 100 条未读记录，不是持久日志。每个实例的 stop/restart/replace/remove
+按调用顺序进入队列；replace 的 config 只在新 generation init 成功后提交。
+停止前先运行 child PluginHost cleanup（graceMs 默认 5000）；失败或超时会 report 并继续停止。
+
+实例 remove 后旧 remote 永久拒绝 `TRAY_INSTANCE_UNKNOWN`，同 id 的重新 spawn 不会复活
+旧 admission。非 ready 调用立即拒绝 `TRAY_INSTANCE_NOT_READY`；已发送调用通过原 RPC receipt
+完成，不被移到新 generation。target 业务错误的 source/code/cause chain 原样通过；
+Tray 验证和 start 错误使用自己的稳定 code，并保留原错误于 cause。
+
+`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`；
+routing namespace 和 pub/sub 由后续 mesh 实现。返回值为冻结的
+`ITrayRoutingPolicy<TName>`；`pick(candidates: readonly ITrayInstance[], context: ITrayRoutingContext)`
+同步返回一个实例 id，`context` 包含 `host: string` 与 `sequence: number`。
+定义时不调用 `pick`。名称必须符合 `^[a-z][A-Za-z0-9]*$`，不能是 `roundRobin`、
+`leastInFlight` 或函数、对象的保留属性名；名称或回调非法时抛 `TRAY_ROUTING_INVALID`。
+
 
 ## 1. 公开入口与类型
 

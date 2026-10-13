@@ -52,9 +52,14 @@
     "@migaia/event-subscriber": "workspace:^",
     "@migaia/lifecycle": "workspace:^",
     "@migaia/plugin-host": "workspace:^",
+    "@migaia/rpc-contract": "workspace:^",
+    "@migaia/rpc-core": "workspace:^",
+    "@migaia/rpc-process": "workspace:^",
+    "@migaia/rpc-threads": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
+    "@migaia/supervision": "workspace:^",
     "typescript": "~6.0.2",
     "vitest": "4.1.10"
   }
