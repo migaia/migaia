@@ -94,13 +94,15 @@ it('[A7] thread probe observes handshake, ready and a genuine supervised crash/r
 it('[A7] process spawn:true forwards probe through ordinary entry discovery and emits handshake/ready', async () => {
   /** Lifecycle strings are copied as scalar fixture observations during the synchronous callback. */
   const lifecycle: string[] = []
-  /** Reporter failures are retained rather than silently swallowed by this fixture. */
+  /** Probe callback failures are retained rather than silently swallowed by this fixture. */
+  const probeErrors: unknown[] = []
+  /** Peer diagnostics; best-effort process isolation reports its unsupported termination capability. */
   const reports: unknown[] = []
   /** The same public probe option reaches managed short process sources. */
   const probe = defineProbe({
     stages: ['peer'],
     emit: (view) => lifecycle.push(view.lifecycle!),
-    onError: (error) => reports.push(error)
+    onError: (error) => probeErrors.push(error)
   })
   /** Spawn:true uses argv[1]; temporarily select the existing child fixture as the ordinary entry. */
   const argv = process.argv
@@ -122,7 +124,16 @@ it('[A7] process spawn:true forwards probe through ordinary entry discovery and 
     assert.equal(((await peer.request('probe', 'observed')) as { value: string }).value, 'observed')
     assert.ok(lifecycle.includes('handshake'), '[A7] process negotiation reaches the peer probe')
     assert.ok(lifecycle.includes('ready'), '[A7] process readiness reaches the peer probe')
-    assert.deepEqual(reports, [])
+    assert.deepEqual(probeErrors, [])
+    for (const report of reports)
+      assert.deepEqual(
+        {
+          source: (report as { source?: unknown }).source,
+          code: (report as { code?: unknown }).code
+        },
+        { source: '@migaia/supervision', code: 'CAPABILITY_UNSUPPORTED' },
+        '[A7] only the existing best-effort termination notice reaches the Peer reporter'
+      )
   } finally {
     await peer.close()
   }
