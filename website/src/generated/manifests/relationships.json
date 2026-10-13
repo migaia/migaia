@@ -11052,16 +11052,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-core/remote/createCoroutineHost",
-      "to": "/en/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-core",
-      "to": "/en/docs/rpc-core/remote/createCoroutineHost",
-      "type": "domain-peer"
-    },
-    {
       "from": "/en/docs/rpc-core/remote/createCoroutinePlugin",
       "to": "/en/guides/rpc-core",
       "type": "domain-peer"
@@ -11142,6 +11132,76 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/docs/rpc-core/remote/ICoroutineChildOptions",
+      "to": "/en/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-core",
+      "to": "/en/docs/rpc-core/remote/ICoroutineChildOptions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote/ICoroutineConnect",
+      "to": "/en/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-core",
+      "to": "/en/docs/rpc-core/remote/ICoroutineConnect",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote/ICoroutineParentOptions",
+      "to": "/en/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-core",
+      "to": "/en/docs/rpc-core/remote/ICoroutineParentOptions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote/ICoroutineReplaceSpec",
+      "to": "/en/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-core",
+      "to": "/en/docs/rpc-core/remote/ICoroutineReplaceSpec",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote/ICoroutineSupervisorPolicy",
+      "to": "/en/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-core",
+      "to": "/en/docs/rpc-core/remote/ICoroutineSupervisorPolicy",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote/ICoroutineTaskContext",
+      "to": "/en/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-core",
+      "to": "/en/docs/rpc-core/remote/ICoroutineTaskContext",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote/ICoroutineUserTask",
+      "to": "/en/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-core",
+      "to": "/en/docs/rpc-core/remote/ICoroutineUserTask",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/docs/rpc-core/remote/IRemoteBinding",
       "to": "/en/guides/rpc-core",
       "type": "domain-peer"
@@ -11199,36 +11259,6 @@
     {
       "from": "/en/guides/rpc-core",
       "to": "/en/docs/rpc-core/remote/IRemoteControlDefinition",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote/IRemoteCoroutineHostOptions",
-      "to": "/en/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-core",
-      "to": "/en/docs/rpc-core/remote/IRemoteCoroutineHostOptions",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote/IRemoteCoroutinePluginOptions",
-      "to": "/en/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-core",
-      "to": "/en/docs/rpc-core/remote/IRemoteCoroutinePluginOptions",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote/IRemoteCoroutineTaskContext",
-      "to": "/en/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-core",
-      "to": "/en/docs/rpc-core/remote/IRemoteCoroutineTaskContext",
       "type": "domain-peer"
     },
     {
@@ -37552,16 +37582,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc-core/remote/createCoroutineHost",
-      "to": "/zh/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-core",
-      "to": "/zh/docs/rpc-core/remote/createCoroutineHost",
-      "type": "domain-peer"
-    },
-    {
       "from": "/zh/docs/rpc-core/remote/createCoroutinePlugin",
       "to": "/zh/guides/rpc-core",
       "type": "domain-peer"
@@ -37642,6 +37662,76 @@
       "type": "domain-peer"
     },
     {
+      "from": "/zh/docs/rpc-core/remote/ICoroutineChildOptions",
+      "to": "/zh/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-core",
+      "to": "/zh/docs/rpc-core/remote/ICoroutineChildOptions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote/ICoroutineConnect",
+      "to": "/zh/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-core",
+      "to": "/zh/docs/rpc-core/remote/ICoroutineConnect",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote/ICoroutineParentOptions",
+      "to": "/zh/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-core",
+      "to": "/zh/docs/rpc-core/remote/ICoroutineParentOptions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote/ICoroutineReplaceSpec",
+      "to": "/zh/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-core",
+      "to": "/zh/docs/rpc-core/remote/ICoroutineReplaceSpec",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote/ICoroutineSupervisorPolicy",
+      "to": "/zh/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-core",
+      "to": "/zh/docs/rpc-core/remote/ICoroutineSupervisorPolicy",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote/ICoroutineTaskContext",
+      "to": "/zh/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-core",
+      "to": "/zh/docs/rpc-core/remote/ICoroutineTaskContext",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote/ICoroutineUserTask",
+      "to": "/zh/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-core",
+      "to": "/zh/docs/rpc-core/remote/ICoroutineUserTask",
+      "type": "domain-peer"
+    },
+    {
       "from": "/zh/docs/rpc-core/remote/IRemoteBinding",
       "to": "/zh/guides/rpc-core",
       "type": "domain-peer"
@@ -37699,36 +37789,6 @@
     {
       "from": "/zh/guides/rpc-core",
       "to": "/zh/docs/rpc-core/remote/IRemoteControlDefinition",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote/IRemoteCoroutineHostOptions",
-      "to": "/zh/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-core",
-      "to": "/zh/docs/rpc-core/remote/IRemoteCoroutineHostOptions",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote/IRemoteCoroutinePluginOptions",
-      "to": "/zh/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-core",
-      "to": "/zh/docs/rpc-core/remote/IRemoteCoroutinePluginOptions",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote/IRemoteCoroutineTaskContext",
-      "to": "/zh/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-core",
-      "to": "/zh/docs/rpc-core/remote/IRemoteCoroutineTaskContext",
       "type": "domain-peer"
     },
     {
@@ -120453,36 +120513,6 @@
     },
     {
       "from": "/en/docs/rpc-core/remote",
-      "to": "/en/docs/rpc-core/remote#rpc-core-remote--createCoroutineHost",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote#rpc-core-remote--createCoroutineHost",
-      "to": "/en/docs/rpc-core/remote",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote#rpc-core-remote--createCoroutineHost",
-      "to": "/en/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-core/getting-started",
-      "to": "/en/docs/rpc-core/remote#rpc-core-remote--createCoroutineHost",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote#rpc-core-remote--createCoroutineHost",
-      "to": "/en/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-core",
-      "to": "/en/docs/rpc-core/remote#rpc-core-remote--createCoroutineHost",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote",
       "to": "/en/docs/rpc-core/remote#rpc-core-remote--createCoroutinePlugin",
       "type": "api-symbol"
     },
@@ -120723,6 +120753,216 @@
     },
     {
       "from": "/en/docs/rpc-core/remote",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineChildOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineChildOptions",
+      "to": "/en/docs/rpc-core/remote",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineChildOptions",
+      "to": "/en/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-core/getting-started",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineChildOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineChildOptions",
+      "to": "/en/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-core",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineChildOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineConnect",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineConnect",
+      "to": "/en/docs/rpc-core/remote",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineConnect",
+      "to": "/en/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-core/getting-started",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineConnect",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineConnect",
+      "to": "/en/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-core",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineConnect",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineParentOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineParentOptions",
+      "to": "/en/docs/rpc-core/remote",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineParentOptions",
+      "to": "/en/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-core/getting-started",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineParentOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineParentOptions",
+      "to": "/en/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-core",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineParentOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineReplaceSpec",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineReplaceSpec",
+      "to": "/en/docs/rpc-core/remote",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineReplaceSpec",
+      "to": "/en/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-core/getting-started",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineReplaceSpec",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineReplaceSpec",
+      "to": "/en/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-core",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineReplaceSpec",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineSupervisorPolicy",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineSupervisorPolicy",
+      "to": "/en/docs/rpc-core/remote",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineSupervisorPolicy",
+      "to": "/en/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-core/getting-started",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineSupervisorPolicy",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineSupervisorPolicy",
+      "to": "/en/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-core",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineSupervisorPolicy",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineTaskContext",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineTaskContext",
+      "to": "/en/docs/rpc-core/remote",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineTaskContext",
+      "to": "/en/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-core/getting-started",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineTaskContext",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineTaskContext",
+      "to": "/en/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-core",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineTaskContext",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineUserTask",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineUserTask",
+      "to": "/en/docs/rpc-core/remote",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineUserTask",
+      "to": "/en/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-core/getting-started",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineUserTask",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineUserTask",
+      "to": "/en/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-core",
+      "to": "/en/docs/rpc-core/remote#rpc-core-remote--ICoroutineUserTask",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/remote",
       "to": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteBinding",
       "type": "api-symbol"
     },
@@ -120899,96 +121139,6 @@
     {
       "from": "/en/architecture/rpc-core",
       "to": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteControlDefinition",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote",
-      "to": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineHostOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineHostOptions",
-      "to": "/en/docs/rpc-core/remote",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineHostOptions",
-      "to": "/en/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-core/getting-started",
-      "to": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineHostOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineHostOptions",
-      "to": "/en/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-core",
-      "to": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineHostOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote",
-      "to": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutinePluginOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutinePluginOptions",
-      "to": "/en/docs/rpc-core/remote",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutinePluginOptions",
-      "to": "/en/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-core/getting-started",
-      "to": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutinePluginOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutinePluginOptions",
-      "to": "/en/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-core",
-      "to": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutinePluginOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote",
-      "to": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineTaskContext",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineTaskContext",
-      "to": "/en/docs/rpc-core/remote",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineTaskContext",
-      "to": "/en/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-core/getting-started",
-      "to": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineTaskContext",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineTaskContext",
-      "to": "/en/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-core",
-      "to": "/en/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineTaskContext",
       "type": "architecture-symbol"
     },
     {
@@ -123083,36 +123233,6 @@
     },
     {
       "from": "/zh/docs/rpc-core/remote",
-      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--createCoroutineHost",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--createCoroutineHost",
-      "to": "/zh/docs/rpc-core/remote",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--createCoroutineHost",
-      "to": "/zh/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-core/getting-started",
-      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--createCoroutineHost",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--createCoroutineHost",
-      "to": "/zh/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-core",
-      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--createCoroutineHost",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote",
       "to": "/zh/docs/rpc-core/remote#rpc-core-remote--createCoroutinePlugin",
       "type": "api-symbol"
     },
@@ -123353,6 +123473,216 @@
     },
     {
       "from": "/zh/docs/rpc-core/remote",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineChildOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineChildOptions",
+      "to": "/zh/docs/rpc-core/remote",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineChildOptions",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineChildOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineChildOptions",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineChildOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineConnect",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineConnect",
+      "to": "/zh/docs/rpc-core/remote",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineConnect",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineConnect",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineConnect",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineConnect",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineParentOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineParentOptions",
+      "to": "/zh/docs/rpc-core/remote",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineParentOptions",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineParentOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineParentOptions",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineParentOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineReplaceSpec",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineReplaceSpec",
+      "to": "/zh/docs/rpc-core/remote",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineReplaceSpec",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineReplaceSpec",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineReplaceSpec",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineReplaceSpec",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineSupervisorPolicy",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineSupervisorPolicy",
+      "to": "/zh/docs/rpc-core/remote",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineSupervisorPolicy",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineSupervisorPolicy",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineSupervisorPolicy",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineSupervisorPolicy",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineTaskContext",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineTaskContext",
+      "to": "/zh/docs/rpc-core/remote",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineTaskContext",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineTaskContext",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineTaskContext",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineTaskContext",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineUserTask",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineUserTask",
+      "to": "/zh/docs/rpc-core/remote",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineUserTask",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineUserTask",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineUserTask",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--ICoroutineUserTask",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/remote",
       "to": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteBinding",
       "type": "api-symbol"
     },
@@ -123529,96 +123859,6 @@
     {
       "from": "/zh/architecture/rpc-core",
       "to": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteControlDefinition",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote",
-      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineHostOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineHostOptions",
-      "to": "/zh/docs/rpc-core/remote",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineHostOptions",
-      "to": "/zh/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-core/getting-started",
-      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineHostOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineHostOptions",
-      "to": "/zh/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-core",
-      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineHostOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote",
-      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutinePluginOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutinePluginOptions",
-      "to": "/zh/docs/rpc-core/remote",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutinePluginOptions",
-      "to": "/zh/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-core/getting-started",
-      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutinePluginOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutinePluginOptions",
-      "to": "/zh/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-core",
-      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutinePluginOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote",
-      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineTaskContext",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineTaskContext",
-      "to": "/zh/docs/rpc-core/remote",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineTaskContext",
-      "to": "/zh/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-core/getting-started",
-      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineTaskContext",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineTaskContext",
-      "to": "/zh/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-core",
-      "to": "/zh/docs/rpc-core/remote#rpc-core-remote--IRemoteCoroutineTaskContext",
       "type": "architecture-symbol"
     },
     {

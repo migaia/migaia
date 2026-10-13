@@ -11617,7 +11617,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包不包含任何平台代码：没有 `node:` 导入，也不依赖 DOM。启动进程、创建 Worker 由其它包负责。"
+                  "text": "本包没有 `node:` 导入。Coroutine 使用支持宿主的全局 `MessageChannel`，在当前事件循环运行；启动进程、创建 Worker 由其它包负责。"
                 }
               ]
             },
@@ -11631,6 +11631,7 @@
                   "rows": [
                     ["调用子进程或本机其它进程", "`@migaia/rpc-process`"],
                     ["调用 Worker 线程", "`@migaia/rpc-threads`"],
+                    ["在同进程运行受监督的 task", "本包 `./remote` 的 `createCoroutinePlugin`"],
                     [
                       "iframe、SharedWorker、可靠有序的 RTCDataChannel",
                       "`@migaia/rpc-browser` 的 `createBrowserPeer`"
@@ -11683,7 +11684,7 @@
                     ],
                     [
                       "`./remote`",
-                      "`createRuntimePeer`、`createManagedRuntimePeer`、`createRuntimePlugin`、出口与事件常量、`RPC_REMOTE_ERROR_SOURCE`"
+                      "`createRuntimePeer`、`createManagedRuntimePeer`、`createRuntimePlugin`、`createCoroutinePlugin`、出口与事件常量、`RPC_REMOTE_ERROR_SOURCE`"
                     ],
                     ["`./testing`", "`createPeerPair`：内存中两个真实 Peer，用于测试"],
                     ["`./adapters/memory`", "`createMemoryTransportPair`"],
@@ -11738,6 +11739,20 @@
                   "type": "code",
                   "language": "ts",
                   "code": "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\n\nconst server = await createEndpoint({\n  id: 'server',\n  transport: right,\n  middlewares: [connect({ transport: right })]\n})\nserver.provide('add', (context) => {\n  const [a, b] = context.data as [number, number]\n  return context.success(a + b)\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['server'],\n  transport: left,\n  middlewares: [connect({ transport: left })]\n})\nconsole.log(await client.send<number>('server', 'add', [20, 22])) // 42\n\nawait client.dispose()\nawait server.dispose()"
+                }
+              ]
+            },
+            {
+              "id": "coroutine-task",
+              "heading": "Coroutine task",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createCoroutinePlugin({ name, task })` 创建受监督的同进程 task；task 内通过 `createCoroutinePlugin({ name, connect })` 把子 Host 接入当前代次的连接。两端使用 `host.coroutine` 调用，并沿用出口的事件与管理 API。`connect` 是 task 收到的 opaque 值；task 与 connect 必须二选一。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Task resolve 表示正常退出，reject 表示崩溃。Stop 通过 task 的 `signal` 协作取消，task 在 `finally` 中释放子 Host 后才结束；阻塞事件循环的 task 无法强制终止。`replace(name, { task })` 更换下一代任务。完整例子见 USEGUIDE 的 Coroutine 节。"
                 }
               ]
             },
@@ -12127,7 +12142,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`createRuntimePlugin`（以及平台包的 `createProcessPlugin`、`createThreadPlugin`）返回一个可以用 `@migaia/plugin-host` 安装的插件。安装后，同一平台的所有连接共享一个出口：`host.process` 或 `host.thread`（名称见 `RuntimePluginKey`）。"
+                  "text": "`createRuntimePlugin`、本包的 `createCoroutinePlugin`，以及平台包的 `createProcessPlugin`、`createThreadPlugin` 返回可以用 `@migaia/plugin-host` 安装的插件。同一运行时家族的连接共享一个出口：`host.process`、`host.thread` 或 `host.coroutine`（名称见 `RuntimePluginKey`）。"
                 },
                 {
                   "type": "table",
@@ -12143,7 +12158,7 @@
                     ],
                     [
                       "`on(event, listener)`",
-                      "订阅事件，返回可重复调用的取消函数。事件名见 `RuntimeEventName`：`ready`、`exit`、`degraded`、`restart`、`liquidated`"
+                      "订阅事件，返回可重复调用的取消函数。事件名见 `RuntimeEventName`：`ready`、`exit`、`degraded`、`restart`、`terminal`、`liquidated`"
                     ],
                     [
                       "`watch(options?)`",
@@ -12155,7 +12170,7 @@
                     ],
                     [
                       "`stop` / `kill` / `restart` / `replace`",
-                      "只对由 spawn 创建的连接有效；对 connect / listen 连接以 `CAPABILITY_CONFLICT` 拒绝"
+                      "只对由 spawn 或 coroutine task 创建的执行单元有效；对 connect / listen 连接以 `CAPABILITY_CONFLICT` 拒绝"
                     ]
                   ]
                 },
@@ -12176,6 +12191,29 @@
                 {
                   "type": "paragraph",
                   "text": "A local Feature method in `expose` is callable from the moment the peer can reach it; calls that arrive during install are held until the plugin commits, and are refused with `TARGET_UNKNOWN` if it does not. This guarantee covers local Feature `expose` entries only; forward and catalog entries are not covered."
+                }
+              ]
+            },
+            {
+              "id": "3-1-coroutine-task",
+              "heading": "3.1 Coroutine task",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createCoroutinePlugin({ name, task, supervisor? })` 是父模式：创建受监督的 task，每个代次拥有自己的 `MessageChannel`。Task 收到 `signal`、`heartbeat()` 与 opaque `connect`；子模式 `createCoroutinePlugin({ name, connect })` 只接入该连接，不创建执行单元。两模式都支持 `provide` 与 `expose`；使用 `expose` 时先安装本端 provider 插件，再安装 runtime 插件。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineHost } from '@migaia/plugin-host'\nimport { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\n/** 父模式拥有 task 与每个代次的消息端口。 */\nconst service = createCoroutinePlugin<{ math: { double(value: number): number } }>({\n  name: 'math',\n  task: async ({ connect, signal }) => {\n    /** 子模式通过 task 的 opaque connect 发布本端 provider。 */\n    const parent = createCoroutinePlugin({\n      name: 'parent',\n      connect,\n      provide: { math: { double: (value: number) => value * 2 } }\n    })\n    /** Task 负责释放自己创建的子 Host。 */\n    const childHost = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: {} })\n    try {\n      await childHost.use(parent)\n      /** Task settlement 就是退出；收到协作取消前持续提供服务。 */\n      await new Promise<void>((resolve) => {\n        if (signal.aborted) resolve()\n        else signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n    } finally {\n      await childHost.dispose()\n    }\n  }\n})\n/** 父 Host 释放时停止它拥有的 coroutine task。 */\nconst host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: {} })\ntry {\n  await host.use(service)\n  console.log(await host.coroutine!.request('math', 'math.double', 21)) // 42\n} finally {\n  await host.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`task` 与 `connect` 必须二选一；`connect` 只能使用当前 task 收到的值，不能传 `MessagePort`。父模式可通过 `supervisor` 配置现有监督策略，默认预算为每个插件一个 coroutine 单元。`host.coroutine.replace('math', { task: nextTask })` 更换任务；非函数 task 在替换前以 `INVALID_CONFIG` 拒绝，旧单元继续提供服务。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Task resolve 产生正常退出，reason 为 `exited`；reject 产生崩溃，reason 为 `crashed`，后续处理遵循监督策略。终止重启链的错误通过 `terminal` 事件提供 `{ source, code }`，`name` 是插件连接名。Stop 的 signal 取消是协作式的，端口在 task 结束后关闭；忽略取消的 task 可延迟结束，预算租约保留到实际 settlement。Coroutine 共享父事件循环，无法强制停止阻塞事件循环的 task。"
                 }
               ]
             },
