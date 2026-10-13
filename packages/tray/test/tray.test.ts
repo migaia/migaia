@@ -18,8 +18,12 @@ const deferred = <T>() => {
   return { promise, resolve }
 }
 describe('tray', () => {
-  it('A5 exports createTrayGraph without the retired static root name', () => {
-    expect(trayRoot).not.toHaveProperty('createTray')
+  it('A5 exports the static graph separately from the host manager', () => {
+    expect(trayRoot).toHaveProperty('createTray', expect.any(Function))
+    expect(trayRoot.createTray).not.toBe(trayRoot.createTrayGraph)
+    expect(() => trayRoot.createTray([] as never)).toThrow(
+      expect.objectContaining({ source: TRAY_SOURCE, code: TrayErrorCode.hostInvalid })
+    )
     expect(trayRoot).toHaveProperty('createTrayGraph', expect.any(Function))
   })
 
