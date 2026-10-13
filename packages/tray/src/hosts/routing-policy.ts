@@ -55,11 +55,32 @@ export function defineRoutingPolicy<const TName extends string>(
     typeof pick !== 'function'
   )
     throw createTrayError(TrayErrorCode.routingInvalid)
+  return authorPolicy(name, pick)
+}
+
+/** One brand owner authors custom and reserved built-in identities without duplicating trust. */
+function authorPolicy<const TName extends string>(
+  name: TName,
+  pick: ITrayRoutingPick
+): ITrayRoutingPolicy<TName> {
   /** Frozen identity contains no callback or mutable registry state. */
   const policy = Object.freeze({ name }) as ITrayRoutingPolicy<TName>
   policies.set(policy, pick)
   return policy
 }
+
+/** Always-available cyclic selection uses the registry's shared host/policy sequence. */
+export const roundRobin = authorPolicy(
+  TrayRoutingBuiltinName.roundRobin,
+  (candidates, context) => candidates[context.sequence % candidates.length]!.id
+)
+/** Stable ties retain spawn order; counters belong to current record admissions. */
+export const leastInFlight = authorPolicy(
+  TrayRoutingBuiltinName.leastInFlight,
+  (candidates) =>
+    candidates.reduce((best, candidate) => (candidate.inFlight < best.inFlight ? candidate : best))
+      .id
+)
 
 /** Internal trust lookup rejects structural copies without reading their properties. */
 export function readRoutingPolicy(value: unknown): ITrayRoutingPick | undefined {

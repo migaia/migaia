@@ -13,12 +13,20 @@ import {
   TrayInstanceState,
   TrayInstanceEvent,
   TrayRuntimeMode,
-  TrayManagementMode
+  TrayManagementMode,
+  TrayCallKind
 } from '../constants.js'
 import { readHost } from '../define-host.js'
 import { readRoutingPolicy, type ITrayRoutingPolicy } from '../routing-policy.js'
 import { toWire } from '../portable.js'
-import { createRemote, type ITraySender, type ITrayInvocation } from '../remote.js'
+import {
+  createRemote,
+  createRoutedRemote,
+  type ITraySender,
+  type ITrayInvocation
+} from '../remote.js'
+import { createRoutingRegistry, createRoutingNamespace } from '../routing.js'
+import { createParentTopics } from './topics.js'
 import {
   runtimePlugin,
   outletOf,
@@ -76,7 +84,41 @@ export function createTrayRuntime<
     }
   }) as ITrayRuntimeHost
   /** Registry owns only metadata, operation admission and parent-issued relay receipts. */
-  const registry = createRegistry(report)
+  const registry = createRegistry(report, sendUncounted)
+  /** Parent registration combines explicit policies and every branded host DSL tuple. */
+  const routingRegistry = createRoutingRegistry(options.hosts, options.routing ?? [], registry)
+  /** Infrastructure delivery stays outside business-send accounting. */
+  const topics = createParentTopics(
+    registry,
+    (record, delivery) =>
+      outletOf(host, record.definition).notify(record.id, TrayInternal.deliver, delivery),
+    report
+  )
+  /** Validate host identity before creating a remote; candidates are selected only at each call. */
+  const routed = (policy: string, definition: IAnyTrayHost) => {
+    assertActive()
+    /** Branding is checked before selecting the parent's registered host definition. */
+    const admitted = readHost(definition)
+    if (definitions.get(admitted.name) !== admitted)
+      throw createTrayError(TrayErrorCode.hostUnknown)
+    /** A kept remote observes closing before candidate lookup, preserving DISPOSED precedence. */
+    const pick = () => {
+      assertActive()
+      return routingRegistry.pick(admitted.name, policy)
+    }
+    return createRoutedRemote(admitted.name, {
+      request: async (input, callOptions) =>
+        registry.sendCounted(pick(), TrayCallKind.request, input, callOptions),
+      notify: async (input, callOptions) =>
+        registry.sendCounted(pick(), TrayCallKind.notify, input, callOptions),
+      stream: (input, callOptions) =>
+        (async function* () {
+          return yield* registry.sendCounted(pick(), TrayCallKind.stream, input, callOptions)
+        })()
+    })
+  }
+  /** Both forms retain one shared cursor and exact frozen own members. */
+  const routing = createRoutingNamespace(routingRegistry.names, routed)
   /** Lifecycle listeners share EventSubscriber's existing owner. */
   const events = createTrayEvents(report)
   /** Family subscription identity follows the actual outlet object's lifetime. */
@@ -86,7 +128,9 @@ export function createTrayRuntime<
   /** Concurrent dispose calls share exactly one cleanup sequence. */
   let disposal: Promise<void> | undefined
   /** Install relay before runtime factories inspect their exposure names. */
-  const relayReady = host.use(createRelay(registry, send)).then(() => undefined)
+  const relayReady = host
+    .use(createRelay(registry, send, routingRegistry, definitions, topics, assertActive))
+    .then(() => undefined)
   /** Public operations cannot admit new work once the parent is closing. */
   function assertActive(): void {
     if (disposing) throw createTrayError(TrayErrorCode.disposed)
@@ -114,6 +158,17 @@ export function createTrayRuntime<
   }
   /** Calls select one current RPC receipt; calls already sent remain owned by that generation. */
   function send(record: ITrayRecord): ITraySender {
+    return {
+      request: (input, callOptions) =>
+        registry.sendCounted(record, TrayCallKind.request, input, callOptions),
+      notify: (input, callOptions) =>
+        registry.sendCounted(record, TrayCallKind.notify, input, callOptions),
+      stream: (input, callOptions) =>
+        registry.sendCounted(record, TrayCallKind.stream, input, callOptions)
+    }
+  }
+  /** Native RPC dispatch keeps its existing readiness checks; accounting is solely registry-owned. */
+  function sendUncounted(record: ITrayRecord): ITraySender {
     /** Readiness is a Tray init fact; never wait for a new generation or resend a call. */
     const ready = (input: ITrayInvocation): ITrayRuntimeOutlet => {
       current(record)
@@ -260,6 +315,10 @@ export function createTrayRuntime<
       }),
       outlet.on(RuntimeEventName.exit, (event) => {
         const admitted = registry.records.get(event.name)
+        if (admitted && typeof event.generation === 'number') {
+          topics.remove(admitted, event.generation)
+          registry.depart(admitted, event.generation)
+        }
         if (
           !admitted ||
           event.reason === 'replaced' ||
@@ -306,6 +365,7 @@ export function createTrayRuntime<
   /** Queue removal revokes metadata before awaiting the original install and resource cleanup. */
   async function remove(record: ITrayRecord, graceMs?: number): Promise<void> {
     const wasReady = record.state === TrayInstanceState.ready
+    topics.remove(record)
     registry.revoke(record)
     if (record.install) {
       try {
@@ -398,6 +458,17 @@ export function createTrayRuntime<
   }
   /** Frozen surface exposes no publisher, runtime Host or original admission token. */
   const tray = Object.freeze({
+    routing,
+    /** Business publications follow the registry's existing closing admission boundary. */
+    publish(topic: string, payload?: unknown): void {
+      assertActive()
+      topics.publish(topic, payload)
+    },
+    /** A closing registry cannot retain new topic listeners. */
+    subscribe(topic: string, listener: import('../topics.js').ITrayTopicListener): () => void {
+      assertActive()
+      return topics.subscribe(topic, listener)
+    },
     async spawn(name: string, spawnOptions: { id: string; config?: unknown }) {
       assertActive()
       const definition = definitions.get(name)
@@ -478,6 +549,7 @@ export function createTrayRuntime<
         record.management = TrayManagementMode.manual
         try {
           await shutdown(record, stopOptions?.graceMs)
+          topics.remove(record)
           await outletOf(host, record.definition).stop(id, stopOptions)
           current(record)
           transition(record, TrayInstanceState.stopped)
@@ -518,8 +590,11 @@ export function createTrayRuntime<
         )
         for (const subscription of subscriptions.values())
           for (const release of subscription.release) release()
+        /** Parent-only topic users can close before relay installation commits. */
+        await relayReady
         await host.dispose()
         events.close()
+        topics.close()
       })()
       return disposal
     },

@@ -53,8 +53,21 @@ export const TrayInternal = {
   bind: 'trayRelay.bind',
   call: 'trayRelay.call',
   notify: 'trayRelay.notify',
-  relayStream: 'trayRelay.stream'
+  relayStream:
+    'trayRelay.stream' /** Portable routed envelopes use this existing relay category for every call kind. */,
+  routed: 'trayRelay.routed',
+  /** Parent authenticates the publisher before attaching topic metadata. */
+  publish: 'trayRelay.publish',
+  /** First child listener admits one generation-bound parent membership. */
+  subscribe: 'trayRelay.subscribe',
+  /** Last child listener releases its generation-bound parent membership. */
+  unsubscribe: 'trayRelay.unsubscribe'
 } as const
+
+/** Business call kinds select existing RPC request, notify and stream operations. */
+export const TrayCallKind = { request: 'request', notify: 'notify', stream: 'stream' } as const
+/** Value/type pair keeps the internal business-call domain canonical. */
+export type TrayCallKind = keyof typeof TrayCallKind
 
 /** The per-init client Feature name belongs to the same plugin contract in every runtime. */
 export const TrayClientFeature = 'tray'

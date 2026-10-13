@@ -105,6 +105,8 @@ export type ITrayInstance = ITrayInstanceInfo &
   Readonly<{
     runtime: ITrayRuntime
     state: TrayInstanceState
+    /** Business operations sent by this admission and not yet ended. */
+    inFlight: number
   }>
 /** Discovery merges rpc detail while retaining Tray's numeric unit generation. */
 export type ITrayInstanceDetail = ITrayInstance & Omit<IRuntimeConnectionDetail, 'generation'>
@@ -197,13 +199,50 @@ export type ITrayRemote<H extends IAnyTrayHost> = Readonly<{
   ): AsyncIterableIterator<IStreamItem<IMethodAt<IHostPlugins<H>, P>>>
 }>
 /** Per-generation Feature methods; routing and pub/sub are extended by the mesh owner. */
-export type ITrayClient = Readonly<{
+/** Routed remote retains the same method grammar but selects a candidate for every operation. */
+export type ITrayRoutedRemote<H extends IAnyTrayHost> = Readonly<{ host: string }> &
+  Omit<ITrayRemote<H>, 'id'>
+/** Built-ins are always addressable without a declaration. */
+type IBuiltInRoutingName = 'roundRobin' | 'leastInFlight'
+/** Literal policy tuple names remain closed rather than widening to arbitrary strings. */
+type IPolicyNames<T> = T extends readonly ITrayRoutingPolicy[] ? T[number]['name'] : never
+/** Host policy tuples contribute their names without recursive tuple traversal. */
+type IHostRoutingNames<T> = T extends readonly (infer H)[]
+  ? H extends { readonly routing?: infer R }
+    ? IPolicyNames<R>
+    : never
+  : never
+/** Parent registration combines explicit policies and all host declarations. */
+export type ITrayParentRoutingNames<THosts, TRouting> =
+  | IBuiltInRoutingName
+  | IPolicyNames<TRouting>
+  | IHostRoutingNames<THosts>
+/** The callable and member forms share the same host domain and routed remote signature. */
+export type ITrayRouting<TNames extends string, THosts extends readonly IAnyTrayHost[]> = (<
+  N extends TNames,
+  H extends THosts[number]
+>(
+  name: N,
+  host: H
+) => ITrayRoutedRemote<H>) &
+  Readonly<{ [N in TNames]: <H extends THosts[number]>(host: H) => ITrayRoutedRemote<H> }>
+/** Per-generation child Feature keeps its declared policy names. */
+export type ITrayClient<TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{
   self(): ITrayInstanceInfo
   to<H extends IAnyTrayHost>(host: H, id: string): Promise<ITrayRemote<H>>
   exit(error?: unknown): void
+  /** Existential internal host views erase callbacks; concrete tuples retain closed policy names. */
+  routing: 0 extends 1 & TRouting
+    ? any
+    : ITrayRouting<IBuiltInRoutingName | IPolicyNames<TRouting>, readonly IAnyTrayHost[]>
+  publish(topic: string, payload?: unknown): Promise<void>
+  subscribe(
+    topic: string,
+    listener: import('./topics.js').ITrayTopicListener
+  ): Promise<() => Promise<void>>
 }>
 /** Per-init PluginHost definition exposes one precise native `tray` Feature. */
-export type ITrayClientPlugin<_TRouting extends readonly ITrayRoutingPolicy[] = readonly []> =
+export type ITrayClientPlugin<TRouting extends readonly ITrayRoutingPolicy[] = readonly []> =
   IDefinedPluginConstraint<
     object,
     never,
@@ -211,7 +250,7 @@ export type ITrayClientPlugin<_TRouting extends readonly ITrayRoutingPolicy[] = 
     IPluginConfig,
     Record<never, never>,
     'trayClient',
-    Readonly<{ tray: IFeature<Record<never, never>, ITrayClient> }>
+    Readonly<{ tray: IFeature<Record<never, never>, ITrayClient<TRouting>> }>
   >
 /** Host selected by an admitted literal registry name. */
 type IHostByName<THosts extends readonly IAnyTrayHost[], N> = Extract<
@@ -225,8 +264,11 @@ export type ITraySpawnOptions<H extends IAnyTrayHost> = Readonly<
 /** Registry contract exposes lifecycle observations without any event trigger. */
 export type ITray<
   THosts extends readonly IAnyTrayHost[],
-  _TRouting extends readonly ITrayRoutingPolicy[] = readonly []
+  TRouting extends readonly ITrayRoutingPolicy[] = readonly []
 > = Readonly<{
+  routing: ITrayRouting<ITrayParentRoutingNames<THosts, TRouting>, THosts>
+  publish(topic: string, payload?: unknown): void
+  subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): () => void
   spawn<N extends THosts[number]['name']>(
     host: N,
     options: ITraySpawnOptions<IHostByName<THosts, N>>

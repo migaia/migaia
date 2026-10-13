@@ -13307,6 +13307,12 @@
       "library": "tray"
     },
     {
+      "path": "/en/docs/tray/ITrayParentRoutingNames",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/en/docs/tray/ITrayPlugins",
       "locale": "en",
       "domain": "docs",
@@ -13314,6 +13320,18 @@
     },
     {
       "path": "/en/docs/tray/ITrayRemote",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayRoutedRemote",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayRouting",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
@@ -13362,6 +13380,12 @@
     },
     {
       "path": "/en/docs/tray/ITraySupervisorPolicy",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/ITrayTopicMeta",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
@@ -13595,6 +13619,12 @@
       "library": "tray"
     },
     {
+      "path": "/en/docs/tray/leastInFlight",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/en/docs/tray/loader",
       "locale": "en",
       "domain": "docs",
@@ -13644,6 +13674,12 @@
     },
     {
       "path": "/en/docs/tray/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/roundRobin",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
@@ -29627,6 +29663,12 @@
       "library": "tray"
     },
     {
+      "path": "/zh/docs/tray/ITrayParentRoutingNames",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/zh/docs/tray/ITrayPlugins",
       "locale": "zh",
       "domain": "docs",
@@ -29634,6 +29676,18 @@
     },
     {
       "path": "/zh/docs/tray/ITrayRemote",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayRoutedRemote",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayRouting",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
@@ -29682,6 +29736,12 @@
     },
     {
       "path": "/zh/docs/tray/ITraySupervisorPolicy",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/ITrayTopicMeta",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
@@ -29915,6 +29975,12 @@
       "library": "tray"
     },
     {
+      "path": "/zh/docs/tray/leastInFlight",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/zh/docs/tray/loader",
       "locale": "zh",
       "domain": "docs",
@@ -29964,6 +30030,12 @@
     },
     {
       "path": "/zh/docs/tray/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/roundRobin",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
