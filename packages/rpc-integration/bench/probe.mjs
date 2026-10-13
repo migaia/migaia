@@ -8,7 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { spawn } from 'node:child_process'
 import { loadavg } from 'node:os'
 import { IpcBenchErrorText } from './error-text.mjs'
-import { IpcBenchDiagnostic } from './text.mjs'
+import { IpcBenchDiagnostic, IpcProbeBenchStages } from './text.mjs'
 
 /** One canonical fixture vocabulary keeps the four acceptance cells and arms unchanged. */
 const ProbeBench = {
@@ -66,8 +66,15 @@ const loaded = []
 const arm = process.env.PROBE_BENCH_ARM
 /** Exact counters deliberately run separately so their observer cost receives no timing credit. */
 const guarding = process.env.PROBE_BENCH_LANE === ProbeBench.guard
-/** Root timing installs the genuine collector with default metadata stages and capture disabled. */
+/**
+ * Root timing installs the genuine collector with the selected metadata stages and capture
+ * disabled.
+ */
 const collectorMode = process.env.PROBE_BENCH_COLLECTOR === ProbeBench.collectorEnabled
+/** Omitted CLI selection retains the revision-1 all-stage arm and its original fixed budgets. */
+const stageMode = process.env[IpcProbeBenchStages.environment] ?? IpcProbeBenchStages.legacy
+/** Cold snapshots record the exact installed stage set and whether production defaults were used. */
+let stageSelection
 /**
  * The frozen collector host remains the installed identity; only cold snapshots call its API.
  *
@@ -107,6 +114,7 @@ function counterSnapshot() {
   return {
     ...counters,
     loaded: loaded.slice(),
+    stageSelection: stageSelection ?? null,
     collectorEventCounter: collectorEventCounter ?? null,
     collector:
       collector === undefined
@@ -199,7 +207,7 @@ if (arm !== undefined) {
         if (!source.includes(marker)) throw new Error(IpcBenchErrorText.configuration)
         source = source.replaceAll(
           marker,
-          "inherit: ['PATH', 'NODE_OPTIONS', 'PROBE_BENCH_ARM', 'PROBE_BENCH_LANE', 'PROBE_BENCH_BASE_DIST', 'PROBE_BENCH_COLLECTOR', 'PROBE_BENCH_COLLECTOR_RING_SHA', 'PROBE_BENCH_COLLECTOR_AUDIT_SHA']"
+          `inherit: ['PATH', 'NODE_OPTIONS', 'PROBE_BENCH_ARM', 'PROBE_BENCH_LANE', 'PROBE_BENCH_BASE_DIST', 'PROBE_BENCH_COLLECTOR', 'PROBE_BENCH_COLLECTOR_RING_SHA', 'PROBE_BENCH_COLLECTOR_AUDIT_SHA', '${IpcProbeBenchStages.environment}']`
         )
       }
       if (url.endsWith('/rpc-integration/bench/observe.mjs')) {
@@ -238,6 +246,16 @@ if (arm !== undefined) {
   if (arm === ProbeBench.installed) {
     /** Canonical stage names select the same mask for the guard as the actual installed probe. */
     const { defineProbe, RpcProbeStageName } = await import('@migaia/rpc-core/probe')
+    /** Fixed selected stages keep the near-noop Core arm comparable with the genuine collector. */
+    const selectedStages =
+      stageMode === IpcProbeBenchStages.default
+        ? IpcProbeBenchStages.defaultStages
+        : RpcProbeStageName
+    /** Compile only the assertion mask; defineProbe remains the production configuration owner. */
+    const selectedMask = selectedStages.reduce(
+      (mask, name) => mask | (1 << RpcProbeStageName.indexOf(name)),
+      0
+    )
     /** Cold reporting preserves full native failure classification in both measured modes. */
     const onError = (error) => {
       console.error(JSON.stringify(classifyFailure(error)))
@@ -245,17 +263,27 @@ if (arm !== undefined) {
     if (collectorMode) {
       /** No host copy, wrapper or post-definition emit replacement changes its compiled identity. */
       const { createRpcDevtools } = await import('@migaia/rpc-devtools')
-      collector = createRpcDevtools({ onError })
-      if (collector.captureMask !== 0) throw new Error(IpcBenchErrorText.configuration)
+      collector = createRpcDevtools(
+        stageMode === IpcProbeBenchStages.default
+          ? { onError }
+          : { stages: selectedStages, onError }
+      )
+      if (collector.captureMask !== 0 || collector.stageMask !== selectedMask)
+        throw new Error(IpcBenchErrorText.configuration)
       globalThis.__PROBE_BENCH_PROBE = collector
+    }
+    stageSelection = {
+      mode: stageMode,
+      stages: selectedStages.slice(),
+      stageMask: collector?.stageMask ?? selectedMask,
+      collectorDefault: collectorMode && stageMode === IpcProbeBenchStages.default
     }
     /** Root timing has only the genuine collector; the separate counting probe is guard-only. */
     if (!collectorMode || guarding) {
       /** Build stage membership once, never enabling a stage absent from the actual collector. */
       const stages = []
       for (let index = 0; index < RpcProbeStageName.length; index++) {
-        if (collector === undefined || (collector.stageMask & (1 << index)) !== 0)
-          stages.push(RpcProbeStageName[index])
+        if ((selectedMask & (1 << index)) !== 0) stages.push(RpcProbeStageName[index])
       }
       /** Guard-only counting observes Core view identities, not gross collector VM allocations. */
       const countingProbe = defineProbe({
@@ -353,7 +381,8 @@ export function countDelta(receipt) {
  * Run one frozen cell/arm in a fresh actual Node parent; retain stderr and all failed receipts.
  *
  * @param {object} cell Frozen carrier, portable payload and bounded concurrency.
- * @param {string} selectedArm Base, absent or installed Core probe/genuine default collector.
+ * @param {string} selectedArm Base, absent or installed Core probe/genuine selected-stage
+ *   collector.
  * @param {string} lane Formal timing, exact counter guard or separate profiling.
  * @param {object} options Samples, warm-up, base dist, raw output and optional diagnostic mode.
  * @param {string} stem Unique receipt name preserving every interleaved launch.
@@ -368,6 +397,7 @@ async function launch(cell, selectedArm, lane, options, stem) {
     PROBE_BENCH_LANE: lane,
     PROBE_BENCH_BASE_DIST: options.baseDist,
     PROBE_BENCH_COLLECTOR: options.collector ? ProbeBench.collectorEnabled : '0',
+    [IpcProbeBenchStages.environment]: options.stageMode,
     PROBE_BENCH_COLLECTOR_RING_SHA: options.collectorAudit?.ringCompiledSha256 ?? '',
     PROBE_BENCH_COLLECTOR_AUDIT_SHA: options.collectorAudit?.sha256 ?? '',
     IPC_BENCH_STEM: join(options.output, stem),
@@ -414,7 +444,11 @@ async function launch(cell, selectedArm, lane, options, stem) {
   }
   writeFileSync(
     join(options.output, `${stem}.json`),
-    JSON.stringify({ cell, arm: selectedArm, lane, status, stderr, receipt }, null, 2)
+    JSON.stringify(
+      { cell, arm: selectedArm, lane, stageMode: options.stageMode, status, stderr, receipt },
+      null,
+      2
+    )
   )
   /** Stdio emits its existing readiness notice on stderr; every other diagnostic remains an error. */
   if (
@@ -425,6 +459,10 @@ async function launch(cell, selectedArm, lane, options, stem) {
   )
     throw new Error(IpcBenchErrorText.paired, { cause: { status, stderr, receipt } })
   if (selectedArm === ProbeBench.installed) {
+    for (const snapshot of [receipt.parentAfter, receipt.peerAfter]) {
+      if (snapshot?.probeCounters?.stageSelection?.mode !== options.stageMode)
+        throw new Error(IpcBenchErrorText.configuration)
+    }
     if (options.collector) {
       for (const snapshot of [receipt.parentAfter, receipt.peerAfter]) {
         if (
@@ -443,6 +481,10 @@ async function launch(cell, selectedArm, lane, options, stem) {
     )
       throw new Error(IpcBenchErrorText.configuration)
     receipt.observedEvents = observations.total.events
+    receipt.stageSelection = [
+      receipt.parentAfter.probeCounters.stageSelection,
+      receipt.peerAfter.probeCounters.stageSelection
+    ]
     if (options.collector) receipt.observedCollectorCalls = observations.total.collectorCalls
   }
   if (lane === ProbeBench.guard) receipt.counterGuard = countDelta(receipt)
@@ -458,9 +500,18 @@ async function launch(cell, selectedArm, lane, options, stem) {
  * @param {boolean} [collector] Root D2 mode selects 5%; ordinary Core A5 remains fixed at 3%.
  * @param {object} [collectorAudit] Current source/compiled hashes covering the collector allocation
  *   site.
+ * @param {string} [selectedStageMode] Explicit all-stage small cells are report-only; omitted mode
+ *   retains the revision-1 fixed budgets.
  * @returns {object} Raw ratios, exact medians, noise bounds and independent verdicts.
  */
-export function judgeProbe(rounds, guard, largePayload = false, collector = false, collectorAudit) {
+export function judgeProbe(
+  rounds,
+  guard,
+  largePayload = false,
+  collector = false,
+  collectorAudit,
+  selectedStageMode = IpcProbeBenchStages.legacy
+) {
   /** SC9(b): analysis restores sorted scalar report data without changing the original raw series. */
   const median = (values) => {
     const sorted = values.toSorted((a, b) => a - b)
@@ -537,6 +588,8 @@ export function judgeProbe(rounds, guard, largePayload = false, collector = fals
   }
   /** Root D2 and Core A5 are distinct fixed budgets; neither derives a looser limit from noise. */
   const budget = collector ? 0.05 : 0.03
+  /** Revision 2 relaxes only installed small-cell reporting when all stages are explicitly selected. */
+  const reportOnly = selectedStageMode === IpcProbeBenchStages.all && !largePayload
   /** The metadata-only 1 MiB cell has a symmetric fixed five-percent budget, never report-only. */
   const installedWithinBudget = largePayload
     ? Math.abs(deltas.installedP50) <= 0.05 && Math.abs(deltas.installedThroughput) <= 0.05
@@ -545,27 +598,35 @@ export function judgeProbe(rounds, guard, largePayload = false, collector = fals
   const status =
     Math.abs(deltas.absentP50) <= noise.p50 &&
     Math.abs(deltas.absentThroughput) <= noise.throughput &&
-    installedWithinBudget &&
+    (reportOnly || installedWithinBudget) &&
     counterGuard.status === 'PASS'
       ? 'PASS'
       : 'FAIL'
   return {
     status,
+    stageMode: selectedStageMode,
+    stageSelection: guard.installed.stageSelection,
+    installedQualification: reportOnly
+      ? IpcProbeBenchStages.reportOnly
+      : IpcProbeBenchStages.fixedBudget,
+    installedWithinBudget: reportOnly ? null : installedWithinBudget,
     pairs: rounds.length,
     noise,
     series,
     deltas,
-    installedBudget: largePayload
-      ? {
-          p50Minimum: -0.05,
-          p50Maximum: 0.05,
-          throughputMinimum: -0.05,
-          throughputMaximum: 0.05
-        }
-      : { p50Maximum: budget, throughputMinimum: -budget },
+    installedBudget: reportOnly
+      ? null
+      : largePayload
+        ? {
+            p50Minimum: -0.05,
+            p50Maximum: 0.05,
+            throughputMinimum: -0.05,
+            throughputMaximum: 0.05
+          }
+        : { p50Maximum: budget, throughputMinimum: -budget },
     counterGuard,
     collector: collector
-      ? 'ENABLED: genuine default metadata collector; guard-only same-mask Core view probe and audited collector event-literal counter'
+      ? 'ENABLED: genuine selected-stage metadata collector; guard-only same-mask Core view probe and audited collector event-literal counter'
       : 'DISABLED: Core-only A5'
   }
 }
@@ -591,6 +652,8 @@ async function main() {
   /** Defaults retain the original IPC fixture's 1000 requests and 100 warm-up calls. */
   const options = {
     collector: rootMode,
+    /** Omitted mode preserves the original all-stage CLI; revision-2 modes must be explicit. */
+    stageMode: value(IpcProbeBenchStages.option, IpcProbeBenchStages.legacy),
     /** Diagnostic selection remains absent for every formal timing and exact-counter launch. */
     diagnostic: value(ProbeBench.diagnosticOption, undefined),
     /** The current audit must match every named source and compiled file before collector runs. */
@@ -619,6 +682,9 @@ async function main() {
   const cells = ProbeBench.cells.filter((cell) => cellId === 'all' || cell.id === cellId)
   if (
     !cells.length ||
+    ![IpcProbeBenchStages.default, IpcProbeBenchStages.all, IpcProbeBenchStages.legacy].includes(
+      options.stageMode
+    ) ||
     !Number.isInteger(options.pairs) ||
     options.pairs < 5 ||
     !Number.isInteger(options.samples) ||
@@ -712,7 +778,9 @@ async function main() {
       options,
       failureInventory,
       acceptance: rootMode ? ProbeBench.rootAcceptance : ProbeBench.coreAcceptance,
-      collector: rootMode ? 'ENABLED: default metadata, captureMask=0' : 'DISABLED: Core-only A5'
+      collector: rootMode
+        ? 'ENABLED: selected-stage metadata, captureMask=0'
+        : 'DISABLED: Core-only A5'
     })
   )
   /** The exclusive runner owns admission/end-load enforcement; this receipt also records raw loads. */
@@ -735,6 +803,7 @@ async function main() {
       timingStatus: IpcBenchDiagnostic.timingStatus,
       cell,
       collector: rootMode,
+      stageMode: options.stageMode,
       runtime: process.version,
       startLoad,
       endLoad: loadavg(),
@@ -781,13 +850,14 @@ async function main() {
         options,
         `${cell.id}-guard-${selectedArm}`
       )
-    /** The large cell uses its fixed symmetric budget; small-cell thresholds remain unchanged. */
+    /** Default stages retain fixed budgets; explicit all-stage small cells remain report-only. */
     const verdict = judgeProbe(
       rounds,
       guard,
       cell.payloadBytes === 1048576,
       rootMode,
-      options.collectorAudit
+      options.collectorAudit,
+      options.stageMode
     )
     results.push({ cell, rounds, verdict })
     writeFileSync(
@@ -796,6 +866,7 @@ async function main() {
         {
           baseCommit: ProbeBench.sourceCommit,
           acceptance: rootMode ? ProbeBench.rootAcceptance : ProbeBench.coreAcceptance,
+          stageMode: options.stageMode,
           startLoad,
           endLoad: loadavg(),
           failureInventory,
@@ -830,6 +901,7 @@ async function main() {
       {
         status,
         acceptance: rootMode ? ProbeBench.rootAcceptance : ProbeBench.coreAcceptance,
+        stageMode: options.stageMode,
         baseCommit: ProbeBench.sourceCommit,
         runtime: process.version,
         startLoad,
@@ -838,9 +910,10 @@ async function main() {
         recompute: {
           module: entry,
           export: 'judgeProbe',
-          arguments: 'rounds, guard, largePayload, collector, collectorAudit',
+          arguments: 'rounds, guard, largePayload, collector, collectorAudit, stageMode',
           collector: rootMode,
-          collectorAudit: options.collectorAudit
+          collectorAudit: options.collectorAudit,
+          stageMode: options.stageMode
         },
         results
       },
