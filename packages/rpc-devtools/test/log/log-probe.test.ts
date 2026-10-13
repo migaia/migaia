@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'
+import { createEndpoint, connect, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
 import {
   RpcProbeDirection,
   RpcProbeKind,
   RpcProbeOutcome,
   RpcProbeStage,
+  probePlugin,
   type IRpcProbe,
   type IRpcProbeEventView
 } from '@migaia/rpc-core/probe'
@@ -64,6 +66,41 @@ function logger(records: ILogRecord[]): IRpcLogSink {
 }
 
 describe('A7 log probe', () => {
+  it('[closure A1] forwards stage capture and redaction through the real Core emitter', async () => {
+    /** Logger-visible fields are captured only after Core's synchronous redaction callback. */
+    const records: ILogRecord[] = []
+    /** The caller's redactor owns this replacement rather than changing business data. */
+    const masked = { masked: true }
+    /** Real progress events prove the capture/redact options reached defineProbe and its emitter. */
+    const probe = createRpcLogProbe(logger(records), {
+      stages: ['message'],
+      capture: ['message'],
+      slowMs: 0,
+      redact: () => masked
+    })
+    /** The same public carrier remains responsible for the original business result. */
+    const [left, right] = createMemoryTransportPair()
+    /** Provider behavior is independent of logger content conversion. */
+    const server = await createEndpoint({
+      id: 'log-redact-server',
+      transport: right,
+      middlewares: [connect()],
+      provider: { echo: (context) => context.success(context.data) }
+    })
+    /** The public plugin is the supported endpoint observation boundary. */
+    const client = await createEndpoint({
+      id: 'log-redact-client',
+      transport: left,
+      middlewares: [connect(), probePlugin(probe)]
+    })
+    try {
+      expect(await client.send('log-redact-server', 'echo', 42)).toBe(42)
+      expect(records.length).toBeGreaterThan(0)
+      for (const record of records) expect(record.fields.content).toBe(masked)
+    } finally {
+      await Promise.all([client.dispose(), server.dispose()])
+    }
+  })
   it('compiles message and peer defaults and skips one million successful events before field construction', () => {
     /** Every possible fields/message boundary is counted before the hot loop starts. */
     const counters = { fieldReads: 0, messages: 0, calls: 0 }
