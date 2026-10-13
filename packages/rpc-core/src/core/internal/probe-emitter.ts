@@ -163,6 +163,7 @@ class ProbeEmitter {
       outcome: 0,
       messageId: undefined,
       method: undefined,
+      variation: undefined,
       senderId: undefined,
       targetId: undefined,
       receiverId: undefined,
@@ -285,6 +286,7 @@ class ProbeEmitter {
     view.outcome = RpcProbeOutcome.none
     view.messageId = messageId === '' ? undefined : messageId
     view.method = method
+    view.variation = undefined
     view.senderId = undefined
     view.targetId = undefined
     view.receiverId = undefined
@@ -316,7 +318,8 @@ class ProbeEmitter {
     if (
       state.methods !== undefined &&
       (stage === RpcProbeStage.message || stage === RpcProbeStage.envelope) &&
-      (method === undefined || !state.methods.has(method))
+      method !== undefined &&
+      !state.methods.has(method)
     )
       return false
     if (state.sampleThreshold !== 0xffffffff && messageId !== undefined) {
@@ -419,7 +422,7 @@ class ProbeEmitter {
     this.#view.error = error
     this.#dispatch(RpcProbeStage.peer, undefined)
   }
-  /** Records logical progress and preserves the original error reference. */
+  /** Records logical progress, borrowing the original variation name and error references. */
   message(
     direction: number,
     kind: number,
@@ -431,7 +434,8 @@ class ProbeEmitter {
     trace: string | undefined,
     durationMs: number,
     rejection: string | undefined,
-    error: unknown
+    error: unknown,
+    variation?: string
   ): void {
     if (!this.#begin(RpcProbeStage.message, messageId, method, senderId)) return
     this.#view.direction = direction
@@ -443,9 +447,10 @@ class ProbeEmitter {
     this.#view.durationMs = durationMs
     this.#view.rejection = rejection
     this.#view.error = error
+    this.#view.variation = variation
     this.#dispatch(RpcProbeStage.message, undefined)
   }
-  /** Observes the pipeline's existing normalized envelope without another normalization. */
+  /** Observes normalized envelope metadata, including variation when content capture is disabled. */
   envelope(
     direction: number,
     messageId: string,
@@ -454,7 +459,8 @@ class ProbeEmitter {
     value: unknown,
     senderId?: string,
     trace?: string,
-    carrierSeq = -1
+    carrierSeq = -1,
+    variation?: string
   ): void {
     if (!this.#begin(RpcProbeStage.envelope, messageId, method, senderId)) return
     this.#view.direction = direction
@@ -462,6 +468,7 @@ class ProbeEmitter {
     this.#view.trace = trace
     this.#view.carrierSeq = carrierSeq
     this.#view.members = members
+    this.#view.variation = variation
     this.#dispatch(RpcProbeStage.envelope, value)
   }
   /** Observes encoded representation before framing or after reassembly. */
