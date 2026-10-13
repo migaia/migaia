@@ -30,7 +30,12 @@ export function readProbeState(probe: IRpcProbe): IRpcProbeState | undefined {
   return probeStates.get(probe)
 }
 
-/** Cold subscription seam lets installed emitters rebuild dispatch tables after stage updates. */
+/** Reads the current cold subscription mask, including frozen hosts whose public mask is initial. */
+export function readProbeStages(probe: IRpcProbe): number {
+  return probeStates.get(probe)?.stageMask ?? probe.stageMask
+}
+
+/** Subscribes once per changed stage mask; the returned release removes the cold subscription. */
 export function subscribeProbeStages(probe: IRpcProbe, listener: () => void): () => void {
   /** Only a probe minted by defineProbe owns the private subscription list. */
   const state = probeStates.get(probe)

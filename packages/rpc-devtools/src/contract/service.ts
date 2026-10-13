@@ -6,6 +6,8 @@ export type IRpcDevtoolsQuery = Readonly<{
   afterSeq?: number
   limit?: number
   stages?: readonly string[]
+  /** Selects canonical outcome names before the numeric event scan or watch ingestion. */
+  outcomes?: readonly string[]
   methods?: readonly string[]
   trace?: string
   endpointIds?: readonly string[]
