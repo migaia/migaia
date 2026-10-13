@@ -39,7 +39,7 @@ it('[closure A1] provides the actual serving endpoint identity', async () => {
     middlewares: [connect()]
   })
   try {
-    expect(await client.send('r3-server', 'identity')).toBe('r3-server')
+    expect(await client.send('r3-server', 'identity', undefined)).toBe('r3-server')
   } finally {
     await Promise.all([client.dispose(), server.dispose()])
   }

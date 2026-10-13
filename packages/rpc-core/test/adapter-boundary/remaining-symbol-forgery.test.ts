@@ -73,6 +73,7 @@ function request(payload: IRpcPortableValue): IProviderRequestInput {
 /** Genuine forwarding options carry the original ordinary provider context and admitted payload. */
 function context(): IRpcContext {
   return {
+    localEndpointId: 'fixture-local-endpoint',
     data: null,
     signal: new AbortController().signal,
     senderId: 'peer',
