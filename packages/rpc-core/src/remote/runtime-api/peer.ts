@@ -1,4 +1,5 @@
 import { createRpcError, createRpcSerializationError } from '../../core/errors.js'
+import { resolveAbortReason } from '../../core/internal/async-control.js'
 import type { IRpcProbe } from '../../core/probe/types.js'
 import { createRuntimePeerCalls } from '../internal/runtime-call.js'
 import {
@@ -83,6 +84,7 @@ import type {
 } from '../types.js'
 import {
   compileRuntimeMethods,
+  readCommitGate,
   runtimeForwardRoute,
   runtimeForwardDiagnosticRoute,
   type IRuntimePeerProvide,
@@ -522,13 +524,22 @@ export async function createRuntimePeer(
       if (entry.supportedModes?.every((mode) => mode === RuntimeApiMode.stream)) continue
       if (entry.kind !== 'forward') {
         /** The original provider owner maps actual async results; the scalar facade is synchronous. */
-        providers[entry.name] = guardMethod(entry, (context: Parameters<IRpcProvider>[0]) =>
-          completeProviderReturn(
-            Reflect.apply(entry.method, entry.receiver, [context.data, context]),
-            context,
-            completeScalar
-          )
-        )
+        providers[entry.name] = guardMethod(entry, (context: Parameters<IRpcProvider>[0]) => {
+          /** A committed local method retains the original synchronous provider return path. */
+          const invoke = () =>
+            completeProviderReturn(
+              Reflect.apply(entry.method, entry.receiver, [context.data, context]),
+              context,
+              completeScalar
+            )
+          /** Only exposed local Feature methods carry their install's private commit metadata. */
+          const gate = readCommitGate(entry.method)
+          if (!gate || gate.isOpen()) return invoke()
+          return gate.wait(context.signal).then(() => {
+            if (context.signal.aborted) throw resolveAbortReason(context.signal)
+            return invoke()
+          })
+        })
         continue
       }
       providers[entry.name] = guardMethod(entry, async (context: Parameters<IRpcProvider>[0]) => {
@@ -728,16 +739,26 @@ export async function createRuntimePeer(
         if (!entry.supportedModes || entry.supportedModes.includes(RuntimeApiMode.stream))
           endpoint.stream!.provide(
             `${RemoteMethodName.runtimeStreamPrefix}${entry.name}`,
-            guardMethod(
-              entry,
-              (payload: unknown, { context }: Parameters<IRpcStreamRun>[1]) =>
-                (entry.kind === 'forward'
-                  ? (readProviderRuntimeRelay(context)?.stream(context) ??
-                    forwardStream(entry, context))
-                  : Reflect.apply(entry.method, entry.receiver, [payload, context])) as
-                  | AsyncIterable<IRpcPortableValue>
-                  | Iterable<IRpcPortableValue>
-            )
+            guardMethod(entry, (payload: unknown, { context }: Parameters<IRpcStreamRun>[1]) => {
+              if (entry.kind === 'forward')
+                return (
+                  readProviderRuntimeRelay(context)?.stream(context) ??
+                  forwardStream(entry, context)
+                )
+              /** Stream admission stays iterable while its first read waits for Host commit. */
+              const gate = readCommitGate(entry.method)
+              if (gate && !gate.isOpen())
+                return (async function* () {
+                  await gate.wait(context.signal)
+                  if (context.signal.aborted) throw resolveAbortReason(context.signal)
+                  return yield* Reflect.apply(entry.method, entry.receiver, [payload, context]) as
+                    | AsyncIterable<IRpcPortableValue>
+                    | Iterable<IRpcPortableValue>
+                })()
+              return Reflect.apply(entry.method, entry.receiver, [payload, context]) as
+                | AsyncIterable<IRpcPortableValue>
+                | Iterable<IRpcPortableValue>
+            })
           )
     }
     localDescription = normalizeRuntimeDescription({
