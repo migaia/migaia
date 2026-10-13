@@ -11,7 +11,9 @@ await createThreadPeer({
   provide: {
     double: (value: number) => value * 2,
     mark: (_value: number) => undefined,
-    values: async function* (count: number) { for (let index = 0; index < count; index++) yield index }
+    values: async function* (count: number) {
+      for (let index = 0; index < count; index++) yield index
+    }
   }
 })
 ```
@@ -37,7 +39,9 @@ try {
 
 ## 2. 创建进程池
 
-使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。
+使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。
+
+两个池工厂都接受 `defineProbe()` 返回的原始 Probe 或只读 Probe 数组。`probe` 原样进入每个成员的 `createThreadPeer` / `createProcessPeer`，握手、ready 和监督重启事件沿原 Peer 路径发出。共享 Probe 的回调用 `endpointId` 区分成员；`seq` 仍属于对应端点，而非整个池的统一序号。
 
 ## 3. 取消、恢复与关闭
 
