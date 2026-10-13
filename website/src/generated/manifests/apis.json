@@ -76792,7 +76792,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/middleware/abort.d.ts:abort:export declare const abort: () => IRpcPlugin;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "rpc-core-index--abort"
         },
@@ -83703,7 +83703,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-core/dist/core/middleware/ping.d.ts:ping:export declare const ping: () => IPingMiddleware;",
           "guidance": [],
-          "usageScore": 28,
+          "usageScore": 32,
           "configuration": [],
           "fragment": "rpc-core-index--ping"
         },
@@ -89974,7 +89974,7 @@
           "name": "IRpcCarrierProbe",
           "kind": "type",
           "signature": "export type IRpcCarrierProbe = Readonly<{\n  readonly capturing: boolean;\n  emit(\n    direction: number,\n    sizeBytes: number,\n    carrier: string,\n    detail: Readonly<Record<string, string | number | boolean>> | undefined,\n    content: unknown,\n  ): void;\n}>;",
-          "declarationLine": 76,
+          "declarationLine": 79,
           "source": "packages/rpc-core/dist/core/probe/types.d.ts",
           "purpose": "Transport capability receives physical observations without owning the endpoint emitter.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcCarrierProbe.",
@@ -90038,7 +90038,7 @@
           "name": "IRpcProbe",
           "kind": "type",
           "signature": "export type IRpcProbe = Readonly<{\n  readonly stageMask: number;\n  readonly captureMask: number;\n  readonly methods: ReadonlySet<string> | undefined;\n  /** 0xffffffff means all events; other values compare against the unsigned sample key. */ readonly sampleThreshold: number;\n  /** An empty list pauses the probe; validation failures leave the previous mask unchanged. */ setStages(\n    stages: readonly IRpcProbeStageName[],\n  ): void;\n}>;",
-          "declarationLine": 66,
+          "declarationLine": 69,
           "source": "packages/rpc-core/dist/core/probe/types.d.ts",
           "purpose": "Frozen public handle retains compiled filters while private stage updates can pause or resume it. Standalone stageMask is a getter; a host's data field retains its initial compiled mask (D7). Emitters read private state once at installation and use their own fixed-shape records thereafter.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcProbe.",
@@ -90133,8 +90133,8 @@
         {
           "name": "IRpcProbeDefinition",
           "kind": "type",
-          "signature": "export type IRpcProbeDefinition = Readonly<{\n  stages: readonly IRpcProbeStageName[];\n  capture?: readonly IRpcProbeStageName[];\n  redact?(stage: RpcProbeStage, content: unknown): unknown;\n  methods?: readonly string[];\n  sample?: number;\n  describe?(descriptor: IRpcProbeDescriptor): void;\n  emit(view: IRpcProbeEventView): void;\n  onError?(error: unknown): void;\n}>;",
-          "declarationLine": 50,
+          "signature": "export type IRpcProbeDefinition = Readonly<{\n  stages: readonly IRpcProbeStageName[];\n  capture?: readonly IRpcProbeStageName[];\n  redact?(stage: RpcProbeStage, content: unknown): unknown;\n  /** Filters method-bearing logical/envelope events; methodless variation controls remain visible. */ methods?: readonly string[];\n  sample?: number;\n  describe?(descriptor: IRpcProbeDescriptor): void;\n  emit(view: IRpcProbeEventView): void;\n  onError?(error: unknown): void;\n}>;",
+          "declarationLine": 52,
           "source": "packages/rpc-core/dist/core/probe/types.d.ts",
           "purpose": "Definition-time options compile once; capture is opt-in and initially a subset of stages.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcProbeDefinition.",
@@ -90149,7 +90149,7 @@
           "aliasOf": "IRpcProbeDefinition",
           "exportPath": "./probe",
           "overloadSignatures": [
-            "export type IRpcProbeDefinition = Readonly<{ stages: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; methods?: readonly string[]; sample?: number; describe?(descriptor: IRpcProbeDescriptor): void; emit(view: IRpcProbeEventView): void; onError?(error: unknown): void; }>;"
+            "export type IRpcProbeDefinition = Readonly<{ stages: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; /** Filters method-bearing logical/envelope events; methodless variation controls remain visible. */ methods?: readonly string[]; sample?: number; describe?(descriptor: IRpcProbeDescriptor): void; emit(view: IRpcProbeEventView): void; onError?(error: unknown): void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -90188,7 +90188,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/core/probe/types.d.ts:IRpcProbeDefinition:export type IRpcProbeDefinition = Readonly<{ stages: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; methods?: readonly string[]; sample?: number; describe?(descriptor: IRpcProbeDescriptor): void; emit(view: IRpcProbeEventView): void; onError?(error: unknown): void; }>;",
+          "identity": "packages/rpc-core/dist/core/probe/types.d.ts:IRpcProbeDefinition:export type IRpcProbeDefinition = Readonly<{ stages: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; /** Filters method-bearing logical/envelope events; methodless variation controls remain visible. */ methods?: readonly string[]; sample?: number; describe?(descriptor: IRpcProbeDescriptor): void; emit(view: IRpcProbeEventView): void; onError?(error: unknown): void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -90198,7 +90198,7 @@
           "name": "IRpcProbeDescriptor",
           "kind": "type",
           "signature": "export type IRpcProbeDescriptor = Readonly<{\n  endpointId: string;\n  platform: string;\n  topology?: string;\n  encodedType?: string;\n  authentication: 'none' | 'sign' | 'encrypt-sign';\n  fastPath: boolean;\n  carrier: string | 'unavailable';\n  stageMask: number;\n}>;",
-          "declarationLine": 39,
+          "declarationLine": 41,
           "source": "packages/rpc-core/dist/core/probe/types.d.ts",
           "purpose": "Cold endpoint capabilities describe which stages can actually produce observations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcProbeDescriptor.",
@@ -90261,7 +90261,7 @@
         {
           "name": "IRpcProbeEventView",
           "kind": "type",
-          "signature": "export type IRpcProbeEventView = {\n  seq: number;\n  /** Inbound physical carrier sequence carried through this frame; -1 means no carrier link. */ carrierSeq: number;\n  at: number;\n  endpointId: string;\n  stage: number;\n  direction: number;\n  kind: number;\n  outcome: number;\n  messageId: string | undefined;\n  method: string | undefined;\n  senderId: string | undefined;\n  targetId: string | undefined;\n  receiverId: string | undefined;\n  peerId: string | undefined;\n  trace: string | undefined;\n  /** -1 means the observing layer cannot determine a byte size. */ sizeBytes: number;\n  /** -1 means this event is not a chunk. */ chunkIndex: number;\n  /** -1 means this event is not a chunk. */ chunkCount: number;\n  /** -1 means this event is not a batch. */ members: number;\n  /** -1 means this event does not represent settlement. */ durationMs: number;\n  rejection: string | undefined;\n  lifecycle: string | undefined;\n  error: unknown;\n  carrier: string | undefined;\n  detail: Readonly<Record<string, string | number | boolean>> | undefined;\n  /** Present only for captured stages, after the owning emitter applies redaction. */ content: unknown;\n};",
+          "signature": "export type IRpcProbeEventView = {\n  seq: number;\n  /** Inbound physical carrier sequence carried through this frame; -1 means no carrier link. */ carrierSeq: number;\n  at: number;\n  endpointId: string;\n  stage: number;\n  direction: number;\n  kind: number;\n  outcome: number;\n  messageId: string | undefined;\n  method: string | undefined;\n  /** Original variation route name on message/envelope observations; absent on other stages. */ variation:\n    | string\n    | undefined;\n  senderId: string | undefined;\n  targetId: string | undefined;\n  receiverId: string | undefined;\n  peerId: string | undefined;\n  trace: string | undefined;\n  /** -1 means the observing layer cannot determine a byte size. */ sizeBytes: number;\n  /** -1 means this event is not a chunk. */ chunkIndex: number;\n  /** -1 means this event is not a chunk. */ chunkCount: number;\n  /** -1 means this event is not a batch. */ members: number;\n  /** -1 means this event does not represent settlement. */ durationMs: number;\n  rejection: string | undefined;\n  lifecycle: string | undefined;\n  error: unknown;\n  carrier: string | undefined;\n  detail: Readonly<Record<string, string | number | boolean>> | undefined;\n  /** Present only for captured stages, after the owning emitter applies redaction. */ content: unknown;\n};",
           "declarationLine": 3,
           "source": "packages/rpc-core/dist/core/probe/types.d.ts",
           "purpose": "Fixed-shape mutable view reused by one emitter; valid only during its synchronous emit call.",
@@ -90279,7 +90279,7 @@
           "aliasOf": "IRpcProbeEventView",
           "exportPath": "./probe",
           "overloadSignatures": [
-            "export type IRpcProbeEventView = { seq: number; /** Inbound physical carrier sequence carried through this frame; -1 means no carrier link. */ carrierSeq: number; at: number; endpointId: string; stage: number; direction: number; kind: number; outcome: number; messageId: string | undefined; method: string | undefined; senderId: string | undefined; targetId: string | undefined; receiverId: string | undefined; peerId: string | undefined; trace: string | undefined; /** -1 means the observing layer cannot determine a byte size. */ sizeBytes: number; /** -1 means this event is not a chunk. */ chunkIndex: number; /** -1 means this event is not a chunk. */ chunkCount: number; /** -1 means this event is not a batch. */ members: number; /** -1 means this event does not represent settlement. */ durationMs: number; rejection: string | undefined; lifecycle: string | undefined; error: unknown; carrier: string | undefined; detail: Readonly<Record<string, string | number | boolean>> | undefined; /** Present only for captured stages, after the owning emitter applies redaction. */ content: unknown; };"
+            "export type IRpcProbeEventView = { seq: number; /** Inbound physical carrier sequence carried through this frame; -1 means no carrier link. */ carrierSeq: number; at: number; endpointId: string; stage: number; direction: number; kind: number; outcome: number; messageId: string | undefined; method: string | undefined; /** Original variation route name on message/envelope observations; absent on other stages. */ variation: string | undefined; senderId: string | undefined; targetId: string | undefined; receiverId: string | undefined; peerId: string | undefined; trace: string | undefined; /** -1 means the observing layer cannot determine a byte size. */ sizeBytes: number; /** -1 means this event is not a chunk. */ chunkIndex: number; /** -1 means this event is not a chunk. */ chunkCount: number; /** -1 means this event is not a batch. */ members: number; /** -1 means this event does not represent settlement. */ durationMs: number; rejection: string | undefined; lifecycle: string | undefined; error: unknown; carrier: string | undefined; detail: Readonly<Record<string, string | number | boolean>> | undefined; /** Present only for captured stages, after the owning emitter applies redaction. */ content: unknown; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -90318,7 +90318,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/core/probe/types.d.ts:IRpcProbeEventView:export type IRpcProbeEventView = { seq: number; /** Inbound physical carrier sequence carried through this frame; -1 means no carrier link. */ carrierSeq: number; at: number; endpointId: string; stage: number; direction: number; kind: number; outcome: number; messageId: string | undefined; method: string | undefined; senderId: string | undefined; targetId: string | undefined; receiverId: string | undefined; peerId: string | undefined; trace: string | undefined; /** -1 means the observing layer cannot determine a byte size. */ sizeBytes: number; /** -1 means this event is not a chunk. */ chunkIndex: number; /** -1 means this event is not a chunk. */ chunkCount: number; /** -1 means this event is not a batch. */ members: number; /** -1 means this event does not represent settlement. */ durationMs: number; rejection: string | undefined; lifecycle: string | undefined; error: unknown; carrier: string | undefined; detail: Readonly<Record<string, string | number | boolean>> | undefined; /** Present only for captured stages, after the owning emitter applies redaction. */ content: unknown; };",
+          "identity": "packages/rpc-core/dist/core/probe/types.d.ts:IRpcProbeEventView:export type IRpcProbeEventView = { seq: number; /** Inbound physical carrier sequence carried through this frame; -1 means no carrier link. */ carrierSeq: number; at: number; endpointId: string; stage: number; direction: number; kind: number; outcome: number; messageId: string | undefined; method: string | undefined; /** Original variation route name on message/envelope observations; absent on other stages. */ variation: string | undefined; senderId: string | undefined; targetId: string | undefined; receiverId: string | undefined; peerId: string | undefined; trace: string | undefined; /** -1 means the observing layer cannot determine a byte size. */ sizeBytes: number; /** -1 means this event is not a chunk. */ chunkIndex: number; /** -1 means this event is not a chunk. */ chunkCount: number; /** -1 means this event is not a batch. */ members: number; /** -1 means this event does not represent settlement. */ durationMs: number; rejection: string | undefined; lifecycle: string | undefined; error: unknown; carrier: string | undefined; detail: Readonly<Record<string, string | number | boolean>> | undefined; /** Present only for captured stages, after the owning emitter applies redaction. */ content: unknown; };",
           "guidance": [
             {
               "id": "13-2-view-生命周期与内容捕获",
@@ -90352,7 +90352,7 @@
               ]
             }
           ],
-          "usageScore": 22,
+          "usageScore": 26,
           "configuration": [],
           "fragment": "rpc-core-probe--IRpcProbeEventView"
         },
@@ -100552,9 +100552,10 @@
           "errors": ["No documented errors are declared for createRpcDevtools."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRpcDevtools.",
           "examples": [
-            "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport {\n  RpcProbeStage,\n  RpcProbeDirection,\n  RpcProbeKind,\n  RpcProbeOutcome,\n  type IRpcProbeEventView\n} from '@migaia/rpc-core/probe'\n\n/** 每个宿主一个 collector，主查询环保留最近事件。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 4 })\n/** 仅本例手填元数据；真实 emitter 在同步调用间复用同一 view。 */\nconst view: IRpcProbeEventView = {\n  seq: 0,\n  carrierSeq: -1,\n  at: 0,\n  endpointId: 'client',\n  stage: RpcProbeStage.message,\n  direction: RpcProbeDirection.outbound,\n  kind: RpcProbeKind.request,\n  outcome: RpcProbeOutcome.settled,\n  messageId: 'call-1',\n  method: 'math.double',\n  senderId: 'client',\n  targetId: 'server',\n  receiverId: undefined,\n  peerId: undefined,\n  trace: 'trace-1',\n  sizeBytes: -1,\n  chunkIndex: -1,\n  chunkCount: -1,\n  members: -1,\n  durationMs: 2,\n  rejection: undefined,\n  lifecycle: undefined,\n  error: undefined,\n  carrier: undefined,\n  detail: undefined,\n  content: undefined\n}\n/** 录制使用独立容量，停止时才物化离线事件。 */\nconst recording = devtools.record({ maxEvents: 8 })\ndevtools.emit(view)\nview.method = 'math.changed' // 已写入的顶层元数据不再读取 view。\nconsole.log(devtools.query({ methods: ['math.double'] }).events[0]?.method)\nconsole.log(devtools.stats().methods[0]?.calls) // 1\n/** next() 开始订阅，后续写入唤醒当前消费者。 */\nconst watcher = devtools.watch({ stages: ['message'] })\nconst next = watcher.next()\ndevtools.emit(view)\nconsole.log((await next).value?.events.length) // 1\nawait watcher.return(undefined)\ndevtools.pause()\ndevtools.emit(view) // 计入 ignoredWhilePaused。\ndevtools.resume()\nconsole.log(devtools.query().counters.ignoredWhilePaused) // 1\n/** Codec 边界把录制转成独立 NDJSON 表示。 */\nconst text = devtools.exportRecord(recording.stop())\nconsole.log(devtools.importRecord(text).events.length) // 2\ndevtools.clear()\nconsole.log(devtools.stats().methods.length) // 0\ndevtools.close()",
+            "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport { readProbeStages } from '@migaia/rpc-core/probe'\n\n/** 常规采集默认保留 message 与 peer。 */\nconst devtools = createRpcDevtools()\n/** 此独立诊断 collector 在构造时选择需要的物理阶段。 */\nconst diagnostic = createRpcDevtools({ stages: ['message', 'peer', 'frame', 'carrier'] })\n/** 原 collector 也可在运行时扩展物理订阅，内容捕获仍保持关闭。 */\ndevtools.setStages(['message', 'peer', 'encoded', 'carrier'])\nconsole.log(readProbeStages(devtools) !== 0) // true\ndiagnostic.close()\ndevtools.close()",
+            "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport {\n  RpcProbeStage,\n  RpcProbeDirection,\n  RpcProbeKind,\n  RpcProbeOutcome,\n  type IRpcProbeEventView\n} from '@migaia/rpc-core/probe'\n\n/** 每个宿主一个 collector，主查询环保留最近事件。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 4 })\n/** 仅本例手填元数据；真实 emitter 在同步调用间复用同一 view。 */\nconst view: IRpcProbeEventView = {\n  seq: 0,\n  carrierSeq: -1,\n  at: 0,\n  endpointId: 'client',\n  stage: RpcProbeStage.message,\n  direction: RpcProbeDirection.outbound,\n  kind: RpcProbeKind.request,\n  outcome: RpcProbeOutcome.settled,\n  messageId: 'call-1',\n  method: 'math.double',\n  variation: undefined,\n  senderId: 'client',\n  targetId: 'server',\n  receiverId: undefined,\n  peerId: undefined,\n  trace: 'trace-1',\n  sizeBytes: -1,\n  chunkIndex: -1,\n  chunkCount: -1,\n  members: -1,\n  durationMs: 2,\n  rejection: undefined,\n  lifecycle: undefined,\n  error: undefined,\n  carrier: undefined,\n  detail: undefined,\n  content: undefined\n}\n/** 录制使用独立容量，停止时才物化离线事件。 */\nconst recording = devtools.record({ maxEvents: 8 })\ndevtools.emit(view)\nview.method = 'math.changed' // 已写入的顶层元数据不再读取 view。\nconsole.log(devtools.query({ methods: ['math.double'] }).events[0]?.method)\nconsole.log(devtools.stats().methods[0]?.calls) // 1\n/** next() 开始订阅，后续写入唤醒当前消费者。 */\nconst watcher = devtools.watch({ stages: ['message'] })\nconst next = watcher.next()\ndevtools.emit(view)\nconsole.log((await next).value?.events.length) // 1\nawait watcher.return(undefined)\ndevtools.pause()\ndevtools.emit(view) // 计入 ignoredWhilePaused。\ndevtools.resume()\nconsole.log(devtools.query().counters.ignoredWhilePaused) // 1\n/** Codec 边界把录制转成独立 NDJSON 表示。 */\nconst text = devtools.exportRecord(recording.stop())\nconsole.log(devtools.importRecord(text).events.length) // 2\ndevtools.clear()\nconsole.log(devtools.stats().methods.length) // 0\ndevtools.close()",
             "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport type { IRpcDevtoolsServiceApi } from '@migaia/rpc-devtools/contract'\nimport { createPeerPair } from '@migaia/rpc-core/testing'\n\n/** Service 专用 Peer 不安装 collector 作为 probe，避免观察自己的查询流量。 */\nconst devtools = createRpcDevtools({ maxEvents: 32 })\n/** 这里的类型断言公开冻结的 service 契约，供 typed Peer 推断方法。 */\nconst pair = await createPeerPair({\n  a: { provide: {} },\n  b: { provide: { devtools: devtools.service as IRpcDevtoolsServiceApi } }\n})\ntry {\n  console.log((await pair.a.request('devtools.describe')).limits.maxEvents) // 32\n  console.log((await pair.a.request('devtools.query', { stages: ['message'] })).events.length)\n  await pair.a.request('devtools.record.start', { maxEvents: 8 })\n  console.log(devtools.importRecord(await pair.a.request('devtools.record.stop')).header.version)\n  await pair.a.request('devtools.pause')\n  await pair.a.request('devtools.resume')\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n  devtools.close()\n}",
-            "import { createRpcDevtools } from '@migaia/rpc-devtools'\n\n/** 默认只采集元数据；调用方拥有 collector 生命周期。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 1_000 })\n/** 独立录制环不受主查询环的淘汰影响。 */\nconst recording = devtools.record({ maxEvents: 100 })\ndevtools.pause()\nconsole.log(devtools.describe().paused) // true\ndevtools.resume()\nconsole.log(devtools.query().events.length, devtools.stats().methods.length) // 0 0\nconsole.log(devtools.importRecord(devtools.exportRecord(recording.stop())).header.version) // 1\ndevtools.close()"
+            "import { createRpcDevtools } from '@migaia/rpc-devtools'\n\n/** 默认订阅 message 与 peer，只采集元数据；调用方拥有 collector 生命周期。 */\nconst devtools = createRpcDevtools({ maxEvents: 1_000 })\n/** 需要物理载体诊断时，显式扩展当前订阅；内容捕获仍关闭。 */\ndevtools.setStages(['message', 'peer', 'carrier'])\n/** 独立录制环不受主查询环的淘汰影响。 */\nconst recording = devtools.record({ maxEvents: 100 })\ndevtools.pause()\nconsole.log(devtools.describe().paused) // true\ndevtools.resume()\nconsole.log(devtools.query().events.length, devtools.stats().methods.length) // 0 0\nconsole.log(devtools.importRecord(devtools.exportRecord(recording.stop())).header.version) // 1\ndevtools.close()"
           ],
           "members": [],
           "aliasOf": "createRpcDevtools",
@@ -100609,7 +100610,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-devtools/dist/collector/devtools.d.ts:createRpcDevtools:export declare function createRpcDevtools(options?: IRpcDevtoolsOptions): IRpcDevtools;",
           "guidance": [],
-          "usageScore": 46,
+          "usageScore": 64,
           "configuration": [],
           "fragment": "rpc-devtools-index--createRpcDevtools"
         },
@@ -100617,7 +100618,7 @@
           "name": "IRpcDevtools",
           "kind": "type",
           "signature": "export type IRpcDevtools = IRpcProbe &\n  Readonly<{\n    /** Collector-owned ingestion exists before host-form defineProbe attaches the compiled fields. */ emit(\n      view: IRpcProbeEventView,\n    ): void;\n    query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage;\n    watch(\n      input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>,\n    ): AsyncGenerator<IRpcDevtoolsWatchBatch>;\n    stats(): IRpcDevtoolsStats;\n    describe(): IRpcDevtoolsDescribe;\n    record(\n      options?: Readonly<{ maxEvents?: number }>,\n    ): Readonly<{ stop(): IRpcDevtoolsRecord }>;\n    exportRecord(record: IRpcDevtoolsRecord): string;\n    importRecord(text: string): IRpcDevtoolsRecord;\n    pause(): void;\n    resume(): void;\n    clear(): void;\n    close(): void;\n    readonly service: IRuntimePeerProvide;\n  }>;",
-          "declarationLine": 19,
+          "declarationLine": 21,
           "source": "packages/rpc-devtools/dist/collector-types.d.ts",
           "purpose": "A collector is directly installable as a probe; callers own its serving Peer and its lifetime.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtools.",
@@ -100680,7 +100681,7 @@
         {
           "name": "IRpcDevtoolsOptions",
           "kind": "type",
-          "signature": "export type IRpcDevtoolsOptions = Readonly<{\n  stages?: readonly IRpcProbeStageName[];\n  capture?: readonly IRpcProbeStageName[];\n  redact?(stage: RpcProbeStage, content: unknown): unknown;\n  methods?: readonly string[];\n  sample?: number;\n  maxEvents?: number;\n  maxContentBytes?: number;\n  maxInterned?: number;\n  exposeContent?: boolean;\n  onError?(error: unknown): void;\n}>;",
+          "signature": "export type IRpcDevtoolsOptions = Readonly<{\n  /** Defaults to message and peer; pass physical stages here or use setStages() to enable them. */ stages?: readonly IRpcProbeStageName[];\n  capture?: readonly IRpcProbeStageName[];\n  redact?(stage: RpcProbeStage, content: unknown): unknown;\n  methods?: readonly string[];\n  sample?: number;\n  maxEvents?: number;\n  maxContentBytes?: number;\n  /** Bounds the reader name table; ingestion retains raw string references without interning. */ maxInterned?: number;\n  exposeContent?: boolean;\n  onError?(error: unknown): void;\n}>;",
           "declarationLine": 6,
           "source": "packages/rpc-devtools/dist/collector-types.d.ts",
           "purpose": "Collector construction options are frozen now; defaults and ingestion belong to layer 2.",
@@ -100696,7 +100697,7 @@
           "aliasOf": "IRpcDevtoolsOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRpcDevtoolsOptions = Readonly<{ stages?: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; methods?: readonly string[]; sample?: number; maxEvents?: number; maxContentBytes?: number; maxInterned?: number; exposeContent?: boolean; onError?(error: unknown): void; }>;"
+            "export type IRpcDevtoolsOptions = Readonly<{ /** Defaults to message and peer; pass physical stages here or use setStages() to enable them. */ stages?: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; methods?: readonly string[]; sample?: number; maxEvents?: number; maxContentBytes?: number; /** Bounds the reader name table; ingestion retains raw string references without interning. */ maxInterned?: number; exposeContent?: boolean; onError?(error: unknown): void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -100735,7 +100736,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/collector-types.d.ts:IRpcDevtoolsOptions:export type IRpcDevtoolsOptions = Readonly<{ stages?: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; methods?: readonly string[]; sample?: number; maxEvents?: number; maxContentBytes?: number; maxInterned?: number; exposeContent?: boolean; onError?(error: unknown): void; }>;",
+          "identity": "packages/rpc-devtools/dist/collector-types.d.ts:IRpcDevtoolsOptions:export type IRpcDevtoolsOptions = Readonly<{ /** Defaults to message and peer; pass physical stages here or use setStages() to enable them. */ stages?: readonly IRpcProbeStageName[]; capture?: readonly IRpcProbeStageName[]; redact?(stage: RpcProbeStage, content: unknown): unknown; methods?: readonly string[]; sample?: number; maxEvents?: number; maxContentBytes?: number; /** Bounds the reader name table; ingestion retains raw string references without interning. */ maxInterned?: number; exposeContent?: boolean; onError?(error: unknown): void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -101659,7 +101660,7 @@
         {
           "name": "IRpcDevtoolsWireEvent",
           "kind": "type",
-          "signature": "export type IRpcDevtoolsWireEvent = Readonly<{\n  target?: string;\n  seq: number;\n  /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number;\n  at: number;\n  endpointId: string;\n  stage: string;\n  direction: string;\n  kind?: string;\n  outcome?: string;\n  messageId?: string;\n  method?: string;\n  senderId?: string;\n  targetId?: string;\n  receiverId?: string;\n  peerId?: string;\n  trace?: string;\n  sizeBytes?: number;\n  chunk?: Readonly<{ index: number; count: number }>;\n  members?: number;\n  durationMs?: number;\n  rejection?: string;\n  lifecycle?: string;\n  error?: IRpcWireError;\n  carrier?: string;\n  detail?: Readonly<Record<string, string | number | boolean>>;\n  content?: unknown;\n}>;",
+          "signature": "export type IRpcDevtoolsWireEvent = Readonly<{\n  target?: string;\n  seq: number;\n  /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number;\n  at: number;\n  endpointId: string;\n  stage: string;\n  direction: string;\n  kind?: string;\n  outcome?: string;\n  messageId?: string;\n  method?: string;\n  /** Original variation route name retained by message/envelope events and offline records. */ variation?: string;\n  senderId?: string;\n  targetId?: string;\n  receiverId?: string;\n  peerId?: string;\n  trace?: string;\n  sizeBytes?: number;\n  chunk?: Readonly<{ index: number; count: number }>;\n  members?: number;\n  durationMs?: number;\n  rejection?: string;\n  lifecycle?: string;\n  error?: IRpcWireError;\n  carrier?: string;\n  detail?: Readonly<Record<string, string | number | boolean>>;\n  content?: unknown;\n}>;",
           "declarationLine": 5,
           "source": "packages/rpc-devtools/dist/contract/wire.d.ts",
           "purpose": "String names appear only at query/export boundaries; the collector retains numeric columns.",
@@ -101674,7 +101675,7 @@
           "members": [],
           "exportPath": "./contract",
           "overloadSignatures": [
-            "export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;"
+            "export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; /** Original variation route name retained by message/envelope events and offline records. */ variation?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -101713,9 +101714,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/contract/wire.d.ts:IRpcDevtoolsWireEvent:export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;",
+          "identity": "packages/rpc-devtools/dist/contract/wire.d.ts:IRpcDevtoolsWireEvent:export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; /** Original variation route name retained by message/envelope events and offline records. */ variation?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 8,
           "configuration": [],
           "fragment": "rpc-devtools-contract--IRpcDevtoolsWireEvent"
         },
