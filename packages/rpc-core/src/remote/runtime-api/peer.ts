@@ -805,7 +805,9 @@ export async function createRuntimePeer(
     if (probe && (probe.mask & (1 << RpcProbeStage.peer)) !== 0) {
       probe.peer(RuntimeProbeLifecycle.handshake, channel.peerId, undefined)
       probe.peer(RuntimeProbeLifecycle.directory, channel.peerId, undefined)
-      probe.peer(RuntimeEventName.ready, channel.peerId, undefined)
+      // Managed generations publish readiness only after their canonical registration commits.
+      if (resources?.generation === undefined)
+        probe.peer(RuntimeEventName.ready, channel.peerId, undefined)
     }
     /** Both explicit and scoped cleanup retain the same original close Promise. */
     const close = (): Promise<void> => {

@@ -37,7 +37,7 @@ export function runtimeReadyEvent(
 ): IRuntimeEvent {
   /** The private connection reader admits only the original constructed Peer. */
   const accepted = readRuntimePeerConnection(peer)
-  /** Managed readiness forwards the existing owner fact to that generation's own emitter. */
+  /** Registration publishes this fact only after its actual current-generation pointer commits. */
   const probe = readInstalledProbe(accepted.channel.transport)
   if (probe && (probe.mask & (1 << RpcProbeStage.peer)) !== 0)
     probe.peer(RuntimeEventName.ready, accepted.peerId, undefined)
