@@ -59,3 +59,6 @@ export { createRuntimeMessageConnection } from '../runtime-adapter/message/conne
 /** Task capture and canonical assembly preserve genuine native source and Host ownership. */
 export { captureAdapterTask, assembleAdapterPlugin } from '../runtime-adapter/definition.js'
 export type { IAdapterTask, IAdapterTaskOptions } from '../runtime-adapter/definition-types.js'
+
+/** Shared physical metadata sizing avoids payload scans or duplicate carrier implementations. */
+export { carrierSizeBytes } from '../core/adapters/probe-content.js'

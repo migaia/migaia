@@ -6,7 +6,6 @@ import {
   type IRpcRuntimeEnvelope
 } from '@migaia/rpc-contract/runtime'
 import { RpcStreamEvent, type IRpcStreamPayload } from '@migaia/rpc-contract/stream'
-import { isArrayBuffer, utf8ByteLength } from '@migaia/utils/bytes'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { createRpcError, RpcCoreErrorCode, tagRpcError } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
@@ -577,22 +576,6 @@ class ProbeEmitter {
     this.#view.error = undefined
     this.#view.detail = undefined
   }
-}
-/** The cached detector keeps ASCII wire lengths exact without a JavaScript scalar-counting loop. */
-const nonAsciiString = /[\u0080-\uffff]/
-
-/**
- * Counts physical UTF-8 strings only for string transports. Clone-friendly string values have no
- * declared UTF-8 wire representation, so their size stays unknown instead of scanning a logical
- * payload repeatedly. Byte views and backings retain their exact already-available lengths.
- */
-export function probeSize(value: unknown, physicalUtf8String: boolean): number {
-  if (typeof value === 'string') {
-    if (!physicalUtf8String) return -1
-    return nonAsciiString.test(value) ? utf8ByteLength(value) : value.length
-  }
-  if (isArrayBuffer(value) || ArrayBuffer.isView(value)) return value.byteLength
-  return -1
 }
 /** Maps the existing legacy envelope grammar to the numeric observation vocabulary. */
 export function envelopeProbeKind(value: IRpcEnvelope): number {
