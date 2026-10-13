@@ -236,6 +236,11 @@ console.log((await exited).type) // exit
 - **目录就绪 ≠ 远端安装完成**：连接 ready 只说明方法目录已交换，不说明对端 Host 的某个插件安装事务已提交。需要等待远端安装完成时，用应用自己的确认信号。
 - **查询格式**：`list` / `get` / `describe` 默认返回对象；可选参数指定为文本格式输出。
 
+### Calls during install
+
+A local Feature method in `expose` is callable from the moment the peer can reach it; calls that arrive during install are held until the plugin commits, and are refused with `TARGET_UNKNOWN` if it does not.
+This guarantee covers local Feature `expose` entries only; forward and catalog entries are not covered.
+
 ## 4. Endpoint
 
 Endpoint 是更底层的 API：没有握手时的方法目录交换，调用按"目标 id + 方法名"路由。

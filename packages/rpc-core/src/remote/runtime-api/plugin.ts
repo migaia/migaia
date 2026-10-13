@@ -9,9 +9,9 @@ import {
   type IPluginRuntimeFeatureSnapshot
 } from '@migaia/plugin-host'
 import { defaultRpcId } from '../../core/internal/id.js'
-import { hostRethrowReporter } from '@migaia/utils/promise'
+import { deferred, hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
-import { RpcCoreErrorCode } from '../../core/index.js'
+import { RpcCoreErrorCode, type IRpcAbortSignal } from '../../core/index.js'
 import {
   createRuntimeOutlet,
   readRuntimeOutletConnection,
@@ -38,6 +38,8 @@ import {
   compileRuntimeMethods,
   runtimeModeForDeclaration,
   registerRuntimePluginMethods,
+  attachCommitGate,
+  type ICommitGate,
   type IRuntimeForwardMethodEntry,
   type IRuntimeMethodEntry
 } from './catalog.js'
@@ -47,6 +49,8 @@ import { readManagedRuntimeHolder } from './managed-peer.js'
 import { readRuntimeDefaultTimeout } from './timeout.js'
 import { createProviderAdmissionScope } from '../../core/features/provider.js'
 import { attachProviderPreflight } from '../../core/internal/provider.js'
+import { registerLocalErrorWireSummary } from '../../core/internal/error-wire-metadata.js'
+import { resolveAbortReason } from '../../core/internal/async-control.js'
 
 /** A private extension uses the original atomic shared-slot owner across both adapter families. */
 const providerAdmissionSlot = Symbol('runtime-provider-admission')
@@ -95,11 +99,66 @@ function closedCatalogMethod(): never {
   throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
 }
 
+/** The existing Host commit and lifecycle signal settle one shared local Feature admission gate. */
+function createCommitGate(lifecycle: IRpcAbortSignal): ICommitGate & { open(): void } {
+  /** Fulfilled failure data avoids an unobserved rejection when an install has no held calls. */
+  const completion = deferred<ReturnType<typeof createRpcError> | undefined>()
+  /** Only the original slot commit opens admission; later generations reuse the open gate. */
+  let open = false
+  /** Rollback retains the actual lifecycle reason rather than the separately thrown install error. */
+  const onAbort = (): void => {
+    /** The canonical wire owner preserves this infrastructure code and its lifecycle cause chain. */
+    const failure = createRpcError(
+      RpcCoreErrorCode.targetUnknown,
+      RuntimeApiErrorText.targetUnknown,
+      resolveAbortReason(lifecycle)
+    )
+    registerLocalErrorWireSummary(
+      failure,
+      RpcCoreErrorCode.targetUnknown,
+      RuntimeApiErrorText.targetUnknown,
+      { preserveSerializedError: true }
+    )
+    completion.resolve(failure)
+  }
+  if (lifecycle.aborted) onAbort()
+  else lifecycle.addEventListener('abort', onAbort, { once: true })
+  return {
+    isOpen: () => open,
+    /** Commit releases waiters before the original ready event is published. */
+    open(): void {
+      if (lifecycle.aborted) return
+      open = true
+      lifecycle.removeEventListener('abort', onAbort)
+      completion.resolve(undefined)
+    },
+    /** Each waiter owns only its invocation signal listener and preserves its exact abort reason. */
+    wait(signal): Promise<void> {
+      if (signal.aborted) return Promise.reject(resolveAbortReason(signal))
+      return new Promise<void>((resolve, reject) => {
+        /** Cancellation settles this call without affecting other held invocations. */
+        const cancel = (): void => {
+          signal.removeEventListener('abort', cancel)
+          reject(resolveAbortReason(signal))
+        }
+        signal.addEventListener('abort', cancel, { once: true })
+        completion.promise.then((failure) => {
+          signal.removeEventListener('abort', cancel)
+          if (signal.aborted) reject(resolveAbortReason(signal))
+          else if (failure) reject(failure)
+          else resolve()
+        })
+      })
+    }
+  }
+}
+
 /** A cold method whitelist resolves current Feature availability through its original Host owner. */
 function exposedMethod(
   readCurrent: () => object | undefined,
   key: string,
-  unavailable: () => never = unavailableExposedMethod
+  unavailable: () => never = unavailableExposedMethod,
+  gate?: ICommitGate
 ): IRuntimePeerMethod {
   /** Both whole-group admission and invocation consult the same live Host permission owner. */
   const current = () => {
@@ -115,16 +174,18 @@ function exposedMethod(
       unavailable()
     return { receiver: receiver!, method: descriptor.value }
   }
-  return attachProviderPreflight(
+  /** Invocation keeps the original guard; only preflight is delayed while the install is pending. */
+  const method: IRuntimePeerMethod = attachProviderPreflight(
     (payload, context) => {
       /** A lifecycle change after admission still obeys the original invocation-time guard. */
       const { receiver, method } = current()
       return Reflect.apply(method, receiver, [payload, context])
     },
     () => {
-      current()
+      if (!gate || gate.isOpen()) current()
     }
   )
+  return gate ? attachCommitGate(method, gate) : method
 }
 
 /** Compile only explicitly exposed real Feature methods, flattening away their local Feature name. */
@@ -133,7 +194,8 @@ function exposedProvide(
   read: (name: string) => IPluginRuntimeFeatureSnapshot,
   resolve: (name: string) => IRuntimePluginConnection | undefined,
   forwards: Map<string, IRuntimeForwardMethodEntry>,
-  nodeId: string
+  nodeId: string,
+  gate: ICommitGate
 ): IRuntimePeerProvide {
   /** One group per Plugin gives the stable plugin.method public namespace. */
   const provide: Record<string, IRuntimePeerProvide> = Object.create(null)
@@ -231,7 +293,7 @@ function exposedProvide(
           )
         found = true
         if (!Object.hasOwn(group, key))
-          group[key] = exposedMethod(() => snapshot.readCurrent(feature), key)
+          group[key] = exposedMethod(() => snapshot.readCurrent(feature), key, undefined, gate)
         owners.set(fullName, feature)
       }
     }
@@ -426,6 +488,8 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
               Object.hasOwn(control!.catalog, path.split('.')[0]!)
           )
         : []
+      /** One install gate is shared only by compiled local Feature methods, never catalog routes. */
+      const commitGate = createCommitGate(core.lifecycle.signal)
       /** Ordinary exposure keeps the same true Feature snapshots and forwarding authority. */
       const provide = exposedProvide(
         expose.filter(
@@ -434,7 +498,8 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
         (target) => integration.readFeatureOutputs(target),
         resolve,
         forwards,
-        integration.nodeId
+        integration.nodeId,
+        commitGate
       )
       /** The same compiled table holds dynamic catalog methods; no second provider is registered. */
       const catalogMethods = control
@@ -585,6 +650,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
       }
       publishReady = ready
       slot.register(record, () => {
+        commitGate.open()
         if (listenerSource) {
           for (const session of readRuntimePeerSessions(peer)!) ready(session)
         } else if (!registration || registration.events.current().active)
