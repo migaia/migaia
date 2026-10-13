@@ -237,6 +237,7 @@ class AdapterPeerPreparation {
     const options: IRuntimePeerOptions = {
       self: this.context.self,
       provide: this.#options.provide,
+      probe: this.#options.probe,
       providerLimits: this.#options.providerLimits,
       authentication: this.#options.authentication,
       defaultTimeoutMs: this.#options.defaultTimeoutMs,

@@ -3,6 +3,9 @@ import { runtimeQuery } from './overview.js'
 import { createAbortController, type IAbortSignal } from '@migaia/lifecycle'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
+import { createProbeEmitter } from '../../core/internal/probe-emitter.js'
+import { RpcProbeStage } from '../../core/probe/constants.js'
+import type { IRpcProbe } from '../../core/probe/types.js'
 import type {
   IRemoteBinding,
   IRemoteServeEndpoint,
@@ -104,6 +107,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
         {
           self: context.self,
           provide: preparation?.readProvide?.() ?? options.provide,
+          probe: options.probe,
           providerLimits: options.providerLimits,
           authentication: options.authentication,
           defaultTimeoutMs: options.defaultTimeoutMs,
@@ -144,6 +148,15 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
    * lifecycle.
    */
   const events = createRuntimeEventPublisher()
+  /** The managed facade outlives generation endpoints and observes its existing supervisor only. */
+  const supervisionProbe =
+    options.probe === undefined
+      ? undefined
+      : createProbeEmitter(
+          Array.isArray(options.probe) ? options.probe : [options.probe as IRpcProbe],
+          () => binding.scheduler.now(),
+          context.self.instanceId
+        )
   /** Initial readiness occurs before factory resolution; only later genuine readiness is observable. */
   const stopReady = registration.onReady((prepared, generation) => {
     events.publish(runtimeReadyEvent(context.self.name, prepared, generation), report)
@@ -152,7 +165,15 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   const stopNative = registration.supervisor.subscribe((event) => {
     /** One shared projection retains the same classification used by the committed Host outlet. */
     const observation = runtimeSupervisorEvent(context.self.name, registration, event, report)
-    if (observation) events.publish(observation, report)
+    if (observation) {
+      if (supervisionProbe && (supervisionProbe.mask & (1 << RpcProbeStage.peer)) !== 0)
+        supervisionProbe.peer(
+          observation.type,
+          typeof observation.instanceId === 'string' ? observation.instanceId : undefined,
+          'error' in event ? event.error : undefined
+        )
+      events.publish(observation, report)
+    }
   })
   /** A standalone Peer uses the original lifecycle signal domain without Host mutation metadata. */
   const signal: IAbortSignal = preparation?.initialSignal ?? createAbortController().signal
@@ -163,6 +184,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
     stopObserving?.()
     stopReady()
     stopNative()
+    supervisionProbe?.dispose()
     events.close()
     return holder.release()
   }
@@ -178,6 +200,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   } catch (primary) {
     stopReady()
     stopNative()
+    supervisionProbe?.dispose()
     events.close()
     try {
       await holder.release()
