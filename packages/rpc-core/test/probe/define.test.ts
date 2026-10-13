@@ -329,6 +329,7 @@ describe('probe contract A1', () => {
       outcome: 1,
       messageId: 'message',
       method: 'echo',
+      variation: undefined,
       senderId: 'left',
       targetId: 'right',
       receiverId: 'receiver',

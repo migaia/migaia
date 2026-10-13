@@ -16,6 +16,7 @@ export function snapshotProbeEvent(view: IRpcProbeEventView): Readonly<IRpcProbe
     outcome: view.outcome,
     messageId: view.messageId,
     method: view.method,
+    variation: view.variation,
     senderId: view.senderId,
     targetId: view.targetId,
     receiverId: view.receiverId,

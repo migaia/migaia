@@ -13,6 +13,8 @@ export type IRpcProbeEventView = {
   outcome: number
   messageId: string | undefined
   method: string | undefined
+  /** Original variation route name on message/envelope observations; absent on other stages. */
+  variation: string | undefined
   senderId: string | undefined
   targetId: string | undefined
   receiverId: string | undefined
@@ -54,6 +56,7 @@ export type IRpcProbeDefinition = Readonly<{
   stages: readonly IRpcProbeStageName[]
   capture?: readonly IRpcProbeStageName[]
   redact?(stage: RpcProbeStage, content: unknown): unknown
+  /** Filters method-bearing logical/envelope events; methodless variation controls remain visible. */
   methods?: readonly string[]
   sample?: number
   describe?(descriptor: IRpcProbeDescriptor): void

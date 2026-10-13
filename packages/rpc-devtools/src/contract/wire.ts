@@ -17,6 +17,8 @@ export type IRpcDevtoolsWireEvent = Readonly<{
   outcome?: string
   messageId?: string
   method?: string
+  /** Original variation route name retained by message/envelope events and offline records. */
+  variation?: string
   senderId?: string
   targetId?: string
   receiverId?: string

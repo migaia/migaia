@@ -1806,7 +1806,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         (this.#probe.captureMask & (1 << RpcProbeStage.envelope)) !== 0 ? envelope : undefined,
         route.route.senderId,
         route.route.trace,
-        physical.carrierSeq
+        physical.carrierSeq,
+        envelope.kind === RpcEnvelopeKind.variation ? envelope.data.route.variation : undefined
       )
     const pendingAdmission = this.inboundIdentity.admitPrepared(
       physical,
@@ -1836,7 +1837,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         route.route.trace,
         -1,
         undefined,
-        undefined
+        undefined,
+        envelope.kind === RpcEnvelopeKind.variation ? envelope.data.route.variation : undefined
       )
     try {
       this.kernel.assertActive(generation)

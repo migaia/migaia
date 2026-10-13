@@ -908,7 +908,12 @@ export class RpcOutboundSender {
               : entry.message.data.route.method,
             entries.length > 1 ? entries.length : -1,
             (p.captureMask & (1 << RpcProbeStage.envelope)) !== 0 ? entry.message : undefined,
-            entry.message.data.route.senderId
+            entry.message.data.route.senderId,
+            undefined,
+            -1,
+            entry.message.kind === RpcEnvelopeKind.variation
+              ? entry.message.data.route.variation
+              : undefined
           )
       if (p !== undefined && (p.mask & (1 << RpcProbeStage.encoded)) !== 0)
         p.encoded(
@@ -1099,7 +1104,10 @@ export class RpcOutboundSender {
         message.kind === RpcEnvelopeKind.request ? message.method : message.data.route.method,
         -1,
         (p.captureMask & (1 << RpcProbeStage.envelope)) !== 0 ? message : undefined,
-        message.data.route.senderId
+        message.data.route.senderId,
+        undefined,
+        -1,
+        message.kind === RpcEnvelopeKind.variation ? message.data.route.variation : undefined
       )
     /** The canonical codec keeps first-user portability and existing source/code/cause boundaries. */
     let encoded: unknown
@@ -1165,7 +1173,10 @@ export class RpcOutboundSender {
         message.kind === RpcEnvelopeKind.request ? message.method : message.data.route.method,
         -1,
         (p.captureMask & (1 << RpcProbeStage.envelope)) !== 0 ? message : undefined,
-        message.data.route.senderId
+        message.data.route.senderId,
+        undefined,
+        -1,
+        message.kind === RpcEnvelopeKind.variation ? message.data.route.variation : undefined
       )
     let encoded: unknown
     try {
@@ -1696,7 +1707,8 @@ export class RpcOutboundSender {
       message.data.route.trace,
       -1,
       undefined,
-      undefined
+      undefined,
+      message.kind === RpcEnvelopeKind.variation ? message.data.route.variation : undefined
     )
   }
 }
