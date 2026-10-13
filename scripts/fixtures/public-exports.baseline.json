@@ -725,6 +725,24 @@
         "safeRead",
         "safeString"
       ],
+      "./probe": [
+        "IpcReporterContext",
+        "RpcProbeDirection",
+        "RpcProbeDirectionName",
+        "RpcProbeKind",
+        "RpcProbeKindName",
+        "RpcProbeOutcome",
+        "RpcProbeOutcomeName",
+        "RpcProbeStage",
+        "RpcProbeStageName",
+        "defineProbe",
+        "hostRethrowReporter",
+        "probePlugin",
+        "readProbeStages",
+        "rpcProbeSampleKey",
+        "snapshotProbeEvent",
+        "subscribeProbeStages"
+      ],
       "./features/outbound": [
         "createOutboundFeature"
       ],
@@ -782,6 +800,7 @@
         "JsonRpcProfile",
         "assembleAdapterPlugin",
         "captureAdapterTask",
+        "carrierSizeBytes",
         "createAdapterBindingDrain",
         "createAdapterConfigurationError",
         "createAdapterConfigurationTypeError",
@@ -806,6 +825,27 @@
         "retainAdapterRuntimeFlags",
         "validateAdapterPeerMethods",
         "validateAdapterPeerTimeout"
+      ]
+    },
+    "@migaia/rpc-devtools": {
+      ".": [
+        "RPC_DEVTOOLS_SOURCE",
+        "RpcDevtoolsErrorCode",
+        "createRpcDevtools"
+      ],
+      "./contract": [
+        "RPC_DEVTOOLS_SOURCE",
+        "RpcDevtoolsErrorCode",
+        "RpcDevtoolsRecordFormat",
+        "decodeRpcDevtoolsRecord",
+        "encodeRpcDevtoolsRecord"
+      ],
+      "./hub": [
+        "RpcDevtoolsTargetStatus",
+        "createRpcDevtoolsHub"
+      ],
+      "./log": [
+        "createRpcLogProbe"
       ]
     },
     "@migaia/rpc-pool": {
