@@ -3,7 +3,8 @@
   "compilerOptions": {
     "rootDir": "src",
     "noEmit": true,
-    "lib": ["ES2024", "ESNext.Disposable"]
+    "lib": ["ES2024", "ESNext.Disposable"],
+    "types": ["node"]
   },
   "include": ["src"]
 }

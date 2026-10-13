@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "exceptions": [
+    {
+      "path": "packages/tray/test/hosts/fixtures/fixture-text.mjs",
+      "reason": "Shared diagnostics for directly Node-invoked host fixtures."
+    },
+    {
+      "path": "packages/tray/test/hosts/fixtures/hosts.mjs",
+      "reason": "Plain-JavaScript consumer of built Tray and PluginHost entries, shared by Node Worker and child process fixtures."
+    },
+    {
+      "path": "packages/tray/test/hosts/fixtures/thread-entry.mjs",
+      "reason": "Node Worker entry invoked directly without a TypeScript loader."
+    },
+    {
+      "path": "packages/tray/test/hosts/fixtures/process-entry.mjs",
+      "reason": "Node child process entry invoked directly without a TypeScript loader."
+    },
+    {
+      "path": "packages/tray/test/hosts/fixtures/worker-entry.mjs",
+      "reason": "Root A-total Node Worker entry invoked directly without a TypeScript loader."
+    },
+    {
+      "path": "packages/tray/test/hosts/fixtures/wiki-entry.mjs",
+      "reason": "Root A-total Node child process entry invoked directly without a TypeScript loader."
+    },
+    {
+      "path": "packages/tray/test/hosts/fixtures/faulty-entry.mjs",
+      "reason": "Node child entry proving init failure without a TypeScript loader."
+    },
+    {
+      "path": "packages/tray/test/hosts/fixtures/restart-failure-entry.mjs",
+      "reason": "Node child process entry proving a real background relaunch failure before bootstrap."
+    }
+  ]
+}
