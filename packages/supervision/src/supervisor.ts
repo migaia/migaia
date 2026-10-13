@@ -534,21 +534,29 @@ export function createSupervisor<
           Promise.resolve(options.ready(handle, request.signal)),
           cancelled,
           handle.exited.then(() => {
-            throw createSupervisionError(
-              Error,
-              SupervisionErrorCode.exitUnexpected,
-              SupervisionErrorText.exitUnexpected,
-              { detail: { kind: options.profile.kind } }
+            // onExit already classified this exact slot and retained its original task/native cause.
+            throw (
+              slot.failureError ??
+              createSupervisionError(
+                Error,
+                SupervisionErrorCode.exitUnexpected,
+                SupervisionErrorText.exitUnexpected,
+                { detail: { kind: options.profile.kind } }
+              )
             )
           })
         ])
       await Promise.resolve()
       if (slot.exitEmitted)
-        throw createSupervisionError(
-          Error,
-          SupervisionErrorCode.exitUnexpected,
-          SupervisionErrorText.exitUnexpected,
-          { detail: { kind: options.profile.kind } }
+        // Preserve the candidate's classified failure instead of losing its original cause at ready.
+        throw (
+          slot.failureError ??
+          createSupervisionError(
+            Error,
+            SupervisionErrorCode.exitUnexpected,
+            SupervisionErrorText.exitUnexpected,
+            { detail: { kind: options.profile.kind } }
+          )
         )
       if (!attempts.isCurrent(request.token)) throw request.signal.reason
       timer.cancel()

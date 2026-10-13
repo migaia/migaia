@@ -46,11 +46,16 @@ export {
 } from './serve-host.js'
 export {
   createCoroutinePlugin,
-  createCoroutineHost,
-  type IRemoteCoroutinePluginOptions,
-  type IRemoteCoroutineHostOptions,
-  type IRemoteCoroutineTaskContext
-} from './coroutine.js'
+  type ICoroutineParentOptions,
+  type ICoroutineChildOptions
+} from './runtime-api/coroutine-plugin.js'
+export type {
+  ICoroutineConnect,
+  ICoroutineTaskContext,
+  ICoroutineUserTask,
+  ICoroutineReplaceSpec
+} from './runtime-api/coroutine-task.js'
+export type { ICoroutineSupervisorPolicy } from './runtime-api/coroutine-binding.js'
 export type {
   IRemoteChannel,
   IRemoteBinding,
