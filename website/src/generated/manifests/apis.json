@@ -56118,7 +56118,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-browser/dist/browser/peer.d.ts:createBrowserPeer:export declare function createBrowserPeer<TRemote = never>(options: IRuntimeBrowserPeerOptions): Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>;\nexport declare function createBrowserPeer(options: IRuntimeBrowserPeerOptions): Promise<IRuntimePeer>;",
           "guidance": [],
-          "usageScore": 100,
+          "usageScore": 104,
           "configuration": [],
           "fragment": "rpc-browser-index--createBrowserPeer"
         },
@@ -100552,7 +100552,7 @@
           "errors": ["No documented errors are declared for createRpcDevtools."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRpcDevtools.",
           "examples": [
-            "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport {\n  RpcProbeStage,\n  RpcProbeDirection,\n  RpcProbeKind,\n  RpcProbeOutcome,\n  type IRpcProbeEventView\n} from '@migaia/rpc-core/probe'\n\n/** 每个宿主一个 collector，主查询环保留最近事件。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 4 })\n/** 仅本例手填元数据；真实 emitter 在同步调用间复用同一 view。 */\nconst view: IRpcProbeEventView = {\n  seq: 0,\n  at: 0,\n  endpointId: 'client',\n  stage: RpcProbeStage.message,\n  direction: RpcProbeDirection.outbound,\n  kind: RpcProbeKind.request,\n  outcome: RpcProbeOutcome.settled,\n  messageId: 'call-1',\n  method: 'math.double',\n  senderId: 'client',\n  targetId: 'server',\n  receiverId: undefined,\n  peerId: undefined,\n  trace: 'trace-1',\n  sizeBytes: -1,\n  chunkIndex: -1,\n  chunkCount: -1,\n  members: -1,\n  durationMs: 2,\n  rejection: undefined,\n  lifecycle: undefined,\n  error: undefined,\n  carrier: undefined,\n  detail: undefined,\n  content: undefined\n}\n/** 录制使用独立容量，停止时才物化离线事件。 */\nconst recording = devtools.record({ maxEvents: 8 })\ndevtools.emit(view)\nview.method = 'math.changed' // 已写入的顶层元数据不再读取 view。\nconsole.log(devtools.query({ methods: ['math.double'] }).events[0]?.method)\nconsole.log(devtools.stats().methods[0]?.calls) // 1\n/** next() 开始订阅，后续写入唤醒当前消费者。 */\nconst watcher = devtools.watch({ stages: ['message'] })\nconst next = watcher.next()\ndevtools.emit(view)\nconsole.log((await next).value?.events.length) // 1\nawait watcher.return(undefined)\ndevtools.pause()\ndevtools.emit(view) // 计入 ignoredWhilePaused。\ndevtools.resume()\nconsole.log(devtools.query().counters.ignoredWhilePaused) // 1\n/** Codec 边界把录制转成独立 NDJSON 表示。 */\nconst text = devtools.exportRecord(recording.stop())\nconsole.log(devtools.importRecord(text).events.length) // 2\ndevtools.clear()\nconsole.log(devtools.stats().methods.length) // 0\ndevtools.close()",
+            "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport {\n  RpcProbeStage,\n  RpcProbeDirection,\n  RpcProbeKind,\n  RpcProbeOutcome,\n  type IRpcProbeEventView\n} from '@migaia/rpc-core/probe'\n\n/** 每个宿主一个 collector，主查询环保留最近事件。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 4 })\n/** 仅本例手填元数据；真实 emitter 在同步调用间复用同一 view。 */\nconst view: IRpcProbeEventView = {\n  seq: 0,\n  carrierSeq: -1,\n  at: 0,\n  endpointId: 'client',\n  stage: RpcProbeStage.message,\n  direction: RpcProbeDirection.outbound,\n  kind: RpcProbeKind.request,\n  outcome: RpcProbeOutcome.settled,\n  messageId: 'call-1',\n  method: 'math.double',\n  senderId: 'client',\n  targetId: 'server',\n  receiverId: undefined,\n  peerId: undefined,\n  trace: 'trace-1',\n  sizeBytes: -1,\n  chunkIndex: -1,\n  chunkCount: -1,\n  members: -1,\n  durationMs: 2,\n  rejection: undefined,\n  lifecycle: undefined,\n  error: undefined,\n  carrier: undefined,\n  detail: undefined,\n  content: undefined\n}\n/** 录制使用独立容量，停止时才物化离线事件。 */\nconst recording = devtools.record({ maxEvents: 8 })\ndevtools.emit(view)\nview.method = 'math.changed' // 已写入的顶层元数据不再读取 view。\nconsole.log(devtools.query({ methods: ['math.double'] }).events[0]?.method)\nconsole.log(devtools.stats().methods[0]?.calls) // 1\n/** next() 开始订阅，后续写入唤醒当前消费者。 */\nconst watcher = devtools.watch({ stages: ['message'] })\nconst next = watcher.next()\ndevtools.emit(view)\nconsole.log((await next).value?.events.length) // 1\nawait watcher.return(undefined)\ndevtools.pause()\ndevtools.emit(view) // 计入 ignoredWhilePaused。\ndevtools.resume()\nconsole.log(devtools.query().counters.ignoredWhilePaused) // 1\n/** Codec 边界把录制转成独立 NDJSON 表示。 */\nconst text = devtools.exportRecord(recording.stop())\nconsole.log(devtools.importRecord(text).events.length) // 2\ndevtools.clear()\nconsole.log(devtools.stats().methods.length) // 0\ndevtools.close()",
             "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport type { IRpcDevtoolsServiceApi } from '@migaia/rpc-devtools/contract'\nimport { createPeerPair } from '@migaia/rpc-core/testing'\n\n/** Service 专用 Peer 不安装 collector 作为 probe，避免观察自己的查询流量。 */\nconst devtools = createRpcDevtools({ maxEvents: 32 })\n/** 这里的类型断言公开冻结的 service 契约，供 typed Peer 推断方法。 */\nconst pair = await createPeerPair({\n  a: { provide: {} },\n  b: { provide: { devtools: devtools.service as IRpcDevtoolsServiceApi } }\n})\ntry {\n  console.log((await pair.a.request('devtools.describe')).limits.maxEvents) // 32\n  console.log((await pair.a.request('devtools.query', { stages: ['message'] })).events.length)\n  await pair.a.request('devtools.record.start', { maxEvents: 8 })\n  console.log(devtools.importRecord(await pair.a.request('devtools.record.stop')).header.version)\n  await pair.a.request('devtools.pause')\n  await pair.a.request('devtools.resume')\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n  devtools.close()\n}",
             "import { createRpcDevtools } from '@migaia/rpc-devtools'\n\n/** 默认只采集元数据；调用方拥有 collector 生命周期。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 1_000 })\n/** 独立录制环不受主查询环的淘汰影响。 */\nconst recording = devtools.record({ maxEvents: 100 })\ndevtools.pause()\nconsole.log(devtools.describe().paused) // true\ndevtools.resume()\nconsole.log(devtools.query().events.length, devtools.stats().methods.length) // 0 0\nconsole.log(devtools.importRecord(devtools.exportRecord(recording.stop())).header.version) // 1\ndevtools.close()"
           ],
@@ -100764,9 +100764,9 @@
           "ownerFragment": "rpc-devtools-contract--RPC_DEVTOOLS_SOURCE"
         },
         {
-          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
+          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: \"SERVICE_RESULT_INVALID\"; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
           "name": "RpcDevtoolsErrorCode",
-          "signature": "export declare const RpcDevtoolsErrorCode: { /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
+          "signature": "export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: \"SERVICE_RESULT_INVALID\"; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
           "source": "packages/rpc-devtools/dist/error-code.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./contract",
@@ -100894,7 +100894,8 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for encodeRpcDevtoolsRecord.",
           "examples": [
             "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 0,\n      endpointId: 'client',\n      stage: 'message',\n      direction: 'outbound',\n      kind: 'request',\n      method: '读取',\n      content: new Uint8Array([1, 2, 3])\n    }\n  ]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
-            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1"
+            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1",
+            "import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'\nimport { RpcDevtoolsRecordFormat, encodeRpcDevtoolsRecord } from '@migaia/rpc-devtools/contract'\n\n/** 离线录制复用 contract codec，不依赖实时 collector。 */\nconst text = encodeRpcDevtoolsRecord({\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 100,\n      endpointId: 'parent',\n      stage: 'message',\n      direction: 'outbound',\n      senderId: 'parent',\n      messageId: 'm1',\n      method: 'read',\n      trace: 'T1'\n    }\n  ]\n})\n/** 每个 target 最多保留 50,000 个事件；关闭由调用方负责。 */\nconst hub = createRpcDevtoolsHub({ maxEvents: 50_000 })\ntry {\n  hub.importRecord('recording', text)\n  console.log(hub.status('recording')) // offline\n  console.log(hub.timeline({ trace: 'T1' })[0]?.alignedAt) // 100\n  console.log(hub.interactions('T1')[0]?.oneSided) // true\n} finally {\n  await hub.close()\n}"
           ],
           "members": [],
           "aliasOf": "encodeRpcDevtoolsRecord",
@@ -100949,7 +100950,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-devtools/dist/contract/record-codec.d.ts:encodeRpcDevtoolsRecord:export declare function encodeRpcDevtoolsRecord(record: IRpcDevtoolsRecord): string;",
           "guidance": [],
-          "usageScore": 28,
+          "usageScore": 38,
           "configuration": [],
           "fragment": "rpc-devtools-contract--encodeRpcDevtoolsRecord"
         },
@@ -100957,7 +100958,7 @@
           "name": "IRpcDevtoolsCounters",
           "kind": "type",
           "signature": "export type IRpcDevtoolsCounters = Readonly<{\n  evicted: number;\n  contentDropped: number;\n  droppedReentrant: number;\n  sampledOut: number;\n  ignoredWhilePaused: number;\n  ignoredAfterClose: number;\n  internOverflow: number;\n}>;",
-          "declarationLine": 13,
+          "declarationLine": 15,
           "source": "packages/rpc-devtools/dist/contract/service.d.ts",
           "purpose": "Loss counters explain bounded retention, interning and the collector's lifecycle decisions.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsCounters.",
@@ -101020,7 +101021,7 @@
           "name": "IRpcDevtoolsDescribe",
           "kind": "type",
           "signature": "export type IRpcDevtoolsDescribe = Readonly<{\n  version: string;\n  now: number;\n  paused: boolean;\n  descriptors: readonly IRpcProbeDescriptor[];\n  limits: Readonly<{ maxEvents: number; maxContentBytes: number }>;\n  counters: IRpcDevtoolsCounters;\n}>;",
-          "declarationLine": 50,
+          "declarationLine": 57,
           "source": "packages/rpc-devtools/dist/contract/service.d.ts",
           "purpose": "Describe supplies the target's current clock sample, active descriptors and retention limits.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsDescribe.",
@@ -101083,7 +101084,7 @@
           "name": "IRpcDevtoolsErrorCode",
           "kind": "type",
           "signature": "export type IRpcDevtoolsErrorCode =\n  (typeof RpcDevtoolsErrorCode)[keyof typeof RpcDevtoolsErrorCode];",
-          "declarationLine": 26,
+          "declarationLine": 31,
           "source": "packages/rpc-devtools/dist/error-code.d.ts",
           "purpose": "Semantic code union retains the registry's exact value spelling.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsErrorCode.",
@@ -101147,7 +101148,7 @@
           "name": "IRpcDevtoolsPage",
           "kind": "type",
           "signature": "export type IRpcDevtoolsPage = Readonly<{\n  events: readonly IRpcDevtoolsWireEvent[];\n  nextSeq: number;\n  counters: IRpcDevtoolsCounters;\n}>;",
-          "declarationLine": 23,
+          "declarationLine": 25,
           "source": "packages/rpc-devtools/dist/contract/service.d.ts",
           "purpose": "Pages carry the next sequence cursor and the loss counters observed with that snapshot.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsPage.",
@@ -101209,7 +101210,7 @@
         {
           "name": "IRpcDevtoolsQuery",
           "kind": "type",
-          "signature": "export type IRpcDevtoolsQuery = Readonly<{\n  afterSeq?: number;\n  limit?: number;\n  stages?: readonly string[];\n  methods?: readonly string[];\n  trace?: string;\n  endpointIds?: readonly string[];\n}>;",
+          "signature": "export type IRpcDevtoolsQuery = Readonly<{\n  afterSeq?: number;\n  limit?: number;\n  stages?: readonly string[];\n  /** Selects canonical outcome names before the numeric event scan or watch ingestion. */ outcomes?: readonly string[];\n  methods?: readonly string[];\n  trace?: string;\n  endpointIds?: readonly string[];\n}>;",
           "declarationLine": 4,
           "source": "packages/rpc-devtools/dist/contract/service.d.ts",
           "purpose": "Query limits are at most 1,000; filters are applied to one collector's retained sequence.",
@@ -101224,7 +101225,7 @@
           "members": [],
           "exportPath": "./contract",
           "overloadSignatures": [
-            "export type IRpcDevtoolsQuery = Readonly<{ afterSeq?: number; limit?: number; stages?: readonly string[]; methods?: readonly string[]; trace?: string; endpointIds?: readonly string[]; }>;"
+            "export type IRpcDevtoolsQuery = Readonly<{ afterSeq?: number; limit?: number; stages?: readonly string[]; /** Selects canonical outcome names before the numeric event scan or watch ingestion. */ outcomes?: readonly string[]; methods?: readonly string[]; trace?: string; endpointIds?: readonly string[]; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -101263,7 +101264,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsQuery:export type IRpcDevtoolsQuery = Readonly<{ afterSeq?: number; limit?: number; stages?: readonly string[]; methods?: readonly string[]; trace?: string; endpointIds?: readonly string[]; }>;",
+          "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsQuery:export type IRpcDevtoolsQuery = Readonly<{ afterSeq?: number; limit?: number; stages?: readonly string[]; /** Selects canonical outcome names before the numeric event scan or watch ingestion. */ outcomes?: readonly string[]; methods?: readonly string[]; trace?: string; endpointIds?: readonly string[]; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -101468,7 +101469,7 @@
           "name": "IRpcDevtoolsServiceApi",
           "kind": "type",
           "signature": "export type IRpcDevtoolsServiceApi = {\n  describe(): IRpcDevtoolsDescribe;\n  query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage;\n  watch(\n    input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>,\n  ): AsyncGenerator<IRpcDevtoolsWatchBatch>;\n  stats(): IRpcDevtoolsStats;\n  record: { start(input?: Readonly<{ maxEvents?: number }>): void; stop(): string };\n  clear(): void;\n  pause(): void;\n  resume(): void;\n};",
-          "declarationLine": 67,
+          "declarationLine": 74,
           "source": "packages/rpc-devtools/dist/contract/service.d.ts",
           "purpose": "Users attach this nested service object to their existing Peer; it owns no connection.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsServiceApi.",
@@ -101525,17 +101526,17 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsServiceApi:export type IRpcDevtoolsServiceApi = { describe(): IRpcDevtoolsDescribe; query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; stats(): IRpcDevtoolsStats; record: { start(input?: Readonly<{ maxEvents?: number; }>): void; stop(): string; }; clear(): void; pause(): void; resume(): void; };",
           "guidance": [],
-          "usageScore": 18,
+          "usageScore": 20,
           "configuration": [],
           "fragment": "rpc-devtools-contract--IRpcDevtoolsServiceApi"
         },
         {
           "name": "IRpcDevtoolsStats",
           "kind": "type",
-          "signature": "export type IRpcDevtoolsStats = Readonly<{\n  since: number;\n  methods: readonly Readonly<{\n    endpointId: string;\n    method: string;\n    calls: number;\n    failed: number;\n    rejected: number;\n    timedOut: number;\n    aborted: number;\n    latencyBucketsMs: readonly number[];\n    latencyCounts: readonly number[];\n    p50Ms: number;\n    p95Ms: number;\n    p99Ms: number;\n  }>[];\n}>;",
-          "declarationLine": 32,
+          "signature": "export type IRpcDevtoolsStats = Readonly<{\n  since: number;\n  methods: readonly Readonly<{\n    endpointId: string;\n    method: string;\n    calls: number;\n    failed: number;\n    rejected: number;\n    timedOut: number;\n    aborted: number;\n    latencyBucketsMs: readonly number[];\n    latencyCounts: readonly number[];\n    /** The final bucket has no upper bound; this value is its exclusive lower boundary. */ latencyOverflowFromMs?: number;\n    /** Observed maximum bounds interpolation honestly, including the open terminal bucket. */ latencyMaxMs?: number;\n    p50Ms: number;\n    p95Ms: number;\n    p99Ms: number;\n  }>[];\n}>;",
+          "declarationLine": 35,
           "source": "packages/rpc-devtools/dist/contract/service.d.ts",
-          "purpose": "Histograms use 24 boundaries, 0.0625 ms × 2^k for k=0…23. Percentiles interpolate within a bucket, with error bounded by its width; ring eviction does not reset these aggregates.",
+          "purpose": "Histograms use 24 boundaries, 0.0625 ms × 2^k for k=0…23. Percentiles interpolate within a bounded bucket. The terminal bucket is open above latencyOverflowFromMs; quantiles are clamped to latencyMaxMs. Ring eviction does not reset these aggregates.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsStats.",
           "advanced": "No additional advanced behavior is declared for IRpcDevtoolsStats.",
           "parameters": ["This type declaration has no parameters."],
@@ -101547,7 +101548,7 @@
           "members": [],
           "exportPath": "./contract",
           "overloadSignatures": [
-            "export type IRpcDevtoolsStats = Readonly<{ since: number; methods: readonly Readonly<{ endpointId: string; method: string; calls: number; failed: number; rejected: number; timedOut: number; aborted: number; latencyBucketsMs: readonly number[]; latencyCounts: readonly number[]; p50Ms: number; p95Ms: number; p99Ms: number; }>[]; }>;"
+            "export type IRpcDevtoolsStats = Readonly<{ since: number; methods: readonly Readonly<{ endpointId: string; method: string; calls: number; failed: number; rejected: number; timedOut: number; aborted: number; latencyBucketsMs: readonly number[]; latencyCounts: readonly number[]; /** The final bucket has no upper bound; this value is its exclusive lower boundary. */ latencyOverflowFromMs?: number; /** Observed maximum bounds interpolation honestly, including the open terminal bucket. */ latencyMaxMs?: number; p50Ms: number; p95Ms: number; p99Ms: number; }>[]; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -101557,7 +101558,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Histograms use 24 boundaries, 0.0625 ms × 2^k for k=0…23. Percentiles interpolate within a bucket, with error bounded by its width; ring eviction does not reset these aggregates."
+              "content": "Histograms use 24 boundaries, 0.0625 ms × 2^k for k=0…23. Percentiles interpolate within a bounded bucket. The terminal bucket is open above latencyOverflowFromMs; quantiles are clamped to latencyMaxMs. Ring eviction does not reset these aggregates."
             },
             {
               "id": "getting-started",
@@ -101586,7 +101587,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsStats:export type IRpcDevtoolsStats = Readonly<{ since: number; methods: readonly Readonly<{ endpointId: string; method: string; calls: number; failed: number; rejected: number; timedOut: number; aborted: number; latencyBucketsMs: readonly number[]; latencyCounts: readonly number[]; p50Ms: number; p95Ms: number; p99Ms: number; }>[]; }>;",
+          "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsStats:export type IRpcDevtoolsStats = Readonly<{ since: number; methods: readonly Readonly<{ endpointId: string; method: string; calls: number; failed: number; rejected: number; timedOut: number; aborted: number; latencyBucketsMs: readonly number[]; latencyCounts: readonly number[]; /** The final bucket has no upper bound; this value is its exclusive lower boundary. */ latencyOverflowFromMs?: number; /** Observed maximum bounds interpolation honestly, including the open terminal bucket. */ latencyMaxMs?: number; p50Ms: number; p95Ms: number; p99Ms: number; }>[]; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -101596,7 +101597,7 @@
           "name": "IRpcDevtoolsWatchBatch",
           "kind": "type",
           "signature": "export type IRpcDevtoolsWatchBatch = Readonly<{\n  events: readonly IRpcDevtoolsWireEvent[];\n  dropped: number;\n}>;",
-          "declarationLine": 62,
+          "declarationLine": 69,
           "source": "packages/rpc-devtools/dist/contract/service.d.ts",
           "purpose": "Watch batches account for loss while the consumer was slower than the collector.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsWatchBatch.",
@@ -101658,7 +101659,7 @@
         {
           "name": "IRpcDevtoolsWireEvent",
           "kind": "type",
-          "signature": "export type IRpcDevtoolsWireEvent = Readonly<{\n  target?: string;\n  seq: number;\n  at: number;\n  endpointId: string;\n  stage: string;\n  direction: string;\n  kind?: string;\n  outcome?: string;\n  messageId?: string;\n  method?: string;\n  senderId?: string;\n  targetId?: string;\n  receiverId?: string;\n  peerId?: string;\n  trace?: string;\n  sizeBytes?: number;\n  chunk?: Readonly<{ index: number; count: number }>;\n  members?: number;\n  durationMs?: number;\n  rejection?: string;\n  lifecycle?: string;\n  error?: IRpcWireError;\n  carrier?: string;\n  detail?: Readonly<Record<string, string | number | boolean>>;\n  content?: unknown;\n}>;",
+          "signature": "export type IRpcDevtoolsWireEvent = Readonly<{\n  target?: string;\n  seq: number;\n  /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number;\n  at: number;\n  endpointId: string;\n  stage: string;\n  direction: string;\n  kind?: string;\n  outcome?: string;\n  messageId?: string;\n  method?: string;\n  senderId?: string;\n  targetId?: string;\n  receiverId?: string;\n  peerId?: string;\n  trace?: string;\n  sizeBytes?: number;\n  chunk?: Readonly<{ index: number; count: number }>;\n  members?: number;\n  durationMs?: number;\n  rejection?: string;\n  lifecycle?: string;\n  error?: IRpcWireError;\n  carrier?: string;\n  detail?: Readonly<Record<string, string | number | boolean>>;\n  content?: unknown;\n}>;",
           "declarationLine": 5,
           "source": "packages/rpc-devtools/dist/contract/wire.d.ts",
           "purpose": "String names appear only at query/export boundaries; the collector retains numeric columns.",
@@ -101673,7 +101674,7 @@
           "members": [],
           "exportPath": "./contract",
           "overloadSignatures": [
-            "export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;"
+            "export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -101712,7 +101713,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/contract/wire.d.ts:IRpcDevtoolsWireEvent:export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;",
+          "identity": "packages/rpc-devtools/dist/contract/wire.d.ts:IRpcDevtoolsWireEvent:export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -101845,7 +101846,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE` 与 `TARGET_UNKNOWN`。Collector 配置和生命周期错误已实现；hub 相关运行时错误仍由 hub 实现提供。"
+                  "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE`、`TARGET_UNKNOWN` 与 `SERVICE_RESULT_INVALID`。Collector 与 hub 的配置和生命周期错误已实现；hub client 的运行时错误按原身份报告，不被 target 状态值替换。"
                 }
               ]
             }
@@ -101857,7 +101858,7 @@
         {
           "name": "RpcDevtoolsErrorCode",
           "kind": "const",
-          "signature": "export declare const RpcDevtoolsErrorCode: {\n  /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: 'INVALID_OPTION';\n  /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: 'CLOSED';\n  /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: 'RECORD_ACTIVE';\n  /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: 'RECORD_NOT_ACTIVE';\n  /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID';\n  /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: 'REDACT_FAILED';\n  /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: 'TARGET_DUPLICATE';\n  /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: 'TARGET_UNKNOWN';\n};",
+          "signature": "export declare const RpcDevtoolsErrorCode: {\n  /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID';\n  /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: 'INVALID_OPTION';\n  /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: 'CLOSED';\n  /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: 'RECORD_ACTIVE';\n  /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: 'RECORD_NOT_ACTIVE';\n  /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID';\n  /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: 'REDACT_FAILED';\n  /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: 'TARGET_DUPLICATE';\n  /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: 'TARGET_UNKNOWN';\n};",
           "declarationLine": 4,
           "source": "packages/rpc-devtools/dist/error-code.d.ts",
           "purpose": "Public code owner for contract R5/S5 and the collector/hub lifecycle clauses.",
@@ -101873,7 +101874,7 @@
           "aliasOf": "RpcDevtoolsErrorCode",
           "exportPath": "./contract",
           "overloadSignatures": [
-            "export declare const RpcDevtoolsErrorCode: { /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };"
+            "export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: \"SERVICE_RESULT_INVALID\"; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -101912,7 +101913,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
+          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: \"SERVICE_RESULT_INVALID\"; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
           "guidance": [
             {
               "id": "4-错误身份",
@@ -101920,7 +101921,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE` 与 `TARGET_UNKNOWN`。Collector 配置和生命周期错误已实现；hub 相关运行时错误仍由 hub 实现提供。"
+                  "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE`、`TARGET_UNKNOWN` 与 `SERVICE_RESULT_INVALID`。Collector 与 hub 的配置和生命周期错误已实现；hub client 的运行时错误按原身份报告，不被 target 状态值替换。"
                 }
               ]
             }
@@ -101945,7 +101946,8 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcDevtoolsRecordFormat.",
           "examples": [
             "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 0,\n      endpointId: 'client',\n      stage: 'message',\n      direction: 'outbound',\n      kind: 'request',\n      method: '读取',\n      content: new Uint8Array([1, 2, 3])\n    }\n  ]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
-            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1"
+            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1",
+            "import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'\nimport { RpcDevtoolsRecordFormat, encodeRpcDevtoolsRecord } from '@migaia/rpc-devtools/contract'\n\n/** 离线录制复用 contract codec，不依赖实时 collector。 */\nconst text = encodeRpcDevtoolsRecord({\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 100,\n      endpointId: 'parent',\n      stage: 'message',\n      direction: 'outbound',\n      senderId: 'parent',\n      messageId: 'm1',\n      method: 'read',\n      trace: 'T1'\n    }\n  ]\n})\n/** 每个 target 最多保留 50,000 个事件；关闭由调用方负责。 */\nconst hub = createRpcDevtoolsHub({ maxEvents: 50_000 })\ntry {\n  hub.importRecord('recording', text)\n  console.log(hub.status('recording')) // offline\n  console.log(hub.timeline({ trace: 'T1' })[0]?.alignedAt) // 100\n  console.log(hub.interactions('T1')[0]?.oneSided) // true\n} finally {\n  await hub.close()\n}"
           ],
           "members": [],
           "aliasOf": "RpcDevtoolsRecordFormat",
@@ -101992,7 +101994,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-devtools/dist/contract/record.d.ts:RpcDevtoolsRecordFormat:export declare const RpcDevtoolsRecordFormat: Readonly<{ readonly format: \"migaia-rpc-devtools\"; readonly version: 1; }>;",
           "guidance": [],
-          "usageScore": 30,
+          "usageScore": 40,
           "configuration": [],
           "fragment": "rpc-devtools-contract--RpcDevtoolsRecordFormat"
         }
@@ -102018,16 +102020,16 @@
         {
           "name": "createRpcDevtoolsHub",
           "kind": "function",
-          "signature": "export declare function createRpcDevtoolsHub(\n  _options?: IRpcDevtoolsHubOptions,\n): IRpcDevtoolsHub;",
-          "declarationLine": 3,
+          "signature": "export declare function createRpcDevtoolsHub(\n  options?: IRpcDevtoolsHubOptions,\n): IRpcDevtoolsHub;",
+          "declarationLine": 6,
           "source": "packages/rpc-devtools/dist/hub/index.d.ts",
-          "purpose": "Layer-1 placeholder: target aggregation becomes available when layer 2 replaces this body.",
+          "purpose": "Aggregate existing service clients and offline records without acquiring transports or Peers. Target registration owns alignment/watch resources; returned queries reuse retained references.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRpcDevtoolsHub.",
           "advanced": "No additional advanced behavior is declared for createRpcDevtoolsHub.",
-          "parameters": ["_options: IRpcDevtoolsHubOptions (optional)"],
+          "parameters": ["options: IRpcDevtoolsHubOptions (optional)"],
           "parameterDetails": [
             {
-              "name": "_options",
+              "name": "options",
               "type": "IRpcDevtoolsHubOptions",
               "optional": true
             }
@@ -102035,16 +102037,19 @@
           "returns": "IRpcDevtoolsHub",
           "errors": ["No documented errors are declared for createRpcDevtoolsHub."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRpcDevtoolsHub.",
-          "examples": [],
+          "examples": [
+            "import { createRpcDevtoolsHub, type IRpcDevtoolsTargetClient } from '@migaia/rpc-devtools/hub'\n\n/** 聚合调用方已经建立的两个 devtools service client。 */\nexport async function inspectHosts(\n  parentClient: IRpcDevtoolsTargetClient,\n  workerClient: IRpcDevtoolsTargetClient\n) {\n  /** onError 接收原始运行时失败；hub 不创建这些连接。 */\n  const hub = createRpcDevtoolsHub({\n    maxEvents: 50_000,\n    realignMs: 30_000,\n    onError: (error) => console.error(error)\n  })\n  /** 订阅函数返回解除监听的函数。 */\n  const unsubscribe = hub.on('status', (name, status) => console.log(name, status))\n  try {\n    await hub.addTarget('parent', parentClient)\n    await hub.addTarget('worker', workerClient)\n    console.log(hub.timeline({ trace: 'T1', limit: 100 }))\n    console.log(hub.interactions('T1'))\n    console.log(await hub.stats())\n    await hub.removeTarget('worker')\n  } finally {\n    unsubscribe()\n    await hub.close()\n  }\n}",
+            "import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'\nimport { RpcDevtoolsRecordFormat, encodeRpcDevtoolsRecord } from '@migaia/rpc-devtools/contract'\n\n/** 离线录制复用 contract codec，不依赖实时 collector。 */\nconst text = encodeRpcDevtoolsRecord({\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 100,\n      endpointId: 'parent',\n      stage: 'message',\n      direction: 'outbound',\n      senderId: 'parent',\n      messageId: 'm1',\n      method: 'read',\n      trace: 'T1'\n    }\n  ]\n})\n/** 每个 target 最多保留 50,000 个事件；关闭由调用方负责。 */\nconst hub = createRpcDevtoolsHub({ maxEvents: 50_000 })\ntry {\n  hub.importRecord('recording', text)\n  console.log(hub.status('recording')) // offline\n  console.log(hub.timeline({ trace: 'T1' })[0]?.alignedAt) // 100\n  console.log(hub.interactions('T1')[0]?.oneSided) // true\n} finally {\n  await hub.close()\n}"
+          ],
           "members": [],
           "exportPath": "./hub",
           "overloadSignatures": [
-            "export declare function createRpcDevtoolsHub(_options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub;"
+            "export declare function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub;"
           ],
           "overloadParameterDetails": [
             [
               {
-                "name": "_options",
+                "name": "options",
                 "type": "IRpcDevtoolsHubOptions",
                 "optional": true
               }
@@ -102057,7 +102062,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Layer-1 placeholder: target aggregation becomes available when layer 2 replaces this body."
+              "content": "Aggregate existing service clients and offline records without acquiring transports or Peers. Target registration owns alignment/watch resources; returned queries reuse retained references."
             },
             {
               "id": "getting-started",
@@ -102086,9 +102091,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/hub/index.d.ts:createRpcDevtoolsHub:export declare function createRpcDevtoolsHub(_options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub;",
+          "identity": "packages/rpc-devtools/dist/hub/index.d.ts:createRpcDevtoolsHub:export declare function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub;",
           "guidance": [],
-          "usageScore": 10,
+          "usageScore": 30,
           "configuration": [],
           "fragment": "rpc-devtools-hub--createRpcDevtoolsHub"
         },
@@ -102151,7 +102156,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-devtools/dist/hub/types.d.ts:IRpcDevtoolsHub:export type IRpcDevtoolsHub = Readonly<{ addTarget(name: string, client: IRpcDevtoolsTargetClient): Promise<void>; removeTarget(name: string): Promise<void>; importRecord(name: string, text: string): void; status(name?: string): RpcDevtoolsTargetStatus | ReadonlyMap<string, RpcDevtoolsTargetStatus>; timeline(query?: IRpcDevtoolsTimelineQuery): readonly IRpcDevtoolsTimelineEvent[]; interactions(trace?: string): readonly IRpcDevtoolsInteraction[]; stats(name?: string): Promise<IRpcDevtoolsStats>; on(event: 'status', listener: (name: string, status: RpcDevtoolsTargetStatus) => void): () => void; on(event: 'event', listener: (event: IRpcDevtoolsTimelineEvent) => void): () => void; close(): Promise<void>; }>;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-devtools-hub--IRpcDevtoolsHub"
         },
@@ -102295,7 +102300,9 @@
           "returns": "No explicit return annotation is declared for this type.",
           "errors": ["No documented errors are declared for IRpcDevtoolsTargetClient."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsTargetClient.",
-          "examples": [],
+          "examples": [
+            "import { createRpcDevtoolsHub, type IRpcDevtoolsTargetClient } from '@migaia/rpc-devtools/hub'\n\n/** 聚合调用方已经建立的两个 devtools service client。 */\nexport async function inspectHosts(\n  parentClient: IRpcDevtoolsTargetClient,\n  workerClient: IRpcDevtoolsTargetClient\n) {\n  /** onError 接收原始运行时失败；hub 不创建这些连接。 */\n  const hub = createRpcDevtoolsHub({\n    maxEvents: 50_000,\n    realignMs: 30_000,\n    onError: (error) => console.error(error)\n  })\n  /** 订阅函数返回解除监听的函数。 */\n  const unsubscribe = hub.on('status', (name, status) => console.log(name, status))\n  try {\n    await hub.addTarget('parent', parentClient)\n    await hub.addTarget('worker', workerClient)\n    console.log(hub.timeline({ trace: 'T1', limit: 100 }))\n    console.log(hub.interactions('T1'))\n    console.log(await hub.stats())\n    await hub.removeTarget('worker')\n  } finally {\n    unsubscribe()\n    await hub.close()\n  }\n}"
+          ],
           "members": [],
           "exportPath": "./hub",
           "overloadSignatures": [
@@ -102340,7 +102347,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-devtools/dist/hub/types.d.ts:IRpcDevtoolsTargetClient:export type IRpcDevtoolsTargetClient = Readonly<{ request(method: string, payload?: unknown): Promise<unknown>; stream(method: string, payload?: unknown): AsyncIterable<unknown>; }>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 22,
           "configuration": [],
           "fragment": "rpc-devtools-hub--IRpcDevtoolsTargetClient"
         },
@@ -102530,7 +102537,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-devtools/dist/hub/types.d.ts:RpcDevtoolsTargetStatus:export declare const RpcDevtoolsTargetStatus: { readonly connecting: \"connecting\"; readonly connected: \"connected\"; readonly disconnected: \"disconnected\"; readonly offline: \"offline\"; readonly removed: \"removed\"; };\nexport type RpcDevtoolsTargetStatus = keyof typeof RpcDevtoolsTargetStatus;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-devtools-hub--RpcDevtoolsTargetStatus"
         }
@@ -102646,7 +102653,7 @@
         {
           "name": "IRpcLogProbeOptions",
           "kind": "type",
-          "signature": "export type IRpcLogProbeOptions = Readonly<{\n  slowMs?: number;\n  sample?: number;\n  methods?: readonly string[];\n  stages?: readonly ('message' | 'peer')[];\n  /** Opts subscribed stages into capture; emit receives already-redacted caller-owned content. */ content?: boolean;\n  levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>;\n  /** Called synchronously for qualifying events; the reusable view must never be retained. */ message?(\n    view: IRpcProbeEventView,\n  ): string;\n  /** Receives logger or formatting failures without changing the business flow. */ onError?(\n    error: unknown,\n  ): void;\n}>;",
+          "signature": "export type IRpcLogProbeOptions = Readonly<{\n  slowMs?: number;\n  sample?: number;\n  methods?: readonly string[];\n  stages?: readonly ('message' | 'peer')[];\n  /** Opts subscribed stages into capture; emit receives already-redacted caller-owned content. */ content?: boolean;\n  /** Explicit subscribed stages whose captured content may be passed to the logger. */ capture?: IRpcProbeDefinition['capture'];\n  /** Redacts captured content at the canonical emitter before logger fields are constructed. */ redact?: IRpcProbeDefinition['redact'];\n  levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>;\n  /** Called synchronously for qualifying events; the reusable view must never be retained. */ message?(\n    view: IRpcProbeEventView,\n  ): string;\n  /** Receives logger or formatting failures without changing the business flow. */ onError?(\n    error: unknown,\n  ): void;\n}>;",
           "declarationLine": 11,
           "source": "packages/rpc-devtools/dist/log/types.d.ts",
           "purpose": "Logging policy compiles once; the owning emitter applies source sampling and method filters.",
@@ -102662,7 +102669,7 @@
           "aliasOf": "IRpcLogProbeOptions",
           "exportPath": "./log",
           "overloadSignatures": [
-            "export type IRpcLogProbeOptions = Readonly<{ slowMs?: number; sample?: number; methods?: readonly string[]; stages?: readonly ('message' | 'peer')[]; /** Opts subscribed stages into capture; emit receives already-redacted caller-owned content. */ content?: boolean; levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>; /** Called synchronously for qualifying events; the reusable view must never be retained. */ message?(view: IRpcProbeEventView): string; /** Receives logger or formatting failures without changing the business flow. */ onError?(error: unknown): void; }>;"
+            "export type IRpcLogProbeOptions = Readonly<{ slowMs?: number; sample?: number; methods?: readonly string[]; stages?: readonly ('message' | 'peer')[]; /** Opts subscribed stages into capture; emit receives already-redacted caller-owned content. */ content?: boolean; /** Explicit subscribed stages whose captured content may be passed to the logger. */ capture?: IRpcProbeDefinition['capture']; /** Redacts captured content at the canonical emitter before logger fields are constructed. */ redact?: IRpcProbeDefinition['redact']; levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>; /** Called synchronously for qualifying events; the reusable view must never be retained. */ message?(view: IRpcProbeEventView): string; /** Receives logger or formatting failures without changing the business flow. */ onError?(error: unknown): void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -102701,7 +102708,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/log/types.d.ts:IRpcLogProbeOptions:export type IRpcLogProbeOptions = Readonly<{ slowMs?: number; sample?: number; methods?: readonly string[]; stages?: readonly ('message' | 'peer')[]; /** Opts subscribed stages into capture; emit receives already-redacted caller-owned content. */ content?: boolean; levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>; /** Called synchronously for qualifying events; the reusable view must never be retained. */ message?(view: IRpcProbeEventView): string; /** Receives logger or formatting failures without changing the business flow. */ onError?(error: unknown): void; }>;",
+          "identity": "packages/rpc-devtools/dist/log/types.d.ts:IRpcLogProbeOptions:export type IRpcLogProbeOptions = Readonly<{ slowMs?: number; sample?: number; methods?: readonly string[]; stages?: readonly ('message' | 'peer')[]; /** Opts subscribed stages into capture; emit receives already-redacted caller-owned content. */ content?: boolean; /** Explicit subscribed stages whose captured content may be passed to the logger. */ capture?: IRpcProbeDefinition['capture']; /** Redacts captured content at the canonical emitter before logger fields are constructed. */ redact?: IRpcProbeDefinition['redact']; levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>; /** Called synchronously for qualifying events; the reusable view must never be retained. */ message?(view: IRpcProbeEventView): string; /** Receives logger or formatting failures without changing the business flow. */ onError?(error: unknown): void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -104580,8 +104587,39 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/rpc-process/dist/process/handshake.d.ts:createProcessTransport:export declare function createProcessTransport(channel: IProcessByteChannel, options: IProcessByteOptions): Promise<IRuntimePeerSourceResult>;\nexport declare function createProcessTransport(channel: IProcessMessageChannel, options: IProcessMessageOptions): Promise<IRemoteChannel>;",
-          "guidance": [],
-          "usageScore": 58,
+          "guidance": [
+            {
+              "id": "错误",
+              "heading": "错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Process carrier 观察尚未实现：`createProcessTransport(.).transport.observe` 当前不存在。计划中的字节事件包含 `detail.frameBytes`（含 4 字节长度前缀的完整物理帧字节数）与 `detail.drainMs`（物理写入发生回压后等待 drain 的毫秒数），内容捕获仅在 `probe.capturing` 为 true 时启用，并保留原字节引用。Node/Bun/Deno stdio 与 socket 的帧编码、解码和 transport 由 Core 的统一字节通道持有；当前接口未暴露帧观察与真实回压等待。Electron utility process 实际使用 whole-message 通道，仍需确定其 detail 语义。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "完成这些接口前，不应将逻辑 send 耗时当作 `drainMs`，也不能声称 Process carrier 已支持观察。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "所有错误都带 `(source, code)`，按这两个字段判断，不要依赖 `message` 文本："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "本包错误：`source === '@migaia/rpc/process'`，`code` 取自 `RpcProcessErrorCode`，例如 `PROCESS_CHANNEL_AUTH_REJECTED`、`PROCESS_HANDSHAKE_TIMEOUT`。",
+                    "调用层错误来自 `@migaia/rpc/core`，例如超时 `DEADLINE_EXCEEDED`（`TimeoutError`）、取消 `CANCELLED`（`AbortError`）、过载 `OVERLOADED`。",
+                    "对端业务函数抛出的错误会还原原生类型、`message` 和 `stack`，例如子进程抛 `RangeError('bad input')`，父端收到的也是 `RangeError`。"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "超时、断线或\"结果未知\"都不代表对端没有执行。重试非幂等操作前请先对账，详见 USEGUIDE 第 8 节。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 60,
           "configuration": [],
           "fragment": "rpc-process-index--createProcessTransport"
         },
@@ -107531,7 +107569,7 @@
           "name": "IRuntimeEvent",
           "kind": "type",
           "signature": "export type IRuntimeEvent = Readonly<{\n  type: RuntimeEventName;\n  name: string;\n  instanceId: string | IRuntimeUnavailable;\n  generation: number | IRuntimeUnavailable;\n  timestamp: number | IRuntimeUnavailable;\n  clock: string;\n  reason?: string;\n  code?: number | IRuntimeUnavailable;\n  signal?: string | IRuntimeUnavailable;\n  error?: Readonly<{ source?: string; code?: string }>;\n  count?: number;\n  degraded?: readonly string[];\n}>;",
-          "declarationLine": 12,
+          "declarationLine": 19,
           "source": "packages/rpc-core/dist/remote/runtime-api/events.d.ts",
           "purpose": "Lifecycle facts contain only the original identity, time and explicitly safe native fields.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeEvent.",
@@ -109406,6 +109444,14 @@
               "blocks": [
                 {
                   "type": "paragraph",
+                  "text": "Process carrier 观察尚未实现：`createProcessTransport(.).transport.observe` 当前不存在。计划中的字节事件包含 `detail.frameBytes`（含 4 字节长度前缀的完整物理帧字节数）与 `detail.drainMs`（物理写入发生回压后等待 drain 的毫秒数），内容捕获仅在 `probe.capturing` 为 true 时启用，并保留原字节引用。Node/Bun/Deno stdio 与 socket 的帧编码、解码和 transport 由 Core 的统一字节通道持有；当前接口未暴露帧观察与真实回压等待。Electron utility process 实际使用 whole-message 通道，仍需确定其 detail 语义。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "完成这些接口前，不应将逻辑 send 耗时当作 `drainMs`，也不能声称 Process carrier 已支持观察。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "所有错误都带 `(source, code)`，按这两个字段判断，不要依赖 `message` 文本："
                 },
                 {
@@ -110278,7 +110324,7 @@
         {
           "name": "createAdapterChildStdio",
           "kind": "function",
-          "signature": "export declare function createAdapterChildStdio(\n  child: IAdapterChildStdio,\n): Readonly<{\n  kind: 'byte';\n  write(chunk: Uint8Array): Promise<void>;\n  onData(listener: (chunk: Uint8Array) => void): () => void;\n  onClose(listener: (reason?: unknown) => void): () => void;\n  close(): void | Promise<void>;\n}>;",
+          "signature": "export declare function createAdapterChildStdio(\n  child: IAdapterChildStdio,\n): Readonly<{\n  kind: 'byte';\n  write(chunk: Uint8Array): Promise<void>;\n  onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void;\n  onData(listener: (chunk: Uint8Array) => void): () => void;\n  onClose(listener: (reason?: unknown) => void): () => void;\n  close(): void | Promise<void>;\n}>;",
           "declarationLine": 13,
           "source": "packages/rpc-process/dist/process/node-io.d.ts",
           "purpose": "Construct the original child pipe channel; Core observes its held resources directly.",
@@ -110292,7 +110338,7 @@
               "optional": false
             }
           ],
-          "returns": "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
+          "returns": "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
           "errors": ["No documented errors are declared for createAdapterChildStdio."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createAdapterChildStdio.",
           "examples": [],
@@ -110300,7 +110346,7 @@
           "aliasOf": "createAdapterChildStdio",
           "exportPath": "./adapters/node-child-process",
           "overloadSignatures": [
-            "export declare function createAdapterChildStdio(child: IAdapterChildStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
+            "export declare function createAdapterChildStdio(child: IAdapterChildStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
           ],
           "overloadParameterDetails": [
             [
@@ -110312,7 +110358,7 @@
             ]
           ],
           "overloadReturns": [
-            "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
+            "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
           ],
           "whenToUse": "Use createAdapterChildStdio when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createAdapterChildStdio does not match the required inputs or return contract.",
@@ -110349,7 +110395,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterChildStdio:export declare function createAdapterChildStdio(child: IAdapterChildStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterChildStdio:export declare function createAdapterChildStdio(child: IAdapterChildStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -110359,7 +110405,7 @@
           "name": "createAdapterNodeProcessLaunch",
           "kind": "function",
           "signature": "export declare function createAdapterNodeProcessLaunch(\n  spec: IProcessSpec,\n  context: IAdapterProcessLaunchContext,\n  options?: IAdapterProcessLaunchOptions,\n): NodeAdapterProcessLaunch;",
-          "declarationLine": 17,
+          "declarationLine": 18,
           "source": "packages/rpc-process/dist/process/node-launch.d.ts",
           "purpose": "Prepare one actual supervised launch before its native spawn or secret write.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createAdapterNodeProcessLaunch.",
@@ -110460,8 +110506,8 @@
         {
           "name": "createAdapterProcessStdio",
           "kind": "function",
-          "signature": "export declare function createAdapterProcessStdio(\n  io: IAdapterProcessStdio,\n): Readonly<{\n  kind: 'byte';\n  write(chunk: Uint8Array): Promise<void>;\n  onData(listener: (chunk: Uint8Array) => void): () => void;\n  onClose(listener: (reason?: unknown) => void): () => void;\n  close(): void | Promise<void>;\n}>;",
-          "declarationLine": 21,
+          "signature": "export declare function createAdapterProcessStdio(\n  io: IAdapterProcessStdio,\n): Readonly<{\n  kind: 'byte';\n  write(chunk: Uint8Array): Promise<void>;\n  onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void;\n  onData(listener: (chunk: Uint8Array) => void): () => void;\n  onClose(listener: (reason?: unknown) => void): () => void;\n  close(): void | Promise<void>;\n}>;",
+          "declarationLine": 22,
           "source": "packages/rpc-process/dist/process/node-io.d.ts",
           "purpose": "Construct current stdio without replacing native pause/end behavior.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createAdapterProcessStdio.",
@@ -110474,7 +110520,7 @@
               "optional": false
             }
           ],
-          "returns": "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
+          "returns": "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
           "errors": ["No documented errors are declared for createAdapterProcessStdio."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createAdapterProcessStdio.",
           "examples": [],
@@ -110482,7 +110528,7 @@
           "aliasOf": "createAdapterProcessStdio",
           "exportPath": "./adapters/node-child-process",
           "overloadSignatures": [
-            "export declare function createAdapterProcessStdio(io: IAdapterProcessStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
+            "export declare function createAdapterProcessStdio(io: IAdapterProcessStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
           ],
           "overloadParameterDetails": [
             [
@@ -110494,7 +110540,7 @@
             ]
           ],
           "overloadReturns": [
-            "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
+            "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
           ],
           "whenToUse": "Use createAdapterProcessStdio when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createAdapterProcessStdio does not match the required inputs or return contract.",
@@ -110531,7 +110577,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterProcessStdio:export declare function createAdapterProcessStdio(io: IAdapterProcessStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterProcessStdio:export declare function createAdapterProcessStdio(io: IAdapterProcessStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -110914,8 +110960,8 @@
         {
           "name": "createAdapterSocketByteIO",
           "kind": "function",
-          "signature": "export declare function createAdapterSocketByteIO(\n  socket: Duplex,\n): Readonly<{\n  kind: 'byte';\n  write(chunk: Uint8Array): Promise<void>;\n  onData(listener: (chunk: Uint8Array) => void): () => void;\n  onClose(listener: (reason?: unknown) => void): () => void;\n  close(): void | Promise<void>;\n}>;",
-          "declarationLine": 29,
+          "signature": "export declare function createAdapterSocketByteIO(\n  socket: Duplex,\n): Readonly<{\n  kind: 'byte';\n  write(chunk: Uint8Array): Promise<void>;\n  onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void;\n  onData(listener: (chunk: Uint8Array) => void): () => void;\n  onClose(listener: (reason?: unknown) => void): () => void;\n  close(): void | Promise<void>;\n}>;",
+          "declarationLine": 31,
           "source": "packages/rpc-process/dist/process/node-io.d.ts",
           "purpose": "A held shared duplex remains the original borrowed-socket replay class.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createAdapterSocketByteIO.",
@@ -110928,7 +110974,7 @@
               "optional": false
             }
           ],
-          "returns": "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
+          "returns": "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
           "errors": ["No documented errors are declared for createAdapterSocketByteIO."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createAdapterSocketByteIO.",
           "examples": [
@@ -110938,7 +110984,7 @@
           "aliasOf": "createAdapterSocketByteIO",
           "exportPath": "./adapters/node-socket",
           "overloadSignatures": [
-            "export declare function createAdapterSocketByteIO(socket: Duplex): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
+            "export declare function createAdapterSocketByteIO(socket: Duplex): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
           ],
           "overloadParameterDetails": [
             [
@@ -110950,7 +110996,7 @@
             ]
           ],
           "overloadReturns": [
-            "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
+            "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
           ],
           "whenToUse": "Use createAdapterSocketByteIO when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createAdapterSocketByteIO does not match the required inputs or return contract.",
@@ -110987,7 +111033,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterSocketByteIO:export declare function createAdapterSocketByteIO(socket: Duplex): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterSocketByteIO:export declare function createAdapterSocketByteIO(socket: Duplex): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],
@@ -112517,7 +112563,7 @@
           "name": "IRuntimeEvent",
           "kind": "type",
           "signature": "export type IRuntimeEvent = Readonly<{\n  type: RuntimeEventName;\n  name: string;\n  instanceId: string | IRuntimeUnavailable;\n  generation: number | IRuntimeUnavailable;\n  timestamp: number | IRuntimeUnavailable;\n  clock: string;\n  reason?: string;\n  code?: number | IRuntimeUnavailable;\n  signal?: string | IRuntimeUnavailable;\n  error?: Readonly<{ source?: string; code?: string }>;\n  count?: number;\n  degraded?: readonly string[];\n}>;",
-          "declarationLine": 12,
+          "declarationLine": 19,
           "source": "packages/rpc-core/dist/remote/runtime-api/events.d.ts",
           "purpose": "Lifecycle facts contain only the original identity, time and explicitly safe native fields.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeEvent.",

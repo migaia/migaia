@@ -12242,6 +12242,46 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/docs/rpc-core/transport-kit/releaseListenerRegistration",
+      "to": "/en/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-core",
+      "to": "/en/docs/rpc-core/transport-kit/releaseListenerRegistration",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-core/transport-kit/reportListenerFailure",
+      "to": "/en/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-core",
+      "to": "/en/docs/rpc-core/transport-kit/reportListenerFailure",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-core/transport-kit/safeRead",
+      "to": "/en/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-core",
+      "to": "/en/docs/rpc-core/transport-kit/safeRead",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-core/transport-kit/safeString",
+      "to": "/en/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-core",
+      "to": "/en/docs/rpc-core/transport-kit/safeString",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/docs/rpc-devtools",
       "to": "/en/guides/rpc-devtools",
       "type": "domain-peer"
@@ -12572,46 +12612,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-devtools/log",
-      "to": "/en/guides/rpc-devtools",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-devtools",
-      "to": "/en/docs/rpc-devtools/log",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-devtools/log/createRpcLogProbe",
-      "to": "/en/guides/rpc-devtools",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-devtools",
-      "to": "/en/docs/rpc-devtools/log/createRpcLogProbe",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-devtools/log/IRpcLogProbeOptions",
-      "to": "/en/guides/rpc-devtools",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-devtools",
-      "to": "/en/docs/rpc-devtools/log/IRpcLogProbeOptions",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-devtools/log/IRpcLogSink",
-      "to": "/en/guides/rpc-devtools",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-devtools",
-      "to": "/en/docs/rpc-devtools/log/IRpcLogSink",
-      "type": "domain-peer"
-    },
-    {
       "from": "/en/docs/rpc-pool",
       "to": "/en/guides/rpc-pool",
       "type": "domain-peer"
@@ -12749,6 +12749,46 @@
     {
       "from": "/en/guides/rpc-pool",
       "to": "/en/docs/rpc-pool/RpcPoolState",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log",
+      "to": "/en/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-devtools",
+      "to": "/en/docs/rpc-devtools/log",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log/createRpcLogProbe",
+      "to": "/en/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-devtools",
+      "to": "/en/docs/rpc-devtools/log/createRpcLogProbe",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log/IRpcLogProbeOptions",
+      "to": "/en/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-devtools",
+      "to": "/en/docs/rpc-devtools/log/IRpcLogProbeOptions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-devtools/log/IRpcLogSink",
+      "to": "/en/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-devtools",
+      "to": "/en/docs/rpc-devtools/log/IRpcLogSink",
       "type": "domain-peer"
     },
     {
@@ -14539,46 +14579,6 @@
     {
       "from": "/en/guides/rpc-threads",
       "to": "/en/docs/rpc-threads/adapters/electron-renderer/createElectronRendererThreadChannelFactory",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/electron-renderer/createElectronRendererThreadLauncher",
-      "to": "/en/guides/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-threads",
-      "to": "/en/docs/rpc-threads/adapters/electron-renderer/createElectronRendererThreadLauncher",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/node",
-      "to": "/en/guides/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-threads",
-      "to": "/en/docs/rpc-threads/adapters/node",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/node/createNodeThreadChannelFactory",
-      "to": "/en/guides/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-threads",
-      "to": "/en/docs/rpc-threads/adapters/node/createNodeThreadChannelFactory",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/node/createNodeThreadLauncher",
-      "to": "/en/guides/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-threads",
-      "to": "/en/docs/rpc-threads/adapters/node/createNodeThreadLauncher",
       "type": "domain-peer"
     },
     {
@@ -24872,6 +24872,66 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/docs/rpc-threads/adapters/electron-renderer/createElectronRendererThreadLauncher",
+      "to": "/en/guides/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-threads",
+      "to": "/en/docs/rpc-threads/adapters/electron-renderer/createElectronRendererThreadLauncher",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-threads/adapters/node",
+      "to": "/en/guides/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-threads",
+      "to": "/en/docs/rpc-threads/adapters/node",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-threads/adapters/node/createNodeThreadChannelFactory",
+      "to": "/en/guides/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-threads",
+      "to": "/en/docs/rpc-threads/adapters/node/createNodeThreadChannelFactory",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-threads/adapters/node/createNodeThreadLauncher",
+      "to": "/en/guides/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-threads",
+      "to": "/en/docs/rpc-threads/adapters/node/createNodeThreadLauncher",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-contract",
+      "to": "/en/docs/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-contract",
+      "to": "/en/guides/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-contract/getting-started",
+      "to": "/en/docs/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-contract",
+      "to": "/en/guides/rpc-contract/getting-started",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/guides/rpc-bridge-jsonrpc",
       "to": "/en/docs/rpc-bridge-jsonrpc",
       "type": "domain-peer"
@@ -24909,66 +24969,6 @@
     {
       "from": "/en/docs/rpc-browser",
       "to": "/en/guides/rpc-browser/getting-started",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-contract",
-      "to": "/en/docs/rpc-contract",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-contract",
-      "to": "/en/guides/rpc-contract",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-contract/getting-started",
-      "to": "/en/docs/rpc-contract",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-contract",
-      "to": "/en/guides/rpc-contract/getting-started",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-core/transport-kit/releaseListenerRegistration",
-      "to": "/en/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-core",
-      "to": "/en/docs/rpc-core/transport-kit/releaseListenerRegistration",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-core/transport-kit/reportListenerFailure",
-      "to": "/en/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-core",
-      "to": "/en/docs/rpc-core/transport-kit/reportListenerFailure",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-core/transport-kit/safeRead",
-      "to": "/en/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-core",
-      "to": "/en/docs/rpc-core/transport-kit/safeRead",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-core/transport-kit/safeString",
-      "to": "/en/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-core",
-      "to": "/en/docs/rpc-core/transport-kit/safeString",
       "type": "domain-peer"
     },
     {
@@ -25032,23 +25032,23 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/guides/rpc-devtools",
-      "to": "/en/docs/rpc-devtools",
+      "from": "/en/guides/rpc-core/transports-and-security",
+      "to": "/en/docs/rpc-core",
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-devtools",
-      "to": "/en/guides/rpc-devtools",
+      "from": "/en/docs/rpc-core",
+      "to": "/en/guides/rpc-core/transports-and-security",
       "type": "domain-peer"
     },
     {
-      "from": "/en/guides/rpc-devtools/getting-started",
-      "to": "/en/docs/rpc-devtools",
+      "from": "/en/guides/rpc-core/discovery-and-control",
+      "to": "/en/docs/rpc-core",
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-devtools",
-      "to": "/en/guides/rpc-devtools/getting-started",
+      "from": "/en/docs/rpc-core",
+      "to": "/en/guides/rpc-core/discovery-and-control",
       "type": "domain-peer"
     },
     {
@@ -25072,43 +25072,43 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/guides/rpc-process",
-      "to": "/en/docs/rpc-process",
+      "from": "/en/guides/rpc-core/chunking-and-backpressure",
+      "to": "/en/docs/rpc-core",
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-process",
-      "to": "/en/guides/rpc-process",
+      "from": "/en/docs/rpc-core",
+      "to": "/en/guides/rpc-core/chunking-and-backpressure",
       "type": "domain-peer"
     },
     {
-      "from": "/en/guides/rpc-process/getting-started",
-      "to": "/en/docs/rpc-process",
+      "from": "/en/guides/rpc-core/replay-retry-and-lifecycle",
+      "to": "/en/docs/rpc-core",
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-process",
-      "to": "/en/guides/rpc-process/getting-started",
+      "from": "/en/docs/rpc-core",
+      "to": "/en/guides/rpc-core/replay-retry-and-lifecycle",
       "type": "domain-peer"
     },
     {
-      "from": "/en/guides/rpc-threads",
-      "to": "/en/docs/rpc-threads",
+      "from": "/en/guides/rpc-devtools",
+      "to": "/en/docs/rpc-devtools",
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-threads",
-      "to": "/en/guides/rpc-threads",
+      "from": "/en/docs/rpc-devtools",
+      "to": "/en/guides/rpc-devtools",
       "type": "domain-peer"
     },
     {
-      "from": "/en/guides/rpc-threads/getting-started",
-      "to": "/en/docs/rpc-threads",
+      "from": "/en/guides/rpc-devtools/getting-started",
+      "to": "/en/docs/rpc-devtools",
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-threads",
-      "to": "/en/guides/rpc-threads/getting-started",
+      "from": "/en/docs/rpc-devtools",
+      "to": "/en/guides/rpc-devtools/getting-started",
       "type": "domain-peer"
     },
     {
@@ -26682,6 +26682,66 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/guides/rpc-process",
+      "to": "/en/docs/rpc-process",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-process",
+      "to": "/en/guides/rpc-process",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-process/getting-started",
+      "to": "/en/docs/rpc-process",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-process",
+      "to": "/en/guides/rpc-process/getting-started",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/architecture/rpc-contract",
+      "to": "/en/docs/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-contract",
+      "to": "/en/architecture/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-threads",
+      "to": "/en/docs/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-threads",
+      "to": "/en/guides/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-threads/getting-started",
+      "to": "/en/docs/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-threads",
+      "to": "/en/guides/rpc-threads/getting-started",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/architecture/rpc-pool",
+      "to": "/en/docs/rpc-pool",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-pool",
+      "to": "/en/architecture/rpc-pool",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/architecture/rpc-bridge-jsonrpc",
       "to": "/en/docs/rpc-bridge-jsonrpc",
       "type": "domain-peer"
@@ -26699,66 +26759,6 @@
     {
       "from": "/en/docs/rpc-browser",
       "to": "/en/architecture/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/architecture/rpc-contract",
-      "to": "/en/docs/rpc-contract",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-contract",
-      "to": "/en/architecture/rpc-contract",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-core/transports-and-security",
-      "to": "/en/docs/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-core",
-      "to": "/en/guides/rpc-core/transports-and-security",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/architecture/rpc-devtools",
-      "to": "/en/docs/rpc-devtools",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-devtools",
-      "to": "/en/architecture/rpc-devtools",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/architecture/rpc-pool",
-      "to": "/en/docs/rpc-pool",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-pool",
-      "to": "/en/architecture/rpc-pool",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/architecture/rpc-process",
-      "to": "/en/docs/rpc-process",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-process",
-      "to": "/en/architecture/rpc-process",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/architecture/rpc-threads",
-      "to": "/en/docs/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/rpc-threads",
-      "to": "/en/architecture/rpc-threads",
       "type": "domain-peer"
     },
     {
@@ -32552,6 +32552,46 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/architecture/rpc-core",
+      "to": "/en/docs/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-core",
+      "to": "/en/architecture/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/architecture/rpc-devtools",
+      "to": "/en/docs/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-devtools",
+      "to": "/en/architecture/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/architecture/rpc-process",
+      "to": "/en/docs/rpc-process",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-process",
+      "to": "/en/architecture/rpc-process",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/architecture/rpc-threads",
+      "to": "/en/docs/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-threads",
+      "to": "/en/architecture/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
       "from": "/zh/docs/rpc-bridge-jsonrpc",
       "to": "/zh/guides/rpc-bridge-jsonrpc",
       "type": "domain-peer"
@@ -32949,46 +32989,6 @@
     {
       "from": "/zh/guides/rpc-browser",
       "to": "/zh/docs/rpc-browser/adapters/window",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window/createWindowMessageTransport",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/window/createWindowMessageTransport",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window/IWindowMessageReceiver",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/window/IWindowMessageReceiver",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTarget",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTarget",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTransportOptions",
-      "to": "/zh/guides/rpc-browser",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTransportOptions",
       "type": "domain-peer"
     },
     {
@@ -35292,43 +35292,43 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/guides/rpc-core/discovery-and-control",
-      "to": "/en/docs/rpc-core",
+      "from": "/zh/docs/rpc-browser/adapters/window/createWindowMessageTransport",
+      "to": "/zh/guides/rpc-browser",
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-core",
-      "to": "/en/guides/rpc-core/discovery-and-control",
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/window/createWindowMessageTransport",
       "type": "domain-peer"
     },
     {
-      "from": "/en/guides/rpc-core/chunking-and-backpressure",
-      "to": "/en/docs/rpc-core",
+      "from": "/zh/docs/rpc-browser/adapters/window/IWindowMessageReceiver",
+      "to": "/zh/guides/rpc-browser",
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-core",
-      "to": "/en/guides/rpc-core/chunking-and-backpressure",
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/window/IWindowMessageReceiver",
       "type": "domain-peer"
     },
     {
-      "from": "/en/guides/rpc-core/replay-retry-and-lifecycle",
-      "to": "/en/docs/rpc-core",
+      "from": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTarget",
+      "to": "/zh/guides/rpc-browser",
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-core",
-      "to": "/en/guides/rpc-core/replay-retry-and-lifecycle",
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTarget",
       "type": "domain-peer"
     },
     {
-      "from": "/en/architecture/rpc-core",
-      "to": "/en/docs/rpc-core",
+      "from": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTransportOptions",
+      "to": "/zh/guides/rpc-browser",
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-core",
-      "to": "/en/architecture/rpc-core",
+      "from": "/zh/guides/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/window/IWindowMessageTransportOptions",
       "type": "domain-peer"
     },
     {
@@ -38652,6 +38652,86 @@
       "type": "domain-peer"
     },
     {
+      "from": "/zh/docs/rpc-core/transport-kit/IRpcSendOptions",
+      "to": "/zh/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit/IRpcSendOptions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit/IRpcTransport",
+      "to": "/zh/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit/IRpcTransport",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit/observeListener",
+      "to": "/zh/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit/observeListener",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit/registerListeners",
+      "to": "/zh/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit/registerListeners",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit/releaseListenerRegistration",
+      "to": "/zh/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit/releaseListenerRegistration",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit/reportListenerFailure",
+      "to": "/zh/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit/reportListenerFailure",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit/safeRead",
+      "to": "/zh/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit/safeRead",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit/safeString",
+      "to": "/zh/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit/safeString",
+      "type": "domain-peer"
+    },
+    {
       "from": "/zh/docs/rpc-devtools",
       "to": "/zh/guides/rpc-devtools",
       "type": "domain-peer"
@@ -38942,86 +39022,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc-devtools/hub/IRpcDevtoolsTargetClient",
-      "to": "/zh/guides/rpc-devtools",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-devtools",
-      "to": "/zh/docs/rpc-devtools/hub/IRpcDevtoolsTargetClient",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-devtools/hub/IRpcDevtoolsTimelineEvent",
-      "to": "/zh/guides/rpc-devtools",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-devtools",
-      "to": "/zh/docs/rpc-devtools/hub/IRpcDevtoolsTimelineEvent",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-devtools/hub/IRpcDevtoolsTimelineQuery",
-      "to": "/zh/guides/rpc-devtools",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-devtools",
-      "to": "/zh/docs/rpc-devtools/hub/IRpcDevtoolsTimelineQuery",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-devtools/hub/RpcDevtoolsTargetStatus",
-      "to": "/zh/guides/rpc-devtools",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-devtools",
-      "to": "/zh/docs/rpc-devtools/hub/RpcDevtoolsTargetStatus",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-devtools/log",
-      "to": "/zh/guides/rpc-devtools",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-devtools",
-      "to": "/zh/docs/rpc-devtools/log",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-devtools/log/createRpcLogProbe",
-      "to": "/zh/guides/rpc-devtools",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-devtools",
-      "to": "/zh/docs/rpc-devtools/log/createRpcLogProbe",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-devtools/log/IRpcLogProbeOptions",
-      "to": "/zh/guides/rpc-devtools",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-devtools",
-      "to": "/zh/docs/rpc-devtools/log/IRpcLogProbeOptions",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-devtools/log/IRpcLogSink",
-      "to": "/zh/guides/rpc-devtools",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-devtools",
-      "to": "/zh/docs/rpc-devtools/log/IRpcLogSink",
-      "type": "domain-peer"
-    },
-    {
       "from": "/zh/docs/rpc-pool",
       "to": "/zh/guides/rpc-pool",
       "type": "domain-peer"
@@ -39159,6 +39159,86 @@
     {
       "from": "/zh/guides/rpc-pool",
       "to": "/zh/docs/rpc-pool/RpcPoolState",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/hub/IRpcDevtoolsTargetClient",
+      "to": "/zh/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools/hub/IRpcDevtoolsTargetClient",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/hub/IRpcDevtoolsTimelineEvent",
+      "to": "/zh/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools/hub/IRpcDevtoolsTimelineEvent",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/hub/IRpcDevtoolsTimelineQuery",
+      "to": "/zh/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools/hub/IRpcDevtoolsTimelineQuery",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/hub/RpcDevtoolsTargetStatus",
+      "to": "/zh/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools/hub/RpcDevtoolsTargetStatus",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log",
+      "to": "/zh/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools/log",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log/createRpcLogProbe",
+      "to": "/zh/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools/log/createRpcLogProbe",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log/IRpcLogProbeOptions",
+      "to": "/zh/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools/log/IRpcLogProbeOptions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools/log/IRpcLogSink",
+      "to": "/zh/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools/log/IRpcLogSink",
       "type": "domain-peer"
     },
     {
@@ -40909,86 +40989,6 @@
     {
       "from": "/zh/guides/rpc-threads",
       "to": "/zh/docs/rpc-threads/adapters/electron-main/createElectronMainThreadChannelFactory",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-main/createElectronMainThreadLauncher",
-      "to": "/zh/guides/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-threads",
-      "to": "/zh/docs/rpc-threads/adapters/electron-main/createElectronMainThreadLauncher",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-main/INodeThreadHandle",
-      "to": "/zh/guides/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-threads",
-      "to": "/zh/docs/rpc-threads/adapters/electron-main/INodeThreadHandle",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-renderer",
-      "to": "/zh/guides/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-threads",
-      "to": "/zh/docs/rpc-threads/adapters/electron-renderer",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-renderer/createElectronRendererThreadChannelFactory",
-      "to": "/zh/guides/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-threads",
-      "to": "/zh/docs/rpc-threads/adapters/electron-renderer/createElectronRendererThreadChannelFactory",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-renderer/createElectronRendererThreadLauncher",
-      "to": "/zh/guides/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-threads",
-      "to": "/zh/docs/rpc-threads/adapters/electron-renderer/createElectronRendererThreadLauncher",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/node",
-      "to": "/zh/guides/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-threads",
-      "to": "/zh/docs/rpc-threads/adapters/node",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/node/createNodeThreadChannelFactory",
-      "to": "/zh/guides/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-threads",
-      "to": "/zh/docs/rpc-threads/adapters/node/createNodeThreadChannelFactory",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/node/createNodeThreadLauncher",
-      "to": "/zh/guides/rpc-threads",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-threads",
-      "to": "/zh/docs/rpc-threads/adapters/node/createNodeThreadLauncher",
       "type": "domain-peer"
     },
     {
@@ -51282,6 +51282,106 @@
       "type": "domain-peer"
     },
     {
+      "from": "/zh/docs/rpc-threads/adapters/electron-main/createElectronMainThreadLauncher",
+      "to": "/zh/guides/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-threads",
+      "to": "/zh/docs/rpc-threads/adapters/electron-main/createElectronMainThreadLauncher",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-main/INodeThreadHandle",
+      "to": "/zh/guides/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-threads",
+      "to": "/zh/docs/rpc-threads/adapters/electron-main/INodeThreadHandle",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-renderer",
+      "to": "/zh/guides/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-threads",
+      "to": "/zh/docs/rpc-threads/adapters/electron-renderer",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-renderer/createElectronRendererThreadChannelFactory",
+      "to": "/zh/guides/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-threads",
+      "to": "/zh/docs/rpc-threads/adapters/electron-renderer/createElectronRendererThreadChannelFactory",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-contract",
+      "to": "/zh/docs/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-contract",
+      "to": "/zh/guides/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-contract/getting-started",
+      "to": "/zh/docs/rpc-contract",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-contract",
+      "to": "/zh/guides/rpc-contract/getting-started",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-renderer/createElectronRendererThreadLauncher",
+      "to": "/zh/guides/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-threads",
+      "to": "/zh/docs/rpc-threads/adapters/electron-renderer/createElectronRendererThreadLauncher",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/node",
+      "to": "/zh/guides/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-threads",
+      "to": "/zh/docs/rpc-threads/adapters/node",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/node/createNodeThreadChannelFactory",
+      "to": "/zh/guides/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-threads",
+      "to": "/zh/docs/rpc-threads/adapters/node/createNodeThreadChannelFactory",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/node/createNodeThreadLauncher",
+      "to": "/zh/guides/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-threads",
+      "to": "/zh/docs/rpc-threads/adapters/node/createNodeThreadLauncher",
+      "type": "domain-peer"
+    },
+    {
       "from": "/zh/guides/rpc-bridge-jsonrpc",
       "to": "/zh/docs/rpc-bridge-jsonrpc",
       "type": "domain-peer"
@@ -51322,106 +51422,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/guides/rpc-contract",
-      "to": "/zh/docs/rpc-contract",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-contract",
-      "to": "/zh/guides/rpc-contract",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-contract/getting-started",
-      "to": "/zh/docs/rpc-contract",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-contract",
-      "to": "/zh/guides/rpc-contract/getting-started",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit/IRpcSendOptions",
-      "to": "/zh/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit/IRpcSendOptions",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit/IRpcTransport",
-      "to": "/zh/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit/IRpcTransport",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit/observeListener",
-      "to": "/zh/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit/observeListener",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit/registerListeners",
-      "to": "/zh/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit/registerListeners",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit/releaseListenerRegistration",
-      "to": "/zh/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit/releaseListenerRegistration",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit/reportListenerFailure",
-      "to": "/zh/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit/reportListenerFailure",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit/safeRead",
-      "to": "/zh/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit/safeRead",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit/safeString",
-      "to": "/zh/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit/safeString",
-      "type": "domain-peer"
-    },
-    {
       "from": "/zh/guides/rpc-core",
       "to": "/zh/docs/rpc-core",
       "type": "domain-peer"
@@ -51442,23 +51442,23 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/guides/rpc-devtools",
-      "to": "/zh/docs/rpc-devtools",
+      "from": "/zh/guides/rpc-core/endpoint-composition",
+      "to": "/zh/docs/rpc-core",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc-devtools",
-      "to": "/zh/guides/rpc-devtools",
+      "from": "/zh/docs/rpc-core",
+      "to": "/zh/guides/rpc-core/endpoint-composition",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/guides/rpc-devtools/getting-started",
-      "to": "/zh/docs/rpc-devtools",
+      "from": "/zh/guides/rpc-core/extension-authoring",
+      "to": "/zh/docs/rpc-core",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc-devtools",
-      "to": "/zh/guides/rpc-devtools/getting-started",
+      "from": "/zh/docs/rpc-core",
+      "to": "/zh/guides/rpc-core/extension-authoring",
       "type": "domain-peer"
     },
     {
@@ -51482,43 +51482,43 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/guides/rpc-process",
-      "to": "/zh/docs/rpc-process",
+      "from": "/zh/guides/rpc-core/calls-and-cancellation",
+      "to": "/zh/docs/rpc-core",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc-process",
-      "to": "/zh/guides/rpc-process",
+      "from": "/zh/docs/rpc-core",
+      "to": "/zh/guides/rpc-core/calls-and-cancellation",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/guides/rpc-process/getting-started",
-      "to": "/zh/docs/rpc-process",
+      "from": "/zh/guides/rpc-core/providers-and-contracts",
+      "to": "/zh/docs/rpc-core",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc-process",
-      "to": "/zh/guides/rpc-process/getting-started",
+      "from": "/zh/docs/rpc-core",
+      "to": "/zh/guides/rpc-core/providers-and-contracts",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/guides/rpc-threads",
-      "to": "/zh/docs/rpc-threads",
+      "from": "/zh/guides/rpc-core/transports-and-security",
+      "to": "/zh/docs/rpc-core",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc-threads",
-      "to": "/zh/guides/rpc-threads",
+      "from": "/zh/docs/rpc-core",
+      "to": "/zh/guides/rpc-core/transports-and-security",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/guides/rpc-threads/getting-started",
-      "to": "/zh/docs/rpc-threads",
+      "from": "/zh/guides/rpc-core/discovery-and-control",
+      "to": "/zh/docs/rpc-core",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc-threads",
-      "to": "/zh/guides/rpc-threads/getting-started",
+      "from": "/zh/docs/rpc-core",
+      "to": "/zh/guides/rpc-core/discovery-and-control",
       "type": "domain-peer"
     },
     {
@@ -53092,23 +53092,23 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/architecture/rpc-bridge-jsonrpc",
-      "to": "/zh/docs/rpc-bridge-jsonrpc",
+      "from": "/zh/guides/rpc-core/chunking-and-backpressure",
+      "to": "/zh/docs/rpc-core",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc-bridge-jsonrpc",
-      "to": "/zh/architecture/rpc-bridge-jsonrpc",
+      "from": "/zh/docs/rpc-core",
+      "to": "/zh/guides/rpc-core/chunking-and-backpressure",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser",
+      "from": "/zh/guides/rpc-core/replay-retry-and-lifecycle",
+      "to": "/zh/docs/rpc-core",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc-browser",
-      "to": "/zh/architecture/rpc-browser",
+      "from": "/zh/docs/rpc-core",
+      "to": "/zh/guides/rpc-core/replay-retry-and-lifecycle",
       "type": "domain-peer"
     },
     {
@@ -53122,23 +53122,23 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/guides/rpc-core/endpoint-composition",
-      "to": "/zh/docs/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/rpc-core",
-      "to": "/zh/guides/rpc-core/endpoint-composition",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/architecture/rpc-devtools",
+      "from": "/zh/guides/rpc-devtools",
       "to": "/zh/docs/rpc-devtools",
       "type": "domain-peer"
     },
     {
       "from": "/zh/docs/rpc-devtools",
-      "to": "/zh/architecture/rpc-devtools",
+      "to": "/zh/guides/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-devtools/getting-started",
+      "to": "/zh/docs/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools",
+      "to": "/zh/guides/rpc-devtools/getting-started",
       "type": "domain-peer"
     },
     {
@@ -53152,23 +53152,23 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/architecture/rpc-process",
+      "from": "/zh/guides/rpc-process",
       "to": "/zh/docs/rpc-process",
       "type": "domain-peer"
     },
     {
       "from": "/zh/docs/rpc-process",
-      "to": "/zh/architecture/rpc-process",
+      "to": "/zh/guides/rpc-process",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/architecture/rpc-threads",
-      "to": "/zh/docs/rpc-threads",
+      "from": "/zh/guides/rpc-process/getting-started",
+      "to": "/zh/docs/rpc-process",
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc-threads",
-      "to": "/zh/architecture/rpc-threads",
+      "from": "/zh/docs/rpc-process",
+      "to": "/zh/guides/rpc-process/getting-started",
       "type": "domain-peer"
     },
     {
@@ -87412,6 +87412,86 @@
       "type": "architecture-symbol"
     },
     {
+      "from": "/zh/guides/rpc-threads",
+      "to": "/zh/docs/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-threads",
+      "to": "/zh/guides/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-threads/getting-started",
+      "to": "/zh/docs/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-threads",
+      "to": "/zh/guides/rpc-threads/getting-started",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/architecture/rpc-bridge-jsonrpc",
+      "to": "/zh/docs/rpc-bridge-jsonrpc",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-bridge-jsonrpc",
+      "to": "/zh/architecture/rpc-bridge-jsonrpc",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-browser",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-core",
+      "to": "/zh/architecture/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/architecture/rpc-devtools",
+      "to": "/zh/docs/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-devtools",
+      "to": "/zh/architecture/rpc-devtools",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/architecture/rpc-process",
+      "to": "/zh/docs/rpc-process",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-process",
+      "to": "/zh/architecture/rpc-process",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/architecture/rpc-threads",
+      "to": "/zh/docs/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-threads",
+      "to": "/zh/architecture/rpc-threads",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/docs/rpc-bridge-jsonrpc",
       "to": "/en/guides/rpc-bridge-jsonrpc/getting-started",
       "type": "api-guide"
@@ -89690,86 +89770,6 @@
       "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
       "to": "/zh/docs/rpc-browser/adapters/window",
       "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "to": "/zh/docs/rpc-browser/adapters/window",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "to": "/zh/docs/rpc-browser/adapters/window",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "to": "/zh/guides/rpc-browser/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-browser/getting-started",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "to": "/zh/architecture/rpc-browser",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-browser",
-      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
-      "type": "architecture-symbol"
     },
     {
       "from": "/en/docs/rpc-contract",
@@ -107372,84 +107372,84 @@
       "type": "alias-symbol"
     },
     {
-      "from": "/zh/guides/rpc-core/extension-authoring",
-      "to": "/zh/docs/rpc-core",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
     },
     {
-      "from": "/zh/docs/rpc-core",
-      "to": "/zh/guides/rpc-core/extension-authoring",
-      "type": "domain-peer"
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
+      "type": "guide-symbol"
     },
     {
-      "from": "/zh/guides/rpc-core/calls-and-cancellation",
-      "to": "/zh/docs/rpc-core",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
     },
     {
-      "from": "/zh/docs/rpc-core",
-      "to": "/zh/guides/rpc-core/calls-and-cancellation",
-      "type": "domain-peer"
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageReceiver",
+      "type": "architecture-symbol"
     },
     {
-      "from": "/zh/guides/rpc-core/providers-and-contracts",
-      "to": "/zh/docs/rpc-core",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/window",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
+      "type": "api-symbol"
     },
     {
-      "from": "/zh/docs/rpc-core",
-      "to": "/zh/guides/rpc-core/providers-and-contracts",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
+      "to": "/zh/docs/rpc-browser/adapters/window",
+      "type": "symbol-api"
     },
     {
-      "from": "/zh/guides/rpc-core/transports-and-security",
-      "to": "/zh/docs/rpc-core",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
     },
     {
-      "from": "/zh/docs/rpc-core",
-      "to": "/zh/guides/rpc-core/transports-and-security",
-      "type": "domain-peer"
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
+      "type": "guide-symbol"
     },
     {
-      "from": "/zh/guides/rpc-core/discovery-and-control",
-      "to": "/zh/docs/rpc-core",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
     },
     {
-      "from": "/zh/docs/rpc-core",
-      "to": "/zh/guides/rpc-core/discovery-and-control",
-      "type": "domain-peer"
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTarget",
+      "type": "architecture-symbol"
     },
     {
-      "from": "/zh/guides/rpc-core/chunking-and-backpressure",
-      "to": "/zh/docs/rpc-core",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/window",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
+      "type": "api-symbol"
     },
     {
-      "from": "/zh/docs/rpc-core",
-      "to": "/zh/guides/rpc-core/chunking-and-backpressure",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
+      "to": "/zh/docs/rpc-browser/adapters/window",
+      "type": "symbol-api"
     },
     {
-      "from": "/zh/guides/rpc-core/replay-retry-and-lifecycle",
-      "to": "/zh/docs/rpc-core",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
+      "to": "/zh/guides/rpc-browser/getting-started",
+      "type": "symbol-guide"
     },
     {
-      "from": "/zh/docs/rpc-core",
-      "to": "/zh/guides/rpc-core/replay-retry-and-lifecycle",
-      "type": "domain-peer"
+      "from": "/zh/guides/rpc-browser/getting-started",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
+      "type": "guide-symbol"
     },
     {
-      "from": "/zh/architecture/rpc-core",
-      "to": "/zh/docs/rpc-core",
-      "type": "domain-peer"
+      "from": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
+      "to": "/zh/architecture/rpc-browser",
+      "type": "symbol-architecture"
     },
     {
-      "from": "/zh/docs/rpc-core",
-      "to": "/zh/architecture/rpc-core",
-      "type": "domain-peer"
+      "from": "/zh/architecture/rpc-browser",
+      "to": "/zh/docs/rpc-browser/adapters/window#rpc-browser-adapters/window--IWindowMessageTransportOptions",
+      "type": "architecture-symbol"
     },
     {
       "from": "/en/docs/rpc-core",
@@ -127392,6 +127392,326 @@
       "type": "architecture-symbol"
     },
     {
+      "from": "/zh/docs/rpc-core/transport-kit",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainListenerFailures",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainListenerFailures",
+      "to": "/zh/docs/rpc-core/transport-kit",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainListenerFailures",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainListenerFailures",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainListenerFailures",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainListenerFailures",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainTerminalListenerFailures",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainTerminalListenerFailures",
+      "to": "/zh/docs/rpc-core/transport-kit",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainTerminalListenerFailures",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainTerminalListenerFailures",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainTerminalListenerFailures",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainTerminalListenerFailures",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcSendOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcSendOptions",
+      "to": "/zh/docs/rpc-core/transport-kit",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcSendOptions",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcSendOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcSendOptions",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcSendOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcTransport",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcTransport",
+      "to": "/zh/docs/rpc-core/transport-kit",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcTransport",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcTransport",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcTransport",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcTransport",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--observeListener",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--observeListener",
+      "to": "/zh/docs/rpc-core/transport-kit",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--observeListener",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--observeListener",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--observeListener",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--observeListener",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--registerListeners",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--registerListeners",
+      "to": "/zh/docs/rpc-core/transport-kit",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--registerListeners",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--registerListeners",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--registerListeners",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--registerListeners",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--releaseListenerRegistration",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--releaseListenerRegistration",
+      "to": "/zh/docs/rpc-core/transport-kit",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--releaseListenerRegistration",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--releaseListenerRegistration",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--releaseListenerRegistration",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--releaseListenerRegistration",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--reportListenerFailure",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--reportListenerFailure",
+      "to": "/zh/docs/rpc-core/transport-kit",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--reportListenerFailure",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--reportListenerFailure",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--reportListenerFailure",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--reportListenerFailure",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeRead",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeRead",
+      "to": "/zh/docs/rpc-core/transport-kit",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeRead",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeRead",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeRead",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeRead",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeString",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeString",
+      "to": "/zh/docs/rpc-core/transport-kit",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeString",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeString",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeString",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeString",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#RpcPlatform",
+      "to": "/zh/docs/rpc-core/transport-constants#rpc-core-transport-constants--RpcPlatform",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-constants#rpc-core-transport-constants--RpcPlatform",
+      "to": "/zh/docs/rpc-core/transport-kit#RpcPlatform",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-kit#RpcTransportOwnership",
+      "to": "/zh/docs/rpc-core/transport-constants#rpc-core-transport-constants--RpcTransportOwnership",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/rpc-core/transport-constants#rpc-core-transport-constants--RpcTransportOwnership",
+      "to": "/zh/docs/rpc-core/transport-kit#RpcTransportOwnership",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/en/docs/rpc-devtools",
       "to": "/en/guides/rpc-devtools/getting-started",
       "type": "api-guide"
@@ -129212,6 +129532,766 @@
       "type": "guide-symbol"
     },
     {
+      "from": "/en/docs/rpc-pool",
+      "to": "/en/guides/rpc-pool/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/guides/rpc-pool/getting-started",
+      "to": "/en/docs/rpc-pool",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/rpc-pool",
+      "to": "/en/architecture/rpc-pool",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-pool",
+      "to": "/en/docs/rpc-pool",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--createProcessPool",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--createProcessPool",
+      "to": "/en/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--createProcessPool",
+      "to": "/en/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-pool/getting-started",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--createProcessPool",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--createProcessPool",
+      "to": "/en/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--createProcessPool",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--createThreadPool",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--createThreadPool",
+      "to": "/en/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--createThreadPool",
+      "to": "/en/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-pool/getting-started",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--createThreadPool",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--createThreadPool",
+      "to": "/en/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--createThreadPool",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IProcessPool",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IProcessPool",
+      "to": "/en/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IProcessPool",
+      "to": "/en/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-pool/getting-started",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IProcessPool",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IProcessPool",
+      "to": "/en/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IProcessPool",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
+      "to": "/en/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
+      "to": "/en/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-pool/getting-started",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
+      "to": "/en/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
+      "to": "/en/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
+      "to": "/en/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-pool/getting-started",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
+      "to": "/en/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
+      "to": "/en/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
+      "to": "/en/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-pool/getting-started",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
+      "to": "/en/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
+      "to": "/en/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
+      "to": "/en/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-pool/getting-started",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
+      "to": "/en/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IThreadPool",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IThreadPool",
+      "to": "/en/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IThreadPool",
+      "to": "/en/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-pool/getting-started",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IThreadPool",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IThreadPool",
+      "to": "/en/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IThreadPool",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
+      "to": "/en/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
+      "to": "/en/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-pool/getting-started",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
+      "to": "/en/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
+      "to": "/en/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
+      "to": "/en/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-pool/getting-started",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
+      "to": "/en/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
+      "to": "/en/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
+      "to": "/en/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-pool/getting-started",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
+      "to": "/en/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolState",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolState",
+      "to": "/en/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolState",
+      "to": "/en/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-pool/getting-started",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolState",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolState",
+      "to": "/en/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-pool",
+      "to": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolState",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool",
+      "to": "/zh/guides/rpc-pool/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-pool/getting-started",
+      "to": "/zh/docs/rpc-pool",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/rpc-pool",
+      "to": "/zh/architecture/rpc-pool",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-pool",
+      "to": "/zh/docs/rpc-pool",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--createProcessPool",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--createProcessPool",
+      "to": "/zh/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--createProcessPool",
+      "to": "/zh/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-pool/getting-started",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--createProcessPool",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--createProcessPool",
+      "to": "/zh/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--createProcessPool",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--createThreadPool",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--createThreadPool",
+      "to": "/zh/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--createThreadPool",
+      "to": "/zh/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-pool/getting-started",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--createThreadPool",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--createThreadPool",
+      "to": "/zh/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--createThreadPool",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPool",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPool",
+      "to": "/zh/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPool",
+      "to": "/zh/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-pool/getting-started",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPool",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPool",
+      "to": "/zh/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPool",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
+      "to": "/zh/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
+      "to": "/zh/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-pool/getting-started",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
+      "to": "/zh/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
+      "to": "/zh/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
+      "to": "/zh/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-pool/getting-started",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
+      "to": "/zh/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
+      "to": "/zh/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
+      "to": "/zh/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-pool/getting-started",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
+      "to": "/zh/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
+      "to": "/zh/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
+      "to": "/zh/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-pool/getting-started",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
+      "to": "/zh/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPool",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPool",
+      "to": "/zh/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPool",
+      "to": "/zh/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-pool/getting-started",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPool",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPool",
+      "to": "/zh/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPool",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
+      "to": "/zh/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
+      "to": "/zh/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-pool/getting-started",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
+      "to": "/zh/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
+      "to": "/zh/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
+      "to": "/zh/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-pool/getting-started",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
+      "to": "/zh/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
+      "to": "/zh/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
+      "to": "/zh/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-pool/getting-started",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
+      "to": "/zh/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolState",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolState",
+      "to": "/zh/docs/rpc-pool",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolState",
+      "to": "/zh/guides/rpc-pool/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-pool/getting-started",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolState",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolState",
+      "to": "/zh/architecture/rpc-pool",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-pool",
+      "to": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolState",
+      "type": "architecture-symbol"
+    },
+    {
       "from": "/zh/docs/rpc-devtools/hub#rpc-devtools-hub--IRpcDevtoolsTargetClient",
       "to": "/zh/architecture/rpc-devtools",
       "type": "symbol-architecture"
@@ -129529,766 +130609,6 @@
     {
       "from": "/zh/architecture/rpc-devtools",
       "to": "/zh/docs/rpc-devtools/log#rpc-devtools-log--IRpcLogSink",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool",
-      "to": "/en/guides/rpc-pool/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/en/guides/rpc-pool/getting-started",
-      "to": "/en/docs/rpc-pool",
-      "type": "guide-api"
-    },
-    {
-      "from": "/en/docs/rpc-pool",
-      "to": "/en/architecture/rpc-pool",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-pool",
-      "to": "/en/docs/rpc-pool",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/en/docs/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--createProcessPool",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--createProcessPool",
-      "to": "/en/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--createProcessPool",
-      "to": "/en/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-pool/getting-started",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--createProcessPool",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--createProcessPool",
-      "to": "/en/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--createProcessPool",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--createThreadPool",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--createThreadPool",
-      "to": "/en/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--createThreadPool",
-      "to": "/en/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-pool/getting-started",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--createThreadPool",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--createThreadPool",
-      "to": "/en/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--createThreadPool",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IProcessPool",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IProcessPool",
-      "to": "/en/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IProcessPool",
-      "to": "/en/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-pool/getting-started",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IProcessPool",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IProcessPool",
-      "to": "/en/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IProcessPool",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
-      "to": "/en/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
-      "to": "/en/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-pool/getting-started",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
-      "to": "/en/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
-      "to": "/en/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
-      "to": "/en/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-pool/getting-started",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
-      "to": "/en/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
-      "to": "/en/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
-      "to": "/en/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-pool/getting-started",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
-      "to": "/en/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
-      "to": "/en/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
-      "to": "/en/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-pool/getting-started",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
-      "to": "/en/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IThreadPool",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IThreadPool",
-      "to": "/en/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IThreadPool",
-      "to": "/en/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-pool/getting-started",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IThreadPool",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IThreadPool",
-      "to": "/en/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IThreadPool",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
-      "to": "/en/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
-      "to": "/en/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-pool/getting-started",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
-      "to": "/en/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
-      "to": "/en/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
-      "to": "/en/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-pool/getting-started",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
-      "to": "/en/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
-      "to": "/en/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
-      "to": "/en/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-pool/getting-started",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
-      "to": "/en/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolState",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolState",
-      "to": "/en/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolState",
-      "to": "/en/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-pool/getting-started",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolState",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolState",
-      "to": "/en/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-pool",
-      "to": "/en/docs/rpc-pool#rpc-pool-index--RpcPoolState",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool",
-      "to": "/zh/guides/rpc-pool/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-pool/getting-started",
-      "to": "/zh/docs/rpc-pool",
-      "type": "guide-api"
-    },
-    {
-      "from": "/zh/docs/rpc-pool",
-      "to": "/zh/architecture/rpc-pool",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-pool",
-      "to": "/zh/docs/rpc-pool",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/zh/docs/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--createProcessPool",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--createProcessPool",
-      "to": "/zh/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--createProcessPool",
-      "to": "/zh/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-pool/getting-started",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--createProcessPool",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--createProcessPool",
-      "to": "/zh/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--createProcessPool",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--createThreadPool",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--createThreadPool",
-      "to": "/zh/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--createThreadPool",
-      "to": "/zh/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-pool/getting-started",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--createThreadPool",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--createThreadPool",
-      "to": "/zh/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--createThreadPool",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPool",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPool",
-      "to": "/zh/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPool",
-      "to": "/zh/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-pool/getting-started",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPool",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPool",
-      "to": "/zh/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPool",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
-      "to": "/zh/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
-      "to": "/zh/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-pool/getting-started",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
-      "to": "/zh/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IProcessPoolOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
-      "to": "/zh/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
-      "to": "/zh/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-pool/getting-started",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
-      "to": "/zh/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolControls",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
-      "to": "/zh/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
-      "to": "/zh/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-pool/getting-started",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
-      "to": "/zh/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolErrorCode",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
-      "to": "/zh/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
-      "to": "/zh/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-pool/getting-started",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
-      "to": "/zh/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IRpcPoolStats",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPool",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPool",
-      "to": "/zh/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPool",
-      "to": "/zh/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-pool/getting-started",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPool",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPool",
-      "to": "/zh/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPool",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
-      "to": "/zh/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
-      "to": "/zh/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-pool/getting-started",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
-      "to": "/zh/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--IThreadPoolOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
-      "to": "/zh/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
-      "to": "/zh/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-pool/getting-started",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
-      "to": "/zh/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--RPC_POOL_ERROR_SOURCE",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
-      "to": "/zh/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
-      "to": "/zh/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-pool/getting-started",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
-      "to": "/zh/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolErrorCode",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolState",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolState",
-      "to": "/zh/docs/rpc-pool",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolState",
-      "to": "/zh/guides/rpc-pool/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-pool/getting-started",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolState",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolState",
-      "to": "/zh/architecture/rpc-pool",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-pool",
-      "to": "/zh/docs/rpc-pool#rpc-pool-index--RpcPoolState",
       "type": "architecture-symbol"
     },
     {
@@ -140770,326 +141090,6 @@
       "from": "/en/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
       "to": "/en/docs/rpc-threads/adapters/electron-renderer",
       "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
-      "to": "/en/guides/rpc-threads/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-threads/getting-started",
-      "to": "/en/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
-      "to": "/en/architecture/rpc-threads",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-threads",
-      "to": "/en/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/electron-renderer#IWebThreadHandle",
-      "to": "/en/docs/rpc-threads/adapters/browser#rpc-threads-adapters/browser--IWebThreadHandle",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/browser#rpc-threads-adapters/browser--IWebThreadHandle",
-      "to": "/en/docs/rpc-threads/adapters/electron-renderer#IWebThreadHandle",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/electron-renderer#IWebThreadLauncherOptions",
-      "to": "/en/docs/rpc-threads/adapters/browser#rpc-threads-adapters/browser--IWebThreadLauncherOptions",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/browser#rpc-threads-adapters/browser--IWebThreadLauncherOptions",
-      "to": "/en/docs/rpc-threads/adapters/electron-renderer#IWebThreadLauncherOptions",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-renderer",
-      "to": "/zh/guides/rpc-threads/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-threads/getting-started",
-      "to": "/zh/docs/rpc-threads/adapters/electron-renderer",
-      "type": "guide-api"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-renderer",
-      "to": "/zh/architecture/rpc-threads",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-threads",
-      "to": "/zh/docs/rpc-threads/adapters/electron-renderer",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-renderer",
-      "to": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadChannelFactory",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadChannelFactory",
-      "to": "/zh/docs/rpc-threads/adapters/electron-renderer",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadChannelFactory",
-      "to": "/zh/guides/rpc-threads/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-threads/getting-started",
-      "to": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadChannelFactory",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadChannelFactory",
-      "to": "/zh/architecture/rpc-threads",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-threads",
-      "to": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadChannelFactory",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-renderer",
-      "to": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
-      "to": "/zh/docs/rpc-threads/adapters/electron-renderer",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
-      "to": "/zh/guides/rpc-threads/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-threads/getting-started",
-      "to": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
-      "to": "/zh/architecture/rpc-threads",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-threads",
-      "to": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-renderer#IWebThreadHandle",
-      "to": "/zh/docs/rpc-threads/adapters/browser#rpc-threads-adapters/browser--IWebThreadHandle",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/browser#rpc-threads-adapters/browser--IWebThreadHandle",
-      "to": "/zh/docs/rpc-threads/adapters/electron-renderer#IWebThreadHandle",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-renderer#IWebThreadLauncherOptions",
-      "to": "/zh/docs/rpc-threads/adapters/browser#rpc-threads-adapters/browser--IWebThreadLauncherOptions",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/browser#rpc-threads-adapters/browser--IWebThreadLauncherOptions",
-      "to": "/zh/docs/rpc-threads/adapters/electron-renderer#IWebThreadLauncherOptions",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/node",
-      "to": "/en/guides/rpc-threads/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/en/guides/rpc-threads/getting-started",
-      "to": "/en/docs/rpc-threads/adapters/node",
-      "type": "guide-api"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/node",
-      "to": "/en/architecture/rpc-threads",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-threads",
-      "to": "/en/docs/rpc-threads/adapters/node",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/node",
-      "to": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
-      "to": "/en/docs/rpc-threads/adapters/node",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
-      "to": "/en/guides/rpc-threads/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-threads/getting-started",
-      "to": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
-      "to": "/en/architecture/rpc-threads",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-threads",
-      "to": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/node",
-      "to": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
-      "to": "/en/docs/rpc-threads/adapters/node",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
-      "to": "/en/guides/rpc-threads/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-threads/getting-started",
-      "to": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
-      "to": "/en/architecture/rpc-threads",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-threads",
-      "to": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/node#INodeThreadHandle",
-      "to": "/en/docs/rpc-threads/adapters/electron-main#rpc-threads-adapters/electron-main--INodeThreadHandle",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/en/docs/rpc-threads/adapters/electron-main#rpc-threads-adapters/electron-main--INodeThreadHandle",
-      "to": "/en/docs/rpc-threads/adapters/node#INodeThreadHandle",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/node",
-      "to": "/zh/guides/rpc-threads/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-threads/getting-started",
-      "to": "/zh/docs/rpc-threads/adapters/node",
-      "type": "guide-api"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/node",
-      "to": "/zh/architecture/rpc-threads",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-threads",
-      "to": "/zh/docs/rpc-threads/adapters/node",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/node",
-      "to": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
-      "to": "/zh/docs/rpc-threads/adapters/node",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
-      "to": "/zh/guides/rpc-threads/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-threads/getting-started",
-      "to": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
-      "to": "/zh/architecture/rpc-threads",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-threads",
-      "to": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/node",
-      "to": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
-      "to": "/zh/docs/rpc-threads/adapters/node",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
-      "to": "/zh/guides/rpc-threads/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-threads/getting-started",
-      "to": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
-      "to": "/zh/architecture/rpc-threads",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-threads",
-      "to": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/node#INodeThreadHandle",
-      "to": "/zh/docs/rpc-threads/adapters/electron-main#rpc-threads-adapters/electron-main--INodeThreadHandle",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/zh/docs/rpc-threads/adapters/electron-main#rpc-threads-adapters/electron-main--INodeThreadHandle",
-      "to": "/zh/docs/rpc-threads/adapters/node#INodeThreadHandle",
-      "type": "alias-symbol"
     },
     {
       "from": "/en/docs/serialize",
@@ -203072,323 +203072,323 @@
       "type": "architecture-symbol"
     },
     {
-      "from": "/zh/docs/rpc-core/transport-kit",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainListenerFailures",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainListenerFailures",
-      "to": "/zh/docs/rpc-core/transport-kit",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainListenerFailures",
-      "to": "/zh/guides/rpc-core/getting-started",
+      "from": "/en/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
+      "to": "/en/guides/rpc-threads/getting-started",
       "type": "symbol-guide"
     },
     {
-      "from": "/zh/guides/rpc-core/getting-started",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainListenerFailures",
+      "from": "/en/guides/rpc-threads/getting-started",
+      "to": "/en/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
       "type": "guide-symbol"
     },
     {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainListenerFailures",
-      "to": "/zh/architecture/rpc-core",
+      "from": "/en/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
+      "to": "/en/architecture/rpc-threads",
       "type": "symbol-architecture"
     },
     {
-      "from": "/zh/architecture/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainListenerFailures",
+      "from": "/en/architecture/rpc-threads",
+      "to": "/en/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
       "type": "architecture-symbol"
     },
     {
-      "from": "/zh/docs/rpc-core/transport-kit",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainTerminalListenerFailures",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainTerminalListenerFailures",
-      "to": "/zh/docs/rpc-core/transport-kit",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainTerminalListenerFailures",
-      "to": "/zh/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-core/getting-started",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainTerminalListenerFailures",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainTerminalListenerFailures",
-      "to": "/zh/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--drainTerminalListenerFailures",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcSendOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcSendOptions",
-      "to": "/zh/docs/rpc-core/transport-kit",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcSendOptions",
-      "to": "/zh/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-core/getting-started",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcSendOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcSendOptions",
-      "to": "/zh/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcSendOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcTransport",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcTransport",
-      "to": "/zh/docs/rpc-core/transport-kit",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcTransport",
-      "to": "/zh/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-core/getting-started",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcTransport",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcTransport",
-      "to": "/zh/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--IRpcTransport",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--observeListener",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--observeListener",
-      "to": "/zh/docs/rpc-core/transport-kit",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--observeListener",
-      "to": "/zh/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-core/getting-started",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--observeListener",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--observeListener",
-      "to": "/zh/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--observeListener",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--registerListeners",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--registerListeners",
-      "to": "/zh/docs/rpc-core/transport-kit",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--registerListeners",
-      "to": "/zh/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-core/getting-started",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--registerListeners",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--registerListeners",
-      "to": "/zh/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--registerListeners",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--releaseListenerRegistration",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--releaseListenerRegistration",
-      "to": "/zh/docs/rpc-core/transport-kit",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--releaseListenerRegistration",
-      "to": "/zh/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-core/getting-started",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--releaseListenerRegistration",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--releaseListenerRegistration",
-      "to": "/zh/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--releaseListenerRegistration",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--reportListenerFailure",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--reportListenerFailure",
-      "to": "/zh/docs/rpc-core/transport-kit",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--reportListenerFailure",
-      "to": "/zh/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-core/getting-started",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--reportListenerFailure",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--reportListenerFailure",
-      "to": "/zh/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--reportListenerFailure",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeRead",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeRead",
-      "to": "/zh/docs/rpc-core/transport-kit",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeRead",
-      "to": "/zh/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-core/getting-started",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeRead",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeRead",
-      "to": "/zh/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeRead",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeString",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeString",
-      "to": "/zh/docs/rpc-core/transport-kit",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeString",
-      "to": "/zh/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-core/getting-started",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeString",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeString",
-      "to": "/zh/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-core",
-      "to": "/zh/docs/rpc-core/transport-kit#rpc-core-transport-kit--safeString",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core/transport-kit#RpcPlatform",
-      "to": "/zh/docs/rpc-core/transport-constants#rpc-core-transport-constants--RpcPlatform",
+      "from": "/en/docs/rpc-threads/adapters/electron-renderer#IWebThreadHandle",
+      "to": "/en/docs/rpc-threads/adapters/browser#rpc-threads-adapters/browser--IWebThreadHandle",
       "type": "symbol-alias"
     },
     {
-      "from": "/zh/docs/rpc-core/transport-constants#rpc-core-transport-constants--RpcPlatform",
-      "to": "/zh/docs/rpc-core/transport-kit#RpcPlatform",
+      "from": "/en/docs/rpc-threads/adapters/browser#rpc-threads-adapters/browser--IWebThreadHandle",
+      "to": "/en/docs/rpc-threads/adapters/electron-renderer#IWebThreadHandle",
       "type": "alias-symbol"
     },
     {
-      "from": "/zh/docs/rpc-core/transport-kit#RpcTransportOwnership",
-      "to": "/zh/docs/rpc-core/transport-constants#rpc-core-transport-constants--RpcTransportOwnership",
+      "from": "/en/docs/rpc-threads/adapters/electron-renderer#IWebThreadLauncherOptions",
+      "to": "/en/docs/rpc-threads/adapters/browser#rpc-threads-adapters/browser--IWebThreadLauncherOptions",
       "type": "symbol-alias"
     },
     {
-      "from": "/zh/docs/rpc-core/transport-constants#rpc-core-transport-constants--RpcTransportOwnership",
-      "to": "/zh/docs/rpc-core/transport-kit#RpcTransportOwnership",
+      "from": "/en/docs/rpc-threads/adapters/browser#rpc-threads-adapters/browser--IWebThreadLauncherOptions",
+      "to": "/en/docs/rpc-threads/adapters/electron-renderer#IWebThreadLauncherOptions",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-renderer",
+      "to": "/zh/guides/rpc-threads/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-threads/getting-started",
+      "to": "/zh/docs/rpc-threads/adapters/electron-renderer",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-renderer",
+      "to": "/zh/architecture/rpc-threads",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-threads",
+      "to": "/zh/docs/rpc-threads/adapters/electron-renderer",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-renderer",
+      "to": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadChannelFactory",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadChannelFactory",
+      "to": "/zh/docs/rpc-threads/adapters/electron-renderer",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadChannelFactory",
+      "to": "/zh/guides/rpc-threads/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-threads/getting-started",
+      "to": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadChannelFactory",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadChannelFactory",
+      "to": "/zh/architecture/rpc-threads",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-threads",
+      "to": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadChannelFactory",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-renderer",
+      "to": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
+      "to": "/zh/docs/rpc-threads/adapters/electron-renderer",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
+      "to": "/zh/guides/rpc-threads/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-threads/getting-started",
+      "to": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
+      "to": "/zh/architecture/rpc-threads",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-threads",
+      "to": "/zh/docs/rpc-threads/adapters/electron-renderer#rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-renderer#IWebThreadHandle",
+      "to": "/zh/docs/rpc-threads/adapters/browser#rpc-threads-adapters/browser--IWebThreadHandle",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/browser#rpc-threads-adapters/browser--IWebThreadHandle",
+      "to": "/zh/docs/rpc-threads/adapters/electron-renderer#IWebThreadHandle",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-renderer#IWebThreadLauncherOptions",
+      "to": "/zh/docs/rpc-threads/adapters/browser#rpc-threads-adapters/browser--IWebThreadLauncherOptions",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/browser#rpc-threads-adapters/browser--IWebThreadLauncherOptions",
+      "to": "/zh/docs/rpc-threads/adapters/electron-renderer#IWebThreadLauncherOptions",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-threads/adapters/node",
+      "to": "/en/guides/rpc-threads/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/guides/rpc-threads/getting-started",
+      "to": "/en/docs/rpc-threads/adapters/node",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/rpc-threads/adapters/node",
+      "to": "/en/architecture/rpc-threads",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-threads",
+      "to": "/en/docs/rpc-threads/adapters/node",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/rpc-threads/adapters/node",
+      "to": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
+      "to": "/en/docs/rpc-threads/adapters/node",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
+      "to": "/en/guides/rpc-threads/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-threads/getting-started",
+      "to": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
+      "to": "/en/architecture/rpc-threads",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-threads",
+      "to": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-threads/adapters/node",
+      "to": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
+      "to": "/en/docs/rpc-threads/adapters/node",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
+      "to": "/en/guides/rpc-threads/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-threads/getting-started",
+      "to": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
+      "to": "/en/architecture/rpc-threads",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-threads",
+      "to": "/en/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-threads/adapters/node#INodeThreadHandle",
+      "to": "/en/docs/rpc-threads/adapters/electron-main#rpc-threads-adapters/electron-main--INodeThreadHandle",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/rpc-threads/adapters/electron-main#rpc-threads-adapters/electron-main--INodeThreadHandle",
+      "to": "/en/docs/rpc-threads/adapters/node#INodeThreadHandle",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/node",
+      "to": "/zh/guides/rpc-threads/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-threads/getting-started",
+      "to": "/zh/docs/rpc-threads/adapters/node",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/node",
+      "to": "/zh/architecture/rpc-threads",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-threads",
+      "to": "/zh/docs/rpc-threads/adapters/node",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/node",
+      "to": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
+      "to": "/zh/docs/rpc-threads/adapters/node",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
+      "to": "/zh/guides/rpc-threads/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-threads/getting-started",
+      "to": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
+      "to": "/zh/architecture/rpc-threads",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-threads",
+      "to": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadChannelFactory",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/node",
+      "to": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
+      "to": "/zh/docs/rpc-threads/adapters/node",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
+      "to": "/zh/guides/rpc-threads/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-threads/getting-started",
+      "to": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
+      "to": "/zh/architecture/rpc-threads",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-threads",
+      "to": "/zh/docs/rpc-threads/adapters/node#rpc-threads-adapters/node--createNodeThreadLauncher",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/node#INodeThreadHandle",
+      "to": "/zh/docs/rpc-threads/adapters/electron-main#rpc-threads-adapters/electron-main--INodeThreadHandle",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/rpc-threads/adapters/electron-main#rpc-threads-adapters/electron-main--INodeThreadHandle",
+      "to": "/zh/docs/rpc-threads/adapters/node#INodeThreadHandle",
       "type": "alias-symbol"
     }
   ]

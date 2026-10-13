@@ -266,6 +266,14 @@
             "blocks": [
               {
                 "type": "paragraph",
+                "text": "Process carrier 观察尚未实现：`createProcessTransport(.).transport.observe` 当前不存在。计划中的字节事件包含 `detail.frameBytes`（含 4 字节长度前缀的完整物理帧字节数）与 `detail.drainMs`（物理写入发生回压后等待 drain 的毫秒数），内容捕获仅在 `probe.capturing` 为 true 时启用，并保留原字节引用。Node/Bun/Deno stdio 与 socket 的帧编码、解码和 transport 由 Core 的统一字节通道持有；当前接口未暴露帧观察与真实回压等待。Electron utility process 实际使用 whole-message 通道，仍需确定其 detail 语义。"
+              },
+              {
+                "type": "paragraph",
+                "text": "完成这些接口前，不应将逻辑 send 耗时当作 `drainMs`，也不能声称 Process carrier 已支持观察。"
+              },
+              {
+                "type": "paragraph",
                 "text": "所有错误都带 `(source, code)`，按这两个字段判断，不要依赖 `message` 文本："
               },
               {
@@ -2014,8 +2022,39 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/rpc-process/dist/process/handshake.d.ts:createProcessTransport:export declare function createProcessTransport(channel: IProcessByteChannel, options: IProcessByteOptions): Promise<IRuntimePeerSourceResult>;\nexport declare function createProcessTransport(channel: IProcessMessageChannel, options: IProcessMessageOptions): Promise<IRemoteChannel>;",
-          "guidance": [],
-          "usageScore": 58,
+          "guidance": [
+            {
+              "id": "错误",
+              "heading": "错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Process carrier 观察尚未实现：`createProcessTransport(.).transport.observe` 当前不存在。计划中的字节事件包含 `detail.frameBytes`（含 4 字节长度前缀的完整物理帧字节数）与 `detail.drainMs`（物理写入发生回压后等待 drain 的毫秒数），内容捕获仅在 `probe.capturing` 为 true 时启用，并保留原字节引用。Node/Bun/Deno stdio 与 socket 的帧编码、解码和 transport 由 Core 的统一字节通道持有；当前接口未暴露帧观察与真实回压等待。Electron utility process 实际使用 whole-message 通道，仍需确定其 detail 语义。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "完成这些接口前，不应将逻辑 send 耗时当作 `drainMs`，也不能声称 Process carrier 已支持观察。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "所有错误都带 `(source, code)`，按这两个字段判断，不要依赖 `message` 文本："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "本包错误：`source === '@migaia/rpc/process'`，`code` 取自 `RpcProcessErrorCode`，例如 `PROCESS_CHANNEL_AUTH_REJECTED`、`PROCESS_HANDSHAKE_TIMEOUT`。",
+                    "调用层错误来自 `@migaia/rpc/core`，例如超时 `DEADLINE_EXCEEDED`（`TimeoutError`）、取消 `CANCELLED`（`AbortError`）、过载 `OVERLOADED`。",
+                    "对端业务函数抛出的错误会还原原生类型、`message` 和 `stack`，例如子进程抛 `RangeError('bad input')`，父端收到的也是 `RangeError`。"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "超时、断线或\"结果未知\"都不代表对端没有执行。重试非幂等操作前请先对账，详见 USEGUIDE 第 8 节。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 60,
           "configuration": [],
           "fragment": "rpc-process-index--createProcessTransport"
         },
@@ -4965,7 +5004,7 @@
           "name": "IRuntimeEvent",
           "kind": "type",
           "signature": "export type IRuntimeEvent = Readonly<{ type: RuntimeEventName; name: string; instanceId: string | IRuntimeUnavailable; generation: number | IRuntimeUnavailable; timestamp: number | IRuntimeUnavailable; clock: string; reason?: string; code?: number | IRuntimeUnavailable; signal?: string | IRuntimeUnavailable; error?: Readonly<{ source?: string; code?: string; }>; count?: number; degraded?: readonly string[]; }>;",
-          "declarationLine": 12,
+          "declarationLine": 19,
           "source": "packages/rpc-core/dist/remote/runtime-api/events.d.ts",
           "purpose": "Lifecycle facts contain only the original identity, time and explicitly safe native fields.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeEvent.",
@@ -6840,6 +6879,14 @@
               "blocks": [
                 {
                   "type": "paragraph",
+                  "text": "Process carrier 观察尚未实现：`createProcessTransport(.).transport.observe` 当前不存在。计划中的字节事件包含 `detail.frameBytes`（含 4 字节长度前缀的完整物理帧字节数）与 `detail.drainMs`（物理写入发生回压后等待 drain 的毫秒数），内容捕获仅在 `probe.capturing` 为 true 时启用，并保留原字节引用。Node/Bun/Deno stdio 与 socket 的帧编码、解码和 transport 由 Core 的统一字节通道持有；当前接口未暴露帧观察与真实回压等待。Electron utility process 实际使用 whole-message 通道，仍需确定其 detail 语义。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "完成这些接口前，不应将逻辑 send 耗时当作 `drainMs`，也不能声称 Process carrier 已支持观察。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "所有错误都带 `(source, code)`，按这两个字段判断，不要依赖 `message` 文本："
                 },
                 {
@@ -7712,7 +7759,7 @@
         {
           "name": "createAdapterChildStdio",
           "kind": "function",
-          "signature": "export declare function createAdapterChildStdio(child: IAdapterChildStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "signature": "export declare function createAdapterChildStdio(child: IAdapterChildStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "declarationLine": 13,
           "source": "packages/rpc-process/dist/process/node-io.d.ts",
           "purpose": "Construct the original child pipe channel; Core observes its held resources directly.",
@@ -7726,7 +7773,7 @@
               "optional": false
             }
           ],
-          "returns": "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
+          "returns": "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
           "errors": ["No documented errors are declared for createAdapterChildStdio."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createAdapterChildStdio.",
           "examples": [],
@@ -7734,7 +7781,7 @@
           "aliasOf": "createAdapterChildStdio",
           "exportPath": "./adapters/node-child-process",
           "overloadSignatures": [
-            "export declare function createAdapterChildStdio(child: IAdapterChildStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
+            "export declare function createAdapterChildStdio(child: IAdapterChildStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
           ],
           "overloadParameterDetails": [
             [
@@ -7746,7 +7793,7 @@
             ]
           ],
           "overloadReturns": [
-            "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
+            "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
           ],
           "whenToUse": "Use createAdapterChildStdio when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createAdapterChildStdio does not match the required inputs or return contract.",
@@ -7783,7 +7830,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterChildStdio:export declare function createAdapterChildStdio(child: IAdapterChildStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterChildStdio:export declare function createAdapterChildStdio(child: IAdapterChildStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -7793,7 +7840,7 @@
           "name": "createAdapterNodeProcessLaunch",
           "kind": "function",
           "signature": "export declare function createAdapterNodeProcessLaunch(spec: IProcessSpec, context: IAdapterProcessLaunchContext, options?: IAdapterProcessLaunchOptions): NodeAdapterProcessLaunch;",
-          "declarationLine": 17,
+          "declarationLine": 18,
           "source": "packages/rpc-process/dist/process/node-launch.d.ts",
           "purpose": "Prepare one actual supervised launch before its native spawn or secret write.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createAdapterNodeProcessLaunch.",
@@ -7894,8 +7941,8 @@
         {
           "name": "createAdapterProcessStdio",
           "kind": "function",
-          "signature": "export declare function createAdapterProcessStdio(io: IAdapterProcessStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
-          "declarationLine": 21,
+          "signature": "export declare function createAdapterProcessStdio(io: IAdapterProcessStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "declarationLine": 22,
           "source": "packages/rpc-process/dist/process/node-io.d.ts",
           "purpose": "Construct current stdio without replacing native pause/end behavior.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createAdapterProcessStdio.",
@@ -7908,7 +7955,7 @@
               "optional": false
             }
           ],
-          "returns": "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
+          "returns": "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
           "errors": ["No documented errors are declared for createAdapterProcessStdio."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createAdapterProcessStdio.",
           "examples": [],
@@ -7916,7 +7963,7 @@
           "aliasOf": "createAdapterProcessStdio",
           "exportPath": "./adapters/node-child-process",
           "overloadSignatures": [
-            "export declare function createAdapterProcessStdio(io: IAdapterProcessStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
+            "export declare function createAdapterProcessStdio(io: IAdapterProcessStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
           ],
           "overloadParameterDetails": [
             [
@@ -7928,7 +7975,7 @@
             ]
           ],
           "overloadReturns": [
-            "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
+            "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
           ],
           "whenToUse": "Use createAdapterProcessStdio when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createAdapterProcessStdio does not match the required inputs or return contract.",
@@ -7965,7 +8012,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterProcessStdio:export declare function createAdapterProcessStdio(io: IAdapterProcessStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterProcessStdio:export declare function createAdapterProcessStdio(io: IAdapterProcessStdio): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -8348,8 +8395,8 @@
         {
           "name": "createAdapterSocketByteIO",
           "kind": "function",
-          "signature": "export declare function createAdapterSocketByteIO(socket: Duplex): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
-          "declarationLine": 29,
+          "signature": "export declare function createAdapterSocketByteIO(socket: Duplex): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "declarationLine": 31,
           "source": "packages/rpc-process/dist/process/node-io.d.ts",
           "purpose": "A held shared duplex remains the original borrowed-socket replay class.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createAdapterSocketByteIO.",
@@ -8362,7 +8409,7 @@
               "optional": false
             }
           ],
-          "returns": "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
+          "returns": "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>",
           "errors": ["No documented errors are declared for createAdapterSocketByteIO."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createAdapterSocketByteIO.",
           "examples": [
@@ -8372,7 +8419,7 @@
           "aliasOf": "createAdapterSocketByteIO",
           "exportPath": "./adapters/node-socket",
           "overloadSignatures": [
-            "export declare function createAdapterSocketByteIO(socket: Duplex): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
+            "export declare function createAdapterSocketByteIO(socket: Duplex): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;"
           ],
           "overloadParameterDetails": [
             [
@@ -8384,7 +8431,7 @@
             ]
           ],
           "overloadReturns": [
-            "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
+            "Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>"
           ],
           "whenToUse": "Use createAdapterSocketByteIO when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createAdapterSocketByteIO does not match the required inputs or return contract.",
@@ -8421,7 +8468,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterSocketByteIO:export declare function createAdapterSocketByteIO(socket: Duplex): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
+          "identity": "packages/rpc-process/dist/process/node-io.d.ts:createAdapterSocketByteIO:export declare function createAdapterSocketByteIO(socket: Duplex): Readonly<{ kind: \"byte\"; write(chunk: Uint8Array): Promise<void>; onWrite?(listener: (chunk: Uint8Array, drainMs: number) => void): () => void; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],

@@ -14,7 +14,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "RPC 元数据采集、统计、录制与远程查询工具。Collector 可直接作为 Probe 接入已有宿主；也可用手填 view 驱动本地采集。Core 观察点与 hub 由对应实现提供。"
+                "text": "RPC 元数据采集、统计、录制与跨宿主 hub。Collector 可作为 Probe 接入已有宿主，也可用手填 view 驱动本地采集。Hub 聚合已有 service client 与离线录制；Core 的直接观察路径已提供，Peer、managed source 与 pool member 均转发 probe。"
               },
               {
                 "type": "table",
@@ -30,7 +30,7 @@
                   ],
                   [
                     "`@migaia/rpc-devtools/hub`",
-                    "`createRpcDevtoolsHub` 的类型占位、`RpcDevtoolsTargetStatus` 与 hub 类型"
+                    "`createRpcDevtoolsHub`、target 管理、时钟对齐、timeline、interactions、stats 与离线导入"
                   ],
                   [
                     "`@migaia/rpc-devtools/log`",
@@ -40,7 +40,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`createRpcDevtools()` 返回 collector 自己的 Probe 对象，不创建 Peer、transport 或持久化资源。包为 workspace-private，peer 依赖 `@migaia/rpc-core` 与 `@migaia/rpc-contract`，版本保持一致。Hub 入口仍是同步抛出 `CLOSED` 的占位工厂。"
+                "text": "`createRpcDevtools()` 返回 collector 自己的 Probe 对象，不创建 Peer、transport 或持久化资源。包为 workspace-private，peer 依赖 `@migaia/rpc-core` 与 `@migaia/rpc-contract`，版本保持一致。Hub 接收调用方已有的 target client 或离线录制，不创建连接。"
               }
             ]
           },
@@ -63,11 +63,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "自动排除自身 service 流量尚未完成（R4/D5）：公开 provider context 没有 serving endpoint identity。不要把同一个 collector 也作为 probe 安装到 serving Peer；独立 service Peer 是调用方当前必须遵守的限制，不能代替自动过滤验收。"
+                "text": "Service 使用实际 `IRpcContext.localEndpointId` 排除 serving endpoint；独立 service Peer 使业务 endpoint 仍可观察。结果在 service 边界转换为 portable wire，保留 Error 链与 byte 标签，失败为 `SERVICE_RESULT_INVALID`。远程 watch 取消通过既有 stream signal 释放等待。"
               },
               {
                 "type": "paragraph",
-                "text": "`resume()` 当前恢复构造时的 stages。如果后来通过 `setStages()` 修改订阅，pause/resume 不保留这次修改；恢复暂停前最新订阅（D4）仍缺少可读取当前有效订阅的公开契约。恢复后由调用方重新应用需要的 stages。"
+                "text": "`pause()` 保存最新有效 stages，`resume()` 恢复该选择；构造后 setStages 的修改保留。Query 与 watch 支持 `outcomes`，空列表不匹配任何事件。"
               },
               {
                 "type": "paragraph",
@@ -108,11 +108,38 @@
               },
               {
                 "type": "paragraph",
-                "text": "统计使用 24 个固定 log2 延迟桶，公开边界为 `0.0625 ms × 2^k`，`k = 0…23`。分位数在桶内插值；末桶接收超出最后边界的延迟，其插值上限扩展到已观察到的最大延迟。末桶的误差不能按固定边界宽度承诺。"
+                "text": "统计使用 24 个固定 log2 延迟桶，公开边界为 `0.0625 ms × 2^k`，`k = 0…23`。分位数在桶内插值；末桶从 `latencyOverflowFromMs = 262144` ms 向上开放，公开实际 `latencyMaxMs`；所有分位数钳制到该最大值，末桶没有固定宽度误差承诺。"
+              }
+            ]
+          },
+          {
+            "id": "hub-实时聚合与离线查询",
+            "heading": "Hub · 实时聚合与离线查询",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Hub 不创建 transport 或 Peer。调用方把已有的 `request`/`stream` client 交给 `await hub.addTarget(name, client)`；client 的方法名须与 `IRpcDevtoolsServiceApi` 一致。Hub 先以五次 `describe` 中 RTT 最小的样本对齐时钟，再用 `query` 追上现有事件，最后消费 `watch`。`realignMs` 可启用周期对齐。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'\nimport { RpcDevtoolsRecordFormat, encodeRpcDevtoolsRecord } from '@migaia/rpc-devtools/contract'\n\n/** 离线录制复用 contract codec，不依赖实时 collector。 */\nconst text = encodeRpcDevtoolsRecord({\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 100,\n      endpointId: 'parent',\n      stage: 'message',\n      direction: 'outbound',\n      senderId: 'parent',\n      messageId: 'm1',\n      method: 'read',\n      trace: 'T1'\n    }\n  ]\n})\n/** 每个 target 最多保留 50,000 个事件；关闭由调用方负责。 */\nconst hub = createRpcDevtoolsHub({ maxEvents: 50_000 })\ntry {\n  hub.importRecord('recording', text)\n  console.log(hub.status('recording')) // offline\n  console.log(hub.timeline({ trace: 'T1' })[0]?.alignedAt) // 100\n  console.log(hub.interactions('T1')[0]?.oneSided) // true\n} finally {\n  await hub.close()\n}"
               },
               {
                 "type": "paragraph",
-                "text": "完整契约与后续入口说明见 USEGUIDE。"
+                "text": "`timeline()` 以 k-way merge 合并 target 序列，按对齐时间排序，同时间按 target 名及 `seq` 决定顺序。`interactions(trace?)` 按显式 `trace` 与 `(senderId, messageId)` 关联，并通过同一 target 的 `carrierSeq` 加入对应 carrier；只有一侧的观察标记为 `oneSided`，不会补造缺失事件。`stats(name?)` 转发实时 target 的统计，省略名称时逐桶汇总各 target 的直方图。"
+              },
+              {
+                "type": "paragraph",
+                "text": "返回数组中的事件是已存储引用。未转移的 content、`detail` 与 error 保留引用；发送后修改原对象可能改变后续读取。详见 USEGUIDE 的生命周期、时钟误差与引用语义。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Revision 3 的 carrierSeq 是同一 target 内的 carrier 链接；collector 转换 Core 的本地序号，hub 在真实 decode 身份到达后增量关联。仓库 carrier 都同步在 send 内 emit，第三方异步 emit 没有 outbound context。Native Peer 不自动携带 trace，应用通过自己的 Endpoint.send 显式传递。前序匿名 chunks 当前不能全部归入 interaction，详见 Core USEGUIDE 和 closure handoff。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`capture` 默认关闭；log probe 支持 capture/redact。Nested transferable 保留引用，可能分离；不深扫描或复制容器，也不额外读取 getter。Metadata 的未知字符串/容器大小为 -1，直接 native bytes 保留已知长度。"
               }
             ]
           }
@@ -126,7 +153,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "Collector 和 log probe 已提供本地实现，codec 保持既有契约。Hub 仍为占位工厂；Core 的真实观察点由 probe-core 实现提供。"
+                "text": "Collector、log probe 和 hub 已提供本地实现，codec 保持既有契约。Core 的直接观察路径已提供；Peer 转发、service 便携结果与 carrier 关联已接通；数值性能门禁及匿名前序 chunk 的限制见 closure handoff。"
               }
             ]
           },
@@ -182,15 +209,15 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport {\n  RpcProbeStage,\n  RpcProbeDirection,\n  RpcProbeKind,\n  RpcProbeOutcome,\n  type IRpcProbeEventView\n} from '@migaia/rpc-core/probe'\n\n/** 每个宿主一个 collector，主查询环保留最近事件。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 4 })\n/** 仅本例手填元数据；真实 emitter 在同步调用间复用同一 view。 */\nconst view: IRpcProbeEventView = {\n  seq: 0,\n  at: 0,\n  endpointId: 'client',\n  stage: RpcProbeStage.message,\n  direction: RpcProbeDirection.outbound,\n  kind: RpcProbeKind.request,\n  outcome: RpcProbeOutcome.settled,\n  messageId: 'call-1',\n  method: 'math.double',\n  senderId: 'client',\n  targetId: 'server',\n  receiverId: undefined,\n  peerId: undefined,\n  trace: 'trace-1',\n  sizeBytes: -1,\n  chunkIndex: -1,\n  chunkCount: -1,\n  members: -1,\n  durationMs: 2,\n  rejection: undefined,\n  lifecycle: undefined,\n  error: undefined,\n  carrier: undefined,\n  detail: undefined,\n  content: undefined\n}\n/** 录制使用独立容量，停止时才物化离线事件。 */\nconst recording = devtools.record({ maxEvents: 8 })\ndevtools.emit(view)\nview.method = 'math.changed' // 已写入的顶层元数据不再读取 view。\nconsole.log(devtools.query({ methods: ['math.double'] }).events[0]?.method)\nconsole.log(devtools.stats().methods[0]?.calls) // 1\n/** next() 开始订阅，后续写入唤醒当前消费者。 */\nconst watcher = devtools.watch({ stages: ['message'] })\nconst next = watcher.next()\ndevtools.emit(view)\nconsole.log((await next).value?.events.length) // 1\nawait watcher.return(undefined)\ndevtools.pause()\ndevtools.emit(view) // 计入 ignoredWhilePaused。\ndevtools.resume()\nconsole.log(devtools.query().counters.ignoredWhilePaused) // 1\n/** Codec 边界把录制转成独立 NDJSON 表示。 */\nconst text = devtools.exportRecord(recording.stop())\nconsole.log(devtools.importRecord(text).events.length) // 2\ndevtools.clear()\nconsole.log(devtools.stats().methods.length) // 0\ndevtools.close()"
+                "code": "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport {\n  RpcProbeStage,\n  RpcProbeDirection,\n  RpcProbeKind,\n  RpcProbeOutcome,\n  type IRpcProbeEventView\n} from '@migaia/rpc-core/probe'\n\n/** 每个宿主一个 collector，主查询环保留最近事件。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 4 })\n/** 仅本例手填元数据；真实 emitter 在同步调用间复用同一 view。 */\nconst view: IRpcProbeEventView = {\n  seq: 0,\n  carrierSeq: -1,\n  at: 0,\n  endpointId: 'client',\n  stage: RpcProbeStage.message,\n  direction: RpcProbeDirection.outbound,\n  kind: RpcProbeKind.request,\n  outcome: RpcProbeOutcome.settled,\n  messageId: 'call-1',\n  method: 'math.double',\n  senderId: 'client',\n  targetId: 'server',\n  receiverId: undefined,\n  peerId: undefined,\n  trace: 'trace-1',\n  sizeBytes: -1,\n  chunkIndex: -1,\n  chunkCount: -1,\n  members: -1,\n  durationMs: 2,\n  rejection: undefined,\n  lifecycle: undefined,\n  error: undefined,\n  carrier: undefined,\n  detail: undefined,\n  content: undefined\n}\n/** 录制使用独立容量，停止时才物化离线事件。 */\nconst recording = devtools.record({ maxEvents: 8 })\ndevtools.emit(view)\nview.method = 'math.changed' // 已写入的顶层元数据不再读取 view。\nconsole.log(devtools.query({ methods: ['math.double'] }).events[0]?.method)\nconsole.log(devtools.stats().methods[0]?.calls) // 1\n/** next() 开始订阅，后续写入唤醒当前消费者。 */\nconst watcher = devtools.watch({ stages: ['message'] })\nconst next = watcher.next()\ndevtools.emit(view)\nconsole.log((await next).value?.events.length) // 1\nawait watcher.return(undefined)\ndevtools.pause()\ndevtools.emit(view) // 计入 ignoredWhilePaused。\ndevtools.resume()\nconsole.log(devtools.query().counters.ignoredWhilePaused) // 1\n/** Codec 边界把录制转成独立 NDJSON 表示。 */\nconst text = devtools.exportRecord(recording.stop())\nconsole.log(devtools.importRecord(text).events.length) // 2\ndevtools.clear()\nconsole.log(devtools.stats().methods.length) // 0\ndevtools.close()"
               },
               {
                 "type": "paragraph",
-                "text": "`query({ afterSeq, limit, stages, methods, trace, endpointIds })` 在保留环上单次扫描；`limit` 最大为 1,000，`nextSeq` 是下页 cursor。驻留表满后，新名称使用溢出 id 0 并增加 `internOverflow`；已有名称仍可还原。Watch 每批最多 256 个事件，每个消费者最多排队 64 批；过慢时丢弃最旧批次，下一批的 `dropped` 报告损失。`close()` 使等待中的 watch 以 `CLOSED` 结束，重复 close 安全。"
+                "text": "`query({ afterSeq, limit, stages, outcomes, methods, trace, endpointIds })` 在保留环上单次扫描；`limit` 最大为 1,000，`nextSeq` 是下页 cursor。驻留表满后，新名称使用溢出 id 0 并增加 `internOverflow`；已有名称仍可还原。Watch 每批最多 256 个事件，每个消费者最多排队 64 批；过慢时丢弃最旧批次，下一批的 `dropped` 报告损失。`close()` 使等待中的 watch 以 `CLOSED` 结束，重复 close 安全。"
               },
               {
                 "type": "paragraph",
-                "text": "`pause()` 清空 emitter 订阅，`resume()` 当前只恢复构造时传入的 stages。如果构造后使用公开 `setStages()` 修改过订阅，pause/resume 后需要重新调用 `setStages()` 应用该列表。D4 要求恢复暂停前的最新订阅；当前 host 的公开 stageMask 仍是初始值，也没有当前订阅读取入口，因此该要求尚未完成。"
+                "text": "`pause()` 保存暂停前最新订阅并清空 emitter mask，重复暂停不覆盖保存值；`resume()` 恢复该列表。构造后 `setStages()` 增加的阶段保留。Query 与 watch 的 `outcomes` 使用同一公开 outcome 名称域，空列表匹配零行。"
               },
               {
                 "type": "paragraph",
@@ -206,7 +233,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`stats()` 按 endpoint 和 method 提供调用、失败、拒绝、超时、取消计数，以及 24 个固定 log2 延迟桶：公开边界为 `0.0625 ms × 2^k`，`k = 0…23`。p50/p95/p99 在桶内插值；超出末边界的延迟进入最后一桶，其插值上限扩展为观察到的最大值，因此末桶误差不能按固定边界宽度承诺。仅携带非负 durationMs 的 settled/failed/rejected message 事件更新统计；环淘汰不影响累计值，`clear()` 同时重置环与统计。"
+                "text": "`stats()` 按 endpoint 和 method 提供调用、失败、拒绝、超时、取消计数，以及 24 个固定 log2 延迟桶：公开边界为 `0.0625 ms × 2^k`，`k = 0…23`。末桶从 `latencyOverflowFromMs = 262144` ms 向上开放，`latencyMaxMs` 给出实际最大样本。p50/p95/p99 在桶内插值并钳制到观察到的最大值；末桶没有固定宽度误差承诺。Hub 汇总所有带最大值的行时保留同一上界；旧 target 未提供最大值时不伪造它。仅携带非负 durationMs 的 settled/failed/rejected message 事件更新统计；环淘汰不影响累计值，`clear()` 同时重置环与统计。"
               }
             ]
           },
@@ -225,7 +252,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "远端 `devtools.watch` 用 Peer 的 `stream('devtools.watch', filters)` 消费；停止消费时关闭流。不要把同一个 collector 也作为 probe 安装到 serving Peer，service 流量会进入采集并可能反馈到 watch。自动识别并过滤自身 service endpoint 的 R4/D5 尚未完成：公开 provider context 缺少本地 endpoint identity。使用独立 service Peer 是当前的调用方限制，不是自动过滤的实现。合法业务 method 可以使用 `devtools.*` 名称，collector 不通过名称前缀删除事件。"
+                "text": "远端 `devtools.watch` 用 Peer 的 `stream('devtools.watch', filters)` 消费；远程取消通过原 stream signal 唤醒并释放 collector 等待。Service 从 provider 的 `localEndpointId` 识别 serving endpoint，排除其后续摄取以及 query/stats 中已有的该 endpoint 行。使用独立 service Peer，使业务 endpoint 保持可观察；合法业务 method 可以使用 `devtools.*` 名称，collector 不按方法前缀删除事件。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Service 在真实边界转换结果为 portable wire：原生 Error 通过 serializeRpcError 保留 source/code/name/message/stack/cause 链；bytes 使用既有 portable 表示，functions、undefined 与类 prototype 不跨线。无法编码时抛出带原 cause 的 TypeError / SERVICE_RESULT_INVALID。"
               },
               {
                 "type": "paragraph",
@@ -234,16 +265,53 @@
             ]
           },
           {
-            "id": "3-hub-契约",
-            "heading": "3. Hub 契约",
+            "id": "3-hub-已有-client-与离线录制",
+            "heading": "3. Hub · 已有 client 与离线录制",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`createRpcDevtoolsHub(options)` 的选项为 `maxEvents`、`realignMs` 与 `onError`。Hub 类型接收由调用方提供、具有 `request` 与 `stream` 的 target client；它不创建 transport。"
+                "text": "`createRpcDevtoolsHub(options)` 的选项为 `maxEvents`、`realignMs` 与 `onError`。`maxEvents` 是每个 target 的保留上限，默认 50,000；超出后淘汰最旧事件，并从 interaction 索引移除。周期对齐使用 `realignMs`；旧设计文字中的 `realign` 不是另一个选项。"
               },
               {
                 "type": "paragraph",
-                "text": "`IRpcDevtoolsHub` 声明 target 管理、离线 record 导入、timeline、interactions、stats、事件订阅与关闭。`RpcDevtoolsTargetStatus` 提供 `connecting`、`connected`、`disconnected`、`offline`、`removed`，这些是状态而非错误码。当前 `createRpcDevtoolsHub()` 抛出 `CLOSED`；hub 行为合入后才可使用。"
+                "text": "调用方提供实现 `IRpcDevtoolsTargetClient` 的已有 client。Hub 只调用该 client 的 `request('describe')`、`request('query', input)`、`request('stats')` 与 `stream('watch', input)`，不创建 transport、Peer 或重连机制。如果现有 Peer 使用嵌套 service 路径，由调用方在 client 边界映射为这些方法名。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRpcDevtoolsHub, type IRpcDevtoolsTargetClient } from '@migaia/rpc-devtools/hub'\n\n/** 聚合调用方已经建立的两个 devtools service client。 */\nexport async function inspectHosts(\n  parentClient: IRpcDevtoolsTargetClient,\n  workerClient: IRpcDevtoolsTargetClient\n) {\n  /** onError 接收原始运行时失败；hub 不创建这些连接。 */\n  const hub = createRpcDevtoolsHub({\n    maxEvents: 50_000,\n    realignMs: 30_000,\n    onError: (error) => console.error(error)\n  })\n  /** 订阅函数返回解除监听的函数。 */\n  const unsubscribe = hub.on('status', (name, status) => console.log(name, status))\n  try {\n    await hub.addTarget('parent', parentClient)\n    await hub.addTarget('worker', workerClient)\n    console.log(hub.timeline({ trace: 'T1', limit: 100 }))\n    console.log(hub.interactions('T1'))\n    console.log(await hub.stats())\n    await hub.removeTarget('worker')\n  } finally {\n    unsubscribe()\n    await hub.close()\n  }\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "连接时依次取五个 `describe` 时钟样本，保留 RTT 最小的样本。`offset = remoteNow − (t0 + t1) / 2`，`uncertaintyMs = RTT / 2`，`alignedAt = event.at − offset`。该估算依赖往返延迟对称假设；读取 `uncertaintyMs`，不要把对齐时间当成无误差时钟。初始化先按 `afterSeq` 分页执行 `query`，追上后跟随 `watch`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`on('event', listener)` 提供新摄入的 timeline 事件；`on('status', listener)` 发布 `connecting`、`connected`、`disconnected`、`offline` 与 `removed`。`status(name)` 返回指定 target 的状态，省略名称时返回状态 Map。这些是生命周期值，不是错误码。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`timeline({ targets, stages, trace, method, from, to, limit })` 可筛选 target、stage、显式 trace、method、对齐时间范围与结果数量。每个 target 保持 `seq` 顺序，跨 target 用 k-way merge 按 `alignedAt` 合并；同时间先按 target 名、再按 `seq` 排序。`interactions(trace?)` 查询增量索引，按 `(senderId, messageId)` 关联两侧和响应。相同非空 trace 可查询到多跳 interaction；只有一侧时 `oneSided` 为 `true`。Hub 不自动传播 trace，不推断缺失侧，也不重新发起业务调用。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`stats(name)` 转发指定实时 target 的统计；`stats()` 逐 endpoint/method 汇总计数，并逐桶相加固定延迟直方图后计算分位数。聚合不平均各 target 的 p50/p95/p99。Record v1 不保存聚合统计；离线 target 的 stats 返回 `{ since: 0, methods: [] }`，汇总时不补造离线计数。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`importRecord(name, text)` 使用 contract NDJSON codec 注册只读 `offline` target，不连接远程 service。离线事件的 `alignedAt` 等于原 `at`，`uncertaintyMs` 为 `undefined`；导入不恢复录制时的时钟偏移。可用 `timeline` 与 `interactions` 查询这些事件。"
+              },
+              {
+                "type": "paragraph",
+                "text": "引用语义（SC9）： Hub 在摄入时创建一次 timeline 元数据包装，并保留内部事件引用。`timeline()` 与 `interactions()` 的结果数组复用这些已存储元素，不为每次查询复制事件。未实际转移的 content、`detail` 与 error 仍按引用保存，发送后修改原对象可能反映在后续读取中。周期重新对齐会更新已存储包装的 `alignedAt`；此前取得的引用也能看到新值。调用方不要修改这些只读结果。离线 codec 编解码是表示转换边界，返回独立的 wire/text 表示。"
+              },
+              {
+                "type": "paragraph",
+                "text": "失败与释放： 重复 target 名抛出 `TARGET_DUPLICATE`。移除未知名称抛出 `TARGET_UNKNOWN`，重复移除已经移除的名称无害。初始化 `describe` 失败时，target 变为 `disconnected`，原错误交给 `onError`，`addTarget` 以同一错误拒绝。运行中的 `watch` 中断会报告失败并保留已收到事件；hub 不自动重试。Listener 失败报告给 `onError`，其他 listener 继续运行。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`close()` 停止所有 watch，重复关闭无害。释放失败汇总为 `AggregateError` 并报告，`errors[0]` 保留第一个原错误。关闭后的操作抛出 `CLOSED`，重复 `close()` 除外。Hub 只释放自己持有的 watch 与状态；调用方仍负责已有 client/Peer 的生命周期。"
               }
             ]
           },
@@ -253,7 +321,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE` 与 `TARGET_UNKNOWN`。Collector 配置和生命周期错误已实现；hub 相关运行时错误仍由 hub 实现提供。"
+                "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE`、`TARGET_UNKNOWN` 与 `SERVICE_RESULT_INVALID`。Collector 与 hub 的配置和生命周期错误已实现；hub client 的运行时错误按原身份报告，不被 target 状态值替换。"
               }
             ]
           },
@@ -275,7 +343,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "不要在自定义 `emit` 中把 `view` 本身放进异步 logger。View 只在同步 emit 期间有效，异步输出时常已变成下一事件。Log probe 先按整数 outcome/kind 做决定，再同步提取 method、messageId、senderId、targetId、trace、durationMs、outcome、kind、rejection、lifecycle、peerId 与 error。字段对象不随 view 复用变化；error 保留原实例，content 默认不记录。`content: true` 为订阅阶段请求捕获；view 的 content 来自 emitter 已完成的捕获/脱敏路径，嵌套引用仍可能被调用方修改。冻结的 log options 没有自定义 `redact` 参数；需要专门脱敏策略时先在 owning Probe/emitter 配置。"
+                "text": "不要在自定义 `emit` 中把 `view` 本身放进异步 logger。View 只在同步 emit 期间有效，异步输出时常已变成下一事件。Log probe 先按整数 outcome/kind 做决定，再同步提取 method、messageId、senderId、targetId、trace、durationMs、outcome、kind、rejection、lifecycle、peerId 与 error。字段对象不随 view 复用变化；error 保留原实例，content 默认不记录。`content: true` 为订阅阶段请求捕获；view 的 content 来自 emitter 已完成的捕获/脱敏路径，嵌套引用仍可能被调用方修改。`capture` 与 `redact` 原样传给 defineProbe；`content: true` 保留旧便利选项。"
+              },
+              {
+                "type": "paragraph",
+                "text": "异步 logger thenable 的拒绝观察使用一个 reaction Promise，这是授权的 logger 路径，默认 collector/业务路径不添加 Promise。"
               },
               {
                 "type": "paragraph",
@@ -289,6 +361,10 @@
                 "type": "code",
                 "language": "ts",
                 "code": "import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, level } from '@migaia/logger/plugins'\nimport { file } from '@migaia/logger/plugins/file'\nimport { createRpcLogProbe } from '@migaia/rpc-devtools/log'\n\n/** 示例用内存代替文件 I/O；生产 fs 能力仍由 Logger 拥有。 */\nconst lines: string[] = []\n/** 注入拥有独立恢复句柄，关闭 Logger 后归还环境。 */\nconst restore = setLoggerRuntimeManager({\n  randomUUID: () => 'doc-log',\n  defer: (task) => queueMicrotask(task),\n  write: () => undefined,\n  fs: {\n    async append(_path, text) {\n      lines.push(text)\n    }\n  }\n})\n/** level 方法只入队，batch/file 接管输出与收尾。 */\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'debug', asyncOutput: true }),\n    batch({ maxSize: 20, maxWaitMs: 1_000, asyncOutput: true }),\n    file({ path: 'logs/rpc.jsonl' })\n  ]\n})\ntry {\n  /** 传给已有 Peer 的 probe；本例只展示 logger 配置。 */\n  const probe = createRpcLogProbe(logger, { slowMs: 200 })\n  console.log(probe.stageMask)\n  logger.info('RPC logger ready', { slowMs: 200 })\n  await logger.flush()\n  console.log(lines.length > 0) // true\n} finally {\n  await logger.shutdown('manual')\n  restore()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`carrierSeq` 在 wire 中引用同一 collector/target 的 carrier 行；hub 不混用不同 target 的序号。Outbound 直接按 senderId:messageId 入索引；inbound 匿名 protected/frame 保留数字链接，真实 decode envelope 提供身份后加入该 interaction。摄取关联行时若原 carrier 已在所有环中淘汰，链接省略；之后淘汰可留下已记录的序号，hub 不补造丢失的 carrier。Frame 内容与 nested transfer 都按引用保存；Byte detail 的 drainMs 在原生 drain 后可更新，显式顶层快照也不会深复制 detail。"
               }
             ]
           }
@@ -334,7 +410,7 @@
           "errors": ["No documented errors are declared for createRpcDevtools."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRpcDevtools.",
           "examples": [
-            "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport {\n  RpcProbeStage,\n  RpcProbeDirection,\n  RpcProbeKind,\n  RpcProbeOutcome,\n  type IRpcProbeEventView\n} from '@migaia/rpc-core/probe'\n\n/** 每个宿主一个 collector，主查询环保留最近事件。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 4 })\n/** 仅本例手填元数据；真实 emitter 在同步调用间复用同一 view。 */\nconst view: IRpcProbeEventView = {\n  seq: 0,\n  at: 0,\n  endpointId: 'client',\n  stage: RpcProbeStage.message,\n  direction: RpcProbeDirection.outbound,\n  kind: RpcProbeKind.request,\n  outcome: RpcProbeOutcome.settled,\n  messageId: 'call-1',\n  method: 'math.double',\n  senderId: 'client',\n  targetId: 'server',\n  receiverId: undefined,\n  peerId: undefined,\n  trace: 'trace-1',\n  sizeBytes: -1,\n  chunkIndex: -1,\n  chunkCount: -1,\n  members: -1,\n  durationMs: 2,\n  rejection: undefined,\n  lifecycle: undefined,\n  error: undefined,\n  carrier: undefined,\n  detail: undefined,\n  content: undefined\n}\n/** 录制使用独立容量，停止时才物化离线事件。 */\nconst recording = devtools.record({ maxEvents: 8 })\ndevtools.emit(view)\nview.method = 'math.changed' // 已写入的顶层元数据不再读取 view。\nconsole.log(devtools.query({ methods: ['math.double'] }).events[0]?.method)\nconsole.log(devtools.stats().methods[0]?.calls) // 1\n/** next() 开始订阅，后续写入唤醒当前消费者。 */\nconst watcher = devtools.watch({ stages: ['message'] })\nconst next = watcher.next()\ndevtools.emit(view)\nconsole.log((await next).value?.events.length) // 1\nawait watcher.return(undefined)\ndevtools.pause()\ndevtools.emit(view) // 计入 ignoredWhilePaused。\ndevtools.resume()\nconsole.log(devtools.query().counters.ignoredWhilePaused) // 1\n/** Codec 边界把录制转成独立 NDJSON 表示。 */\nconst text = devtools.exportRecord(recording.stop())\nconsole.log(devtools.importRecord(text).events.length) // 2\ndevtools.clear()\nconsole.log(devtools.stats().methods.length) // 0\ndevtools.close()",
+            "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport {\n  RpcProbeStage,\n  RpcProbeDirection,\n  RpcProbeKind,\n  RpcProbeOutcome,\n  type IRpcProbeEventView\n} from '@migaia/rpc-core/probe'\n\n/** 每个宿主一个 collector，主查询环保留最近事件。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 4 })\n/** 仅本例手填元数据；真实 emitter 在同步调用间复用同一 view。 */\nconst view: IRpcProbeEventView = {\n  seq: 0,\n  carrierSeq: -1,\n  at: 0,\n  endpointId: 'client',\n  stage: RpcProbeStage.message,\n  direction: RpcProbeDirection.outbound,\n  kind: RpcProbeKind.request,\n  outcome: RpcProbeOutcome.settled,\n  messageId: 'call-1',\n  method: 'math.double',\n  senderId: 'client',\n  targetId: 'server',\n  receiverId: undefined,\n  peerId: undefined,\n  trace: 'trace-1',\n  sizeBytes: -1,\n  chunkIndex: -1,\n  chunkCount: -1,\n  members: -1,\n  durationMs: 2,\n  rejection: undefined,\n  lifecycle: undefined,\n  error: undefined,\n  carrier: undefined,\n  detail: undefined,\n  content: undefined\n}\n/** 录制使用独立容量，停止时才物化离线事件。 */\nconst recording = devtools.record({ maxEvents: 8 })\ndevtools.emit(view)\nview.method = 'math.changed' // 已写入的顶层元数据不再读取 view。\nconsole.log(devtools.query({ methods: ['math.double'] }).events[0]?.method)\nconsole.log(devtools.stats().methods[0]?.calls) // 1\n/** next() 开始订阅，后续写入唤醒当前消费者。 */\nconst watcher = devtools.watch({ stages: ['message'] })\nconst next = watcher.next()\ndevtools.emit(view)\nconsole.log((await next).value?.events.length) // 1\nawait watcher.return(undefined)\ndevtools.pause()\ndevtools.emit(view) // 计入 ignoredWhilePaused。\ndevtools.resume()\nconsole.log(devtools.query().counters.ignoredWhilePaused) // 1\n/** Codec 边界把录制转成独立 NDJSON 表示。 */\nconst text = devtools.exportRecord(recording.stop())\nconsole.log(devtools.importRecord(text).events.length) // 2\ndevtools.clear()\nconsole.log(devtools.stats().methods.length) // 0\ndevtools.close()",
             "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport type { IRpcDevtoolsServiceApi } from '@migaia/rpc-devtools/contract'\nimport { createPeerPair } from '@migaia/rpc-core/testing'\n\n/** Service 专用 Peer 不安装 collector 作为 probe，避免观察自己的查询流量。 */\nconst devtools = createRpcDevtools({ maxEvents: 32 })\n/** 这里的类型断言公开冻结的 service 契约，供 typed Peer 推断方法。 */\nconst pair = await createPeerPair({\n  a: { provide: {} },\n  b: { provide: { devtools: devtools.service as IRpcDevtoolsServiceApi } }\n})\ntry {\n  console.log((await pair.a.request('devtools.describe')).limits.maxEvents) // 32\n  console.log((await pair.a.request('devtools.query', { stages: ['message'] })).events.length)\n  await pair.a.request('devtools.record.start', { maxEvents: 8 })\n  console.log(devtools.importRecord(await pair.a.request('devtools.record.stop')).header.version)\n  await pair.a.request('devtools.pause')\n  await pair.a.request('devtools.resume')\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n  devtools.close()\n}",
             "import { createRpcDevtools } from '@migaia/rpc-devtools'\n\n/** 默认只采集元数据；调用方拥有 collector 生命周期。 */\nconst devtools = createRpcDevtools({ stages: ['message'], maxEvents: 1_000 })\n/** 独立录制环不受主查询环的淘汰影响。 */\nconst recording = devtools.record({ maxEvents: 100 })\ndevtools.pause()\nconsole.log(devtools.describe().paused) // true\ndevtools.resume()\nconsole.log(devtools.query().events.length, devtools.stats().methods.length) // 0 0\nconsole.log(devtools.importRecord(devtools.exportRecord(recording.stop())).header.version) // 1\ndevtools.close()"
           ],
@@ -546,9 +622,9 @@
           "ownerFragment": "rpc-devtools-contract--RPC_DEVTOOLS_SOURCE"
         },
         {
-          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
+          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: \"SERVICE_RESULT_INVALID\"; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
           "name": "RpcDevtoolsErrorCode",
-          "signature": "export declare const RpcDevtoolsErrorCode: { /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
+          "signature": "export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: \"SERVICE_RESULT_INVALID\"; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
           "source": "packages/rpc-devtools/dist/error-code.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./contract",
@@ -676,7 +752,8 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for encodeRpcDevtoolsRecord.",
           "examples": [
             "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 0,\n      endpointId: 'client',\n      stage: 'message',\n      direction: 'outbound',\n      kind: 'request',\n      method: '读取',\n      content: new Uint8Array([1, 2, 3])\n    }\n  ]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
-            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1"
+            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1",
+            "import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'\nimport { RpcDevtoolsRecordFormat, encodeRpcDevtoolsRecord } from '@migaia/rpc-devtools/contract'\n\n/** 离线录制复用 contract codec，不依赖实时 collector。 */\nconst text = encodeRpcDevtoolsRecord({\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 100,\n      endpointId: 'parent',\n      stage: 'message',\n      direction: 'outbound',\n      senderId: 'parent',\n      messageId: 'm1',\n      method: 'read',\n      trace: 'T1'\n    }\n  ]\n})\n/** 每个 target 最多保留 50,000 个事件；关闭由调用方负责。 */\nconst hub = createRpcDevtoolsHub({ maxEvents: 50_000 })\ntry {\n  hub.importRecord('recording', text)\n  console.log(hub.status('recording')) // offline\n  console.log(hub.timeline({ trace: 'T1' })[0]?.alignedAt) // 100\n  console.log(hub.interactions('T1')[0]?.oneSided) // true\n} finally {\n  await hub.close()\n}"
           ],
           "members": [],
           "aliasOf": "encodeRpcDevtoolsRecord",
@@ -731,7 +808,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-devtools/dist/contract/record-codec.d.ts:encodeRpcDevtoolsRecord:export declare function encodeRpcDevtoolsRecord(record: IRpcDevtoolsRecord): string;",
           "guidance": [],
-          "usageScore": 28,
+          "usageScore": 38,
           "configuration": [],
           "fragment": "rpc-devtools-contract--encodeRpcDevtoolsRecord"
         },
@@ -739,7 +816,7 @@
           "name": "IRpcDevtoolsCounters",
           "kind": "type",
           "signature": "export type IRpcDevtoolsCounters = Readonly<{ evicted: number; contentDropped: number; droppedReentrant: number; sampledOut: number; ignoredWhilePaused: number; ignoredAfterClose: number; internOverflow: number; }>;",
-          "declarationLine": 13,
+          "declarationLine": 15,
           "source": "packages/rpc-devtools/dist/contract/service.d.ts",
           "purpose": "Loss counters explain bounded retention, interning and the collector's lifecycle decisions.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsCounters.",
@@ -802,7 +879,7 @@
           "name": "IRpcDevtoolsDescribe",
           "kind": "type",
           "signature": "export type IRpcDevtoolsDescribe = Readonly<{ version: string; now: number; paused: boolean; descriptors: readonly IRpcProbeDescriptor[]; limits: Readonly<{ maxEvents: number; maxContentBytes: number; }>; counters: IRpcDevtoolsCounters; }>;",
-          "declarationLine": 50,
+          "declarationLine": 57,
           "source": "packages/rpc-devtools/dist/contract/service.d.ts",
           "purpose": "Describe supplies the target's current clock sample, active descriptors and retention limits.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsDescribe.",
@@ -865,7 +942,7 @@
           "name": "IRpcDevtoolsErrorCode",
           "kind": "type",
           "signature": "export type IRpcDevtoolsErrorCode = (typeof RpcDevtoolsErrorCode)[keyof typeof RpcDevtoolsErrorCode];",
-          "declarationLine": 26,
+          "declarationLine": 31,
           "source": "packages/rpc-devtools/dist/error-code.d.ts",
           "purpose": "Semantic code union retains the registry's exact value spelling.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsErrorCode.",
@@ -929,7 +1006,7 @@
           "name": "IRpcDevtoolsPage",
           "kind": "type",
           "signature": "export type IRpcDevtoolsPage = Readonly<{ events: readonly IRpcDevtoolsWireEvent[]; nextSeq: number; counters: IRpcDevtoolsCounters; }>;",
-          "declarationLine": 23,
+          "declarationLine": 25,
           "source": "packages/rpc-devtools/dist/contract/service.d.ts",
           "purpose": "Pages carry the next sequence cursor and the loss counters observed with that snapshot.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsPage.",
@@ -991,7 +1068,7 @@
         {
           "name": "IRpcDevtoolsQuery",
           "kind": "type",
-          "signature": "export type IRpcDevtoolsQuery = Readonly<{ afterSeq?: number; limit?: number; stages?: readonly string[]; methods?: readonly string[]; trace?: string; endpointIds?: readonly string[]; }>;",
+          "signature": "export type IRpcDevtoolsQuery = Readonly<{ afterSeq?: number; limit?: number; stages?: readonly string[]; /** Selects canonical outcome names before the numeric event scan or watch ingestion. */ outcomes?: readonly string[]; methods?: readonly string[]; trace?: string; endpointIds?: readonly string[]; }>;",
           "declarationLine": 4,
           "source": "packages/rpc-devtools/dist/contract/service.d.ts",
           "purpose": "Query limits are at most 1,000; filters are applied to one collector's retained sequence.",
@@ -1006,7 +1083,7 @@
           "members": [],
           "exportPath": "./contract",
           "overloadSignatures": [
-            "export type IRpcDevtoolsQuery = Readonly<{ afterSeq?: number; limit?: number; stages?: readonly string[]; methods?: readonly string[]; trace?: string; endpointIds?: readonly string[]; }>;"
+            "export type IRpcDevtoolsQuery = Readonly<{ afterSeq?: number; limit?: number; stages?: readonly string[]; /** Selects canonical outcome names before the numeric event scan or watch ingestion. */ outcomes?: readonly string[]; methods?: readonly string[]; trace?: string; endpointIds?: readonly string[]; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1045,7 +1122,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsQuery:export type IRpcDevtoolsQuery = Readonly<{ afterSeq?: number; limit?: number; stages?: readonly string[]; methods?: readonly string[]; trace?: string; endpointIds?: readonly string[]; }>;",
+          "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsQuery:export type IRpcDevtoolsQuery = Readonly<{ afterSeq?: number; limit?: number; stages?: readonly string[]; /** Selects canonical outcome names before the numeric event scan or watch ingestion. */ outcomes?: readonly string[]; methods?: readonly string[]; trace?: string; endpointIds?: readonly string[]; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -1250,7 +1327,7 @@
           "name": "IRpcDevtoolsServiceApi",
           "kind": "type",
           "signature": "export type IRpcDevtoolsServiceApi = { describe(): IRpcDevtoolsDescribe; query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; stats(): IRpcDevtoolsStats; record: { start(input?: Readonly<{ maxEvents?: number; }>): void; stop(): string; }; clear(): void; pause(): void; resume(): void; };",
-          "declarationLine": 67,
+          "declarationLine": 74,
           "source": "packages/rpc-devtools/dist/contract/service.d.ts",
           "purpose": "Users attach this nested service object to their existing Peer; it owns no connection.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsServiceApi.",
@@ -1307,17 +1384,17 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsServiceApi:export type IRpcDevtoolsServiceApi = { describe(): IRpcDevtoolsDescribe; query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; stats(): IRpcDevtoolsStats; record: { start(input?: Readonly<{ maxEvents?: number; }>): void; stop(): string; }; clear(): void; pause(): void; resume(): void; };",
           "guidance": [],
-          "usageScore": 18,
+          "usageScore": 20,
           "configuration": [],
           "fragment": "rpc-devtools-contract--IRpcDevtoolsServiceApi"
         },
         {
           "name": "IRpcDevtoolsStats",
           "kind": "type",
-          "signature": "export type IRpcDevtoolsStats = Readonly<{ since: number; methods: readonly Readonly<{ endpointId: string; method: string; calls: number; failed: number; rejected: number; timedOut: number; aborted: number; latencyBucketsMs: readonly number[]; latencyCounts: readonly number[]; p50Ms: number; p95Ms: number; p99Ms: number; }>[]; }>;",
-          "declarationLine": 32,
+          "signature": "export type IRpcDevtoolsStats = Readonly<{ since: number; methods: readonly Readonly<{ endpointId: string; method: string; calls: number; failed: number; rejected: number; timedOut: number; aborted: number; latencyBucketsMs: readonly number[]; latencyCounts: readonly number[]; /** The final bucket has no upper bound; this value is its exclusive lower boundary. */ latencyOverflowFromMs?: number; /** Observed maximum bounds interpolation honestly, including the open terminal bucket. */ latencyMaxMs?: number; p50Ms: number; p95Ms: number; p99Ms: number; }>[]; }>;",
+          "declarationLine": 35,
           "source": "packages/rpc-devtools/dist/contract/service.d.ts",
-          "purpose": "Histograms use 24 boundaries, 0.0625 ms × 2^k for k=0…23. Percentiles interpolate within a bucket, with error bounded by its width; ring eviction does not reset these aggregates.",
+          "purpose": "Histograms use 24 boundaries, 0.0625 ms × 2^k for k=0…23. Percentiles interpolate within a bounded bucket. The terminal bucket is open above latencyOverflowFromMs; quantiles are clamped to latencyMaxMs. Ring eviction does not reset these aggregates.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsStats.",
           "advanced": "No additional advanced behavior is declared for IRpcDevtoolsStats.",
           "parameters": ["This type declaration has no parameters."],
@@ -1329,7 +1406,7 @@
           "members": [],
           "exportPath": "./contract",
           "overloadSignatures": [
-            "export type IRpcDevtoolsStats = Readonly<{ since: number; methods: readonly Readonly<{ endpointId: string; method: string; calls: number; failed: number; rejected: number; timedOut: number; aborted: number; latencyBucketsMs: readonly number[]; latencyCounts: readonly number[]; p50Ms: number; p95Ms: number; p99Ms: number; }>[]; }>;"
+            "export type IRpcDevtoolsStats = Readonly<{ since: number; methods: readonly Readonly<{ endpointId: string; method: string; calls: number; failed: number; rejected: number; timedOut: number; aborted: number; latencyBucketsMs: readonly number[]; latencyCounts: readonly number[]; /** The final bucket has no upper bound; this value is its exclusive lower boundary. */ latencyOverflowFromMs?: number; /** Observed maximum bounds interpolation honestly, including the open terminal bucket. */ latencyMaxMs?: number; p50Ms: number; p95Ms: number; p99Ms: number; }>[]; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1339,7 +1416,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Histograms use 24 boundaries, 0.0625 ms × 2^k for k=0…23. Percentiles interpolate within a bucket, with error bounded by its width; ring eviction does not reset these aggregates."
+              "content": "Histograms use 24 boundaries, 0.0625 ms × 2^k for k=0…23. Percentiles interpolate within a bounded bucket. The terminal bucket is open above latencyOverflowFromMs; quantiles are clamped to latencyMaxMs. Ring eviction does not reset these aggregates."
             },
             {
               "id": "getting-started",
@@ -1368,7 +1445,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsStats:export type IRpcDevtoolsStats = Readonly<{ since: number; methods: readonly Readonly<{ endpointId: string; method: string; calls: number; failed: number; rejected: number; timedOut: number; aborted: number; latencyBucketsMs: readonly number[]; latencyCounts: readonly number[]; p50Ms: number; p95Ms: number; p99Ms: number; }>[]; }>;",
+          "identity": "packages/rpc-devtools/dist/contract/service.d.ts:IRpcDevtoolsStats:export type IRpcDevtoolsStats = Readonly<{ since: number; methods: readonly Readonly<{ endpointId: string; method: string; calls: number; failed: number; rejected: number; timedOut: number; aborted: number; latencyBucketsMs: readonly number[]; latencyCounts: readonly number[]; /** The final bucket has no upper bound; this value is its exclusive lower boundary. */ latencyOverflowFromMs?: number; /** Observed maximum bounds interpolation honestly, including the open terminal bucket. */ latencyMaxMs?: number; p50Ms: number; p95Ms: number; p99Ms: number; }>[]; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -1378,7 +1455,7 @@
           "name": "IRpcDevtoolsWatchBatch",
           "kind": "type",
           "signature": "export type IRpcDevtoolsWatchBatch = Readonly<{ events: readonly IRpcDevtoolsWireEvent[]; dropped: number; }>;",
-          "declarationLine": 62,
+          "declarationLine": 69,
           "source": "packages/rpc-devtools/dist/contract/service.d.ts",
           "purpose": "Watch batches account for loss while the consumer was slower than the collector.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDevtoolsWatchBatch.",
@@ -1440,7 +1517,7 @@
         {
           "name": "IRpcDevtoolsWireEvent",
           "kind": "type",
-          "signature": "export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;",
+          "signature": "export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;",
           "declarationLine": 5,
           "source": "packages/rpc-devtools/dist/contract/wire.d.ts",
           "purpose": "String names appear only at query/export boundaries; the collector retains numeric columns.",
@@ -1455,7 +1532,7 @@
           "members": [],
           "exportPath": "./contract",
           "overloadSignatures": [
-            "export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;"
+            "export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1494,7 +1571,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/contract/wire.d.ts:IRpcDevtoolsWireEvent:export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;",
+          "identity": "packages/rpc-devtools/dist/contract/wire.d.ts:IRpcDevtoolsWireEvent:export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -1627,7 +1704,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE` 与 `TARGET_UNKNOWN`。Collector 配置和生命周期错误已实现；hub 相关运行时错误仍由 hub 实现提供。"
+                  "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE`、`TARGET_UNKNOWN` 与 `SERVICE_RESULT_INVALID`。Collector 与 hub 的配置和生命周期错误已实现；hub client 的运行时错误按原身份报告，不被 target 状态值替换。"
                 }
               ]
             }
@@ -1639,7 +1716,7 @@
         {
           "name": "RpcDevtoolsErrorCode",
           "kind": "const",
-          "signature": "export declare const RpcDevtoolsErrorCode: { /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
+          "signature": "export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: \"SERVICE_RESULT_INVALID\"; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
           "declarationLine": 4,
           "source": "packages/rpc-devtools/dist/error-code.d.ts",
           "purpose": "Public code owner for contract R5/S5 and the collector/hub lifecycle clauses.",
@@ -1655,7 +1732,7 @@
           "aliasOf": "RpcDevtoolsErrorCode",
           "exportPath": "./contract",
           "overloadSignatures": [
-            "export declare const RpcDevtoolsErrorCode: { /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };"
+            "export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: \"SERVICE_RESULT_INVALID\"; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1694,7 +1771,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
+          "identity": "packages/rpc-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** * Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure. */ readonly serviceResultInvalid: \"SERVICE_RESULT_INVALID\"; /** Collector/hub options violate their supported domain; fix the option before construction (R5). */ readonly invalidOption: \"INVALID_OPTION\"; /** * Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5). */ readonly closed: \"CLOSED\"; /** A recording already owns the collector; stop it before starting another (collector R3). */ readonly recordActive: \"RECORD_ACTIVE\"; /** No recording remains active; start one before stopping it (collector R3). */ readonly recordNotActive: \"RECORD_NOT_ACTIVE\"; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4). */ readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\"; /** Redaction failed; report the original cause and discard content (collector §5). */ readonly redactFailed: \"REDACT_FAILED\"; /** A hub target name is registered; remove it before replacement (hub R1). */ readonly targetDuplicate: \"TARGET_DUPLICATE\"; /** A hub operation names an unknown target; register it before use (hub R1). */ readonly targetUnknown: \"TARGET_UNKNOWN\"; };",
           "guidance": [
             {
               "id": "4-错误身份",
@@ -1702,7 +1779,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE` 与 `TARGET_UNKNOWN`。Collector 配置和生命周期错误已实现；hub 相关运行时错误仍由 hub 实现提供。"
+                  "text": "错误 source 为 `RPC_DEVTOOLS_SOURCE`（`@migaia/rpc/devtools`）；按 `RpcDevtoolsErrorCode` 与 source 分支，保留 cause，不匹配 message。错误表已注册 `INVALID_OPTION`、`CLOSED`、`RECORD_ACTIVE`、`RECORD_NOT_ACTIVE`、`RECORD_FORMAT_INVALID`、`REDACT_FAILED`、`TARGET_DUPLICATE`、`TARGET_UNKNOWN` 与 `SERVICE_RESULT_INVALID`。Collector 与 hub 的配置和生命周期错误已实现；hub client 的运行时错误按原身份报告，不被 target 状态值替换。"
                 }
               ]
             }
@@ -1727,7 +1804,8 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcDevtoolsRecordFormat.",
           "examples": [
             "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 0,\n      endpointId: 'client',\n      stage: 'message',\n      direction: 'outbound',\n      kind: 'request',\n      method: '读取',\n      content: new Uint8Array([1, 2, 3])\n    }\n  ]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
-            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1"
+            "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1",
+            "import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'\nimport { RpcDevtoolsRecordFormat, encodeRpcDevtoolsRecord } from '@migaia/rpc-devtools/contract'\n\n/** 离线录制复用 contract codec，不依赖实时 collector。 */\nconst text = encodeRpcDevtoolsRecord({\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 100,\n      endpointId: 'parent',\n      stage: 'message',\n      direction: 'outbound',\n      senderId: 'parent',\n      messageId: 'm1',\n      method: 'read',\n      trace: 'T1'\n    }\n  ]\n})\n/** 每个 target 最多保留 50,000 个事件；关闭由调用方负责。 */\nconst hub = createRpcDevtoolsHub({ maxEvents: 50_000 })\ntry {\n  hub.importRecord('recording', text)\n  console.log(hub.status('recording')) // offline\n  console.log(hub.timeline({ trace: 'T1' })[0]?.alignedAt) // 100\n  console.log(hub.interactions('T1')[0]?.oneSided) // true\n} finally {\n  await hub.close()\n}"
           ],
           "members": [],
           "aliasOf": "RpcDevtoolsRecordFormat",
@@ -1774,7 +1852,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-devtools/dist/contract/record.d.ts:RpcDevtoolsRecordFormat:export declare const RpcDevtoolsRecordFormat: Readonly<{ readonly format: \"migaia-rpc-devtools\"; readonly version: 1; }>;",
           "guidance": [],
-          "usageScore": 30,
+          "usageScore": 40,
           "configuration": [],
           "fragment": "rpc-devtools-contract--RpcDevtoolsRecordFormat"
         }
@@ -1800,16 +1878,16 @@
         {
           "name": "createRpcDevtoolsHub",
           "kind": "function",
-          "signature": "export declare function createRpcDevtoolsHub(_options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub;",
-          "declarationLine": 3,
+          "signature": "export declare function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub;",
+          "declarationLine": 6,
           "source": "packages/rpc-devtools/dist/hub/index.d.ts",
-          "purpose": "Layer-1 placeholder: target aggregation becomes available when layer 2 replaces this body.",
+          "purpose": "Aggregate existing service clients and offline records without acquiring transports or Peers. Target registration owns alignment/watch resources; returned queries reuse retained references.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRpcDevtoolsHub.",
           "advanced": "No additional advanced behavior is declared for createRpcDevtoolsHub.",
-          "parameters": ["_options: IRpcDevtoolsHubOptions (optional)"],
+          "parameters": ["options: IRpcDevtoolsHubOptions (optional)"],
           "parameterDetails": [
             {
-              "name": "_options",
+              "name": "options",
               "type": "IRpcDevtoolsHubOptions",
               "optional": true
             }
@@ -1817,16 +1895,19 @@
           "returns": "IRpcDevtoolsHub",
           "errors": ["No documented errors are declared for createRpcDevtoolsHub."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRpcDevtoolsHub.",
-          "examples": [],
+          "examples": [
+            "import { createRpcDevtoolsHub, type IRpcDevtoolsTargetClient } from '@migaia/rpc-devtools/hub'\n\n/** 聚合调用方已经建立的两个 devtools service client。 */\nexport async function inspectHosts(\n  parentClient: IRpcDevtoolsTargetClient,\n  workerClient: IRpcDevtoolsTargetClient\n) {\n  /** onError 接收原始运行时失败；hub 不创建这些连接。 */\n  const hub = createRpcDevtoolsHub({\n    maxEvents: 50_000,\n    realignMs: 30_000,\n    onError: (error) => console.error(error)\n  })\n  /** 订阅函数返回解除监听的函数。 */\n  const unsubscribe = hub.on('status', (name, status) => console.log(name, status))\n  try {\n    await hub.addTarget('parent', parentClient)\n    await hub.addTarget('worker', workerClient)\n    console.log(hub.timeline({ trace: 'T1', limit: 100 }))\n    console.log(hub.interactions('T1'))\n    console.log(await hub.stats())\n    await hub.removeTarget('worker')\n  } finally {\n    unsubscribe()\n    await hub.close()\n  }\n}",
+            "import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'\nimport { RpcDevtoolsRecordFormat, encodeRpcDevtoolsRecord } from '@migaia/rpc-devtools/contract'\n\n/** 离线录制复用 contract codec，不依赖实时 collector。 */\nconst text = encodeRpcDevtoolsRecord({\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 100,\n      endpointId: 'parent',\n      stage: 'message',\n      direction: 'outbound',\n      senderId: 'parent',\n      messageId: 'm1',\n      method: 'read',\n      trace: 'T1'\n    }\n  ]\n})\n/** 每个 target 最多保留 50,000 个事件；关闭由调用方负责。 */\nconst hub = createRpcDevtoolsHub({ maxEvents: 50_000 })\ntry {\n  hub.importRecord('recording', text)\n  console.log(hub.status('recording')) // offline\n  console.log(hub.timeline({ trace: 'T1' })[0]?.alignedAt) // 100\n  console.log(hub.interactions('T1')[0]?.oneSided) // true\n} finally {\n  await hub.close()\n}"
+          ],
           "members": [],
           "exportPath": "./hub",
           "overloadSignatures": [
-            "export declare function createRpcDevtoolsHub(_options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub;"
+            "export declare function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub;"
           ],
           "overloadParameterDetails": [
             [
               {
-                "name": "_options",
+                "name": "options",
                 "type": "IRpcDevtoolsHubOptions",
                 "optional": true
               }
@@ -1839,7 +1920,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Layer-1 placeholder: target aggregation becomes available when layer 2 replaces this body."
+              "content": "Aggregate existing service clients and offline records without acquiring transports or Peers. Target registration owns alignment/watch resources; returned queries reuse retained references."
             },
             {
               "id": "getting-started",
@@ -1868,9 +1949,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/hub/index.d.ts:createRpcDevtoolsHub:export declare function createRpcDevtoolsHub(_options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub;",
+          "identity": "packages/rpc-devtools/dist/hub/index.d.ts:createRpcDevtoolsHub:export declare function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub;",
           "guidance": [],
-          "usageScore": 10,
+          "usageScore": 30,
           "configuration": [],
           "fragment": "rpc-devtools-hub--createRpcDevtoolsHub"
         },
@@ -1933,7 +2014,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-devtools/dist/hub/types.d.ts:IRpcDevtoolsHub:export type IRpcDevtoolsHub = Readonly<{ addTarget(name: string, client: IRpcDevtoolsTargetClient): Promise<void>; removeTarget(name: string): Promise<void>; importRecord(name: string, text: string): void; status(name?: string): RpcDevtoolsTargetStatus | ReadonlyMap<string, RpcDevtoolsTargetStatus>; timeline(query?: IRpcDevtoolsTimelineQuery): readonly IRpcDevtoolsTimelineEvent[]; interactions(trace?: string): readonly IRpcDevtoolsInteraction[]; stats(name?: string): Promise<IRpcDevtoolsStats>; on(event: 'status', listener: (name: string, status: RpcDevtoolsTargetStatus) => void): () => void; on(event: 'event', listener: (event: IRpcDevtoolsTimelineEvent) => void): () => void; close(): Promise<void>; }>;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-devtools-hub--IRpcDevtoolsHub"
         },
@@ -2077,7 +2158,9 @@
           "returns": "No explicit return annotation is declared for this type.",
           "errors": ["No documented errors are declared for IRpcDevtoolsTargetClient."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsTargetClient.",
-          "examples": [],
+          "examples": [
+            "import { createRpcDevtoolsHub, type IRpcDevtoolsTargetClient } from '@migaia/rpc-devtools/hub'\n\n/** 聚合调用方已经建立的两个 devtools service client。 */\nexport async function inspectHosts(\n  parentClient: IRpcDevtoolsTargetClient,\n  workerClient: IRpcDevtoolsTargetClient\n) {\n  /** onError 接收原始运行时失败；hub 不创建这些连接。 */\n  const hub = createRpcDevtoolsHub({\n    maxEvents: 50_000,\n    realignMs: 30_000,\n    onError: (error) => console.error(error)\n  })\n  /** 订阅函数返回解除监听的函数。 */\n  const unsubscribe = hub.on('status', (name, status) => console.log(name, status))\n  try {\n    await hub.addTarget('parent', parentClient)\n    await hub.addTarget('worker', workerClient)\n    console.log(hub.timeline({ trace: 'T1', limit: 100 }))\n    console.log(hub.interactions('T1'))\n    console.log(await hub.stats())\n    await hub.removeTarget('worker')\n  } finally {\n    unsubscribe()\n    await hub.close()\n  }\n}"
+          ],
           "members": [],
           "exportPath": "./hub",
           "overloadSignatures": [
@@ -2122,7 +2205,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-devtools/dist/hub/types.d.ts:IRpcDevtoolsTargetClient:export type IRpcDevtoolsTargetClient = Readonly<{ request(method: string, payload?: unknown): Promise<unknown>; stream(method: string, payload?: unknown): AsyncIterable<unknown>; }>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 22,
           "configuration": [],
           "fragment": "rpc-devtools-hub--IRpcDevtoolsTargetClient"
         },
@@ -2312,7 +2395,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-devtools/dist/hub/types.d.ts:RpcDevtoolsTargetStatus:export declare const RpcDevtoolsTargetStatus: { readonly connecting: \"connecting\"; readonly connected: \"connected\"; readonly disconnected: \"disconnected\"; readonly offline: \"offline\"; readonly removed: \"removed\"; };\nexport type RpcDevtoolsTargetStatus = keyof typeof RpcDevtoolsTargetStatus;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-devtools-hub--RpcDevtoolsTargetStatus"
         }
@@ -2428,7 +2511,7 @@
         {
           "name": "IRpcLogProbeOptions",
           "kind": "type",
-          "signature": "export type IRpcLogProbeOptions = Readonly<{ slowMs?: number; sample?: number; methods?: readonly string[]; stages?: readonly ('message' | 'peer')[]; /** Opts subscribed stages into capture; emit receives already-redacted caller-owned content. */ content?: boolean; levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>; /** Called synchronously for qualifying events; the reusable view must never be retained. */ message?(view: IRpcProbeEventView): string; /** Receives logger or formatting failures without changing the business flow. */ onError?(error: unknown): void; }>;",
+          "signature": "export type IRpcLogProbeOptions = Readonly<{ slowMs?: number; sample?: number; methods?: readonly string[]; stages?: readonly ('message' | 'peer')[]; /** Opts subscribed stages into capture; emit receives already-redacted caller-owned content. */ content?: boolean; /** Explicit subscribed stages whose captured content may be passed to the logger. */ capture?: IRpcProbeDefinition['capture']; /** Redacts captured content at the canonical emitter before logger fields are constructed. */ redact?: IRpcProbeDefinition['redact']; levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>; /** Called synchronously for qualifying events; the reusable view must never be retained. */ message?(view: IRpcProbeEventView): string; /** Receives logger or formatting failures without changing the business flow. */ onError?(error: unknown): void; }>;",
           "declarationLine": 11,
           "source": "packages/rpc-devtools/dist/log/types.d.ts",
           "purpose": "Logging policy compiles once; the owning emitter applies source sampling and method filters.",
@@ -2444,7 +2527,7 @@
           "aliasOf": "IRpcLogProbeOptions",
           "exportPath": "./log",
           "overloadSignatures": [
-            "export type IRpcLogProbeOptions = Readonly<{ slowMs?: number; sample?: number; methods?: readonly string[]; stages?: readonly ('message' | 'peer')[]; /** Opts subscribed stages into capture; emit receives already-redacted caller-owned content. */ content?: boolean; levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>; /** Called synchronously for qualifying events; the reusable view must never be retained. */ message?(view: IRpcProbeEventView): string; /** Receives logger or formatting failures without changing the business flow. */ onError?(error: unknown): void; }>;"
+            "export type IRpcLogProbeOptions = Readonly<{ slowMs?: number; sample?: number; methods?: readonly string[]; stages?: readonly ('message' | 'peer')[]; /** Opts subscribed stages into capture; emit receives already-redacted caller-owned content. */ content?: boolean; /** Explicit subscribed stages whose captured content may be passed to the logger. */ capture?: IRpcProbeDefinition['capture']; /** Redacts captured content at the canonical emitter before logger fields are constructed. */ redact?: IRpcProbeDefinition['redact']; levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>; /** Called synchronously for qualifying events; the reusable view must never be retained. */ message?(view: IRpcProbeEventView): string; /** Receives logger or formatting failures without changing the business flow. */ onError?(error: unknown): void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2483,7 +2566,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-devtools/dist/log/types.d.ts:IRpcLogProbeOptions:export type IRpcLogProbeOptions = Readonly<{ slowMs?: number; sample?: number; methods?: readonly string[]; stages?: readonly ('message' | 'peer')[]; /** Opts subscribed stages into capture; emit receives already-redacted caller-owned content. */ content?: boolean; levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>; /** Called synchronously for qualifying events; the reusable view must never be retained. */ message?(view: IRpcProbeEventView): string; /** Receives logger or formatting failures without changing the business flow. */ onError?(error: unknown): void; }>;",
+          "identity": "packages/rpc-devtools/dist/log/types.d.ts:IRpcLogProbeOptions:export type IRpcLogProbeOptions = Readonly<{ slowMs?: number; sample?: number; methods?: readonly string[]; stages?: readonly ('message' | 'peer')[]; /** Opts subscribed stages into capture; emit receives already-redacted caller-owned content. */ content?: boolean; /** Explicit subscribed stages whose captured content may be passed to the logger. */ capture?: IRpcProbeDefinition['capture']; /** Redacts captured content at the canonical emitter before logger fields are constructed. */ redact?: IRpcProbeDefinition['redact']; levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>; /** Called synchronously for qualifying events; the reusable view must never be retained. */ message?(view: IRpcProbeEventView): string; /** Receives logger or formatting failures without changing the business flow. */ onError?(error: unknown): void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
