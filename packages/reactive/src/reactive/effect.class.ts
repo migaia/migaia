@@ -16,7 +16,7 @@ import { createReactiveError, tagReactiveError } from '../errors.js'
 import { ReactiveErrorCode } from '../error-code.js'
 import { ReactiveErrorText } from '../error-text.js'
 
-// 副作用：唯一真正"被执行"的观察者——Computed 只标脏不重跑，只有 Effect 会被调度器实际 tick
+// Effects are scheduled observers. A `Computed` propagates dirty state; the scheduler calls an `Effect` through `tick`.
 export class Effect implements IObserver, IDisposable {
   #deps = new Set<IObservable>()
   #depVersions = new Map<IObservable, number>()

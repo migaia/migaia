@@ -3,7 +3,7 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { SerializeErrorCode, type ISerializeErrorCode }
 
-/** 错误 `source` 的唯一字面量来源；禁止各处手写 `'@migaia/serialize'` 字符串。 */
+/** The single literal source for error `source`. Throw sites do not repeat `'@migaia/serialize'`. */
 export const SERIALIZE_SOURCE = '@migaia/serialize' as const
 
 /** Stable registry-option diagnostics used by construction-time validation. */
@@ -73,7 +73,10 @@ export const SerializeErrorText = {
   streamConsumerClosed: 'serialize stream consumer closed'
 } as const
 
-/** 结构化 tagged 错误：原生错误类型 `TError` 交叉附加 `source`/`code`/`context?`。运行时仍为 `TError`（`instanceof` 保持真）。 */
+/**
+ * Adds `source`, `code`, and optional `context` to a native error while retaining its runtime type
+ * and `instanceof` behavior.
+ */
 export type ISerializeTaggedError<TError extends Error> = TError & {
   readonly source: string
   readonly code: ISerializeErrorCode
@@ -81,16 +84,21 @@ export type ISerializeTaggedError<TError extends Error> = TError & {
 }
 export type ISerializeTypeError = ISerializeTaggedError<TypeError>
 export type ISerializeRangeError = ISerializeTaggedError<RangeError>
-/** 构造/生命周期错误的 tagged 原生 Error（`cause` 继承自 `Error`，另含 `errors`）。 */
+/**
+ * Tagged native error for construction and lifecycle failures. Inherits `cause` from `Error` and
+ * can carry `errors`.
+ */
 export type ISerializeLifecycleError = ISerializeTaggedError<Error> & {
   readonly errors?: readonly unknown[]
 }
 
 /**
- * 只读附加 `source`/`code`（及可选 `context`），返回带字段的原对象：不重建、不替换、不覆盖 stack。
+ * Attaches read-only `source`, `code`, and optional `context` and returns the original error. Never
+ * rebuilds or replaces the error or overwrites its stack.
  *
- * **幂等（方案 A）**：已标记且 `(source, code)` 一致 → 直接返回（`context` 仅在未定义时写入一次）；已标记但 `(source, code)` 不一致 → 抛
- * TypeError（不得静默改写，避免二次 `defineProperty` 触发 `configurable: false` 抛错）。
+ * Idempotent for matching `(source, code)`: returns the error and adds `context` only if not
+ * already defined. Conflicting identity throws a `TypeError` instead of silently rewriting
+ * immutable properties.
  */
 export function tagSerializeError<E extends Error>(
   error: E,
@@ -118,10 +126,11 @@ export function tagSerializeError<E extends Error>(
 }
 
 /**
- * 构造/生命周期错误（`REGISTRY_DISPOSED`/`ENV_UNSUPPORTED`/rollback）：原生 Error +
- * source/code/context/cause/errors。
+ * Creates a native construction or lifecycle error, such as `REGISTRY_DISPOSED`, `ENV_UNSUPPORTED`,
+ * or rollback failure. Attaches `source`, `code`, and optional `context`, `cause`, and `errors`.
  *
- * `errors` 是 rollback 完成后一次性创建的不可变快照（`Object.freeze`），空则省略字段、不替换 `cause`。
+ * `errors` is a frozen snapshot copied after rollback completes. An empty list omits that property
+ * and never replaces `cause`.
  */
 export function createSerializeError(
   code: ISerializeErrorCode,
@@ -146,7 +155,10 @@ export function createSerializeError(
   return error
 }
 
-/** 参数错误（scheduler 结构非法）：原生 TypeError + `INVALID_OPTION`。 */
+/**
+ * Creates a native `TypeError` with the supplied code, for example `INVALID_OPTION` for an invalid
+ * scheduler.
+ */
 export function createSerializeTypeError(
   code: ISerializeErrorCode,
   message: string,
@@ -159,7 +171,10 @@ export function createSerializeTypeError(
   )
 }
 
-/** 插件校验失败（空表 / 重复 / 非法 type）：原生 RangeError + `INVALID_OPTION`。 */
+/**
+ * Creates a native `RangeError` tagged for invalid input, such as an empty plugin list, duplicate
+ * type, or illegal type.
+ */
 export function createSerializeRangeError(
   code: ISerializeErrorCode,
   message: string,

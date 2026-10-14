@@ -33,8 +33,8 @@ export {
   type IGraphReadinessState
 } from './graph-readiness.js'
 
-// 错误码是公开 API（`docs/contracts/error-codes.md` §3.5 / migration.sdd.md §8.1）：调用方要能按
-// `(source, code)` 分支，必须从主入口拿得到常量与类型，不能被迫抄写字符串字面量。
+// Error codes are public API (`docs/contracts/error-codes.md` §3.5 / migration.sdd.md §8.1).
+// Export constants and types from the main entry so callers can branch on `(source, code)`.
 export { CapabilityErrorCode, type ICapabilityErrorCode } from './error-code.js'
 export { CAPABILITY_SOURCE } from './errors.js'
 
@@ -43,10 +43,12 @@ export type ICapabilityHandle = {
 }
 
 /**
- * 能力当前生命周期。
+ * The capability's current lifecycle state.
  *
- * `off` 表示闸门允许、但尚未启用；`gated` 表示被开关明确拒绝。两者分开后， 控制台与调用方不再把「从未尝试」误报成「灰度策略拦截」。名字与 tray 的 graph
- * availability `blocked` 区分开（`migration.sdd.md` §5.5）——两者是完全不同的恢复语义，不共用一个状态名。
+ * `off` means the gate allows activation but the capability is not enabled. `gated` means a flag
+ * denies activation, distinct from an activation that has not been attempted. This differs from
+ * tray graph availability `blocked`, which has different recovery semantics. See `migration.sdd.md`
+ * §5.5.
  */
 export type ICapabilityState = (typeof CapabilityState)[keyof typeof CapabilityState]
 
@@ -59,53 +61,74 @@ export type ICapabilityEnableResult =
 export type ICapabilityDefinition<Context, Handle extends ICapabilityHandle = ICapabilityHandle> = {
   readonly name: string
   /**
-   * 启用这个能力。
+   * Activates this capability.
    *
-   * 允许异步，正是为了按需加载持久化等增强能力——关着的时候那个 chunk 不进初始包。
+   * Async activation supports loading enhancements such as persistence on demand. Dynamic imports
+   * keep the disabled capability's chunk out of the initial bundle.
    */
   activate(context: Context): Handle | Promise<Handle>
 }
 
 export type ICapabilityHostOptions = {
   /**
-   * 开关表。安全默认是拒绝：只有值严格等于 `true` 的自有数据属性才允许启用。
+   * Initial flag snapshot. The gate denies activation by default. Only own data properties whose
+   * value is exactly `true` permit activation.
    *
-   * Host 会复制这份初始快照；之后请调用 `setFlag()` / `setFlags()`。外部改写传入对象 不会绕过状态机。`setFlag(name, false)`
-   * 本身就是原子回退：它会作废在途激活并 释放现有 handle，不需要调用方再补一次 `disable()`。
+   * The host copies this snapshot. Use `setFlag()` or `setFlags()` for later changes. Mutating the
+   * input object cannot bypass the state machine. `setFlag(name, false)` atomically invalidates
+   * pending activation and releases the current handle. A separate `disable()` call is
+   * unnecessary.
    */
   readonly flags?: Readonly<Record<string, boolean>>
-  /** 激活或释放失败的上报口。Reporter 自己抛错也不会破坏闸门状态机；原始错误仍可 通过 `error(name)` 查询。 */
+  /**
+   * Reports activation or release failures. Reporter failures preserve gate state and `error(name)`
+   * diagnostics.
+   */
   readonly onError?: (name: string, error: unknown) => void
 }
 
 export type ICapabilityHost<Context> = {
-  /** 登记一个能力。重复登记同名视为编程错误。 */
+  /** Registers a capability. Duplicate names are programming errors. */
   register<Handle extends ICapabilityHandle>(
     definition: ICapabilityDefinition<Context, Handle>
   ): void
   readonly names: readonly string[]
   state(name: string): ICapabilityState
-  /** 已启用能力的 handle；未启用返回 undefined。 */
+  /** Returns the enabled capability's handle, or `undefined` when it is not enabled. */
   handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined
-  /** 上一次激活或释放失败的原因；成功重启或重新配置会清除。 */
+  /**
+   * Returns the last activation or release failure. Successful restart or reconfiguration clears
+   * it.
+   */
   error(name: string): unknown
-  /** 更新单个灰度开关。关闭会同步作废在途激活并释放现有 handle；打开不会自动启用。 */
+  /**
+   * Updates one flag. Disabling synchronously invalidates pending activation and releases the
+   * handle. Enabling does not activate.
+   */
   setFlag(name: string, enabled: boolean): void
-  /** 原子替换整份开关快照。新快照未列出的能力按拒绝处理，因此远端配置删键不会让 旧的 `true` 永久残留。 */
+  /**
+   * Atomically replaces all flags. Missing capabilities are denied, so removed keys cannot retain
+   * an earlier `true` value.
+   */
   setFlags(flags: Readonly<Record<string, boolean>>): void
   /**
-   * 启用。返回是否处于启用态。
+   * Activates the capability and returns its structured activation outcome.
    *
-   * 幂等：并发调用共享同一次激活，`activate` 只跑一次。开关为 false 时直接拒绝 （返回 false），不会「偷偷打开」。
+   * Concurrent calls share one activation, so `activate` runs once. A false flag returns `{ status:
+   * 'gated' }` without activating the capability.
    */
   enable(name: string): Promise<ICapabilityEnableResult>
   /** Structured counterpart of enable(); false is retained for compatibility. */
   enableResult(name: string): Promise<ICapabilityEnableResult>
-  /** 关闭并释放 handle。返回是否确实关掉了一个启用态的能力。 */
+  /**
+   * Disables the capability and releases its handle. Returns whether an enabled capability was
+   * disabled.
+   */
   disable(name: string): Promise<boolean>
   /**
-   * 关闭全部（后进先出）并使 host 不可用。首次调用返回唯一 completion Promise；该 Promise 完成前的后续调用 fail-fast with
-   * `HOST_TRANSITIONING`，完成后才恢复 canonical Promise identity。
+   * Disables all capabilities in LIFO order and makes the host unusable. The first call returns the
+   * sole completion Promise. Later calls fail immediately with `HOST_TRANSITIONING` until that
+   * Promise settles. After completion, repeated calls return the original Promise by identity.
    */
   dispose(): Promise<void>
   /** Synchronous compatibility adapter for integrations that require a boolean. */

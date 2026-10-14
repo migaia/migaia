@@ -942,9 +942,11 @@ class LoggerImpl<const P extends readonly ILoggerPluginConstraint[] = []> {
 }
 
 /**
- * 真正对外导出的入口。插件通过构造参数显式安装，`new Logger(...)` 用法保持不变。
+ * Public constructor entry. Constructor options install plugins explicitly through `new
+ * Logger(...)`.
  *
- * 实例级动态追加插件用 `log.use(...)`，动态移除用 `log.unUse(name)`， 两者都定义在 ILoggerCore 里（LoggerCore 类的方法），不需要额外包装。
+ * Use `log.use(...)` to add plugins and `log.unUse(name)` to remove them from an existing instance.
+ * Both belong to `ILoggerCore` and are implemented by `LoggerCore` without another wrapper.
  */
 export const Logger: IStaticLoggerCtor = LoggerImpl as unknown as IStaticLoggerCtor
 

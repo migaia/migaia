@@ -98,8 +98,9 @@ export type IResourceOptions<T = unknown> = {
   /** SSR/persisted success cache used before optional revalidation. */
   initialSnapshot?: IResourceCacheSnapshot<T>
   /**
-   * 时间域与排程来源（`runtime-neutrality.sdd.md` R-9 / AR-02）：TTL/`updatedAt`/`expiresAt`/retry delay 全部走同一
-   * scheduler，默认 lifecycle `systemScheduler`。缺宿主能力时 fail-fast，不静默降级成微任务。
+   * Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays
+   * (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to lifecycle `systemScheduler`. Missing
+   * host capabilities fail immediately instead of silently falling back to microtasks.
    */
   scheduler?: IScheduler
 }
@@ -535,10 +536,10 @@ export class Resource<T> implements IObserver, IDisposable {
   }
 
   /**
-   * 非追踪读，形状与 `read()` 相同（success 返回值，pending throw Promise，error throw）。
-   *
-   * 与 `read()` 的差别只有两条：不建依赖边；不顺手 `ensureFresh()` 启动请求。 React getSnapshot /
-   * 外部诊断需要「读当前快照但不加入别人的追踪窗口」。
+   * Reads without tracking, with the same result semantics as `read()`. Success returns data,
+   * pending throws a Promise, and failure throws the error. It creates no dependency edges and does
+   * not call `#ensureFresh()` to start a request. `React` snapshot reads and external diagnostics
+   * can inspect current state without entering another consumer's tracking window.
    */
   peek(): T {
     this.#assertUsable()

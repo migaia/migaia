@@ -3,13 +3,16 @@ import { createSerializeError, createSerializeTypeError, SerializeErrorCode } fr
 import { SerializeChunkKind, SerializePluginType } from '../format-constants.js'
 
 export type IJsonPluginOptions = {
-  /** 传给 JSON.stringify 的 replacer，用于裁剪不可序列化字段。 */
+  /** Passed to `JSON.stringify` to omit fields that cannot be serialized. */
   readonly replacer?: (key: string, value: unknown) => unknown
-  /** 传给 JSON.parse 的 reviver，用于还原 Date 之类的富类型。 */
+  /** Passed to `JSON.parse` to restore rich values such as dates. */
   readonly reviver?: (key: string, value: unknown) => unknown
-  /** 缩进。仅调试用——线上留空以免白白撑大体积。 */
+  /** Debug indentation. Omit in production to avoid increasing payload size. */
   readonly space?: number
-  /** 字节段解码器（Encoding 注入；省略时用宿主 `TextDecoder`，明确声明宿主 Encoding API）。 */
+  /**
+   * Injected byte decoder. Defaults to the host `TextDecoder`, explicitly relying on the Encoding
+   * API.
+   */
   readonly decoder?: ITextDecoder
 }
 
@@ -19,8 +22,9 @@ const hostTextDecoder = (): ITextDecoder | undefined => {
 }
 
 /**
- * 默认方案，也是实测下最快的一条：V8 的 JSON 是高度优化的 C++ 实现， 在「需要拿到主线程上的对象图」这个前提下没有任何方案能赢它。 只有当你不需要对象图（字节直通）或格式 V8
- * 不认识时，才该换别的插件。
+ * Default JSON parser using V8's optimized native JSON implementation. Earlier measurements
+ * identify JSON as the fastest tested path when consumers require a main-thread object graph. Use
+ * another parser for byte passthrough or a format that JSON cannot represent.
  */
 export function jsonParser(options: IJsonPluginOptions = {}): ISerializeParser {
   const { replacer, reviver, space, decoder } = options

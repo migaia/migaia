@@ -40,7 +40,10 @@ export type IGenerationControllerOptions = {
    * to notice the race without treating it as an error.
    */
   readonly onSuperseded?: (info: ILifecycleError) => void
-  /** Runtime-neutral scheduler（默认 `systemScheduler`）；`begin({ timeoutMs })` 的超时计时经它。 */
+  /**
+   * Uses a runtime-neutral scheduler for `begin({ timeoutMs })` timing. Defaults to
+   * `systemScheduler`.
+   */
   readonly scheduler?: IScheduler
 }
 

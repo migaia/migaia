@@ -1,13 +1,15 @@
-/** `errors.ts` 默认双失败工厂与 `docs/contracts/error-codes.md` 注册表共用的稳定 source。 */
+/**
+ * Defines the stable `source` shared by the default dual-failure factory in `errors.ts` and the
+ * error-code registry.
+ */
 export const MIDDLEWARE_PIPELINE_SOURCE = '@migaia/middleware-pipeline'
 
-/** `@migaia/middleware-pipeline` 的包边界错误码唯一声明处。 */
+/** Owns the package-boundary error-code declarations for `@migaia/middleware-pipeline`. */
 export const MiddlewarePipelineErrorCode = {
   /**
-   * 当前 stage 与它已经启动的 downstream 同时失败，且调用方未提供错误组合策略时抛出。
-   *
-   * 落实 `middleware-pipeline.sdd.md` MP-R08；调用方应检查 `AggregateError.errors` 中的两个原始失败，或通过
-   * `combineStageAndDownstreamError` 接管领域错误。
+   * Reports failure in both the current stage and its started downstream when no error combiner is
+   * supplied. Enforces `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in
+   * `AggregateError.errors`, or provide `combineStageAndDownstreamError` for domain errors.
    */
   executionFailed: 'EXECUTION_FAILED',
   /**

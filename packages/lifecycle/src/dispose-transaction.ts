@@ -277,8 +277,9 @@ export type IDisposeTransactionOptions = {
   /** Absolute deadline shared, unchanged, across every item in this run (L-T32). */
   readonly deadlineAt?: number
   /**
-   * Scheduler whose `now()` produced `deadlineAt`（R-9 时间域契约）；缺省 `systemScheduler`。 Forwarded into
-   * every item's `context.scheduler` and into the graceful-phase `boundedWait`.
+   * Uses the scheduler whose `now()` produces `deadlineAt` under the R-9 clock-domain contract.
+   * Defaults to `systemScheduler`. Forwards it to every item's `context.scheduler` and the
+   * graceful-phase `boundedWait`.
    */
   readonly scheduler?: IScheduler
   /** Forwarded into `context.signal` for every item; aborted automatically once `run()` starts. */

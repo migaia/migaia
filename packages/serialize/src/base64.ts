@@ -22,8 +22,9 @@ export function bytesToBase64(bytes: Uint8Array): string {
 }
 
 /**
- * 逐片产出 base64 文本，供写入 sink（`WritableStream`、分块上传）的调用方——它永远不需要整份 base64 字符串一次成型。`bytesToBase64`
- * 仍是「最终只要一个字符串」时的正确选择。
+ * Yields base64 text pieces to consumers that write to a sink, such as `WritableStream` or chunked
+ * upload. The full base64 string never needs to be assembled at once. Use `bytesToBase64` when the
+ * final consumer requires one string.
  */
 export function* streamBase64Chunks(bytes: Uint8Array): Generator<string, void, void> {
   yield* streamCanonicalBase64Chunks(bytes, CHUNK_BYTES)

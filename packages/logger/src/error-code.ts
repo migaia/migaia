@@ -1,10 +1,11 @@
 /**
- * `@migaia/logger` 错误码的唯一声明处。
+ * The single declaration site for `@migaia/logger` error codes.
  *
- * 契约见 `docs/contracts/error-codes.md`：错误由 `(source, code)` 二元组唯一定位，`source` 恒为
- * `'@migaia/logger'`。抛出点必须引用本文件的常量，不得内联字面量。
+ * See `docs/contracts/error-codes.md`. The pair `(source, code)` uniquely identifies an error.
+ * `source` is always `'@migaia/logger'`. Throw sites use these constants instead of inline values.
  *
- * 码值是公开 API 的一部分，改名等同破坏性变更（`docs/contracts/error-code-rollout.sdd.md` §1.2）。
+ * Code values are public API. Renaming a code is a breaking change. See
+ * `docs/contracts/error-code-rollout.sdd.md` §1.2.
  */
 export const LoggerErrorCode = {
   /**
@@ -22,23 +23,23 @@ export const LoggerErrorCode = {
   runtimeShuttingDown: 'RUNTIME_SHUTTING_DOWN',
 
   /**
-   * Process 插件被以不同的配置重复安装。
+   * Thrown when the process plugin is installed again with a different configuration.
    *
-   * 调用方统一配置，或先卸载再重装。
+   * Use the same configuration or uninstall the plugin before reinstalling.
    */
   pluginConfigConflict: 'PLUGIN_CONFIG_CONFLICT',
 
   /**
-   * 宿主运行时没有可用的 HTTP transport（`fetch`）。
+   * Thrown when the host runtime has no HTTP transport (`fetch`).
    *
-   * 调用方提供 `runtimeFetch` 或在支持 fetch 的运行时使用 http 插件。
+   * Supply a runtime manager with `fetch` or use the HTTP plugin on a host that supports fetch.
    */
   transportUnavailable: 'TRANSPORT_UNAVAILABLE',
 
   /**
-   * Http 日志序列化失败。
+   * Thrown when serializing HTTP log entries fails.
    *
-   * 原始序列化错误挂在 `cause`；调用方检查被记录的载荷。
+   * `cause` retains the original serialization error. Inspect the logged payload.
    */
   serializeFailed: 'SERIALIZE_FAILED',
 
@@ -86,23 +87,25 @@ export const LoggerErrorCode = {
   pluginShutdownCleanupFailed: 'PLUGIN_SHUTDOWN_CLEANUP_FAILED',
 
   /**
-   * 诊断码，不抛出。failure hook 自身抛错时由 reporter 边界上报。
+   * Diagnostic code reported when a failure hook throws. It is not thrown itself.
    *
-   * 仅经 `runtime.console.error`/`runtime.write` 上报，保证失败上报通道自身不会递归失败。
+   * The reporter uses only `runtime.console.error` or `runtime.write`, preventing recursive failure
+   * reporting.
    */
   hookFailed: 'HOOK_FAILED',
 
   /**
-   * `extends()` 传入自身（自引用）。
+   * Thrown when `extends()` receives the current logger itself.
    *
-   * 调用方不要把自己加入自己的 extends 目标列表。
+   * Do not add a logger to its own forwarding targets.
    */
   extendsSelf: 'EXTENDS_SELF',
 
   /**
-   * `extends()` 会形成循环转发链（目标 logger 已能沿其 extends 链转发回当前 logger）。
+   * Thrown when `extends()` would create a forwarding cycle. The target logger can already forward
+   * through its own targets back to the current logger.
    *
-   * 调用方检查 extends 拓扑，拆除环路。
+   * Inspect the forwarding graph and remove the cycle.
    */
   extendsCycle: 'EXTENDS_CYCLE',
 
