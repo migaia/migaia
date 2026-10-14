@@ -1763,8 +1763,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/plugin-host/getting-started",
-      "architecturePath": "/en/architecture/plugin-host",
+      "guidePath": "/en/docs/plugin-host/getting-started",
+      "architecturePath": "/en/docs/plugin-host",
       "symbols": [
         {
           "name": "asyncDisposeKey",
@@ -12269,8 +12269,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/plugin-host/getting-started",
-      "architecturePath": "/en/architecture/plugin-host",
+      "guidePath": "/en/docs/plugin-host/getting-started",
+      "architecturePath": "/en/docs/plugin-host",
       "symbols": [
         {
           "name": "buildManagedPort",

@@ -639,8 +639,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/resource/getting-started",
-      "architecturePath": "/en/architecture/resource",
+      "guidePath": "/en/docs/resource/getting-started",
+      "architecturePath": "/en/docs/resource",
       "symbols": [
         {
           "name": "IResourceCacheSnapshot",

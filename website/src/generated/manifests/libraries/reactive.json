@@ -995,8 +995,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "defaultRuntime",
@@ -1980,8 +1980,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "assertNoForeignOwnershipBrand",
@@ -2578,8 +2578,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "internalsOf",
@@ -2993,8 +2993,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "IInternalRuntime",
@@ -3292,8 +3292,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "mutableDeps",
@@ -4094,8 +4094,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "assertOwnedBy",
@@ -4475,8 +4475,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "Computed",
@@ -5702,8 +5702,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "createObserverBinding",
@@ -9764,8 +9764,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "createFieldSource",

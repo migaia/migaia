@@ -1235,8 +1235,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/logger/getting-started",
-      "architecturePath": "/en/architecture/logger",
+      "guidePath": "/en/docs/logger/getting-started",
+      "architecturePath": "/en/docs/logger",
       "symbols": [
         {
           "name": "getLoggerRuntimeManager",
@@ -4235,8 +4235,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/logger/getting-started",
-      "architecturePath": "/en/architecture/logger",
+      "guidePath": "/en/docs/logger/getting-started",
+      "architecturePath": "/en/docs/logger",
       "symbols": [
         {
           "name": "ANSIS_PLUGIN_NAME",
@@ -7423,8 +7423,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/logger/getting-started",
-      "architecturePath": "/en/architecture/logger",
+      "guidePath": "/en/docs/logger/getting-started",
+      "architecturePath": "/en/docs/logger",
       "symbols": [
         {
           "name": "file",

@@ -197,8 +197,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/supervision/getting-started",
-      "architecturePath": "/en/architecture/supervision",
+      "guidePath": "/en/docs/supervision/getting-started",
+      "architecturePath": "/en/docs/supervision",
       "symbols": [
         {
           "name": "BudgetOverflow",
@@ -3524,8 +3524,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/supervision/getting-started",
-      "architecturePath": "/en/architecture/supervision",
+      "guidePath": "/en/docs/supervision/getting-started",
+      "architecturePath": "/en/docs/supervision",
       "symbols": [
         {
           "name": "coroutineCapabilities",
@@ -4664,8 +4664,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/supervision/getting-started",
-      "architecturePath": "/en/architecture/supervision",
+      "guidePath": "/en/docs/supervision/getting-started",
+      "architecturePath": "/en/docs/supervision",
       "symbols": [
         {
           "name": "BootstrapVia",
@@ -7730,8 +7730,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/supervision/getting-started",
-      "architecturePath": "/en/architecture/supervision",
+      "guidePath": "/en/docs/supervision/getting-started",
+      "architecturePath": "/en/docs/supervision",
       "symbols": [
         {
           "name": "createThreadSupervisor",

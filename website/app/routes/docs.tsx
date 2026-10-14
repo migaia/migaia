@@ -1,7 +1,9 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate, type MetaFunction as IMetaFunction } from 'react-router'
+import { Link, useNavigate, type MetaFunction as IMetaFunction } from 'react-router'
 import {
+  API_SEGMENT,
   domainPath,
+  guidePath,
   isCallableApiSymbol,
   resolveDocsSelection,
   symbolSlug,
@@ -58,28 +60,34 @@ export async function loader({
   const librarySlug = parts[0]
   if (!librarySlug) return null
   const pathname = new URL(request.url).pathname
-  const domain = pathname.split('/')[2]
   const locale = pathname.split('/')[1]
+  const domain = pageKind(parts)
   const topic = parts.slice(1).join('/') || 'index'
   /** Guide registry stays loader-only so the client route does not ship every tutorial body. */
-  const journeyModule = domain === 'guides' ? await import('../guide-journeys.js') : undefined
+  const journeyModule = await import('../guide-journeys.js')
   const guideLocale = locale === 'zh' ? 'zh' : 'en'
-  const journeyExists = Boolean(journeyModule?.findGuideJourney(librarySlug, topic, guideLocale))
+  const journeyExists =
+    domain === 'guides' && Boolean(journeyModule.findGuideJourney(librarySlug, topic, guideLocale))
+  /** The Chinese package home also carries the full README as the package description. */
+  const packageHome = domain === 'guides' && topic === 'index'
   const documentation =
-    domain === 'docs' && locale === 'zh'
-      ? 'all'
-      : domain === 'architecture' && locale === 'zh'
-        ? 'readme'
-        : domain === 'guides' && locale === 'zh' && !journeyExists
-          ? 'guide'
-          : 'none'
+    locale !== 'zh'
+      ? 'none'
+      : domain === 'docs' || (packageHome && !journeyExists)
+        ? 'all'
+        : packageHome
+          ? 'readme'
+          : !journeyExists
+            ? 'guide'
+            : 'none'
   /** Initial index projection supplies every public module path needed for longest-prefix routing. */
-  const requestedSegments = domain === 'docs' ? parts.slice(1) : []
+  const requestedSegments = domain === 'docs' ? parts.slice(2) : []
   let selectedModule = 'index'
   let selectedSymbolPath: string | undefined
+  /** Guide pages also receive the light API index because they share the library sidebar. */
   let content = await loadLibraryRouteContent(librarySlug, {
     documentation,
-    includeApiIndex: domain === 'docs',
+    includeApiIndex: true,
     selectedModule: domain === 'docs' ? 'index' : undefined
   })
   if (domain === 'docs' && content) {
@@ -161,10 +169,7 @@ export async function loader({
       (symbol.kind === 'type' || symbol.kind === 'interface')
   )
   /** Reader routes receive lightweight navigation facts, never other APIs' documentation bodies. */
-  const apiLinks =
-    domain === 'guides' || domain === 'docs' || domain === 'architecture'
-      ? await loadLibraryApiLinks(librarySlug)
-      : undefined
+  const apiLinks = await loadLibraryApiLinks(librarySlug)
   let guide: IApiGuide | undefined
   let optionTranslations: Readonly<Record<string, string>> | undefined
   /** Existing English field prose fills missing or duplicated Chinese extractor descriptions. */
@@ -213,15 +218,27 @@ export async function loader({
       )
     }
   }
+  /** Guide pages only need reader-facing modules for the sidebar; internals stay on API pages. */
+  if (domain === 'guides' && content)
+    content = {
+      ...content,
+      library: {
+        ...content.library,
+        exports: content.library.exports.filter(
+          (exportPath) => !/^\.\/(?:internals|node-internals)$/.test(exportPath)
+        )
+      },
+      apis: content.apis.filter((api) => !/^(?:internals|node-internals)$/.test(api.module))
+    }
   return content
     ? {
         ...content,
         apiLinks,
         guide,
         journey: journeyExists
-          ? journeyModule?.findGuideJourney(librarySlug, topic, guideLocale)
+          ? journeyModule.findGuideJourney(librarySlug, topic, guideLocale)
           : undefined,
-        journeyTopics: journeyModule?.listGuideJourneys(librarySlug, guideLocale),
+        journeyTopics: journeyModule.listGuideJourneys(librarySlug, guideLocale),
         optionTranslations,
         optionFallbacks,
         selectedTypeFragment: selectedType?.fragment
@@ -230,13 +247,13 @@ export async function loader({
 }
 
 /** Uses the visible page purpose and canonical API identity for localized search metadata. */
-export const meta: IMetaFunction<typeof loader> = ({ loaderData: data, location, params }) => {
-  /** Domain and public selection are shared with the route's rendered page. */
-  const domain = (location.pathname.split('/')[2] || 'docs') as IDomain
+export const meta: IMetaFunction<typeof loader> = ({ loaderData: data, params }) => {
   /** Locale determines prose, while package and API names stay identical in both languages. */
   const locale = params.lang === 'zh' ? 'zh' : 'en'
   /** Public subpath identifies the selected API without exposing the root entry filename. */
   const parts = (params['*'] ?? '').split('/').filter(Boolean)
+  /** Page kind is shared with the route's rendered page. */
+  const domain = pageKind(parts)
   /** Loader supplies exactly the selected library's content and maintained purpose. */
   const library = data?.library
   if (!library)
@@ -245,7 +262,7 @@ export const meta: IMetaFunction<typeof loader> = ({ loaderData: data, location,
       { name: 'description', content: domainDescription(locale, domain) }
     ]
   /** Resolve nested modules before interpreting the final segment as an API name. */
-  const selection = resolveDocsSelection(parts.slice(1), data.apis)
+  const selection = resolveDocsSelection(parts.slice(2), data.apis)
   /** Selected runtime declaration owns the API title and its one-sentence purpose. */
   const api = data.apis.find((candidate) => candidate.module === selection.moduleName)
   /** Legacy type pages use their declaration identity even when rendered under the module. */
@@ -267,14 +284,7 @@ export const meta: IMetaFunction<typeof loader> = ({ loaderData: data, location,
           localizedSymbolPurpose(locale, symbol) ??
           libraryReferenceDescription(locale, library.slug))
         : libraryReferenceDescription(locale, library.slug)
-      : (data.journey?.lede ??
-        (domain === 'guides'
-          ? libraryReferenceDescription(locale, library.slug)
-          : locale === 'zh'
-            ? (LIBRARY_ARCHITECTURE_LEDES_ZH[
-                library.slug as keyof typeof LIBRARY_ARCHITECTURE_LEDES_ZH
-              ] ?? libraryReferenceDescription(locale, library.slug))
-            : libraryReferenceDescription(locale, library.slug)))
+      : (data.journey?.lede ?? libraryReferenceDescription(locale, library.slug))
   /** Metadata has plain prose and only the opening purpose sentence. */
   const description = purpose.replace(/[`*]/g, '').trim()
   return [
@@ -289,17 +299,17 @@ export const meta: IMetaFunction<typeof loader> = ({ loaderData: data, location,
 /** Renders one of the three content domains from the canonical route and generated graph. */
 function Docs({ params, loaderData }: IDocsRouteProps) {
   const locale = (params.lang === 'zh' ? 'zh' : 'en') as ILocale
-  const location = useLocation()
   const parts = (params['*'] ?? '').split('/').filter(Boolean)
-  const domain = (location.pathname.split('/')[2] || 'docs') as IDomain
+  const domain = pageKind(parts)
   const librarySlug = parts.shift()
   const library = loaderData?.library
   const libraryApis = loaderData?.apis ?? []
-  /** Docs keeps the full public subpath so nested exports remain addressable. */
-  const modulePath = domain === 'docs' ? parts.join('/') || 'index' : parts.join('/') || undefined
+  /** API pages drop the `api` segment; guide pages keep their topic path. */
+  const modulePath =
+    domain === 'docs' ? parts.slice(1).join('/') || 'index' : parts.join('/') || undefined
   if (librarySlug && !library) return <NotFound locale={locale} domain={domain} />
-  if (!library) return <DomainIndex locale={locale} domain={domain} />
-  if (domain === 'docs' && parts[0] === 'index') return <NotFound locale={locale} domain={domain} />
+  if (!library) return <DocsIndex locale={locale} />
+  if (domain === 'docs' && parts[1] === 'index') return <NotFound locale={locale} domain={domain} />
   if (domain === 'docs')
     return (
       <DocsLibrary
@@ -307,6 +317,7 @@ function Docs({ params, loaderData }: IDocsRouteProps) {
         locale={locale}
         library={library}
         apiLinks={loaderData?.apiLinks ?? []}
+        journeyTopics={loaderData?.journeyTopics ?? []}
         libraryApis={libraryApis}
         modulePath={modulePath}
         optionTranslations={loaderData?.optionTranslations}
@@ -317,9 +328,9 @@ function Docs({ params, loaderData }: IDocsRouteProps) {
   return (
     <DomainLibrary
       locale={locale}
-      domain={domain}
       library={library}
       apiLinks={loaderData?.apiLinks ?? []}
+      libraryApis={libraryApis}
       modulePath={modulePath}
       journey={loaderData?.journey}
       journeyTopics={loaderData?.journeyTopics ?? []}
@@ -327,11 +338,12 @@ function Docs({ params, loaderData }: IDocsRouteProps) {
   )
 }
 
-/** Displays a domain index with one discoverable entry for every current library. */
-function DomainIndex({ locale, domain }: { locale: ILocale; domain: IDomain }) {
-  if (domain === 'guides') return <GuidesIndex locale={locale} />
-  if (domain === 'architecture') return <ArchitectureIndex locale={locale} />
-  return <DocsIndex locale={locale} />
+/**
+ * Classifies a library path: `<library>/api/...` is API reference (`docs`); every other library
+ * path, including the library root, is a learning-path or guide topic (`guides`).
+ */
+function pageKind(parts: readonly string[]): IDomain {
+  return parts[1] === API_SEGMENT ? 'docs' : 'guides'
 }
 
 /** Curated outcome-first routes that keep task discovery independent of package inventory. */
@@ -475,9 +487,11 @@ const ARCHITECTURE_FAMILIES = [
   }
 ] as const
 
-/** Renders the source-backed API catalogue and nothing task- or topology-specific. */
+/**
+ * Renders the single docs home: outcome-first starters, then every library grouped by architectural
+ * role. Each card opens that library's learning path.
+ */
 function DocsIndex({ locale }: { locale: ILocale }) {
-  const copy = copyFor(locale)
   return (
     <main
       id="main-content"
@@ -488,93 +502,27 @@ function DocsIndex({ locale }: { locale: ILocale }) {
       <p className="eyebrow">docs</p>
       <h1>{domainTitle(locale, 'docs')}</h1>
       <p className="lede">{domainDescription(locale, 'docs')}</p>
-      <section className="section-block" aria-labelledby="library-index">
-        <h2 id="library-index">{copy.libraryIndex}</h2>
-        <div className="library-grid">
-          {librarySummaries.map((library) => (
-            <Link
-              className="library-item"
-              key={library.slug}
-              to={domainPath(locale, 'docs', library.slug)}
-            >
-              <strong>{library.slug}</strong>
-              <span>{libraryReferenceDescription(locale, library.slug)}</span>
-              <small>
-                {locale === 'zh'
-                  ? `${library.exports.length} 个公开模块`
-                  : `${library.exports.length} public module${library.exports.length === 1 ? '' : 's'}`}
-              </small>
-            </Link>
-          ))}
-        </div>
-      </section>
-      <NextActions locale={locale} domain="docs" />
-    </main>
-  )
-}
-
-/** Renders outcome-first guide choices instead of mirroring the library catalogue. */
-function GuidesIndex({ locale }: { locale: ILocale }) {
-  return (
-    <main
-      id="main-content"
-      className="page-shell content-page domain-index-page"
-      lang={locale}
-      data-pagefind-body
-    >
-      <p className="eyebrow">guides</p>
-      <h1>{domainTitle(locale, 'guides')}</h1>
-      <p className="lede">{domainDescription(locale, 'guides')}</p>
       <section className="section-block" aria-labelledby="task-index">
         <h2 id="task-index">
           {locale === 'zh' ? '你现在想完成什么？' : 'What do you need to accomplish?'}
         </h2>
-        <p>
-          {locale === 'zh'
-            ? '先选结果，再进入包含步骤、解释、代码与验收方式的任务指南。'
-            : 'Choose an outcome first, then follow a task guide with steps, rationale, code, and verification.'}
-        </p>
         <div className="journey-grid">
           {GUIDE_STARTERS.map((guide) => (
             <Link
               className="journey-item"
               key={guide.library}
-              to={domainPath(locale, 'guides', guide.library)}
+              to={domainPath(locale, guide.library)}
             >
               <small>{guide.library}</small>
               <strong>{locale === 'zh' ? guide.titleZh : guide.titleEn}</strong>
               <span>{locale === 'zh' ? guide.bodyZh : guide.bodyEn}</span>
-              <b>{locale === 'zh' ? '开始任务 →' : 'Start task →'}</b>
+              <b>{locale === 'zh' ? '开始 →' : 'Start →'}</b>
             </Link>
           ))}
         </div>
       </section>
-      <NextActions locale={locale} domain="guides" />
-    </main>
-  )
-}
-
-/** Renders architecture-oriented library families instead of a flat package catalogue. */
-function ArchitectureIndex({ locale }: { locale: ILocale }) {
-  return (
-    <main
-      id="main-content"
-      className="page-shell content-page domain-index-page"
-      lang={locale}
-      data-pagefind-body
-    >
-      <p className="eyebrow">architecture</p>
-      <h1>{domainTitle(locale, 'architecture')}</h1>
-      <p className="lede">{domainDescription(locale, 'architecture')}</p>
-      <section className="section-block" aria-labelledby="dependency-map">
-        <h2 id="dependency-map">
-          {locale === 'zh' ? '按架构职责浏览类库' : 'Browse libraries by architectural role'}
-        </h2>
-        <p>
-          {locale === 'zh'
-            ? '同一家族解决相邻问题；选择类库前，先确认它属于状态、组合、平台还是通用基础能力。'
-            : 'Libraries in one family solve adjacent problems; identify state, composition, platform, or shared foundation concerns before choosing one.'}
-        </p>
+      <section className="section-block" aria-labelledby="library-index">
+        <h2 id="library-index">{copyFor(locale).libraryIndex}</h2>
         <div className="architecture-stack">
           {ARCHITECTURE_FAMILIES.map((family, index) => (
             <article className="architecture-layer" key={family.titleEn}>
@@ -588,8 +536,9 @@ function ArchitectureIndex({ locale }: { locale: ILocale }) {
                   }
                 >
                   {family.libraries.map((library) => (
-                    <Link key={library} to={domainPath(locale, 'architecture', library)}>
-                      {library}
+                    <Link className="library-item" key={library} to={domainPath(locale, library)}>
+                      <strong>{library}</strong>
+                      <span>{libraryReferenceDescription(locale, library)}</span>
                     </Link>
                   ))}
                 </nav>
@@ -610,13 +559,14 @@ function docsModulePath(
   symbol?: string
 ): string {
   const moduleSegment = moduleName === 'index' ? '' : `/${moduleName}`
-  return `/${locale}/docs/${library}${moduleSegment}${symbol ? `/${symbol}` : ''}`
+  return `/${locale}/docs/${library}/${API_SEGMENT}${moduleSegment}${symbol ? `/${symbol}` : ''}`
 }
 
 /** Renders a library documentation root and its source-backed module map. */
 function DocsLibrary({
   apiLinks,
   guide,
+  journeyTopics,
   locale,
   library,
   libraryApis,
@@ -627,6 +577,7 @@ function DocsLibrary({
 }: {
   apiLinks: readonly IGuideApiLink[]
   guide?: IApiGuide
+  journeyTopics: readonly { readonly title: string; readonly topic: string }[]
   locale: ILocale
   library: ILibrary
   libraryApis: readonly IApi[]
@@ -652,19 +603,17 @@ function DocsLibrary({
   /** One stable category tree supplies both the desktop sidebar and the existing mobile menu. */
   const pageNavigation = useMemo(
     () => (
-      <nav aria-label={copy.libraryModules}>
-        <strong>{library.slug}</strong>
-        <LibraryModuleLinks
-          api={api}
-          apiLinks={apiLinks}
-          libraryApis={libraryApis}
-          librarySlug={library.slug}
-          locale={locale}
-          selectedSymbol={selectedSymbol}
-        />
-      </nav>
+      <LibraryNavigation
+        api={api}
+        apiLinks={apiLinks}
+        journeyTopics={journeyTopics}
+        libraryApis={libraryApis}
+        librarySlug={library.slug}
+        locale={locale}
+        selectedSymbol={selectedSymbol}
+      />
     ),
-    [api, apiLinks, copy.libraryModules, library.slug, libraryApis, locale, selectedSymbol]
+    [api, apiLinks, journeyTopics, library.slug, libraryApis, locale, selectedSymbol]
   )
   usePageNavigation(pageNavigation)
   if (!moduleName || moduleName === 'overview')
@@ -791,6 +740,68 @@ function DocsLibrary({
   )
 }
 
+/**
+ * Renders the one library sidebar shared by guide and API pages: guide topics first, then the API
+ * tree whose leaves open each API's detail page (signature, parameters, examples).
+ */
+function LibraryNavigation({
+  activeTopic,
+  api,
+  apiLinks,
+  journeyTopics,
+  libraryApis,
+  librarySlug,
+  locale,
+  selectedSymbol
+}: {
+  readonly activeTopic?: string
+  readonly api: IApi | undefined
+  readonly apiLinks: readonly IGuideApiLink[]
+  readonly journeyTopics: readonly { readonly title: string; readonly topic: string }[]
+  readonly libraryApis: readonly IApi[]
+  readonly librarySlug: string
+  readonly locale: ILocale
+  readonly selectedSymbol: IApiSymbol | undefined
+}) {
+  return (
+    <nav aria-label={copyFor(locale).libraryModules}>
+      <strong>{librarySlug}</strong>
+      {journeyTopics.length > 0 ? (
+        <div className="left-rail-group left-rail-primary">
+          <span>{locale === 'zh' ? '指南' : 'Guides'}</span>
+          <div className="left-rail-children">
+            {journeyTopics.map((entry) => (
+              <Link
+                className={entry.topic === activeTopic ? 'active' : ''}
+                key={entry.topic}
+                to={guidePath(locale, librarySlug, entry.topic)}
+              >
+                {entry.title}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      <div className="left-rail-group left-rail-primary">
+        <Link
+          className={api?.module === 'index' && !selectedSymbol ? 'active' : ''}
+          to={docsModulePath(locale, librarySlug, 'index')}
+        >
+          {locale === 'zh' ? 'API 参考' : 'API reference'}
+        </Link>
+      </div>
+      <LibraryModuleLinks
+        api={api}
+        apiLinks={apiLinks}
+        libraryApis={libraryApis}
+        librarySlug={librarySlug}
+        locale={locale}
+        selectedSymbol={selectedSymbol}
+      />
+    </nav>
+  )
+}
+
 /** Renders the same nested module tree in the desktop rail and mobile disclosure. */
 function LibraryModuleLinks({
   api,
@@ -899,13 +910,13 @@ function LibraryModuleLinks({
         <div className="left-rail-group left-rail-primary">
           <span>{locale === 'zh' ? '场景应用' : 'Real-world scenarios'}</span>
           <div className="left-rail-children">
-            <Link to={`/${locale}/guides/rpc-contract/real-world-bindings`}>
+            <Link to={guidePath(locale, 'rpc-contract', 'real-world-bindings')}>
               {locale === 'zh' ? '同一 Contract 的完整数据流' : 'One Contract, complete data flow'}
             </Link>
             {rpcContractScenarioLinks.map(([labelZh, labelEn, anchor]) => (
               <Link
                 key={labelEn}
-                to={`/${locale}/guides/rpc-contract/${anchor.replace('bindings-', '')}`}
+                to={guidePath(locale, 'rpc-contract', anchor.replace('bindings-', ''))}
               >
                 {locale === 'zh' ? labelZh : labelEn}
               </Link>
@@ -923,10 +934,10 @@ function LibraryModuleLinks({
               </Link>
             ))}
           </div>
-          <Link to={`/${locale}/guides/rpc-core/endpoint-composition`}>
+          <Link to={guidePath(locale, 'rpc-core', 'endpoint-composition')}>
             {locale === 'zh' ? '如何选择 Endpoint →' : 'How to choose an Endpoint →'}
           </Link>
-          <Link to={`/${locale}/guides/rpc-core/transports-and-security`}>
+          <Link to={guidePath(locale, 'rpc-core', 'transports-and-security')}>
             {locale === 'zh' ? 'Transport 选择与完整案例' : 'Transport selection and examples'}
           </Link>
         </div>
@@ -961,7 +972,7 @@ function LibraryModuleLinks({
                   </Link>
                 ))}
               {librarySlug === 'logger' && candidate.module === 'plugins' ? (
-                <Link to={`/${locale}/guides/logger/custom-plugin`}>
+                <Link to={guidePath(locale, 'logger', 'custom-plugin')}>
                   {locale === 'zh' ? '编写自定义插件 →' : 'Author a custom plugin →'}
                 </Link>
               ) : null}
@@ -1774,7 +1785,7 @@ function SingleApiReference({
             </li>
           ))}
         </ul>
-        <Link to={`/${locale}/guides/${api.library}`}>
+        <Link to={guidePath(locale, api.library)}>
           {locale === 'zh' ? `${api.library} 入门指南` : `Get started with ${api.library}`}
         </Link>
       </section>
@@ -2071,7 +2082,7 @@ function ModuleGuidance({
         </section>
       ))}
       <p className="document-next-step">
-        <Link className="text-link" to={`/${locale}/guides/${library.slug}`}>
+        <Link className="text-link" to={guidePath(locale, library.slug)}>
           {locale === 'zh' ? `${library.slug} 入门指南 →` : `Get started with ${library.slug} →`}
         </Link>
       </p>
@@ -2465,7 +2476,8 @@ function isApiBoundaryBlock(block: IMaintainedBlock): boolean {
 
 /** Maps package-owned error-code tokens to the public error reference page. */
 function errorReferencePath(locale: ILocale, library: string | undefined): string | undefined {
-  if (library === 'storage-web') return `/${locale}/docs/storage-web/StorageError`
+  if (library === 'storage-web')
+    return docsModulePath(locale, 'storage-web', 'index', 'StorageError')
   return undefined
 }
 
@@ -2683,7 +2695,8 @@ function libraryReferenceDescription(locale: ILocale, slug: string): string {
 
 /** Highlights inline code and links public errors and explicit cross-library references. */
 function InlineText({
-  domain = 'docs',
+  // Cross-library links open the target library's learning path, whatever the page kind.
+  domain: _domain = 'docs',
   library,
   locale,
   text
@@ -2716,7 +2729,7 @@ function InlineText({
               className="library-reference"
               key={index}
               title={description}
-              to={domainPath(locale, domain, referencedLibrary)}
+              to={domainPath(locale, referencedLibrary)}
             >
               {inlineCode ? <code>{value}</code> : value}
               <span className="library-reference-popover" role="note">
@@ -2744,24 +2757,6 @@ type IGuideApiGroup = {
   readonly label?: string
   readonly links: readonly IGuideApiLink[]
   readonly module: string
-}
-
-/** Groups lightweight API links by their public module while preserving export order. */
-function groupGuideApiLinks(
-  apiLinks: readonly IGuideApiLink[],
-  library: string,
-  locale: ILocale
-): readonly IGuideApiGroup[] {
-  if (library === 'rpc-core') return groupWebRpcGuideApiLinks(apiLinks, locale)
-  if (library === 'storage-web') return groupStorageWebApiLinks(apiLinks, locale)
-  /** Ordered module buckets keep generated public export order stable in navigation. */
-  const groups = new Map<string, IGuideApiLink[]>()
-  for (const link of apiLinks) {
-    const links = groups.get(link.module) ?? []
-    links.push(link)
-    groups.set(link.module, links)
-  }
-  return [...groups].map(([module, links]) => ({ key: module, links, module }))
 }
 
 /** Groups Storage Web by the decision a caller is making, independent of export-path layout. */
@@ -2834,278 +2829,137 @@ function groupStorageWebApiLinks(
     .filter((group) => group.links.length > 0)
 }
 
-/** Separates RPC APIs, plugins, specifications, adapters, and errors by public role. */
-function groupWebRpcGuideApiLinks(
-  apiLinks: readonly IGuideApiLink[],
-  locale: ILocale
-): readonly IGuideApiGroup[] {
-  /** Root-exported factories below are middleware plugins, not ordinary utility APIs. */
-  const middlewareNames = new Set([
-    'abort',
-    'authentication',
-    'chunk',
-    'codec',
-    'connect',
-    'contract',
-    'framer',
-    'hooks',
-    'ping',
-    'protocol',
-    'timeout'
-  ])
-  /** Error helpers and constructors form one recovery-oriented navigation group. */
-  const isErrorEntry = (link: IGuideApiLink) =>
-    link.name === 'RPC_CORE_ERROR_SOURCE' ||
-    link.name.endsWith('Error') ||
-    ['deserializeRpcError', 'isRpcError', 'reachRpcError', 'serializeRpcError'].includes(link.name)
-  /** Stable category order matches the decisions developers make while reading. */
-  const definitions = [
-    {
-      key: 'api',
-      label: locale === 'zh' ? 'API' : 'APIs',
-      matches: (link: IGuideApiLink) =>
-        !middlewareNames.has(link.name) &&
-        !link.module.startsWith('features/') &&
-        !link.module.startsWith('adapters/') &&
-        !link.module.startsWith('adapter/') &&
-        link.module !== 'transport-constants' &&
-        !isErrorEntry(link)
-    },
-    {
-      key: 'plugins',
-      label: locale === 'zh' ? '插件' : 'Plugins',
-      matches: (link: IGuideApiLink) =>
-        middlewareNames.has(link.name) || link.module.startsWith('features/')
-    },
-    {
-      key: 'contracts',
-      label: locale === 'zh' ? '规范' : 'Specifications',
-      matches: (link: IGuideApiLink) => link.module === 'transport-constants'
-    },
-    {
-      key: 'adapters',
-      label: locale === 'zh' ? '宿主适配器' : 'Host adapters',
-      matches: (link: IGuideApiLink) =>
-        link.module.startsWith('adapters/') || link.module.startsWith('adapter/')
-    },
-    {
-      key: 'errors',
-      label: locale === 'zh' ? '错误与诊断' : 'Errors and diagnostics',
-      matches: isErrorEntry
-    }
-  ] as const
-  return definitions
-    .map(({ key, label, matches }) => ({
-      key,
-      label,
-      links: apiLinks.filter(matches),
-      module: key
-    }))
-    .filter((group) => group.links.length > 0)
-}
-
-/** Renders the first Guide menu: every callable API grouped under its owning public module. */
-function GuideApiNavigation({
-  apiLinks,
-  library,
-  locale,
-  placement
-}: {
-  readonly apiLinks: readonly IGuideApiLink[]
-  readonly library: string
-  readonly locale: ILocale
-  readonly placement: 'desktop' | 'mobile'
-}) {
-  /** One shared projection backs both desktop and mobile navigation surfaces. */
-  const groups = groupGuideApiLinks(apiLinks, library, locale)
-  return (
-    <section
-      className={`guide-api-menu ${placement}`}
-      aria-label={locale === 'zh' ? 'API 列表' : 'API list'}
-    >
-      <h2>{locale === 'zh' ? '分类导航' : 'Reference navigation'}</h2>
-      <p>
-        {locale === 'zh'
-          ? 'API、插件、规范、宿主适配器和错误各自独立列出。'
-          : 'APIs, plugins, specifications, host adapters, and errors are listed separately.'}
-      </p>
-      <div className="guide-api-groups">
-        {groups.map((group) => (
-          <section className="guide-api-group" key={group.key}>
-            <header>
-              <h3>
-                {group.label ? (
-                  group.label
-                ) : (
-                  <code>
-                    {group.module === 'index'
-                      ? `${library} · ${readerFacingModuleName(locale, group.module)}`
-                      : readerFacingModuleName(locale, group.module)}
-                  </code>
-                )}
-              </h3>
-              <span>{group.links.length}</span>
-            </header>
-            <nav aria-label={`${group.label ?? group.module}${locale === 'zh' ? '列表' : ' list'}`}>
-              {group.links.map((link) => (
-                <Link
-                  key={link.symbolPath}
-                  to={docsModulePath(locale, library, link.module, link.symbolPath)}
-                >
-                  <code>{link.name}</code>
-                </Link>
-              ))}
-            </nav>
-          </section>
-        ))}
-      </div>
-      <Link className="guide-api-all" to={docsModulePath(locale, library, 'index')}>
-        {locale === 'zh' ? '查看全部 API →' : 'Browse all APIs →'}
-      </Link>
-    </section>
-  )
-}
-
-/** Renders a guide or architecture library page with its fixed page-family order. */
+/** Renders a library learning path or guide topic beside the shared library sidebar. */
 function DomainLibrary({
   locale,
-  domain,
   library,
   apiLinks,
+  libraryApis,
   modulePath,
   journey,
   journeyTopics
 }: {
   locale: ILocale
-  domain: IDomain
   library: ILibrary
   apiLinks: readonly IGuideApiLink[]
+  libraryApis: readonly IApi[]
   modulePath?: string
   journey?: IGuideJourney
   journeyTopics: readonly { readonly title: string; readonly topic: string }[]
 }) {
   const topic = modulePath ?? 'index'
-  const guide = domain === 'guides'
-  const document = guide ? library.documentation.guide : library.documentation.readme
-  /** Loader-provided guide inventory keeps every task reachable without bundling all guide bodies. */
-  const guideTopics = guide ? journeyTopics : []
+  /** Maintained usage guide shown in Chinese when a topic has no hand-written journey yet. */
+  const document = library.documentation.guide
   /** Visible guide headings back the right-side reading outline. */
   const guideSections = journey?.document.sections ?? []
-  /** Category links remain one page-owned projection in the sidebar and mobile menu. */
+  /** Maintained positioning paragraph: what the library is for and where it sits among the others. */
+  const packagePosition =
+    LIBRARY_ARCHITECTURE_LEDES_ZH[library.slug as keyof typeof LIBRARY_ARCHITECTURE_LEDES_ZH]
+  /** The library sidebar is identical on guide and API pages; only the active entry differs. */
   const pageNavigation = useMemo(
     () => (
-      <div className="page-category-navigation">
-        <strong>{library.slug}</strong>
-        <GuideApiNavigation
-          apiLinks={apiLinks}
-          library={library.slug}
-          locale={locale}
-          placement="desktop"
-        />
-        {guide ? (
-          <section className="guide-topic-navigation">
-            <h2>{locale === 'zh' ? '任务指南' : 'Task guides'}</h2>
-            <nav aria-label={copyFor(locale).taskGuides}>
-              {guideTopics.map((entry) => (
-                <Link
-                  className={`guide-topic-link${entry.topic === topic ? ' active' : ''}`}
-                  key={entry.topic}
-                  to={
-                    entry.topic === 'index'
-                      ? `/${locale}/guides/${library.slug}`
-                      : `/${locale}/guides/${library.slug}/${entry.topic}`
-                  }
-                >
-                  {entry.title}
-                </Link>
-              ))}
-            </nav>
-          </section>
-        ) : null}
-      </div>
+      <LibraryNavigation
+        activeTopic={topic}
+        api={undefined}
+        apiLinks={apiLinks}
+        journeyTopics={journeyTopics}
+        libraryApis={libraryApis}
+        librarySlug={library.slug}
+        locale={locale}
+        selectedSymbol={undefined}
+      />
     ),
-    [apiLinks, guide, guide ? journeyTopics : undefined, library.slug, locale, topic]
+    [apiLinks, journeyTopics, library.slug, libraryApis, locale, topic]
   )
   usePageNavigation(pageNavigation)
-  const article = (
-    <article className={guide ? 'article-column' : 'article-column full-article'}>
-      <p className="eyebrow">
-        {guide ? (locale === 'zh' ? '指南' : 'Guide') : locale === 'zh' ? '架构' : 'Architecture'} ·{' '}
-        {library.slug}
-      </p>
-      <h1>{journey?.title ?? (modulePath ? topic : library.slug)}</h1>
-      <p className="lede">
-        <InlineText
-          library={library.slug}
-          locale={locale}
-          text={
-            journey?.lede ??
-            (locale === 'zh'
-              ? guide
-                ? libraryReferenceDescription(locale, library.slug)
-                : (LIBRARY_ARCHITECTURE_LEDES_ZH[
-                    library.slug as keyof typeof LIBRARY_ARCHITECTURE_LEDES_ZH
-                  ] ?? libraryReferenceDescription(locale, library.slug))
-              : guide
-                ? libraryReferenceDescription(locale, library.slug)
-                : libraryReferenceDescription(locale, library.slug))
-          }
-        />
-      </p>
-      {journey ? (
-        <GuideJourneyContent journey={journey} library={library.slug} locale={locale} />
-      ) : locale === 'zh' && document ? (
-        <MaintainedDocument
-          document={document}
-          domain={domain}
-          library={library.slug}
-          locale={locale}
-        />
-      ) : null}
-      <p className="document-next-step">
-        <Link className="text-link" to={docsModulePath(locale, library.slug, 'index')}>
-          {locale === 'zh'
-            ? `查看 ${library.slug} API 与类型 →`
-            : `${library.slug} API reference →`}
-        </Link>
-      </p>
-    </article>
-  )
   return (
     <main id="main-content" className="page-shell content-page" lang={locale} data-pagefind-body>
-      <Breadcrumb locale={locale} domain={domain} library={library.slug} moduleName={topic} />
-      {guide ? (
-        <div className="reading-layout">
-          {article}
-          <div className="left-rail-sticky">
-            <ScrollArea className="left-rail">
-              <aside className="left-rail-content" aria-label={copyFor(locale).taskGuides}>
-                {pageNavigation}
-              </aside>
-            </ScrollArea>
-          </div>
-          {guideSections.length ? (
-            <details className="page-toc">
-              <summary>{copyFor(locale).onPage}</summary>
-              <nav aria-label={copyFor(locale).onPage}>
-                {guideSections.map((section) => (
-                  <a href={`#${section.id}`} key={section.id}>
-                    {section.heading}
-                  </a>
-                ))}
-              </nav>
-            </details>
+      <Breadcrumb
+        locale={locale}
+        domain="guides"
+        library={library.slug}
+        moduleName={topic === 'index' ? undefined : (journey?.title ?? topic)}
+      />
+      <div className="reading-layout">
+        <article className="article-column">
+          <p className="eyebrow">
+            {locale === 'zh' ? '指南' : 'Guide'} · {library.slug}
+          </p>
+          <h1>{journey?.title ?? (modulePath ? topic : library.slug)}</h1>
+          <p className="lede">
+            <InlineText
+              library={library.slug}
+              locale={locale}
+              text={
+                journey?.lede ??
+                (locale === 'zh'
+                  ? (LIBRARY_ARCHITECTURE_LEDES_ZH[
+                      library.slug as keyof typeof LIBRARY_ARCHITECTURE_LEDES_ZH
+                    ] ?? libraryReferenceDescription(locale, library.slug))
+                  : libraryReferenceDescription(locale, library.slug))
+              }
+            />
+          </p>
+          {topic === 'index' && journey && locale === 'zh' && packagePosition ? (
+            <section className="section-block" aria-labelledby="package-position">
+              <h2 id="package-position">在 migaia 中的位置</h2>
+              <p className="package-position">
+                <InlineText library={library.slug} locale={locale} text={packagePosition} />
+              </p>
+            </section>
           ) : null}
-        </div>
-      ) : (
-        <div className="architecture-reading-layout">
-          {article}
-          <ScrollArea className="architecture-api-rail">
-            <aside className="architecture-api-rail-content">{pageNavigation}</aside>
+          {journey ? (
+            <GuideJourneyContent journey={journey} library={library.slug} locale={locale} />
+          ) : locale === 'zh' && document ? (
+            <MaintainedDocument
+              document={document}
+              domain="guides"
+              library={library.slug}
+              locale={locale}
+            />
+          ) : null}
+          {topic === 'index' && locale === 'zh' && library.documentation.readme ? (
+            <section className="section-block" aria-labelledby="package-readme">
+              <h2 id="package-readme">包说明</h2>
+              <MaintainedDocument
+                document={library.documentation.readme}
+                domain="guides"
+                headingLevel={3}
+                idPrefix="readme-"
+                library={library.slug}
+                locale={locale}
+              />
+            </section>
+          ) : null}
+          <p className="document-next-step">
+            <Link className="text-link" to={docsModulePath(locale, library.slug, 'index')}>
+              {locale === 'zh'
+                ? `查看 ${library.slug} API 参考 →`
+                : `${library.slug} API reference →`}
+            </Link>
+          </p>
+        </article>
+        <div className="left-rail-sticky">
+          <ScrollArea className="left-rail">
+            <aside className="left-rail-content" aria-label={copyFor(locale).libraryModules}>
+              {pageNavigation}
+            </aside>
           </ScrollArea>
         </div>
-      )}
-      <NextActions locale={locale} domain={domain} library={library.slug} />
+        {guideSections.length ? (
+          <details className="page-toc">
+            <summary>{copyFor(locale).onPage}</summary>
+            <nav aria-label={copyFor(locale).onPage}>
+              {guideSections.map((section) => (
+                <a href={`#${section.id}`} key={section.id}>
+                  {section.heading}
+                </a>
+              ))}
+            </nav>
+          </details>
+        ) : null}
+      </div>
+      <NextActions locale={locale} domain="guides" library={library.slug} />
     </main>
   )
 }
@@ -3134,13 +2988,7 @@ function GuideJourneyContent({
           <Link
             className="text-link"
             key={next.path}
-            to={
-              next.path.startsWith('docs/')
-                ? `/${locale}/${next.path.replace(/^docs\/([^/]+)\/index(?=\/|$)/, 'docs/$1')}`
-                : next.path === 'index'
-                  ? `/${locale}/guides/${library}`
-                  : `/${locale}/guides/${library}/${next.path}`
-            }
+            to={journeyNextPath(locale, library, next.path)}
           >
             {next.label} →
           </Link>
@@ -3148,6 +2996,20 @@ function GuideJourneyContent({
       </nav>
     </>
   )
+}
+
+/**
+ * Resolves a journey `next` path. `docs/<library>/<api path>` names an API page (an `index` module
+ * segment means the root module); any other value is a guide topic of this library.
+ */
+function journeyNextPath(locale: ILocale, library: string, path: string): string {
+  /** `../<library>/<topic>` names a guide topic of another library. */
+  if (path.startsWith('../')) return `/${locale}/docs/${path.slice(3)}`
+  const apiTarget = path.match(/^docs\/([^/]+)(?:\/(.*))?$/)
+  if (!apiTarget) return guidePath(locale, library, path)
+  const [, targetLibrary, rest = ''] = apiTarget
+  const apiPath = rest.replace(/^index(?=\/|$)\/?/, '')
+  return `/${locale}/docs/${targetLibrary}/${API_SEGMENT}${apiPath ? `/${apiPath}` : ''}`
 }
 
 /** Keeps type declarations subordinate to runtime APIs and displays selected declarations in full. */
@@ -3552,7 +3414,7 @@ function MetaLine({ locale, library }: { locale: ILocale; library: ILibrary }) {
 /** Renders derived breadcrumb position for all content pages. */
 function Breadcrumb({
   locale,
-  domain,
+  domain: _domain,
   library,
   moduleName
 }: {
@@ -3563,11 +3425,11 @@ function Breadcrumb({
 }) {
   return (
     <nav className="breadcrumb" aria-label="Breadcrumb">
-      <Link to={domainPath(locale, domain)}>{domain}</Link>
+      <Link to={domainPath(locale)}>docs</Link>
       {library ? (
         <>
           <span>/</span>
-          <Link to={domainPath(locale, domain, library)}>{library}</Link>
+          <Link to={domainPath(locale, library)}>{library}</Link>
         </>
       ) : null}
       {moduleName ? (
@@ -3580,7 +3442,7 @@ function Breadcrumb({
   )
 }
 
-/** Provides at most three meaningful continuation actions. */
+/** Provides at most three meaningful continuation actions inside one library. */
 function NextActions({
   locale,
   domain: _domain,
@@ -3591,17 +3453,21 @@ function NextActions({
   library?: string
 }) {
   const copy = copyFor(locale)
+  if (!library)
+    return (
+      <nav className="next-actions" aria-label={copy.continueReading}>
+        <Link to={domainPath(locale)}>{copy.browseLibraries} →</Link>
+      </nav>
+    )
   return (
     <nav className="next-actions" aria-label={copy.continueReading}>
-      <Link to={domainPath(locale, 'docs', library)}>
-        {library ? `${library} API` : copy.browseLibraries} →
+      <Link to={guidePath(locale, library)}>
+        {library} · {locale === 'zh' ? '学习路径' : 'Learning path'} →
       </Link>
-      <Link to={domainPath(locale, 'guides', library)}>
-        {library ? `${library} · ${copy.taskGuides}` : copy.taskGuides} →
+      <Link to={guidePath(locale, library, 'getting-started')}>
+        {library} · {locale === 'zh' ? '快速开始' : 'Quick start'} →
       </Link>
-      <Link to={domainPath(locale, 'architecture', library)}>
-        {library ? `${library} · ${copy.architecture}` : copy.architecture} →
-      </Link>
+      <Link to={docsModulePath(locale, library, 'index')}>{library} API →</Link>
     </nav>
   )
 }
@@ -3613,7 +3479,7 @@ function EmptyState({ locale, library }: { locale: ILocale; library: string }) {
     <section className="empty-state">
       <h2>{copy.nothingMatched}</h2>
       <p>{copy.nothingMatchedBody}</p>
-      <Link className="text-link" to={`/${locale}/docs/${library}`}>
+      <Link className="text-link" to={domainPath(locale, library)}>
         {copy.returnTo} {library} →
       </Link>
     </section>
@@ -3629,7 +3495,7 @@ function NotFound({ locale, domain }: { locale: ILocale; domain: IDomain }) {
       <p className="eyebrow">{copy.notFound}</p>
       <h1>{copy.missingEntry}</h1>
       <p className="lede">{copy.missingEntryBody}</p>
-      <Link className="button button-primary" to={domainPath(locale, domain)}>
+      <Link className="button button-primary" to={domainPath(locale)}>
         {copy.browse} {domain}
       </Link>
       <NextActions locale={locale} domain={domain} />

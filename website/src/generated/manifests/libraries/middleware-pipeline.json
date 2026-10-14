@@ -426,8 +426,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/middleware-pipeline/getting-started",
-      "architecturePath": "/en/architecture/middleware-pipeline",
+      "guidePath": "/en/docs/middleware-pipeline/getting-started",
+      "architecturePath": "/en/docs/middleware-pipeline",
       "symbols": [
         {
           "name": "createPipeline",

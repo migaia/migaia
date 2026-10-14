@@ -856,8 +856,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/tray/getting-started",
-      "architecturePath": "/en/architecture/tray",
+      "guidePath": "/en/docs/tray/getting-started",
+      "architecturePath": "/en/docs/tray",
       "symbols": [
         {
           "name": "createTray",
@@ -5783,8 +5783,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/tray/getting-started",
-      "architecturePath": "/en/architecture/tray",
+      "guidePath": "/en/docs/tray/getting-started",
+      "architecturePath": "/en/docs/tray",
       "symbols": [
         {
           "name": "defineAdapter",
@@ -6010,8 +6010,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/tray/getting-started",
-      "architecturePath": "/en/architecture/tray",
+      "guidePath": "/en/docs/tray/getting-started",
+      "architecturePath": "/en/docs/tray",
       "symbols": [
         {
           "name": "createHost",
@@ -7631,8 +7631,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/tray/getting-started",
-      "architecturePath": "/en/architecture/tray",
+      "guidePath": "/en/docs/tray/getting-started",
+      "architecturePath": "/en/docs/tray",
       "symbols": [
         {
           "name": "defineLoader",
@@ -8242,8 +8242,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/tray/getting-started",
-      "architecturePath": "/en/architecture/tray",
+      "guidePath": "/en/docs/tray/getting-started",
+      "architecturePath": "/en/docs/tray",
       "symbols": [
         {
           "name": "createRuntime",

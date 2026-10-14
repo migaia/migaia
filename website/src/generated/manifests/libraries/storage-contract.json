@@ -1237,8 +1237,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-contract/getting-started",
-      "architecturePath": "/en/architecture/storage-contract",
+      "guidePath": "/en/docs/storage-contract/getting-started",
+      "architecturePath": "/en/docs/storage-contract",
       "symbols": [
         {
           "name": "asChangeFeedStore",
