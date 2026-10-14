@@ -21,16 +21,6 @@ export const WebsiteCopy = {
     homeTitle: 'Manage application state, background tasks, and plugin processes.',
     homeDescription:
       'Choose libraries for reactive state, browser persistence, cancellable Worker tasks, cross-runtime calls, and plugin or agent process management.',
-    capabilityMap: 'Capability map',
-    shortestPath: 'Choose the shortest useful path.',
-    foundation: 'Foundation',
-    foundationText: 'Stable primitives and utility APIs.',
-    runtime: 'Runtime',
-    runtimeText: 'Task-focused paths with observable checks.',
-    stateStorage: 'State & storage',
-    stateStorageText: 'Compose state, persistence, and boundaries.',
-    integration: 'Integration',
-    integrationText: 'Understand transport and platform edges.',
     scenarios: 'Build with migaia',
     scenarioTitle: 'What do you need your application to do?',
     /** Home scenarios connect concrete application goals to existing library pages. */
@@ -77,8 +67,8 @@ export const WebsiteCopy = {
     traySupervision: 'Tray + Supervision',
     traySupervisionText:
       'Limit how many plugin or agent instances run at once, check their health, and restart failures.',
-    webRpcSerialize: 'RPC Peer + Serialize',
-    webRpcSerializeText:
+    rpcPeerSerialize: 'RPC Peer + Serialize',
+    rpcPeerSerializeText:
       'Make typed remote calls through RPC Peer and encode and decode application data with Serialize.',
     libraryIndex: 'Library index',
     responsibility: 'Responsibility and boundary',
@@ -143,16 +133,6 @@ export const WebsiteCopy = {
     homeTitle: '管理应用状态、后台任务与插件进程。',
     homeDescription:
       '按需组合响应式状态、浏览器持久化、可取消的 Worker 任务与跨运行时调用，并管理插件或 agent 进程。',
-    capabilityMap: '能力地图',
-    shortestPath: '选择最短且有效的路径。',
-    foundation: '基础能力',
-    foundationText: '稳定的基础能力与工具 API。',
-    runtime: '运行时',
-    runtimeText: '以任务为中心，并提供可观察的验证步骤。',
-    stateStorage: '状态与存储',
-    stateStorageText: '组合状态、持久化与边界。',
-    integration: '集成',
-    integrationText: '理解传输层与平台边界。',
     scenarios: '用 migaia 解决实际问题',
     scenarioTitle: '你的应用现在需要做什么？',
     /** Home scenarios connect concrete application goals to existing library pages. */
@@ -195,8 +175,8 @@ export const WebsiteCopy = {
     capabilityPluginHostText: '按策略启用可选能力，再安装或替换插件，并在退出时释放资源。',
     traySupervision: 'Tray + Supervision',
     traySupervisionText: '限制同时运行的插件或 agent 实例数量，检查健康并在故障后重启。',
-    webRpcSerialize: 'RPC Peer + Serialize',
-    webRpcSerializeText: '通过 RPC Peer 定义类型安全的远程调用，用 Serialize 编解码应用数据。',
+    rpcPeerSerialize: 'RPC Peer + Serialize',
+    rpcPeerSerializeText: '通过 RPC Peer 定义类型安全的远程调用，用 Serialize 编解码应用数据。',
     libraryIndex: '类库索引',
     responsibility: '职责与边界',
     responsibilityBody:

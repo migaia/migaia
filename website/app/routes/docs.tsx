@@ -2548,7 +2548,7 @@ const LIBRARY_ARCHITECTURE_LEDES_ZH = {
     '用于 Store 的特定字段需要由 WebAssembly 内存承载或执行高成本转换，同时仍保留 Store 的订阅接口。它通过可选适配层管理 JS/WASM 值边界和内存所有权；普通字段没有测得瓶颈时应继续使用纯 TypeScript。',
   'store-worker':
     '用于把 Store 操作、Resource 请求或序列化工作移到 Worker，同时让主线程保留可订阅的调用接口。核心设计以消息协议和适配器管理请求关联、错误、取消与关闭，解决手写 postMessage 容易丢失类型和生命周期的问题。',
-  tray: '当应用启动时必须先准备配置，再用配置创建 logger、API client 或数据库连接，并在退出时按相反顺序关闭它们，可以用 Tray 代替散落的启动脚本。调用方一次声明每个 entry 的 key、依赖、start 和 release；Tray 按依赖顺序启动，只有全部成功后 ready() 才完成，随后通过 get(key) 读取结果，任一步失败都不会暴露半初始化对象，dispose() 会逆序释放已启动项。它适合启动前集合已确定的同进程组合，不是运行期增删服务的 DI 容器，也不负责跨 Worker 传输。',
+  tray: '当应用需要按依赖准备启动资源，或启动、调用和重启插件宿主时使用。静态资源用 createTrayGraph 声明完整 entry 集合，ready() 后读取结果，dispose() 按依赖逆序释放；宿主实例用 defineTrayHost 与 createTray({ hosts }) 管理，可选择 coroutine、Node Worker 或子进程。Tray 复用 RPC 和 supervision 的连接、执行与重启能力，并在停止实例前清理子 PluginHost；跨机器发现、browser Worker 与持久消息不在当前范围。',
   utils:
     '用于多个包共同需要、且不应绑定 Store、DOM 或具体运行时的基础能力，包括取消、并发、错误、集合、对象路径、字节与字符串处理。每个子路径拥有独立契约和错误语义，调用方应按能力导入；它不是无边界的杂物箱。',
   wasm: '用于统一 WebAssembly 模块初始化、实例复用、线性内存分配、JS/WASM 值转换和确定性释放。它把平台加载与内存所有权封装在明确边界内，避免每个消费者重复处理指针、视图失效和清理；没有 WASM 模块时无需使用。',
@@ -2568,7 +2568,7 @@ const LIBRARY_ARCHITECTURE_LEDES_ZH = {
   'rpc-browser':
     '用于 Window、共享 Worker、ServiceWorker、BroadcastChannel、WebTransport 或 RTCDataChannel 两端需要 RPC 的场景。各适配器持有实际浏览器通道及其监听器，保留来源校验、传输能力与关闭边界；Endpoint 和协议工具由 Core、Contract 复用，应用按实际通道选择适配器。',
   'rpc-devtools':
-    '用于让 RPC 观察工具共享同一套 service、事件与离线录制契约。当前 layer 1 提供版本 1 的 NDJSON 纯函数 codec，复用 Core 的 Probe 类型与 Contract 的错误链编解码，不依赖载体包，也不创建 transport；Core 观察点、collector 与 hub 运行时由后续实现提供，当前两个 devtools 工厂均以 CLOSED 拒绝。'
+    '当应用需要追踪 RPC 失败、调用耗时或跨宿主事件时使用。createRpcDevtools 作为 Probe 接入已有宿主，按有界事件环提供查询、统计、录制、暂停与 service；createRpcDevtoolsHub 聚合已有 service client 和离线录制，对齐时钟并关联 timeline 与 interactions。默认只采集元数据，内容捕获必须显式启用；录制使用版本 1 的 NDJSON，错误链复用 RPC Contract，连接与持久化由调用方管理。'
 } as const satisfies Readonly<Record<string, string>>
 
 /** README-backed English summaries mirror the same user-facing responsibilities. */
@@ -2667,8 +2667,8 @@ function libraryReferenceDescription(locale: ILocale, slug: string): string {
   if (locale === 'zh')
     return LIBRARY_REFERENCE_DESCRIPTIONS_ZH[slug as keyof typeof LIBRARY_REFERENCE_DESCRIPTIONS_ZH]
   return (
-    librarySummaries.find((entry) => entry.slug === slug)?.description ??
-    LIBRARY_REFERENCE_DESCRIPTIONS_EN[slug as keyof typeof LIBRARY_REFERENCE_DESCRIPTIONS_EN]
+    LIBRARY_REFERENCE_DESCRIPTIONS_EN[slug as keyof typeof LIBRARY_REFERENCE_DESCRIPTIONS_EN] ??
+    librarySummaries.find((entry) => entry.slug === slug)?.description
   )
 }
 

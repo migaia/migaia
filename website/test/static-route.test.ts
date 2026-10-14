@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { copyFor } from '../app/copy.js'
 
 const websiteRoot = fileURLToPath(new URL('../', import.meta.url))
 const buildRoot = join(websiteRoot, 'build/client')
@@ -129,14 +130,72 @@ test('SITE-T-HOME uses the header language control and explains the documentatio
   )
 })
 
-test('SITE-T-LANGUAGE-HOME presents concrete production library combinations', () => {
+test('SITE-T-LANGUAGE-HOME renders task scenarios and concrete production library combinations', () => {
   assert.doesNotMatch(languageSource, /copy\.chooseGoal|copy\.architecturePreview/)
+  for (const field of [
+    'homeEyebrow',
+    'homeTitle',
+    'homeDescription',
+    'scenarios',
+    'scenarioTitle',
+    'homeScenarios'
+  ])
+    assert.ok(languageSource.includes(`copy.${field}`), `home does not read ${field}`)
   assert.match(languageSource, /copy\.reactiveResource/)
   assert.match(languageSource, /copy\.capabilityPluginHost/)
-  assert.match(languageSource, /copy\.webRpcSerialize/)
+  assert.match(languageSource, /copy\.rpcPeerSerialize/)
+  assert.match(languageSource, /copy\.traySupervision/)
+  assert.doesNotMatch(
+    languageSource,
+    /copy\.(?:capabilityMap|shortestPath|foundation\w*|runtime\w*|stateStorage\w*|integration\w*|webRpcSerialize)/
+  )
+  assert.doesNotMatch(
+    copySource,
+    /^\s+(?:capabilityMap|shortestPath|foundation\w*|runtime\w*|stateStorage\w*|integration\w*|webRpcSerialize\w*):/m,
+    'reviewed home copy retains a retired field'
+  )
   assert.match(copySource, /跟踪变化的输入，取消过期请求/)
   assert.match(copySource, /按策略启用可选能力/)
   assert.match(copySource, /定义类型安全的远程调用/)
+  for (const locale of ['en', 'zh'] as const) {
+    /** The built home must consume the reviewed localized data, including each task's library links. */
+    const copy = copyFor(locale)
+    /** Reader-visible text avoids coupling the oracle to syntax or inline markup. */
+    const html = readFileSync(join(buildRoot, artifactPath(`/${locale}`)), 'utf8')
+    /** One localized landing page owns its hero, task scenarios, and common combinations. */
+    const text = renderedText(html)
+    for (const value of [
+      copy.homeEyebrow,
+      copy.homeTitle,
+      copy.homeDescription,
+      copy.scenarios,
+      copy.scenarioTitle
+    ])
+      assert.ok(text.includes(value), `/${locale} misses reviewed home text: ${value}`)
+    for (const scenario of copy.homeScenarios) {
+      assert.ok(text.includes(scenario.title), `/${locale} misses scenario: ${scenario.title}`)
+      assert.ok(
+        text.includes(scenario.body),
+        `/${locale} misses scenario explanation: ${scenario.title}`
+      )
+      for (const library of scenario.libraries)
+        assert.ok(
+          html.includes(`href="/${locale}/docs/${library}"`),
+          `/${locale} misses ${library} scenario link`
+        )
+    }
+    for (const combination of [
+      copy.reactiveResource,
+      copy.capabilityPluginHost,
+      copy.rpcPeerSerialize,
+      copy.traySupervision
+    ])
+      assert.ok(text.includes(combination), `/${locale} misses combination: ${combination}`)
+    assert.ok(
+      html.includes(`href="/${locale}/architecture/tray"`),
+      `/${locale} misses Tray combination link`
+    )
+  }
 })
 
 test('SITE-T-DOCS-NAV classifies public symbols by developer-facing role', () => {
@@ -408,7 +467,8 @@ test('SITE-T-LOCALE keeps Chinese navigation and introductions localized', () =>
   const chineseDocs = readFileSync(join(buildRoot, 'zh/docs/index.html'), 'utf8')
 
   assert.match(chineseHome, /<html[^>]+lang="zh"/)
-  assert.match(chineseHome, /选择最短且有效的路径。/)
+  assert.match(chineseHome, /管理应用状态、后台任务与插件进程。/)
+  assert.match(chineseHome, /你的应用现在需要做什么？/)
   assert.match(chineseHome, /开始查文档/)
   assert.match(chineseHome, /浏览指南/)
   assert.match(chineseHome, /href="\/zh\/docs"/)
@@ -853,7 +913,7 @@ test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampolin
 test('SITE-T-CROSS-LIBRARY makes maintained cross-library references explainable and navigable', () => {
   const capability = readFileSync(join(buildRoot, 'zh/architecture/capability/index.html'), 'utf8')
   assert.match(capability, /class="library-reference"[^>]*href="\/zh\/architecture\/plugin-host"/)
-  assert.match(capability, /负责插件定义、安装、管线组合、回滚与释放/)
+  assert.match(renderedText(capability), /安装和卸载插件.*配置共享能力与处理步骤.*安装失败时回滚/s)
   assert.match(capability, /class="library-reference"[^>]*href="\/zh\/architecture\/storage-web"/)
 
   for (const path of emittedFiles(buildRoot).filter((file) => file.endsWith('.html'))) {
@@ -1131,10 +1191,13 @@ test('SITE-T-LIBRARY-DESCRIPTIONS uses concrete responsibilities instead of slog
     'utf8'
   )
 
-  assert.match(docsIndex, /utils.*提供取消、并发、错误、集合、字符串等通用基础工具/s)
+  assert.match(renderedText(docsIndex), /utils.*添加超时、取消与错误追踪.*数据转换和对象更新/s)
   assert.match(utilsArchitecture, /多个包共同需要、且不应绑定 Store、DOM 或具体运行时/)
   assert.match(utilsArchitecture, /不是无边界的杂物箱/)
-  assert.match(loggerEnglish, /Structured logging with stable levels.*flush ownership/s)
+  assert.match(
+    renderedText(loggerEnglish),
+    /Send logs to a console or service.*filter and format.*asynchronous output/s
+  )
   for (const html of [docsIndex, utilsArchitecture, loggerEnglish]) {
     assert.doesNotMatch(html, /归属与边界模型/)
     assert.doesNotMatch(html, /源码契约、能力边界与使用入口/)
@@ -1170,10 +1233,13 @@ test('SITE-T-ARCHITECTURE-LEDES explain capability, pain, and design for every l
   assert.match(lifecycle, /不负责事件分发、业务排队或依赖图/)
 
   const tray = readFileSync(join(buildRoot, artifactPath('/zh/architecture/tray')), 'utf8')
-  assert.match(tray, /先准备配置，再用配置创建 logger、API client 或数据库连接/)
-  assert.match(tray, /任一步失败都不会暴露半初始化对象/)
-  assert.match(tray, /dispose\(\) 会逆序释放已启动项/)
-  assert.match(tray, /不是运行期增删服务的 DI 容器/)
+  /** Tray supports both fixed startup entries and managed runtime Host instances. */
+  const trayText = renderedText(tray)
+  assert.match(trayText, /createTrayGraph.*ready\(\).*dispose\(\).*按依赖逆序释放/s)
+  assert.match(trayText, /defineTrayHost.*createTray\(\{ hosts \}\)/s)
+  assert.match(trayText, /coroutine、Node Worker 或子进程/)
+  assert.match(trayText, /复用 RPC.*和 supervision/s)
+  assert.match(trayText, /跨机器发现、browser Worker 与持久消息不在当前范围/)
 })
 
 test('SITE-T-ARCHITECTURE-API-NAV exposes library API shortcuts beside architecture content', () => {
