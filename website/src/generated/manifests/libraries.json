@@ -8088,17 +8088,7 @@
       "slug": "reactive",
       "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
       "version": "0.0.7",
-      "exports": [
-        ".",
-        "./copy-check",
-        "./internals",
-        "./node-factories",
-        "./node-internals",
-        "./ownership",
-        "./reactive/*",
-        "./runtime",
-        "./source"
-      ],
+      "exports": [".", "./extension", "./internals"],
       "documentation": {
         "readme": {
           "sections": [
@@ -8168,7 +8158,7 @@
                     "完全隔离的 Runtime：不同 `Runtime` 的节点分属不同依赖图和版本时钟，混用会立即抛错，不会有全局单例串状态的问题。",
                     "惰性 + 缓存的 Computed：没有订阅者时不计算；多个下游共享同一个上游变化（diamond 依赖）只重算一次；没人观察的 `Computed` 会在空闲时自动挂起（断开依赖、释放订阅），无需手动管理。",
                     "显式生命周期：`Signal`/`Computed`/`Effect` 都要 `dispose()`；`Scope` 提供集中持有与一次性释放。读取已释放节点会立刻抛出明确错误，不会静默返回陈旧值。",
-                    "可控的调度：默认微任务合并触发；可用 `setSchedulerStrategy` 换成 `requestAnimationFrame`/`idle`/自定义策略；`batch()` 显式合并多次写入为一次副作用刷新；`flush()` 手动同步冲刷。",
+                    "可控的调度：默认微任务合并触发；创建 Runtime 时可用 `schedulerStrategy` 选项设为 `requestAnimationFrame`/`idle`/自定义策略；`batch()` 显式合并多次写入为一次副作用刷新；`flush()` 手动同步冲刷。",
                     "失控保护：自触发无限循环会在超过 `maxFlushPasses`（默认 100 轮）后抛错并如实报告被丢弃了哪些待办，而不是让标签页卡死。",
                     "诊断即观测，不侵入业务：trace 事件、错误上报都走独立通道，不会成为业务状态的一部分。"
                   ]
@@ -8190,19 +8180,15 @@
                   "rows": [
                     [
                       "`@migaia/reactive`",
-                      "日常 API：`Signal`、`Computed`、`Effect`、`createRuntime`、`defaultRuntime` 和公开类型/错误码。"
+                      "Runtime 工厂、`IReactiveSignal`/`IReactiveComputed`/`IReactiveEffect`、诊断常量与错误码。"
                     ],
                     [
-                      "`@migaia/reactive/runtime`",
-                      "Runtime、调度和 observer binding，供框架适配层使用。"
+                      "`@migaia/reactive/extension`",
+                      "所有权、受控 source、observer binding、图协议类型与只读版本查询。"
                     ],
                     [
-                      "`@migaia/reactive/ownership`、`/source`",
-                      "所有权断言与受控 source，供上层基础库使用。"
-                    ],
-                    [
-                      "`@migaia/reactive/internals`、`/node-internals`、`/node-factories`、`/copy-check`、`/reactive/*`",
-                      "内核扩展面；只在实现新的 reactive 基础设施时使用，不是一般应用 API。"
+                      "`@migaia/reactive/internals`",
+                      "tracker/scheduler/clock 与可变依赖边；供需要危险能力的节点实现层使用。"
                     ]
                   ]
                 }
@@ -8215,11 +8201,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\n\nconst count = new Signal(1, runtime);\nconst doubled = new Computed(() => count.value * 2, runtime);\n\nconst seen: number[] = [];\nconst effect = new Effect(() => {\n  seen.push(doubled.value);\n}, runtime); // 构造时立即同步跑一次：seen = [2]\n\ncount.value = 3;\nruntime.flush(); // 手动冲刷待处理的副作用：seen = [2, 6]\n\neffect.dispose();\ndoubled.dispose();\ncount.dispose();"
+                  "code": "import { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\n\nconst count = runtime.signal(1);\nconst doubled = runtime.computed(() => count.value * 2);\n\nconst seen: number[] = [];\nconst effect = runtime.effect(() => {\n  seen.push(doubled.value);\n}); // 创建时立即同步跑一次：seen = [2]\n\ncount.value = 3;\nruntime.flush(); // 手动冲刷待处理的副作用：seen = [2, 6]\n\neffect.dispose();\ndoubled.dispose();\ncount.dispose();"
                 },
                 {
                   "type": "paragraph",
-                  "text": "这段代码建立的是一张由当前 `runtime` 独占的依赖图。`Effect` 构造时会立即执行一次；执行过程中读取 `doubled.value`，使 `Effect → Computed → Signal` 三层依赖自动登记，所以 `seen` 首先得到 `2`。这不是手工订阅，之后也不需要再次告诉 `Effect` 它依赖了谁。"
+                  "text": "这段代码建立的是一张由当前 `runtime` 独占的依赖图。`runtime.effect()` 创建时会立即执行一次；执行过程中读取 `doubled.value`，使 `Effect → Computed → Signal` 三层依赖自动登记，所以 `seen` 首先得到 `2`。这不是手工订阅，之后也不需要再次告诉 `Effect` 它依赖了谁。"
                 },
                 {
                   "type": "paragraph",
@@ -8267,35 +8253,8 @@
               "heading": "7. 包内入口一览",
               "blocks": [
                 {
-                  "type": "table",
-                  "headers": ["入口", "提供什么", "适用人群"],
-                  "rows": [
-                    [
-                      "`@migaia/reactive`（主入口）",
-                      "`Signal`/`Computed`/`Effect`/`createRuntime`/`defaultRuntime` 及全部公共类型",
-                      "日常使用，绝大多数场景只需要这一个入口"
-                    ],
-                    [
-                      "`@migaia/reactive/runtime`",
-                      "`createObserverBinding` 等面向框架适配层的并发安全绑定原语",
-                      "自己实现 React/Vue/Solid 一类响应式绑定的作者"
-                    ],
-                    [
-                      "`@migaia/reactive/ownership`",
-                      "「某节点属于哪个 `Runtime`」的登记与断言",
-                      "在本包之上构建 Store/集合/资源类库的作者"
-                    ],
-                    [
-                      "`@migaia/reactive/internals` / `@migaia/reactive/node-internals` / `@migaia/reactive/node-factories`",
-                      "内核内部面（clock/tracker/scheduler、可变依赖边、具体节点类工厂）",
-                      "同上，仅供需要手工接入依赖图的节点实现层使用"
-                    ],
-                    [
-                      "`@migaia/reactive/source`",
-                      "`createFieldSource()`——为扩展层创建一条受控 Source",
-                      "同上"
-                    ]
-                  ]
+                  "type": "paragraph",
+                  "text": "应用作者从根入口使用工厂和窄节点类型。Store、集合、资源及框架适配层作者从 `/extension` 取得受控扩展能力；需要直接操作内部服务或可变图边时使用 `/internals`。三个节点类保持内部实现，不作为值导出。"
                 },
                 {
                   "type": "paragraph",
@@ -8309,7 +8268,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 不要跨 `Runtime` 混用节点——一个 `Runtime` 创建的 `Signal` 被另一个 `Runtime` 的 `Computed`/`Effect` 读取会直接抛错。 2. `Signal`/`Computed`/`Effect` 构造参数顺序是\"先业务参数、后 `runtime`\"：`new Signal(value, runtime, options?)`、`new Computed(fn, runtime, config?)`、`new Effect(fn, runtime, options?)`。 3. `new Effect(.)` 构造时会同步立即执行一次，不是等到依赖变化才第一次运行。 4. `Signal.value = 相同值`（`Object.is` 判定）不会触发任何通知，也不会推进版本号。 5."
+                  "text": "1. 不要跨 `Runtime` 混用节点——一个 `Runtime` 创建的 `Signal` 被另一个 `Runtime` 的 `Computed`/`Effect` 读取会直接抛错。 2. 统一经 Runtime 工厂创建节点：`runtime.signal(value, options?)`、`runtime.computed(fn, config?)`、`runtime.effect(fn, options?)`，均支持 `dispose()`/`disposed`。 3. `runtime.effect(.)` 创建时会同步立即执行一次，不是等到依赖变化才第一次运行。 4. `Signal.value = 相同值`（`Object.is` 判定）不会触发任何通知，也不会推进版本号。 5."
                 },
                 {
                   "type": "paragraph",
@@ -8331,7 +8290,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "本指南逐个入口列出全部导出 API 的签名、边界行为与错误码。包的定位、适用场景与五分钟上手见 README。"
+                  "text": "本指南列出三个已发布入口的 API、边界行为与错误码。节点统一经 Runtime 工厂创建；`Signal`、`Computed`、`Effect` 类保留为内部实现。包的定位与五分钟上手见 README。"
                 }
               ]
             },
@@ -8342,18 +8301,11 @@
                 {
                   "type": "list",
                   "items": [
-                    "主入口 `@migaia/reactive`：`Signal`、`Computed`、`Effect`、`createRuntime`、`defaultRuntime`",
-                    "`/runtime` 入口：`Runtime`、`createObserverBinding`（`capture`/`observe`/`commit`/`retrack`）、`VersionClock`、`DependencyTracker`、`Scheduler`",
-                    "`/ownership` 入口：`claimOwnership`、`ownerOf`、`assertOwnedBy`、`assertReactiveOwnedBy`",
-                    "`/source` 入口：`createFieldSource`",
-                    "`/internals` 入口：`registerInternals`、`internalsOf`、`isRuntime`",
-                    "`/node-factories` 入口：`internalRuntimeOf`、`isRuntimeTracking`、`isAnyRuntimeTracking`",
-                    "`/node-internals` 入口：`registerSubs`/`registerDeps`/`registerDepVersions`/`registerVersion` 及其可变访问器",
-                    "`/copy-check` 入口：`brandOwnedValue`、`assertNoForeignOwnershipBrand`、`noteRuntimeCopy`、`runtimeCopyCount`、`assertSingleRuntimeCopy`",
-                    "`/reactive/*` 入口：绕过桶文件的直接类导入",
-                    "错误码：`ReactiveErrorCode`（16 个码）逐条语义",
-                    "诊断消息：`ReactiveErrorText`",
-                    "Trace 事件与常量：`IRuntimeTraceEvent`、`ReactiveTraceType`、`ReactiveTracePhase`、`ReactiveErrorPhase`、`ReactiveTraceReason`",
+                    "主入口 `@migaia/reactive`：Runtime 工厂、窄节点类型、诊断常量与错误码",
+                    "`/extension` 入口：所有权、受控 source、observer binding、图类型与只读版本查询",
+                    "`/internals` 入口：内部服务、节点版本与可变边集",
+                    "错误码",
+                    "Trace 事件与常量",
                     "高阶组合示例",
                     "排查与构建门禁"
                   ]
@@ -8367,18 +8319,18 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  Signal,\n  Computed,\n  Effect,\n  type IComputedConfig,\n  createRuntime,\n  defaultRuntime,\n  type Runtime,\n  ReactiveErrorCode,\n  type IReactiveErrorCode,\n  ReactiveErrorText,\n  type IReactiveErrorText,\n  REACTIVE_SOURCE,\n  type IReactiveError,\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IDisposable,\n  type IDisposer,\n  type IComputedValue,\n  type IObservable,\n  type IObserver,\n  type IRuntime,\n  type IRuntimeOptions,\n  type ISignal,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';"
+                  "code": "import {\n  createRuntime, defaultRuntime, assertSingleRuntimeCopy,\n  ReactiveErrorCode, REACTIVE_SOURCE, ReactiveErrorPhase, ReactiveTracePhase,\n  ReactiveTraceType, ReactiveTraceReason, ReactiveDependencyKind,\n  type IReactiveSignal, type IReactiveComputed, type IReactiveEffect,\n  type IComputedConfig, type IReactiveNodeOptions, type IDisposable, type IDisposer,\n  type IRuntime, type IRuntimeOptions, type ISchedulerStrategy, type IFlushResult,\n  type IRuntimeTraceEvent, type IRuntimeErrorContext, type IReactiveErrorCode,\n  type IReactiveError\n} from '@migaia/reactive';"
                 }
               ]
             },
             {
-              "id": "signal-t",
-              "heading": "Signal<T>",
+              "id": "ireactivesignal-t",
+              "heading": "IReactiveSignal<T>",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class Signal<T> implements IObservable, IDisposable {\n  constructor(v: T, runtime: IRuntime, options?: { debugName?: string });\n  readonly runtime: IRuntime;\n  debugName?: string;\n  readonly version: number;\n  readonly disposed: boolean;\n  readonly observed: boolean; // !disposed && 有下游订阅\n  readonly subs: ReadonlySet<IObserver>;\n  value: T; // 读建立依赖；写触发下游\n  peek(): T; // 读，不建立依赖\n  dispose(): void;\n  addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void }): () => void;\n}"
+                  "code": "type IReactiveSignal<T> = IDisposable & {\n  readonly runtime: IRuntime;\n  readonly debugName?: string;\n  readonly version: number;\n  readonly disposed: boolean;\n  readonly observed: boolean; // !disposed && 有下游订阅\n  value: T; // 读建立依赖；写触发下游\n  peek(): T; // 读，不建立依赖\n  dispose(): void;\n  addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void }): () => void;\n}"
                 },
                 {
                   "type": "paragraph",
@@ -8387,7 +8339,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const runtime = createRuntime();\nconst count = new Signal(1, runtime);\ncount.value; // 1，在 Computed/Effect 内读取会建立依赖\ncount.value = 2; // Object.is 判定；写入相同值不触发任何通知，也不推进版本\ncount.peek(); // 2，不建立依赖\ncount.dispose();\ncount.value; // 抛 NODE_DISPOSED"
+                  "code": "const runtime = createRuntime();\nconst count = runtime.signal(1);\ncount.value; // 1，在 Computed/Effect 内读取会建立依赖\ncount.value = 2; // Object.is 判定；写入相同值不触发任何通知，也不推进版本\ncount.peek(); // 2，不建立依赖\ncount.dispose();\ncount.value; // 抛 NODE_DISPOSED"
                 },
                 {
                   "type": "paragraph",
@@ -8396,7 +8348,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "构造参数顺序是\"先业务参数、后 `runtime`\"：`new Signal(value, runtime, options?)`。",
+                    "经 `runtime.signal(value, options?)` 创建；返回窄节点视图，不暴露图边或内部方法。",
                     "`value = next`：`Object.is(next, 之前值)` 为真时短路，不推进版本、不触发下游；否则先向 `VersionClock` 领取新版本号再落值（领取失败——时钟耗尽——保持原子失败，绝不出现\"值已变、版本未变\"的陈旧状态）。",
                     "`dispose()` 幂等；释放时先标记 `disposed` 再断开全部下游订阅边（通知顺序：标记优先，确保被迫重跑的 Effect 读到明确的 `NODE_DISPOSED` 而不是重新订阅一个已释放节点）。",
                     "`addObservedHooks({ onObserved?, onUnobserved? })`：登记节点级生命周期钩子（多个调用方可各自登记互不覆盖），返回移除函数；多个钩子中若有失败，单个失败原样抛出，多个失败聚合为携带 `OBSERVER_FAILED` 码的 `AggregateError`。",
@@ -8406,13 +8358,13 @@
               ]
             },
             {
-              "id": "computed-t",
-              "heading": "Computed<T>",
+              "id": "ireactivecomputed-t",
+              "heading": "IReactiveComputed<T>",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IComputedOptions<T> = {\n  equals?: (a: T, b: T) => boolean;\n  keepAlive?: boolean;\n  debugName?: string;\n};\ntype IComputedConfig<T> = IComputedOptions<T> | ((a: T, b: T) => boolean);\n\nclass Computed<T> implements IObservable, IObserver, IDisposable {\n  constructor(fn: () => T, runtime: IRuntime, config?: IComputedConfig<T>);\n  readonly runtime: IRuntime;\n  debugName?: string;\n  readonly version: number;\n  readonly disposed: boolean;\n  readonly observed: boolean;\n  readonly subs: ReadonlySet<IObserver>;\n  readonly deps: ReadonlySet<IObservable>;\n  readonly depVersions: ReadonlyMap<IObservable, number>;\n  readonly value: T; // 读建立依赖 + 惰性重算\n  peek(): T; // 读、重算，但不建立依赖\n  preview(): T; // 推测性求值：不发布缓存、不建立依赖边（供 React getSnapshot 一类可能被丢弃的渲染使用）\n  pull(): void; // 若脏则重算并落定版本；所有读取路径的统一入口\n  isStale(): boolean;\n  dispose(): void;\n}"
+                  "code": "type IComputedOptions<T> = {\n  equals?: (a: T, b: T) => boolean;\n  keepAlive?: boolean;\n  debugName?: string;\n};\ntype IComputedConfig<T> = IComputedOptions<T> | ((a: T, b: T) => boolean);\n\ntype IReactiveComputed<T> = IDisposable & {\n  readonly runtime: IRuntime;\n  readonly debugName?: string;\n  readonly version: number;\n  readonly disposed: boolean;\n  readonly observed: boolean;\n  readonly value: T; // 读建立依赖 + 惰性重算\n  peek(): T; // 读、重算，但不建立依赖\n  dispose(): void;\n}"
                 },
                 {
                   "type": "paragraph",
@@ -8421,7 +8373,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const doubled = new Computed(() => count.value * 2, runtime);\ndoubled.value; // 首次读取才真正计算\ndoubled.value; // 依赖未变则直接返回缓存，不重算\n\nconst clamped = new Computed(() => Math.max(0, count.value), runtime, { keepAlive: true }); // 无订阅者也保持热态\nconst custom = new Computed(\n  () => ({ n: count.value }),\n  runtime,\n  (a, b) => a.n === b.n\n); // 第三参数可直接传比较函数"
+                  "code": "const doubled = runtime.computed(() => count.value * 2);\ndoubled.value; // 首次读取才真正计算\ndoubled.value; // 依赖未变则直接返回缓存，不重算\n\nconst clamped = runtime.computed(() => Math.max(0, count.value), { keepAlive: true }); // 无订阅者也保持热态\nconst custom = runtime.computed(() => ({ n: count.value }), (a, b) => a.n === b.n); // 配置参数可直接传比较函数"
                 },
                 {
                   "type": "paragraph",
@@ -8430,24 +8382,23 @@
                 {
                   "type": "list",
                   "items": [
-                    "构造参数顺序：`new Computed(fn, runtime, config?)`；`config` 可以是 `IComputedOptions` 对象，也可以直接传一个 `equals` 比较函数。",
+                    "经 `runtime.computed(fn, config?)` 创建；配置可以是对象，也可以直接传一个 `equals` 比较函数。",
                     "`equals`：默认 `Object.is`；比较函数本身抛错会阻止 dirty 落定（下次读取仍会重算，不会陷入\"陈旧但标记为干净\"的状态）。",
                     "`keepAlive`：默认 `false`——没有订阅者时会在下一个 idle 时机自动挂起（断开全部依赖、状态回到 dirty），下次读取重新建立依赖并重算；设为 `true` 时禁用自动挂起。",
                     "循环自依赖（求值过程中直接或间接又读了自己）抛 `CIRCULAR_DEPENDENCY`，不会栈溢出。",
-                    "已释放节点的 `value`/`peek`/`pull`/`preview` 一律抛 `NODE_DISPOSED`。",
-                    "`preview()`：用于渲染可能被丢弃的并发场景（如 React `getSnapshot`）；返回值与已提交值满足 `equals` 时共享同一个对象身份，避免消费方看到两个\"相等但不同一\"的对象。真正订阅仍应走 `value`/`peek`。"
+                    "已释放节点的 `value`/`peek` 一律抛 `NODE_DISPOSED`。"
                   ]
                 }
               ]
             },
             {
-              "id": "effect",
-              "heading": "Effect",
+              "id": "ireactiveeffect",
+              "heading": "IReactiveEffect",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class Effect implements IObserver, IDisposable {\n  constructor(fn: () => void | IDisposer, runtime: IRuntime, options?: { debugName?: string });\n  readonly runtime: IRuntime;\n  debugName?: string;\n  readonly disposed: boolean;\n  readonly deps: ReadonlySet<IObservable>;\n  readonly depVersions: ReadonlyMap<IObservable, number>;\n  run(): void;\n  dispose(): void;\n}"
+                  "code": "type IReactiveEffect = IDisposable & {\n  readonly runtime: IRuntime;\n  readonly debugName?: string;\n  readonly disposed: boolean;\n  dispose(): void;\n}"
                 },
                 {
                   "type": "paragraph",
@@ -8456,7 +8407,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const seen: number[] = [];\nconst effect = new Effect(() => {\n  seen.push(doubled.value);\n  return () => console.log('cleanup'); // 可选：返回值作为下次重跑/dispose 前的清理回调\n}, runtime); // 构造时立即同步跑一次\neffect.dispose(); // 释放：清理依赖边 + 跑最后一次 cleanup（untracked 执行，不建立依赖）"
+                  "code": "const seen: number[] = [];\nconst effect = runtime.effect(() => {\n  seen.push(doubled.value);\n  return () => console.log('cleanup'); // 可选：返回值作为下次重跑/dispose 前的清理回调\n}); // 构造时立即同步跑一次\neffect.dispose(); // 释放：清理依赖边 + 跑最后一次 cleanup（untracked 执行，不建立依赖）"
                 },
                 {
                   "type": "paragraph",
@@ -8480,12 +8431,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createRuntime(options?: IRuntimeOptions): Runtime;\nconst defaultRuntime: Runtime;"
+                  "code": "function createRuntime(options?: IRuntimeOptions): IRuntime;\nconst defaultRuntime: IRuntime;"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IRuntimeOptions = {\n  adapter?: Partial<IReactiveRuntimeAdapter>; // scheduleMicrotask/now/timestamp/reportError\n  onError?: (error: unknown, context: IRuntimeErrorContext) => void;\n  onTrace?: (event: IRuntimeTraceEvent) => void;\n  maxFlushPasses?: number; // 默认 100，须为正整数\n  scheduleIdle?: (task: () => void) => void; // 默认走 adapter.scheduleMicrotask\n};"
+                  "code": "type IRuntimeOptions = {\n  adapter?: Partial<IReactiveRuntimeAdapter>; // scheduleMicrotask/now/timestamp/reportError\n  onError?: (error: unknown, context: IRuntimeErrorContext) => void;\n  onTrace?: (event: IRuntimeTraceEvent) => void;\n  maxFlushPasses?: number; // 默认 100，须为正整数\n  scheduleIdle?: (task: () => void) => void; // 默认走 adapter.scheduleMicrotask\n  schedulerStrategy?: ISchedulerStrategy; // 创建期选择，默认微任务合并\n};"
                 },
                 {
                   "type": "paragraph",
@@ -8505,19 +8456,19 @@
                   "items": [
                     "`maxFlushPasses` 非正整数（非安全整数或 `< 1`）抛贴 `INVALID_OPTION` 码的 `RangeError`。",
                     "`adapter` 的每个方法（`scheduleMicrotask`/`now`/`timestamp`/`reportError`）独立解析：未提供或显式 `undefined` 回落到默认实现（`queueMicrotask`/`performance.now()`/`Date.now()`/no-op）；提供了但不是函数抛贴 `INVALID_OPTION` 码的 `TypeError`。",
-                    "`onError`/`onTrace`/`scheduleIdle` 若提供但不是函数，同样抛 `INVALID_OPTION`。",
+                    "`onError`/`onTrace`/`scheduleIdle`/`schedulerStrategy` 若提供但不是函数，构造时抛携带顶层 `INVALID_OPTION` 的原生 `TypeError`。策略校验发生在创建 Scheduler 之前。",
                     "`defaultRuntime` 是进程级单例（模块加载时立即 `createRuntime()`），SSR 每请求隔离、单测互不污染、Worker 独立场景都应显式 `createRuntime()`，不要依赖它。",
                     "若检测到本库存在多份运行时副本（重复安装/CDN 副本共存/微前端各自打包），构造期会通过 `reportError` 上报一条 `COPY_CONFLICT` 诊断（不阻断构造）。"
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`Runtime` 实例上的全部方法："
+                  "text": "`IRuntime` 的公开方法（品牌字段省略）："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class Runtime implements IRuntime {\n  signal<T>(value: T, options?: { debugName?: string }): Signal<T>;\n  computed<T>(fn: () => T, config?: IComputedConfig<T>): Computed<T>;\n  effect(fn: () => void | IDisposer, options?: { debugName?: string }): IDisposer; // 返回 dispose 函数，不是 Effect 实例\n  batch<T>(fn: () => T): T;\n  untracked<T>(fn: () => T): T;\n  flush(): 'completed' | 'deferred';\n  setSchedulerStrategy(strategy: (flush: () => void) => void): void;\n  currentVersion(): number;\n  runTracedAction<T>(name: string, fn: () => T): T;\n  reportError(\n    error: unknown,\n    context: { phase: string; observer?: object; observable?: object }\n  ): void;\n  subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer;\n}"
+                  "code": "type IRuntime = {\n  signal<T>(value: T, options?: IReactiveNodeOptions): IReactiveSignal<T>;\n  computed<T>(fn: () => T, config?: IComputedConfig<T>): IReactiveComputed<T>;\n  effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IReactiveEffect; // 返回现有节点的生命周期句柄\n  batch<T>(fn: () => T): T;\n  untracked<T>(fn: () => T): T;\n  flush(): 'completed' | 'deferred';\n  runTracedAction<T>(name: string, fn: () => T): T;\n  reportError(\n    error: unknown,\n    context: { phase: IRuntimeErrorContext['phase']; observer?: object; observable?: object }\n  ): void;\n  subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer;\n}"
                 },
                 {
                   "type": "paragraph",
@@ -8529,8 +8480,7 @@
                     "`batch(fn)`：显式合并多次写入为一次副作用刷新；进入时计深度，只有最外层退出才真正 `flush()`。若 `fn` 抛错且随后的收尾 `flush()` 也抛错，可写的普通 `Error` 保持原对象并在 `cause` 附上 flush 错误；非 `Error` 或不可写 `Error` 用携带 `ACTION_FLUSH_FAILED` 码的 `AggregateError` 保留原值。若业务错误的 `cause` getter 抛错，聚合错误的 `errors` 依次保留业务错误、flush 错误、getter 抛出值；`onError` 另收到 getter 抛出值及 `cause-read` phase。",
                     "`untracked(fn)`：`fn` 执行期间关闭依赖收集，读取任何 `Signal`/`Computed` 都不会建立依赖边。",
                     "`flush()`：同步冲刷当前队列。重入语义：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。",
-                    "`setSchedulerStrategy(strategy)`：受控地替换冲刷触发策略（默认微任务合并，可换成 `requestAnimationFrame`/`idle`/自定义）；只改变何时 `flush`，不交出 `Scheduler` 队列本身。`strategy` 必须是函数（否则抛 `INVALID_OPTION`），且调用后必须同步返回（不能返回 thenable）——策略返回 thenable 会被判定失败，自动回退到上一个安全策略并上报 `INVALID_OPTION` 诊断。",
-                    "`currentVersion()`：只读版本观测，不交出可递增的 `VersionClock`。",
+                    "`schedulerStrategy` 创建期选项只改变何时 `flush`，不交出 Scheduler 队列。策略须同步返回；返回 thenable 会触发 `INVALID_OPTION` 诊断并回退到已验证的安全策略。Runtime 存活期间不公开替换入口。",
                     "`runTracedAction(name, fn)`：执行并追踪一段真实 action；`name` 必须是非空字符串，否则抛 `INVALID_OPTION`。未启用 trace（无监听器）时直接等价于 `fn()`，不产生额外开销。",
                     "`reportError(error, context)`：诊断通道；`context.observer`/`context.observable` 是原始节点对象，内部会先脱敏为 `IRuntimeNodeDescriptor` 再转发给 `onError`。",
                     "`subscribeTrace(listener)`：只读诊断事件流（节点创建、依赖连接/断开、副作用执行、显式 action），返回取消订阅函数。"
@@ -8539,17 +8489,27 @@
               ]
             },
             {
-              "id": "runtime-入口",
-              "heading": "/runtime 入口",
+              "id": "assertsingleruntimecopy",
+              "heading": "assertSingleRuntimeCopy()",
               "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "要求当前进程只有一份进入过正确性边界的模块副本，否则抛 `COPY_CONFLICT`。应用从根入口显式调用，库自身不主动调用它。重复安装、CDN 副本共存或微前端独立打包时，应去重依赖。"
+                }
+              ]
+            },
+            {
+              "id": "extension-入口",
+              "heading": "/extension 入口",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "实现层通过本入口取得扩展能力。它允许图协议参与和所有权登记，能力多于公共 `IRuntime`；不会交出 tracker/scheduler/clock 对象或可变边集。"
+                },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createObserverBinding,\n  type IObserverBinding,\n  type IObserverCommitResult,\n  type IObserverRetrackResult,\n  Runtime,\n  createRuntime,\n  VersionClock,\n  DependencyTracker,\n  Scheduler,\n  type ICapture,\n  type IRuntime,\n  type IRuntimeOptions,\n  type IReactiveNodeOptions,\n  type ISchedulerStrategy,\n  type IFlushResult\n} from '@migaia/reactive/runtime';"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "面向框架适配层的并发安全绑定原语。`defaultRuntime` 刻意不从这里转发——import 这个入口不该顺手建一个 Runtime，需要它请从主入口显式取。"
+                  "code": "import { createObserverBinding, type IObserverBinding, type IObserverCommitResult, type IObserverRetrackResult, type ICapture } from '@migaia/reactive/extension';"
                 }
               ]
             },
@@ -8587,68 +8547,13 @@
               ]
             },
             {
-              "id": "runtime-createruntime",
-              "heading": "Runtime / createRuntime",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "与主入口是同一个类/函数，此处重复导出供框架适配层直接从 `/runtime` 引用而不必经过主桶文件。"
-                }
-              ]
-            },
-            {
-              "id": "versionclock",
-              "heading": "VersionClock",
+              "id": "所有权登记与断言",
+              "heading": "所有权登记与断言",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class VersionClock {\n  constructor(maxVersion?: number); // 默认 Number.MAX_SAFE_INTEGER\n  next(): number; // 领取下一个版本号\n  current(): number; // 只读查看，不消耗\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "单调版本时钟。`next()` 达到 `maxVersion` 后抛 `VERSION_EXHAUSTED`（生产默认约 285 年才耗尽，耗尽后应释放整个 `Runtime` 并新建，而不是复用同一张图）；构造参数非正安全整数抛 `INVALID_OPTION`。"
-                }
-              ]
-            },
-            {
-              "id": "dependencytracker",
-              "heading": "DependencyTracker",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "class DependencyTracker {\n  constructor(runtime: IRuntime);\n  isTracking(): boolean;\n  static isAnyTracking(): boolean;\n  track(observable: IObservable): void;\n  clearDependencies(observer: IObserver): void;\n  disconnectObservable(observable: IObservable, reason: 'invalidate' | 'dispose'): void;\n  runTracked<R>(observer: IObserver, fn: () => R): R;\n  capture<R>(fn: () => R): ICapture<R>;\n  commitCapture(observer: IObserver, capture: ICapture<unknown>): boolean;\n  untracked<R>(fn: () => R): R;\n  hasStaleDependencies(observer: IObserver): boolean;\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "每个 `Runtime` 一个的依赖追踪上下文，图内核内部使用；`runTracked` 是事务化重算（成功才提交依赖差异，失败丢弃临时集合，旧图不动）；`track()` 检测到跨 `Runtime` 读取（当前活跃 tracker 不是本 tracker，但确实在追踪）会抛 `CROSS_RUNTIME`。一般应用代码不需要直接使用，仅供实现自定义节点类型/框架适配层参考。"
-                }
-              ]
-            },
-            {
-              "id": "scheduler",
-              "heading": "Scheduler",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "class Scheduler {\n  constructor(\n    onAsyncError?: (error: unknown) => void,\n    maxFlushPasses?: number,\n    scheduleMicrotask?: (task: () => void) => void\n  );\n  batchDepth: number;\n  setStrategy(strategy: ISchedulerStrategy): void;\n  enqueue(item: IFlushable): void;\n  dequeue(item: IFlushable): void;\n  requestFlush(): void;\n  flush(): IFlushResult;\n  runBatched<T>(fn: () => T): T;\n  runDeferred<T>(fn: () => T): T;\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "调度器：待冲刷队列、批处理深度、冲刷状态、可插拔触发策略全部收在这一个类里；`Runtime.flush()`/`batch()`/`setSchedulerStrategy()` 都是对它的委派。`maxFlushPasses` 非正整数抛 `INVALID_OPTION`；`requestFlush()` 重复调用安全（`scheduled`/`flushing` 两个标记天然去重）。一般应用代码同样不直接使用。"
-                }
-              ]
-            },
-            {
-              "id": "ownership-入口",
-              "heading": "/ownership 入口",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import {\n  claimOwnership,\n  ownerOf,\n  assertOwnedBy,\n  assertReactiveOwnedBy\n} from '@migaia/reactive/ownership';"
+                  "code": "import {\n  claimOwnership,\n  ownerOf,\n  assertOwnedBy,\n  assertReactiveOwnedBy\n} from '@migaia/reactive/extension';"
                 },
                 {
                   "type": "paragraph",
@@ -8671,13 +8576,13 @@
               ]
             },
             {
-              "id": "source-入口",
-              "heading": "/source 入口",
+              "id": "createfieldsource",
+              "heading": "createFieldSource",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createFieldSource } from '@migaia/reactive/source';"
+                  "code": "import { createFieldSource, type IRuntimeFieldSource } from '@migaia/reactive/extension';"
                 },
                 {
                   "type": "code",
@@ -8696,6 +8601,31 @@
                 {
                   "type": "paragraph",
                   "text": "边界行为：`track()`/`notify()`/`commit()` 在 `dispose()` 之后调用抛 `NODE_DISPOSED`；`commit(write)` 先领取版本号、执行 `write()`、再发布通知（与 `Signal.value = ` 的三段式一致）。"
+                }
+              ]
+            },
+            {
+              "id": "图视图与只读查询",
+              "heading": "图视图与只读查询",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  internalRuntimeOf,\n  isRuntimeTracking,\n  isAnyRuntimeTracking,\n  currentRuntimeVersion,\n  type IObservable,\n  type IObserver,\n  type IInternalRuntime\n} from '@migaia/reactive/extension';"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`internalRuntimeOf(runtime: IRuntime): IInternalRuntime` —— 校验本库 Runtime 登记，未登记抛 `NOT_RUNTIME_OWNED`。`signal()` 返回 `IReactiveSignal<T> & IObservable`，`computed()` 返回 `IReactiveComputed<T> & IObservable & IObserver`。关系只读；observer 操作与所有权登记属于扩展能力，内部服务对象和可变边集仍在危险面。公开节点本身已经具有 `dispose()`。",
+                    "`isRuntimeTracking(runtime: IRuntime): boolean` —— 只读查询：该 `Runtime` 当前是否正在收集依赖帧。",
+                    "`isAnyRuntimeTracking(): boolean` —— 只读查询：进程内任意 `Runtime` 当前是否有依赖帧处于活跃状态。"
+                  ]
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`currentRuntimeVersion(runtime: IRuntime): number` —— 读取原有版本时钟，不暴露时钟对象；未登记对象抛顶层 `NOT_RUNTIME_OWNED`。"
+                  ]
                 }
               ]
             },
@@ -8727,32 +8657,13 @@
               ]
             },
             {
-              "id": "node-factories-入口",
-              "heading": "/node-factories 入口",
+              "id": "节点版本与可变边集",
+              "heading": "节点版本与可变边集",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  internalRuntimeOf,\n  isRuntimeTracking,\n  isAnyRuntimeTracking,\n  type IInternalRuntime\n} from '@migaia/reactive/node-factories';"
-                },
-                {
-                  "type": "list",
-                  "items": [
-                    "`internalRuntimeOf(runtime: IRuntime): IInternalRuntime` —— 先校验是本库创建的 `Runtime`（内部调用 `internalsOf`，未登记会抛 `NOT_RUNTIME_OWNED`），再把 `signal()`/`computed()` 的返回类型从窄接口（`ISignal`/`IComputedValue`）收窄回具体类（`Signal`/`Computed`），供需要调用具体类方法（如 `dispose()`）的实现层（collections、对象门面）使用。节点仍走同一个 `Runtime` 造，仍受归属登记与通知管线约束——这里只是类型收窄，不额外授权。",
-                    "`isRuntimeTracking(runtime: IRuntime): boolean` —— 只读查询：该 `Runtime` 当前是否正在收集依赖帧。",
-                    "`isAnyRuntimeTracking(): boolean` —— 只读查询：进程内任意 `Runtime` 当前是否有依赖帧处于活跃状态。"
-                  ]
-                }
-              ]
-            },
-            {
-              "id": "node-internals-入口",
-              "heading": "/node-internals 入口",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import {\n  registerVersion,\n  setVersion,\n  readVersion,\n  registerSubs,\n  mutableSubs,\n  registerDeps,\n  mutableDeps,\n  registerDepVersions,\n  mutableDepVersions\n} from '@migaia/reactive/node-internals';"
+                  "code": "import {\n  registerVersion,\n  setVersion,\n  readVersion,\n  registerSubs,\n  mutableSubs,\n  registerDeps,\n  mutableDeps,\n  registerDepVersions,\n  mutableDepVersions\n} from '@migaia/reactive/internals';"
                 },
                 {
                   "type": "paragraph",
@@ -8769,48 +8680,6 @@
                 {
                   "type": "paragraph",
                   "text": "一般应用代码不需要这个入口；只有需要自己实现 `IObservable`/`IObserver` 协议、并让其反向边受同一套只读视图保护的节点实现层才会用到。"
-                }
-              ]
-            },
-            {
-              "id": "copy-check-入口",
-              "heading": "/copy-check 入口",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import {\n  brandOwnedValue,\n  assertNoForeignOwnershipBrand,\n  consumePendingCopyWarning,\n  noteRuntimeCopy,\n  runtimeCopyCount,\n  assertSingleRuntimeCopy,\n  resetRuntimeCopiesForTest\n} from '@migaia/reactive/copy-check';"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "双实例自检：本库若干模块级状态（所有权表、内部面表、同步追踪上下文）的正确性前提是\"进程内只有一份模块\"。重复安装、CDN 副本共存、微前端各自打包会安静地打破这个前提。"
-                },
-                {
-                  "type": "list",
-                  "items": [
-                    "`brandOwnedValue(value: object): void` —— 为本副本创建的受管对象打上不可变品牌，供另一份模块 fail closed；对已打过本副本品牌的对象重复调用是空操作，对已打过另一副本品牌的对象调用抛 `COPY_CONFLICT`；品牌被篡改成非预期形状时抛 `BRAND_CORRUPTED`。",
-                    "`assertNoForeignOwnershipBrand(value: object): void` —— 本地所有权表 miss 时识别是否是另一副本创建的受管对象，避免误判为普通值放行；命中另一副本品牌抛 `COPY_CONFLICT`，品牌被篡改抛 `BRAND_CORRUPTED`。",
-                    "`consumePendingCopyWarning(): string | undefined` —— 取出并清空待上报的多副本诊断文案（`Runtime` 构造时消费一次）。",
-                    "`noteRuntimeCopy(copy?: symbol): void` —— 登记本副本；`createRuntime()`、所有权/内部面边界都会调用，幂等且有本地快路径。",
-                    "`runtimeCopyCount(): number` —— 当前进程里已进入正确性边界的副本数（纯 `import` 不计数）。",
-                    "`assertSingleRuntimeCopy(): void` —— 要求单副本，否则抛 `COPY_CONFLICT`；供\"宁可启动失败也不要静默陈旧数据\"的应用主动调用，库自身从不调用它。",
-                    "`resetRuntimeCopiesForTest(): void` —— 仅供测试：清掉模拟出来的副本登记。"
-                  ]
-                }
-              ]
-            },
-            {
-              "id": "reactive-入口",
-              "heading": "/reactive/* 入口",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { Signal } from '@migaia/reactive/reactive/signal.class';\nimport { Computed, type IComputedConfig } from '@migaia/reactive/reactive/computed.class';\nimport { Effect } from '@migaia/reactive/reactive/effect.class';"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "与主入口导出的是同一批类，只是绕开桶文件（`index.ts`）直接从具体文件导入，供打包分析/摇树场景使用。行为与主入口描述的 `Signal`/`Computed`/`Effect` 完全一致，不重复列出签名。"
                 }
               ]
             },
@@ -8916,33 +8785,6 @@
               ]
             },
             {
-              "id": "诊断消息",
-              "heading": "诊断消息",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { ReactiveErrorText } from '@migaia/reactive';"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "稳定诊断消息表；部分键是接受参数的函数（用于把动态信息嵌入固定文案模板），其余为固定字符串常量。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "全部键：`runtimeOptionGetterFailed(option)`、`runtimeAdapterGetterFailed(method)`、`runtimeAdapterMustBeFunction(method)`、`runtimeOptionMustBeFunction(option)`、`maxFlushPassesInvalid`、`maximumReactiveVersionInvalid`、`tracedActionNameInvalid`、`disposedSignal`、`disposedFieldSource`、`disposedComputed`、`circularComputedDependency`、`ownershipConflict`、`belongsToDifferentRuntime(what)`、`notRuntimeOwned(what)`、"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`belongsToAnotherRuntime(what)`、`internalsAlreadyRegistered`、`runtimeNotCreatedByFactory`、`observerBindingAlreadyObserved`、`crossRuntimeDependency`、`captureDifferentRuntime`、`captureDisposedObserver`、`captureInvalid`、`copyRegistryInvalid`、`foreignCopyValue`、`foreignCopyDependency`、`ownershipBrandCorrupted`、`multipleCopiesWarning`、`expectedSingleCopy(count)`、`versionClockExhausted`、`schedulerStrategyInvalid`、"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`schedulerStrategyReturnedThenable`、`observersBeforeFlushLoop`、`multipleObserversFailed`、`actionCauseAndFlushFailed`、`actionAndFlushFailed`、`multipleLifecycleHooksFailed`、`flushLoopDetected(maxPasses, droppedCount, names)`。逐条文案与语义见源码 `src/error-text.ts`。"
-                }
-              ]
-            },
-            {
               "id": "trace-事件与常量",
               "heading": "Trace 事件与常量",
               "blocks": [
@@ -8999,7 +8841,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Signal, Computed, Effect, createRuntime } from '@migaia/reactive';\n\nfunction renderOnce() {\n  const runtime = createRuntime(); // 每次请求/每个用例独立一份，互不污染\n  const count = new Signal(1, runtime);\n  const doubled = new Computed(() => count.value * 2, runtime);\n  const seen: number[] = [];\n  const dispose = runtime.effect(() => {\n    seen.push(doubled.value);\n  });\n  count.value = 5;\n  runtime.flush(); // 手动同步冲刷，SSR 场景不依赖微任务时机\n  dispose();\n  return seen; // [2, 10]\n}"
+                  "code": "import { createRuntime } from '@migaia/reactive';\n\nfunction renderOnce() {\n  const runtime = createRuntime(); // 每次请求/每个用例独立一份，互不污染\n  const count = runtime.signal(1);\n  const doubled = runtime.computed(() => count.value * 2);\n  const seen: number[] = [];\n  const dispose = runtime.effect(() => {\n    seen.push(doubled.value);\n  });\n  count.value = 5;\n  runtime.flush(); // 手动同步冲刷，SSR 场景不依赖微任务时机\n  dispose.dispose();\n  return seen; // [2, 10]\n}"
                 }
               ]
             },
@@ -9010,7 +8852,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createObserverBinding } from '@migaia/reactive/runtime';\nimport { createRuntime, Computed, Signal } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst count = new Signal(0, runtime);\nconst doubled = new Computed(() => count.value * 2, runtime);\n\nfunction useReactiveValue<T>(read: () => T): T {\n  const binding = createObserverBinding(runtime);\n  const capture = binding.capture(read); // 渲染期：只读捕获，可能被丢弃\n  // ……渲染真正提交时：\n  const result = binding.commit(capture);\n  if (result === 'stale') {\n    // 依赖已变，重新求值（真实框架适配层这里会触发一次重渲染）\n  }\n  binding.observe(() => {\n    // 订阅变化后触发重渲染\n  });\n  return capture.result;\n}"
+                  "code": "import { createObserverBinding } from '@migaia/reactive/extension';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst count = runtime.signal(0);\nconst doubled = runtime.computed(() => count.value * 2);\n\nfunction useReactiveValue<T>(read: () => T): T {\n  const binding = createObserverBinding(runtime);\n  const capture = binding.capture(read); // 渲染期：只读捕获，可能被丢弃\n  // ……渲染真正提交时：\n  const result = binding.commit(capture);\n  if (result === 'stale') {\n    // 依赖已变，重新求值（真实框架适配层这里会触发一次重渲染）\n  }\n  binding.observe(() => {\n    // 订阅变化后触发重渲染\n  });\n  return capture.result;\n}"
                 }
               ]
             },
@@ -9032,7 +8874,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "runtime.setSchedulerStrategy((flush) => {\n  requestAnimationFrame(() => flush());\n});"
+                  "code": "const runtime = createRuntime({\n  schedulerStrategy: (flush) => {\n    requestAnimationFrame(() => flush());\n  }\n});"
                 }
               ]
             },
@@ -20807,7 +20649,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "这两个函数不依赖 `createStoreDevTools`，可独立使用，只需要一个 `@migaia/reactive/runtime` 的 `IObservable`/`IObserver` 实例（Signal/Computed/Effect 的内部图节点）。"
+                  "text": "这两个函数不依赖 `createStoreDevTools`，可独立使用。`getDependencyTree` 接受 `runtime.effect()` 或 `runtime.computed()` 的公开句柄；`getObserverTree` 接受 `runtime.signal()` 或 `runtime.computed()` 的公开句柄。实现层也可传入 `@migaia/reactive/extension` 的 `IObservable`/`IObserver` 图节点。"
                 },
                 {
                   "type": "paragraph",
@@ -21035,7 +20877,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive/runtime\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;"
+                  "code": "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;"
                 }
               ]
             },
@@ -21238,12 +21080,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`getDependencyTree`/`getObserverTree` 不依赖 `createStoreDevTools`，可独立使用，参数类型 `IObservable`/`IObserver` 来自 `@migaia/reactive/runtime`（内核内部图协议子路径，刻意不从 `@migaia/reactive` 主入口导出——第三方通常应该组合公开的 `Signal`/`Computed`/`Effect`，而不是直接操作图节点；本包需要读取节点内部的 `deps`/`subs`/`version` 才能画依赖图，所以走这条子路径导入）。"
+                  "text": "`getDependencyTree`/`getObserverTree` 不依赖 `createStoreDevTools`，可独立使用。公开句柄类型 `IReactiveSignal`/`IReactiveComputed`/`IReactiveEffect` 来自 `@migaia/reactive`；实现层图协议 `IObservable`/`IObserver` 来自 `@migaia/reactive/extension`。传入 Runtime 工厂创建的真实节点即可，本包按既有图关系读取 `deps`/`subs`/`version`。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IDependencyTreeNode = {\n  kind: 'observable' | 'observer';\n  label: string; // node.debugName ?? node.constructor?.name ?? 'AnonymousReactiveNode'\n  version?: number; // 仅 kind === 'observable' 的节点携带；对应该节点当前的版本号\n  children: IDependencyTreeNode[];\n  circular?: boolean; // 该节点在当前递归路径上被重复访问\n};\n\nfunction getDependencyTree(observer: IObserver, maxDepth?: number): IDependencyTreeNode;\nfunction getObserverTree(observable: IObservable, maxDepth?: number): IDependencyTreeNode;"
+                  "code": "type IDependencyTreeNode = {\n  kind: 'observable' | 'observer';\n  label: string; // node.debugName ?? node.constructor?.name ?? 'AnonymousReactiveNode'\n  version?: number; // 仅 kind === 'observable' 的节点携带；对应该节点当前的版本号\n  children: IDependencyTreeNode[];\n  circular?: boolean; // 该节点在当前递归路径上被重复访问\n};\n\nfunction getDependencyTree(\n  root: IObserver | IReactiveEffect | IReactiveComputed<unknown>,\n  maxDepth?: number\n): IDependencyTreeNode;\nfunction getObserverTree(\n  root: IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>,\n  maxDepth?: number\n): IDependencyTreeNode;"
                 }
               ]
             },
@@ -21476,7 +21318,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "不适用：只需要一个普通的响应式对象/数组、不关心细粒度依赖或容量——直接用 `@migaia/reactive` 的 `Signal<T>` 更省事；需要\"按值稳定标识、删除/插入不改变其余成员定位\"的实体集合——`ObservableArray` 是纯索引语义，`splice`/`pop`/`replace` 会移动后续索引对应的值，这不是本包的设计目标。"
+                  "text": "不适用：只需要一个普通的响应式对象/数组、不关心细粒度依赖或容量——直接用 `runtime.signal(value)` 创建 `IReactiveSignal<T>` 更省事；需要\"按值稳定标识、删除/插入不改变其余成员定位\"的实体集合——`ObservableArray` 是纯索引语义，`splice`/`pop`/`replace` 会移动后续索引对应的值，这不是本包的设计目标。"
                 }
               ]
             },
@@ -21491,7 +21333,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "依赖 `@migaia/reactive`（响应式运行时，提供 `IRuntime`/`defaultRuntime`/`Signal`）与 `@migaia/store-light`（提供 `IMutationGuard` 类型），二者通常已经在同一个 monorepo 里作为对等依赖存在。"
+                  "text": "依赖 `@migaia/reactive`（响应式运行时，提供 `IRuntime`/`defaultRuntime`/`IReactiveSignal`）与 `@migaia/store-light`（提供 `IMutationGuard` 类型），二者通常已经在同一个 monorepo 里作为对等依赖存在。"
                 }
               ]
             },
@@ -21735,7 +21577,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { ObservableArray } from '@migaia/store-indexed';\nimport { Effect } from '@migaia/reactive';\n\nconst rows = new ObservableArray<{ id: string; name: string }>(\n  Array.from({ length: 100_000 }, (_, i) => ({ id: String(i), name: `row-${i}` }))\n);\n\n// 只有被订阅的 5 行才会实体化 cell，其余 99995 行不占用任何 Signal\nconst watched = [0, 1, 2, 3, 4].map(\n  (index) => new Effect(() => render(index, rows.at(index)), rows.runtime)\n);\n\nrows.splice(0, 1); // 索引语义整体后移一位\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\nfor (const effect of watched) effect.dispose();\nrows.dispose();"
+                  "code": "import { ObservableArray } from '@migaia/store-indexed';\n\nconst rows = new ObservableArray<{ id: string; name: string }>(\n  Array.from({ length: 100_000 }, (_, i) => ({ id: String(i), name: `row-${i}` }))\n);\n\n// 只有被订阅的 5 行才会实体化 cell，其余 99995 行不占用任何 Signal\nconst watched = [0, 1, 2, 3, 4].map(\n  (index) => rows.runtime.effect(() => render(index, rows.at(index)))\n);\n\nrows.splice(0, 1); // 索引语义整体后移一位\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\nfor (const effect of watched) effect.dispose();\nrows.dispose();"
                 }
               ]
             },
@@ -21757,7 +21599,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime, Effect } from '@migaia/reactive';\nimport { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed';\n\nconst runtimeA = createRuntime();\nconst runtimeB = createRuntime();\nconst tagsInA = new ObservableSet(['a', 'b'], runtimeA);\n\nnew Effect(() => {\n  try {\n    tagsInA.has('a'); // 当前 effect 属于 runtimeB，读了 runtimeA 的集合\n  } catch (error) {\n    if ((error as { code?: string }).code === StoreIndexedErrorCode.crossRuntime) {\n      // 预期内的跨 Runtime 保护\n    }\n  }\n}, runtimeB);"
+                  "code": "import { createRuntime } from '@migaia/reactive';\nimport { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed';\n\nconst runtimeA = createRuntime();\nconst runtimeB = createRuntime();\nconst tagsInA = new ObservableSet(['a', 'b'], runtimeA);\n\nruntimeB.effect(() => {\n  try {\n    tagsInA.has('a'); // 当前 effect 属于 runtimeB，读了 runtimeA 的集合\n  } catch (error) {\n    if ((error as { code?: string }).code === StoreIndexedErrorCode.crossRuntime) {\n      // 预期内的跨 Runtime 保护\n    }\n  }\n});"
                 }
               ]
             },
@@ -22529,7 +22371,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Effect } from '@migaia/reactive';\nimport { ObservableArray } from '@migaia/store-indexed';\nimport { MutationPolicy } from '@migaia/store-middleware';\n\nconst guard = new MutationPolicy('actions-only');\nconst rows = new ObservableArray<{ id: string }>(\n  [{ id: 'a' }, { id: 'b' }, { id: 'c' }],\n  undefined,\n  { mutationGuard: guard, debugName: 'rows' }\n);\n\n// 只订阅索引 0：改其余索引不会让这个 effect 重算\nconst effect = new Effect(() => console.log('row0', rows.at(0)), rows.runtime);\n\nguard.runInAction(() => {\n  rows.splice(0, 1); // 删除首行，触发结构信号与修订信号\n});\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\neffect.dispose();\nrows.dispose();"
+                  "code": "import { ObservableArray } from '@migaia/store-indexed';\nimport { MutationPolicy } from '@migaia/store-middleware';\n\nconst guard = new MutationPolicy('actions-only');\nconst rows = new ObservableArray<{ id: string }>(\n  [{ id: 'a' }, { id: 'b' }, { id: 'c' }],\n  undefined,\n  { mutationGuard: guard, debugName: 'rows' }\n);\n\n// 只订阅索引 0：改其余索引不会让这个 effect 重算\nconst effect = rows.runtime.effect(() => console.log('row0', rows.at(0)));\n\nguard.runInAction(() => {\n  rows.splice(0, 1); // 删除首行，触发结构信号与修订信号\n});\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\neffect.dispose();\nrows.dispose();"
                 },
                 {
                   "type": "paragraph",
@@ -22617,7 +22459,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "不适用：整个应用只有一份全局状态、永远不需要多作用域隔离——直接用 `@migaia/reactive` 的 `Signal`/`Computed` 或更薄的 atom 库即可，不需要 definition/store 两层间接。本包不依赖 React、不依赖 DOM，也不提供 Provider/Hook；那是 `@migaia/store-react` 的职责。`familyDef`/`createFamily` 类原语只做同步初值/派生缓存，不支持异步初始值（`atomDef`/`atomDefFactory` 的初值/工厂遇到 thenable 会直接拒绝）。"
+                  "text": "不适用：整个应用只有一份全局状态、永远不需要多作用域隔离——直接用 `runtime.signal()`/`runtime.computed()` 或更薄的 atom 库即可，不需要 definition/store 两层间接。本包不依赖 React、不依赖 DOM，也不提供 Provider/Hook；那是 `@migaia/store-react` 的职责。`familyDef`/`createFamily` 类原语只做同步初值/派生缓存，不支持异步初始值（`atomDef`/`atomDefFactory` 的初值/工厂遇到 thenable 会直接拒绝）。"
                 }
               ]
             },
@@ -22856,7 +22698,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "单参数同上。已有真实实例时直接走 `peek()` 语义；否则计算一个只在当前 `runtime.currentVersion()` 内有效的临时值，一个 microtask 后若始终未提交就自动丢弃。`primitive-factory` 必须标记 `previewSafe: true` 才能在这里执行，否则抛 `Error('[store] atom factory is not marked preview-safe')`；出现循环自我依赖抛 `Error('[store] circular atom preview detected')`。"
+                  "text": "单参数同上。已有真实实例时直接走 `peek()` 语义；否则计算一个只在当前版本时钟值内有效（由 `@migaia/reactive/extension` 的 `currentRuntimeVersion(runtime)` 读取）的临时值，一个 microtask 后若始终未提交就自动丢弃。`primitive-factory` 必须标记 `previewSafe: true` 才能在这里执行，否则抛 `Error('[store] atom factory is not marked preview-safe')`；出现循环自我依赖抛 `Error('[store] circular atom preview detected')`。"
                 },
                 {
                   "type": "paragraph",
@@ -24350,7 +24192,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`override()`/其撤销函数都会 `previews.clear()`——这保证 `store.preview()` 不会在 override 状态切换的瞬间读到一份对应旧路由的推测值。`preview()` 本身对已有真实实例的定义直接短路成 `peek()`，只有\"还没有真实实例\"的定义才会走推测计算路径，且该路径产出的值只在当前 `runtime.currentVersion()` 内复用，一个 microtask 后如果始终没有变成真实实例就会被丢弃——一个长期挂载的 Provider 不会因为一次被放弃的推测渲染而永久持有一份推测对象。"
+                  "text": "`override()`/其撤销函数都会 `previews.clear()`——这保证 `store.preview()` 不会在 override 状态切换的瞬间读到一份对应旧路由的推测值。`preview()` 本身对已有真实实例的定义直接短路成 `peek()`，只有\"还没有真实实例\"的定义才会走推测计算路径，且该路径产出的值只在当前版本时钟值内复用（由 `@migaia/reactive/extension` 的 `currentRuntimeVersion(runtime)` 读取），一个 microtask 后如果始终没有变成真实实例就会被丢弃——一个长期挂载的 Provider 不会因为一次被放弃的推测渲染而永久持有一份推测对象。"
                 }
               ]
             },
@@ -27261,7 +27103,7 @@
                   "rows": [
                     [
                       "`status`",
-                      "`IComputedValue<'loading' \\",
+                      "`IReactiveComputed<'loading' \\",
                       "'ready' \\",
                       "'error' \\",
                       "'disposed'>`",
@@ -27270,13 +27112,13 @@
                     ],
                     [
                       "`error`",
-                      "`IComputedValue<unknown>`",
+                      "`IReactiveComputed<unknown>`",
                       "—",
                       "hydration/write 任一失败时的错误；两者都失败返回 `AggregateError`"
                     ],
                     [
                       "`hydrated`",
-                      "`IComputedValue<boolean>`",
+                      "`IReactiveComputed<boolean>`",
                       "—",
                       "等价于 `hydrationStatus.value === 'success'`"
                     ],
@@ -27693,7 +27535,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`useSignal(signal)`｜3 秒上手 —— 订阅单个 `ISignal`，返回 `[值, 设置函数]`："
+                  "text": "`useSignal(signal)`｜3 秒上手 —— 订阅单个 `IReactiveSignal`，返回 `[值, 设置函数]`："
                 },
                 {
                   "type": "code",
@@ -27702,7 +27544,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "单参数 `signal: ISignal<T>`（必填），无其他选项；依赖集合恒为该 Signal 自己，走比 `useTracked` 更轻的直连路径。"
+                  "text": "单参数 `signal: IReactiveSignal<T>`（必填），无其他选项；依赖集合恒为该 Signal 自己，走比 `useTracked` 更轻的直连路径。"
                 },
                 {
                   "type": "paragraph",
@@ -27950,7 +27792,7 @@
                 {
                   "type": "code",
                   "language": "tsx",
-                  "code": "import { useTracked } from '@migaia/store-react';\nimport { Signal } from '@migaia/reactive';\n\nconst priceSignal = new Signal(10);\nconst qtySignal = new Signal(2);\n\nfunction Total() {\n  const total = useTracked(() => priceSignal.value * qtySignal.value);\n  return <span>合计：{total}</span>;\n}"
+                  "code": "import { useTracked } from '@migaia/store-react';\nimport { defaultRuntime } from '@migaia/reactive';\n\nconst priceSignal = defaultRuntime.signal(10);\nconst qtySignal = defaultRuntime.signal(2);\n\nfunction Total() {\n  const total = useTracked(() => priceSignal.value * qtySignal.value);\n  return <span>合计：{total}</span>;\n}"
                 }
               ]
             },
@@ -28278,11 +28120,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function useSignal<T>(s: ISignal<T>): readonly [T, (next: T) => void];"
+                  "code": "function useSignal<T>(s: IReactiveSignal<T>): readonly [T, (next: T) => void];"
                 },
                 {
                   "type": "paragraph",
-                  "text": "订阅单个 `ISignal`，返回 `[当前值, 设置函数]`。因为依赖集合恒为\"这一个 Signal 自己\"，内部直接走 `useNodeValue` 快路径，不经过 `useTracked` 的捕获/提交记账——比 `useTracked(() => signal.value)` 更轻。`set` 函数引用在 `signal` 不变时保持稳定。"
+                  "text": "订阅单个 `IReactiveSignal`，返回 `[当前值, 设置函数]`。因为依赖集合恒为\"这一个 Signal 自己\"，内部直接走 `useNodeValue` 快路径，不经过 `useTracked` 的捕获/提交记账——比 `useTracked(() => signal.value)` 更轻。`set` 函数引用在 `signal` 不变时保持稳定。"
                 }
               ]
             },
@@ -28303,7 +28145,7 @@
                   "type": "list",
                   "items": [
                     "`runtime` 变化时会整体重建内部追踪实例——旧实例留给旧 effect 用到 cleanup 为止，新实例从当前 `read`/`isEqual` 初始化，绝不会让新 Runtime 执行旧 Runtime 捕获到的 selector。",
-                    "内部使用 `@migaia/reactive/runtime` 导出的公开 `createObserverBinding` 三段式绑定（capture/commit/retrack），不依赖任何内部私有 API——第三方要写等价的自定义适配层也能做到同样的并发安全。",
+                    "内部使用 `@migaia/reactive/extension` 导出的公开 `createObserverBinding` 三段式绑定（capture/commit/retrack），不依赖任何内部私有 API——第三方要写等价的自定义适配层也能做到同样的并发安全。",
                     "自己直接用这个 hook 时，把 `read`/`isEqual` 的引用稳定下来（`useCallback`/模块级函数），身份变化会触发一次重新捕获依赖（仍然正确，但多一次工作）。"
                   ]
                 }
@@ -28899,7 +28741,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { sharedInt32, SharedInt32Signal } from '@migaia/store-shared';\nimport { createRuntime, Effect } from '@migaia/reactive';"
+                  "code": "import { sharedInt32, SharedInt32Signal } from '@migaia/store-shared';\nimport { createRuntime } from '@migaia/reactive';"
                 },
                 {
                   "type": "paragraph",
@@ -28908,7 +28750,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const runtime = createRuntime();\nconst counter = sharedInt32(runtime, 0);\n\nconst stop = new Effect(() => console.log('counter =', counter.value), runtime);\ncounter.value = 1; // 本地写入，Effect 自动重跑\n\nstop.dispose();\ncounter.dispose();"
+                  "code": "const runtime = createRuntime();\nconst counter = sharedInt32(runtime, 0);\n\nconst stop = runtime.effect(() => console.log('counter =', counter.value));\ncounter.value = 1; // 本地写入，Effect 自动重跑\n\nstop.dispose();\ncounter.dispose();"
                 },
                 {
                   "type": "paragraph",
@@ -28978,7 +28820,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { sharedInt32Array, SharedInt32Array } from '@migaia/store-shared';\nimport { createRuntime, Effect } from '@migaia/reactive';"
+                  "code": "import { sharedInt32Array, SharedInt32Array } from '@migaia/store-shared';\nimport { createRuntime } from '@migaia/reactive';"
                 },
                 {
                   "type": "paragraph",
@@ -28987,7 +28829,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000, { initialValues: [0, 0] });\n\nconst render = new Effect(() => {\n  drawEntity(positions.get(0), positions.get(1)); // 只追踪被读取的下标\n}, runtime);\n\npositions.set(0, 10); // 只惊动依赖下标 0 的观察者\npositions.update(1, (y) => y + 1); // 读-改-写，内部 CAS 重试\n\nrender.dispose();\npositions.dispose();"
+                  "code": "const runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000, { initialValues: [0, 0] });\n\nconst render = runtime.effect(() => {\n  drawEntity(positions.get(0), positions.get(1)); // 只追踪被读取的下标\n});\n\npositions.set(0, 10); // 只惊动依赖下标 0 的观察者\npositions.update(1, (y) => y + 1); // 读-改-写，内部 CAS 重试\n\nrender.dispose();\npositions.dispose();"
                 },
                 {
                   "type": "paragraph",
@@ -29195,7 +29037,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// main.ts\nimport { createRuntime, Effect } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000); // 500 个实体的 x/y\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\nconst render = new Effect(() => drawEntity(0, positions.get(0), positions.get(1)), runtime);\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});"
+                  "code": "// main.ts\nimport { createRuntime } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000); // 500 个实体的 x/y\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\nconst render = runtime.effect(() => drawEntity(0, positions.get(0), positions.get(1)));\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});"
                 },
                 {
                   "type": "code",
@@ -29233,7 +29075,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Effect } from '@migaia/reactive';\n\nconst probe = new Effect(() => {\n  for (let index = 0; index < positions.length; index += 37) {\n    positions.get(index); // 遍历式探测，每次命中不同下标\n  }\n}, runtime);\n\nsetInterval(() => {\n  const removed = positions.prune(); // 清理已无订阅者的 cell，避免累积\n  if (removed > 0) console.log(`released ${removed} idle cells`);\n}, 5000);"
+                  "code": "const probe = runtime.effect(() => {\n  for (let index = 0; index < positions.length; index += 37) {\n    positions.get(index); // 遍历式探测，每次命中不同下标\n  }\n});\n\nsetInterval(() => {\n  const removed = positions.prune(); // 清理已无订阅者的 cell，避免累积\n  if (removed > 0) console.log(`released ${removed} idle cells`);\n}, 5000);"
                 }
               ]
             },
@@ -29697,7 +29539,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "两者都是 `IObservable`：内部通过 `@migaia/reactive` 的 `internalsOf`/`registerSubs`/`registerVersion`/`claimOwnership` 接入所属 `Runtime` 的依赖图，行为和普通的 `Signal`/`Computed` 节点一致——可以被 `Effect`/`Computed` 追踪，`isStale()` 可查询是否有未同步的远端变化。",
+                    "两者都是 `IObservable`：内部通过 `@migaia/reactive/internals` 的 `internalsOf`/`registerSubs`/`registerVersion` 与 `@migaia/reactive/extension` 的 `claimOwnership` 接入所属 `Runtime` 的依赖图，行为和普通的 `Signal`/`Computed` 节点一致——可以被 `Effect`/`Computed` 追踪，`isStale()` 可查询是否有未同步的远端变化。",
                     "单一归属：构造时调用 `claimOwnership(this, runtime)` 登记归属；同一个 JS 对象不能被登记到第二个 `Runtime`（会抛 `@migaia/reactive` 所有权系统的错误）。这意味着共享的是 `SharedArrayBuffer`，而不是 JS 对象本身——另一个线程/`Runtime` 要读同一份数据，必须用同一个 `buffer` 单独 `new` 一份自己的实例。",
                     "`SharedInt32Array` 的按需物化：`get(index)` 只有在检测到当前处于依赖追踪上下文（`internalsOf(runtime).tracker.isTracking()` 为真，即身处 `Effect`/`Computed` 内部）时才会为该下标创建一个内部的响应式 cell 并登记依赖；在追踪上下文之外调用 `get()`（比如普通同步代码里的一次性读取）走直读路径，不产生任何 cell 对象。",
                     "cell 的自动回收：`Effect`/`Computed` 可能在提交观察之前就放弃一次\"投机读\"（比如 `Computed` 重新计算时依赖发生了变化）。为此新物化的 cell 会在下一个微任务里检查是否仍有订阅者，没有就自动断开并从内部 Map 里移除，不需要手动处理。",
@@ -29768,7 +29610,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// main.ts\nimport { createRuntime, Effect } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000);\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\n\nconst render = new Effect(() => {\n  drawEntity(0, positions.get(0), positions.get(1));\n}, runtime);\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});"
+                  "code": "// main.ts\nimport { createRuntime } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000);\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\n\nconst render = runtime.effect(() => {\n  drawEntity(0, positions.get(0), positions.get(1));\n});\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});"
                 },
                 {
                   "type": "code",
@@ -32384,7 +32226,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Signal, defaultRuntime } from '@migaia/reactive';\n\nconst values = new Signal([1, 2, 3], defaultRuntime);\nconst sum = workerComputed(adapter, () => values.value);\n\nconsole.log(await sum.refetch()); // 6\nsum.dispose();"
+                  "code": "import { defaultRuntime } from '@migaia/reactive';\n\nconst values = defaultRuntime.signal([1, 2, 3]);\nconst sum = workerComputed(adapter, () => values.value);\n\nconsole.log(await sum.refetch()); // 6\nsum.dispose();"
                 },
                 {
                   "type": "paragraph",
@@ -32617,7 +32459,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { Signal, defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = new Signal<readonly Row[]>([], defaultRuntime);\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000,\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();"
+                  "code": "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = defaultRuntime.signal<readonly Row[]>([]);\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000,\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();"
                 }
               ]
             },
@@ -33261,7 +33103,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { Signal, defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = new Signal<readonly Row[]>([], defaultRuntime);\n\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000, // 30 秒内复用结果,不重新触发 Worker 计算\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();"
+                  "code": "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = defaultRuntime.signal<readonly Row[]>([]);\n\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000, // 30 秒内复用结果,不重新触发 Worker 计算\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();"
                 }
               ]
             },

@@ -1308,9 +1308,9 @@
           "name": "asRecordStore",
           "kind": "const",
           "signature": "export declare const asRecordStore: <T = unknown>(store: IKeyValueStore) => IRecordStore<T>;",
-          "declarationLine": 85,
+          "declarationLine": 94,
           "source": "packages/storage-contract/dist/store.d.ts",
-          "purpose": "运行时收窄到 IRecordStore；能力或最小方法形状不足时立即抛契约级 unsupported。",
+          "purpose": "Narrows a store to `IRecordStore` at runtime. Immediately throws the contract `unsupported` error when capabilities or required methods are missing.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for asRecordStore.",
           "advanced": "No additional advanced behavior is declared for asRecordStore.",
           "parameters": ["This const declaration has no parameters."],
@@ -1343,7 +1343,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "运行时收窄到 IRecordStore；能力或最小方法形状不足时立即抛契约级 unsupported。"
+              "content": "Narrows a store to `IRecordStore` at runtime. Immediately throws the contract `unsupported` error when capabilities or required methods are missing."
             },
             {
               "id": "getting-started",
@@ -2440,7 +2440,7 @@
           "name": "ConflictPolicy",
           "kind": "const",
           "signature": "export declare const ConflictPolicy: Readonly<{ readonly conflict: \"conflict\"; readonly replace: \"replace\"; }>;",
-          "declarationLine": 11,
+          "declarationLine": 21,
           "source": "packages/storage-contract/dist/context.d.ts",
           "purpose": "ConflictPolicy is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ConflictPolicy.",
@@ -2886,10 +2886,10 @@
         {
           "name": "ICodec",
           "kind": "type",
-          "signature": "export type ICodec<T = unknown, TRaw = string | Uint8Array | unknown> = { readonly name: string; /** 声明产出形态，用于与后端能力选路。 */ readonly output: ICodecOutput; encode(value: T, ctx?: IOperationContext): Promise<TRaw>; decode(raw: TRaw, ctx?: IOperationContext): Promise<T>; };",
-          "declarationLine": 7,
+          "signature": "export type ICodec<T = unknown, TRaw = string | Uint8Array | unknown> = { readonly name: string; /** Declares the output form used to select a route from the backend capabilities. */ readonly output: ICodecOutput; encode(value: T, ctx?: IOperationContext): Promise<TRaw>; decode(raw: TRaw, ctx?: IOperationContext): Promise<T>; };",
+          "declarationLine": 9,
           "source": "packages/storage-contract/dist/codec.d.ts",
-          "purpose": "序列化是面向开发者的开放契约，不绑定任何库。内置实现只提供最常用的三个（见 storage-web 的 jsonCodec / structured.ts / binary.ts），任何自定义编解码——压缩、 加密、走 Worker 的重编码——都通过实现同一接口接入，本包不内置也不依赖它们。",
+          "purpose": "Defines an open serialization contract without tying it to a library. `storage-web` supplies three common implementations in `jsonCodec`, `structured.ts`, and `binary.ts`. Custom compression, encryption, and Worker-based recoding implement the same contract. This module neither supplies nor depends on those custom implementations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICodec.",
           "advanced": "No additional advanced behavior is declared for ICodec.",
           "parameters": ["This type declaration has no parameters."],
@@ -2910,7 +2910,7 @@
           "aliasOf": "ICodec",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ICodec<T = unknown, TRaw = string | Uint8Array | unknown> = { readonly name: string; /** 声明产出形态，用于与后端能力选路。 */ readonly output: ICodecOutput; encode(value: T, ctx?: IOperationContext): Promise<TRaw>; decode(raw: TRaw, ctx?: IOperationContext): Promise<T>; };"
+            "export type ICodec<T = unknown, TRaw = string | Uint8Array | unknown> = { readonly name: string; /** Declares the output form used to select a route from the backend capabilities. */ readonly output: ICodecOutput; encode(value: T, ctx?: IOperationContext): Promise<TRaw>; decode(raw: TRaw, ctx?: IOperationContext): Promise<T>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2920,7 +2920,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "序列化是面向开发者的开放契约，不绑定任何库。内置实现只提供最常用的三个（见 storage-web 的 jsonCodec / structured.ts / binary.ts），任何自定义编解码——压缩、 加密、走 Worker 的重编码——都通过实现同一接口接入，本包不内置也不依赖它们。"
+              "content": "Defines an open serialization contract without tying it to a library. `storage-web` supplies three common implementations in `jsonCodec`, `structured.ts`, and `binary.ts`. Custom compression, encryption, and Worker-based recoding implement the same contract. This module neither supplies nor depends on those custom implementations."
             },
             {
               "id": "getting-started",
@@ -2949,7 +2949,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-contract/dist/codec.d.ts:ICodec:export type ICodec<T = unknown, TRaw = string | Uint8Array | unknown> = { readonly name: string; /** 声明产出形态，用于与后端能力选路。 */ readonly output: ICodecOutput; encode(value: T, ctx?: IOperationContext): Promise<TRaw>; decode(raw: TRaw, ctx?: IOperationContext): Promise<T>; };",
+          "identity": "packages/storage-contract/dist/codec.d.ts:ICodec:export type ICodec<T = unknown, TRaw = string | Uint8Array | unknown> = { readonly name: string; /** Declares the output form used to select a route from the backend capabilities. */ readonly output: ICodecOutput; encode(value: T, ctx?: IOperationContext): Promise<TRaw>; decode(raw: TRaw, ctx?: IOperationContext): Promise<T>; };",
           "guidance": [],
           "usageScore": 44,
           "configuration": [],
@@ -3024,7 +3024,7 @@
           "name": "IConflictPolicy",
           "kind": "type",
           "signature": "export type IConflictPolicy = (typeof ConflictPolicy)[keyof typeof ConflictPolicy];",
-          "declarationLine": 15,
+          "declarationLine": 25,
           "source": "packages/storage-contract/dist/context.d.ts",
           "purpose": "IConflictPolicy is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IConflictPolicy.",
@@ -3219,9 +3219,9 @@
           "name": "IKeyRange",
           "kind": "type",
           "signature": "export type IKeyRange<TKey extends IStorageKey = IStorageKey> = { readonly lower?: TKey; readonly lowerOpen?: boolean; readonly upper?: TKey; readonly upperOpen?: boolean; };",
-          "declarationLine": 26,
+          "declarationLine": 42,
           "source": "packages/storage-contract/dist/context.d.ts",
-          "purpose": "L1 范围查询边界，与 IDBKeyRange 语义对齐但不直接依赖它，便于其他结构化后端实现。",
+          "purpose": "Defines L1 query bounds with `IDBKeyRange` semantics. Avoids a direct dependency so other structured backends can implement it.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IKeyRange.",
           "advanced": "No additional advanced behavior is declared for IKeyRange.",
           "parameters": ["This type declaration has no parameters."],
@@ -3249,7 +3249,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "L1 范围查询边界，与 IDBKeyRange 语义对齐但不直接依赖它，便于其他结构化后端实现。"
+              "content": "Defines L1 query bounds with `IDBKeyRange` semantics. Avoids a direct dependency so other structured backends can implement it."
             },
             {
               "id": "getting-started",
@@ -3412,10 +3412,10 @@
         {
           "name": "IKeyValueStore",
           "kind": "type",
-          "signature": "export type IKeyValueStore = { readonly backend: IBackendKind; readonly capabilities: IStorageCapabilities; get(key: string, ctx?: IOperationContext): Promise<string | null>; set(key: string, value: string, ctx?: IWriteOptions): Promise<void>; remove(key: string, ctx?: IOperationContext): Promise<void>; has(key: string, ctx?: IOperationContext): Promise<boolean>; keys(ctx?: IOperationContext): Promise<string[]>; clearValues(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; dispose(): Promise<void>; /** 仅同步后端提供；IndexedDB 等异步后端上为 undefined。 */ readonly sync?: ISyncKeyValueStore; };",
-          "declarationLine": 14,
+          "signature": "export type IKeyValueStore = { readonly backend: IBackendKind; readonly capabilities: IStorageCapabilities; get(key: string, ctx?: IOperationContext): Promise<string | null>; set(key: string, value: string, ctx?: IWriteOptions): Promise<void>; remove(key: string, ctx?: IOperationContext): Promise<void>; has(key: string, ctx?: IOperationContext): Promise<boolean>; keys(ctx?: IOperationContext): Promise<string[]>; clearValues(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; dispose(): Promise<void>; /** * Exists only on synchronous backends. Asynchronous backends such as IndexedDB expose * `undefined`. */ readonly sync?: ISyncKeyValueStore; };",
+          "declarationLine": 17,
           "source": "packages/storage-contract/dist/store.d.ts",
-          "purpose": "L0：所有后端都实现的字符串键值通道。",
+          "purpose": "Defines the L0 string key-value channel implemented by every backend.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IKeyValueStore.",
           "advanced": "No additional advanced behavior is declared for IKeyValueStore.",
           "parameters": ["This type declaration has no parameters."],
@@ -3442,7 +3442,7 @@
           "aliasOf": "IKeyValueStore",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IKeyValueStore = { readonly backend: IBackendKind; readonly capabilities: IStorageCapabilities; get(key: string, ctx?: IOperationContext): Promise<string | null>; set(key: string, value: string, ctx?: IWriteOptions): Promise<void>; remove(key: string, ctx?: IOperationContext): Promise<void>; has(key: string, ctx?: IOperationContext): Promise<boolean>; keys(ctx?: IOperationContext): Promise<string[]>; clearValues(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; dispose(): Promise<void>; /** 仅同步后端提供；IndexedDB 等异步后端上为 undefined。 */ readonly sync?: ISyncKeyValueStore; };"
+            "export type IKeyValueStore = { readonly backend: IBackendKind; readonly capabilities: IStorageCapabilities; get(key: string, ctx?: IOperationContext): Promise<string | null>; set(key: string, value: string, ctx?: IWriteOptions): Promise<void>; remove(key: string, ctx?: IOperationContext): Promise<void>; has(key: string, ctx?: IOperationContext): Promise<boolean>; keys(ctx?: IOperationContext): Promise<string[]>; clearValues(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; dispose(): Promise<void>; /** * Exists only on synchronous backends. Asynchronous backends such as IndexedDB expose * `undefined`. */ readonly sync?: ISyncKeyValueStore; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3452,7 +3452,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "L0：所有后端都实现的字符串键值通道。"
+              "content": "Defines the L0 string key-value channel implemented by every backend."
             },
             {
               "id": "getting-started",
@@ -3481,7 +3481,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-contract/dist/store.d.ts:IKeyValueStore:export type IKeyValueStore = { readonly backend: IBackendKind; readonly capabilities: IStorageCapabilities; get(key: string, ctx?: IOperationContext): Promise<string | null>; set(key: string, value: string, ctx?: IWriteOptions): Promise<void>; remove(key: string, ctx?: IOperationContext): Promise<void>; has(key: string, ctx?: IOperationContext): Promise<boolean>; keys(ctx?: IOperationContext): Promise<string[]>; clearValues(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; dispose(): Promise<void>; /** 仅同步后端提供；IndexedDB 等异步后端上为 undefined。 */ readonly sync?: ISyncKeyValueStore; };",
+          "identity": "packages/storage-contract/dist/store.d.ts:IKeyValueStore:export type IKeyValueStore = { readonly backend: IBackendKind; readonly capabilities: IStorageCapabilities; get(key: string, ctx?: IOperationContext): Promise<string | null>; set(key: string, value: string, ctx?: IWriteOptions): Promise<void>; remove(key: string, ctx?: IOperationContext): Promise<void>; has(key: string, ctx?: IOperationContext): Promise<boolean>; keys(ctx?: IOperationContext): Promise<string[]>; clearValues(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; dispose(): Promise<void>; /** * Exists only on synchronous backends. Asynchronous backends such as IndexedDB expose * `undefined`. */ readonly sync?: ISyncKeyValueStore; };",
           "guidance": [],
           "usageScore": 118,
           "configuration": [],
@@ -3491,7 +3491,7 @@
           "name": "IKeyValueStoreAdmission",
           "kind": "type",
           "signature": "export type IKeyValueStoreAdmission = { readonly valid: true; readonly store: IKeyValueStore; readonly backend: IBackendKind; readonly capabilities: IStorageCapabilities; readonly dispose: () => Promise<void>; readonly receiver: object; } | { readonly valid: false; readonly cause: unknown; };",
-          "declarationLine": 57,
+          "declarationLine": 63,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Detailed one-read admission result retained for lifecycle owners at module boundaries.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IKeyValueStoreAdmission.",
@@ -3622,10 +3622,10 @@
         {
           "name": "IOperationContext",
           "kind": "type",
-          "signature": "export type IOperationContext = { /** 协作式取消。后端可忽略，但调用方一定会以 AbortError 结束等待。结构化信号，不引全局 AbortSignal。 */ readonly signal?: IAbortSignal; /** 便捷超时，内部合成为 signal；与外部 signal 同时存在时取先触发者。 */ readonly timeoutMs?: number; /** IndexedDB iterator page size; bounded to protect cursor memory. */ readonly pageSize?: number; };",
-          "declarationLine": 3,
+          "signature": "export type IOperationContext = { /** * Requests cooperative cancellation. Backends can ignore work cancellation, while * cancellation-aware operations stop waiting with the contract `ABORTED` error. Uses a structural * signal without depending on the global `AbortSignal`. */ readonly signal?: IAbortSignal; /** * Creates an internal timeout signal. When an external `signal` also exists, the first signal to * fire wins. */ readonly timeoutMs?: number; /** IndexedDB iterator page size; bounded to protect cursor memory. */ readonly pageSize?: number; };",
+          "declarationLine": 6,
           "source": "packages/storage-contract/dist/context.d.ts",
-          "purpose": "协作式取消与超时。所有公开方法的最后一个可选参数。",
+          "purpose": "Supplies cooperative cancellation and timeouts as an optional final argument to storage operations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IOperationContext.",
           "advanced": "No additional advanced behavior is declared for IOperationContext.",
           "parameters": ["This type declaration has no parameters."],
@@ -3648,7 +3648,7 @@
           "aliasOf": "IOperationContext",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IOperationContext = { /** 协作式取消。后端可忽略，但调用方一定会以 AbortError 结束等待。结构化信号，不引全局 AbortSignal。 */ readonly signal?: IAbortSignal; /** 便捷超时，内部合成为 signal；与外部 signal 同时存在时取先触发者。 */ readonly timeoutMs?: number; /** IndexedDB iterator page size; bounded to protect cursor memory. */ readonly pageSize?: number; };"
+            "export type IOperationContext = { /** * Requests cooperative cancellation. Backends can ignore work cancellation, while * cancellation-aware operations stop waiting with the contract `ABORTED` error. Uses a structural * signal without depending on the global `AbortSignal`. */ readonly signal?: IAbortSignal; /** * Creates an internal timeout signal. When an external `signal` also exists, the first signal to * fire wins. */ readonly timeoutMs?: number; /** IndexedDB iterator page size; bounded to protect cursor memory. */ readonly pageSize?: number; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3658,7 +3658,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "协作式取消与超时。所有公开方法的最后一个可选参数。"
+              "content": "Supplies cooperative cancellation and timeouts as an optional final argument to storage operations."
             },
             {
               "id": "getting-started",
@@ -3687,7 +3687,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-contract/dist/context.d.ts:IOperationContext:export type IOperationContext = { /** 协作式取消。后端可忽略，但调用方一定会以 AbortError 结束等待。结构化信号，不引全局 AbortSignal。 */ readonly signal?: IAbortSignal; /** 便捷超时，内部合成为 signal；与外部 signal 同时存在时取先触发者。 */ readonly timeoutMs?: number; /** IndexedDB iterator page size; bounded to protect cursor memory. */ readonly pageSize?: number; };",
+          "identity": "packages/storage-contract/dist/context.d.ts:IOperationContext:export type IOperationContext = { /** * Requests cooperative cancellation. Backends can ignore work cancellation, while * cancellation-aware operations stop waiting with the contract `ABORTED` error. Uses a structural * signal without depending on the global `AbortSignal`. */ readonly signal?: IAbortSignal; /** * Creates an internal timeout signal. When an external `signal` also exists, the first signal to * fire wins. */ readonly timeoutMs?: number; /** IndexedDB iterator page size; bounded to protect cursor memory. */ readonly pageSize?: number; };",
           "guidance": [
             {
               "id": "context-operation-context-模块-操作上下文与写选项",
@@ -4398,9 +4398,9 @@
           "name": "IRecordStore",
           "kind": "type",
           "signature": "export type IRecordStore<TValue = unknown> = IKeyValueStore & { getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; clearBytes(ctx?: IOperationContext): Promise<void>; getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>; clearRecords(ctx?: IOperationContext): Promise<void>; clearAll(ctx?: IOperationContext): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; delete(key: string, ctx?: IOperationContext): Promise<void>; }; iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>; transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };",
-          "declarationLine": 38,
+          "declarationLine": 44,
           "source": "packages/storage-contract/dist/store.d.ts",
-          "purpose": "L1：结构化后端额外提供的字节与对象通道。",
+          "purpose": "Defines the additional L1 byte and object channels supplied by structured backends.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRecordStore.",
           "advanced": "No additional advanced behavior is declared for IRecordStore.",
           "parameters": ["This type declaration has no parameters."],
@@ -4429,7 +4429,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "L1：结构化后端额外提供的字节与对象通道。"
+              "content": "Defines the additional L1 byte and object channels supplied by structured backends."
             },
             {
               "id": "getting-started",
@@ -4660,7 +4660,7 @@
           "name": "isKeyValueStore",
           "kind": "const",
           "signature": "export declare const isKeyValueStore: (store: unknown) => store is IKeyValueStore;",
-          "declarationLine": 83,
+          "declarationLine": 89,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Check the complete callable L0 surface and capability descriptor at runtime boundaries.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isKeyValueStore.",
@@ -4728,7 +4728,7 @@
           "name": "isRecordStore",
           "kind": "const",
           "signature": "export declare const isRecordStore: (store: IKeyValueStore) => store is IRecordStore;",
-          "declarationLine": 86,
+          "declarationLine": 95,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "isRecordStore is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isRecordStore.",
@@ -4923,7 +4923,7 @@
           "name": "isStorageCapabilities",
           "kind": "const",
           "signature": "export declare const isStorageCapabilities: (value: unknown) => value is IStorageCapabilities;",
-          "declarationLine": 26,
+          "declarationLine": 29,
           "source": "packages/storage-contract/dist/capabilities.d.ts",
           "purpose": "Validate the complete runtime capability descriptor shared by public boundaries.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isStorageCapabilities.",
@@ -4991,7 +4991,7 @@
           "name": "isStorageContractError",
           "kind": "const",
           "signature": "export declare const isStorageContractError: (value: unknown) => value is StorageContractError;",
-          "declarationLine": 24,
+          "declarationLine": 28,
           "source": "packages/storage-contract/dist/errors.d.ts",
           "purpose": "isStorageContractError is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isStorageContractError.",
@@ -5173,7 +5173,7 @@
         {
           "name": "IStorageCapabilities",
           "kind": "type",
-          "signature": "export type IStorageCapabilities = { readonly syncRead: boolean; readonly binary: boolean; readonly records: boolean; readonly transactions: boolean; readonly iteration: boolean; /** Whether backend exposes logical secondary-index operations. Missing legacy fields mean false. */ readonly secondaryIndexes: boolean; /** Whether backend emits post-commit invalidation changes. Missing legacy fields mean false. */ readonly changeFeed: boolean; /** 单值近似上限，字节。cookie ~4096，localStorage ~5MB，IndexedDB 为 undefined（受配额而非单值限制）。 */ readonly maxValueBytes: number | undefined; /** 该后端上不可见的键是否可能存在（cookies 的 HttpOnly）。 */ readonly opaqueEntries: boolean; };",
+          "signature": "export type IStorageCapabilities = { readonly syncRead: boolean; readonly binary: boolean; readonly records: boolean; readonly transactions: boolean; readonly iteration: boolean; /** Whether backend exposes logical secondary-index operations. Missing legacy fields mean false. */ readonly secondaryIndexes: boolean; /** Whether backend emits post-commit invalidation changes. Missing legacy fields mean false. */ readonly changeFeed: boolean; /** * Approximate per-value limit in bytes: about 4096 for cookies and 5 MB for localStorage. * IndexedDB uses `undefined` because quota limits total storage. */ readonly maxValueBytes: number | undefined; /** Whether the backend can contain keys hidden from JavaScript, such as `HttpOnly` cookies. */ readonly opaqueEntries: boolean; };",
           "declarationLine": 2,
           "source": "packages/storage-contract/dist/capabilities.d.ts",
           "purpose": "IStorageCapabilities is part of this module's public type contract.",
@@ -5195,7 +5195,7 @@
           "aliasOf": "IStorageCapabilities",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStorageCapabilities = { readonly syncRead: boolean; readonly binary: boolean; readonly records: boolean; readonly transactions: boolean; readonly iteration: boolean; /** Whether backend exposes logical secondary-index operations. Missing legacy fields mean false. */ readonly secondaryIndexes: boolean; /** Whether backend emits post-commit invalidation changes. Missing legacy fields mean false. */ readonly changeFeed: boolean; /** 单值近似上限，字节。cookie ~4096，localStorage ~5MB，IndexedDB 为 undefined（受配额而非单值限制）。 */ readonly maxValueBytes: number | undefined; /** 该后端上不可见的键是否可能存在（cookies 的 HttpOnly）。 */ readonly opaqueEntries: boolean; };"
+            "export type IStorageCapabilities = { readonly syncRead: boolean; readonly binary: boolean; readonly records: boolean; readonly transactions: boolean; readonly iteration: boolean; /** Whether backend exposes logical secondary-index operations. Missing legacy fields mean false. */ readonly secondaryIndexes: boolean; /** Whether backend emits post-commit invalidation changes. Missing legacy fields mean false. */ readonly changeFeed: boolean; /** * Approximate per-value limit in bytes: about 4096 for cookies and 5 MB for localStorage. * IndexedDB uses `undefined` because quota limits total storage. */ readonly maxValueBytes: number | undefined; /** Whether the backend can contain keys hidden from JavaScript, such as `HttpOnly` cookies. */ readonly opaqueEntries: boolean; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5234,7 +5234,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-contract/dist/capabilities.d.ts:IStorageCapabilities:export type IStorageCapabilities = { readonly syncRead: boolean; readonly binary: boolean; readonly records: boolean; readonly transactions: boolean; readonly iteration: boolean; /** Whether backend exposes logical secondary-index operations. Missing legacy fields mean false. */ readonly secondaryIndexes: boolean; /** Whether backend emits post-commit invalidation changes. Missing legacy fields mean false. */ readonly changeFeed: boolean; /** 单值近似上限，字节。cookie ~4096，localStorage ~5MB，IndexedDB 为 undefined（受配额而非单值限制）。 */ readonly maxValueBytes: number | undefined; /** 该后端上不可见的键是否可能存在（cookies 的 HttpOnly）。 */ readonly opaqueEntries: boolean; };",
+          "identity": "packages/storage-contract/dist/capabilities.d.ts:IStorageCapabilities:export type IStorageCapabilities = { readonly syncRead: boolean; readonly binary: boolean; readonly records: boolean; readonly transactions: boolean; readonly iteration: boolean; /** Whether backend exposes logical secondary-index operations. Missing legacy fields mean false. */ readonly secondaryIndexes: boolean; /** Whether backend emits post-commit invalidation changes. Missing legacy fields mean false. */ readonly changeFeed: boolean; /** * Approximate per-value limit in bytes: about 4096 for cookies and 5 MB for localStorage. * IndexedDB uses `undefined` because quota limits total storage. */ readonly maxValueBytes: number | undefined; /** Whether the backend can contain keys hidden from JavaScript, such as `HttpOnly` cookies. */ readonly opaqueEntries: boolean; };",
           "guidance": [],
           "usageScore": 40,
           "configuration": [],
@@ -5375,9 +5375,9 @@
           "name": "IStorageContractErrorDetails",
           "kind": "type",
           "signature": "export type IStorageContractErrorDetails = { readonly backend?: IBackendKind; readonly key?: string | IStorageKey; readonly cause?: unknown; };",
-          "declarationLine": 8,
+          "declarationLine": 11,
           "source": "packages/storage-contract/dist/errors.d.ts",
-          "purpose": "契约级错误详情：只含中立字段，不泄漏 web 诊断词汇（codec/migration/extension 等留 storage-web）。",
+          "purpose": "Contains neutral contract error details. Web diagnostics such as codec, migration, and extension details belong to `storage-web`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageContractErrorDetails.",
           "advanced": "No additional advanced behavior is declared for IStorageContractErrorDetails.",
           "parameters": ["This type declaration has no parameters."],
@@ -5402,7 +5402,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "契约级错误详情：只含中立字段，不泄漏 web 诊断词汇（codec/migration/extension 等留 storage-web）。"
+              "content": "Contains neutral contract error details. Web diagnostics such as codec, migration, and extension details belong to `storage-web`."
             },
             {
               "id": "getting-started",
@@ -5496,9 +5496,9 @@
           "name": "IStorageKey",
           "kind": "type",
           "signature": "export type IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[];",
-          "declarationLine": 24,
+          "declarationLine": 37,
           "source": "packages/storage-contract/dist/context.d.ts",
-          "purpose": "L1 文档主键。结构化后端（IndexedDB）上等同 IDBValidKey。",
+          "purpose": "Identifies an L1 document. Corresponds to `IDBValidKey` on a structured backend such as IndexedDB.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageKey.",
           "advanced": "No additional advanced behavior is declared for IStorageKey.",
           "parameters": ["This type declaration has no parameters."],
@@ -5530,7 +5530,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "L1 文档主键。结构化后端（IndexedDB）上等同 IDBValidKey。"
+              "content": "Identifies an L1 document. Corresponds to `IDBValidKey` on a structured backend such as IndexedDB."
             },
             {
               "id": "getting-started",
@@ -5808,9 +5808,9 @@
           "name": "ISyncCapableStore",
           "kind": "type",
           "signature": "export type ISyncCapableStore<TStore extends { readonly sync?: object; }> = TStore & { readonly sync: NonNullable<TStore['sync']>; };",
-          "declarationLine": 32,
+          "declarationLine": 38,
           "source": "packages/storage-contract/dist/store.d.ts",
-          "purpose": "把某个 `IKeyValueStore` 变体的 `sync` 字段从 optional 收紧成必然存在。 localStorage/sessionStorage/memoryStorage/cookies 这些同步后端的工厂函数用它标注返回类型。",
+          "purpose": "Requires the `sync` channel on a variant of `IKeyValueStore`. Factory functions for localStorage, sessionStorage, memoryStorage, and cookies use it for their return types.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISyncCapableStore.",
           "advanced": "No additional advanced behavior is declared for ISyncCapableStore.",
           "parameters": ["This type declaration has no parameters."],
@@ -5837,7 +5837,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "把某个 `IKeyValueStore` 变体的 `sync` 字段从 optional 收紧成必然存在。 localStorage/sessionStorage/memoryStorage/cookies 这些同步后端的工厂函数用它标注返回类型。"
+              "content": "Requires the `sync` channel on a variant of `IKeyValueStore`. Factory functions for localStorage, sessionStorage, memoryStorage, and cookies use it for their return types."
             },
             {
               "id": "getting-started",
@@ -5876,9 +5876,9 @@
           "name": "ISyncKeyValueStore",
           "kind": "type",
           "signature": "export type ISyncKeyValueStore = { get(key: string): string | null; set(key: string, value: string, options?: ISyncWriteOptions): void; remove(key: string): void; has(key: string): boolean; keys(): string[]; clearValues(): void; };",
-          "declarationLine": 5,
+          "declarationLine": 8,
           "source": "packages/storage-contract/dist/store.d.ts",
-          "purpose": "同步通道。仅同步后端提供；由该后端的实现直接驱动，异步方法是它的薄包装。",
+          "purpose": "Exposes the synchronous channel only on synchronous backends. The backend drives it directly, and asynchronous methods wrap it.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISyncKeyValueStore.",
           "advanced": "No additional advanced behavior is declared for ISyncKeyValueStore.",
           "parameters": ["This type declaration has no parameters."],
@@ -5904,7 +5904,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "同步通道。仅同步后端提供；由该后端的实现直接驱动，异步方法是它的薄包装。"
+              "content": "Exposes the synchronous channel only on synchronous backends. The backend drives it directly, and asynchronous methods wrap it."
             },
             {
               "id": "getting-started",
@@ -5943,7 +5943,7 @@
           "name": "ISyncWriteOptions",
           "kind": "type",
           "signature": "export type ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy; };",
-          "declarationLine": 20,
+          "declarationLine": 30,
           "source": "packages/storage-contract/dist/context.d.ts",
           "purpose": "Synchronous writes cannot honor cancellation or timeout fields.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISyncWriteOptions.",
@@ -6273,7 +6273,7 @@
           "name": "IWriteOptions",
           "kind": "type",
           "signature": "export type IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy; };",
-          "declarationLine": 16,
+          "declarationLine": 26,
           "source": "packages/storage-contract/dist/context.d.ts",
           "purpose": "IWriteOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWriteOptions.",
@@ -6669,7 +6669,7 @@
           "name": "snapshotKeyValueStore",
           "kind": "const",
           "signature": "export declare const snapshotKeyValueStore: (store: unknown) => { readonly store: IKeyValueStore; readonly backend: IBackendKind; readonly capabilities: IStorageCapabilities; } | undefined;",
-          "declarationLine": 71,
+          "declarationLine": 77,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Return one immutable base-store inspection so capability guards do not reread hostile accessors.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for snapshotKeyValueStore.",
@@ -6733,7 +6733,7 @@
           "name": "snapshotKeyValueStoreDetailed",
           "kind": "const",
           "signature": "export declare const snapshotKeyValueStoreDetailed: (store: unknown) => IKeyValueStoreAdmission;",
-          "declarationLine": 69,
+          "declarationLine": 75,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Admit one key-value store while preserving the exact hostile accessor failure, if any.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for snapshotKeyValueStoreDetailed.",
@@ -6992,7 +6992,7 @@
           "name": "snapshotRecordStore",
           "kind": "const",
           "signature": "export declare const snapshotRecordStore: <T = unknown>(store: unknown) => { readonly store: IRecordStore<T>; readonly backend: IBackendKind; readonly capabilities: IStorageCapabilities; } | undefined;",
-          "declarationLine": 77,
+          "declarationLine": 83,
           "source": "packages/storage-contract/dist/store.d.ts",
           "purpose": "Return one immutable record-store inspection for capability composition.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for snapshotRecordStore.",
@@ -7056,7 +7056,7 @@
           "name": "snapshotStorageCapabilities",
           "kind": "const",
           "signature": "export declare const snapshotStorageCapabilities: (value: unknown) => IStorageCapabilities | undefined;",
-          "declarationLine": 24,
+          "declarationLine": 27,
           "source": "packages/storage-contract/dist/capabilities.d.ts",
           "purpose": "Snapshot a capability descriptor once; invalid or throwing accessors return undefined.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for snapshotStorageCapabilities.",
@@ -7636,9 +7636,9 @@
           "name": "StorageContractError",
           "kind": "class",
           "signature": "export declare class StorageContractError extends Error { readonly source: string; readonly code: IStorageContractErrorCode; readonly backend?: IBackendKind; readonly key?: string | IStorageKey; constructor(code: IStorageContractErrorCode, details?: IStorageContractErrorDetails, message?: string); }",
-          "declarationLine": 17,
+          "declarationLine": 21,
           "source": "packages/storage-contract/dist/errors.d.ts",
-          "purpose": "契约级错误。`source` 恒为 `@migaia/storage-contract`，码表见 `StorageContractErrorCode`。 构造后 `Object.freeze`；不重写 `stack`；`cause` 链可达（`docs/contracts/error-codes.md` §3.2）。",
+          "purpose": "Represents a contract error with `source` fixed to `@migaia/storage-contract`. `StorageContractErrorCode` defines the codes. Freezes the instance after construction and preserves `stack` and the reachable `cause` chain. See `docs/contracts/error-codes.md` §3.2.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StorageContractError.",
           "advanced": "No additional advanced behavior is declared for StorageContractError.",
           "parameters": [
@@ -7734,7 +7734,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "契约级错误。`source` 恒为 `@migaia/storage-contract`，码表见 `StorageContractErrorCode`。 构造后 `Object.freeze`；不重写 `stack`；`cause` 链可达（`docs/contracts/error-codes.md` §3.2）。"
+              "content": "Represents a contract error with `source` fixed to `@migaia/storage-contract`. `StorageContractErrorCode` defines the codes. Freezes the instance after construction and preserves `stack` and the reachable `cause` chain. See `docs/contracts/error-codes.md` §3.2."
             },
             {
               "id": "getting-started",

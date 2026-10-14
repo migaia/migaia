@@ -2786,9 +2786,9 @@
           "name": "StorageError",
           "kind": "class",
           "signature": "export declare class StorageError extends Error { readonly source: string; readonly code: IStorageErrorCode; readonly backend?: IBackendKind; readonly key?: string | IStorageKey; readonly existingChannel?: IStorageChannel; readonly attemptedChannel?: IStorageChannel; readonly extensionStage?: IExtensionStage; readonly operation?: string; /** Internal repository stage used to apply invalid-record policy. */ readonly stage?: 'decode' | 'migrate' | 'validate'; constructor(code: IStorageErrorCode, details?: IStorageErrorDetails, message?: string, stage?: 'decode' | 'migrate' | 'validate'); }",
-          "declarationLine": 54,
+          "declarationLine": 57,
           "source": "packages/storage-web/dist/types/errors.d.ts",
-          "purpose": "所有后端异常的统一归一化形态。原始异常一律进 cause，不改写其 message。",
+          "purpose": "Normalizes backend exceptions into one error form. Retains the original exception as `cause` without changing its message.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StorageError.",
           "advanced": "No additional advanced behavior is declared for StorageError.",
           "parameters": [
@@ -2933,7 +2933,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "所有后端异常的统一归一化形态。原始异常一律进 cause，不改写其 message。"
+              "content": "Normalizes backend exceptions into one error form. Retains the original exception as `cause` without changing its message."
             },
             {
               "id": "getting-started",
@@ -3581,9 +3581,9 @@
           "name": "cookiesHost",
           "kind": "const",
           "signature": "export declare const cookiesHost: (options?: ICookiesOptions) => ISyncCapableStore<ICookieStore>;",
-          "declarationLine": 18,
+          "declarationLine": 21,
           "source": "packages/storage-web/dist/backends/cookie.d.ts",
-          "purpose": "Document.cookie 后端。不处理服务端 cookie；SSR 场景由调用方在服务端 自行解析 `req.headers.cookie` 并注入 memoryStorageHost。",
+          "purpose": "Stores cookies through `document.cookie`. Does not handle server-side cookies. For SSR, the caller parses `req.headers.cookie` on the server and supplies the data to `memoryStorageHost`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for cookiesHost.",
           "advanced": "No additional advanced behavior is declared for cookiesHost.",
           "parameters": ["This const declaration has no parameters."],
@@ -3612,7 +3612,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Document.cookie 后端。不处理服务端 cookie；SSR 场景由调用方在服务端 自行解析 `req.headers.cookie` 并注入 memoryStorageHost。"
+              "content": "Stores cookies through `document.cookie`. Does not handle server-side cookies. For SSR, the caller parses `req.headers.cookie` on the server and supplies the data to `memoryStorageHost`."
             },
             {
               "id": "getting-started",
@@ -3645,25 +3645,25 @@
               "name": "namespace",
               "type": "string",
               "optional": true,
-              "description": "命名空间前缀，避免多实例/多应用互相踩踏。默认为 'default'。"
+              "description": "Prefixes keys to isolate instances and applications. Defaults to `default`."
             },
             {
               "name": "namespaceCodec",
               "type": "INamespaceCodec",
               "optional": true,
-              "description": "高级物理键编码扩展点；改变 codec 即改变 cookie 持久化格式。"
+              "description": "Customizes physical key encoding. Changing the codec changes the cookie persistence format."
             },
             {
               "name": "scope",
               "type": "ICookieScope",
               "optional": true,
-              "description": "固定 cookie scope；写入与删除始终使用同一 scope。"
+              "description": "Fixes the cookie scope. Writes and deletions always use the same scope."
             },
             {
               "name": "document",
               "type": "ICookieDocument",
               "optional": true,
-              "description": "注入点：测试环境用。默认为 globalThis.document。"
+              "description": "Injects a document for testing. Defaults to `globalThis.document`."
             }
           ],
           "identity": "packages/storage-web/dist/backends/cookie.d.ts:cookiesHost:export declare const cookiesHost: (options?: ICookiesOptions) => ISyncCapableStore<ICookieStore>;",
@@ -3675,7 +3675,7 @@
               "type": "string",
               "optional": true,
               "description": "`namespace?: string` —— 默认 `'default'`；同 Web Storage。",
-              "descriptionEn": "",
+              "descriptionEn": "Prefixes keys to isolate instances and applications. Defaults to `default`.",
               "descriptionZh": "`namespace?: string` —— 默认 `'default'`；同 Web Storage。"
             },
             {
@@ -3683,7 +3683,7 @@
               "type": "INamespaceCodec",
               "optional": true,
               "description": "默认物理 key 编码器（`localStorageHost`/`sessionStorageHost`/`cookiesHost` 的 `namespaceCodec` 默认值）。编码格式：`sw1:<命名空间 UTF-8 字节长度>:<encodeURIComponent(命名空间)>:<key>`——长度前缀 + 编码后的命名空间共同防止“命名空间 A 的 key 恰好是命名空间 B 前缀”这种碰撞。`decode` 只在物理 key 精确匹配该命名空间时返回原始逻辑 key，否则返回 `undefined`（不属于该命名空间，调用方应跳过而非报错）。",
-              "descriptionEn": "",
+              "descriptionEn": "Customizes physical key encoding. Changing the codec changes the cookie persistence format.",
               "descriptionZh": "默认物理 key 编码器（`localStorageHost`/`sessionStorageHost`/`cookiesHost` 的 `namespaceCodec` 默认值）。编码格式：`sw1:<命名空间 UTF-8 字节长度>:<encodeURIComponent(命名空间)>:<key>`——长度前缀 + 编码后的命名空间共同防止“命名空间 A 的 key 恰好是命名空间 B 前缀”这种碰撞。`decode` 只在物理 key 精确匹配该命名空间时返回原始逻辑 key，否则返回 `undefined`（不属于该命名空间，调用方应跳过而非报错）。"
             },
             {
@@ -3691,7 +3691,7 @@
               "type": "ICookieScope",
               "optional": true,
               "description": "`scope` 和 `matches(change)` 只做安全失效过滤；无法证明无关的 change 会保守 refresh。",
-              "descriptionEn": "",
+              "descriptionEn": "Fixes the cookie scope. Writes and deletions always use the same scope.",
               "descriptionZh": "`scope` 和 `matches(change)` 只做安全失效过滤；无法证明无关的 change 会保守 refresh。"
             },
             {
@@ -3699,7 +3699,7 @@
               "type": "ICookieDocument",
               "optional": true,
               "description": "源码：`src/backends/cookie.ts`。基于 `document.cookie` 的读写封装，不处理服务端 cookie（SSR 场景由调用方在服务端自行解析 `req.headers.cookie` 后注入 `memoryStorageHost`）。",
-              "descriptionEn": "",
+              "descriptionEn": "Injects a document for testing. Defaults to `globalThis.document`.",
               "descriptionZh": "源码：`src/backends/cookie.ts`。基于 `document.cookie` 的读写封装，不处理服务端 cookie（SSR 场景由调用方在服务端自行解析 `req.headers.cookie` 后注入 `memoryStorageHost`）。"
             }
           ],
@@ -3772,7 +3772,7 @@
         {
           "name": "ICookiesOptions",
           "kind": "type",
-          "signature": "export type ICookiesOptions = { /** 命名空间前缀，避免多实例/多应用互相踩踏。默认为 'default'。 */ readonly namespace?: string; /** 高级物理键编码扩展点；改变 codec 即改变 cookie 持久化格式。 */ readonly namespaceCodec?: INamespaceCodec; /** 固定 cookie scope；写入与删除始终使用同一 scope。 */ readonly scope?: ICookieScope; /** 注入点：测试环境用。默认为 globalThis.document。 */ readonly document?: ICookieDocument; };",
+          "signature": "export type ICookiesOptions = { /** Prefixes keys to isolate instances and applications. Defaults to `default`. */ readonly namespace?: string; /** Customizes physical key encoding. Changing the codec changes the cookie persistence format. */ readonly namespaceCodec?: INamespaceCodec; /** Fixes the cookie scope. Writes and deletions always use the same scope. */ readonly scope?: ICookieScope; /** Injects a document for testing. Defaults to `globalThis.document`. */ readonly document?: ICookieDocument; };",
           "declarationLine": 7,
           "source": "packages/storage-web/dist/backends/cookie.d.ts",
           "purpose": "ICookiesOptions is part of this module's public type contract.",
@@ -3790,7 +3790,7 @@
           "aliasOf": "ICookiesOptions",
           "exportPath": "./cookies",
           "overloadSignatures": [
-            "export type ICookiesOptions = { /** 命名空间前缀，避免多实例/多应用互相踩踏。默认为 'default'。 */ readonly namespace?: string; /** 高级物理键编码扩展点；改变 codec 即改变 cookie 持久化格式。 */ readonly namespaceCodec?: INamespaceCodec; /** 固定 cookie scope；写入与删除始终使用同一 scope。 */ readonly scope?: ICookieScope; /** 注入点：测试环境用。默认为 globalThis.document。 */ readonly document?: ICookieDocument; };"
+            "export type ICookiesOptions = { /** Prefixes keys to isolate instances and applications. Defaults to `default`. */ readonly namespace?: string; /** Customizes physical key encoding. Changing the codec changes the cookie persistence format. */ readonly namespaceCodec?: INamespaceCodec; /** Fixes the cookie scope. Writes and deletions always use the same scope. */ readonly scope?: ICookieScope; /** Injects a document for testing. Defaults to `globalThis.document`. */ readonly document?: ICookieDocument; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3829,7 +3829,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/backends/cookie.d.ts:ICookiesOptions:export type ICookiesOptions = { /** 命名空间前缀，避免多实例/多应用互相踩踏。默认为 'default'。 */ readonly namespace?: string; /** 高级物理键编码扩展点；改变 codec 即改变 cookie 持久化格式。 */ readonly namespaceCodec?: INamespaceCodec; /** 固定 cookie scope；写入与删除始终使用同一 scope。 */ readonly scope?: ICookieScope; /** 注入点：测试环境用。默认为 globalThis.document。 */ readonly document?: ICookieDocument; };",
+          "identity": "packages/storage-web/dist/backends/cookie.d.ts:ICookiesOptions:export type ICookiesOptions = { /** Prefixes keys to isolate instances and applications. Defaults to `default`. */ readonly namespace?: string; /** Customizes physical key encoding. Changing the codec changes the cookie persistence format. */ readonly namespaceCodec?: INamespaceCodec; /** Fixes the cookie scope. Writes and deletions always use the same scope. */ readonly scope?: ICookieScope; /** Injects a document for testing. Defaults to `globalThis.document`. */ readonly document?: ICookieDocument; };",
           "guidance": [],
           "usageScore": 16,
           "configuration": [],
@@ -3858,9 +3858,9 @@
           "name": "defineEntity",
           "kind": "function",
           "signature": "export declare function defineEntity<TDomain, TStored = TDomain>(options: IEntityOptions<TDomain, TStored, never> & { readonly indexes?: undefined; }): IEntityDefinition<TDomain>;\nexport declare function defineEntity<TDomain, TStored = TDomain>(): IDefineEntityBuilder<TDomain, TStored>;",
-          "declarationLine": 16,
+          "declarationLine": 17,
           "source": "packages/storage-web/dist/entity/define.d.ts",
-          "purpose": "声明式定义一类 record。`connect()` 把定义绑定到具体 backend，产出可反复调用 get/put/remove/list/stream/batch 的仓储对象。 同一个 definition 可以 connect 到多个 backend，行为在两者上保持一致。",
+          "purpose": "Defines a record entity declaratively. `connect()` binds the definition to a backend and returns a repository for repeated `get`, `put`, `remove`, `list`, `stream`, and `batch` calls. The same definition can connect to multiple backends with consistent behavior.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineEntity.",
           "advanced": "No additional advanced behavior is declared for defineEntity.",
           "parameters": [
@@ -3911,7 +3911,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "声明式定义一类 record。`connect()` 把定义绑定到具体 backend，产出可反复调用 get/put/remove/list/stream/batch 的仓储对象。 同一个 definition 可以 connect 到多个 backend，行为在两者上保持一致。"
+              "content": "Defines a record entity declaratively. `connect()` binds the definition to a backend and returns a repository for repeated `get`, `put`, `remove`, `list`, `stream`, and `batch` calls. The same definition can connect to multiple backends with consistent behavior."
             },
             {
               "id": "getting-started",
@@ -3950,19 +3950,19 @@
               "name": "key",
               "type": "Extract<keyof TDomain, string>",
               "optional": false,
-              "description": "领域对象上作为主键的属性名。"
+              "description": "Names the domain object property used as its primary key."
             },
             {
               "name": "schema",
               "type": "ISchemaAdapter<TDomain, TStored>",
               "optional": true,
-              "description": "默认 passthrough：零校验直接透传。"
+              "description": "Defaults to `passthrough`, which returns values without validation."
             },
             {
               "name": "codec",
               "type": "ICodec<unknown, unknown>",
               "optional": true,
-              "description": "在所有后端上统一生效，经 selectCodec 按 store.capabilities 选路 （见 §7）——显式配置的 codec 不会被结构化后端绕过。未提供时按后端 * 类型选默认值：结构化后端（IndexedDB/memory）默认 structuredCodec （原样存对象，利用原生 structured clone）；KV-only 后端默认 * jsonCodec。"
+              "description": "Applies on every backend through `selectCodec` using `store.capabilities` (see §7). Structured * backends do not bypass an explicitly configured codec. When omitted, IndexedDB and memory * default to `structuredCodec`, preserving objects through native structured cloning. * Key-value-only backends default to `jsonCodec`."
             },
             {
               "name": "version",
@@ -3980,7 +3980,7 @@
               "name": "validateOnRead",
               "type": "boolean",
               "optional": true,
-              "description": "默认 true：持久化数据会跨版本存活，读到脏数据比写入脏数据更常见。"
+              "description": "Defaults to `true` because persisted data survives version changes, making invalid reads more * common than invalid writes."
             },
             {
               "name": "onDiagnostic",
@@ -4082,7 +4082,7 @@
               "type": "Extract<keyof TDomain, string>",
               "optional": false,
               "description": "声明式定义一类记录（record）。`connect(store)` 把定义绑定到具体后端，产出可反复调用 `get`/`put`/`remove`/`list`/`stream`/`migrate`/`batch` 的仓储（repository）对象。同一个 definition 可以 `connect` 到多个后端，行为在两者上保持一致；同一个 `store` 实例也可以被多个 entity definition 共用（内部会把 entity 名编入实际存储 key，避免不同 entity 的同 `id` 记录互相覆盖）。",
-              "descriptionEn": "",
+              "descriptionEn": "Names the domain object property used as its primary key.",
               "descriptionZh": "声明式定义一类记录（record）。`connect(store)` 把定义绑定到具体后端，产出可反复调用 `get`/`put`/`remove`/`list`/`stream`/`migrate`/`batch` 的仓储（repository）对象。同一个 definition 可以 `connect` 到多个后端，行为在两者上保持一致；同一个 `store` 实例也可以被多个 entity definition 共用（内部会把 entity 名编入实际存储 key，避免不同 entity 的同 `id` 记录互相覆盖）。"
             },
             {
@@ -4090,7 +4090,7 @@
               "type": "ISchemaAdapter<TDomain, TStored>",
               "optional": true,
               "description": "`module.json` 的 `exports` 只声明根错误/命名空间契约与各个精确 backend/entity/schema/serialize/host/plugin 子路径，其余源码目录（`backends/`、`core/` 等）不是公开导入点。",
-              "descriptionEn": "",
+              "descriptionEn": "Defaults to `passthrough`, which returns values without validation.",
               "descriptionZh": "`module.json` 的 `exports` 只声明根错误/命名空间契约与各个精确 backend/entity/schema/serialize/host/plugin 子路径，其余源码目录（`backends/`、`core/` 等）不是公开导入点。"
             },
             {
@@ -4098,7 +4098,7 @@
               "type": "ICodec<unknown, unknown>",
               "optional": true,
               "description": "`codec` 选项的延迟决策：未显式提供时，`defineEntity` 本身不会默认成任何具体 codec（不能默认成 `jsonCodec`，因为结构化后端与 KV 后端的合理默认不同，且只有 `connect(store)` 时才知道实际连接的是哪种后端）。真正的默认值由 `createRepository` 在 `connect` 阶段决定：结构化后端（IndexedDB/memory，`isRecordStore(store) === true`）默认 `structuredCodec`；KV-only 后端（local/session/cookie）默认 `jsonCodec`。显式提供的 `codec` 会在 `connect` 阶段经 `selectCodec` 按后端能力选路，不会被结构化后端“绕过”默认值逻辑。",
-              "descriptionEn": "",
+              "descriptionEn": "Applies on every backend through `selectCodec` using `store.capabilities` (see §7). Structured * backends do not bypass an explicitly configured codec. When omitted, IndexedDB and memory * default to `structuredCodec`, preserving objects through native structured cloning. * Key-value-only backends default to `jsonCodec`.",
               "descriptionZh": "`codec` 选项的延迟决策：未显式提供时，`defineEntity` 本身不会默认成任何具体 codec（不能默认成 `jsonCodec`，因为结构化后端与 KV 后端的合理默认不同，且只有 `connect(store)` 时才知道实际连接的是哪种后端）。真正的默认值由 `createRepository` 在 `connect` 阶段决定：结构化后端（IndexedDB/memory，`isRecordStore(store) === true`）默认 `structuredCodec`；KV-only 后端（local/session/cookie）默认 `jsonCodec`。显式提供的 `codec` 会在 `connect` 阶段经 `selectCodec` 按后端能力选路，不会被结构化后端“绕过”默认值逻辑。"
             },
             {
@@ -4122,7 +4122,7 @@
               "type": "boolean",
               "optional": true,
               "description": "`validateOnRead?: boolean` —— 默认 `true`。",
-              "descriptionEn": "",
+              "descriptionEn": "Defaults to `true` because persisted data survives version changes, making invalid reads more * common than invalid writes.",
               "descriptionZh": "`validateOnRead?: boolean` —— 默认 `true`。"
             },
             {
@@ -4156,7 +4156,7 @@
           "name": "IEntityDefinition",
           "kind": "type",
           "signature": "export type IEntityDefinition<TDomain, TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>> = { readonly name: string; readonly version: number; connect(store: IKeyValueStore): IRepository<TDomain, TIndexes>; };",
-          "declarationLine": 130,
+          "declarationLine": 143,
           "source": "packages/storage-web/dist/entity/types.d.ts",
           "purpose": "IEntityDefinition is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEntityDefinition.",
@@ -4349,7 +4349,7 @@
         {
           "name": "IEntityOptions",
           "kind": "type",
-          "signature": "export type IEntityOptions<TDomain, TStored = TDomain, TIndexes extends IEntityIndexDefinitions<TDomain> | undefined = undefined> = { readonly name: string; /** 领域对象上作为主键的属性名。 */ readonly key: Extract<keyof TDomain, string>; /** 默认 passthrough：零校验直接透传。 */ readonly schema?: ISchemaAdapter<TDomain, TStored>; /** * 在所有后端上统一生效，经 selectCodec 按 store.capabilities 选路 （见 §7）——显式配置的 codec 不会被结构化后端绕过。未提供时按后端 * 类型选默认值：结构化后端（IndexedDB/memory）默认 structuredCodec （原样存对象，利用原生 structured clone）；KV-only 后端默认 * jsonCodec。 */ readonly codec?: ICodec<unknown, unknown>; readonly version?: number; readonly migrations?: Record<number, IMigration>; /** 默认 true：持久化数据会跨版本存活，读到脏数据比写入脏数据更常见。 */ readonly validateOnRead?: boolean; readonly onDiagnostic?: (message: string) => void; readonly defaultOrderBy?: IRecordComparator<TDomain>; /** Secondary projections are entity-owned and backend-neutral. */ readonly indexes?: TIndexes; };",
+          "signature": "export type IEntityOptions<TDomain, TStored = TDomain, TIndexes extends IEntityIndexDefinitions<TDomain> | undefined = undefined> = { readonly name: string; /** Names the domain object property used as its primary key. */ readonly key: Extract<keyof TDomain, string>; /** Defaults to `passthrough`, which returns values without validation. */ readonly schema?: ISchemaAdapter<TDomain, TStored>; /** * Applies on every backend through `selectCodec` using `store.capabilities` (see §7). Structured * backends do not bypass an explicitly configured codec. When omitted, IndexedDB and memory * default to `structuredCodec`, preserving objects through native structured cloning. * Key-value-only backends default to `jsonCodec`. */ readonly codec?: ICodec<unknown, unknown>; readonly version?: number; readonly migrations?: Record<number, IMigration>; /** * Defaults to `true` because persisted data survives version changes, making invalid reads more * common than invalid writes. */ readonly validateOnRead?: boolean; readonly onDiagnostic?: (message: string) => void; readonly defaultOrderBy?: IRecordComparator<TDomain>; /** Secondary projections are entity-owned and backend-neutral. */ readonly indexes?: TIndexes; };",
           "declarationLine": 51,
           "source": "packages/storage-web/dist/entity/types.d.ts",
           "purpose": "IEntityOptions is part of this module's public type contract.",
@@ -4367,7 +4367,7 @@
           "aliasOf": "IEntityOptions",
           "exportPath": "./entity",
           "overloadSignatures": [
-            "export type IEntityOptions<TDomain, TStored = TDomain, TIndexes extends IEntityIndexDefinitions<TDomain> | undefined = undefined> = { readonly name: string; /** 领域对象上作为主键的属性名。 */ readonly key: Extract<keyof TDomain, string>; /** 默认 passthrough：零校验直接透传。 */ readonly schema?: ISchemaAdapter<TDomain, TStored>; /** * 在所有后端上统一生效，经 selectCodec 按 store.capabilities 选路 （见 §7）——显式配置的 codec 不会被结构化后端绕过。未提供时按后端 * 类型选默认值：结构化后端（IndexedDB/memory）默认 structuredCodec （原样存对象，利用原生 structured clone）；KV-only 后端默认 * jsonCodec。 */ readonly codec?: ICodec<unknown, unknown>; readonly version?: number; readonly migrations?: Record<number, IMigration>; /** 默认 true：持久化数据会跨版本存活，读到脏数据比写入脏数据更常见。 */ readonly validateOnRead?: boolean; readonly onDiagnostic?: (message: string) => void; readonly defaultOrderBy?: IRecordComparator<TDomain>; /** Secondary projections are entity-owned and backend-neutral. */ readonly indexes?: TIndexes; };"
+            "export type IEntityOptions<TDomain, TStored = TDomain, TIndexes extends IEntityIndexDefinitions<TDomain> | undefined = undefined> = { readonly name: string; /** Names the domain object property used as its primary key. */ readonly key: Extract<keyof TDomain, string>; /** Defaults to `passthrough`, which returns values without validation. */ readonly schema?: ISchemaAdapter<TDomain, TStored>; /** * Applies on every backend through `selectCodec` using `store.capabilities` (see §7). Structured * backends do not bypass an explicitly configured codec. When omitted, IndexedDB and memory * default to `structuredCodec`, preserving objects through native structured cloning. * Key-value-only backends default to `jsonCodec`. */ readonly codec?: ICodec<unknown, unknown>; readonly version?: number; readonly migrations?: Record<number, IMigration>; /** * Defaults to `true` because persisted data survives version changes, making invalid reads more * common than invalid writes. */ readonly validateOnRead?: boolean; readonly onDiagnostic?: (message: string) => void; readonly defaultOrderBy?: IRecordComparator<TDomain>; /** Secondary projections are entity-owned and backend-neutral. */ readonly indexes?: TIndexes; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4406,7 +4406,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/entity/types.d.ts:IEntityOptions:export type IEntityOptions<TDomain, TStored = TDomain, TIndexes extends IEntityIndexDefinitions<TDomain> | undefined = undefined> = { readonly name: string; /** 领域对象上作为主键的属性名。 */ readonly key: Extract<keyof TDomain, string>; /** 默认 passthrough：零校验直接透传。 */ readonly schema?: ISchemaAdapter<TDomain, TStored>; /** * 在所有后端上统一生效，经 selectCodec 按 store.capabilities 选路 （见 §7）——显式配置的 codec 不会被结构化后端绕过。未提供时按后端 * 类型选默认值：结构化后端（IndexedDB/memory）默认 structuredCodec （原样存对象，利用原生 structured clone）；KV-only 后端默认 * jsonCodec。 */ readonly codec?: ICodec<unknown, unknown>; readonly version?: number; readonly migrations?: Record<number, IMigration>; /** 默认 true：持久化数据会跨版本存活，读到脏数据比写入脏数据更常见。 */ readonly validateOnRead?: boolean; readonly onDiagnostic?: (message: string) => void; readonly defaultOrderBy?: IRecordComparator<TDomain>; /** Secondary projections are entity-owned and backend-neutral. */ readonly indexes?: TIndexes; };",
+          "identity": "packages/storage-web/dist/entity/types.d.ts:IEntityOptions:export type IEntityOptions<TDomain, TStored = TDomain, TIndexes extends IEntityIndexDefinitions<TDomain> | undefined = undefined> = { readonly name: string; /** Names the domain object property used as its primary key. */ readonly key: Extract<keyof TDomain, string>; /** Defaults to `passthrough`, which returns values without validation. */ readonly schema?: ISchemaAdapter<TDomain, TStored>; /** * Applies on every backend through `selectCodec` using `store.capabilities` (see §7). Structured * backends do not bypass an explicitly configured codec. When omitted, IndexedDB and memory * default to `structuredCodec`, preserving objects through native structured cloning. * Key-value-only backends default to `jsonCodec`. */ readonly codec?: ICodec<unknown, unknown>; readonly version?: number; readonly migrations?: Record<number, IMigration>; /** * Defaults to `true` because persisted data survives version changes, making invalid reads more * common than invalid writes. */ readonly validateOnRead?: boolean; readonly onDiagnostic?: (message: string) => void; readonly defaultOrderBy?: IRecordComparator<TDomain>; /** Secondary projections are entity-owned and backend-neutral. */ readonly indexes?: TIndexes; };",
           "guidance": [],
           "usageScore": 16,
           "configuration": [],
@@ -4416,7 +4416,7 @@
           "name": "IEntityTransactionScope",
           "kind": "type",
           "signature": "export type IEntityTransactionScope<TDomain> = { get(id: IStorageKey): Promise<TDomain | undefined>; put(value: TDomain): Promise<IStorageKey>; remove(id: IStorageKey): Promise<void>; };",
-          "declarationLine": 111,
+          "declarationLine": 118,
           "source": "packages/storage-web/dist/entity/types.d.ts",
           "purpose": "IEntityTransactionScope is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEntityTransactionScope.",
@@ -4483,7 +4483,7 @@
           "name": "IIndexedListOptions",
           "kind": "type",
           "signature": "export type IIndexedListOptions<TRecord, TIndexes extends object> = { [TName in keyof TIndexes & string]: Omit<IListOptions<TRecord>, 'range' | 'index'> & { readonly index: TName; readonly range?: IKeyRange<TIndexes[TName] & IStorageKey>; }; }[keyof TIndexes & string];",
-          "declarationLine": 84,
+          "declarationLine": 91,
           "source": "packages/storage-web/dist/entity/types.d.ts",
           "purpose": "Indexed list options reuse the repository query pipeline with an exact index key range.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IIndexedListOptions.",
@@ -4547,7 +4547,7 @@
           "name": "IInvalidRecordAction",
           "kind": "type",
           "signature": "export type IInvalidRecordAction = IStorageInvalidRecordAction;",
-          "declarationLine": 90,
+          "declarationLine": 97,
           "source": "packages/storage-web/dist/entity/types.d.ts",
           "purpose": "IInvalidRecordAction is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IInvalidRecordAction.",
@@ -4609,7 +4609,7 @@
           "name": "IInvalidRecordHandler",
           "kind": "type",
           "signature": "export type IInvalidRecordHandler<TRecord = unknown> = (issue: IInvalidRecordIssue<TRecord>) => IInvalidRecordAction;",
-          "declarationLine": 98,
+          "declarationLine": 105,
           "source": "packages/storage-web/dist/entity/types.d.ts",
           "purpose": "IInvalidRecordHandler is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IInvalidRecordHandler.",
@@ -4673,7 +4673,7 @@
           "name": "IInvalidRecordIssue",
           "kind": "type",
           "signature": "export type IInvalidRecordIssue<TRecord = unknown> = { readonly key: IStorageKey; readonly raw: unknown; readonly record?: TRecord; readonly stage: IStorageRecordStage; readonly cause: unknown; };",
-          "declarationLine": 91,
+          "declarationLine": 98,
           "source": "packages/storage-web/dist/entity/types.d.ts",
           "purpose": "IInvalidRecordIssue is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IInvalidRecordIssue.",
@@ -4790,8 +4790,8 @@
         {
           "name": "IListOptions",
           "kind": "type",
-          "signature": "export type IListOptions<TRecord = unknown, TKey extends IStorageKey = IStorageKey> = { /** V2 record key 先隔离 entity；legacy 兼容记录在显式 migrate 前仍需全库扫描。 */ readonly range?: IKeyRange<TKey>; /** Indexed queries use IIndexedListOptions so their index key remains correlated. */ readonly index?: never; readonly limit?: number; readonly orderBy?: IRecordComparator<TRecord>; readonly direction?: 'next' | 'prev'; readonly onInvalid?: IInvalidRecordAction | IInvalidRecordHandler<TRecord>; };",
-          "declarationLine": 73,
+          "signature": "export type IListOptions<TRecord = unknown, TKey extends IStorageKey = IStorageKey> = { /** * V2 record keys isolate the entity first. Legacy records require a full-store scan until * explicit migration. */ readonly range?: IKeyRange<TKey>; /** Indexed queries use IIndexedListOptions so their index key remains correlated. */ readonly index?: never; readonly limit?: number; readonly orderBy?: IRecordComparator<TRecord>; readonly direction?: 'next' | 'prev'; readonly onInvalid?: IInvalidRecordAction | IInvalidRecordHandler<TRecord>; };",
+          "declarationLine": 77,
           "source": "packages/storage-web/dist/entity/types.d.ts",
           "purpose": "IListOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IListOptions.",
@@ -4809,7 +4809,7 @@
           "aliasOf": "IListOptions",
           "exportPath": "./entity",
           "overloadSignatures": [
-            "export type IListOptions<TRecord = unknown, TKey extends IStorageKey = IStorageKey> = { /** V2 record key 先隔离 entity；legacy 兼容记录在显式 migrate 前仍需全库扫描。 */ readonly range?: IKeyRange<TKey>; /** Indexed queries use IIndexedListOptions so their index key remains correlated. */ readonly index?: never; readonly limit?: number; readonly orderBy?: IRecordComparator<TRecord>; readonly direction?: 'next' | 'prev'; readonly onInvalid?: IInvalidRecordAction | IInvalidRecordHandler<TRecord>; };"
+            "export type IListOptions<TRecord = unknown, TKey extends IStorageKey = IStorageKey> = { /** * V2 record keys isolate the entity first. Legacy records require a full-store scan until * explicit migration. */ readonly range?: IKeyRange<TKey>; /** Indexed queries use IIndexedListOptions so their index key remains correlated. */ readonly index?: never; readonly limit?: number; readonly orderBy?: IRecordComparator<TRecord>; readonly direction?: 'next' | 'prev'; readonly onInvalid?: IInvalidRecordAction | IInvalidRecordHandler<TRecord>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4848,7 +4848,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/entity/types.d.ts:IListOptions:export type IListOptions<TRecord = unknown, TKey extends IStorageKey = IStorageKey> = { /** V2 record key 先隔离 entity；legacy 兼容记录在显式 migrate 前仍需全库扫描。 */ readonly range?: IKeyRange<TKey>; /** Indexed queries use IIndexedListOptions so their index key remains correlated. */ readonly index?: never; readonly limit?: number; readonly orderBy?: IRecordComparator<TRecord>; readonly direction?: 'next' | 'prev'; readonly onInvalid?: IInvalidRecordAction | IInvalidRecordHandler<TRecord>; };",
+          "identity": "packages/storage-web/dist/entity/types.d.ts:IListOptions:export type IListOptions<TRecord = unknown, TKey extends IStorageKey = IStorageKey> = { /** * V2 record keys isolate the entity first. Legacy records require a full-store scan until * explicit migration. */ readonly range?: IKeyRange<TKey>; /** Indexed queries use IIndexedListOptions so their index key remains correlated. */ readonly index?: never; readonly limit?: number; readonly orderBy?: IRecordComparator<TRecord>; readonly direction?: 'next' | 'prev'; readonly onInvalid?: IInvalidRecordAction | IInvalidRecordHandler<TRecord>; };",
           "guidance": [
             {
               "id": "list-options-ctx-stream-options-ctx",
@@ -4881,7 +4881,7 @@
           "name": "IMigrateOptions",
           "kind": "type",
           "signature": "export type IMigrateOptions<TRecord = unknown> = { readonly batchSize?: number; readonly onInvalid?: IInvalidRecordAction | IInvalidRecordHandler<TRecord>; };",
-          "declarationLine": 99,
+          "declarationLine": 106,
           "source": "packages/storage-web/dist/entity/types.d.ts",
           "purpose": "IMigrateOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMigrateOptions.",
@@ -4977,7 +4977,7 @@
           "name": "IMigrateResult",
           "kind": "type",
           "signature": "export type IMigrateResult = { readonly scanned: number; readonly eligible: number; readonly migrated: number; readonly skipped: number; readonly alreadyCurrent: number; readonly conflicted: number; };",
-          "declarationLine": 103,
+          "declarationLine": 110,
           "source": "packages/storage-web/dist/entity/types.d.ts",
           "purpose": "IMigrateResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMigrateResult.",
@@ -5073,7 +5073,7 @@
           "name": "IRecordComparator",
           "kind": "type",
           "signature": "export type IRecordComparator<TRecord> = (left: TRecord, right: TRecord) => number;",
-          "declarationLine": 72,
+          "declarationLine": 76,
           "source": "packages/storage-web/dist/entity/types.d.ts",
           "purpose": "IRecordComparator is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRecordComparator.",
@@ -5136,8 +5136,8 @@
         {
           "name": "IRepository",
           "kind": "type",
-          "signature": "export type IRepository<TDomain, TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>> = { get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>; put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>; remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>; /** V2 结构化记录按 entity 物理前缀扫描并用共享 comparator 过滤；legacy 兼容记录会暂时走全库扫描。 */ list(options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>, ctx?: IOperationContext): Promise<TDomain[]>; stream(options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>; findBy<TName extends keyof TIndexes & string>(index: TName, key: TIndexes[TName], ctx?: IOperationContext): Promise<TDomain | undefined>; findManyBy<TName extends keyof TIndexes & string>(index: TName, range?: IKeyRange<TIndexes[TName]>, options?: Omit<IListOptions<TDomain>, 'range'>, ctx?: IOperationContext): Promise<TDomain[]>; streamBy<TName extends keyof TIndexes & string>(index: TName, range?: IKeyRange<TIndexes[TName]>, options?: Omit<IListOptions<TDomain>, 'range'>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>; migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>; /** 仅结构化后端支持（有真正的事务回滚）；KV-only 后端抛 UNSUPPORTED_CAPABILITY。 */ batch<T>(run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };",
-          "declarationLine": 116,
+          "signature": "export type IRepository<TDomain, TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>> = { get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>; put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>; remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>; /** * Scans V2 structured records by their physical entity prefix and filters with the shared * comparator. Legacy records temporarily require a full-store scan. */ list(options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>, ctx?: IOperationContext): Promise<TDomain[]>; stream(options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>; findBy<TName extends keyof TIndexes & string>(index: TName, key: TIndexes[TName], ctx?: IOperationContext): Promise<TDomain | undefined>; findManyBy<TName extends keyof TIndexes & string>(index: TName, range?: IKeyRange<TIndexes[TName]>, options?: Omit<IListOptions<TDomain>, 'range'>, ctx?: IOperationContext): Promise<TDomain[]>; streamBy<TName extends keyof TIndexes & string>(index: TName, range?: IKeyRange<TIndexes[TName]>, options?: Omit<IListOptions<TDomain>, 'range'>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>; migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>; /** * Requires a structured backend with transaction rollback. Key-value-only backends throw * `UNSUPPORTED_CAPABILITY`. */ batch<T>(run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };",
+          "declarationLine": 123,
           "source": "packages/storage-web/dist/entity/types.d.ts",
           "purpose": "IRepository is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRepository.",
@@ -5155,7 +5155,7 @@
           "aliasOf": "IRepository",
           "exportPath": "./entity",
           "overloadSignatures": [
-            "export type IRepository<TDomain, TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>> = { get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>; put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>; remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>; /** V2 结构化记录按 entity 物理前缀扫描并用共享 comparator 过滤；legacy 兼容记录会暂时走全库扫描。 */ list(options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>, ctx?: IOperationContext): Promise<TDomain[]>; stream(options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>; findBy<TName extends keyof TIndexes & string>(index: TName, key: TIndexes[TName], ctx?: IOperationContext): Promise<TDomain | undefined>; findManyBy<TName extends keyof TIndexes & string>(index: TName, range?: IKeyRange<TIndexes[TName]>, options?: Omit<IListOptions<TDomain>, 'range'>, ctx?: IOperationContext): Promise<TDomain[]>; streamBy<TName extends keyof TIndexes & string>(index: TName, range?: IKeyRange<TIndexes[TName]>, options?: Omit<IListOptions<TDomain>, 'range'>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>; migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>; /** 仅结构化后端支持（有真正的事务回滚）；KV-only 后端抛 UNSUPPORTED_CAPABILITY。 */ batch<T>(run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };"
+            "export type IRepository<TDomain, TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>> = { get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>; put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>; remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>; /** * Scans V2 structured records by their physical entity prefix and filters with the shared * comparator. Legacy records temporarily require a full-store scan. */ list(options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>, ctx?: IOperationContext): Promise<TDomain[]>; stream(options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>; findBy<TName extends keyof TIndexes & string>(index: TName, key: TIndexes[TName], ctx?: IOperationContext): Promise<TDomain | undefined>; findManyBy<TName extends keyof TIndexes & string>(index: TName, range?: IKeyRange<TIndexes[TName]>, options?: Omit<IListOptions<TDomain>, 'range'>, ctx?: IOperationContext): Promise<TDomain[]>; streamBy<TName extends keyof TIndexes & string>(index: TName, range?: IKeyRange<TIndexes[TName]>, options?: Omit<IListOptions<TDomain>, 'range'>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>; migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>; /** * Requires a structured backend with transaction rollback. Key-value-only backends throw * `UNSUPPORTED_CAPABILITY`. */ batch<T>(run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5194,7 +5194,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/entity/types.d.ts:IRepository:export type IRepository<TDomain, TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>> = { get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>; put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>; remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>; /** V2 结构化记录按 entity 物理前缀扫描并用共享 comparator 过滤；legacy 兼容记录会暂时走全库扫描。 */ list(options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>, ctx?: IOperationContext): Promise<TDomain[]>; stream(options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>; findBy<TName extends keyof TIndexes & string>(index: TName, key: TIndexes[TName], ctx?: IOperationContext): Promise<TDomain | undefined>; findManyBy<TName extends keyof TIndexes & string>(index: TName, range?: IKeyRange<TIndexes[TName]>, options?: Omit<IListOptions<TDomain>, 'range'>, ctx?: IOperationContext): Promise<TDomain[]>; streamBy<TName extends keyof TIndexes & string>(index: TName, range?: IKeyRange<TIndexes[TName]>, options?: Omit<IListOptions<TDomain>, 'range'>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>; migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>; /** 仅结构化后端支持（有真正的事务回滚）；KV-only 后端抛 UNSUPPORTED_CAPABILITY。 */ batch<T>(run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };",
+          "identity": "packages/storage-web/dist/entity/types.d.ts:IRepository:export type IRepository<TDomain, TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>> = { get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>; put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>; remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>; /** * Scans V2 structured records by their physical entity prefix and filters with the shared * comparator. Legacy records temporarily require a full-store scan. */ list(options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>, ctx?: IOperationContext): Promise<TDomain[]>; stream(options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>; findBy<TName extends keyof TIndexes & string>(index: TName, key: TIndexes[TName], ctx?: IOperationContext): Promise<TDomain | undefined>; findManyBy<TName extends keyof TIndexes & string>(index: TName, range?: IKeyRange<TIndexes[TName]>, options?: Omit<IListOptions<TDomain>, 'range'>, ctx?: IOperationContext): Promise<TDomain[]>; streamBy<TName extends keyof TIndexes & string>(index: TName, range?: IKeyRange<TIndexes[TName]>, options?: Omit<IListOptions<TDomain>, 'range'>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>; migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>; /** * Requires a structured backend with transaction rollback. Key-value-only backends throw * `UNSUPPORTED_CAPABILITY`. */ batch<T>(run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>, ctx?: IOperationContext): Promise<T>; };",
           "guidance": [],
           "usageScore": 34,
           "configuration": [],
@@ -5730,7 +5730,7 @@
         {
           "name": "ILiveQueryStateView",
           "kind": "type",
-          "signature": "export type ILiveQueryStateView<T> = Pick<IComputedValue<ILiveQueryState<T>>, 'runtime' | 'debugName' | 'observed' | 'value' | 'peek'>;",
+          "signature": "export type ILiveQueryStateView<T> = Pick<IReactiveComputed<ILiveQueryState<T>>, 'runtime' | 'debugName' | 'observed' | 'value' | 'peek'>;",
           "declarationLine": 136,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Non-disposable read-only projection of the same-runtime computed state node.",
@@ -5745,7 +5745,7 @@
           "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type ILiveQueryStateView<T> = Pick<IComputedValue<ILiveQueryState<T>>, 'runtime' | 'debugName' | 'observed' | 'value' | 'peek'>;"
+            "export type ILiveQueryStateView<T> = Pick<IReactiveComputed<ILiveQueryState<T>>, 'runtime' | 'debugName' | 'observed' | 'value' | 'peek'>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5784,7 +5784,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/host/types.d.ts:ILiveQueryStateView:export type ILiveQueryStateView<T> = Pick<IComputedValue<ILiveQueryState<T>>, 'runtime' | 'debugName' | 'observed' | 'value' | 'peek'>;",
+          "identity": "packages/storage-web/dist/host/types.d.ts:ILiveQueryStateView:export type ILiveQueryStateView<T> = Pick<IReactiveComputed<ILiveQueryState<T>>, 'runtime' | 'debugName' | 'observed' | 'value' | 'peek'>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -7758,7 +7758,7 @@
         {
           "name": "IIndexedDbOptions",
           "kind": "type",
-          "signature": "export type IIndexedDbOptions = { readonly dbName?: string; readonly kvStoreName?: string; readonly bytesStoreName?: string; readonly recordsStoreName?: string; /** Explicit release-time opt-in to delete the legacy `documents` object store after migration. */ readonly cleanupLegacyRecords?: boolean; /** 注入点：测试环境（jsdom 没有 IndexedDB）与非浏览器环境用。 */ readonly factory?: IDBFactory; /** * 注入点：`IDBKeyRange` 构造器。jsdom 完全不提供 IndexedDB，测试环境下 必须和 `factory` 一起从 fake-indexeddb * 显式传入；真实浏览器默认取 `globalThis.IDBKeyRange`。 */ readonly keyRange?: typeof IDBKeyRange; };",
+          "signature": "export type IIndexedDbOptions = { readonly dbName?: string; readonly kvStoreName?: string; readonly bytesStoreName?: string; readonly recordsStoreName?: string; /** Explicit release-time opt-in to delete the legacy `documents` object store after migration. */ readonly cleanupLegacyRecords?: boolean; /** * Injects an IndexedDB factory for tests and non-browser environments. jsdom does not provide * IndexedDB. */ readonly factory?: IDBFactory; /** * Injects the `IDBKeyRange` constructor. Since jsdom does not provide IndexedDB, tests supply it * explicitly with `factory` from fake-indexeddb. Browsers default to `globalThis.IDBKeyRange`. */ readonly keyRange?: typeof IDBKeyRange; };",
           "declarationLine": 4,
           "source": "packages/storage-web/dist/backends/indexed-db.d.ts",
           "purpose": "IIndexedDbOptions is part of this module's public type contract.",
@@ -7776,7 +7776,7 @@
           "aliasOf": "IIndexedDbOptions",
           "exportPath": "./indexed-db",
           "overloadSignatures": [
-            "export type IIndexedDbOptions = { readonly dbName?: string; readonly kvStoreName?: string; readonly bytesStoreName?: string; readonly recordsStoreName?: string; /** Explicit release-time opt-in to delete the legacy `documents` object store after migration. */ readonly cleanupLegacyRecords?: boolean; /** 注入点：测试环境（jsdom 没有 IndexedDB）与非浏览器环境用。 */ readonly factory?: IDBFactory; /** * 注入点：`IDBKeyRange` 构造器。jsdom 完全不提供 IndexedDB，测试环境下 必须和 `factory` 一起从 fake-indexeddb * 显式传入；真实浏览器默认取 `globalThis.IDBKeyRange`。 */ readonly keyRange?: typeof IDBKeyRange; };"
+            "export type IIndexedDbOptions = { readonly dbName?: string; readonly kvStoreName?: string; readonly bytesStoreName?: string; readonly recordsStoreName?: string; /** Explicit release-time opt-in to delete the legacy `documents` object store after migration. */ readonly cleanupLegacyRecords?: boolean; /** * Injects an IndexedDB factory for tests and non-browser environments. jsdom does not provide * IndexedDB. */ readonly factory?: IDBFactory; /** * Injects the `IDBKeyRange` constructor. Since jsdom does not provide IndexedDB, tests supply it * explicitly with `factory` from fake-indexeddb. Browsers default to `globalThis.IDBKeyRange`. */ readonly keyRange?: typeof IDBKeyRange; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7815,7 +7815,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/backends/indexed-db.d.ts:IIndexedDbOptions:export type IIndexedDbOptions = { readonly dbName?: string; readonly kvStoreName?: string; readonly bytesStoreName?: string; readonly recordsStoreName?: string; /** Explicit release-time opt-in to delete the legacy `documents` object store after migration. */ readonly cleanupLegacyRecords?: boolean; /** 注入点：测试环境（jsdom 没有 IndexedDB）与非浏览器环境用。 */ readonly factory?: IDBFactory; /** * 注入点：`IDBKeyRange` 构造器。jsdom 完全不提供 IndexedDB，测试环境下 必须和 `factory` 一起从 fake-indexeddb * 显式传入；真实浏览器默认取 `globalThis.IDBKeyRange`。 */ readonly keyRange?: typeof IDBKeyRange; };",
+          "identity": "packages/storage-web/dist/backends/indexed-db.d.ts:IIndexedDbOptions:export type IIndexedDbOptions = { readonly dbName?: string; readonly kvStoreName?: string; readonly bytesStoreName?: string; readonly recordsStoreName?: string; /** Explicit release-time opt-in to delete the legacy `documents` object store after migration. */ readonly cleanupLegacyRecords?: boolean; /** * Injects an IndexedDB factory for tests and non-browser environments. jsdom does not provide * IndexedDB. */ readonly factory?: IDBFactory; /** * Injects the `IDBKeyRange` constructor. Since jsdom does not provide IndexedDB, tests supply it * explicitly with `factory` from fake-indexeddb. Browsers default to `globalThis.IDBKeyRange`. */ readonly keyRange?: typeof IDBKeyRange; };",
           "guidance": [],
           "usageScore": 16,
           "configuration": [],
@@ -7825,9 +7825,9 @@
           "name": "indexedDbHost",
           "kind": "const",
           "signature": "export declare const indexedDbHost: <TValue = unknown>(options?: IIndexedDbOptions) => IRecordStore<TValue> & ISecondaryIndexRecordStore<TValue> & IChangeFeedStore;",
-          "declarationLine": 24,
+          "declarationLine": 28,
           "source": "packages/storage-web/dist/backends/indexed-db.d.ts",
-          "purpose": "IndexedDB 后端：唯一原样存字节、支持索引与事务的浏览器存储。 连接管理、写入-等-commit、onblocked/onversionchange 处理，都是从早期 实现直接搬运的已验证坑位处理，未改动核心逻辑，详见各处注释。",
+          "purpose": "Provides the IndexedDB backend, the browser storage backend that stores bytes directly and supports indexes and transactions. Carries forward the previously verified connection management, commit-based write completion, and `onblocked`/`onversionchange` handling from the earlier implementation without changing their core logic. See the comments at each handling site.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for indexedDbHost.",
           "advanced": "No additional advanced behavior is declared for indexedDbHost.",
           "parameters": ["This const declaration has no parameters."],
@@ -7866,7 +7866,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IndexedDB 后端：唯一原样存字节、支持索引与事务的浏览器存储。 连接管理、写入-等-commit、onblocked/onversionchange 处理，都是从早期 实现直接搬运的已验证坑位处理，未改动核心逻辑，详见各处注释。"
+              "content": "Provides the IndexedDB backend, the browser storage backend that stores bytes directly and supports indexes and transactions. Carries forward the previously verified connection management, commit-based write completion, and `onblocked`/`onversionchange` handling from the earlier implementation without changing their core logic. See the comments at each handling site."
             },
             {
               "id": "getting-started",
@@ -7929,13 +7929,13 @@
               "name": "factory",
               "type": "IDBFactory",
               "optional": true,
-              "description": "注入点：测试环境（jsdom 没有 IndexedDB）与非浏览器环境用。"
+              "description": "Injects an IndexedDB factory for tests and non-browser environments. jsdom does not provide * IndexedDB."
             },
             {
               "name": "keyRange",
               "type": "typeof IDBKeyRange",
               "optional": true,
-              "description": "注入点：`IDBKeyRange` 构造器。jsdom 完全不提供 IndexedDB，测试环境下 必须和 `factory` 一起从 fake-indexeddb * 显式传入；真实浏览器默认取 `globalThis.IDBKeyRange`。"
+              "description": "Injects the `IDBKeyRange` constructor. Since jsdom does not provide IndexedDB, tests supply it * explicitly with `factory` from fake-indexeddb. Browsers default to `globalThis.IDBKeyRange`."
             }
           ],
           "identity": "packages/storage-web/dist/backends/indexed-db.d.ts:indexedDbHost:export declare const indexedDbHost: <TValue = unknown>(options?: IIndexedDbOptions) => IRecordStore<TValue> & ISecondaryIndexRecordStore<TValue> & IChangeFeedStore;",
@@ -7987,7 +7987,7 @@
               "type": "IDBFactory",
               "optional": true,
               "description": "`factory?: IDBFactory` —— 测试/非浏览器环境注入点；默认 `globalThis.indexedDB`，缺失抛 `BACKEND_UNAVAILABLE`。",
-              "descriptionEn": "",
+              "descriptionEn": "Injects an IndexedDB factory for tests and non-browser environments. jsdom does not provide * IndexedDB.",
               "descriptionZh": "`factory?: IDBFactory` —— 测试/非浏览器环境注入点；默认 `globalThis.indexedDB`，缺失抛 `BACKEND_UNAVAILABLE`。"
             },
             {
@@ -7995,7 +7995,7 @@
               "type": "typeof IDBKeyRange",
               "optional": true,
               "description": "`keyRange?: typeof IDBKeyRange` —— 测试环境（jsdom 无原生 IndexedDB）须与 `factory` 一起从 `fake-indexeddb` 显式传入；默认 `globalThis.IDBKeyRange`。",
-              "descriptionEn": "",
+              "descriptionEn": "Injects the `IDBKeyRange` constructor. Since jsdom does not provide IndexedDB, tests supply it * explicitly with `factory` from fake-indexeddb. Browsers default to `globalThis.IDBKeyRange`.",
               "descriptionZh": "`keyRange?: typeof IDBKeyRange` —— 测试环境（jsdom 无原生 IndexedDB）须与 `factory` 一起从 `fake-indexeddb` 显式传入；默认 `globalThis.IDBKeyRange`。"
             }
           ],
@@ -8023,7 +8023,7 @@
         {
           "name": "ILocalStorageOptions",
           "kind": "type",
-          "signature": "export type ILocalStorageOptions = IWebStorageOptions & { /** 注入点：测试环境与非浏览器环境用。默认为 globalThis.localStorage。 */ readonly storage?: IWebStorageLike; };",
+          "signature": "export type ILocalStorageOptions = IWebStorageOptions & { /** Injects storage for tests and non-browser environments. Defaults to `globalThis.localStorage`. */ readonly storage?: IWebStorageLike; };",
           "declarationLine": 3,
           "source": "packages/storage-web/dist/backends/local-storage.d.ts",
           "purpose": "ILocalStorageOptions is part of this module's public type contract.",
@@ -8041,7 +8041,7 @@
           "aliasOf": "ILocalStorageOptions",
           "exportPath": "./local-storage",
           "overloadSignatures": [
-            "export type ILocalStorageOptions = IWebStorageOptions & { /** 注入点：测试环境与非浏览器环境用。默认为 globalThis.localStorage。 */ readonly storage?: IWebStorageLike; };"
+            "export type ILocalStorageOptions = IWebStorageOptions & { /** Injects storage for tests and non-browser environments. Defaults to `globalThis.localStorage`. */ readonly storage?: IWebStorageLike; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8080,7 +8080,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/backends/local-storage.d.ts:ILocalStorageOptions:export type ILocalStorageOptions = IWebStorageOptions & { /** 注入点：测试环境与非浏览器环境用。默认为 globalThis.localStorage。 */ readonly storage?: IWebStorageLike; };",
+          "identity": "packages/storage-web/dist/backends/local-storage.d.ts:ILocalStorageOptions:export type ILocalStorageOptions = IWebStorageOptions & { /** Injects storage for tests and non-browser environments. Defaults to `globalThis.localStorage`. */ readonly storage?: IWebStorageLike; };",
           "guidance": [],
           "usageScore": 16,
           "configuration": [],
@@ -8156,7 +8156,7 @@
               "name": "storage",
               "type": "IWebStorageLike",
               "optional": true,
-              "description": "注入点：测试环境与非浏览器环境用。默认为 globalThis.localStorage。"
+              "description": "Injects storage for tests and non-browser environments. Defaults to `globalThis.localStorage`."
             }
           ],
           "identity": "packages/storage-web/dist/backends/local-storage.d.ts:localStorageHost:export declare const localStorageHost: (options?: ILocalStorageOptions) => ISyncCapableStore<IKeyValueStore>;",
@@ -8458,7 +8458,7 @@
               "type": "IWebStorageLike",
               "optional": true,
               "description": "源码：`src/backends/local-storage.ts`、`src/backends/session-storage.ts`、`src/backends/web-storage.ts`。两者共享同一个 `createWebStorageBackend` 实现，仅注入不同的宿主 `Storage` 对象。",
-              "descriptionEn": "`plugins/local-storage` — `localStorageBackendPlugin` — `local`",
+              "descriptionEn": "Injects storage for tests and non-browser environments. Defaults to `globalThis.localStorage`.",
               "descriptionZh": "源码：`src/backends/local-storage.ts`、`src/backends/session-storage.ts`、`src/backends/web-storage.ts`。两者共享同一个 `createWebStorageBackend` 实现，仅注入不同的宿主 `Storage` 对象。"
             }
           ],
@@ -8487,9 +8487,9 @@
           "name": "memoryStorageHost",
           "kind": "const",
           "signature": "export declare const memoryStorageHost: <TValue = unknown>() => ISyncCapableStore<IRecordStore<TValue>> & IChangeFeedStore;",
-          "declarationLine": 7,
+          "declarationLine": 9,
           "source": "packages/storage-web/dist/backends/memory.d.ts",
-          "purpose": "纯内存实现。用于测试、SSR 服务端、以及其他后端不可用时的显式降级目标。 每个实例持有独立存储，天然隔离，不需要命名空间参数。 实现全部 L0 + L1 接口（record 使用 structured clone），v1 不提供原生二级索引。",
+          "purpose": "Provides an in-memory backend for tests, server-side SSR, and explicit fallback when other backends are unavailable. Each instance owns isolated storage and needs no namespace. Supplies all L0 and L1 operations, with structured cloning for records. The v1 backend does not supply native secondary indexes.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for memoryStorageHost.",
           "advanced": "No additional advanced behavior is declared for memoryStorageHost.",
           "parameters": ["This const declaration has no parameters."],
@@ -8521,7 +8521,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "纯内存实现。用于测试、SSR 服务端、以及其他后端不可用时的显式降级目标。 每个实例持有独立存储，天然隔离，不需要命名空间参数。 实现全部 L0 + L1 接口（record 使用 structured clone），v1 不提供原生二级索引。"
+              "content": "Provides an in-memory backend for tests, server-side SSR, and explicit fallback when other backends are unavailable. Each instance owns isolated storage and needs no namespace. Supplies all L0 and L1 operations, with structured cloning for records. The v1 backend does not supply native secondary indexes."
             },
             {
               "id": "getting-started",
@@ -8665,25 +8665,25 @@
               "name": "namespace",
               "type": "string",
               "optional": true,
-              "description": "命名空间前缀，避免多实例/多应用互相踩踏。默认为 'default'。"
+              "description": "Prefixes keys to isolate instances and applications. Defaults to `default`."
             },
             {
               "name": "namespaceCodec",
               "type": "INamespaceCodec",
               "optional": true,
-              "description": "高级物理键编码扩展点；改变 codec 即改变 cookie 持久化格式。"
+              "description": "Customizes physical key encoding. Changing the codec changes the cookie persistence format."
             },
             {
               "name": "scope",
               "type": "ICookieScope",
               "optional": true,
-              "description": "固定 cookie scope；写入与删除始终使用同一 scope。"
+              "description": "Fixes the cookie scope. Writes and deletions always use the same scope."
             },
             {
               "name": "document",
               "type": "ICookieDocument",
               "optional": true,
-              "description": "注入点：测试环境用。默认为 globalThis.document。"
+              "description": "Injects a document for testing. Defaults to `globalThis.document`."
             }
           ],
           "identity": "packages/storage-web/dist/plugins/cookies.d.ts:cookieBackendPlugin:export declare const cookieBackendPlugin: <const TId extends string = \"cookies\">(options?: ICookiesOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId>;",
@@ -8694,33 +8694,33 @@
               "name": "namespace",
               "type": "string",
               "optional": true,
-              "description": "命名空间前缀，避免多实例/多应用互相踩踏。默认为 'default'。",
-              "descriptionEn": "",
-              "descriptionZh": "命名空间前缀，避免多实例/多应用互相踩踏。默认为 'default'。"
+              "description": "Prefixes keys to isolate instances and applications. Defaults to `default`.",
+              "descriptionEn": "Prefixes keys to isolate instances and applications. Defaults to `default`.",
+              "descriptionZh": "`namespace?: string` —— 默认 `'default'`；同 Web Storage。"
             },
             {
               "name": "namespaceCodec",
               "type": "INamespaceCodec",
               "optional": true,
-              "description": "高级物理键编码扩展点；改变 codec 即改变 cookie 持久化格式。",
-              "descriptionEn": "",
-              "descriptionZh": "高级物理键编码扩展点；改变 codec 即改变 cookie 持久化格式。"
+              "description": "Customizes physical key encoding. Changing the codec changes the cookie persistence format.",
+              "descriptionEn": "Customizes physical key encoding. Changing the codec changes the cookie persistence format.",
+              "descriptionZh": "默认物理 key 编码器（`localStorageHost`/`sessionStorageHost`/`cookiesHost` 的 `namespaceCodec` 默认值）。编码格式：`sw1:<命名空间 UTF-8 字节长度>:<encodeURIComponent(命名空间)>:<key>`——长度前缀 + 编码后的命名空间共同防止“命名空间 A 的 key 恰好是命名空间 B 前缀”这种碰撞。`decode` 只在物理 key 精确匹配该命名空间时返回原始逻辑 key，否则返回 `undefined`（不属于该命名空间，调用方应跳过而非报错）。"
             },
             {
               "name": "scope",
               "type": "ICookieScope",
               "optional": true,
-              "description": "固定 cookie scope；写入与删除始终使用同一 scope。",
-              "descriptionEn": "",
-              "descriptionZh": "固定 cookie scope；写入与删除始终使用同一 scope。"
+              "description": "Fixes the cookie scope. Writes and deletions always use the same scope.",
+              "descriptionEn": "Fixes the cookie scope. Writes and deletions always use the same scope.",
+              "descriptionZh": "`scope` 和 `matches(change)` 只做安全失效过滤；无法证明无关的 change 会保守 refresh。"
             },
             {
               "name": "document",
               "type": "ICookieDocument",
               "optional": true,
-              "description": "注入点：测试环境用。默认为 globalThis.document。",
-              "descriptionEn": "",
-              "descriptionZh": "注入点：测试环境用。默认为 globalThis.document。"
+              "description": "Injects a document for testing. Defaults to `globalThis.document`.",
+              "descriptionEn": "Injects a document for testing. Defaults to `globalThis.document`.",
+              "descriptionZh": "源码：`src/backends/cookie.ts`。基于 `document.cookie` 的读写封装，不处理服务端 cookie（SSR 场景由调用方在服务端自行解析 `req.headers.cookie` 后注入 `memoryStorageHost`）。"
             }
           ],
           "fragment": "storage-web-plugins/cookies--cookieBackendPlugin"
@@ -8837,13 +8837,13 @@
               "name": "factory",
               "type": "IDBFactory",
               "optional": true,
-              "description": "注入点：测试环境（jsdom 没有 IndexedDB）与非浏览器环境用。"
+              "description": "Injects an IndexedDB factory for tests and non-browser environments. jsdom does not provide * IndexedDB."
             },
             {
               "name": "keyRange",
               "type": "typeof IDBKeyRange",
               "optional": true,
-              "description": "注入点：`IDBKeyRange` 构造器。jsdom 完全不提供 IndexedDB，测试环境下 必须和 `factory` 一起从 fake-indexeddb * 显式传入；真实浏览器默认取 `globalThis.IDBKeyRange`。"
+              "description": "Injects the `IDBKeyRange` constructor. Since jsdom does not provide IndexedDB, tests supply it * explicitly with `factory` from fake-indexeddb. Browsers default to `globalThis.IDBKeyRange`."
             }
           ],
           "identity": "packages/storage-web/dist/plugins/indexed-db.d.ts:indexedDbBackendPlugin:export declare const indexedDbBackendPlugin: <const TId extends string = \"indexed-db\">(options?: IIndexedDbOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId>;",
@@ -8894,17 +8894,17 @@
               "name": "factory",
               "type": "IDBFactory",
               "optional": true,
-              "description": "注入点：测试环境（jsdom 没有 IndexedDB）与非浏览器环境用。",
-              "descriptionEn": "",
-              "descriptionZh": "注入点：测试环境（jsdom 没有 IndexedDB）与非浏览器环境用。"
+              "description": "Injects an IndexedDB factory for tests and non-browser environments. jsdom does not provide * IndexedDB.",
+              "descriptionEn": "Injects an IndexedDB factory for tests and non-browser environments. jsdom does not provide * IndexedDB.",
+              "descriptionZh": "`factory?: IDBFactory` —— 测试/非浏览器环境注入点；默认 `globalThis.indexedDB`，缺失抛 `BACKEND_UNAVAILABLE`。"
             },
             {
               "name": "keyRange",
               "type": "typeof IDBKeyRange",
               "optional": true,
-              "description": "注入点：`IDBKeyRange` 构造器。jsdom 完全不提供 IndexedDB，测试环境下 必须和 `factory` 一起从 fake-indexeddb * 显式传入；真实浏览器默认取 `globalThis.IDBKeyRange`。",
-              "descriptionEn": "",
-              "descriptionZh": "注入点：`IDBKeyRange` 构造器。jsdom 完全不提供 IndexedDB，测试环境下 必须和 `factory` 一起从 fake-indexeddb * 显式传入；真实浏览器默认取 `globalThis.IDBKeyRange`。"
+              "description": "Injects the `IDBKeyRange` constructor. Since jsdom does not provide IndexedDB, tests supply it * explicitly with `factory` from fake-indexeddb. Browsers default to `globalThis.IDBKeyRange`.",
+              "descriptionEn": "Injects the `IDBKeyRange` constructor. Since jsdom does not provide IndexedDB, tests supply it * explicitly with `factory` from fake-indexeddb. Browsers default to `globalThis.IDBKeyRange`.",
+              "descriptionZh": "`keyRange?: typeof IDBKeyRange` —— 测试环境（jsdom 无原生 IndexedDB）须与 `factory` 一起从 `fake-indexeddb` 显式传入；默认 `globalThis.IDBKeyRange`。"
             }
           ],
           "fragment": "storage-web-plugins/indexed-db--indexedDbBackendPlugin"
@@ -9052,7 +9052,7 @@
               "name": "storage",
               "type": "IWebStorageLike",
               "optional": true,
-              "description": "注入点：测试环境与非浏览器环境用。默认为 globalThis.localStorage。"
+              "description": "Injects storage for tests and non-browser environments. Defaults to `globalThis.localStorage`."
             }
           ],
           "identity": "packages/storage-web/dist/plugins/local-storage.d.ts:localStorageBackendPlugin:export declare const localStorageBackendPlugin: <const TId extends string = \"local\">(options?: ILocalStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId>;",
@@ -9065,7 +9065,7 @@
               "optional": true,
               "description": "`plugins/local-storage` — `localStorageBackendPlugin` — `local`",
               "descriptionEn": "`plugins/local-storage` — `localStorageBackendPlugin` — `local`",
-              "descriptionZh": "注入点：测试环境与非浏览器环境用。默认为 globalThis.localStorage。"
+              "descriptionZh": ""
             }
           ],
           "fragment": "storage-web-plugins/local-storage--localStorageBackendPlugin"
@@ -9305,25 +9305,25 @@
               "name": "namespace",
               "type": "string",
               "optional": true,
-              "description": "命名空间前缀，避免多实例/多应用互相踩踏。默认为 'default'。"
+              "description": "Prefixes keys to isolate instances and applications. Defaults to `default`."
             },
             {
               "name": "namespaceCodec",
               "type": "INamespaceCodec",
               "optional": true,
-              "description": "高级物理键编码扩展点；改变 codec 即改变 cookie 持久化格式。"
+              "description": "Customizes physical key encoding. Changing the codec changes the cookie persistence format."
             },
             {
               "name": "scope",
               "type": "ICookieScope",
               "optional": true,
-              "description": "固定 cookie scope；写入与删除始终使用同一 scope。"
+              "description": "Fixes the cookie scope. Writes and deletions always use the same scope."
             },
             {
               "name": "document",
               "type": "ICookieDocument",
               "optional": true,
-              "description": "注入点：测试环境用。默认为 globalThis.document。"
+              "description": "Injects a document for testing. Defaults to `globalThis.document`."
             }
           ],
           "identity": "packages/storage-web/dist/plugins/reactive/cookies.d.ts:cookiesReactive:export declare const cookiesReactive: <const TId extends string = \"cookies\">(options?: ICookiesOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId, true>;",
@@ -9334,33 +9334,33 @@
               "name": "namespace",
               "type": "string",
               "optional": true,
-              "description": "命名空间前缀，避免多实例/多应用互相踩踏。默认为 'default'。",
-              "descriptionEn": "",
-              "descriptionZh": "命名空间前缀，避免多实例/多应用互相踩踏。默认为 'default'。"
+              "description": "Prefixes keys to isolate instances and applications. Defaults to `default`.",
+              "descriptionEn": "Prefixes keys to isolate instances and applications. Defaults to `default`.",
+              "descriptionZh": "`namespace?: string` —— 默认 `'default'`；同 Web Storage。"
             },
             {
               "name": "namespaceCodec",
               "type": "INamespaceCodec",
               "optional": true,
-              "description": "高级物理键编码扩展点；改变 codec 即改变 cookie 持久化格式。",
-              "descriptionEn": "",
-              "descriptionZh": "高级物理键编码扩展点；改变 codec 即改变 cookie 持久化格式。"
+              "description": "Customizes physical key encoding. Changing the codec changes the cookie persistence format.",
+              "descriptionEn": "Customizes physical key encoding. Changing the codec changes the cookie persistence format.",
+              "descriptionZh": "默认物理 key 编码器（`localStorageHost`/`sessionStorageHost`/`cookiesHost` 的 `namespaceCodec` 默认值）。编码格式：`sw1:<命名空间 UTF-8 字节长度>:<encodeURIComponent(命名空间)>:<key>`——长度前缀 + 编码后的命名空间共同防止“命名空间 A 的 key 恰好是命名空间 B 前缀”这种碰撞。`decode` 只在物理 key 精确匹配该命名空间时返回原始逻辑 key，否则返回 `undefined`（不属于该命名空间，调用方应跳过而非报错）。"
             },
             {
               "name": "scope",
               "type": "ICookieScope",
               "optional": true,
               "description": "`scope` 和 `matches(change)` 只做安全失效过滤；无法证明无关的 change 会保守 refresh。",
-              "descriptionEn": "",
+              "descriptionEn": "Fixes the cookie scope. Writes and deletions always use the same scope.",
               "descriptionZh": "`scope` 和 `matches(change)` 只做安全失效过滤；无法证明无关的 change 会保守 refresh。"
             },
             {
               "name": "document",
               "type": "ICookieDocument",
               "optional": true,
-              "description": "注入点：测试环境用。默认为 globalThis.document。",
-              "descriptionEn": "",
-              "descriptionZh": "注入点：测试环境用。默认为 globalThis.document。"
+              "description": "Injects a document for testing. Defaults to `globalThis.document`.",
+              "descriptionEn": "Injects a document for testing. Defaults to `globalThis.document`.",
+              "descriptionZh": "源码：`src/backends/cookie.ts`。基于 `document.cookie` 的读写封装，不处理服务端 cookie（SSR 场景由调用方在服务端自行解析 `req.headers.cookie` 后注入 `memoryStorageHost`）。"
             }
           ],
           "fragment": "storage-web-plugins/reactive/cookies--cookiesReactive"
@@ -9478,13 +9478,13 @@
               "name": "factory",
               "type": "IDBFactory",
               "optional": true,
-              "description": "注入点：测试环境（jsdom 没有 IndexedDB）与非浏览器环境用。"
+              "description": "Injects an IndexedDB factory for tests and non-browser environments. jsdom does not provide * IndexedDB."
             },
             {
               "name": "keyRange",
               "type": "typeof IDBKeyRange",
               "optional": true,
-              "description": "注入点：`IDBKeyRange` 构造器。jsdom 完全不提供 IndexedDB，测试环境下 必须和 `factory` 一起从 fake-indexeddb * 显式传入；真实浏览器默认取 `globalThis.IDBKeyRange`。"
+              "description": "Injects the `IDBKeyRange` constructor. Since jsdom does not provide IndexedDB, tests supply it * explicitly with `factory` from fake-indexeddb. Browsers default to `globalThis.IDBKeyRange`."
             }
           ],
           "identity": "packages/storage-web/dist/plugins/reactive/indexed-db.d.ts:indexedDbReactive:export declare const indexedDbReactive: <const TId extends string = \"indexed-db\">(options?: IIndexedDbOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true>;",
@@ -9535,17 +9535,17 @@
               "name": "factory",
               "type": "IDBFactory",
               "optional": true,
-              "description": "注入点：测试环境（jsdom 没有 IndexedDB）与非浏览器环境用。",
-              "descriptionEn": "",
-              "descriptionZh": "注入点：测试环境（jsdom 没有 IndexedDB）与非浏览器环境用。"
+              "description": "Injects an IndexedDB factory for tests and non-browser environments. jsdom does not provide * IndexedDB.",
+              "descriptionEn": "Injects an IndexedDB factory for tests and non-browser environments. jsdom does not provide * IndexedDB.",
+              "descriptionZh": "`factory?: IDBFactory` —— 测试/非浏览器环境注入点；默认 `globalThis.indexedDB`，缺失抛 `BACKEND_UNAVAILABLE`。"
             },
             {
               "name": "keyRange",
               "type": "typeof IDBKeyRange",
               "optional": true,
-              "description": "注入点：`IDBKeyRange` 构造器。jsdom 完全不提供 IndexedDB，测试环境下 必须和 `factory` 一起从 fake-indexeddb * 显式传入；真实浏览器默认取 `globalThis.IDBKeyRange`。",
-              "descriptionEn": "",
-              "descriptionZh": "注入点：`IDBKeyRange` 构造器。jsdom 完全不提供 IndexedDB，测试环境下 必须和 `factory` 一起从 fake-indexeddb * 显式传入；真实浏览器默认取 `globalThis.IDBKeyRange`。"
+              "description": "Injects the `IDBKeyRange` constructor. Since jsdom does not provide IndexedDB, tests supply it * explicitly with `factory` from fake-indexeddb. Browsers default to `globalThis.IDBKeyRange`.",
+              "descriptionEn": "Injects the `IDBKeyRange` constructor. Since jsdom does not provide IndexedDB, tests supply it * explicitly with `factory` from fake-indexeddb. Browsers default to `globalThis.IDBKeyRange`.",
+              "descriptionZh": "`keyRange?: typeof IDBKeyRange` —— 测试环境（jsdom 无原生 IndexedDB）须与 `factory` 一起从 `fake-indexeddb` 显式传入；默认 `globalThis.IDBKeyRange`。"
             }
           ],
           "fragment": "storage-web-plugins/reactive/indexed-db--indexedDbReactive"
@@ -9630,7 +9630,7 @@
               "name": "storage",
               "type": "IWebStorageLike",
               "optional": true,
-              "description": "注入点：测试环境与非浏览器环境用。默认为 globalThis.localStorage。"
+              "description": "Injects storage for tests and non-browser environments. Defaults to `globalThis.localStorage`."
             }
           ],
           "identity": "packages/storage-web/dist/plugins/reactive/local-storage.d.ts:localStorageReactive:export declare const localStorageReactive: <const TId extends string = \"local\">(options?: ILocalStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true>;",
@@ -9642,7 +9642,7 @@
               "type": "IWebStorageLike",
               "optional": true,
               "description": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`。它是 kind-hidden 的原生 Feature：同一 `definePlugin(., { reactive })` 安装时由 PluginHost 注入 exact Store 和 Host 已快照的 scheduler，而不是由调用者传入 backend-kind token。",
-              "descriptionEn": "`plugins/local-storage` — `localStorageBackendPlugin` — `local`",
+              "descriptionEn": "Injects storage for tests and non-browser environments. Defaults to `globalThis.localStorage`.",
               "descriptionZh": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`。它是 kind-hidden 的原生 Feature：同一 `definePlugin(., { reactive })` 安装时由 PluginHost 注入 exact Store 和 Host 已快照的 scheduler，而不是由调用者传入 backend-kind token。"
             }
           ],
@@ -9810,7 +9810,7 @@
               "name": "storage",
               "type": "IWebStorageLike",
               "optional": true,
-              "description": "注入点：测试环境与非浏览器环境用。默认为 globalThis.sessionStorage。"
+              "description": "Injects storage for tests and non-browser environments. Defaults to * `globalThis.sessionStorage`."
             }
           ],
           "identity": "packages/storage-web/dist/plugins/reactive/session-storage.d.ts:sessionStorageReactive:export declare const sessionStorageReactive: <const TId extends string = \"session\">(options?: ISessionStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId, true>;",
@@ -9822,7 +9822,7 @@
               "type": "IWebStorageLike",
               "optional": true,
               "description": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`。它是 kind-hidden 的原生 Feature：同一 `definePlugin(., { reactive })` 安装时由 PluginHost 注入 exact Store 和 Host 已快照的 scheduler，而不是由调用者传入 backend-kind token。",
-              "descriptionEn": "`plugins/local-storage` — `localStorageBackendPlugin` — `local`",
+              "descriptionEn": "Injects storage for tests and non-browser environments. Defaults to * `globalThis.sessionStorage`.",
               "descriptionZh": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`。它是 kind-hidden 的原生 Feature：同一 `definePlugin(., { reactive })` 安装时由 PluginHost 注入 exact Store 和 Host 已快照的 scheduler，而不是由调用者传入 backend-kind token。"
             }
           ],
@@ -9908,7 +9908,7 @@
               "name": "storage",
               "type": "IWebStorageLike",
               "optional": true,
-              "description": "注入点：测试环境与非浏览器环境用。默认为 globalThis.sessionStorage。"
+              "description": "Injects storage for tests and non-browser environments. Defaults to * `globalThis.sessionStorage`."
             }
           ],
           "identity": "packages/storage-web/dist/plugins/session-storage.d.ts:sessionStorageBackendPlugin:export declare const sessionStorageBackendPlugin: <const TId extends string = \"session\">(options?: ISessionStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId>;",
@@ -9921,7 +9921,7 @@
               "optional": true,
               "description": "`plugins/local-storage` — `localStorageBackendPlugin` — `local`",
               "descriptionEn": "`plugins/local-storage` — `localStorageBackendPlugin` — `local`",
-              "descriptionZh": "注入点：测试环境与非浏览器环境用。默认为 globalThis.sessionStorage。"
+              "descriptionZh": ""
             }
           ],
           "fragment": "storage-web-plugins/session-storage--sessionStorageBackendPlugin"
@@ -10178,9 +10178,9 @@
           "name": "fromStandardSchema",
           "kind": "const",
           "signature": "export declare const fromStandardSchema: <T>(schema: IStandardSchemaV1<unknown, T>) => ISchemaAdapter<T, T>;",
-          "declarationLine": 28,
+          "declarationLine": 29,
           "source": "packages/storage-web/dist/schema/standard-schema.d.ts",
-          "purpose": "适配任意实现了 Standard Schema 规范的校验库。",
+          "purpose": "Adapts any validation library that implements Standard Schema.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for fromStandardSchema.",
           "advanced": "No additional advanced behavior is declared for fromStandardSchema.",
           "parameters": ["This const declaration has no parameters."],
@@ -10209,7 +10209,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "适配任意实现了 Standard Schema 规范的校验库。"
+              "content": "Adapts any validation library that implements Standard Schema."
             },
             {
               "id": "getting-started",
@@ -10283,7 +10283,7 @@
           "signature": "export type IMigration = (previous: unknown, ctx: IMigrationContext) => Promise<unknown>;",
           "declarationLine": 10,
           "source": "packages/storage-web/dist/schema/migrate.d.ts",
-          "purpose": "迁移函数一律 async，允许迁移过程中读取其他存储或发请求。",
+          "purpose": "Runs migrations asynchronously so they can read other storage or make requests.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMigration.",
           "advanced": "No additional advanced behavior is declared for IMigration.",
           "parameters": ["This type declaration has no parameters."],
@@ -10309,7 +10309,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "迁移函数一律 async，允许迁移过程中读取其他存储或发请求。"
+              "content": "Runs migrations asynchronously so they can read other storage or make requests."
             },
             {
               "id": "getting-started",
@@ -10347,7 +10347,7 @@
         {
           "name": "IMigrationContext",
           "kind": "type",
-          "signature": "export type IMigrationContext = { readonly fromVersion: number; readonly toVersion: number; /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IWebAbortSignal; };",
+          "signature": "export type IMigrationContext = { readonly fromVersion: number; readonly toVersion: number; /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IAbortSignal; };",
           "declarationLine": 3,
           "source": "packages/storage-web/dist/schema/migrate.d.ts",
           "purpose": "IMigrationContext is part of this module's public type contract.",
@@ -10365,7 +10365,7 @@
           "aliasOf": "IMigrationContext",
           "exportPath": "./schema",
           "overloadSignatures": [
-            "export type IMigrationContext = { readonly fromVersion: number; readonly toVersion: number; /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IWebAbortSignal; };"
+            "export type IMigrationContext = { readonly fromVersion: number; readonly toVersion: number; /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IAbortSignal; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -10404,7 +10404,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/schema/migrate.d.ts:IMigrationContext:export type IMigrationContext = { readonly fromVersion: number; readonly toVersion: number; /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IWebAbortSignal; };",
+          "identity": "packages/storage-web/dist/schema/migrate.d.ts:IMigrationContext:export type IMigrationContext = { readonly fromVersion: number; readonly toVersion: number; /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IAbortSignal; };",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -10413,10 +10413,10 @@
         {
           "name": "ISchemaAdapter",
           "kind": "type",
-          "signature": "export type ISchemaAdapter<TDomain, TStored = TDomain> = { readonly name: string; /** 异步：允许 async refinement 与远程校验。同步 schema 库包装成 resolved Promise。 */ validate(value: unknown, ctx?: IOperationContext): Promise<TDomain>; /** 领域对象 → 存储表示。不实现则恒等。 */ encode?(value: TDomain, ctx?: IOperationContext): Promise<TStored>; /** 存储表示 → 领域对象。不实现则恒等。 */ decode?(raw: TStored, ctx?: IOperationContext): Promise<TDomain>; /** 写入前的可选归一化，默认等同 validate。 */ normalize?(value: TDomain, ctx?: IOperationContext): Promise<TDomain>; };",
-          "declarationLine": 7,
+          "signature": "export type ISchemaAdapter<TDomain, TStored = TDomain> = { readonly name: string; /** * Supports asynchronous refinement and remote validation. Wrappers for synchronous schema * libraries return resolved promises. */ validate(value: unknown, ctx?: IOperationContext): Promise<TDomain>; /** * Converts a domain object to its stored representation. Without this method, the value passes * through unchanged. */ encode?(value: TDomain, ctx?: IOperationContext): Promise<TStored>; /** * Converts a stored representation to its domain object. Without this method, the value passes * through unchanged. */ decode?(raw: TStored, ctx?: IOperationContext): Promise<TDomain>; /** * Optionally normalizes before writing. Without this method, the validated value passes through * unchanged. */ normalize?(value: TDomain, ctx?: IOperationContext): Promise<TDomain>; };",
+          "declarationLine": 9,
           "source": "packages/storage-web/dist/schema/types.d.ts",
-          "purpose": "Schema 层是面向开发者的开放契约，不绑定任何校验库，也不强制使用。 `encode`/`decode` 处理领域表示（`Date` ↔ ISO 串、内部字段裁剪），与 §7 codec 处理的存储格式（对象 ↔ 字符串/字节）分工不同。执行顺序： 写入 validate → encode → codec.encode，读取 codec.decode → decode → validate。",
+          "purpose": "ISchemaAdapter is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISchemaAdapter.",
           "advanced": "No additional advanced behavior is declared for ISchemaAdapter.",
           "parameters": ["This type declaration has no parameters."],
@@ -10434,7 +10434,7 @@
           "aliasOf": "ISchemaAdapter",
           "exportPath": "./schema",
           "overloadSignatures": [
-            "export type ISchemaAdapter<TDomain, TStored = TDomain> = { readonly name: string; /** 异步：允许 async refinement 与远程校验。同步 schema 库包装成 resolved Promise。 */ validate(value: unknown, ctx?: IOperationContext): Promise<TDomain>; /** 领域对象 → 存储表示。不实现则恒等。 */ encode?(value: TDomain, ctx?: IOperationContext): Promise<TStored>; /** 存储表示 → 领域对象。不实现则恒等。 */ decode?(raw: TStored, ctx?: IOperationContext): Promise<TDomain>; /** 写入前的可选归一化，默认等同 validate。 */ normalize?(value: TDomain, ctx?: IOperationContext): Promise<TDomain>; };"
+            "export type ISchemaAdapter<TDomain, TStored = TDomain> = { readonly name: string; /** * Supports asynchronous refinement and remote validation. Wrappers for synchronous schema * libraries return resolved promises. */ validate(value: unknown, ctx?: IOperationContext): Promise<TDomain>; /** * Converts a domain object to its stored representation. Without this method, the value passes * through unchanged. */ encode?(value: TDomain, ctx?: IOperationContext): Promise<TStored>; /** * Converts a stored representation to its domain object. Without this method, the value passes * through unchanged. */ decode?(raw: TStored, ctx?: IOperationContext): Promise<TDomain>; /** * Optionally normalizes before writing. Without this method, the validated value passes through * unchanged. */ normalize?(value: TDomain, ctx?: IOperationContext): Promise<TDomain>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -10444,7 +10444,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Schema 层是面向开发者的开放契约，不绑定任何校验库，也不强制使用。 `encode`/`decode` 处理领域表示（`Date` ↔ ISO 串、内部字段裁剪），与 §7 codec 处理的存储格式（对象 ↔ 字符串/字节）分工不同。执行顺序： 写入 validate → encode → codec.encode，读取 codec.decode → decode → validate。"
+              "content": "ISchemaAdapter is part of this module's public type contract."
             },
             {
               "id": "getting-started",
@@ -10473,7 +10473,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/schema/types.d.ts:ISchemaAdapter:export type ISchemaAdapter<TDomain, TStored = TDomain> = { readonly name: string; /** 异步：允许 async refinement 与远程校验。同步 schema 库包装成 resolved Promise。 */ validate(value: unknown, ctx?: IOperationContext): Promise<TDomain>; /** 领域对象 → 存储表示。不实现则恒等。 */ encode?(value: TDomain, ctx?: IOperationContext): Promise<TStored>; /** 存储表示 → 领域对象。不实现则恒等。 */ decode?(raw: TStored, ctx?: IOperationContext): Promise<TDomain>; /** 写入前的可选归一化，默认等同 validate。 */ normalize?(value: TDomain, ctx?: IOperationContext): Promise<TDomain>; };",
+          "identity": "packages/storage-web/dist/schema/types.d.ts:ISchemaAdapter:export type ISchemaAdapter<TDomain, TStored = TDomain> = { readonly name: string; /** * Supports asynchronous refinement and remote validation. Wrappers for synchronous schema * libraries return resolved promises. */ validate(value: unknown, ctx?: IOperationContext): Promise<TDomain>; /** * Converts a domain object to its stored representation. Without this method, the value passes * through unchanged. */ encode?(value: TDomain, ctx?: IOperationContext): Promise<TStored>; /** * Converts a stored representation to its domain object. Without this method, the value passes * through unchanged. */ decode?(raw: TStored, ctx?: IOperationContext): Promise<TDomain>; /** * Optionally normalizes before writing. Without this method, the validated value passes through * unchanged. */ normalize?(value: TDomain, ctx?: IOperationContext): Promise<TDomain>; };",
           "guidance": [],
           "usageScore": 42,
           "configuration": [],
@@ -10483,9 +10483,9 @@
           "name": "IStandardSchemaV1",
           "kind": "type",
           "signature": "export type IStandardSchemaV1<TInput = unknown, TOutput = TInput> = { readonly '~standard': { readonly version: 1; readonly vendor: string; validate(value: unknown): { readonly value: TOutput; readonly issues?: undefined; } | { readonly issues: ReadonlyArray<{ readonly message: string; }>; } | Promise<{ readonly value: TOutput; readonly issues?: undefined; } | { readonly issues: ReadonlyArray<{ readonly message: string; }>; }>; }; };",
-          "declarationLine": 6,
+          "declarationLine": 7,
           "source": "packages/storage-web/dist/schema/standard-schema.d.ts",
-          "purpose": "[Standard Schema](https://standardschema.dev) 的最小契约。zod ≥3.24、 valibot ≥1.0、arktype ≥2.0 都实现了该规范，一个适配器覆盖三家。 本包不 import 任何一家，也不把它们列为 peerDependency。",
+          "purpose": "Defines the minimal [Standard Schema](https://standardschema.dev) contract. Zod ≥3.24, Valibot ≥1.0, and ArkType ≥2.0 implement it, so one adapter supports all three. This module does not import them or list them as peer dependencies.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStandardSchemaV1.",
           "advanced": "No additional advanced behavior is declared for IStandardSchemaV1.",
           "parameters": ["This type declaration has no parameters."],
@@ -10510,7 +10510,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "[Standard Schema](https://standardschema.dev) 的最小契约。zod ≥3.24、 valibot ≥1.0、arktype ≥2.0 都实现了该规范，一个适配器覆盖三家。 本包不 import 任何一家，也不把它们列为 peerDependency。"
+              "content": "Defines the minimal [Standard Schema](https://standardschema.dev) contract. Zod ≥3.24, Valibot ≥1.0, and ArkType ≥2.0 implement it, so one adapter supports all three. This module does not import them or list them as peer dependencies."
             },
             {
               "id": "getting-started",
@@ -10551,7 +10551,7 @@
           "signature": "export declare const passthrough: <T = unknown>() => ISchemaAdapter<T, T>;",
           "declarationLine": 3,
           "source": "packages/storage-web/dist/schema/passthrough.d.ts",
-          "purpose": "零校验直接透传。默认值——不传 schema 就是它，零依赖零开销。",
+          "purpose": "Returns values without validation or dependencies. Used by default when no schema is supplied.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for passthrough.",
           "advanced": "No additional advanced behavior is declared for passthrough.",
           "parameters": ["This const declaration has no parameters."],
@@ -10579,7 +10579,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "零校验直接透传。默认值——不传 schema 就是它，零依赖零开销。"
+              "content": "Returns values without validation or dependencies. Used by default when no schema is supplied."
             },
             {
               "id": "getting-started",
@@ -10638,10 +10638,10 @@
         {
           "name": "runMigrations",
           "kind": "const",
-          "signature": "export declare const runMigrations: (value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IWebAbortSignal) => Promise<unknown>;",
-          "declarationLine": 15,
+          "signature": "export declare const runMigrations: (value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IAbortSignal) => Promise<unknown>;",
+          "declarationLine": 16,
           "source": "packages/storage-web/dist/schema/migrate.d.ts",
-          "purpose": "公开入口：创建新 runtime（一次 operation 一个 reporter），见 `docs/store-persist/storage-web-integration.sdd.md` §4.4「公开 API 兼作内部步骤的拆分」。",
+          "purpose": "Creates a new runtime at the public entry, with one reporter per operation. See `docs/store-persist/storage-web-integration.sdd.md` §4.4 on separating public APIs from their internal steps.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for runMigrations.",
           "advanced": "No additional advanced behavior is declared for runMigrations.",
           "parameters": ["This const declaration has no parameters."],
@@ -10659,7 +10659,7 @@
           "aliasOf": "runMigrations",
           "exportPath": "./schema",
           "overloadSignatures": [
-            "export declare const runMigrations: (value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IWebAbortSignal) => Promise<unknown>;"
+            "export declare const runMigrations: (value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IAbortSignal) => Promise<unknown>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -10669,7 +10669,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "公开入口：创建新 runtime（一次 operation 一个 reporter），见 `docs/store-persist/storage-web-integration.sdd.md` §4.4「公开 API 兼作内部步骤的拆分」。"
+              "content": "Creates a new runtime at the public entry, with one reporter per operation. See `docs/store-persist/storage-web-integration.sdd.md` §4.4 on separating public APIs from their internal steps."
             },
             {
               "id": "getting-started",
@@ -10698,7 +10698,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/schema/migrate.d.ts:runMigrations:export declare const runMigrations: (value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IWebAbortSignal) => Promise<unknown>;",
+          "identity": "packages/storage-web/dist/schema/migrate.d.ts:runMigrations:export declare const runMigrations: (value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IAbortSignal) => Promise<unknown>;",
           "guidance": [
             {
               "id": "runmigrations",
@@ -10760,9 +10760,9 @@
           "name": "binaryCodec",
           "kind": "const",
           "signature": "export declare const binaryCodec: ICodec<Uint8Array, Uint8Array>;",
-          "declarationLine": 3,
+          "declarationLine": 6,
           "source": "packages/storage-web/dist/serialize/binary.d.ts",
-          "purpose": "调用方自带字节，走 setBytes 通道；遇 text-only 后端自动 base64 降级（体积 +33%）。",
+          "purpose": "Stores caller-supplied bytes through `setBytes`. Text-only backends use a base64 fallback with about 33% larger output.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for binaryCodec.",
           "advanced": "No additional advanced behavior is declared for binaryCodec.",
           "parameters": ["This const declaration has no parameters."],
@@ -10793,7 +10793,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "调用方自带字节，走 setBytes 通道；遇 text-only 后端自动 base64 降级（体积 +33%）。"
+              "content": "Stores caller-supplied bytes through `setBytes`. Text-only backends use a base64 fallback with about 33% larger output."
             },
             {
               "id": "getting-started",
@@ -10852,7 +10852,7 @@
         {
           "name": "ISelectedCodec",
           "kind": "type",
-          "signature": "export type ISelectedCodec = { /** 选路后实际要写入存储的字符串或字节。 */ encode(value: unknown, ctx?: { signal?: NonNullable<IOperationContext['signal']>; }): Promise<string | Uint8Array | unknown>; decode(raw: string | Uint8Array | unknown, ctx?: { signal?: NonNullable<IOperationContext['signal']>; }): Promise<unknown>; };",
+          "signature": "export type ISelectedCodec = { /** Produces the string, bytes, or structured value that the selected route writes to storage. */ encode(value: unknown, ctx?: { signal?: NonNullable<IOperationContext['signal']>; }): Promise<string | Uint8Array | unknown>; decode(raw: string | Uint8Array | unknown, ctx?: { signal?: NonNullable<IOperationContext['signal']>; }): Promise<unknown>; };",
           "declarationLine": 4,
           "source": "packages/storage-web/dist/serialize/registry.d.ts",
           "purpose": "ISelectedCodec is part of this module's public type contract.",
@@ -10870,7 +10870,7 @@
           "aliasOf": "ISelectedCodec",
           "exportPath": "./serialize",
           "overloadSignatures": [
-            "export type ISelectedCodec = { /** 选路后实际要写入存储的字符串或字节。 */ encode(value: unknown, ctx?: { signal?: NonNullable<IOperationContext['signal']>; }): Promise<string | Uint8Array | unknown>; decode(raw: string | Uint8Array | unknown, ctx?: { signal?: NonNullable<IOperationContext['signal']>; }): Promise<unknown>; };"
+            "export type ISelectedCodec = { /** Produces the string, bytes, or structured value that the selected route writes to storage. */ encode(value: unknown, ctx?: { signal?: NonNullable<IOperationContext['signal']>; }): Promise<string | Uint8Array | unknown>; decode(raw: string | Uint8Array | unknown, ctx?: { signal?: NonNullable<IOperationContext['signal']>; }): Promise<unknown>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -10909,7 +10909,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/serialize/registry.d.ts:ISelectedCodec:export type ISelectedCodec = { /** 选路后实际要写入存储的字符串或字节。 */ encode(value: unknown, ctx?: { signal?: NonNullable<IOperationContext['signal']>; }): Promise<string | Uint8Array | unknown>; decode(raw: string | Uint8Array | unknown, ctx?: { signal?: NonNullable<IOperationContext['signal']>; }): Promise<unknown>; };",
+          "identity": "packages/storage-web/dist/serialize/registry.d.ts:ISelectedCodec:export type ISelectedCodec = { /** Produces the string, bytes, or structured value that the selected route writes to storage. */ encode(value: unknown, ctx?: { signal?: NonNullable<IOperationContext['signal']>; }): Promise<string | Uint8Array | unknown>; decode(raw: string | Uint8Array | unknown, ctx?: { signal?: NonNullable<IOperationContext['signal']>; }): Promise<unknown>; };",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],
@@ -10921,7 +10921,7 @@
           "signature": "export declare const jsonCodec: ICodec<unknown, string>;",
           "declarationLine": 3,
           "source": "packages/storage-web/dist/serialize/json.d.ts",
-          "purpose": "默认 codec：零依赖，全后端可用。",
+          "purpose": "Provides the default codec without external dependencies. Works on every backend.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for jsonCodec.",
           "advanced": "No additional advanced behavior is declared for jsonCodec.",
           "parameters": ["This const declaration has no parameters."],
@@ -10947,7 +10947,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "默认 codec：零依赖，全后端可用。"
+              "content": "Provides the default codec without external dependencies. Works on every backend."
             },
             {
               "id": "getting-started",
@@ -11016,7 +11016,7 @@
           "signature": "export declare const selectCodec: (codec: ICodec, capabilities: IStorageCapabilities, onDiagnostic?: (message: string) => void) => ISelectedCodec;",
           "declarationLine": 21,
           "source": "packages/storage-web/dist/serialize/registry.d.ts",
-          "purpose": "选路规则： 1. Codec.output 与后端 capabilities 匹配 → 直连。 2. Binary codec 遇 text-only 后端 → 自动 base64 包装，体积 +33%， 通过 onDiagnostic 报一次，不是静默发生。 3. Structured codec 遇 text-only 后端 → 抛 UNSUPPORTED_CAPABILITY。 structured clone 的能力（Blob/Map/Set/循环引用）无法用 JSON 表达， 静默降级会丢数据，这里不做隐式转换。",
+          "purpose": "selectCodec is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for selectCodec.",
           "advanced": "No additional advanced behavior is declared for selectCodec.",
           "parameters": ["This const declaration has no parameters."],
@@ -11046,7 +11046,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "选路规则： 1. Codec.output 与后端 capabilities 匹配 → 直连。 2. Binary codec 遇 text-only 后端 → 自动 base64 包装，体积 +33%， 通过 onDiagnostic 报一次，不是静默发生。 3. Structured codec 遇 text-only 后端 → 抛 UNSUPPORTED_CAPABILITY。 structured clone 的能力（Blob/Map/Set/循环引用）无法用 JSON 表达， 静默降级会丢数据，这里不做隐式转换。"
+              "content": "selectCodec is part of this module's public const contract."
             },
             {
               "id": "getting-started",
@@ -11122,9 +11122,9 @@
           "name": "structuredCodec",
           "kind": "const",
           "signature": "export declare const structuredCodec: ICodec<unknown, unknown>;",
-          "declarationLine": 6,
+          "declarationLine": 8,
           "source": "packages/storage-web/dist/serialize/structured.d.ts",
-          "purpose": "不做序列化，交给后端的 structured clone（IndexedDB）。可直接存 Blob/File/ArrayBuffer/Map/Set/Date，甚至循环引用。仅结构化后端可用； 遇到 text-only 后端时选路层拒绝降级，见 registry.ts。",
+          "purpose": "Passes serialization to the backend's structured cloning, such as IndexedDB. Supports `Blob`, `File`, `ArrayBuffer`, `Map`, `Set`, `Date`, and cyclic references directly. Only structured backends can use it. The routing layer rejects fallback on text-only backends; see `registry.ts`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for structuredCodec.",
           "advanced": "No additional advanced behavior is declared for structuredCodec.",
           "parameters": ["This const declaration has no parameters."],
@@ -11150,7 +11150,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "不做序列化，交给后端的 structured clone（IndexedDB）。可直接存 Blob/File/ArrayBuffer/Map/Set/Date，甚至循环引用。仅结构化后端可用； 遇到 text-only 后端时选路层拒绝降级，见 registry.ts。"
+              "content": "Passes serialization to the backend's structured cloning, such as IndexedDB. Supports `Blob`, `File`, `ArrayBuffer`, `Map`, `Set`, `Date`, and cyclic references directly. Only structured backends can use it. The routing layer rejects fallback on text-only backends; see `registry.ts`."
             },
             {
               "id": "getting-started",
@@ -11228,7 +11228,7 @@
         {
           "name": "ISessionStorageOptions",
           "kind": "type",
-          "signature": "export type ISessionStorageOptions = IWebStorageOptions & { /** 注入点：测试环境与非浏览器环境用。默认为 globalThis.sessionStorage。 */ readonly storage?: IWebStorageLike; };",
+          "signature": "export type ISessionStorageOptions = IWebStorageOptions & { /** * Injects storage for tests and non-browser environments. Defaults to * `globalThis.sessionStorage`. */ readonly storage?: IWebStorageLike; };",
           "declarationLine": 3,
           "source": "packages/storage-web/dist/backends/session-storage.d.ts",
           "purpose": "ISessionStorageOptions is part of this module's public type contract.",
@@ -11246,7 +11246,7 @@
           "aliasOf": "ISessionStorageOptions",
           "exportPath": "./session-storage",
           "overloadSignatures": [
-            "export type ISessionStorageOptions = IWebStorageOptions & { /** 注入点：测试环境与非浏览器环境用。默认为 globalThis.sessionStorage。 */ readonly storage?: IWebStorageLike; };"
+            "export type ISessionStorageOptions = IWebStorageOptions & { /** * Injects storage for tests and non-browser environments. Defaults to * `globalThis.sessionStorage`. */ readonly storage?: IWebStorageLike; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -11285,7 +11285,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/backends/session-storage.d.ts:ISessionStorageOptions:export type ISessionStorageOptions = IWebStorageOptions & { /** 注入点：测试环境与非浏览器环境用。默认为 globalThis.sessionStorage。 */ readonly storage?: IWebStorageLike; };",
+          "identity": "packages/storage-web/dist/backends/session-storage.d.ts:ISessionStorageOptions:export type ISessionStorageOptions = IWebStorageOptions & { /** * Injects storage for tests and non-browser environments. Defaults to * `globalThis.sessionStorage`. */ readonly storage?: IWebStorageLike; };",
           "guidance": [],
           "usageScore": 16,
           "configuration": [],
@@ -11295,7 +11295,7 @@
           "name": "sessionStorageHost",
           "kind": "const",
           "signature": "export declare const sessionStorageHost: (options?: ISessionStorageOptions) => ISyncCapableStore<IKeyValueStore>;",
-          "declarationLine": 7,
+          "declarationLine": 10,
           "source": "packages/storage-web/dist/backends/session-storage.d.ts",
           "purpose": "sessionStorageHost is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for sessionStorageHost.",
@@ -11359,7 +11359,7 @@
               "name": "storage",
               "type": "IWebStorageLike",
               "optional": true,
-              "description": "注入点：测试环境与非浏览器环境用。默认为 globalThis.sessionStorage。"
+              "description": "Injects storage for tests and non-browser environments. Defaults to * `globalThis.sessionStorage`."
             }
           ],
           "identity": "packages/storage-web/dist/backends/session-storage.d.ts:sessionStorageHost:export declare const sessionStorageHost: (options?: ISessionStorageOptions) => ISyncCapableStore<IKeyValueStore>;",
@@ -11392,7 +11392,7 @@
               "type": "IWebStorageLike",
               "optional": true,
               "description": "源码：`src/backends/local-storage.ts`、`src/backends/session-storage.ts`、`src/backends/web-storage.ts`。两者共享同一个 `createWebStorageBackend` 实现，仅注入不同的宿主 `Storage` 对象。",
-              "descriptionEn": "`plugins/local-storage` — `localStorageBackendPlugin` — `local`",
+              "descriptionEn": "Injects storage for tests and non-browser environments. Defaults to * `globalThis.sessionStorage`.",
               "descriptionZh": "源码：`src/backends/local-storage.ts`、`src/backends/session-storage.ts`、`src/backends/web-storage.ts`。两者共享同一个 `createWebStorageBackend` 实现，仅注入不同的宿主 `Storage` 对象。"
             }
           ],

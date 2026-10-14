@@ -28,7 +28,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "不适用：只需要一个普通的响应式对象/数组、不关心细粒度依赖或容量——直接用 `@migaia/reactive` 的 `Signal<T>` 更省事；需要\"按值稳定标识、删除/插入不改变其余成员定位\"的实体集合——`ObservableArray` 是纯索引语义，`splice`/`pop`/`replace` 会移动后续索引对应的值，这不是本包的设计目标。"
+                "text": "不适用：只需要一个普通的响应式对象/数组、不关心细粒度依赖或容量——直接用 `runtime.signal(value)` 创建 `IReactiveSignal<T>` 更省事；需要\"按值稳定标识、删除/插入不改变其余成员定位\"的实体集合——`ObservableArray` 是纯索引语义，`splice`/`pop`/`replace` 会移动后续索引对应的值，这不是本包的设计目标。"
               }
             ]
           },
@@ -43,7 +43,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "依赖 `@migaia/reactive`（响应式运行时，提供 `IRuntime`/`defaultRuntime`/`Signal`）与 `@migaia/store-light`（提供 `IMutationGuard` 类型），二者通常已经在同一个 monorepo 里作为对等依赖存在。"
+                "text": "依赖 `@migaia/reactive`（响应式运行时，提供 `IRuntime`/`defaultRuntime`/`IReactiveSignal`）与 `@migaia/store-light`（提供 `IMutationGuard` 类型），二者通常已经在同一个 monorepo 里作为对等依赖存在。"
               }
             ]
           },
@@ -287,7 +287,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { ObservableArray } from '@migaia/store-indexed';\nimport { Effect } from '@migaia/reactive';\n\nconst rows = new ObservableArray<{ id: string; name: string }>(\n  Array.from({ length: 100_000 }, (_, i) => ({ id: String(i), name: `row-${i}` }))\n);\n\n// 只有被订阅的 5 行才会实体化 cell，其余 99995 行不占用任何 Signal\nconst watched = [0, 1, 2, 3, 4].map(\n  (index) => new Effect(() => render(index, rows.at(index)), rows.runtime)\n);\n\nrows.splice(0, 1); // 索引语义整体后移一位\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\nfor (const effect of watched) effect.dispose();\nrows.dispose();"
+                "code": "import { ObservableArray } from '@migaia/store-indexed';\n\nconst rows = new ObservableArray<{ id: string; name: string }>(\n  Array.from({ length: 100_000 }, (_, i) => ({ id: String(i), name: `row-${i}` }))\n);\n\n// 只有被订阅的 5 行才会实体化 cell，其余 99995 行不占用任何 Signal\nconst watched = [0, 1, 2, 3, 4].map(\n  (index) => rows.runtime.effect(() => render(index, rows.at(index)))\n);\n\nrows.splice(0, 1); // 索引语义整体后移一位\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\nfor (const effect of watched) effect.dispose();\nrows.dispose();"
               }
             ]
           },
@@ -309,7 +309,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRuntime, Effect } from '@migaia/reactive';\nimport { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed';\n\nconst runtimeA = createRuntime();\nconst runtimeB = createRuntime();\nconst tagsInA = new ObservableSet(['a', 'b'], runtimeA);\n\nnew Effect(() => {\n  try {\n    tagsInA.has('a'); // 当前 effect 属于 runtimeB，读了 runtimeA 的集合\n  } catch (error) {\n    if ((error as { code?: string }).code === StoreIndexedErrorCode.crossRuntime) {\n      // 预期内的跨 Runtime 保护\n    }\n  }\n}, runtimeB);"
+                "code": "import { createRuntime } from '@migaia/reactive';\nimport { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed';\n\nconst runtimeA = createRuntime();\nconst runtimeB = createRuntime();\nconst tagsInA = new ObservableSet(['a', 'b'], runtimeA);\n\nruntimeB.effect(() => {\n  try {\n    tagsInA.has('a'); // 当前 effect 属于 runtimeB，读了 runtimeA 的集合\n  } catch (error) {\n    if ((error as { code?: string }).code === StoreIndexedErrorCode.crossRuntime) {\n      // 预期内的跨 Runtime 保护\n    }\n  }\n});"
               }
             ]
           },
@@ -1081,7 +1081,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { Effect } from '@migaia/reactive';\nimport { ObservableArray } from '@migaia/store-indexed';\nimport { MutationPolicy } from '@migaia/store-middleware';\n\nconst guard = new MutationPolicy('actions-only');\nconst rows = new ObservableArray<{ id: string }>(\n  [{ id: 'a' }, { id: 'b' }, { id: 'c' }],\n  undefined,\n  { mutationGuard: guard, debugName: 'rows' }\n);\n\n// 只订阅索引 0：改其余索引不会让这个 effect 重算\nconst effect = new Effect(() => console.log('row0', rows.at(0)), rows.runtime);\n\nguard.runInAction(() => {\n  rows.splice(0, 1); // 删除首行，触发结构信号与修订信号\n});\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\neffect.dispose();\nrows.dispose();"
+                "code": "import { ObservableArray } from '@migaia/store-indexed';\nimport { MutationPolicy } from '@migaia/store-middleware';\n\nconst guard = new MutationPolicy('actions-only');\nconst rows = new ObservableArray<{ id: string }>(\n  [{ id: 'a' }, { id: 'b' }, { id: 'c' }],\n  undefined,\n  { mutationGuard: guard, debugName: 'rows' }\n);\n\n// 只订阅索引 0：改其余索引不会让这个 effect 重算\nconst effect = rows.runtime.effect(() => console.log('row0', rows.at(0)));\n\nguard.runInAction(() => {\n  rows.splice(0, 1); // 删除首行，触发结构信号与修订信号\n});\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\neffect.dispose();\nrows.dispose();"
               },
               {
                 "type": "paragraph",
@@ -1945,7 +1945,7 @@
           "name": "observableArray",
           "kind": "function",
           "signature": "export declare function observableArray<T>(initial?: Iterable<T>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableArray<T>;",
-          "declarationLine": 102,
+          "declarationLine": 104,
           "source": "packages/store-indexed/dist/collections.d.ts",
           "purpose": "observableArray is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observableArray.",
@@ -2079,7 +2079,7 @@
           "name": "ObservableArray",
           "kind": "class",
           "signature": "export declare class ObservableArray<T> extends ObservableCollectionBase { #private; constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); get length(): number; at(index: number): T | undefined; snapshot(): readonly T[]; peek(): readonly T[]; set(index: number, value: T): void; push(...values: readonly T[]): number; pop(): T | undefined; splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[]; replace(values: Iterable<T>): void; clear(): void; /** Release unobserved cells left behind by removals/high churn. */ prune(): number; }",
-          "declarationLine": 41,
+          "declarationLine": 43,
           "source": "packages/store-indexed/dist/collections.d.ts",
           "purpose": "Explicit array with index-level dependencies and separate length tracking.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ObservableArray.",
@@ -2113,9 +2113,9 @@
             "new ObservableObject<T extends Record<string, unknown>>(\n  initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableArray<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableSet<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);",
             "// 错误示范：把 runtime 当成第二个参数传给工厂函数\nobservableArray([1, 2, 3], myRuntime); // myRuntime 被当成了 options！\n\n// 正确写法\nobservableArray([1, 2, 3], {}, myRuntime);\n// 或者直接用类构造函数，参数顺序是 (initial, runtime, options)\nnew ObservableArray([1, 2, 3], myRuntime);",
             "import { createRuntime } from '@migaia/reactive';\nimport { ObservableArray } from '@migaia/store-indexed';\n\nconst runtime = createRuntime();\nconst rows = new ObservableArray([1, 2, 3], runtime);",
-            "import { Effect } from '@migaia/reactive';\nimport { ObservableArray } from '@migaia/store-indexed';\nimport { MutationPolicy } from '@migaia/store-middleware';\n\nconst guard = new MutationPolicy('actions-only');\nconst rows = new ObservableArray<{ id: string }>(\n  [{ id: 'a' }, { id: 'b' }, { id: 'c' }],\n  undefined,\n  { mutationGuard: guard, debugName: 'rows' }\n);\n\n// 只订阅索引 0：改其余索引不会让这个 effect 重算\nconst effect = new Effect(() => console.log('row0', rows.at(0)), rows.runtime);\n\nguard.runInAction(() => {\n  rows.splice(0, 1); // 删除首行，触发结构信号与修订信号\n});\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\neffect.dispose();\nrows.dispose();",
+            "import { ObservableArray } from '@migaia/store-indexed';\nimport { MutationPolicy } from '@migaia/store-middleware';\n\nconst guard = new MutationPolicy('actions-only');\nconst rows = new ObservableArray<{ id: string }>(\n  [{ id: 'a' }, { id: 'b' }, { id: 'c' }],\n  undefined,\n  { mutationGuard: guard, debugName: 'rows' }\n);\n\n// 只订阅索引 0：改其余索引不会让这个 effect 重算\nconst effect = rows.runtime.effect(() => console.log('row0', rows.at(0)));\n\nguard.runInAction(() => {\n  rows.splice(0, 1); // 删除首行，触发结构信号与修订信号\n});\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\neffect.dispose();\nrows.dispose();",
             "const rows = new ObservableArray([{ id: 'a' }, { id: 'b' }, { id: 'c' }]);\nrows.at(1); // 只读了索引 1，只订阅索引 1\nrows.set(1, { id: 'b2' }); // 触发依赖索引 1 的订阅者\nrows.push({ id: 'd' }); // 改变 length，触发依赖 length/结构 的订阅者\nrows.dispose();",
-            "import { ObservableArray } from '@migaia/store-indexed';\nimport { Effect } from '@migaia/reactive';\n\nconst rows = new ObservableArray<{ id: string; name: string }>(\n  Array.from({ length: 100_000 }, (_, i) => ({ id: String(i), name: `row-${i}` }))\n);\n\n// 只有被订阅的 5 行才会实体化 cell，其余 99995 行不占用任何 Signal\nconst watched = [0, 1, 2, 3, 4].map(\n  (index) => new Effect(() => render(index, rows.at(index)), rows.runtime)\n);\n\nrows.splice(0, 1); // 索引语义整体后移一位\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\nfor (const effect of watched) effect.dispose();\nrows.dispose();"
+            "import { ObservableArray } from '@migaia/store-indexed';\n\nconst rows = new ObservableArray<{ id: string; name: string }>(\n  Array.from({ length: 100_000 }, (_, i) => ({ id: String(i), name: `row-${i}` }))\n);\n\n// 只有被订阅的 5 行才会实体化 cell，其余 99995 行不占用任何 Signal\nconst watched = [0, 1, 2, 3, 4].map(\n  (index) => rows.runtime.effect(() => render(index, rows.at(index)))\n);\n\nrows.splice(0, 1); // 索引语义整体后移一位\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\nfor (const effect of watched) effect.dispose();\nrows.dispose();"
           ],
           "members": [
             {
@@ -2417,7 +2417,7 @@
           "name": "observableMap",
           "kind": "function",
           "signature": "export declare function observableMap<K, V>(initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableMap<K, V>;",
-          "declarationLine": 103,
+          "declarationLine": 105,
           "source": "packages/store-indexed/dist/collections.d.ts",
           "purpose": "observableMap is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observableMap.",
@@ -2548,7 +2548,7 @@
           "name": "ObservableMap",
           "kind": "class",
           "signature": "export declare class ObservableMap<K, V> extends ObservableCollectionBase { #private; constructor(initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>, runtime?: IRuntime, options?: IObservableCollectionOptions); get size(): number; get(key: K): V | undefined; peek(key: K): V | undefined; has(key: K): boolean; set(key: K, value: V): this; delete(key: K): boolean; clear(): void; /** * Atomically swap the whole map for `next`. Fires at most one structural (`#structure`) and one * iteration (`#iteration`) notification for the entire swap, unlike `clear()` + per-entry `set()` * which would fire one per key. */ replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void; keys(): readonly K[]; valuesArray(): readonly V[]; entries(): readonly (readonly [K, V])[]; snapshot(): ReadonlyMap<K, V>; /** Release cells for deleted keys that no observer still references. */ prune(): number; }",
-          "declarationLine": 58,
+          "declarationLine": 60,
           "source": "packages/store-indexed/dist/collections.d.ts",
           "purpose": "Per-key lookup tracking plus a separate dependency for iteration and size.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ObservableMap.",
@@ -2897,7 +2897,7 @@
           "name": "observableObject",
           "kind": "function",
           "signature": "export declare function observableObject<T extends Record<string, unknown>>(initial: T, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableObject<T>;",
-          "declarationLine": 101,
+          "declarationLine": 103,
           "source": "packages/store-indexed/dist/collections.d.ts",
           "purpose": "observableObject is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observableObject.",
@@ -3028,7 +3028,7 @@
           "name": "ObservableObject",
           "kind": "class",
           "signature": "export declare class ObservableObject<T extends Record<string, unknown>> extends ObservableCollectionBase { #private; constructor(initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions); get<K extends keyof T & string>(key: K): T[K]; peek<K extends keyof T & string>(key: K): T[K]; has(key: keyof T & string): boolean; set<K extends keyof T & string>(key: K, value: T[K]): void; update<K extends keyof T & string>(key: K, updater: (value: T[K]) => T[K]): void; delete(key: keyof T & string): boolean; keys(): readonly (keyof T & string)[]; snapshot(): Readonly<T>; replace(next: T): void; /** Release cells for deleted keys that no observer still references. */ prune(): number; }",
-          "declarationLine": 25,
+          "declarationLine": 27,
           "source": "packages/store-indexed/dist/collections.d.ts",
           "purpose": "Fine-grained keyed object with explicit accessors and structural key tracking.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ObservableObject.",
@@ -3362,7 +3362,7 @@
           "name": "observableSet",
           "kind": "function",
           "signature": "export declare function observableSet<T>(initial?: Iterable<T>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableSet<T>;",
-          "declarationLine": 104,
+          "declarationLine": 106,
           "source": "packages/store-indexed/dist/collections.d.ts",
           "purpose": "observableSet is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observableSet.",
@@ -3493,7 +3493,7 @@
           "name": "ObservableSet",
           "kind": "class",
           "signature": "export declare class ObservableSet<T> extends ObservableCollectionBase { #private; constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); get size(): number; has(value: T): boolean; add(value: T): this; delete(value: T): boolean; clear(): void; /** * Atomically swap the whole set for `next`. Fires at most one structural (`#structure`) * notification for the entire swap, unlike `clear()` + per-value `add()` which would fire one per * value. */ replace(next: Iterable<T>): void; valuesArray(): readonly T[]; snapshot(): ReadonlySet<T>; /** Release cells for deleted values that no observer still references. */ prune(): number; }",
-          "declarationLine": 82,
+          "declarationLine": 84,
           "source": "packages/store-indexed/dist/collections.d.ts",
           "purpose": "Set counterpart of ObservableMap with per-value membership tracking.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ObservableSet.",
@@ -3526,7 +3526,7 @@
           "examples": [
             "new ObservableObject<T extends Record<string, unknown>>(\n  initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableArray<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableSet<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);",
             "const tags = new ObservableSet(['a', 'b']);\ntags.has('a'); // 追踪读，惰性建 'a' 的 membership cell\ntags.add('c'); // 触发结构信号\ntags.dispose();",
-            "import { createRuntime, Effect } from '@migaia/reactive';\nimport { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed';\n\nconst runtimeA = createRuntime();\nconst runtimeB = createRuntime();\nconst tagsInA = new ObservableSet(['a', 'b'], runtimeA);\n\nnew Effect(() => {\n  try {\n    tagsInA.has('a'); // 当前 effect 属于 runtimeB，读了 runtimeA 的集合\n  } catch (error) {\n    if ((error as { code?: string }).code === StoreIndexedErrorCode.crossRuntime) {\n      // 预期内的跨 Runtime 保护\n    }\n  }\n}, runtimeB);"
+            "import { createRuntime } from '@migaia/reactive';\nimport { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed';\n\nconst runtimeA = createRuntime();\nconst runtimeB = createRuntime();\nconst tagsInA = new ObservableSet(['a', 'b'], runtimeA);\n\nruntimeB.effect(() => {\n  try {\n    tagsInA.has('a'); // 当前 effect 属于 runtimeB，读了 runtimeA 的集合\n  } catch (error) {\n    if ((error as { code?: string }).code === StoreIndexedErrorCode.crossRuntime) {\n      // 预期内的跨 Runtime 保护\n    }\n  }\n});"
           ],
           "members": [
             {
