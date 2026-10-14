@@ -48,7 +48,7 @@ pipeline.run(stages, initialValue, done, control?)
 `control` 目前只含可选 `signal`。调用级 signal 存在时覆盖构造级 signal。上下文仅在有效 signal 存在时传给 stage 和 `done`：
 
 ```ts
-type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal }
+type IMiddlewarePipelineContext = { readonly signal: IAbortSignal }
 ```
 
 ### 2.1 Sync

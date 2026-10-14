@@ -1882,16 +1882,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/event-subscriber/subscriber/IEventAbortSignal",
-      "to": "/en/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/event-subscriber",
-      "to": "/en/docs/event-subscriber/subscriber/IEventAbortSignal",
-      "type": "domain-peer"
-    },
-    {
       "from": "/en/docs/event-subscriber/subscriber/IEventChannelLike",
       "to": "/en/guides/event-subscriber",
       "type": "domain-peer"
@@ -3819,16 +3809,6 @@
     {
       "from": "/en/guides/middleware-pipeline",
       "to": "/en/docs/middleware-pipeline/IMiddlewarePipeline",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/middleware-pipeline/IMiddlewarePipelineAbortSignal",
-      "to": "/en/guides/middleware-pipeline",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/middleware-pipeline",
-      "to": "/en/docs/middleware-pipeline/IMiddlewarePipelineAbortSignal",
       "type": "domain-peer"
     },
     {
@@ -28802,16 +28782,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/event-subscriber/subscriber/IEventAbortSignal",
-      "to": "/zh/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/event-subscriber",
-      "to": "/zh/docs/event-subscriber/subscriber/IEventAbortSignal",
-      "type": "domain-peer"
-    },
-    {
       "from": "/zh/docs/event-subscriber/subscriber/IEventChannelLike",
       "to": "/zh/guides/event-subscriber",
       "type": "domain-peer"
@@ -30739,16 +30709,6 @@
     {
       "from": "/zh/guides/middleware-pipeline",
       "to": "/zh/docs/middleware-pipeline/IMiddlewarePipeline",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/middleware-pipeline/IMiddlewarePipelineAbortSignal",
-      "to": "/zh/guides/middleware-pipeline",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/middleware-pipeline",
-      "to": "/zh/docs/middleware-pipeline/IMiddlewarePipelineAbortSignal",
       "type": "domain-peer"
     },
     {
@@ -61122,16 +61082,6 @@
       "type": "architecture-symbol"
     },
     {
-      "from": "/en/docs/event-subscriber#IEventAbortSignal",
-      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
-      "to": "/en/docs/event-subscriber#IEventAbortSignal",
-      "type": "alias-symbol"
-    },
-    {
       "from": "/en/docs/event-subscriber#IEventChannelLike",
       "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
       "type": "symbol-alias"
@@ -62402,16 +62352,6 @@
       "type": "architecture-symbol"
     },
     {
-      "from": "/zh/docs/event-subscriber#IEventAbortSignal",
-      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
-      "to": "/zh/docs/event-subscriber#IEventAbortSignal",
-      "type": "alias-symbol"
-    },
-    {
       "from": "/zh/docs/event-subscriber#IEventChannelLike",
       "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
       "type": "symbol-alias"
@@ -62513,36 +62453,6 @@
     },
     {
       "from": "/en/docs/event-subscriber/subscriber",
-      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
-      "to": "/en/docs/event-subscriber/subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
-      "to": "/en/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/event-subscriber/getting-started",
-      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
-      "to": "/en/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/event-subscriber",
-      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber/subscriber",
       "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
       "type": "api-symbol"
     },
@@ -62800,36 +62710,6 @@
       "from": "/zh/architecture/event-subscriber",
       "to": "/zh/docs/event-subscriber/subscriber",
       "type": "architecture-api"
-    },
-    {
-      "from": "/zh/docs/event-subscriber/subscriber",
-      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
-      "to": "/zh/docs/event-subscriber/subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
-      "to": "/zh/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/event-subscriber/getting-started",
-      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
-      "to": "/zh/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/event-subscriber",
-      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
-      "type": "architecture-symbol"
     },
     {
       "from": "/zh/docs/event-subscriber/subscriber",
@@ -74193,36 +74073,6 @@
     },
     {
       "from": "/en/docs/middleware-pipeline",
-      "to": "/en/docs/middleware-pipeline#middleware-pipeline-index--IMiddlewarePipelineAbortSignal",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/middleware-pipeline#middleware-pipeline-index--IMiddlewarePipelineAbortSignal",
-      "to": "/en/docs/middleware-pipeline",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/middleware-pipeline#middleware-pipeline-index--IMiddlewarePipelineAbortSignal",
-      "to": "/en/guides/middleware-pipeline/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/middleware-pipeline/getting-started",
-      "to": "/en/docs/middleware-pipeline#middleware-pipeline-index--IMiddlewarePipelineAbortSignal",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/middleware-pipeline#middleware-pipeline-index--IMiddlewarePipelineAbortSignal",
-      "to": "/en/architecture/middleware-pipeline",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/middleware-pipeline",
-      "to": "/en/docs/middleware-pipeline#middleware-pipeline-index--IMiddlewarePipelineAbortSignal",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/middleware-pipeline",
       "to": "/en/docs/middleware-pipeline#middleware-pipeline-index--IMiddlewarePipelineContext",
       "type": "api-symbol"
     },
@@ -75049,36 +74899,6 @@
     {
       "from": "/zh/architecture/middleware-pipeline",
       "to": "/zh/docs/middleware-pipeline#middleware-pipeline-index--IMiddlewarePipeline",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/middleware-pipeline",
-      "to": "/zh/docs/middleware-pipeline#middleware-pipeline-index--IMiddlewarePipelineAbortSignal",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/middleware-pipeline#middleware-pipeline-index--IMiddlewarePipelineAbortSignal",
-      "to": "/zh/docs/middleware-pipeline",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/middleware-pipeline#middleware-pipeline-index--IMiddlewarePipelineAbortSignal",
-      "to": "/zh/guides/middleware-pipeline/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/middleware-pipeline/getting-started",
-      "to": "/zh/docs/middleware-pipeline#middleware-pipeline-index--IMiddlewarePipelineAbortSignal",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/middleware-pipeline#middleware-pipeline-index--IMiddlewarePipelineAbortSignal",
-      "to": "/zh/architecture/middleware-pipeline",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/middleware-pipeline",
-      "to": "/zh/docs/middleware-pipeline#middleware-pipeline-index--IMiddlewarePipelineAbortSignal",
       "type": "architecture-symbol"
     },
     {

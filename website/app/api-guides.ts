@@ -5247,7 +5247,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
         name: 'signal',
         description: 'Optional cooperative cancellation signal whose reason is preserved.',
         defaultValue: 'undefined',
-        type: 'IWebAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'Bind work to request, host, or disposal lifetime.',
         example: 'controller.signal'
       }
@@ -5292,7 +5292,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
         name: 'signal',
         description: '可选 cooperative cancellation signal，并保留其 reason。',
         defaultValue: 'undefined',
-        type: 'IWebAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: '把 work 绑定到 request、host 或 disposal lifetime。',
         example: 'controller.signal'
       }
@@ -22949,7 +22949,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           description:
             'Optional cooperative abort signal checked before each stage and done admission. A started synchronous callback cannot be rolled back or interrupted mid-call.',
           defaultValue: 'undefined (no abort context)',
-          type: 'IMiddlewarePipelineAbortSignal',
+          type: 'IAbortSignal',
           whenToUse: 'Stop admission between synchronous stages when the caller owns cancellation.',
           example: 'runSyncMiddleware(stages, value, done, onViolation, { signal })'
         }
@@ -22975,7 +22975,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           description:
             '可选协作式 abort signal，在每个 stage 与 done 准入前检查；已经开始的同步 callback 无法中途回滚或打断。',
           defaultValue: 'undefined（不传 abort context）',
-          type: 'IMiddlewarePipelineAbortSignal',
+          type: 'IAbortSignal',
           whenToUse: '调用方拥有取消，并需要在同步 stage 之间停止准入时设置。',
           example: 'runSyncMiddleware(stages, value, done, onViolation, { signal })'
         }
@@ -23033,7 +23033,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           description:
             'Cooperative abort signal exposed through stage context and checked before frame and done admission. It does not undo work that already completed.',
           defaultValue: 'undefined (no abort context)',
-          type: 'IMiddlewarePipelineAbortSignal',
+          type: 'IAbortSignal',
           whenToUse: 'Tie pipeline admission to request or lifecycle cancellation.',
           example: '{ onViolation, signal: controller.signal }'
         }
@@ -23088,7 +23088,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           description:
             '通过 stage context 暴露的协作式 abort signal，在 frame 与 done 准入前检查；不会撤销已经完成的工作。',
           defaultValue: 'undefined（不传 abort context）',
-          type: 'IMiddlewarePipelineAbortSignal',
+          type: 'IAbortSignal',
           whenToUse: '把 pipeline 准入绑定到请求或 lifecycle 取消。',
           example: '{ onViolation, signal: controller.signal }'
         }
@@ -23116,7 +23116,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           description:
             'Cooperative abort signal checked at iterator transitions. Abort calls return once on an unfinished iterator and strictly drains cleanup yields without sending them downstream.',
           defaultValue: 'undefined (no abort context)',
-          type: 'IMiddlewarePipelineAbortSignal',
+          type: 'IAbortSignal',
           whenToUse: 'Allow lifecycle cancellation between synchronous generator transitions.',
           example: 'runGeneratorMiddleware(stages, value, done, undefined, { signal })'
         }
@@ -23142,7 +23142,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           description:
             '在 iterator transition 检查的协作式 abort signal；取消时对未完成 iterator 调用一次 return，并严格 drain cleanup yield，绝不传给下游。',
           defaultValue: 'undefined（不传 abort context）',
-          type: 'IMiddlewarePipelineAbortSignal',
+          type: 'IAbortSignal',
           whenToUse: '允许 lifecycle 在同步 generator transition 之间取消。',
           example: 'runGeneratorMiddleware(stages, value, done, undefined, { signal })'
         }
@@ -23170,7 +23170,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           description:
             'Cooperative abort signal checked before iterator transitions and done admission. Error reasons retain identity; primitive reasons become a traceable ABORTED error.',
           defaultValue: 'undefined (no abort context)',
-          type: 'IMiddlewarePipelineAbortSignal',
+          type: 'IAbortSignal',
           whenToUse: 'Bind serial async generator execution and cleanup to a lifecycle owner.',
           example: 'runAsyncGeneratorMiddleware(stages, value, done, undefined, { signal })'
         }
@@ -23196,7 +23196,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           description:
             '在 iterator transition 与 done 准入前检查的协作式 abort signal。Error reason 保持 identity；primitive reason 转成可追踪 ABORTED error。',
           defaultValue: 'undefined（不传 abort context）',
-          type: 'IMiddlewarePipelineAbortSignal',
+          type: 'IAbortSignal',
           whenToUse: '把串行 async generator 执行与 cleanup 绑定到 lifecycle owner。',
           example: 'runAsyncGeneratorMiddleware(stages, value, done, undefined, { signal })'
         }

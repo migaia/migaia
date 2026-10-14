@@ -136,7 +136,7 @@ subscribeUntil(channel, controller.signal, (event) => consume(event.value))
 controller.abort('owner closed')
 ```
 
-参数：`channel`（必填）、`signal: IEventAbortSignal`（必填，结构上兼容标准 `AbortSignal`）、`listener`（必填）、`options?: { taskId?: string }`（可选）。返回 `IUnsubscribe`（可重复调用，幂等）。已 `aborted` 的 signal 直接返回 no-op unsubscribe，不创建 registration。`abort()` 只撤销 registration，不会中断已经开始执行的 listener。
+参数：`channel`（必填）、`signal: IAbortSignal`（必填，结构上兼容标准 `AbortSignal`）、`listener`（必填）、`options?: { taskId?: string }`（可选）。返回 `IUnsubscribe`（可重复调用，幂等）。已 `aborted` 的 signal 直接返回 no-op unsubscribe，不创建 registration。`abort()` 只撤销 registration，不会中断已经开始执行的 listener。
 
 **`subscribeSubscriber`｜5 秒上手** —— 用对象而非函数订阅，保留 `this`：
 

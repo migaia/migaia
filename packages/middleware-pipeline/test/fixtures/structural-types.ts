@@ -1,5 +1,5 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type {
-  IMiddlewarePipelineAbortSignal,
   IMiddlewarePipelineContext,
   IMiddlewarePipelineControlOptions
 } from '@migaia/middleware-pipeline'
@@ -16,7 +16,7 @@ const customSignal: ICustomSignal = {
   addEventListener() {},
   removeEventListener() {}
 }
-const signal: IMiddlewarePipelineAbortSignal = customSignal
+const signal: IAbortSignal = customSignal
 const context: IMiddlewarePipelineContext = Object.freeze({ signal })
 const control: IMiddlewarePipelineControlOptions = { signal }
 

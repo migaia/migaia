@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { EventSubscriberErrorCode } from './error-code.js'
 import { MAX_NATIVE_RECURSION_DEPTH } from '@migaia/utils/function'
 import { admitAbortSignal } from '@migaia/utils/promise'
@@ -18,7 +19,6 @@ import type {
   IEventInvocation,
   IEventInvocationVisitor,
   IEventListener,
-  IEventAbortSignal,
   IFilteredEventChannel,
   IUnsubscribe,
   IStyledEventChannel,
@@ -972,7 +972,7 @@ export const subscribeOnce = <T, R, V = undefined>(
 /** Installs abort-linked subscription with a helper-owned overlay and closed race protocol. */
 export const subscribeUntil = <T, R, V = undefined>(
   channel: IEventChannelLike<T, R, V>,
-  signal: IEventAbortSignal,
+  signal: IAbortSignal,
   listener: IEventListener<T, R, V>,
   options?: { readonly taskId?: string }
 ): IUnsubscribe => {

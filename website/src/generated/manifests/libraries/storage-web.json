@@ -10347,7 +10347,7 @@
         {
           "name": "IMigrationContext",
           "kind": "type",
-          "signature": "export type IMigrationContext = { readonly fromVersion: number; readonly toVersion: number; /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IWebAbortSignal; };",
+          "signature": "export type IMigrationContext = { readonly fromVersion: number; readonly toVersion: number; /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IAbortSignal; };",
           "declarationLine": 3,
           "source": "packages/storage-web/dist/schema/migrate.d.ts",
           "purpose": "IMigrationContext is part of this module's public type contract.",
@@ -10365,7 +10365,7 @@
           "aliasOf": "IMigrationContext",
           "exportPath": "./schema",
           "overloadSignatures": [
-            "export type IMigrationContext = { readonly fromVersion: number; readonly toVersion: number; /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IWebAbortSignal; };"
+            "export type IMigrationContext = { readonly fromVersion: number; readonly toVersion: number; /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IAbortSignal; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -10404,7 +10404,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/schema/migrate.d.ts:IMigrationContext:export type IMigrationContext = { readonly fromVersion: number; readonly toVersion: number; /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IWebAbortSignal; };",
+          "identity": "packages/storage-web/dist/schema/migrate.d.ts:IMigrationContext:export type IMigrationContext = { readonly fromVersion: number; readonly toVersion: number; /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IAbortSignal; };",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -10638,7 +10638,7 @@
         {
           "name": "runMigrations",
           "kind": "const",
-          "signature": "export declare const runMigrations: (value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IWebAbortSignal) => Promise<unknown>;",
+          "signature": "export declare const runMigrations: (value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IAbortSignal) => Promise<unknown>;",
           "declarationLine": 15,
           "source": "packages/storage-web/dist/schema/migrate.d.ts",
           "purpose": "公开入口：创建新 runtime（一次 operation 一个 reporter），见 `docs/store-persist/storage-web-integration.sdd.md` §4.4「公开 API 兼作内部步骤的拆分」。",
@@ -10659,7 +10659,7 @@
           "aliasOf": "runMigrations",
           "exportPath": "./schema",
           "overloadSignatures": [
-            "export declare const runMigrations: (value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IWebAbortSignal) => Promise<unknown>;"
+            "export declare const runMigrations: (value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IAbortSignal) => Promise<unknown>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -10698,7 +10698,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/schema/migrate.d.ts:runMigrations:export declare const runMigrations: (value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IWebAbortSignal) => Promise<unknown>;",
+          "identity": "packages/storage-web/dist/schema/migrate.d.ts:runMigrations:export declare const runMigrations: (value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IAbortSignal) => Promise<unknown>;",
           "guidance": [
             {
               "id": "runmigrations",

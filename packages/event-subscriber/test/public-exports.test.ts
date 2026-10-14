@@ -1,11 +1,7 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import * as EventSubscriber from '../src/index.js'
 import { readFileSync } from 'node:fs'
-import {
-  createEventChannel,
-  createEventHub,
-  type IEventAbortSignal,
-  type IEventSubscriber
-} from '../src/index.js'
+import { createEventChannel, createEventHub, type IEventSubscriber } from '../src/index.js'
 import { describe, expect, it } from 'vitest'
 import * as SubscriberEntry from '../src/subscriber.js'
 
@@ -53,7 +49,7 @@ describe('public exports', () => {
         void message
       }
     })
-    const signal: IEventAbortSignal = {
+    const signal: IAbortSignal = {
       aborted: false,
       addEventListener: () => undefined,
       removeEventListener: () => undefined
@@ -86,7 +82,7 @@ describe('public exports', () => {
 
   it('ES-T48 accepts the host AbortSignal structure without lifecycle runtime import', () => {
     const channel = createEventChannel<number>()
-    const nativeSignal: IEventAbortSignal = new AbortController().signal
+    const nativeSignal: IAbortSignal = new AbortController().signal
     const stop = channel.subscribeUntil(nativeSignal, () => undefined)
     expect(nativeSignal.aborted).toBe(false)
     stop()

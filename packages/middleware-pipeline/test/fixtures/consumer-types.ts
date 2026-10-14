@@ -2,16 +2,15 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import type {
   IAsyncGeneratorMiddlewareStage,
   IGeneratorMiddlewareStage,
-  IMiddlewarePipelineAbortSignal,
   IMiddlewarePipelineContext,
   IMiddlewarePipelineControlOptions,
   ISyncMiddlewareStage
 } from '@migaia/middleware-pipeline'
 
 /** Compile-time consumer proof for native, lifecycle, and minimal structural signals. */
-const nativeSignal: IMiddlewarePipelineAbortSignal = {} as AbortSignal
-const lifecycleSignal: IMiddlewarePipelineAbortSignal = {} as IAbortSignal
-const customSignal: IMiddlewarePipelineAbortSignal = {
+const nativeSignal: IAbortSignal = {} as AbortSignal
+const lifecycleSignal: IAbortSignal = {} as IAbortSignal
+const customSignal: IAbortSignal = {
   aborted: false,
   addEventListener() {},
   removeEventListener() {}
