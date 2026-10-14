@@ -843,12 +843,6 @@
       "library": "event-subscriber"
     },
     {
-      "path": "/en/docs/event-subscriber/api/subscriber/IEventAbortSignal",
-      "locale": "en",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
       "path": "/en/docs/event-subscriber/api/subscriber/IEventChannelLike",
       "locale": "en",
       "domain": "docs",
@@ -2139,12 +2133,6 @@
       "library": "middleware-pipeline"
     },
     {
-      "path": "/en/docs/middleware-pipeline/api/IMiddlewarePipelineAbortSignal",
-      "locale": "en",
-      "domain": "docs",
-      "library": "middleware-pipeline"
-    },
-    {
       "path": "/en/docs/middleware-pipeline/api/IMiddlewarePipelineContext",
       "locale": "en",
       "domain": "docs",
@@ -2991,6 +2979,42 @@
       "library": "reactive"
     },
     {
+      "path": "/en/docs/reactive/api/IComputedConfig",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/IDisposable",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/IDisposer",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/IFlushResult",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/IReactiveComputed",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/IReactiveEffect",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/en/docs/reactive/api/IReactiveError",
       "locale": "en",
       "domain": "docs",
@@ -3003,7 +3027,43 @@
       "library": "reactive"
     },
     {
-      "path": "/en/docs/reactive/api/IReactiveErrorText",
+      "path": "/en/docs/reactive/api/IReactiveNodeOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/IReactiveSignal",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/IRuntime",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/IRuntimeErrorContext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/IRuntimeOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/IRuntimeTraceEvent",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/ISchedulerStrategy",
       "locale": "en",
       "domain": "docs",
       "library": "reactive"
@@ -3015,67 +3075,169 @@
       "library": "reactive"
     },
     {
+      "path": "/en/docs/reactive/api/ReactiveDependencyKind",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/en/docs/reactive/api/ReactiveErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/en/docs/reactive/api/ReactiveErrorText",
+      "path": "/en/docs/reactive/api/ReactiveErrorPhase",
       "locale": "en",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/en/docs/reactive/api/copy-check",
+      "path": "/en/docs/reactive/api/ReactiveTracePhase",
       "locale": "en",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/en/docs/reactive/api/copy-check/assertNoForeignOwnershipBrand",
+      "path": "/en/docs/reactive/api/ReactiveTraceReason",
       "locale": "en",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/en/docs/reactive/api/copy-check/assertSingleRuntimeCopy",
+      "path": "/en/docs/reactive/api/ReactiveTraceType",
       "locale": "en",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/en/docs/reactive/api/copy-check/brandOwnedValue",
+      "path": "/en/docs/reactive/api/assertSingleRuntimeCopy",
       "locale": "en",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/en/docs/reactive/api/copy-check/consumePendingCopyWarning",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/copy-check/noteRuntimeCopy",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/copy-check/resetRuntimeCopiesForTest",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/copy-check/runtimeCopyCount",
+      "path": "/en/docs/reactive/api/createRuntime",
       "locale": "en",
       "domain": "docs",
       "library": "reactive"
     },
     {
       "path": "/en/docs/reactive/api/defaultRuntime",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/ICapture",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/IInternalRuntime",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/IObservable",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/IObserver",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/IObserverBinding",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/IObserverCommitResult",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/IObserverRetrackResult",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/IRuntimeFieldSource",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/assertOwnedBy",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/assertReactiveOwnedBy",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/claimOwnership",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/createFieldSource",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/createObserverBinding",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/currentRuntimeVersion",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/internalRuntimeOf",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/isAnyRuntimeTracking",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/isRuntimeTracking",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/ownerOf",
       "locale": "en",
       "domain": "docs",
       "library": "reactive"
@@ -3105,421 +3267,61 @@
       "library": "reactive"
     },
     {
+      "path": "/en/docs/reactive/api/internals/mutableDepVersions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/internals/mutableDeps",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/internals/mutableSubs",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/internals/readVersion",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/internals/registerDepVersions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/internals/registerDeps",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/en/docs/reactive/api/internals/registerInternals",
       "locale": "en",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/en/docs/reactive/api/node-factories",
+      "path": "/en/docs/reactive/api/internals/registerSubs",
       "locale": "en",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/en/docs/reactive/api/node-factories/IInternalRuntime",
+      "path": "/en/docs/reactive/api/internals/registerVersion",
       "locale": "en",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/en/docs/reactive/api/node-factories/internalRuntimeOf",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/node-factories/isAnyRuntimeTracking",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/node-factories/isRuntimeTracking",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/node-internals",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/node-internals/mutableDepVersions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/node-internals/mutableDeps",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/node-internals/mutableSubs",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/node-internals/readVersion",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/node-internals/registerDepVersions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/node-internals/registerDeps",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/node-internals/registerSubs",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/node-internals/registerVersion",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/node-internals/setVersion",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/ownership",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/ownership/assertOwnedBy",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/ownership/assertReactiveOwnedBy",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/ownership/claimOwnership",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/ownership/ownerOf",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/reactive",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/reactive/Computed",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/reactive/Effect",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/reactive/IComputedConfig",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/reactive/IComputedOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/reactive/Signal",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/DependencyTracker",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/ICapture",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IComputedValue",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IDisposable",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IDisposer",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IFlushResult",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IFlushable",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IObservable",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IObserver",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IObserverBinding",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IObserverCommitResult",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IObserverRetrackResult",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IReactiveDependencyKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IReactiveErrorPhase",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IReactiveNodeOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IReactiveRuntimeAdapter",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IReactiveTracePhase",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IReactiveTraceReason",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IReactiveTraceType",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IRuntime",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IRuntimeErrorContext",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IRuntimeErrorPhase",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IRuntimeErrorReportContext",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IRuntimeNodeDescriptor",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IRuntimeNodeKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IRuntimeOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/IRuntimeTraceEvent",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/ISchedulerStrategy",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/ISignal",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/RUNTIME_BRAND",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/ReactiveDependencyKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/ReactiveErrorPhase",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/ReactiveTracePhase",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/ReactiveTraceReason",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/ReactiveTraceType",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/Runtime",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/Scheduler",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/VersionClock",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/createObserverBinding",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/runtime/createRuntime",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/source",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/en/docs/reactive/api/source/createFieldSource",
+      "path": "/en/docs/reactive/api/internals/setVersion",
       "locale": "en",
       "domain": "docs",
       "library": "reactive"
@@ -16635,12 +16437,6 @@
       "library": "event-subscriber"
     },
     {
-      "path": "/zh/docs/event-subscriber/api/subscriber/IEventAbortSignal",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
       "path": "/zh/docs/event-subscriber/api/subscriber/IEventChannelLike",
       "locale": "zh",
       "domain": "docs",
@@ -17931,12 +17727,6 @@
       "library": "middleware-pipeline"
     },
     {
-      "path": "/zh/docs/middleware-pipeline/api/IMiddlewarePipelineAbortSignal",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "middleware-pipeline"
-    },
-    {
       "path": "/zh/docs/middleware-pipeline/api/IMiddlewarePipelineContext",
       "locale": "zh",
       "domain": "docs",
@@ -18783,6 +18573,42 @@
       "library": "reactive"
     },
     {
+      "path": "/zh/docs/reactive/api/IComputedConfig",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/IDisposable",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/IDisposer",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/IFlushResult",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/IReactiveComputed",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/IReactiveEffect",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/zh/docs/reactive/api/IReactiveError",
       "locale": "zh",
       "domain": "docs",
@@ -18795,7 +18621,43 @@
       "library": "reactive"
     },
     {
-      "path": "/zh/docs/reactive/api/IReactiveErrorText",
+      "path": "/zh/docs/reactive/api/IReactiveNodeOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/IReactiveSignal",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/IRuntime",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/IRuntimeErrorContext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/IRuntimeOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/IRuntimeTraceEvent",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/ISchedulerStrategy",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"
@@ -18807,67 +18669,169 @@
       "library": "reactive"
     },
     {
+      "path": "/zh/docs/reactive/api/ReactiveDependencyKind",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/zh/docs/reactive/api/ReactiveErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/zh/docs/reactive/api/ReactiveErrorText",
+      "path": "/zh/docs/reactive/api/ReactiveErrorPhase",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/zh/docs/reactive/api/copy-check",
+      "path": "/zh/docs/reactive/api/ReactiveTracePhase",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/zh/docs/reactive/api/copy-check/assertNoForeignOwnershipBrand",
+      "path": "/zh/docs/reactive/api/ReactiveTraceReason",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/zh/docs/reactive/api/copy-check/assertSingleRuntimeCopy",
+      "path": "/zh/docs/reactive/api/ReactiveTraceType",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/zh/docs/reactive/api/copy-check/brandOwnedValue",
+      "path": "/zh/docs/reactive/api/assertSingleRuntimeCopy",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/zh/docs/reactive/api/copy-check/consumePendingCopyWarning",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/copy-check/noteRuntimeCopy",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/copy-check/resetRuntimeCopiesForTest",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/copy-check/runtimeCopyCount",
+      "path": "/zh/docs/reactive/api/createRuntime",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"
     },
     {
       "path": "/zh/docs/reactive/api/defaultRuntime",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/ICapture",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/IInternalRuntime",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/IObservable",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/IObserver",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/IObserverBinding",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/IObserverCommitResult",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/IObserverRetrackResult",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/IRuntimeFieldSource",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/assertOwnedBy",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/assertReactiveOwnedBy",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/claimOwnership",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/createFieldSource",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/createObserverBinding",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/currentRuntimeVersion",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/internalRuntimeOf",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/isAnyRuntimeTracking",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/isRuntimeTracking",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/ownerOf",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"
@@ -18897,421 +18861,61 @@
       "library": "reactive"
     },
     {
+      "path": "/zh/docs/reactive/api/internals/mutableDepVersions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/internals/mutableDeps",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/internals/mutableSubs",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/internals/readVersion",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/internals/registerDepVersions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/internals/registerDeps",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/zh/docs/reactive/api/internals/registerInternals",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/zh/docs/reactive/api/node-factories",
+      "path": "/zh/docs/reactive/api/internals/registerSubs",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/zh/docs/reactive/api/node-factories/IInternalRuntime",
+      "path": "/zh/docs/reactive/api/internals/registerVersion",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"
     },
     {
-      "path": "/zh/docs/reactive/api/node-factories/internalRuntimeOf",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/node-factories/isAnyRuntimeTracking",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/node-factories/isRuntimeTracking",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/node-internals",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/node-internals/mutableDepVersions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/node-internals/mutableDeps",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/node-internals/mutableSubs",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/node-internals/readVersion",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/node-internals/registerDepVersions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/node-internals/registerDeps",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/node-internals/registerSubs",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/node-internals/registerVersion",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/node-internals/setVersion",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/ownership",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/ownership/assertOwnedBy",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/ownership/assertReactiveOwnedBy",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/ownership/claimOwnership",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/ownership/ownerOf",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/reactive",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/reactive/Computed",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/reactive/Effect",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/reactive/IComputedConfig",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/reactive/IComputedOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/reactive/Signal",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/DependencyTracker",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/ICapture",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IComputedValue",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IDisposable",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IDisposer",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IFlushResult",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IFlushable",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IObservable",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IObserver",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IObserverBinding",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IObserverCommitResult",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IObserverRetrackResult",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IReactiveDependencyKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IReactiveErrorPhase",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IReactiveNodeOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IReactiveRuntimeAdapter",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IReactiveTracePhase",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IReactiveTraceReason",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IReactiveTraceType",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IRuntime",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IRuntimeErrorContext",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IRuntimeErrorPhase",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IRuntimeErrorReportContext",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IRuntimeNodeDescriptor",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IRuntimeNodeKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IRuntimeOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/IRuntimeTraceEvent",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/ISchedulerStrategy",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/ISignal",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/RUNTIME_BRAND",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/ReactiveDependencyKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/ReactiveErrorPhase",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/ReactiveTracePhase",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/ReactiveTraceReason",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/ReactiveTraceType",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/Runtime",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/Scheduler",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/VersionClock",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/createObserverBinding",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/runtime/createRuntime",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/source",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
-      "path": "/zh/docs/reactive/api/source/createFieldSource",
+      "path": "/zh/docs/reactive/api/internals/setVersion",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"

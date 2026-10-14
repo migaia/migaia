@@ -130,7 +130,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "这两个函数不依赖 `createStoreDevTools`，可独立使用，只需要一个 `@migaia/reactive/runtime` 的 `IObservable`/`IObserver` 实例（Signal/Computed/Effect 的内部图节点）。"
+                "text": "这两个函数不依赖 `createStoreDevTools`，可独立使用。`getDependencyTree` 接受 `runtime.effect()` 或 `runtime.computed()` 的公开句柄；`getObserverTree` 接受 `runtime.signal()` 或 `runtime.computed()` 的公开句柄。实现层也可传入 `@migaia/reactive/extension` 的 `IObservable`/`IObserver` 图节点。"
               },
               {
                 "type": "paragraph",
@@ -358,7 +358,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive/runtime\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;"
+                "code": "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;"
               }
             ]
           },
@@ -561,12 +561,12 @@
               },
               {
                 "type": "paragraph",
-                "text": "`getDependencyTree`/`getObserverTree` 不依赖 `createStoreDevTools`，可独立使用，参数类型 `IObservable`/`IObserver` 来自 `@migaia/reactive/runtime`（内核内部图协议子路径，刻意不从 `@migaia/reactive` 主入口导出——第三方通常应该组合公开的 `Signal`/`Computed`/`Effect`，而不是直接操作图节点；本包需要读取节点内部的 `deps`/`subs`/`version` 才能画依赖图，所以走这条子路径导入）。"
+                "text": "`getDependencyTree`/`getObserverTree` 不依赖 `createStoreDevTools`，可独立使用。公开句柄类型 `IReactiveSignal`/`IReactiveComputed`/`IReactiveEffect` 来自 `@migaia/reactive`；实现层图协议 `IObservable`/`IObserver` 来自 `@migaia/reactive/extension`。传入 Runtime 工厂创建的真实节点即可，本包按既有图关系读取 `deps`/`subs`/`version`。"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IDependencyTreeNode = {\n  kind: 'observable' | 'observer';\n  label: string; // node.debugName ?? node.constructor?.name ?? 'AnonymousReactiveNode'\n  version?: number; // 仅 kind === 'observable' 的节点携带；对应该节点当前的版本号\n  children: IDependencyTreeNode[];\n  circular?: boolean; // 该节点在当前递归路径上被重复访问\n};\n\nfunction getDependencyTree(observer: IObserver, maxDepth?: number): IDependencyTreeNode;\nfunction getObserverTree(observable: IObservable, maxDepth?: number): IDependencyTreeNode;"
+                "code": "type IDependencyTreeNode = {\n  kind: 'observable' | 'observer';\n  label: string; // node.debugName ?? node.constructor?.name ?? 'AnonymousReactiveNode'\n  version?: number; // 仅 kind === 'observable' 的节点携带；对应该节点当前的版本号\n  children: IDependencyTreeNode[];\n  circular?: boolean; // 该节点在当前递归路径上被重复访问\n};\n\nfunction getDependencyTree(\n  root: IObserver | IReactiveEffect | IReactiveComputed<unknown>,\n  maxDepth?: number\n): IDependencyTreeNode;\nfunction getObserverTree(\n  root: IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>,\n  maxDepth?: number\n): IDependencyTreeNode;"
               }
             ]
           },
@@ -792,7 +792,7 @@
           "name": "createStoreDevTools",
           "kind": "function",
           "signature": "export declare function createStoreDevTools<S extends Record<string, unknown>>(store: IReactiveStore<S>, options?: IStoreDevToolsOptions): IStoreDevTools;",
-          "declarationLine": 43,
+          "declarationLine": 46,
           "source": "packages/store-devtools/dist/devtools.d.ts",
           "purpose": "createStoreDevTools is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreDevTools.",
@@ -1544,17 +1544,20 @@
         {
           "name": "getDependencyTree",
           "kind": "function",
-          "signature": "export declare function getDependencyTree(observer: IObserver, maxDepth?: number): IDependencyTreeNode;",
-          "declarationLine": 41,
+          "signature": "export declare function getDependencyTree(root: IObserver | IReactiveEffect | IReactiveComputed<unknown>, maxDepth?: number): IDependencyTreeNode;",
+          "declarationLine": 43,
           "source": "packages/store-devtools/dist/devtools.d.ts",
-          "purpose": "getDependencyTree is part of this module's public function contract.",
+          "purpose": "Traverses dependencies of runtime-created public handles or extension graph observers.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for getDependencyTree.",
           "advanced": "No additional advanced behavior is declared for getDependencyTree.",
-          "parameters": ["observer: IObserver", "maxDepth: number (optional)"],
+          "parameters": [
+            "root: IObserver | IReactiveEffect | IReactiveComputed<unknown>",
+            "maxDepth: number (optional)"
+          ],
           "parameterDetails": [
             {
-              "name": "observer",
-              "type": "IObserver",
+              "name": "root",
+              "type": "IObserver | IReactiveEffect | IReactiveComputed<unknown>",
               "optional": false
             },
             {
@@ -1574,13 +1577,13 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function getDependencyTree(observer: IObserver, maxDepth?: number): IDependencyTreeNode;"
+            "export declare function getDependencyTree(root: IObserver | IReactiveEffect | IReactiveComputed<unknown>, maxDepth?: number): IDependencyTreeNode;"
           ],
           "overloadParameterDetails": [
             [
               {
-                "name": "observer",
-                "type": "IObserver",
+                "name": "root",
+                "type": "IObserver | IReactiveEffect | IReactiveComputed<unknown>",
                 "optional": false
               },
               {
@@ -1597,7 +1600,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "getDependencyTree is part of this module's public function contract."
+              "content": "Traverses dependencies of runtime-created public handles or extension graph observers."
             },
             {
               "id": "getting-started",
@@ -1626,7 +1629,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-devtools/dist/devtools.d.ts:getDependencyTree:export declare function getDependencyTree(observer: IObserver, maxDepth?: number): IDependencyTreeNode;",
+          "identity": "packages/store-devtools/dist/devtools.d.ts:getDependencyTree:export declare function getDependencyTree(root: IObserver | IReactiveEffect | IReactiveComputed<unknown>, maxDepth?: number): IDependencyTreeNode;",
           "guidance": [
             {
               "id": "storedevtoolserrorcode",
@@ -1670,24 +1673,27 @@
               ]
             }
           ],
-          "usageScore": 84,
+          "usageScore": 86,
           "configuration": [],
           "fragment": "store-devtools-index--getDependencyTree"
         },
         {
           "name": "getObserverTree",
           "kind": "function",
-          "signature": "export declare function getObserverTree(observable: IObservable, maxDepth?: number): IDependencyTreeNode;",
-          "declarationLine": 42,
+          "signature": "export declare function getObserverTree(root: IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>, maxDepth?: number): IDependencyTreeNode;",
+          "declarationLine": 45,
           "source": "packages/store-devtools/dist/devtools.d.ts",
-          "purpose": "getObserverTree is part of this module's public function contract.",
+          "purpose": "Traverses subscribers of runtime-created public handles or extension graph observables.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for getObserverTree.",
           "advanced": "No additional advanced behavior is declared for getObserverTree.",
-          "parameters": ["observable: IObservable", "maxDepth: number (optional)"],
+          "parameters": [
+            "root: IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>",
+            "maxDepth: number (optional)"
+          ],
           "parameterDetails": [
             {
-              "name": "observable",
-              "type": "IObservable",
+              "name": "root",
+              "type": "IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>",
               "optional": false
             },
             {
@@ -1706,13 +1712,13 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function getObserverTree(observable: IObservable, maxDepth?: number): IDependencyTreeNode;"
+            "export declare function getObserverTree(root: IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>, maxDepth?: number): IDependencyTreeNode;"
           ],
           "overloadParameterDetails": [
             [
               {
-                "name": "observable",
-                "type": "IObservable",
+                "name": "root",
+                "type": "IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>",
                 "optional": false
               },
               {
@@ -1729,7 +1735,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "getObserverTree is part of this module's public function contract."
+              "content": "Traverses subscribers of runtime-created public handles or extension graph observables."
             },
             {
               "id": "getting-started",
@@ -1758,7 +1764,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-devtools/dist/devtools.d.ts:getObserverTree:export declare function getObserverTree(observable: IObservable, maxDepth?: number): IDependencyTreeNode;",
+          "identity": "packages/store-devtools/dist/devtools.d.ts:getObserverTree:export declare function getObserverTree(root: IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>, maxDepth?: number): IDependencyTreeNode;",
           "guidance": [
             {
               "id": "storedevtoolserrorcode",
@@ -1802,7 +1808,7 @@
               ]
             }
           ],
-          "usageScore": 74,
+          "usageScore": 76,
           "configuration": [],
           "fragment": "store-devtools-index--getObserverTree"
         },
@@ -1810,7 +1816,7 @@
           "name": "IActionTrace",
           "kind": "type",
           "signature": "export type IActionTrace = { timestamp: number; name: string; payload?: unknown; durationMs?: number; error?: unknown; };",
-          "declarationLine": 17,
+          "declarationLine": 18,
           "source": "packages/store-devtools/dist/devtools.d.ts",
           "purpose": "IActionTrace is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IActionTrace.",
@@ -1822,7 +1828,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IActionTrace.",
           "examples": [
             "import {\n  createStoreDevTools,\n  type IStoreDevTools,\n  type IStoreDevToolsOptions,\n  type IStoreHistoryEntry,\n  type IActionTrace\n} from '@migaia/store-devtools';",
-            "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive/runtime\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;",
+            "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;",
             "recordAction(trace: Omit<IActionTrace, 'timestamp'>): void"
           ],
           "members": [],
@@ -1877,7 +1883,7 @@
           "name": "IDependencyTreeNode",
           "kind": "type",
           "signature": "export type IDependencyTreeNode = { kind: (typeof StoreDevtoolsNodeKind)[keyof typeof StoreDevtoolsNodeKind]; label: string; version?: number; children: IDependencyTreeNode[]; circular?: boolean; };",
-          "declarationLine": 4,
+          "declarationLine": 5,
           "source": "packages/store-devtools/dist/devtools.d.ts",
           "purpose": "IDependencyTreeNode is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDependencyTreeNode.",
@@ -1889,7 +1895,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDependencyTreeNode.",
           "examples": [
             "import {\n  getDependencyTree,\n  getObserverTree,\n  type IDependencyTreeNode\n} from '@migaia/store-devtools';",
-            "type IDependencyTreeNode = {\n  kind: 'observable' | 'observer';\n  label: string; // node.debugName ?? node.constructor?.name ?? 'AnonymousReactiveNode'\n  version?: number; // 仅 kind === 'observable' 的节点携带；对应该节点当前的版本号\n  children: IDependencyTreeNode[];\n  circular?: boolean; // 该节点在当前递归路径上被重复访问\n};\n\nfunction getDependencyTree(observer: IObserver, maxDepth?: number): IDependencyTreeNode;\nfunction getObserverTree(observable: IObservable, maxDepth?: number): IDependencyTreeNode;"
+            "type IDependencyTreeNode = {\n  kind: 'observable' | 'observer';\n  label: string; // node.debugName ?? node.constructor?.name ?? 'AnonymousReactiveNode'\n  version?: number; // 仅 kind === 'observable' 的节点携带；对应该节点当前的版本号\n  children: IDependencyTreeNode[];\n  circular?: boolean; // 该节点在当前递归路径上被重复访问\n};\n\nfunction getDependencyTree(\n  root: IObserver | IReactiveEffect | IReactiveComputed<unknown>,\n  maxDepth?: number\n): IDependencyTreeNode;\nfunction getObserverTree(\n  root: IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>,\n  maxDepth?: number\n): IDependencyTreeNode;"
           ],
           "members": [],
           "exportPath": ".",
@@ -1943,7 +1949,7 @@
           "name": "IStoreDevTools",
           "kind": "type",
           "signature": "export type IStoreDevTools = { readonly history: readonly IStoreHistoryEntry[]; readonly actions: readonly IActionTrace[]; readonly trace: readonly IRuntimeTraceEvent[]; record(label?: string): IStoreHistoryEntry; recordAction(trace: Omit<IActionTrace, 'timestamp'>): void; jumpTo(id: number): void; clear(): void; dispose(): void; };",
-          "declarationLine": 31,
+          "declarationLine": 32,
           "source": "packages/store-devtools/dist/devtools.d.ts",
           "purpose": "IStoreDevTools is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreDevTools.",
@@ -1955,7 +1961,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreDevTools.",
           "examples": [
             "import {\n  createStoreDevTools,\n  type IStoreDevTools,\n  type IStoreDevToolsOptions,\n  type IStoreHistoryEntry,\n  type IActionTrace\n} from '@migaia/store-devtools';",
-            "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive/runtime\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;"
+            "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;"
           ],
           "members": [],
           "exportPath": ".",
@@ -2076,7 +2082,7 @@
           "name": "IStoreDevToolsOptions",
           "kind": "type",
           "signature": "export type IStoreDevToolsOptions = { maxHistory?: number; maxTrace?: number; captureRuntimeTrace?: boolean; now?: () => number; clone?: (state: Record<string, unknown>) => Record<string, unknown>; };",
-          "declarationLine": 24,
+          "declarationLine": 25,
           "source": "packages/store-devtools/dist/devtools.d.ts",
           "purpose": "IStoreDevToolsOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreDevToolsOptions.",
@@ -2088,7 +2094,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreDevToolsOptions.",
           "examples": [
             "import {\n  createStoreDevTools,\n  type IStoreDevTools,\n  type IStoreDevToolsOptions,\n  type IStoreHistoryEntry,\n  type IActionTrace\n} from '@migaia/store-devtools';",
-            "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive/runtime\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;"
+            "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;"
           ],
           "members": [],
           "exportPath": ".",
@@ -2142,7 +2148,7 @@
           "name": "IStoreHistoryEntry",
           "kind": "type",
           "signature": "export type IStoreHistoryEntry = { id: number; timestamp: number; label: string; state: Record<string, unknown>; };",
-          "declarationLine": 11,
+          "declarationLine": 12,
           "source": "packages/store-devtools/dist/devtools.d.ts",
           "purpose": "IStoreHistoryEntry is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreHistoryEntry.",
@@ -2154,7 +2160,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreHistoryEntry.",
           "examples": [
             "import {\n  createStoreDevTools,\n  type IStoreDevTools,\n  type IStoreDevToolsOptions,\n  type IStoreHistoryEntry,\n  type IActionTrace\n} from '@migaia/store-devtools';",
-            "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive/runtime\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;",
+            "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;",
             "record(label: string = 'state change'): IStoreHistoryEntry"
           ],
           "members": [],

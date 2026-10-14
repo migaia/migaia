@@ -175,7 +175,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { Signal, defaultRuntime } from '@migaia/reactive';\n\nconst values = new Signal([1, 2, 3], defaultRuntime);\nconst sum = workerComputed(adapter, () => values.value);\n\nconsole.log(await sum.refetch()); // 6\nsum.dispose();"
+                "code": "import { defaultRuntime } from '@migaia/reactive';\n\nconst values = defaultRuntime.signal([1, 2, 3]);\nconst sum = workerComputed(adapter, () => values.value);\n\nconsole.log(await sum.refetch()); // 6\nsum.dispose();"
               },
               {
                 "type": "paragraph",
@@ -408,7 +408,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { Signal, defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = new Signal<readonly Row[]>([], defaultRuntime);\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000,\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();"
+                "code": "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = defaultRuntime.signal<readonly Row[]>([]);\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000,\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();"
               }
             ]
           },
@@ -1052,7 +1052,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { Signal, defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = new Signal<readonly Row[]>([], defaultRuntime);\n\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000, // 30 秒内复用结果,不重新触发 Worker 计算\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();"
+                "code": "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = defaultRuntime.signal<readonly Row[]>([]);\n\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000, // 30 秒内复用结果,不重新触发 Worker 计算\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();"
               }
             ]
           },
@@ -1658,7 +1658,7 @@
           "name": "createWorkerHandler",
           "kind": "function",
           "signature": "export declare function createWorkerHandler<Input, Output>(compute: (payload: Input, context: { signal: IAbortSignal; }) => Output | Promise<Output>, postMessage: (message: unknown) => void, options?: { readonly timeoutMs?: number; }): IManagedRpcHandler;",
-          "declarationLine": 27,
+          "declarationLine": 31,
           "source": "packages/store-worker/dist/worker.d.ts",
           "purpose": "createWorkerHandler is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWorkerHandler.",
@@ -1884,10 +1884,10 @@
         {
           "name": "IManagedRpcHandler",
           "kind": "type",
-          "signature": "export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * 唯一异步释放入口。先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`； 不吞清理错误（失败会 reject），重复调用复用同一个 * Promise。 */ dispose(): Promise<void>; /** 同步标记不可用：仅置 `disposed = true`，不执行底层释放。幂等。 */ close(): void; readonly pendingCount: number; readonly disposed: boolean; };",
-          "declarationLine": 8,
+          "signature": "export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup * failures reject the promise instead of being swallowed. Repeated calls return the same * promise. */ dispose(): Promise<void>; /** * Synchronously marks the handler unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; readonly pendingCount: number; readonly disposed: boolean; };",
+          "declarationLine": 9,
           "source": "packages/store-worker/dist/managed-rpc-handler.d.ts",
-          "purpose": "Worker 侧托管的 RPC 消息处理器。 生命周期遵循 `lifecycle-extraction.sdd.md` §4.1：`disposeAsync()` 不存在，`dispose()` 是唯一 异步释放入口并恒返回 `Promise<void>`；同步的「停止接受新工作」用 `close()`，它只标记不可用、 不执行用户清理。",
+          "purpose": "Defines a managed RPC message handler for the worker side. Following `lifecycle-extraction.sdd.md` §4.1, `dispose()` is the only asynchronous disposal entry point. It always returns `Promise<void>`; there is no `disposeAsync()`. `close()` synchronously stops accepting work without running user cleanup.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IManagedRpcHandler.",
           "advanced": "No additional advanced behavior is declared for IManagedRpcHandler.",
           "parameters": ["This type declaration has no parameters."],
@@ -1900,7 +1900,7 @@
           "aliasOf": "IManagedRpcHandler",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * 唯一异步释放入口。先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`； 不吞清理错误（失败会 reject），重复调用复用同一个 * Promise。 */ dispose(): Promise<void>; /** 同步标记不可用：仅置 `disposed = true`，不执行底层释放。幂等。 */ close(): void; readonly pendingCount: number; readonly disposed: boolean; };"
+            "export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup * failures reject the promise instead of being swallowed. Repeated calls return the same * promise. */ dispose(): Promise<void>; /** * Synchronously marks the handler unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; readonly pendingCount: number; readonly disposed: boolean; };"
           ],
           "overloadParameterDetails": [[], []],
           "overloadReturns": [],
@@ -1910,7 +1910,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Worker 侧托管的 RPC 消息处理器。 生命周期遵循 `lifecycle-extraction.sdd.md` §4.1：`disposeAsync()` 不存在，`dispose()` 是唯一 异步释放入口并恒返回 `Promise<void>`；同步的「停止接受新工作」用 `close()`，它只标记不可用、 不执行用户清理。"
+              "content": "Defines a managed RPC message handler for the worker side. Following `lifecycle-extraction.sdd.md` §4.1, `dispose()` is the only asynchronous disposal entry point. It always returns `Promise<void>`; there is no `disposeAsync()`. `close()` synchronously stops accepting work without running user cleanup."
             },
             {
               "id": "getting-started",
@@ -1939,7 +1939,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/managed-rpc-handler.d.ts:IManagedRpcHandler:export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * 唯一异步释放入口。先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`； 不吞清理错误（失败会 reject），重复调用复用同一个 * Promise。 */ dispose(): Promise<void>; /** 同步标记不可用：仅置 `disposed = true`，不执行底层释放。幂等。 */ close(): void; readonly pendingCount: number; readonly disposed: boolean; };",
+          "identity": "packages/store-worker/dist/managed-rpc-handler.d.ts:IManagedRpcHandler:export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup * failures reject the promise instead of being swallowed. Repeated calls return the same * promise. */ dispose(): Promise<void>; /** * Synchronously marks the handler unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; readonly pendingCount: number; readonly disposed: boolean; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -1949,7 +1949,7 @@
           "name": "IWorkerComputedOptions",
           "kind": "type",
           "signature": "export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & { readonly runtime?: IRuntime; readonly transfer?: (input: Input) => readonly unknown[]; };",
-          "declarationLine": 32,
+          "declarationLine": 36,
           "source": "packages/store-worker/dist/worker.d.ts",
           "purpose": "IWorkerComputedOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWorkerComputedOptions.",
@@ -2355,7 +2355,7 @@
         {
           "name": "WorkerAdapter",
           "kind": "class",
-          "signature": "export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** 同步标记不可用：仅置 `disposed = true`，不释放底层 endpoint。幂等。 */ close(): void; /** * 唯一异步释放入口：先 `close()`，再等待 endpoint 初始化并执行 `endpoint.dispose()`。 不吞清理错误（失败会 reject），重复调用复用同一个 * Promise。 */ dispose(): Promise<void>; }",
+          "signature": "export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** * Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls * return the same promise. */ dispose(): Promise<void>; }",
           "declarationLine": 8,
           "source": "packages/store-worker/dist/worker.d.ts",
           "purpose": "WorkerAdapter is part of this module's public class contract.",
@@ -2381,9 +2381,9 @@
           "errors": ["No documented errors are declared for WorkerAdapter."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for WorkerAdapter.",
           "examples": [
-            "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { Signal, defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = new Signal<readonly Row[]>([], defaultRuntime);\n\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000, // 30 秒内复用结果,不重新触发 Worker 计算\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();",
+            "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = defaultRuntime.signal<readonly Row[]>([]);\n\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000, // 30 秒内复用结果,不重新触发 Worker 计算\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();",
             "const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker);\n\nconst result = await adapter.request<number[], number>([1, 2, 3]);\nadapter.dispose();",
-            "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { Signal, defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = new Signal<readonly Row[]>([], defaultRuntime);\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000,\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();"
+            "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = defaultRuntime.signal<readonly Row[]>([]);\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000,\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();"
           ],
           "members": [
             {
@@ -2417,7 +2417,7 @@
               "name": "close",
               "kind": "method",
               "signature": "close(): void;",
-              "description": "同步标记不可用：仅置 `disposed = true`，不释放底层 endpoint。幂等。",
+              "description": "Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release the endpoint. Repeated calls have no additional effect.",
               "parameterDetails": [],
               "returns": "void"
             },
@@ -2425,14 +2425,14 @@
               "name": "dispose",
               "kind": "method",
               "signature": "dispose(): Promise<void>;",
-              "description": "唯一异步释放入口：先 `close()`，再等待 endpoint 初始化并执行 `endpoint.dispose()`。 不吞清理错误（失败会 reject），重复调用复用同一个 Promise。",
+              "description": "Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls return the same promise.",
               "parameterDetails": [],
               "returns": "Promise<void>"
             }
           ],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** 同步标记不可用：仅置 `disposed = true`，不释放底层 endpoint。幂等。 */ close(): void; /** * 唯一异步释放入口：先 `close()`，再等待 endpoint 初始化并执行 `endpoint.dispose()`。 不吞清理错误（失败会 reject），重复调用复用同一个 * Promise。 */ dispose(): Promise<void>; }"
+            "export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** * Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls * return the same promise. */ dispose(): Promise<void>; }"
           ],
           "overloadParameterDetails": [
             [
@@ -2484,7 +2484,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/worker.d.ts:WorkerAdapter:export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** 同步标记不可用：仅置 `disposed = true`，不释放底层 endpoint。幂等。 */ close(): void; /** * 唯一异步释放入口：先 `close()`，再等待 endpoint 初始化并执行 `endpoint.dispose()`。 不吞清理错误（失败会 reject），重复调用复用同一个 * Promise。 */ dispose(): Promise<void>; }",
+          "identity": "packages/store-worker/dist/worker.d.ts:WorkerAdapter:export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** * Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls * return the same promise. */ dispose(): Promise<void>; }",
           "guidance": [
             {
               "id": "8-1-通用-rpc-错误",
@@ -2573,7 +2573,7 @@
           "name": "workerComputed",
           "kind": "function",
           "signature": "export declare function workerComputed<Input, Output>(adapter: WorkerAdapter, selectInput: () => Input, options?: IWorkerComputedOptions<Input, Output>): Resource<Output>;",
-          "declarationLine": 36,
+          "declarationLine": 40,
           "source": "packages/store-worker/dist/worker.d.ts",
           "purpose": "workerComputed is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for workerComputed.",
@@ -2604,9 +2604,9 @@
           "errors": ["No documented errors are declared for workerComputed."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for workerComputed.",
           "examples": [
-            "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { Signal, defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = new Signal<readonly Row[]>([], defaultRuntime);\n\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000, // 30 秒内复用结果,不重新触发 Worker 计算\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();",
-            "import { Signal, defaultRuntime } from '@migaia/reactive';\n\nconst values = new Signal([1, 2, 3], defaultRuntime);\nconst sum = workerComputed(adapter, () => values.value);\n\nconsole.log(await sum.refetch()); // 6\nsum.dispose();",
-            "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { Signal, defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = new Signal<readonly Row[]>([], defaultRuntime);\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000,\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();"
+            "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = defaultRuntime.signal<readonly Row[]>([]);\n\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000, // 30 秒内复用结果,不重新触发 Worker 计算\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();",
+            "import { defaultRuntime } from '@migaia/reactive';\n\nconst values = defaultRuntime.signal([1, 2, 3]);\nconst sum = workerComputed(adapter, () => values.value);\n\nconsole.log(await sum.refetch()); // 6\nsum.dispose();",
+            "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = defaultRuntime.signal<readonly Row[]>([]);\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000,\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();"
           ],
           "members": [],
           "exportPath": ".",
@@ -2837,9 +2837,9 @@
           "name": "createSerializeWorkerHandler",
           "kind": "function",
           "signature": "export declare function createSerializeWorkerHandler(parser: ISerializeParser, post: (message: unknown, transfer?: readonly unknown[]) => void): IManagedRpcHandler;",
-          "declarationLine": 52,
+          "declarationLine": 69,
           "source": "packages/store-worker/dist/serialize/worker.d.ts",
-          "purpose": "Worker 侧的对端。把一个普通 parser 装进 worker，按上面的报文协议应答。 与 core/worker.ts 里的 createWorkerHandler 同一手法：错误一律转成回包，绝不让 异常逃逸成 worker 的 unhandled error——那会静默吞掉请求方的 Promise。",
+          "purpose": "Installs an ordinary parser on the worker side and responds through the serialization message protocol. Like `createWorkerHandler` in `core/worker.ts`, it converts operation failures into replies. This prevents unhandled worker errors from leaving the caller's request promise unresolved.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSerializeWorkerHandler.",
           "advanced": "No additional advanced behavior is declared for createSerializeWorkerHandler.",
           "parameters": [
@@ -2893,7 +2893,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Worker 侧的对端。把一个普通 parser 装进 worker，按上面的报文协议应答。 与 core/worker.ts 里的 createWorkerHandler 同一手法：错误一律转成回包，绝不让 异常逃逸成 worker 的 unhandled error——那会静默吞掉请求方的 Promise。"
+              "content": "Installs an ordinary parser on the worker side and responds through the serialization message protocol. Like `createWorkerHandler` in `core/worker.ts`, it converts operation failures into replies. This prevents unhandled worker errors from leaving the caller's request promise unresolved."
             },
             {
               "id": "getting-started",
@@ -2943,7 +2943,7 @@
           "name": "decodeWorkerValue",
           "kind": "function",
           "signature": "export declare function decodeWorkerValue(value: unknown): ISerializeChunk;",
-          "declarationLine": 19,
+          "declarationLine": 23,
           "source": "packages/store-worker/dist/serialize/worker.d.ts",
           "purpose": "Encodes one worker decode result, preserving byte payload identity for transfer handling.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for decodeWorkerValue.",
@@ -3020,7 +3020,7 @@
           "name": "encodeWorkerValue",
           "kind": "function",
           "signature": "export declare function encodeWorkerValue(value: unknown): ISerializeChunk;",
-          "declarationLine": 17,
+          "declarationLine": 21,
           "source": "packages/store-worker/dist/serialize/worker.d.ts",
           "purpose": "Encodes one worker input using the canonical byte brand without copying its payload.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for encodeWorkerValue.",
@@ -3097,9 +3097,9 @@
           "name": "IWorkerFailureEvent",
           "kind": "type",
           "signature": "export type IWorkerFailureEvent = 'error' | 'messageerror';",
-          "declarationLine": 6,
+          "declarationLine": 9,
           "source": "packages/store-worker/dist/serialize/worker.d.ts",
-          "purpose": "Worker 出事的三种途径，全都得监听，否则请求会永久悬挂。",
+          "purpose": "Identifies the `error` and `messageerror` worker failure events. Both must be observed so requests do not remain pending indefinitely.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWorkerFailureEvent.",
           "advanced": "No additional advanced behavior is declared for IWorkerFailureEvent.",
           "parameters": ["This type declaration has no parameters."],
@@ -3119,7 +3119,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Worker 出事的三种途径，全都得监听，否则请求会永久悬挂。"
+              "content": "Identifies the `error` and `messageerror` worker failure events. Both must be observed so requests do not remain pending indefinitely."
             },
             {
               "id": "getting-started",
@@ -3158,7 +3158,7 @@
           "name": "IWorkerLike",
           "kind": "type",
           "signature": "export type IWorkerLike = IWebWorkerLikePort & { terminate?(): void; };",
-          "declarationLine": 7,
+          "declarationLine": 10,
           "source": "packages/store-worker/dist/serialize/worker.d.ts",
           "purpose": "IWorkerLike is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWorkerLike.",
@@ -3257,8 +3257,8 @@
         {
           "name": "IWorkerPluginOptions",
           "kind": "type",
-          "signature": "export type IWorkerPluginOptions = { readonly worker: IWorkerLike; /** 注册到 registry 的格式标签，需与 worker 侧实际使用的编码一致。 */ readonly type?: string; /** 卸载时是否顺带终止 worker。外部传入的 worker 默认归调用方所有。 */ readonly terminateOnDispose?: boolean; /** 默认 'copy'：安全但要复制一遍。只有当调用方确认这段字节独占、且交出去之后 不再使用时，才该选 'transfer' 换取零拷贝。 */ readonly ownership?: IByteOwnership; /** Overrides the default client id (a fixed value rather than a factory — see `src/rpc`). */ readonly clientId?: string; };",
-          "declarationLine": 20,
+          "signature": "export type IWorkerPluginOptions = { readonly worker: IWorkerLike; /** Names the format registered in the registry. It must match the encoding used by the worker. */ readonly type?: string; /** * Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default. */ readonly terminateOnDispose?: boolean; /** * Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes * are exclusively owned and no longer used after handoff. */ readonly ownership?: IByteOwnership; /** Overrides the default client id (a fixed value rather than a factory — see `src/rpc`). */ readonly clientId?: string; };",
+          "declarationLine": 24,
           "source": "packages/store-worker/dist/serialize/worker.d.ts",
           "purpose": "IWorkerPluginOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWorkerPluginOptions.",
@@ -3275,7 +3275,7 @@
           "members": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
-            "export type IWorkerPluginOptions = { readonly worker: IWorkerLike; /** 注册到 registry 的格式标签，需与 worker 侧实际使用的编码一致。 */ readonly type?: string; /** 卸载时是否顺带终止 worker。外部传入的 worker 默认归调用方所有。 */ readonly terminateOnDispose?: boolean; /** 默认 'copy'：安全但要复制一遍。只有当调用方确认这段字节独占、且交出去之后 不再使用时，才该选 'transfer' 换取零拷贝。 */ readonly ownership?: IByteOwnership; /** Overrides the default client id (a fixed value rather than a factory — see `src/rpc`). */ readonly clientId?: string; };"
+            "export type IWorkerPluginOptions = { readonly worker: IWorkerLike; /** Names the format registered in the registry. It must match the encoding used by the worker. */ readonly type?: string; /** * Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default. */ readonly terminateOnDispose?: boolean; /** * Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes * are exclusively owned and no longer used after handoff. */ readonly ownership?: IByteOwnership; /** Overrides the default client id (a fixed value rather than a factory — see `src/rpc`). */ readonly clientId?: string; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3314,7 +3314,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/serialize/worker.d.ts:IWorkerPluginOptions:export type IWorkerPluginOptions = { readonly worker: IWorkerLike; /** 注册到 registry 的格式标签，需与 worker 侧实际使用的编码一致。 */ readonly type?: string; /** 卸载时是否顺带终止 worker。外部传入的 worker 默认归调用方所有。 */ readonly terminateOnDispose?: boolean; /** 默认 'copy'：安全但要复制一遍。只有当调用方确认这段字节独占、且交出去之后 不再使用时，才该选 'transfer' 换取零拷贝。 */ readonly ownership?: IByteOwnership; /** Overrides the default client id (a fixed value rather than a factory — see `src/rpc`). */ readonly clientId?: string; };",
+          "identity": "packages/store-worker/dist/serialize/worker.d.ts:IWorkerPluginOptions:export type IWorkerPluginOptions = { readonly worker: IWorkerLike; /** Names the format registered in the registry. It must match the encoding used by the worker. */ readonly type?: string; /** * Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default. */ readonly terminateOnDispose?: boolean; /** * Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes * are exclusively owned and no longer used after handoff. */ readonly ownership?: IByteOwnership; /** Overrides the default client id (a fixed value rather than a factory — see `src/rpc`). */ readonly clientId?: string; };",
           "guidance": [
             {
               "id": "6-1-iworkerpluginoptions",
@@ -3461,9 +3461,9 @@
           "name": "workerParser",
           "kind": "function",
           "signature": "export declare function workerParser(options: IWorkerPluginOptions): ISerializeParser;",
-          "declarationLine": 44,
+          "declarationLine": 60,
           "source": "packages/store-worker/dist/serialize/worker.d.ts",
-          "purpose": "把编解码放到 worker 里做。 实测结论决定了它的正确用法（1M 条 / 71.5MB，主线程阻塞时长）： - 字节进、字节出，结果不还原成主线程对象图 → 主线程 1.4ms，比主线程直接做 JSON 的 65ms 少约 46 倍，墙钟基本持平。这是唯一真正划算的形态。 - 把对象图 postMessage 进 worker → 主线程 126ms，比直接在主线程做还慢一倍。 结构化克隆是在调用方线程同步完成的，成本只是从 stringify 换成 clone。 所以：用它承接落盘/传输这类「拿到字节就结束」的活，不要用它加速 hydrate。",
+          "purpose": "workerParser is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for workerParser.",
           "advanced": "No additional advanced behavior is declared for workerParser.",
           "parameters": ["options: IWorkerPluginOptions"],
@@ -3502,7 +3502,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "把编解码放到 worker 里做。 实测结论决定了它的正确用法（1M 条 / 71.5MB，主线程阻塞时长）： - 字节进、字节出，结果不还原成主线程对象图 → 主线程 1.4ms，比主线程直接做 JSON 的 65ms 少约 46 倍，墙钟基本持平。这是唯一真正划算的形态。 - 把对象图 postMessage 进 worker → 主线程 126ms，比直接在主线程做还慢一倍。 结构化克隆是在调用方线程同步完成的，成本只是从 stringify 换成 clone。 所以：用它承接落盘/传输这类「拿到字节就结束」的活，不要用它加速 hydrate。"
+              "content": "workerParser is part of this module's public function contract."
             },
             {
               "id": "getting-started",
@@ -3541,19 +3541,19 @@
               "name": "type",
               "type": "string",
               "optional": true,
-              "description": "注册到 registry 的格式标签，需与 worker 侧实际使用的编码一致。"
+              "description": "Names the format registered in the registry. It must match the encoding used by the worker."
             },
             {
               "name": "terminateOnDispose",
               "type": "boolean",
               "optional": true,
-              "description": "卸载时是否顺带终止 worker。外部传入的 worker 默认归调用方所有。"
+              "description": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default."
             },
             {
               "name": "ownership",
               "type": "IByteOwnership",
               "optional": true,
-              "description": "默认 'copy'：安全但要复制一遍。只有当调用方确认这段字节独占、且交出去之后 不再使用时，才该选 'transfer' 换取零拷贝。"
+              "description": "Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes * are exclusively owned and no longer used after handoff."
             },
             {
               "name": "clientId",
@@ -3712,7 +3712,7 @@
               "type": "string",
               "optional": true,
               "description": "`context.signal` 会作为这次 RPC 调用的取消信号透传；调用被取消时，`request` 内部会把泛化的 `AbortError` 重新包装成 `SerializeError`（见 §9），带上 `type`/`phase`/`source`/`chunkIndex`/`bytesConsumed` 这些定位信息，而不是让调用方拿到一个语义模糊的通用 abort 错误。",
-              "descriptionEn": "",
+              "descriptionEn": "Names the format registered in the registry. It must match the encoding used by the worker.",
               "descriptionZh": "`context.signal` 会作为这次 RPC 调用的取消信号透传；调用被取消时，`request` 内部会把泛化的 `AbortError` 重新包装成 `SerializeError`（见 §9），带上 `type`/`phase`/`source`/`chunkIndex`/`bytesConsumed` 这些定位信息，而不是让调用方拿到一个语义模糊的通用 abort 错误。"
             },
             {
@@ -3720,7 +3720,7 @@
               "type": "boolean",
               "optional": true,
               "description": "`dispose()`：异步 dispose 底层端点，并在 `terminateOnDispose: true` 时继续尝试 `worker.terminate?.()`；两步都会执行。单个 cleanup 失败会被原样 reject，端点与 terminate 都失败时返回 `CLEANUP_FAILED` `AggregateError`，不会吞掉 parser/endpoint/terminate 错误。",
-              "descriptionEn": "",
+              "descriptionEn": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default.",
               "descriptionZh": "`dispose()`：异步 dispose 底层端点，并在 `terminateOnDispose: true` 时继续尝试 `worker.terminate?.()`；两步都会执行。单个 cleanup 失败会被原样 reject，端点与 terminate 都失败时返回 `CLEANUP_FAILED` `AggregateError`，不会吞掉 parser/endpoint/terminate 错误。"
             },
             {
@@ -3728,7 +3728,7 @@
               "type": "IByteOwnership",
               "optional": true,
               "description": "无调用参数，`as const` 常量对象；`IByteOwnership` 是其取值的联合类型，也是 `workerPlugin`/`workerParser` 的 `ownership` 选项类型，见 §8。",
-              "descriptionEn": "",
+              "descriptionEn": "Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes * are exclusively owned and no longer used after handoff.",
               "descriptionZh": "无调用参数，`as const` 常量对象；`IByteOwnership` 是其取值的联合类型，也是 `workerPlugin`/`workerParser` 的 `ownership` 选项类型，见 §8。"
             },
             {
@@ -3746,7 +3746,7 @@
           "name": "workerPlugin",
           "kind": "const",
           "signature": "export declare const workerPlugin: (options: IWorkerPluginOptions) => ISerializePlugin;",
-          "declarationLine": 45,
+          "declarationLine": 61,
           "source": "packages/store-worker/dist/serialize/worker.d.ts",
           "purpose": "workerPlugin is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for workerPlugin.",
@@ -3815,19 +3815,19 @@
               "name": "type",
               "type": "string",
               "optional": true,
-              "description": "注册到 registry 的格式标签，需与 worker 侧实际使用的编码一致。"
+              "description": "Names the format registered in the registry. It must match the encoding used by the worker."
             },
             {
               "name": "terminateOnDispose",
               "type": "boolean",
               "optional": true,
-              "description": "卸载时是否顺带终止 worker。外部传入的 worker 默认归调用方所有。"
+              "description": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default."
             },
             {
               "name": "ownership",
               "type": "IByteOwnership",
               "optional": true,
-              "description": "默认 'copy'：安全但要复制一遍。只有当调用方确认这段字节独占、且交出去之后 不再使用时，才该选 'transfer' 换取零拷贝。"
+              "description": "Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes * are exclusively owned and no longer used after handoff."
             },
             {
               "name": "clientId",
@@ -3869,7 +3869,7 @@
               "type": "string",
               "optional": true,
               "description": "纯粹是 `{ type, parser: workerParser(options) }` 的包装，产出可以直接塞进 `createSerializeRegistry([.])` 插件数组的标准形状。",
-              "descriptionEn": "",
+              "descriptionEn": "Names the format registered in the registry. It must match the encoding used by the worker.",
               "descriptionZh": "纯粹是 `{ type, parser: workerParser(options) }` 的包装，产出可以直接塞进 `createSerializeRegistry([.])` 插件数组的标准形状。"
             },
             {
@@ -3877,7 +3877,7 @@
               "type": "boolean",
               "optional": true,
               "description": "Q:`adapter.dispose()`/`registry.dispose()` 之后,Worker 进程/线程还活着。 `WorkerAdapter.dispose()`/`workerParser` 的 `dispose()` 默认只 dispose RPC 端点,不会 terminate 底层 `Worker`——外部传入的 Worker 默认被认为归调用方所有。需要连带终止 Worker,`workerPlugin`/`workerParser` 传 `terminateOnDispose: true`;`WorkerAdapter` 场景下需要调用方自己在合适的时机调用 `worker.terminate()`。",
-              "descriptionEn": "",
+              "descriptionEn": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default.",
               "descriptionZh": "Q:`adapter.dispose()`/`registry.dispose()` 之后,Worker 进程/线程还活着。 `WorkerAdapter.dispose()`/`workerParser` 的 `dispose()` 默认只 dispose RPC 端点,不会 terminate 底层 `Worker`——外部传入的 Worker 默认被认为归调用方所有。需要连带终止 Worker,`workerPlugin`/`workerParser` 传 `terminateOnDispose: true`;`WorkerAdapter` 场景下需要调用方自己在合适的时机调用 `worker.terminate()`。"
             },
             {
@@ -3885,7 +3885,7 @@
               "type": "IByteOwnership",
               "optional": true,
               "description": "无调用参数，`as const` 常量对象；`IByteOwnership` 是其取值的联合类型，也是 `workerPlugin`/`workerParser` 的 `ownership` 选项类型，见 §8。",
-              "descriptionEn": "",
+              "descriptionEn": "Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes * are exclusively owned and no longer used after handoff.",
               "descriptionZh": "无调用参数，`as const` 常量对象；`IByteOwnership` 是其取值的联合类型，也是 `workerPlugin`/`workerParser` 的 `ownership` 选项类型，见 §8。"
             },
             {

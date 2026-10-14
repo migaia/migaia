@@ -235,70 +235,42 @@
     },
     "@migaia/reactive": {
       ".": [
-        "Computed",
-        "Effect",
         "REACTIVE_SOURCE",
-        "ReactiveErrorCode",
-        "ReactiveErrorPhase",
-        "ReactiveErrorText",
-        "ReactiveTracePhase",
-        "ReactiveTraceType",
-        "Signal",
-        "createRuntime",
-        "defaultRuntime"
-      ],
-      "./runtime": [
-        "DependencyTracker",
-        "RUNTIME_BRAND",
         "ReactiveDependencyKind",
+        "ReactiveErrorCode",
         "ReactiveErrorPhase",
         "ReactiveTracePhase",
         "ReactiveTraceReason",
         "ReactiveTraceType",
-        "Runtime",
-        "Scheduler",
-        "VersionClock",
-        "createObserverBinding",
-        "createRuntime"
+        "assertSingleRuntimeCopy",
+        "createRuntime",
+        "defaultRuntime"
       ],
-      "./ownership": [
+      "./extension": [
         "assertOwnedBy",
         "assertReactiveOwnedBy",
         "claimOwnership",
+        "createFieldSource",
+        "createObserverBinding",
+        "currentRuntimeVersion",
+        "internalRuntimeOf",
+        "isAnyRuntimeTracking",
+        "isRuntimeTracking",
         "ownerOf"
       ],
       "./internals": [
         "internalsOf",
         "isRuntime",
-        "registerInternals"
-      ],
-      "./node-internals": [
         "mutableDepVersions",
         "mutableDeps",
         "mutableSubs",
         "readVersion",
         "registerDepVersions",
         "registerDeps",
+        "registerInternals",
         "registerSubs",
         "registerVersion",
         "setVersion"
-      ],
-      "./node-factories": [
-        "internalRuntimeOf",
-        "isAnyRuntimeTracking",
-        "isRuntimeTracking"
-      ],
-      "./source": [
-        "createFieldSource"
-      ],
-      "./copy-check": [
-        "assertNoForeignOwnershipBrand",
-        "assertSingleRuntimeCopy",
-        "brandOwnedValue",
-        "consumePendingCopyWarning",
-        "noteRuntimeCopy",
-        "resetRuntimeCopiesForTest",
-        "runtimeCopyCount"
       ]
     },
     "@migaia/resource": {

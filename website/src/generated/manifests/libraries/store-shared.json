@@ -75,7 +75,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { sharedInt32, SharedInt32Signal } from '@migaia/store-shared';\nimport { createRuntime, Effect } from '@migaia/reactive';"
+                "code": "import { sharedInt32, SharedInt32Signal } from '@migaia/store-shared';\nimport { createRuntime } from '@migaia/reactive';"
               },
               {
                 "type": "paragraph",
@@ -84,7 +84,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const runtime = createRuntime();\nconst counter = sharedInt32(runtime, 0);\n\nconst stop = new Effect(() => console.log('counter =', counter.value), runtime);\ncounter.value = 1; // 本地写入，Effect 自动重跑\n\nstop.dispose();\ncounter.dispose();"
+                "code": "const runtime = createRuntime();\nconst counter = sharedInt32(runtime, 0);\n\nconst stop = runtime.effect(() => console.log('counter =', counter.value));\ncounter.value = 1; // 本地写入，Effect 自动重跑\n\nstop.dispose();\ncounter.dispose();"
               },
               {
                 "type": "paragraph",
@@ -154,7 +154,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { sharedInt32Array, SharedInt32Array } from '@migaia/store-shared';\nimport { createRuntime, Effect } from '@migaia/reactive';"
+                "code": "import { sharedInt32Array, SharedInt32Array } from '@migaia/store-shared';\nimport { createRuntime } from '@migaia/reactive';"
               },
               {
                 "type": "paragraph",
@@ -163,7 +163,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000, { initialValues: [0, 0] });\n\nconst render = new Effect(() => {\n  drawEntity(positions.get(0), positions.get(1)); // 只追踪被读取的下标\n}, runtime);\n\npositions.set(0, 10); // 只惊动依赖下标 0 的观察者\npositions.update(1, (y) => y + 1); // 读-改-写，内部 CAS 重试\n\nrender.dispose();\npositions.dispose();"
+                "code": "const runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000, { initialValues: [0, 0] });\n\nconst render = runtime.effect(() => {\n  drawEntity(positions.get(0), positions.get(1)); // 只追踪被读取的下标\n});\n\npositions.set(0, 10); // 只惊动依赖下标 0 的观察者\npositions.update(1, (y) => y + 1); // 读-改-写，内部 CAS 重试\n\nrender.dispose();\npositions.dispose();"
               },
               {
                 "type": "paragraph",
@@ -371,7 +371,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "// main.ts\nimport { createRuntime, Effect } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000); // 500 个实体的 x/y\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\nconst render = new Effect(() => drawEntity(0, positions.get(0), positions.get(1)), runtime);\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});"
+                "code": "// main.ts\nimport { createRuntime } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000); // 500 个实体的 x/y\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\nconst render = runtime.effect(() => drawEntity(0, positions.get(0), positions.get(1)));\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});"
               },
               {
                 "type": "code",
@@ -409,7 +409,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { Effect } from '@migaia/reactive';\n\nconst probe = new Effect(() => {\n  for (let index = 0; index < positions.length; index += 37) {\n    positions.get(index); // 遍历式探测，每次命中不同下标\n  }\n}, runtime);\n\nsetInterval(() => {\n  const removed = positions.prune(); // 清理已无订阅者的 cell，避免累积\n  if (removed > 0) console.log(`released ${removed} idle cells`);\n}, 5000);"
+                "code": "const probe = runtime.effect(() => {\n  for (let index = 0; index < positions.length; index += 37) {\n    positions.get(index); // 遍历式探测，每次命中不同下标\n  }\n});\n\nsetInterval(() => {\n  const removed = positions.prune(); // 清理已无订阅者的 cell，避免累积\n  if (removed > 0) console.log(`released ${removed} idle cells`);\n}, 5000);"
               }
             ]
           },
@@ -873,7 +873,7 @@
               {
                 "type": "list",
                 "items": [
-                  "两者都是 `IObservable`：内部通过 `@migaia/reactive` 的 `internalsOf`/`registerSubs`/`registerVersion`/`claimOwnership` 接入所属 `Runtime` 的依赖图，行为和普通的 `Signal`/`Computed` 节点一致——可以被 `Effect`/`Computed` 追踪，`isStale()` 可查询是否有未同步的远端变化。",
+                  "两者都是 `IObservable`：内部通过 `@migaia/reactive/internals` 的 `internalsOf`/`registerSubs`/`registerVersion` 与 `@migaia/reactive/extension` 的 `claimOwnership` 接入所属 `Runtime` 的依赖图，行为和普通的 `Signal`/`Computed` 节点一致——可以被 `Effect`/`Computed` 追踪，`isStale()` 可查询是否有未同步的远端变化。",
                   "单一归属：构造时调用 `claimOwnership(this, runtime)` 登记归属；同一个 JS 对象不能被登记到第二个 `Runtime`（会抛 `@migaia/reactive` 所有权系统的错误）。这意味着共享的是 `SharedArrayBuffer`，而不是 JS 对象本身——另一个线程/`Runtime` 要读同一份数据，必须用同一个 `buffer` 单独 `new` 一份自己的实例。",
                   "`SharedInt32Array` 的按需物化：`get(index)` 只有在检测到当前处于依赖追踪上下文（`internalsOf(runtime).tracker.isTracking()` 为真，即身处 `Effect`/`Computed` 内部）时才会为该下标创建一个内部的响应式 cell 并登记依赖；在追踪上下文之外调用 `get()`（比如普通同步代码里的一次性读取）走直读路径，不产生任何 cell 对象。",
                   "cell 的自动回收：`Effect`/`Computed` 可能在提交观察之前就放弃一次\"投机读\"（比如 `Computed` 重新计算时依赖发生了变化）。为此新物化的 cell 会在下一个微任务里检查是否仍有订阅者，没有就自动断开并从内部 Map 里移除，不需要手动处理。",
@@ -944,7 +944,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "// main.ts\nimport { createRuntime, Effect } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000);\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\n\nconst render = new Effect(() => {\n  drawEntity(0, positions.get(0), positions.get(1));\n}, runtime);\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});"
+                "code": "// main.ts\nimport { createRuntime } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000);\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\n\nconst render = runtime.effect(() => {\n  drawEntity(0, positions.get(0), positions.get(1));\n});\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});"
               },
               {
                 "type": "code",
@@ -1555,7 +1555,7 @@
           "name": "sharedInt32",
           "kind": "const",
           "signature": "export declare const sharedInt32: (runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer) => SharedInt32Signal;",
-          "declarationLine": 30,
+          "declarationLine": 33,
           "source": "packages/store-shared/dist/shared-state.d.ts",
           "purpose": "sharedInt32 is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for sharedInt32.",
@@ -1569,8 +1569,8 @@
             "import { createRuntime } from '@migaia/reactive';\nimport {\n  sharedInt32,\n  SharedInt32Signal,\n  sharedInt32Array,\n  SharedInt32Array,\n  SharedWaitMode,\n  type ISharedWaitMode,\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';",
             "function sharedInt32(\n  runtime: IRuntime,\n  initialValue?: number,\n  buffer?: SharedArrayBuffer\n): SharedInt32Signal;\n\nclass SharedInt32Signal implements IObservable, IDisposable {\n  constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer);\n}",
             "const runtime = createRuntime();\nconst counter = sharedInt32(runtime, 0);\ncounter.value; // 0\ncounter.value = 5;\ncounter.peek(); // 5，不触发追踪\ncounter.dispose();\ncounter.value; // 抛 Error（code: 'SIGNAL_DISPOSED'）",
-            "import { sharedInt32, SharedInt32Signal } from '@migaia/store-shared';\nimport { createRuntime, Effect } from '@migaia/reactive';",
-            "const runtime = createRuntime();\nconst counter = sharedInt32(runtime, 0);\n\nconst stop = new Effect(() => console.log('counter =', counter.value), runtime);\ncounter.value = 1; // 本地写入，Effect 自动重跑\n\nstop.dispose();\ncounter.dispose();",
+            "import { sharedInt32, SharedInt32Signal } from '@migaia/store-shared';\nimport { createRuntime } from '@migaia/reactive';",
+            "const runtime = createRuntime();\nconst counter = sharedInt32(runtime, 0);\n\nconst stop = runtime.effect(() => console.log('counter =', counter.value));\ncounter.value = 1; // 本地写入，Effect 自动重跑\n\nstop.dispose();\ncounter.dispose();",
             "import { createRuntime } from '@migaia/reactive';\nimport { sharedInt32 } from '@migaia/store-shared';\n\nconst mainRuntime = createRuntime();\nconst shared = sharedInt32(mainRuntime, 0);\nworker.postMessage({ buffer: shared.buffer }); // SharedArrayBuffer 可以直接传递，不会被拷贝\n\n// worker 内\nconst workerRuntime = createRuntime();\nconst mirror = sharedInt32(workerRuntime, 0, receivedBuffer); // initialValue 被忽略，附着已有数据\nmirror.watch();"
           ],
           "members": [],
@@ -1648,7 +1648,7 @@
           "name": "sharedInt32Array",
           "kind": "const",
           "signature": "export declare const sharedInt32Array: (runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }) => SharedInt32Array;",
-          "declarationLine": 84,
+          "declarationLine": 95,
           "source": "packages/store-shared/dist/shared-state.d.ts",
           "purpose": "sharedInt32Array is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for sharedInt32Array.",
@@ -1662,12 +1662,12 @@
             "import { createRuntime } from '@migaia/reactive';\nimport {\n  sharedInt32,\n  SharedInt32Signal,\n  sharedInt32Array,\n  SharedInt32Array,\n  SharedWaitMode,\n  type ISharedWaitMode,\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';",
             "function sharedInt32Array(\n  runtime: IRuntime,\n  length: number,\n  options?: {\n    readonly buffer?: SharedArrayBuffer;\n    readonly initialValues?: Iterable<number>;\n  }\n): SharedInt32Array;\n\nclass SharedInt32Array implements IDisposable {\n  constructor(\n    runtime: IRuntime,\n    length: number,\n    options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number> }\n  );\n}",
             "const runtime = createRuntime();\nconst grid = sharedInt32Array(runtime, 4, { initialValues: [0, 0, 0, 0] });\ngrid.set(0, 10);\ngrid.get(0); // 10\ngrid.update(1, (v) => v + 1); // 1\ngrid.snapshot(); // Int32Array [10, 1, 0, 0]\ngrid.dispose();\ngrid.get(0); // 抛 Error（code: 'ARRAY_DISPOSED'）",
-            "// main.ts\nimport { createRuntime, Effect } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000);\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\n\nconst render = new Effect(() => {\n  drawEntity(0, positions.get(0), positions.get(1));\n}, runtime);\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});",
+            "// main.ts\nimport { createRuntime } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000);\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\n\nconst render = runtime.effect(() => {\n  drawEntity(0, positions.get(0), positions.get(1));\n});\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});",
             "// worker.ts\nimport { createRuntime } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nself.onmessage = (event: MessageEvent<{ buffer: SharedArrayBuffer }>) => {\n  const runtime = createRuntime();\n  const positions = sharedInt32Array(runtime, 1000, { buffer: event.data.buffer });\n\n  setInterval(() => {\n    positions.update(0, (x) => x + 1); // 每帧推进实体 0 的 x 坐标\n  }, 16);\n};",
             "const positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer });\n\nsetInterval(() => {\n  const changed = positions.sync(); // 返回本轮实际变化的下标个数\n  if (changed > 0) console.log(`${changed} 个下标发生了远端变化`);\n}, 100);",
-            "import { sharedInt32Array, SharedInt32Array } from '@migaia/store-shared';\nimport { createRuntime, Effect } from '@migaia/reactive';",
-            "const runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000, { initialValues: [0, 0] });\n\nconst render = new Effect(() => {\n  drawEntity(positions.get(0), positions.get(1)); // 只追踪被读取的下标\n}, runtime);\n\npositions.set(0, 10); // 只惊动依赖下标 0 的观察者\npositions.update(1, (y) => y + 1); // 读-改-写，内部 CAS 重试\n\nrender.dispose();\npositions.dispose();",
-            "// main.ts\nimport { createRuntime, Effect } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000); // 500 个实体的 x/y\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\nconst render = new Effect(() => drawEntity(0, positions.get(0), positions.get(1)), runtime);\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});",
+            "import { sharedInt32Array, SharedInt32Array } from '@migaia/store-shared';\nimport { createRuntime } from '@migaia/reactive';",
+            "const runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000, { initialValues: [0, 0] });\n\nconst render = runtime.effect(() => {\n  drawEntity(positions.get(0), positions.get(1)); // 只追踪被读取的下标\n});\n\npositions.set(0, 10); // 只惊动依赖下标 0 的观察者\npositions.update(1, (y) => y + 1); // 读-改-写，内部 CAS 重试\n\nrender.dispose();\npositions.dispose();",
+            "// main.ts\nimport { createRuntime } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000); // 500 个实体的 x/y\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\nconst render = runtime.effect(() => drawEntity(0, positions.get(0), positions.get(1)));\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});",
             "// worker.ts\nimport { createRuntime } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nself.onmessage = (event: MessageEvent<{ buffer: SharedArrayBuffer }>) => {\n  const runtime = createRuntime();\n  const positions = sharedInt32Array(runtime, 1000, { buffer: event.data.buffer });\n  setInterval(() => positions.update(0, (x) => x + 1), 16);\n};",
             "import { StoreSharedErrorCode, sharedInt32Array } from '@migaia/store-shared';\n\nconst positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer });\n\nlet stopWatch: (() => void) | undefined;\ntry {\n  stopWatch = positions.watch();\n} catch (error) {\n  if ((error as { code?: string }).code === StoreSharedErrorCode.envUnsupported) {\n    const timer = setInterval(() => {\n      const changed = positions.sync();\n      if (changed > 0) console.log(`${changed} 个下标发生了远端变化`);\n    }, 100);\n    stopWatch = () => clearInterval(timer);\n  } else {\n    throw error;\n  }\n}",
             "import {\n  StoreSharedErrorCode,\n  createStoreSharedRangeError,\n  sharedInt32Array\n} from '@migaia/store-shared';\n\nfunction createEntityGrid(runtime: IRuntime, entityCount: number) {\n  if (entityCount <= 0) {\n    throw createStoreSharedRangeError(\n      StoreSharedErrorCode.invalidOption,\n      'entityCount must be a positive integer'\n    );\n  }\n  return sharedInt32Array(runtime, entityCount * 2); // 每个实体占 [x, y] 两格\n}"
@@ -1746,8 +1746,8 @@
         {
           "name": "SharedInt32Array",
           "kind": "class",
-          "signature": "export declare class SharedInt32Array implements IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly length: number; constructor(runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }); get disposed(): boolean; get(index: number): number; set(index: number, value: number): void; /** * 读-改-写。 * * 用户回调**在锁外**执行：持锁期间调用别人的代码，一旦它抛错就留下一把奇数的 死锁，之后所有读者都会自旋到上限然后抛。所以先一致读、锁外算、再带期望值写， 值被别人改掉就重来。 因此 * `update` 回调必须纯且可重复执行；不要在回调中埋点、发请求或产生不可逆副作用。 */ update(index: number, update: (current: number) => number): number; /** * Scan for remote writes and notify only affected index observers. * * `watch()` 起了回路之后不必手动调；没有 waitAsync 的环境仍可从消息循环 pump。 */ sync(index?: number): number; /** * 起一条 waitAsync 回路覆盖整片。 * * 等的是 epoch 而不是逐格的 seq：一格一个 waiter 在长数组上不可行。醒来后 `sync()` 扫描，只有真正变了的格会通知它自己的观察者。 */ watch(): IDisposer; snapshot(): Int32Array; /** Release cells that no longer have observers after high-churn access. */ prune(): number; dispose(): void; assertActive(): void; /** 一致读某一格：value 与 version 同源。 */ readCell(index: number): { readonly value: number; readonly version: bigint; }; /** 写某一格；返回新版本，或 undefined 表示没写（值未变或期望值不符）。 */ writeCell(index: number, value: number, expected?: number): bigint | undefined; /** Advance the shared 64-bit generation and wake every independent reader cursor. */ notifyWaiters(): void; /** Keep array-level pull bookkeeping aligned with local cell writes. */ recordObservedVersion(index: number, version: bigint): void; }",
-          "declarationLine": 36,
+          "signature": "export declare class SharedInt32Array implements IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly length: number; constructor(runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }); get disposed(): boolean; get(index: number): number; set(index: number, value: number): void; /** * Reads, updates, and writes one cell. * * The callback runs outside the lock so a thrown exception cannot leave readers spinning on an * odd locked version. The operation reads a consistent value, computes outside the lock, and * writes with that value as its expectation. It retries if another writer changes the value. The * `update` callback must be pure and repeatable. Avoid telemetry, requests, and irreversible side * effects in the callback. */ update(index: number, update: (current: number) => number): number; /** * Scans remote writes and notifies only affected index observers. * * An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can * poll from their message loop. */ sync(index?: number): number; /** * Starts an `Atomics.waitAsync` loop for the whole array. * * It waits on the generation epoch instead of creating a waiter for every cell. After waking, * `sync()` scans cells and notifies observers only for cells that changed. */ watch(): IDisposer; snapshot(): Int32Array; /** Release cells that no longer have observers after high-churn access. */ prune(): number; dispose(): void; assertActive(): void; /** Reads one cell consistently, with its value and version from the same observation. */ readCell(index: number): { readonly value: number; readonly version: bigint; }; /** * Writes one cell and returns its new version. Returns `undefined` when the value is unchanged or * the expected value does not match. */ writeCell(index: number, value: number, expected?: number): bigint | undefined; /** Advance the shared 64-bit generation and wake every independent reader cursor. */ notifyWaiters(): void; /** Keep array-level pull bookkeeping aligned with local cell writes. */ recordObservedVersion(index: number, version: bigint): void; }",
+          "declarationLine": 39,
           "source": "packages/store-shared/dist/shared-state.d.ts",
           "purpose": "Fixed-layout, index-granular shared state for Workers. Each element owns a value/seq pair in the SharedArrayBuffer, so changing one conversation slot does not invalidate readers of every other slot.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for SharedInt32Array.",
@@ -1848,7 +1848,7 @@
               "name": "update",
               "kind": "method",
               "signature": "update(index: number, update: (current: number) => number): number;",
-              "description": "读-改-写。 用户回调**在锁外**执行：持锁期间调用别人的代码，一旦它抛错就留下一把奇数的 死锁，之后所有读者都会自旋到上限然后抛。所以先一致读、锁外算、再带期望值写， 值被别人改掉就重来。 因此 `update` 回调必须纯且可重复执行；不要在回调中埋点、发请求或产生不可逆副作用。",
+              "description": "Reads, updates, and writes one cell. The callback runs outside the lock so a thrown exception cannot leave readers spinning on an odd locked version. The operation reads a consistent value, computes outside the lock, and writes with that value as its expectation. It retries if another writer changes the value. The `update` callback must be pure and repeatable. Avoid telemetry, requests, and irreversible side effects in the callback.",
               "parameterDetails": [
                 {
                   "name": "index",
@@ -1867,7 +1867,7 @@
               "name": "sync",
               "kind": "method",
               "signature": "sync(index?: number): number;",
-              "description": "Scan for remote writes and notify only affected index observers. `watch()` 起了回路之后不必手动调；没有 waitAsync 的环境仍可从消息循环 pump。",
+              "description": "Scans remote writes and notifies only affected index observers. An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can poll from their message loop.",
               "parameterDetails": [
                 {
                   "name": "index",
@@ -1881,7 +1881,7 @@
               "name": "watch",
               "kind": "method",
               "signature": "watch(): IDisposer;",
-              "description": "起一条 waitAsync 回路覆盖整片。 等的是 epoch 而不是逐格的 seq：一格一个 waiter 在长数组上不可行。醒来后 `sync()` 扫描，只有真正变了的格会通知它自己的观察者。",
+              "description": "Starts an `Atomics.waitAsync` loop for the whole array. It waits on the generation epoch instead of creating a waiter for every cell. After waking, `sync()` scans cells and notifies observers only for cells that changed.",
               "parameterDetails": [],
               "returns": "IDisposer"
             },
@@ -1921,7 +1921,7 @@
               "name": "readCell",
               "kind": "method",
               "signature": "readCell(index: number): { readonly value: number; readonly version: bigint; };",
-              "description": "一致读某一格：value 与 version 同源。",
+              "description": "Reads one cell consistently, with its value and version from the same observation.",
               "parameterDetails": [
                 {
                   "name": "index",
@@ -1935,7 +1935,7 @@
               "name": "writeCell",
               "kind": "method",
               "signature": "writeCell(index: number, value: number, expected?: number): bigint | undefined;",
-              "description": "写某一格；返回新版本，或 undefined 表示没写（值未变或期望值不符）。",
+              "description": "Writes one cell and returns its new version. Returns `undefined` when the value is unchanged or the expected value does not match.",
               "parameterDetails": [
                 {
                   "name": "index",
@@ -1985,7 +1985,7 @@
           ],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare class SharedInt32Array implements IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly length: number; constructor(runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }); get disposed(): boolean; get(index: number): number; set(index: number, value: number): void; /** * 读-改-写。 * * 用户回调**在锁外**执行：持锁期间调用别人的代码，一旦它抛错就留下一把奇数的 死锁，之后所有读者都会自旋到上限然后抛。所以先一致读、锁外算、再带期望值写， 值被别人改掉就重来。 因此 * `update` 回调必须纯且可重复执行；不要在回调中埋点、发请求或产生不可逆副作用。 */ update(index: number, update: (current: number) => number): number; /** * Scan for remote writes and notify only affected index observers. * * `watch()` 起了回路之后不必手动调；没有 waitAsync 的环境仍可从消息循环 pump。 */ sync(index?: number): number; /** * 起一条 waitAsync 回路覆盖整片。 * * 等的是 epoch 而不是逐格的 seq：一格一个 waiter 在长数组上不可行。醒来后 `sync()` 扫描，只有真正变了的格会通知它自己的观察者。 */ watch(): IDisposer; snapshot(): Int32Array; /** Release cells that no longer have observers after high-churn access. */ prune(): number; dispose(): void; assertActive(): void; /** 一致读某一格：value 与 version 同源。 */ readCell(index: number): { readonly value: number; readonly version: bigint; }; /** 写某一格；返回新版本，或 undefined 表示没写（值未变或期望值不符）。 */ writeCell(index: number, value: number, expected?: number): bigint | undefined; /** Advance the shared 64-bit generation and wake every independent reader cursor. */ notifyWaiters(): void; /** Keep array-level pull bookkeeping aligned with local cell writes. */ recordObservedVersion(index: number, version: bigint): void; }"
+            "export declare class SharedInt32Array implements IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly length: number; constructor(runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }); get disposed(): boolean; get(index: number): number; set(index: number, value: number): void; /** * Reads, updates, and writes one cell. * * The callback runs outside the lock so a thrown exception cannot leave readers spinning on an * odd locked version. The operation reads a consistent value, computes outside the lock, and * writes with that value as its expectation. It retries if another writer changes the value. The * `update` callback must be pure and repeatable. Avoid telemetry, requests, and irreversible side * effects in the callback. */ update(index: number, update: (current: number) => number): number; /** * Scans remote writes and notifies only affected index observers. * * An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can * poll from their message loop. */ sync(index?: number): number; /** * Starts an `Atomics.waitAsync` loop for the whole array. * * It waits on the generation epoch instead of creating a waiter for every cell. After waking, * `sync()` scans cells and notifies observers only for cells that changed. */ watch(): IDisposer; snapshot(): Int32Array; /** Release cells that no longer have observers after high-churn access. */ prune(): number; dispose(): void; assertActive(): void; /** Reads one cell consistently, with its value and version from the same observation. */ readCell(index: number): { readonly value: number; readonly version: bigint; }; /** * Writes one cell and returns its new version. Returns `undefined` when the value is unchanged or * the expected value does not match. */ writeCell(index: number, value: number, expected?: number): bigint | undefined; /** Advance the shared 64-bit generation and wake every independent reader cursor. */ notifyWaiters(): void; /** Keep array-level pull bookkeeping aligned with local cell writes. */ recordObservedVersion(index: number, version: bigint): void; }"
           ],
           "overloadParameterDetails": [
             [
@@ -2042,7 +2042,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-shared/dist/shared-state.d.ts:SharedInt32Array:export declare class SharedInt32Array implements IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly length: number; constructor(runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }); get disposed(): boolean; get(index: number): number; set(index: number, value: number): void; /** * 读-改-写。 * * 用户回调**在锁外**执行：持锁期间调用别人的代码，一旦它抛错就留下一把奇数的 死锁，之后所有读者都会自旋到上限然后抛。所以先一致读、锁外算、再带期望值写， 值被别人改掉就重来。 因此 * `update` 回调必须纯且可重复执行；不要在回调中埋点、发请求或产生不可逆副作用。 */ update(index: number, update: (current: number) => number): number; /** * Scan for remote writes and notify only affected index observers. * * `watch()` 起了回路之后不必手动调；没有 waitAsync 的环境仍可从消息循环 pump。 */ sync(index?: number): number; /** * 起一条 waitAsync 回路覆盖整片。 * * 等的是 epoch 而不是逐格的 seq：一格一个 waiter 在长数组上不可行。醒来后 `sync()` 扫描，只有真正变了的格会通知它自己的观察者。 */ watch(): IDisposer; snapshot(): Int32Array; /** Release cells that no longer have observers after high-churn access. */ prune(): number; dispose(): void; assertActive(): void; /** 一致读某一格：value 与 version 同源。 */ readCell(index: number): { readonly value: number; readonly version: bigint; }; /** 写某一格；返回新版本，或 undefined 表示没写（值未变或期望值不符）。 */ writeCell(index: number, value: number, expected?: number): bigint | undefined; /** Advance the shared 64-bit generation and wake every independent reader cursor. */ notifyWaiters(): void; /** Keep array-level pull bookkeeping aligned with local cell writes. */ recordObservedVersion(index: number, version: bigint): void; }",
+          "identity": "packages/store-shared/dist/shared-state.d.ts:SharedInt32Array:export declare class SharedInt32Array implements IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly length: number; constructor(runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }); get disposed(): boolean; get(index: number): number; set(index: number, value: number): void; /** * Reads, updates, and writes one cell. * * The callback runs outside the lock so a thrown exception cannot leave readers spinning on an * odd locked version. The operation reads a consistent value, computes outside the lock, and * writes with that value as its expectation. It retries if another writer changes the value. The * `update` callback must be pure and repeatable. Avoid telemetry, requests, and irreversible side * effects in the callback. */ update(index: number, update: (current: number) => number): number; /** * Scans remote writes and notifies only affected index observers. * * An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can * poll from their message loop. */ sync(index?: number): number; /** * Starts an `Atomics.waitAsync` loop for the whole array. * * It waits on the generation epoch instead of creating a waiter for every cell. After waking, * `sync()` scans cells and notifies observers only for cells that changed. */ watch(): IDisposer; snapshot(): Int32Array; /** Release cells that no longer have observers after high-churn access. */ prune(): number; dispose(): void; assertActive(): void; /** Reads one cell consistently, with its value and version from the same observation. */ readCell(index: number): { readonly value: number; readonly version: bigint; }; /** * Writes one cell and returns its new version. Returns `undefined` when the value is unchanged or * the expected value does not match. */ writeCell(index: number, value: number, expected?: number): bigint | undefined; /** Advance the shared 64-bit generation and wake every independent reader cursor. */ notifyWaiters(): void; /** Keep array-level pull bookkeeping aligned with local cell writes. */ recordObservedVersion(index: number, version: bigint): void; }",
           "guidance": [
             {
               "id": "5-3-createstoresharederror-createstoresharedrangeerror",
@@ -2202,8 +2202,8 @@
         {
           "name": "SharedInt32Signal",
           "kind": "class",
-          "signature": "export declare class SharedInt32Signal implements IObservable, IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly subs: ReadonlySet<IObserver>; get version(): number; constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer); get disposed(): boolean; get value(): number; set value(next: number); /** * Pull remote writes into this Runtime. * * `watch()` 起了回路之后就不必手动调它；没有 waitAsync 的环境仍可从自己的消息 循环里 pump。 */ sync(): boolean; /** * 起一条 waitAsync 回路：远端写入直接推到本 Runtime，不必再 pump `sync()`。 * * 返回停止函数；`dispose()` 也会停。 */ watch(): IDisposer; peek(): number; onObserved(): void; onUnobserved(): void; isStale(): boolean; dispose(): void; }",
-          "declarationLine": 2,
+          "signature": "export declare class SharedInt32Signal implements IObservable, IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly subs: ReadonlySet<IObserver>; get version(): number; constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer); get disposed(): boolean; get value(): number; set value(next: number); /** * Pulls remote writes into this `Runtime`. * * An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can * poll from their own message loop. */ sync(): boolean; /** * Starts an `Atomics.waitAsync` loop that publishes remote writes to this `Runtime` without * manual `sync()` polling. * * Returns a stop function. `dispose()` also stops the loop. */ watch(): IDisposer; peek(): number; onObserved(): void; onUnobserved(): void; isStale(): boolean; dispose(): void; }",
+          "declarationLine": 3,
           "source": "packages/store-shared/dist/shared-state.d.ts",
           "purpose": "SharedInt32Signal is part of this module's public class contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for SharedInt32Signal.",
@@ -2301,7 +2301,7 @@
               "name": "sync",
               "kind": "method",
               "signature": "sync(): boolean;",
-              "description": "Pull remote writes into this Runtime. `watch()` 起了回路之后就不必手动调它；没有 waitAsync 的环境仍可从自己的消息 循环里 pump。",
+              "description": "Pulls remote writes into this `Runtime`. An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can poll from their own message loop.",
               "parameterDetails": [],
               "returns": "boolean"
             },
@@ -2309,7 +2309,7 @@
               "name": "watch",
               "kind": "method",
               "signature": "watch(): IDisposer;",
-              "description": "起一条 waitAsync 回路：远端写入直接推到本 Runtime，不必再 pump `sync()`。 返回停止函数；`dispose()` 也会停。",
+              "description": "Starts an `Atomics.waitAsync` loop that publishes remote writes to this `Runtime` without manual `sync()` polling. Returns a stop function. `dispose()` also stops the loop.",
               "parameterDetails": [],
               "returns": "IDisposer"
             },
@@ -2356,7 +2356,7 @@
           ],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare class SharedInt32Signal implements IObservable, IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly subs: ReadonlySet<IObserver>; get version(): number; constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer); get disposed(): boolean; get value(): number; set value(next: number); /** * Pull remote writes into this Runtime. * * `watch()` 起了回路之后就不必手动调它；没有 waitAsync 的环境仍可从自己的消息 循环里 pump。 */ sync(): boolean; /** * 起一条 waitAsync 回路：远端写入直接推到本 Runtime，不必再 pump `sync()`。 * * 返回停止函数；`dispose()` 也会停。 */ watch(): IDisposer; peek(): number; onObserved(): void; onUnobserved(): void; isStale(): boolean; dispose(): void; }"
+            "export declare class SharedInt32Signal implements IObservable, IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly subs: ReadonlySet<IObserver>; get version(): number; constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer); get disposed(): boolean; get value(): number; set value(next: number); /** * Pulls remote writes into this `Runtime`. * * An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can * poll from their own message loop. */ sync(): boolean; /** * Starts an `Atomics.waitAsync` loop that publishes remote writes to this `Runtime` without * manual `sync()` polling. * * Returns a stop function. `dispose()` also stops the loop. */ watch(): IDisposer; peek(): number; onObserved(): void; onUnobserved(): void; isStale(): boolean; dispose(): void; }"
           ],
           "overloadParameterDetails": [
             [
@@ -2413,7 +2413,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-shared/dist/shared-state.d.ts:SharedInt32Signal:export declare class SharedInt32Signal implements IObservable, IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly subs: ReadonlySet<IObserver>; get version(): number; constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer); get disposed(): boolean; get value(): number; set value(next: number); /** * Pull remote writes into this Runtime. * * `watch()` 起了回路之后就不必手动调它；没有 waitAsync 的环境仍可从自己的消息 循环里 pump。 */ sync(): boolean; /** * 起一条 waitAsync 回路：远端写入直接推到本 Runtime，不必再 pump `sync()`。 * * 返回停止函数；`dispose()` 也会停。 */ watch(): IDisposer; peek(): number; onObserved(): void; onUnobserved(): void; isStale(): boolean; dispose(): void; }",
+          "identity": "packages/store-shared/dist/shared-state.d.ts:SharedInt32Signal:export declare class SharedInt32Signal implements IObservable, IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly subs: ReadonlySet<IObserver>; get version(): number; constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer); get disposed(): boolean; get value(): number; set value(next: number); /** * Pulls remote writes into this `Runtime`. * * An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can * poll from their own message loop. */ sync(): boolean; /** * Starts an `Atomics.waitAsync` loop that publishes remote writes to this `Runtime` without * manual `sync()` polling. * * Returns a stop function. `dispose()` also stops the loop. */ watch(): IDisposer; peek(): number; onObserved(): void; onUnobserved(): void; isStale(): boolean; dispose(): void; }",
           "guidance": [
             {
               "id": "10-错误一览表",
