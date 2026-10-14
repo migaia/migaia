@@ -281,22 +281,15 @@ test('reactive Signal guide covers direct construction, update semantics, observ
   }
 })
 
-test('createObserverBinding quick start explains every executable line and host phase', () => {
+test('createObserverBinding quick start keeps authored comments and host phases without generated filler', () => {
   for (const locale of ['zh', 'en'] as const) {
     const guide = findApiGuide('reactive', 'runtime', 'createObserverBinding', locale)
     assert.ok(guide?.quickStart)
-    const lines = guide.quickStart
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-
-    for (const [index, line] of lines.entries()) {
-      if (line.startsWith('//')) continue
-      assert.ok(
-        index > 0 && lines[index - 1]?.startsWith('//'),
-        `Expected an explanatory comment immediately before: ${line}`
-      )
-    }
+    assert.match(guide.quickStart, /^\s*\/\//m)
+    assert.doesNotMatch(
+      guide.quickStart,
+      /本例对应的生产场景是|没有创建可供后续复用的实例|返回的本次实例|输出用于确认上一操作的结果。|Logs the result of the preceding operation\./
+    )
 
     assert.match(guide.quickStart, /binding\.capture\(\(\) => value\.value\)/)
     assert.match(guide.quickStart, /capture\.result/)
