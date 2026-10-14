@@ -225,7 +225,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal }"
+                "code": "type IMiddlewarePipelineContext = { readonly signal: IAbortSignal }"
               }
             ]
           },
@@ -433,7 +433,7 @@
           "name": "createPipeline",
           "kind": "function",
           "signature": "export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.sync>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.sync, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue>;\nexport declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode>): IMiddlewarePipeline<TMode, TValue>;",
-          "declarationLine": 51,
+          "declarationLine": 52,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Creates a stateless sync pipeline with a value type chosen by its caller. Creates a stateless async pipeline with a value type chosen by its caller. Creates a stateless generator pipeline with a value type chosen by its caller. Creates a stateless async-generator pipeline with a value type chosen by its caller. Creates a stateless runner whose mode controls stage, terminal, lift, and result types.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createPipeline.",
@@ -599,7 +599,7 @@
             },
             {
               "name": "signal",
-              "type": "IMiddlewarePipelineAbortSignal",
+              "type": "IAbortSignal",
               "optional": true,
               "description": "Default cooperative abort signal; a run-level signal overrides it."
             },
@@ -698,7 +698,7 @@
             },
             {
               "name": "signal",
-              "type": "IMiddlewarePipelineAbortSignal",
+              "type": "IAbortSignal",
               "optional": true,
               "description": "`signal`：可选，所有调用的默认取消信号。",
               "descriptionEn": "Default cooperative abort signal; a run-level signal overrides it.",
@@ -921,7 +921,7 @@
           "name": "IAsyncGeneratorMiddlewareStage",
           "kind": "type",
           "signature": "export type IAsyncGeneratorMiddlewareStage<TValue> = (value: TValue, context?: IMiddlewarePipelineContext) => AsyncGenerator<TValue, TValue | IGeneratorUndefinedSignal<TValue> | typeof GENERATOR_HALT | typeof GENERATOR_CONTINUE | undefined, void>;",
-          "declarationLine": 20,
+          "declarationLine": 18,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
           "purpose": "IAsyncGeneratorMiddlewareStage is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAsyncGeneratorMiddlewareStage.",
@@ -985,7 +985,7 @@
           "name": "IAsyncMiddlewareStage",
           "kind": "type",
           "signature": "export type IAsyncMiddlewareStage<TValue> = (value: TValue, next: (value: TValue) => Promise<void>, context?: IMiddlewarePipelineContext) => void | Promise<void>;",
-          "declarationLine": 18,
+          "declarationLine": 16,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
           "purpose": "IAsyncMiddlewareStage is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAsyncMiddlewareStage.",
@@ -1048,8 +1048,8 @@
         {
           "name": "ICreatePipelineOptions",
           "kind": "type",
-          "signature": "export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Selects the execution algebra for every run; stages must match this mode or be lifted * explicitly. */ readonly mode: TMode; /** Reports duplicate or late next calls without starting a second downstream traversal. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** Checks owner admission before each frame; a thrown failure prevents that stage from starting. */ readonly assertActive?: () => void; /** Default cooperative abort signal; a run-level signal overrides it. */ readonly signal?: IMiddlewarePipelineAbortSignal; /** Optional generator sentinel set; all three sentinel identities must be distinct. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Combines simultaneous asynchronous stage and downstream failures while retaining both * originals. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;",
-          "declarationLine": 24,
+          "signature": "export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Selects the execution algebra for every run; stages must match this mode or be lifted * explicitly. */ readonly mode: TMode; /** Reports duplicate or late next calls without starting a second downstream traversal. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** Checks owner admission before each frame; a thrown failure prevents that stage from starting. */ readonly assertActive?: () => void; /** Default cooperative abort signal; a run-level signal overrides it. */ readonly signal?: IAbortSignal; /** Optional generator sentinel set; all three sentinel identities must be distinct. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Combines simultaneous asynchronous stage and downstream failures while retaining both * originals. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;",
+          "declarationLine": 25,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Shared construction options for every middleware mode.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICreatePipelineOptions.",
@@ -1066,7 +1066,7 @@
           "aliasOf": "ICreatePipelineOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Selects the execution algebra for every run; stages must match this mode or be lifted * explicitly. */ readonly mode: TMode; /** Reports duplicate or late next calls without starting a second downstream traversal. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** Checks owner admission before each frame; a thrown failure prevents that stage from starting. */ readonly assertActive?: () => void; /** Default cooperative abort signal; a run-level signal overrides it. */ readonly signal?: IMiddlewarePipelineAbortSignal; /** Optional generator sentinel set; all three sentinel identities must be distinct. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Combines simultaneous asynchronous stage and downstream failures while retaining both * originals. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;"
+            "export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Selects the execution algebra for every run; stages must match this mode or be lifted * explicitly. */ readonly mode: TMode; /** Reports duplicate or late next calls without starting a second downstream traversal. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** Checks owner admission before each frame; a thrown failure prevents that stage from starting. */ readonly assertActive?: () => void; /** Default cooperative abort signal; a run-level signal overrides it. */ readonly signal?: IAbortSignal; /** Optional generator sentinel set; all three sentinel identities must be distinct. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Combines simultaneous asynchronous stage and downstream failures while retaining both * originals. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1105,7 +1105,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/create-pipeline.d.ts:ICreatePipelineOptions:export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Selects the execution algebra for every run; stages must match this mode or be lifted * explicitly. */ readonly mode: TMode; /** Reports duplicate or late next calls without starting a second downstream traversal. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** Checks owner admission before each frame; a thrown failure prevents that stage from starting. */ readonly assertActive?: () => void; /** Default cooperative abort signal; a run-level signal overrides it. */ readonly signal?: IMiddlewarePipelineAbortSignal; /** Optional generator sentinel set; all three sentinel identities must be distinct. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Combines simultaneous asynchronous stage and downstream failures while retaining both * originals. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;",
+          "identity": "packages/middleware-pipeline/dist/create-pipeline.d.ts:ICreatePipelineOptions:export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Selects the execution algebra for every run; stages must match this mode or be lifted * explicitly. */ readonly mode: TMode; /** Reports duplicate or late next calls without starting a second downstream traversal. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** Checks owner admission before each frame; a thrown failure prevents that stage from starting. */ readonly assertActive?: () => void; /** Default cooperative abort signal; a run-level signal overrides it. */ readonly signal?: IAbortSignal; /** Optional generator sentinel set; all three sentinel identities must be distinct. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Combines simultaneous asynchronous stage and downstream failures while retaining both * originals. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],
@@ -1179,7 +1179,7 @@
           "name": "IGeneratorMiddlewareStage",
           "kind": "type",
           "signature": "export type IGeneratorMiddlewareStage<TValue> = (value: TValue, context?: IMiddlewarePipelineContext) => Generator<TValue, TValue | IGeneratorUndefinedSignal<TValue> | typeof GENERATOR_HALT | typeof GENERATOR_CONTINUE | undefined, void>;",
-          "declarationLine": 19,
+          "declarationLine": 17,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
           "purpose": "IGeneratorMiddlewareStage is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGeneratorMiddlewareStage.",
@@ -1243,7 +1243,7 @@
           "name": "IMiddlewarePipeline",
           "kind": "type",
           "signature": "export type IMiddlewarePipeline<TMode extends IMiddlewarePipelineMode, TValue> = Readonly<{ readonly mode: TMode; lift<TFrom extends IMiddlewarePipelineLiftSource<TMode>>(stage: IMiddlewarePipelineStage<TFrom, TValue>, from: TFrom): IMiddlewarePipelineStage<TMode, TValue>; run(stages: readonly IMiddlewarePipelineStage<TMode, TValue>[], value: TValue, done: IMiddlewarePipelineDone<TMode, TValue>, control?: IMiddlewarePipelineControlOptions): IMiddlewarePipelineRunResult<TMode>; }>;",
-          "declarationLine": 45,
+          "declarationLine": 46,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Stateless runner returned by `createPipeline`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipeline.",
@@ -1306,74 +1306,10 @@
           "fragment": "middleware-pipeline-index--IMiddlewarePipeline"
         },
         {
-          "name": "IMiddlewarePipelineAbortSignal",
-          "kind": "type",
-          "signature": "export type IMiddlewarePipelineAbortSignal = IAbortSignal;",
-          "declarationLine": 10,
-          "source": "packages/middleware-pipeline/dist/runtime.d.ts",
-          "purpose": "Public compatibility name for utils-owned structural abort-signal admission.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineAbortSignal.",
-          "advanced": "No additional advanced behavior is declared for IMiddlewarePipelineAbortSignal.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IMiddlewarePipelineAbortSignal."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineAbortSignal.",
-          "examples": [
-            "type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal }"
-          ],
-          "members": [],
-          "aliasOf": "IMiddlewarePipelineAbortSignal",
-          "exportPath": ".",
-          "overloadSignatures": ["export type IMiddlewarePipelineAbortSignal = IAbortSignal;"],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IMiddlewarePipelineAbortSignal when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IMiddlewarePipelineAbortSignal does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Public compatibility name for utils-owned structural abort-signal admission."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IMiddlewarePipelineAbortSignal from @migaia/middleware-pipeline, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IMiddlewarePipelineAbortSignal when its type contract and declared inputs match the result you need. Choose a different public symbol when IMiddlewarePipelineAbortSignal does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineAbortSignal."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IMiddlewarePipelineAbortSignal."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IMiddlewarePipelineAbortSignal:export type IMiddlewarePipelineAbortSignal = IAbortSignal;",
-          "guidance": [],
-          "usageScore": 10,
-          "configuration": [],
-          "fragment": "middleware-pipeline-index--IMiddlewarePipelineAbortSignal"
-        },
-        {
           "name": "IMiddlewarePipelineContext",
           "kind": "type",
-          "signature": "export type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal; };",
-          "declarationLine": 11,
+          "signature": "export type IMiddlewarePipelineContext = { readonly signal: IAbortSignal; };",
+          "declarationLine": 9,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
           "purpose": "IMiddlewarePipelineContext is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineContext.",
@@ -1383,14 +1319,12 @@
           "returns": "No explicit return annotation is declared for this type.",
           "errors": ["No documented errors are declared for IMiddlewarePipelineContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineContext.",
-          "examples": [
-            "type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal }"
-          ],
+          "examples": ["type IMiddlewarePipelineContext = { readonly signal: IAbortSignal }"],
           "members": [],
           "aliasOf": "IMiddlewarePipelineContext",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal; };"
+            "export type IMiddlewarePipelineContext = { readonly signal: IAbortSignal; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1429,7 +1363,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IMiddlewarePipelineContext:export type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal; };",
+          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IMiddlewarePipelineContext:export type IMiddlewarePipelineContext = { readonly signal: IAbortSignal; };",
           "guidance": [],
           "usageScore": 10,
           "configuration": [],
@@ -1438,8 +1372,8 @@
         {
           "name": "IMiddlewarePipelineControlOptions",
           "kind": "type",
-          "signature": "export type IMiddlewarePipelineControlOptions = { readonly signal?: IMiddlewarePipelineAbortSignal; };",
-          "declarationLine": 14,
+          "signature": "export type IMiddlewarePipelineControlOptions = { readonly signal?: IAbortSignal; };",
+          "declarationLine": 12,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
           "purpose": "IMiddlewarePipelineControlOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineControlOptions.",
@@ -1454,7 +1388,7 @@
           "aliasOf": "IMiddlewarePipelineControlOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IMiddlewarePipelineControlOptions = { readonly signal?: IMiddlewarePipelineAbortSignal; };"
+            "export type IMiddlewarePipelineControlOptions = { readonly signal?: IAbortSignal; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1493,7 +1427,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IMiddlewarePipelineControlOptions:export type IMiddlewarePipelineControlOptions = { readonly signal?: IMiddlewarePipelineAbortSignal; };",
+          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IMiddlewarePipelineControlOptions:export type IMiddlewarePipelineControlOptions = { readonly signal?: IAbortSignal; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -1503,7 +1437,7 @@
           "name": "IMiddlewarePipelineDone",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineDone<TMode extends IMiddlewarePipelineMode, TValue> = TMode extends IMiddlewarePipelineSyncMode ? (value: TValue, context?: IMiddlewarePipelineContext) => void : (value: TValue, context?: IMiddlewarePipelineContext) => void | Promise<void>;",
-          "declarationLine": 13,
+          "declarationLine": 14,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Terminal callback selected by one concrete middleware mode.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineDone.",
@@ -1631,7 +1565,7 @@
           "name": "IMiddlewarePipelineLiftSource",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineLiftSource<TMode extends IMiddlewarePipelineMode> = { readonly sync: 'sync'; readonly async: 'sync' | 'async'; readonly generator: 'sync' | 'generator'; readonly 'async-generator': 'sync' | 'generator' | 'async-generator'; }[TMode];",
-          "declarationLine": 17,
+          "declarationLine": 18,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Source modes that can be lifted into one target middleware mode.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineLiftSource.",
@@ -1759,7 +1693,7 @@
           "name": "IMiddlewarePipelineRunResult",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineRunResult<TMode extends IMiddlewarePipelineMode> = TMode extends IMiddlewarePipelineSyncMode ? void : Promise<void>;",
-          "declarationLine": 15,
+          "declarationLine": 16,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Execution result selected by one concrete middleware mode.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineRunResult.",
@@ -1823,7 +1757,7 @@
           "name": "IMiddlewarePipelineStage",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineStage<TMode extends IMiddlewarePipelineMode, TValue> = { readonly sync: ISyncMiddlewareStage<TValue>; readonly async: IAsyncMiddlewareStage<TValue>; readonly generator: IGeneratorMiddlewareStage<TValue>; readonly 'async-generator': IAsyncGeneratorMiddlewareStage<TValue>; }[TMode];",
-          "declarationLine": 4,
+          "declarationLine": 5,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Stage selected by one concrete middleware mode.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineStage.",
@@ -1887,7 +1821,7 @@
           "name": "IMiddlewarePipelineSyncMode",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineSyncMode = typeof MiddlewarePipelineMode.sync | typeof MiddlewarePipelineMode.generator;",
-          "declarationLine": 11,
+          "declarationLine": 12,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Modes whose execution completes before `run` returns.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineSyncMode.",
@@ -2079,7 +2013,7 @@
           "name": "ISyncMiddlewareStage",
           "kind": "type",
           "signature": "export type ISyncMiddlewareStage<TValue> = (value: TValue, next: (value: TValue) => void, context?: IMiddlewarePipelineContext) => void;",
-          "declarationLine": 17,
+          "declarationLine": 15,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
           "purpose": "ISyncMiddlewareStage is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISyncMiddlewareStage.",

@@ -2,7 +2,10 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
+    "lib": ["ES2024", "ESNext.Disposable", "DOM"],
     "types": ["node", "vitest/globals"]
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "*.test.ts"],
+  // Real Node types are used here; the structural node:fs/promises declaration would duplicate them.
+  "exclude": ["src/node-fs-promises.d.ts"]
 }

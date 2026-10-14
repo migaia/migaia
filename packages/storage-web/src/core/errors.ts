@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -14,7 +15,7 @@ import {
   type IExtensionStage,
   type IStorageErrorCode
 } from '../types/errors.js'
-import { throwIfAborted, type IWebAbortSignal } from './operation.js'
+import { throwIfAborted } from './operation.js'
 
 /** Normalize an extension or backend failure without discarding its original cause. */
 export const normalizeError = (
@@ -34,7 +35,7 @@ export const invokeExtension = async <T>(
   backend: IBackendKind,
   operation: string,
   extensionStage: IExtensionStage,
-  signal: IWebAbortSignal | undefined,
+  signal: IAbortSignal | undefined,
   runtime: IStorageOperationRuntime
 ): Promise<T> => {
   void runtime

@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
@@ -9,7 +10,6 @@ import {
   MiddlewarePipelineMode,
   type IAsyncGeneratorMiddlewareStage,
   type IGeneratorMiddlewareStage,
-  type IMiddlewarePipelineAbortSignal,
   type IMiddlewarePipelineMode
 } from '../src/index.js'
 
@@ -28,7 +28,7 @@ const throwingReasonSignal = (failure: unknown, initiallyAborted: boolean) => {
       },
       addEventListener() {},
       removeEventListener() {}
-    } satisfies IMiddlewarePipelineAbortSignal,
+    } satisfies IAbortSignal,
     abort: () => {
       aborted = true
     },
@@ -39,7 +39,7 @@ const throwingReasonSignal = (failure: unknown, initiallyAborted: boolean) => {
 /** Runs a mode through its public pipeline while preserving its sync or Promise failure shape. */
 const runMode = (
   mode: IMiddlewarePipelineMode,
-  signal: IMiddlewarePipelineAbortSignal,
+  signal: IAbortSignal,
   duringStage: (() => void) | undefined,
   downstream = vi.fn(),
   done = vi.fn()

@@ -107,7 +107,7 @@ type IEventChannel<T, R = void> = {
     options?: { readonly taskId?: string }
   ): IUnsubscribe
   subscribeUntil(
-    signal: IEventAbortSignal,
+    signal: IAbortSignal,
     listener: IEventListener<T, R>,
     options?: { readonly taskId?: string }
   ): IUnsubscribe
@@ -218,12 +218,12 @@ subscribeOnce(channel, (event) => console.log('only once', event.value))
 ```ts
 function subscribeUntil<T, R>(
   channel: IEventChannelLike<T, R>,
-  signal: IEventAbortSignal,
+  signal: IAbortSignal,
   listener: IEventListener<T, R>,
   options?: { readonly taskId?: string }
 ): IUnsubscribe
 
-type IEventAbortSignal = {
+type IAbortSignal = {
   readonly aborted: boolean
   readonly reason?: unknown
   addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void
@@ -573,7 +573,7 @@ import { EventSubscriberState } from '@migaia/event-subscriber'
 协议常量，无调用参数：
 
 ```ts
-EventSubscriberState.abort // 'abort' —— IEventAbortSignal 的事件类型
+EventSubscriberState.abort // 'abort' —— IAbortSignal 的事件类型
 EventSubscriberState.fulfilled // 'fulfilled' —— IListenerResult 的状态判别值
 EventSubscriberState.rejected // 'rejected'
 ```

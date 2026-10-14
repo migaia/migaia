@@ -17,7 +17,7 @@ import { atomDef, createAtomStore } from '@migaia/store-keyed'
 import { createSSRRequestScope } from '@migaia/store-ssr'
 import { createMutationPolicy } from '@migaia/store-middleware'
 import { getDependencyTree } from '@migaia/store-devtools'
-import { createEventChannel, type IEventAbortSignal } from '@migaia/event-subscriber'
+import { createEventChannel } from '@migaia/event-subscriber'
 import { createAbortController } from '@migaia/lifecycle'
 import type { IAbortSignal } from '@migaia/utils/promise'
 
@@ -38,7 +38,7 @@ void getDependencyTree
 
 const eventChannel = createEventChannel<number>()
 const lifecycleSignal: IAbortSignal = createAbortController().signal
-const eventSignal: IEventAbortSignal = lifecycleSignal
+const eventSignal: IAbortSignal = lifecycleSignal
 eventChannel.subscribeUntil(eventSignal, (event) => {
   void event.value
 })

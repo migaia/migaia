@@ -1,14 +1,10 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { isStorageErrorFamily } from '../core/error-family.js'
 import type { IStorageOperationRuntime } from '../core/operation-reporter.js'
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import { normalizeStorageException } from './quota.js'
-import {
-  readAbortReason,
-  snapshotOperationContext,
-  subscribeToAbort,
-  type IWebAbortSignal
-} from '../core/operation.js'
+import { readAbortReason, snapshotOperationContext, subscribeToAbort } from '../core/operation.js'
 import { StorageBackend } from '../constants.js'
 
 /**
@@ -21,7 +17,7 @@ import { StorageBackend } from '../constants.js'
  * subscribe/read cancellation state; they do not require DOM-only AbortSignal members, so retaining
  * the contract type keeps storage-web usable in non-DOM test consumers.
  */
-export type IIdbOperationContext = { readonly signal?: IWebAbortSignal }
+export type IIdbOperationContext = { readonly signal?: IAbortSignal }
 
 const normalizeTransactionAbort = (error: unknown): StorageError | StorageContractError => {
   const normalized = normalizeStorageException(error, StorageBackend.indexedDb)

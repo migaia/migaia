@@ -24,7 +24,6 @@ export type { IEventApiStyle, IEventApiStyleNames } from './style.js'
 export type { IStyledEventChannel, IStyledEventHub } from './types.js'
 export type {
   ICanonicalEventChannel,
-  IEventAbortSignal,
   IEventChannel,
   IEventChannelLike,
   IEventChannelOptions,
