@@ -94,9 +94,6 @@ export type IEventSubscriberResultStatus =
   | typeof EventSubscriberState.fulfilled
   | typeof EventSubscriberState.rejected
 
-/** Public compatibility name for utils-owned structural abort-signal admission. */
-export type IEventAbortSignal = IAbortSignal
-
 export type IEventContext<T> = {
   readonly value: T
   readonly aborted: boolean
@@ -203,7 +200,7 @@ export type IEventChannel<
     options?: { readonly taskId?: string }
   ): IUnsubscribe
   subscribeUntil(
-    signal: IEventAbortSignal,
+    signal: IAbortSignal,
     listener: IEventListener<T, R, V>,
     options?: { readonly taskId?: string }
   ): IUnsubscribe

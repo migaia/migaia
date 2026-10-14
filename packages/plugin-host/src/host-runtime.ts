@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import ERROR_TEXT, {
   attachPluginHostIdentity,
   formatPluginHostDiagnostic,
@@ -68,7 +69,6 @@ import {
   type IAsyncMiddlewareStage,
   type IGeneratorMiddlewareStage,
   type IMiddlewarePipeline,
-  type IMiddlewarePipelineAbortSignal,
   type IMiddlewarePipelineMode,
   type ISyncMiddlewareStage
 } from '@migaia/middleware-pipeline'
@@ -211,8 +211,7 @@ export class PluginHost<
   #pipeline: IMiddlewarePipeline<IMiddlewarePipelineMode, TValue>
   #diagnostic: IPluginHostDiagnostic
   /** Real lifecycle signal shared by active pipeline stages and disposal cancellation. */
-  #liveSignal: IMiddlewarePipelineAbortSignal = this.#executionController
-    .signal as unknown as IMiddlewarePipelineAbortSignal
+  #liveSignal: IAbortSignal = this.#executionController.signal as unknown as IAbortSignal
   /** Tracks synchronous pipeline execution so a stage cannot extend its own traversal. */
   #pipelineDepth = 0
   #configRuntime: PluginHostConfigRuntime<TDomainCore, TValue, TInstalled>

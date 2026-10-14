@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -10,13 +11,13 @@ import {
   type IStorageOperationRuntime
 } from '../core/operation-reporter.js'
 import { StorageError, StorageErrorCode } from '../types/errors.js'
-import { assertOperationContext, throwIfAborted, type IWebAbortSignal } from '../core/operation.js'
+import { assertOperationContext, throwIfAborted } from '../core/operation.js'
 
 export type IMigrationContext = {
   readonly fromVersion: number
   readonly toVersion: number
   /** Optional operation signal for cooperative migration cancellation. */
-  readonly signal?: IWebAbortSignal
+  readonly signal?: IAbortSignal
 }
 
 /** 迁移函数一律 async，允许迁移过程中读取其他存储或发请求。 */
@@ -31,7 +32,7 @@ export const runMigrations = async (
   fromVersion: number,
   toVersion: number,
   migrations: Record<number, IMigration> | undefined,
-  signal?: IWebAbortSignal
+  signal?: IAbortSignal
 ): Promise<unknown> => {
   const runtime = createStorageOperationRuntime()
   return runMigrationsWithRuntime(runtime, value, fromVersion, toVersion, migrations, signal)
@@ -49,7 +50,7 @@ export const runMigrationsWithRuntime = async (
   fromVersion: number,
   toVersion: number,
   migrations: Record<number, IMigration> | undefined,
-  signal?: IWebAbortSignal
+  signal?: IAbortSignal
 ): Promise<unknown> => {
   void runtime
   if (!Number.isSafeInteger(fromVersion) || fromVersion < 0)
