@@ -4,7 +4,7 @@
 
 ## 适用与不适用场景
 
-**适用**：你在写一个库（logger、状态管理器、网络客户端……），希望核心保持精简，把颜色输出、批量发送、退出前 flush 这类可选能力做成独立插件，按需装卸；需要插件之间共享能力（比如"批处理"插件的调度器被"HTTP 上报"插件复用）；需要统一的安装失败回滚、卸载资源清理、按插件维度的配置管理；需要一套 sync/async/generator 三选一的处理管线机制。`@migaia/logger` 就是用这套机制实现插件化的真实例子。
+**适用**：你在写一个库（logger、状态管理器、网络客户端……），希望核心保持精简，把颜色输出、批量发送、退出前 flush 这类可选能力做成独立插件，按需装卸；需要插件之间共享能力（比如"批处理"插件的调度器被"HTTP 上报"插件复用）；需要统一的安装失败回滚、卸载资源清理、按插件维度的配置管理；需要一套 sync/async/generator/async-generator 四种模式的处理管线机制。`@migaia/logger` 就是用这套机制实现插件化的真实例子。
 
 **不适用**：如果你的"扩展点"只有一两个、且不需要动态装卸，直接写几个可选参数或组合函数比引入一套插件系统更简单——这个包解决的是"扩展点会持续增长、需要统一治理"这个规模化问题。它也不是通用的处理管线执行器：纯粹的 sync/async/generator middleware 执行算法在 [`@migaia/middleware-pipeline`](../middleware-pipeline/README.md)，本包只负责把插件注册的 stage 接入执行器,并叠加插件注册、生命周期、配置、diagnostic 这层。
 
@@ -16,9 +16,9 @@ pnpm add @migaia/plugin-host
 
 包公开根入口 `@migaia/plugin-host`，另有稳定的 `@migaia/plugin-host/composition` 子路径。根入口
 提供 `PluginHost`、插件/配置/pipeline 类型、状态常量、错误码与错误类、
-`GENERATOR_*` 信号量与 dispose symbol；composition 子路径仅提供 opaque
+`GENERATOR_*` 信号量与 dispose symbol；composition 子路径提供 opaque
 `IRegistrationToken`、`IRegistrationView<TPlugin>` 与 `createView(token)`。不要依赖 `src`/`dist`
-内部文件，也不要把 composition view 当成 Host mutation/config/shared 能力。
+内部文件，也不要把 composition view 当成 Host mutation/config/shared 能力。托管组合 owner 可使用该子路径的 `openComposition()` 协议。
 
 ## 目录
 
@@ -52,7 +52,7 @@ Tray 一次安装多个插件时，先让 PluginHost 完成插件的 `setup`，�
 
 ## 核心心智模型：五分钟上手
 
-```ts
+```ts doc-test=check
 import { definePlugin, PluginHost } from '@migaia/plugin-host'
 
 // 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能
@@ -79,15 +79,15 @@ const upper = definePlugin<ICore, { upper(value: string): string }>('upper', (co
 const host = new Host({
   execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }
 })
-const view = await host.use(upper)
-view.extensions.upper('migaia') // 扩展只出现在成功安装后返回的 committed view 上
-await view.unUse('upper')
+const [handle] = await host.use(upper)
+handle.extensions.upper('migaia') // 从成功安装后返回的插件句柄读取扩展
+await host.unUse('upper')
 await host.dispose()
 ```
 
-`definePlugin()` 有两种写法。上面是函数形 `definePlugin(name, descriptorFactory)`：每次安装先同步创建一个 descriptor，再由其 `install`、`expose`、`featureExpose`、`shared` hooks 提供这次安装的能力。需要 `config`、`update`、`dispose` 等长期定义字段时使用保留对象形：`definePlugin({ name, config, install, shared, update, dispose })`。调用 `definePlugin()` 只会校验并保存定义，不会执行 descriptor 或 `install()`；真正的安装发生在 `host.use(plugin)`。
+`definePlugin()` 有两种写法。上面使用函数形 `definePlugin(name, descriptorFactory)`。每次安装先同步创建一个 descriptor。descriptor 通过 `install`、`expose`、`featureExpose` hooks 提供这次安装的能力。需要 `config`、`update`、`dispose` 等定义字段时，使用对象形 `definePlugin({ name, config, install, update, dispose })`。`shared` 已删除，插件通过 Feature 共享能力。调用 `definePlugin()` 只会校验并保存定义。它不会执行 descriptor 或 `install()`。真正的安装发生在 `host.use(plugin)`。
 
-`PluginHost<TDomainCore, TValue>` 子类唯一必须实现的是 `createPluginDomainCore()`——每次插件安装都会调用一次，产出一份独立的领域 core。插件通过 `install(core)` 拿到“领域能力 + 通用 core 能力”，返回扩展方法。`use()` 成功后按输入顺序返回插件句柄，业务代码从 `handle.extensions` 调用这些方法；`host.unUse(name)` 卸载插件，`host.dispose()` 关闭整个宿主。
+需要领域能力时，`PluginHost<TDomainCore, TValue>` 子类重写 `createPluginDomainCore()`。它每次插件安装都会调用一次，产出一份独立的领域 core。默认实现返回空对象。插件通过 `install(core)` 拿到“领域能力 + 通用 core 能力”，返回扩展方法。`use()` 成功后按输入顺序返回插件句柄。业务代码从 `handle.extensions` 调用这些方法。`host.unUse(name)` 卸载插件。`host.dispose()` 关闭整个宿主并返回清理结果。
 
 ### 禁用不是卸载
 
@@ -109,11 +109,13 @@ await host.dispose()
 
 ## Host 构造与生命周期 API
 
-```ts
+```ts doc-test=check
 import { PluginHost, type IPluginHostOptions } from '@migaia/plugin-host'
 ```
 
-**`new Host(options?)`** —— 构造函数，`TValue` 泛型不为 `never` 时才需要用到 pipeline。全部选项字段（`IPluginHostOptions`）：
+**`new Host(options)`** —— `options` 必填。`TValue` 泛型不为 `never` 时才需要用到 pipeline。全部选项字段（`IPluginHostOptions`）：
+
+- `execution: { mutationTimeoutMs: number | false; pipelineDrainTimeoutMs: number | false }`（必填）—— 分别限制一次 mutation 的执行时间和 pipeline 租约排空时间。两项均须显式提供。`false` 表示无限等待。
 
 - `pipeline?: { mode?: 'sync' | 'async' | 'generator' | 'async-generator' }` —— 默认 `'sync'`；运行期不能切换，非法值抛 `INVALID_PIPELINE_MODE`。
 - `diagnostic?: (message: string, code?: IPluginHostErrorCode, error?: unknown) => void`（`IPluginHostDiagnostic`）—— 接收"不构成错误但值得关注"的信号（如 `PIPELINE_NEXT_LATE`、`EXTENSION_NON_ENUMERABLE_IGNORED`、队列等待）；被吞下而改为上报的错误（回滚/清理失败、换绑钩子失败、Feature 异步拒绝）会以原始对象经第三个参数送达，可沿 `cause`/`errors` 追溯；
@@ -127,19 +129,19 @@ import { PluginHost, type IPluginHostOptions } from '@migaia/plugin-host'
 
 **Host 实例方法/属性**：
 
-| API                                     | 参数                                                               | 返回                                                    | 作用                                                                                  |
-| --------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `host.use(...plugins)`                  | 至少 1 个插件定义                                                  | `Promise<PluginHandle[]>`                               | 按 Feature 依赖拓扑安装；返回与输入同序的名称句柄。                                   |
-| `host.unUse(name)`                      | `name: string`；`dryRun: true` 可选                                  | 执行时 `Promise<IPluginRemoval>`；dry run 时 `Promise<IPluginDependencyPlan>` | 依赖安全地卸载插件；执行结果的冻结 `affected` 只含实际生效步骤。 |
-| `host.dispose()`                        | 无                                                                 | `Promise<void>`                                         | 卸载全部插件并永久关闭宿主；重复调用复用同一 Promise。                                |
-| `host.config.get(path)`                 | `path: string`——插件名，或 `插件名.键` / `插件名.[下标].键`        | `unknown \| undefined`                                  | 同步读取；对象/数组返回 Readonly 懒代理；未知插件或路径返回 `undefined`。见下方说明。 |
-| `host.config.update(name, recipe)`      | `name: string`；`recipe(previous) => Partial<patch>`（须同步返回） | `Promise<void>`                                         | Copy-on-Write 合并 patch，跑 `plugin.update(next, core)` 成功才提交。                 |
-| `host.pipelineMode`                     | 无（只读属性）                                                     | `'sync' \| 'async' \| 'generator' \| 'async-generator'` | 构造时固定的 pipeline 模式。                                                          |
-| `host.usePipeline(stage)`               | `(value, next) => void`                                            | `this`                                                  | sync stage 可提升到任意 Host mode。                                                    |
-| `host.useAsyncPipeline(stage)`          | `(value, next) => void \| Promise<void>`                           | `this`                                                  | 仅 async mode 可用；`next()` 返回 Promise。                                           |
-| `host.useGeneratorPipeline(stage)`      | `(value) => Generator<...>`                                        | `this`                                                  | 可用于 generator 与 async-generator mode，后者由 runner 提升。                       |
-| `host.useAsyncGeneratorPipeline(stage)` | `(value) => AsyncGenerator<...>`                                   | `this`                                                  | 仅 async-generator mode 可用。                                                        |
-| `PluginHost.setLocale(locale)`          | `locale: 'en' \| 'zh'`（静态方法）                                 | `void`                                                  | 切换内置错误文案语言，影响全局、全部 Host 实例。                                      |
+| API                                     | 参数                                                               | 返回                                                                          | 作用                                                                                |
+| --------------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `host.use(...plugins)`                  | 至少 1 个插件定义                                                  | `Promise<IPluginHandleTuple<TPlugins>>`                                       | 按 Feature 依赖拓扑安装；返回与输入同序的插件句柄 tuple。                           |
+| `host.unUse(name)`                      | `name: string`；`dryRun: true` 可选                                | 执行时 `Promise<IPluginRemoval>`；dry run 时 `Promise<IPluginDependencyPlan>` | 依赖安全地卸载插件；执行结果的冻结 `affected` 只含实际生效步骤。                    |
+| `host.dispose()`                        | 无                                                                 | `Promise<IPluginHostDisposalResult>`                                          | 永久关闭宿主并返回清理结果；重复调用复用同一 Promise。                              |
+| `host.config.get(path)`                 | `path: string`——插件名，或 `插件名.键` / `插件名.[下标].键`        | `unknown \| undefined`                                                        | 同步读取；对象/数组返回冻结的只读快照；未知插件或路径返回 `undefined`。见下方说明。 |
+| `host.config.update(name, recipe)`      | `name: string`；`recipe(previous) => Partial<patch>`（须同步返回） | `Promise<void>`                                                               | Copy-on-Write 合并 patch，跑 `plugin.update(next, core)` 成功才提交。               |
+| `host.pipelineMode`                     | 无（只读属性）                                                     | `'sync' \| 'async' \| 'generator' \| 'async-generator'`                       | 构造时固定的 pipeline 模式。                                                        |
+| `host.usePipeline(stage)`               | `(value, next) => void`                                            | `this`                                                                        | sync stage 可提升到任意 Host mode。                                                 |
+| `host.useAsyncPipeline(stage)`          | `(value, next) => void \| Promise<void>`                           | `this`                                                                        | 仅 async mode 可用；`next()` 返回 Promise。                                         |
+| `host.useGeneratorPipeline(stage)`      | `(value) => Generator<...>`                                        | `this`                                                                        | 可用于 generator 与 async-generator mode，后者由 runner 提升。                      |
+| `host.useAsyncGeneratorPipeline(stage)` | `(value) => AsyncGenerator<...>`                                   | `this`                                                                        | 仅 async-generator mode 可用。                                                      |
+| `PluginHost.setLocale(locale)`          | `locale: 'en' \| 'zh'`（静态方法）                                 | `void`                                                                        | 切换内置错误文案语言，影响全局、全部 Host 实例。                                    |
 
 无法提升的组合会同步抛顶层 `PluginHostError`，`code === 'PIPELINE_MODE_MISMATCH'`；其 `cause` 是 middleware-pipeline 原始 `TypeError`，携带 `code === 'INVALID_OPTION'` 与 `source === '@migaia/middleware-pipeline'`。
 
@@ -153,7 +155,7 @@ import { PluginHost, type IPluginHostOptions } from '@migaia/plugin-host'
 
 ## 插件对象与插件 core API
 
-```ts
+```ts doc-test=check
 import type { IPlugin, IPluginConfig, IPluginDisposer, IPluginResource } from '@migaia/plugin-host'
 ```
 
@@ -170,18 +172,18 @@ import type { IPlugin, IPluginConfig, IPluginDisposer, IPluginResource } from '@
 
 `readPluginDependencies(pluginOrAdmission)` 从 Feature 引用读取 `{ provider, required }` 列表，包含本地 Feature 的完整依赖闭包，按首次引用排序，同一 provider 的必需引用优先。它接受 `definePlugin` 结果、有效原始描述符和 composition admission；admission 形式直接读取已捕获的定义，不再调用 getter，其他输入经标准 admission 快照读取一次。读取不会执行 setup、install 或 Feature 工厂，非法输入保留 admission 的原生错误。根入口也导出 `IPluginDependency`、`IPluginFeatureName` 和 `IPluginFeatureOutput`；`getFeature()` 引用类型保留 provider 的名称字面量。
 
-`install()` 返回值只有**可枚举的 data property** 会被挂载到 host；非枚举 key 会被有意忽略并经 `diagnostic` 上报（`EXTENSION_NON_ENUMERABLE_IGNORED`）；getter/setter 形式的属性直接抛 `TypeError`。**保留键不能作为 extension key**：`then`（否则 `await host.use(plugin)` 会把返回值误当成 thenable 解包）、本包的 `disposeKey`/`asyncDisposeKey`（及宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`，若存在），命中会抛 `EXTENSION_RESERVED`；与 Host 上已有属性冲突抛 `EXTENSION_DUPLICATE`；与 `Object.prototype` 成员（如 `toString`）冲突抛 `EXTENSION_OBJECT_PROTOTYPE`。`catch`、`finally` 可以正常使用。
+`install()` 返回值只有**可枚举的 data property** 会通过 `handle.extensions` 发布；非枚举 key 会被有意忽略并经 `diagnostic` 上报（`EXTENSION_NON_ENUMERABLE_IGNORED`）；getter/setter 形式的属性直接抛 `TypeError`。**保留键不能作为 extension key**：`then`（否则 `await host.use(plugin)` 会把返回值误当成 thenable 解包）、本包的 `disposeKey`/`asyncDisposeKey`（及宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`，若存在），命中会抛 `EXTENSION_RESERVED`；与 Host 上已有属性冲突抛 `EXTENSION_DUPLICATE`；与 `Object.prototype` 成员（如 `toString`）冲突抛 `EXTENSION_OBJECT_PROTOTYPE`。`catch`、`finally` 可以正常使用。
 
 **插件 core**（安装时 `install(core)`/`update(next, core)` 拿到的对象）在子类领域方法之上叠加：
 
-| API                                     | 参数                                                                 | 返回                 | 说明                                                               |
-| --------------------------------------- | -------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------ |
-| `core.config.get<T>()`                  | 无运行时参数                                                         | `IReadonlyConfig<T>` | 当前插件已提交配置的只读懒代理；嵌套对象/数组按访问路径缓存代理。  |
-| `core.onDispose(resource)`              | `IPluginResource`（函数 / `Symbol.dispose` / `Symbol.asyncDispose`） | `void`               | **仅安装期间可调用**；setup 使用 `context.onDispose`，尝试关闭后的迟到登记先释放资源再抛 `RESOURCE_OUTSIDE_INSTALL`。 |
-| `core.usePipeline(stage)`               | `(value, next) => void`                                              | `core`               | 仅 install 期间注册；sync stage 可提升到任意 Host mode。           |
-| `core.useAsyncPipeline(stage)`          | `(value, next) => void \| Promise<void>`                             | `core`               | 仅 install 期间、且 Host mode 为 `async` 时可用。                  |
-| `core.useGeneratorPipeline(stage)`      | `(value) => Generator`                                               | `core`               | 仅 install 期间，可用于 `generator` 与 `async-generator` mode。    |
-| `core.useAsyncGeneratorPipeline(stage)` | `(value) => AsyncGenerator`                                          | `core`               | 仅 install 期间、且 Host mode 为 `async-generator` 时可用。        |
+| API                                     | 参数                                                                 | 返回                       | 说明                                                                                                                  |
+| --------------------------------------- | -------------------------------------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `core.config.get()`                     | 无运行时参数                                                         | `IReadonlyConfig<TConfig>` | 当前插件已提交配置的只读快照；嵌套对象和数组也已冻结。                                                                |
+| `core.onDispose(resource)`              | `IPluginResource`（函数 / `Symbol.dispose` / `Symbol.asyncDispose`） | `void`                     | **仅安装期间可调用**；setup 使用 `context.onDispose`，尝试关闭后的迟到登记先释放资源再抛 `RESOURCE_OUTSIDE_INSTALL`。 |
+| `core.usePipeline(stage)`               | `(value, next) => void`                                              | `core`                     | 仅 install 期间注册；sync stage 可提升到任意 Host mode。                                                              |
+| `core.useAsyncPipeline(stage)`          | `(value, next) => void \| Promise<void>`                             | `core`                     | 仅 install 期间、且 Host mode 为 `async` 时可用。                                                                     |
+| `core.useGeneratorPipeline(stage)`      | `(value) => Generator`                                               | `core`                     | 仅 install 期间，可用于 `generator` 与 `async-generator` mode。                                                       |
+| `core.useAsyncGeneratorPipeline(stage)` | `(value) => AsyncGenerator`                                          | `core`                     | 仅 install 期间、且 Host mode 为 `async-generator` 时可用。                                                           |
 
 领域 core（`createPluginDomainCore()` 的返回值）不能定义与上表同名的字段（`config`/`onDispose`/`usePipeline`/`useAsyncPipeline`/`useGeneratorPipeline`/`useAsyncGeneratorPipeline` 是保留键），且必须是普通对象、字段都是可枚举 data property，否则构造时抛 `TypeError`。
 
@@ -193,7 +195,7 @@ import type { IPlugin, IPluginConfig, IPluginDisposer, IPluginResource } from '@
 
 对象形式 `definePlugin` 可声明 `setup(context)`。它先于 `featureExpose`、Feature 工厂和 `install` 运行，适合建立连接并用 `context.onDispose(resource)` 把连接交给本次安装事务。`context` 仅提供 `config`、`operation`（`signal`、绝对 `deadlineAt`、`now()`）、`lifecycle` 和 `onDispose`；它没有 Feature、pipeline 或 Host mutation 能力。setup 返回的值保持同一对象身份，传给后续两个钩子的第二参数；未声明 setup 的插件仍只收到一个 core 参数。
 
-```ts
+```ts doc-test=check
 import { definePlugin, PluginHost } from '@migaia/plugin-host'
 
 const host = new PluginHost<Record<string, never>>({
@@ -203,7 +205,9 @@ const prepared = definePlugin({
   name: 'prepared',
   setup: async (context) => {
     const resource = { closed: false }
-    context.onDispose(() => { resource.closed = true })
+    context.onDispose(() => {
+      resource.closed = true
+    })
     await Promise.resolve()
     return { resource }
   },
@@ -224,17 +228,29 @@ setup 与 install 共用一次 `mutationTimeoutMs` 期限；超时会取消本�
 
 构造时选择一种模式，运行期不能切换：
 
-```ts
-const host = new Host({ pipeline: { mode: 'sync' } })
+```ts doc-test=check
+import { PluginHost } from '@migaia/plugin-host'
+
+class Host extends PluginHost<Record<string, never>, string> {}
+
+const host = new Host({
+  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },
+  pipeline: { mode: 'sync' }
+})
 host.usePipeline((value, next) => next(value.trim()))
 ```
 
 **`async-generator`｜10 秒上手**：
 
-```ts
-import { GENERATOR_CONTINUE } from '@migaia/plugin-host'
+```ts doc-test=check
+import { GENERATOR_CONTINUE, PluginHost } from '@migaia/plugin-host'
 
-const host = new Host({ pipeline: { mode: 'async-generator' } })
+class Host extends PluginHost<Record<string, never>, string> {}
+
+const host = new Host({
+  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },
+  pipeline: { mode: 'async-generator' }
+})
 host.useAsyncGeneratorPipeline(async function* (value) {
   await Promise.resolve() // 可以在 yield 之间做任意异步工作
   yield value.trim()
@@ -267,7 +283,7 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 
 ## 错误、诊断与状态常量
 
-```ts
+```ts doc-test=check
 import {
   PluginHostError,
   ERROR_TEXT,
@@ -286,7 +302,8 @@ import {
 - 句柄与依赖图新增的稳定码包括：`PLUGIN_DISABLED`、`PLUGIN_SUSPENDED`、`PLUGIN_NOT_ACTIVATED`、`FEATURE_NOT_DECLARED`、`PREREQUISITE_MISSING`、`DEPENDENCY_CYCLE`、`DEPENDENCY_BLOCKED`、`REPLACE_NAME_MISMATCH`、`DEPENDENT_RESTART_FAILED`、`PLUGIN_DEFINITION_INVALID`、`REGISTRATION_REVOKED`。其余生命周期、pipeline、配置与组合错误码及完整处理建议见 [USEGUIDE §9](./USEGUIDE.md#9-错误码完整参考)。
 
 完整稳定码集合：`HOST_DISPOSED`、`HOST_DISPOSING`、`PLUGIN_DUPLICATE`、`PLUGIN_NOT_INSTALLED`、`PLUGIN_DISABLED`、`PLUGIN_SUSPENDED`、`PLUGIN_NOT_ACTIVATED`、`FEATURE_NOT_DECLARED`、`PREREQUISITE_MISSING`、`DEPENDENCY_CYCLE`、`DEPENDENCY_BLOCKED`、`REPLACE_NAME_MISMATCH`、`DEPENDENT_RESTART_FAILED`、`PLUGIN_DEFINITION_INVALID`、`PLUGIN_INSTALL_FAILED`、`SETUP_REQUIRES_ASYNC_INSTALL`、`PLUGIN_DISPOSE_FAILED`、`EXTENSION_DUPLICATE`、`EXTENSION_OBJECT_PROTOTYPE`、`EXTENSION_RESERVED`、`PREREQUISITE_DISABLED`、`PREREQUISITE_REMOVED`、`RESOURCE_OUTSIDE_INSTALL`、`LIFECYCLE_MUTATION`、`INVALID_PIPELINE_MODE`、`PIPELINE_MODE_MISMATCH`、`PIPELINE_NEXT_DUPLICATE`、`PIPELINE_NEXT_LATE`、`PIPELINE_EXECUTING`、`PIPELINE_FAILED`、`PLUGIN_INSTALL_ROLLBACK_FAILED`、`EXTENSION_NON_ENUMERABLE_IGNORED`、`MUTATION_QUEUE_TIMEOUT`、`DISPOSE_STEP_TIMEOUT`、`INVALID_OPTION`、`INVALID_CONFIG_VALUE`、`CONFIG_CYCLE_REJECTED`、`MUTATION_EXECUTION_TIMEOUT`、`REGISTRATION_REVOKED`、`INSTALL_RESULT_THENABLE`、`PIPELINE_DRAIN_TIMEOUT`、`CLEANUP_INCOMPLETE`、`COMPOSITION_TARGET_UNMANAGED`。
-- **`ERROR_TEXT`**（默认导出）：本包内置的中/英双语错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。
+
+- **`ERROR_TEXT`**（根入口的命名导出）：本包内置的中/英双语错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。
 - **`PluginHost.setLocale(locale: ILocaleKey)`**：静态方法，`ILocaleKey = 'en' | 'zh'`，切换 `ERROR_TEXT` 与后续抛出错误的默认语言，默认 `'zh'`，全局生效（不是每个 Host 实例独立）。
 - **`PluginHostStatus`**：`{ active, closing, disposed }`——Host 的三态生命周期，`closing` 是 `dispose()` 已开始、尚未收敛的窗口。
 - **`MiddlewarePipelineMode`**：从 `@migaia/middleware-pipeline` 原名转发的模式常量；`host.pipelineMode` 返回其中之一。
@@ -299,7 +316,7 @@ import {
 
 ## Pipeline 类型与信号量
 
-```ts
+```ts doc-test=check
 import {
   MiddlewarePipelineMode,
   MiddlewarePipelineViolation,
@@ -317,6 +334,7 @@ import {
 ```
 
 mode、violation 与四种 stage 类型均从 `@migaia/middleware-pipeline` **原名转发**，没有 plugin-host 自己的重复声明。Host 在 stage 注册时使用其唯一的 `createPipeline` runner 提升到宿主 mode；需要手工提升或执行时直接使用 middleware-pipeline 的 `createPipeline`。
+
 - **`GENERATOR_CONTINUE`/`GENERATOR_HALT`/`GENERATOR_UNDEFINED`** —— generator pipeline 专用的哨兵值（`unique symbol`，直接从 `@migaia/middleware-pipeline` 转发，保持跨包同一身份）：generator stage 的 `return` 可以返回它们中的一个来表达"继续/终止/显式 undefined"，语义见上方 [Pipeline 处理管线](#pipeline-处理管线) 表格。
 - **`disposeKey`/`asyncDisposeKey`** —— 本包自声明的 `unique symbol`（不依赖 `ESNext.Disposable` lib），语义等价于宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`。插件/资源可以用这两个 key 之一声明清理方法，运行时会把自声明 symbol 与宿主真实 symbol（若存在）都识别为等价键。
 
@@ -328,28 +346,39 @@ mode、violation 与四种 stage 类型均从 `@migaia/middleware-pipeline` **�
 
 ### 1. 带配置、Feature 依赖、失败回滚的完整插件组合
 
-```ts
+```ts doc-test=check
 import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
 
 type ICore = { write(text: string): void }
 type IFormatterConfig = { prefix?: string }
-const format = defineFeature(
-  (core: { featureExpose: { format(value: string): string } }) => core.featureExpose.format
+const format = defineFeature((core: { featureExpose: { format(value: string): string } }) => ({
+  format: core.featureExpose.format
+}))
+const formatter = definePlugin({
+  name: 'formatter',
+  config: { prefix: '[app]' },
+  features: { format },
+  install: () => ({}),
+  featureExpose: (core: { config: { get(): IFormatterConfig } }) => ({
+    format: (value: string) => `${core.config.get().prefix} ${value}`
+  })
+})
+const writerFormat = defineFeature(
+  (_core, dependencies) => ({ format: dependencies.formatter.format }),
+  { formatter: formatter.getFeature('format') }
 )
-const formatter = definePlugin(
-  'formatter',
-  (core: ICore & { config: { get(): IFormatterConfig } }) => ({
-    install: () => ({}),
-    featureExpose: () => ({ format: (value: string) => `${core.config.get().prefix} ${value}` })
-  }),
-  { format }
-)
-const writer = definePlugin(
+const writer = definePlugin<
+  ICore,
+  { log(msg: string): void },
+  never,
   'writer',
-  (core: ICore & { features: { format: (value: string) => string } }) => ({
-    install: () => ({ log: (msg: string) => core.write(core.features.format(msg)) })
+  { format: typeof writerFormat }
+>(
+  'writer',
+  (core) => ({
+    install: () => ({ log: (msg: string) => core.write(core.features.format.format(msg)) })
   }),
-  { format: formatter.getFeature('format') }
+  { format: writerFormat }
 )
 
 class Host extends PluginHost<ICore, never> {
@@ -358,18 +387,21 @@ class Host extends PluginHost<ICore, never> {
   }
 }
 
-const [, writerHandle] = await new Host().use(formatter, writer)
+const host = new Host({
+  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }
+})
+const [, writerHandle] = await host.use(formatter, writer)
 writerHandle.extensions.log('server started') // "[app] server started"
 
 await host.config.update('formatter', () => ({ prefix: '[api]' }))
-host.log('request handled') // "[api] request handled"
+writerHandle.extensions.log('request handled') // "[api] request handled"
 
 await host.dispose()
 ```
 
 ### 2. async pipeline 做请求耗时统计（洋葱模型的"前置 + 后置"）
 
-```ts
+```ts doc-test=check
 import { PluginHost } from '@migaia/plugin-host'
 
 type IRequest = { path: string; startedAt?: number }
@@ -383,7 +415,10 @@ class Host extends PluginHost<{}, IRequest> {
   }
 }
 
-const host = new Host({ pipeline: { mode: 'async' } })
+const host = new Host({
+  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },
+  pipeline: { mode: 'async' }
+})
 host.useAsyncPipeline(async (value, next) => {
   const startedAt = Date.now()
   await next({ ...value, startedAt }) // 前置：给下游打时间戳
@@ -395,7 +430,7 @@ await host.handle({ path: '/users' })
 
 ### 3. 用 `diagnostic` + 自定义队列/清理超时观测宿主内部行为
 
-```ts
+```ts doc-test=check
 import { PluginHost, type IPluginHostErrorCode } from '@migaia/plugin-host'
 
 class Host extends PluginHost<{}, never> {
@@ -406,9 +441,10 @@ class Host extends PluginHost<{}, never> {
 
 const events: { message: string; code?: IPluginHostErrorCode }[] = []
 const host = new Host({
+  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },
   diagnostic: (message, code) => events.push({ message, code }),
   queueAdmissionTimeoutMs: 2000, // 显式开启拒绝阈值——默认是"只诊断不拒绝"
-  queueAdmissionDiagnosticMs: 200, // 排队超过 200ms 先打一条诊断
+  queueAdmissionDiagnosticMs: 200, // 未配置拒绝阈值时才使用；本例不会触发该诊断
   disposeStepTimeoutMs: 3000 // 单个 disposer 最多等 3 秒
 })
 
@@ -420,12 +456,12 @@ await host.use({
   }
 })
 await host.dispose()
-// events 里可能包含排队等待、非枚举扩展被忽略等诊断，取决于实际时序
+// events 里可能包含非枚举扩展被忽略等诊断，取决于实际时序
 ```
 
 ### 4. 优雅降级：安装失败时读出真实原因与回滚详情
 
-```ts
+```ts doc-test=check
 import { PluginHost, PluginHostError, type IPlugin } from '@migaia/plugin-host'
 
 class Host extends PluginHost<{}, never> {
@@ -442,7 +478,9 @@ const broken: IPlugin<{}, {}> = {
 }
 
 try {
-  await new Host().use(broken)
+  await new Host({
+    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }
+  }).use(broken)
 } catch (error) {
   if (error instanceof PluginHostError && error.code === 'PLUGIN_INSTALL_FAILED') {
     console.error('安装失败，原始错误:', (error.cause as Error).message) // 'boom'
@@ -452,7 +490,7 @@ try {
 
 ### 5. generator pipeline：用 `GENERATOR_HALT` 提前截断处理链
 
-```ts
+```ts doc-test=check
 import { PluginHost, GENERATOR_HALT } from '@migaia/plugin-host'
 
 type IEvent = { level: 'info' | 'debug'; message: string }
@@ -466,7 +504,10 @@ class Host extends PluginHost<{}, IEvent> {
   }
 }
 
-const host = new Host({ pipeline: { mode: 'generator' } })
+const host = new Host({
+  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },
+  pipeline: { mode: 'generator' }
+})
 host.useGeneratorPipeline(function* (value) {
   if (value.level === 'debug') return GENERATOR_HALT // 直接丢弃 debug 事件，后续 stage 不再执行
   return value
@@ -478,7 +519,7 @@ host.emit({ level: 'debug', message: 'noisy' }) // 被截断，不打印
 
 ### 6. Async-generator：串行异步处理 + host 中途 dispose 自动止损
 
-```ts
+```ts doc-test=check
 import { PluginHost, GENERATOR_CONTINUE } from '@migaia/plugin-host'
 
 class FetchHost extends PluginHost<{}, string> {
@@ -495,7 +536,10 @@ class FetchHost extends PluginHost<{}, string> {
   }
 }
 
-const host = new FetchHost({ pipeline: { mode: 'async-generator' } })
+const host = new FetchHost({
+  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },
+  pipeline: { mode: 'async-generator' }
+})
 host.useAsyncGeneratorPipeline(async function* (url) {
   yield url // 中间 yield 仅用于观测，不会提前进入下一 stage
   const response = await fetch(url)
@@ -509,12 +553,8 @@ const text = await host.run('https://example.com/data')
 
 ### 7. Async-generator 多 stage 链式处理，复用已有的同步 generator stage
 
-```ts
-import {
-  PluginHost,
-  GENERATOR_CONTINUE,
-  type IGeneratorMiddlewareStage
-} from '@migaia/plugin-host'
+```ts doc-test=check
+import { PluginHost, GENERATOR_CONTINUE, type IGeneratorMiddlewareStage } from '@migaia/plugin-host'
 
 // 已有的一个同步 generator stage（比如从 generator 模式的 Host 上迁移过来的）
 const trimStage: IGeneratorMiddlewareStage<string> = function* (value) {
@@ -536,7 +576,10 @@ class TextHost extends PluginHost<{}, string> {
   }
 }
 
-const host = new TextHost({ pipeline: { mode: 'async-generator' } })
+const host = new TextHost({
+  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },
+  pipeline: { mode: 'async-generator' }
+})
 
 // 不用重写或手工适配：Host runner 直接提升 generator stage
 host.useGeneratorPipeline(trimStage)
