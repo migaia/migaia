@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IPluginDependencyPlan, IPluginRemoval } from '@migaia/plugin-host'
 import type { IReadyOutcome, ISupervisorSnapshot } from '@migaia/supervision'
 import type { IScheduler } from '@migaia/utils/scheduler'
@@ -98,7 +98,7 @@ export type IProcessRegistrationListenOptions = Readonly<{
   ): 'adopt' | 'reject' | Promise<'adopt' | 'reject'>
   scheduler?: IScheduler
   handshakeTimeoutMs?: number
-  signal?: AbortSignal
+  signal?: IAbortSignal
 }>
 
 /** Bounded defaults are selected at construction; the scheduler and reporter are caller owned. */

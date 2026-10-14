@@ -10,7 +10,6 @@ export {
   SerializeCodecError,
   assertSerializeType,
   isChunkShape,
-  type ISerializeAbortSignal,
   type ISerializeChunk,
   type ISerializeChunkType,
   type ISerializeContext,

@@ -32,7 +32,8 @@ type ICaptureToken = {
    */
   provisional?: boolean
   /** Explicit-expiry timer set alongside `provisional`; see PROVISIONAL_COMMIT_WINDOW_MS. */
-  expireTimer?: ReturnType<typeof setTimeout>
+  /** Host timer handle; opaque, so declarations need no Node or DOM timer types. */
+  expireTimer?: unknown
 }
 type ICapturableOperation = Promise<unknown> & { [CAPTURES]?: Set<ICaptureToken> }
 
@@ -140,8 +141,10 @@ export class ResourceCaptureRegistry {
 
   #cancelProvisionalExpiry(token: ICaptureToken): void {
     if (token.expireTimer === undefined) return
-    clearTimeout(token.expireTimer)
-    this.#expireTimers.delete(token.expireTimer)
+    /** The opaque public field always holds the handle this owner stored from `setTimeout`. */
+    const timer = token.expireTimer as ReturnType<typeof setTimeout>
+    clearTimeout(timer)
+    this.#expireTimers.delete(timer)
     token.expireTimer = undefined
   }
 

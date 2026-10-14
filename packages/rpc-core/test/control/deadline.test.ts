@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
@@ -11,7 +12,6 @@ import { RpcPortName } from '../../dist/core/internal/plugin-shared-keys.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { timeout } from '../../dist/core/middleware/timeout.js'
 import type { IRpcTransport } from '../../dist/core/transport.js'
-import type { IRpcAbortSignal } from '../../dist/core/typing.js'
 
 describe('provider relative deadline (A6)', () => {
   it('subtracts receiver resolution delay from the outbound wire budget', async () => {
@@ -70,7 +70,7 @@ describe('provider relative deadline (A6)', () => {
         return clientWire.send(message, options)
       }
     }
-    let providerSignal: IRpcAbortSignal | undefined
+    let providerSignal: IAbortSignal | undefined
     const provider = await createProviderEndpoint({
       id: 'provider',
       transport: providerWire,
@@ -181,7 +181,7 @@ describe('provider relative deadline (A6)', () => {
     const providerStarted = new Promise<void>((resolve) => {
       started = resolve
     })
-    let providerSignal: IRpcAbortSignal | undefined
+    let providerSignal: IAbortSignal | undefined
     const provider = await createProviderEndpoint({
       id: 'provider',
       transport: providerWire,

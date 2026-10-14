@@ -1,4 +1,5 @@
-import type { IAbortSignal, IAbortController } from '@migaia/lifecycle/abort'
+import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortController } from '@migaia/lifecycle/abort'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IRegistration } from './registry.js'
 import type { IPluginHostCore, IPluginHostDiagnostic } from './typing.js'

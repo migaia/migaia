@@ -44,7 +44,7 @@ export const RuntimeApiErrorText = {
   targetUnknown: 'Runtime outlet target is not a live connection',
   /** Canonical indexes preserve all matches and reject ambiguity instead of selecting one. */
   targetAmbiguous: 'Runtime outlet target identifies multiple connections',
-  /** Passive subscriptions admit only the five declared lifecycle events and actual callbacks. */
+  /** Passive subscriptions admit only the declared lifecycle events and actual callbacks. */
   eventInvalid: 'Runtime event subscription is invalid',
   /** Native mutations require an original spawn/create lease, never a local channel ownership claim. */
   controlBorrowed: 'Runtime target does not own native execution',
@@ -53,14 +53,22 @@ export const RuntimeApiErrorText = {
   /** Filters use only canonical states, source kinds and one explicit name discriminator. */
   filterInvalid: 'Runtime query filter is invalid',
   /** Host controls require the original catalog, synchronous resolver and this exact managed Host. */
-  hostControlInvalid: 'Runtime host exposure requires its managed Host catalog and resolver'
+  hostControlInvalid: 'Runtime host exposure requires its managed Host catalog and resolver',
+  /** Parent task and opaque child connection are mutually exclusive coroutine source modes. */
+  coroutineModeInvalid: 'Runtime coroutine requires exactly one task or opaque connection',
+  /** Replacement preserves the old unit unless the new coroutine task is callable. */
+  coroutineReplaceInvalid: 'Runtime coroutine replacement requires a task function'
 } as const
 
 /**
- * Applications use these scalar labels to identify process/thread Plugin and query metadata. A
- * label grants no Host slot or native execution authority; those belong to held resources.
+ * Applications use these scalar labels to identify runtime Plugin and query metadata. A label
+ * grants no Host slot or native execution authority; those belong to held resources.
  */
-export const RuntimePluginKey = Object.freeze({ process: 'process', thread: 'thread' } as const)
+export const RuntimePluginKey = Object.freeze({
+  process: 'process',
+  thread: 'thread',
+  coroutine: 'coroutine'
+} as const)
 
 /** Direct Core Peers use this display name; it grants no remote identity or execution authority. */
 export const RUNTIME_PEER_DEFAULT_NAME = 'peer'
@@ -151,6 +159,7 @@ export const RuntimeEventName = {
   exit: 'exit',
   degraded: 'degraded',
   restart: 'restart',
+  terminal: 'terminal',
   liquidated: 'liquidated'
 } as const
 export type RuntimeEventName = (typeof RuntimeEventName)[keyof typeof RuntimeEventName]

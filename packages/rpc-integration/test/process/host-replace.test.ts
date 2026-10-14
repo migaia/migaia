@@ -1,6 +1,7 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
 import type { IRpcEndpoint } from '@migaia/rpc-core'
-import { createMutationQueue, type IAbortSignal } from '@migaia/lifecycle'
+import { createMutationQueue } from '@migaia/lifecycle'
 import { catalog, hostFixture, runtimeHostFixture } from './fixtures/host-control.js'
 import { nativeHostFixture } from './fixtures/host-native.js'
 import { createProcessPlugin } from '@migaia/rpc-process'

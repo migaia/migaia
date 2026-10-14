@@ -1,4 +1,4 @@
-import type { IAbortSignal } from './abort.js'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { createLifecycleTypeError } from './errors.js'

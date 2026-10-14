@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcAbortError,
   createRpcContractError,
@@ -14,7 +15,6 @@ import type {
   IRpcConnectControl,
   IRpcDiscoveryControl,
   IRpcDiscoveryCandidate,
-  IRpcAbortSignal,
   IRpcInboundDiscoveryQuery,
   IRpcServerMetadata,
   IRpcPlatform,
@@ -61,7 +61,7 @@ type IDiscoveryPorts = {
   readonly time: IRpcTimePort
   readonly candidatePing: (
     candidate: IRpcDiscoveryCandidate<string>,
-    options?: { readonly timeoutMs?: number; readonly signal?: IRpcAbortSignal }
+    options?: { readonly timeoutMs?: number; readonly signal?: IAbortSignal }
   ) => Promise<boolean>
 }
 
@@ -215,7 +215,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         ? {
             query: (
               targetId: TTargetId,
-              options?: { readonly timeoutMs?: number; readonly signal?: IRpcAbortSignal }
+              options?: { readonly timeoutMs?: number; readonly signal?: IAbortSignal }
             ) => this.#manualQuery(targetId, options),
             onQuery: (
               listener: (query: IRpcInboundDiscoveryQuery<TTargetId>) => void | Promise<void>
@@ -238,7 +238,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
                     candidate: IRpcDiscoveryCandidate<TTargetId>,
                     options?: {
                       readonly timeoutMs?: number
-                      readonly signal?: IRpcAbortSignal
+                      readonly signal?: IAbortSignal
                     }
                   ) => this.#manualPing(candidate, options)
                 }
@@ -542,7 +542,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     targetId: TTargetId,
     operation: string,
     timeoutMs?: number | false,
-    signal?: IRpcAbortSignal
+    signal?: IAbortSignal
   ): Promise<{ readonly receiverId?: string; readonly verifiedPeerKey?: string }> {
     const pinned = this.#registry.getPin(targetId)
     if (pinned !== undefined || !this.#receiverSelector) return this.receiverForTarget(targetId)
@@ -588,7 +588,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   async discoverTargetIfNeeded(
     targetId: TTargetId,
     timeoutMs: number | false = 1000,
-    signal?: IRpcAbortSignal
+    signal?: IAbortSignal
   ): Promise<void> {
     this.#assertActive()
     if (this.#kernel.topology === 'exclusive') return
@@ -674,7 +674,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     targetId: TTargetId,
     waiter: IAutomaticDiscoveryWaiter,
     timeoutMs: number | false,
-    signal?: IRpcAbortSignal
+    signal?: IAbortSignal
   ): Promise<void> {
     if (waiter.references >= this.limits.maxWaitersPerSession)
       return Promise.reject(
@@ -714,7 +714,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   #automaticDiscovery(
     targetId: TTargetId,
     timeoutMs: number | false,
-    signal?: IRpcAbortSignal
+    signal?: IAbortSignal
   ): Promise<void> {
     this.#assertActive()
     const key = String(targetId)
@@ -862,7 +862,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   /** Executes manual discovery against the same authenticated query path without exposing internals. */
   async #manualQuery(
     targetId: TTargetId,
-    options?: { readonly timeoutMs?: number; readonly signal?: IRpcAbortSignal }
+    options?: { readonly timeoutMs?: number; readonly signal?: IAbortSignal }
   ): Promise<readonly IRpcDiscoveryCandidate<TTargetId>[]> {
     this.#assertManualMode()
     this.#validateIdentifier(targetId, 'targetId')
@@ -1120,7 +1120,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
   /** Pings a manually selected receiver through normal authenticated routing. */
   async #manualPing(
     candidate: IRpcDiscoveryCandidate<TTargetId>,
-    options?: { readonly timeoutMs?: number; readonly signal?: IRpcAbortSignal }
+    options?: { readonly timeoutMs?: number; readonly signal?: IAbortSignal }
   ): Promise<boolean> {
     this.#assertManualMode()
     if (!candidate || typeof candidate !== 'object')

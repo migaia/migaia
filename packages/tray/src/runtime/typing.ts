@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IExtractPluginExt, IPluginConstraint } from '@migaia/plugin-host'
 
 /** Resolves exact extension types for literal ready plugin names and stays unknown when widened. */

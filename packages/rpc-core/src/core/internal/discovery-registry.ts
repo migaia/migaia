@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { RpcCoreErrorText } from '../error-text.js'
 
 /** Owns all discovery, DNS, pinning and manual-candidate state for one endpoint. */
@@ -701,4 +702,3 @@ export class DiscoveryRegistry {
     this.#releaseBinding?.(token)
   }
 }
-import type { IAbortSignal } from './async-control.js'

@@ -1013,7 +1013,7 @@
         {
           "name": "createStorePersistAbortError",
           "kind": "function",
-          "signature": "export declare function createStorePersistAbortError(code: IStorePersistErrorCode, message: string, cause?: unknown): DOMException;",
+          "signature": "export declare function createStorePersistAbortError(code: IStorePersistErrorCode, message: string, cause?: unknown): Error;",
           "declarationLine": 10,
           "source": "packages/store-persist/dist/errors.d.ts",
           "purpose": "Builds a tagged native DOMException for cancellation after disposal.",
@@ -1041,14 +1041,14 @@
               "optional": true
             }
           ],
-          "returns": "DOMException",
+          "returns": "Error",
           "errors": ["No documented errors are declared for createStorePersistAbortError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStorePersistAbortError.",
           "examples": [],
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function createStorePersistAbortError(code: IStorePersistErrorCode, message: string, cause?: unknown): DOMException;"
+            "export declare function createStorePersistAbortError(code: IStorePersistErrorCode, message: string, cause?: unknown): Error;"
           ],
           "overloadParameterDetails": [
             [
@@ -1069,7 +1069,7 @@
               }
             ]
           ],
-          "overloadReturns": ["DOMException"],
+          "overloadReturns": ["Error"],
           "whenToUse": "Use createStorePersistAbortError when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createStorePersistAbortError does not match the required inputs or return contract.",
           "sections": [
@@ -1105,7 +1105,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/errors.d.ts:createStorePersistAbortError:export declare function createStorePersistAbortError(code: IStorePersistErrorCode, message: string, cause?: unknown): DOMException;",
+          "identity": "packages/store-persist/dist/errors.d.ts:createStorePersistAbortError:export declare function createStorePersistAbortError(code: IStorePersistErrorCode, message: string, cause?: unknown): Error;",
           "guidance": [
             {
               "id": "10-底层导出-envelope-工具-状态常量与错误构造函数",
@@ -1678,7 +1678,7 @@
           "name": "defaultJsonCodec",
           "kind": "const",
           "signature": "export declare const defaultJsonCodec: ICodec;",
-          "declarationLine": 7,
+          "declarationLine": 8,
           "source": "packages/store-persist/dist/storage/codec.d.ts",
           "purpose": "默认 codec：等价于 storage-web 的 `jsonCodec` 再加 Map/Set 往返支持——本包不 import `@migaia/storage-web` 的具体值，只按结构复刻这一份零依赖实现，避免让\"默认 codec 是什么\"这件事 额外背上一条运行时依赖。",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defaultJsonCodec.",
@@ -3588,8 +3588,8 @@
         {
           "name": "readEnvelope",
           "kind": "function",
-          "signature": "export declare function readEnvelope(storage: IPersistStorage, key: string, codec: ICodec, ctx: { signal?: AbortSignal; }): Promise<unknown | undefined>;",
-          "declarationLine": 11,
+          "signature": "export declare function readEnvelope(storage: IPersistStorage, key: string, codec: ICodec, ctx: { signal?: IAbortSignal; }): Promise<unknown | undefined>;",
+          "declarationLine": 12,
           "source": "packages/store-persist/dist/storage/codec.d.ts",
           "purpose": "readEnvelope is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for readEnvelope.",
@@ -3598,7 +3598,7 @@
             "storage: IPersistStorage",
             "key: string",
             "codec: ICodec",
-            "ctx: { signal?: AbortSignal; }"
+            "ctx: { signal?: IAbortSignal; }"
           ],
           "parameterDetails": [
             {
@@ -3618,7 +3618,7 @@
             },
             {
               "name": "ctx",
-              "type": "{ signal?: AbortSignal; }",
+              "type": "{ signal?: IAbortSignal; }",
               "optional": false
             }
           ],
@@ -3630,7 +3630,7 @@
           "aliasOf": "readEnvelope",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function readEnvelope(storage: IPersistStorage, key: string, codec: ICodec, ctx: { signal?: AbortSignal; }): Promise<unknown | undefined>;"
+            "export declare function readEnvelope(storage: IPersistStorage, key: string, codec: ICodec, ctx: { signal?: IAbortSignal; }): Promise<unknown | undefined>;"
           ],
           "overloadParameterDetails": [
             [
@@ -3651,7 +3651,7 @@
               },
               {
                 "name": "ctx",
-                "type": "{ signal?: AbortSignal; }",
+                "type": "{ signal?: IAbortSignal; }",
                 "optional": false
               }
             ]
@@ -3692,7 +3692,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/storage/codec.d.ts:readEnvelope:export declare function readEnvelope(storage: IPersistStorage, key: string, codec: ICodec, ctx: { signal?: AbortSignal; }): Promise<unknown | undefined>;",
+          "identity": "packages/store-persist/dist/storage/codec.d.ts:readEnvelope:export declare function readEnvelope(storage: IPersistStorage, key: string, codec: ICodec, ctx: { signal?: IAbortSignal; }): Promise<unknown | undefined>;",
           "guidance": [
             {
               "id": "10-底层导出-envelope-工具-状态常量与错误构造函数",
@@ -3766,8 +3766,8 @@
         {
           "name": "removeEnvelope",
           "kind": "function",
-          "signature": "export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: AbortSignal; }): Promise<void>;",
-          "declarationLine": 14,
+          "signature": "export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: IAbortSignal; }): Promise<void>;",
+          "declarationLine": 15,
           "source": "packages/store-persist/dist/storage/codec.d.ts",
           "purpose": "removeEnvelope is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for removeEnvelope.",
@@ -3775,7 +3775,7 @@
           "parameters": [
             "storage: IPersistStorage",
             "key: string",
-            "ctx: { signal?: AbortSignal; }"
+            "ctx: { signal?: IAbortSignal; }"
           ],
           "parameterDetails": [
             {
@@ -3790,7 +3790,7 @@
             },
             {
               "name": "ctx",
-              "type": "{ signal?: AbortSignal; }",
+              "type": "{ signal?: IAbortSignal; }",
               "optional": false
             }
           ],
@@ -3802,7 +3802,7 @@
           "aliasOf": "removeEnvelope",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: AbortSignal; }): Promise<void>;"
+            "export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: IAbortSignal; }): Promise<void>;"
           ],
           "overloadParameterDetails": [
             [
@@ -3818,7 +3818,7 @@
               },
               {
                 "name": "ctx",
-                "type": "{ signal?: AbortSignal; }",
+                "type": "{ signal?: IAbortSignal; }",
                 "optional": false
               }
             ]
@@ -3859,7 +3859,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/storage/codec.d.ts:removeEnvelope:export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: AbortSignal; }): Promise<void>;",
+          "identity": "packages/store-persist/dist/storage/codec.d.ts:removeEnvelope:export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: IAbortSignal; }): Promise<void>;",
           "guidance": [
             {
               "id": "10-底层导出-envelope-工具-状态常量与错误构造函数",
@@ -4064,8 +4064,8 @@
         {
           "name": "writeEnvelope",
           "kind": "function",
-          "signature": "export declare function writeEnvelope(storage: IPersistStorage, key: string, codec: ICodec, value: unknown, ctx: { signal?: AbortSignal; }): Promise<void>;",
-          "declarationLine": 8,
+          "signature": "export declare function writeEnvelope(storage: IPersistStorage, key: string, codec: ICodec, value: unknown, ctx: { signal?: IAbortSignal; }): Promise<void>;",
+          "declarationLine": 9,
           "source": "packages/store-persist/dist/storage/codec.d.ts",
           "purpose": "writeEnvelope is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for writeEnvelope.",
@@ -4075,7 +4075,7 @@
             "key: string",
             "codec: ICodec",
             "value: unknown",
-            "ctx: { signal?: AbortSignal; }"
+            "ctx: { signal?: IAbortSignal; }"
           ],
           "parameterDetails": [
             {
@@ -4100,7 +4100,7 @@
             },
             {
               "name": "ctx",
-              "type": "{ signal?: AbortSignal; }",
+              "type": "{ signal?: IAbortSignal; }",
               "optional": false
             }
           ],
@@ -4112,7 +4112,7 @@
           "aliasOf": "writeEnvelope",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function writeEnvelope(storage: IPersistStorage, key: string, codec: ICodec, value: unknown, ctx: { signal?: AbortSignal; }): Promise<void>;"
+            "export declare function writeEnvelope(storage: IPersistStorage, key: string, codec: ICodec, value: unknown, ctx: { signal?: IAbortSignal; }): Promise<void>;"
           ],
           "overloadParameterDetails": [
             [
@@ -4138,7 +4138,7 @@
               },
               {
                 "name": "ctx",
-                "type": "{ signal?: AbortSignal; }",
+                "type": "{ signal?: IAbortSignal; }",
                 "optional": false
               }
             ]
@@ -4179,7 +4179,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/storage/codec.d.ts:writeEnvelope:export declare function writeEnvelope(storage: IPersistStorage, key: string, codec: ICodec, value: unknown, ctx: { signal?: AbortSignal; }): Promise<void>;",
+          "identity": "packages/store-persist/dist/storage/codec.d.ts:writeEnvelope:export declare function writeEnvelope(storage: IPersistStorage, key: string, codec: ICodec, value: unknown, ctx: { signal?: IAbortSignal; }): Promise<void>;",
           "guidance": [
             {
               "id": "10-底层导出-envelope-工具-状态常量与错误构造函数",

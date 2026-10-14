@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcConstructionError,
   createRpcError,
@@ -53,7 +54,6 @@ import type {
   IRpcMiddleware,
   IRpcProvider,
   IRpcPingEndpointSurface,
-  IRpcAbortSignal,
   IRpcHookEvent
 } from './typing.js'
 import { inspectFeatures } from '@migaia/plugin-host/composition'
@@ -176,7 +176,7 @@ async function createComposedEndpointRuntime<
     )
     const constructionConfig = deferred.construction
     const constructionSignal =
-      constructionConfig?.signal ?? (new AbortController().signal as IRpcAbortSignal)
+      constructionConfig?.signal ?? (new AbortController().signal as IAbortSignal)
     construction = createConstructionControl({
       signal: constructionSignal,
       timeoutMs: constructionConfig?.timeoutMs,

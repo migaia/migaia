@@ -795,7 +795,7 @@ await terminal.whenTerminal()
 
 | Subpath                        | 主要导出                                                    |
 | ------------------------------ | ----------------------------------------------------------- |
-| `@migaia/lifecycle/abort`      | `createAbortController`、`observeAbortSubscription`、`IAbortSignal`、`IAbortController`、`IObservedAbortSubscription`、`IObservedAbortFailureSink` |
+| `@migaia/lifecycle/abort`      | `createAbortController`、`observeAbortSubscription`、`IAbortController`、`IObservedAbortSubscription`、`IObservedAbortFailureSink`（结构化 signal 类型 `IAbortSignal` 由 `@migaia/utils` 提供） |
 | `@migaia/lifecycle/scheduler`  | scheduler、snapshot与时间校验                               |
 | `@migaia/lifecycle/quiescence` | quiescence/lease/pending trackers                           |
 | `@migaia/lifecycle/scope`      | `createLifecycleScope`                                      |

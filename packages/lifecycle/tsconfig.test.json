@@ -5,6 +5,5 @@
     "rootDir": ".",
     "types": ["node", "vitest/globals"]
   },
-  "include": ["src", "test"],
-  "exclude": ["src/ambient.d.ts"]
+  "include": ["src", "test"]
 }

@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   assimilateCapturedThen,
   createAbortController,
@@ -6,7 +7,7 @@ import {
   createProvisionalScope,
   probeThenable
 } from '@migaia/lifecycle'
-import { observeAbortSubscription, type IAbortSignal } from '@migaia/lifecycle/abort'
+import { observeAbortSubscription } from '@migaia/lifecycle/abort'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { copyConfig, readPlainDataRecord } from './config.js'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'

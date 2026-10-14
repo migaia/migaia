@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createSerializeError,
   createSerializeTypeError,
@@ -5,7 +6,6 @@ import {
   SerializeErrorText
 } from './errors.js'
 import { createAbortController } from '@migaia/lifecycle/abort'
-import type { ISerializeAbortSignal } from './types.js'
 import {
   isSerializeTaggedError,
   readAborted,
@@ -15,7 +15,7 @@ import {
 
 /** Internal registration record used to make signal-listener rollback idempotent. */
 type IListenerRegistration = {
-  readonly signal: ISerializeAbortSignal
+  readonly signal: IAbortSignal
   readonly listener: () => void
   attempted: boolean
   removed: boolean
@@ -30,10 +30,10 @@ type IListenerRegistration = {
  * secondary errors so they cannot replace an abort or registration failure.
  */
 export function composeSerializeSignal(
-  caller: ISerializeAbortSignal | undefined,
-  closing: ISerializeAbortSignal,
+  caller: IAbortSignal | undefined,
+  closing: IAbortSignal,
   report: (error: unknown) => void
-): { readonly signal: ISerializeAbortSignal; readonly dispose: () => void } {
+): { readonly signal: IAbortSignal; readonly dispose: () => void } {
   const closingSnapshot = snapshotSerializeSignal(closing)
   if (readAborted(closingSnapshot)) return { signal: closingSnapshot, dispose: () => {} }
   const callerSnapshot = caller === undefined ? undefined : snapshotSerializeSignal(caller)
@@ -80,7 +80,7 @@ export function composeSerializeSignal(
   const exposedListeners = new Map<() => void, () => void>()
 
   /** Expose the composed signal while retaining primary abort state and reporting listener errors. */
-  const exposedSignal: ISerializeAbortSignal = {
+  const exposedSignal: IAbortSignal = {
     get aborted() {
       return composed.signal.aborted
     },
@@ -150,7 +150,7 @@ export function composeSerializeSignal(
   }
 
   /** Convert asynchronous source abort failures into a composed package-owned failure. */
-  const observeAbort = (source: ISerializeAbortSignal): void => {
+  const observeAbort = (source: IAbortSignal): void => {
     try {
       abortComposed(readReason(source))
     } catch (error) {
@@ -190,7 +190,7 @@ export function composeSerializeSignal(
   }
 
   /** Recheck one source after listener registration and feed its current reason if aborted. */
-  const recheck = (source: ISerializeAbortSignal): boolean => {
+  const recheck = (source: IAbortSignal): boolean => {
     if (!readAborted(source)) return false
     abortComposed(readReason(source))
     return true
@@ -214,10 +214,10 @@ export function composeSerializeSignal(
 
 /** Create one operation owner through the existing lifecycle controller and signal composition path. */
 export function createSerializeOperationSignal(
-  caller: ISerializeAbortSignal | undefined,
+  caller: IAbortSignal | undefined,
   report: (error: unknown) => void
 ): {
-  readonly signal: ISerializeAbortSignal
+  readonly signal: IAbortSignal
   readonly abort: (reason?: unknown) => void
   readonly dispose: () => void
 } {

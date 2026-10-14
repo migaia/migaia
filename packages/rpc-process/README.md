@@ -25,7 +25,7 @@
 pnpm add @migaia/rpc-process @migaia/rpc-core @migaia/rpc-contract
 ```
 
-`@migaia/rpc-core` 与 `@migaia/rpc-contract` 是 peer 依赖，三者版本必须完全一致（当前 `0.0.7`）。运行时依赖 `@migaia/supervision`（进程监督与预算）、`@migaia/lifecycle`、`@migaia/plugin-host`、`@migaia/utils`，会随包安装。
+`@migaia/rpc-core` 与 `@migaia/rpc-contract` 是 peer 依赖，三者版本必须完全一致（当前 `0.0.7`）。运行时依赖 `@migaia/supervision`（进程监督与预算）、`@migaia/plugin-host`、`@migaia/utils`，会随包安装。
 
 两个可选 peer，只在用到对应子路径时才需要：
 
@@ -95,6 +95,8 @@ if (isProcessChild()) {
 ```
 
 REPL、`--eval`、单文件可执行程序、Electron 或测试运行器没有可用的自派生主入口时，会以注册的配置错误拒绝，不猜测调用位置。Deno 默认子入口只获得 bootstrap 所需的 env 权限；需要额外运行权限时使用显式 command/args。
+
+需要把子进程放进外部沙箱时，短对象的 `wrap(command)` 可包装运行时计算出的启动命令，重启与替换时同样生效。库不提供沙箱工具或配置；`sandbox-exec`、`bwrap` 示例及 stdin/stdout、环境与退出码转发要求见 [Running the child in an external sandbox](./USEGUIDE.md#running-the-child-in-an-external-sandbox)。
 
 ## 独立进程按名称连接
 

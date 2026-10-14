@@ -1,8 +1,12 @@
+import { isUrlObject, type IUrlLike } from '@migaia/utils'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { systemScheduler, systemWallClock, type IScheduler } from '@migaia/utils/scheduler'
 import { createUnitBudget, SUPERVISION_SOURCE, SupervisionErrorCode } from '@migaia/supervision'
 import type {
   IProcessEnv,
+  IProcessHandle,
+  IProcessLauncher,
   IProcessSpec,
   IProcessSupervisorOptions
 } from '@migaia/supervision/process'
@@ -16,7 +20,6 @@ import {
 } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IAdapterPeerPreparation } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IRpcHandshakeOffer } from '@migaia/rpc-contract'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IRemoteContract } from '@migaia/rpc-core/remote'
 import { createProcessTransport } from '../handshake.js'
 import { createNativeProcessOffer } from '../offer.js'
@@ -42,17 +45,28 @@ import {
   PROCESS_LOCAL_SOCKET_MODE,
   PROCESS_LOCAL_DIRECTORY_PREFIX,
   PROCESS_LOCAL_PIPE_PREFIX,
-  PROCESS_SHORT_CHILD_NAME
+  PROCESS_SHORT_CHILD_NAME,
+  PROCESS_SHORT_WRAP_FIELD
 } from '../short-source-constants.js'
+
+/** Caller-owned command data excludes the channel, bootstrap and supervision authority. */
+export type IProcessLaunchCommand = Readonly<{
+  command: string
+  args: readonly string[]
+  cwd?: string
+  env: Readonly<IProcessEnv>
+}>
 
 /** Ordinary launch configuration overrides defaults without granting launch or handshake authority. */
 export type IProcessShortSpawn = Readonly<{
-  entry?: string | URL
-  base?: string | URL
+  entry?: IUrlLike
+  base?: IUrlLike
   command?: string
   args?: readonly string[]
   cwd?: string
   env?: Partial<IProcessEnv>
+  /** Rewrite the computed command once per launch; rpc retains the channel and bootstrap. */
+  wrap?: (command: IProcessLaunchCommand) => IProcessLaunchCommand
   stdio?: IProcessSpec['stdio']
   limits?: IProcessSpec['limits']
   permissions?: IProcessSpec['permissions']
@@ -82,6 +96,94 @@ function invalid(field: string, text: string = RpcProcessErrorText.pluginInvalid
     code: RpcProcessErrorCode.pluginInvalidOption,
     detail: { field }
   })
+}
+
+/** Returned data failures have no cause because the callback completed normally. */
+function invalidWrap(field: string): never {
+  return invalid(`${PROCESS_SHORT_WRAP_FIELD}.${field}`)
+}
+
+/** Read only own data without executing callback-result accessors or inheriting command fields. */
+function launchData(value: object, key: string, field: string = key): unknown {
+  /** Descriptors distinguish an absent optional cwd from a forbidden accessor. */
+  const descriptor = Object.getOwnPropertyDescriptor(value, key)
+  if (descriptor && !('value' in descriptor)) invalidWrap(field)
+  return descriptor?.value
+}
+
+/** Command arguments and environment names must contain strings, including at sparse positions. */
+function launchStrings(value: unknown, field: string): readonly string[] {
+  if (!Array.isArray(value)) invalidWrap(field)
+  for (const item of value) if (typeof item !== 'string') invalidWrap(field)
+  return value
+}
+
+/** Validate only the four public command fields; extra callback-result keys grant no authority. */
+function validateLaunchCommand(value: unknown): IProcessLaunchCommand {
+  if (!value || typeof value !== 'object') invalidWrap('command')
+  /** Each projected property is read once as own data before the native launcher sees it. */
+  const command = launchData(value, 'command')
+  if (typeof command !== 'string' || !command) invalidWrap('command')
+  /** Keep the caller's argument list after validating every actual array position. */
+  const args = launchStrings(launchData(value, 'args'), 'args')
+  /** Undefined is the normal absent-cwd value supplied by rpc's own command. */
+  const cwd = launchData(value, 'cwd')
+  if (cwd !== undefined && typeof cwd !== 'string') invalidWrap('cwd')
+  /** Environment retains the existing explicit inherit/set policy instead of ambient inheritance. */
+  const env = launchData(value, 'env')
+  if (!env || typeof env !== 'object') invalidWrap('env')
+  launchStrings(launchData(env, 'inherit', 'env'), 'env')
+  /** Native environment expansion consumes only own string-valued data entries. */
+  const set = launchData(env, 'set', 'env')
+  if (!set || typeof set !== 'object') invalidWrap('env')
+  for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(set)))
+    if (!('value' in descriptor) || typeof descriptor.value !== 'string') invalidWrap('env')
+  return { command, args, cwd, env: env as IProcessEnv }
+}
+
+/** Invoke the caller once for this launch and preserve every rpc-owned specification field. */
+function projectWrapped(
+  spec: IProcessSpec,
+  wrap: NonNullable<IProcessShortSpawn['wrap']>
+): IProcessSpec {
+  /** Only callback throws acquire a native cause; invalid returned data has no synthetic cause. */
+  let result: unknown
+  try {
+    result = wrap({ command: spec.command, args: spec.args, cwd: spec.cwd, env: spec.env })
+  } catch (cause) {
+    throw attachErrorIdentity(new TypeError(RpcProcessErrorText.pluginInvalidOption, { cause }), {
+      source: ERROR_SOURCE,
+      code: RpcProcessErrorCode.pluginInvalidOption,
+      detail: { field: PROCESS_SHORT_WRAP_FIELD }
+    })
+  }
+  /** Projection prevents planted stdio, bootstrap, limits or permissions from replacing rpc data. */
+  const next = validateLaunchCommand(result)
+  return { ...spec, command: next.command, args: next.args, cwd: next.cwd, env: next.env }
+}
+
+/** Delegate the selected native or caller launcher with its receiver and optional operations intact. */
+function wrapLauncher<THandle extends IProcessHandle>(
+  inner: IProcessLauncher<THandle>,
+  wrap: NonNullable<IProcessShortSpawn['wrap']>
+): IProcessLauncher<THandle> {
+  return {
+    capabilities: inner.capabilities,
+    /** Start, restart and replacement all pass through the supervisor's original launch point. */
+    launch: (spec, context) => inner.launch(projectWrapped(spec, wrap), context),
+    ...(inner.probe
+      ? {
+          /** Recovery still belongs to the selected launcher's instance. */
+          probe: (record) => inner.probe!(record)
+        }
+      : {}),
+    ...(inner.terminateRecord
+      ? {
+          /** Preserve native recovery teardown without fabricating unsupported operations. */
+          terminateRecord: (record) => inner.terminateRecord!(record)
+        }
+      : {})
+  }
 }
 
 /**
@@ -219,11 +321,7 @@ export async function normalizeProcessSources(
   if (
     typeof options.spawn !== 'function' &&
     options.spawn !== undefined &&
-    !(
-      typeof options.spawn === 'object' &&
-      !(options.spawn instanceof URL) &&
-      'kind' in options.spawn
-    )
+    !(typeof options.spawn === 'object' && !isUrlObject(options.spawn) && 'kind' in options.spawn)
   ) {
     /** Lazy deep paths continue to own native launch; connect/listen do not acquire launchers. */
     const native =
@@ -236,9 +334,11 @@ export async function normalizeProcessSources(
     const { default: process } = await import('node:process')
     /** Object short forms contain only ordinary user-selected launch defaults. */
     const short: IProcessShortSpawn =
-      typeof options.spawn === 'object' && !(options.spawn instanceof URL)
+      typeof options.spawn === 'object' && !isUrlObject(options.spawn)
         ? options.spawn
         : { entry: options.spawn === true ? undefined : options.spawn }
+    if (short.wrap !== undefined && typeof short.wrap !== 'function')
+      invalid(PROCESS_SHORT_WRAP_FIELD)
     /** Native runtime metadata is input to Core's pure entry resolver. */
     const deno = Reflect.get(globalThis, 'Deno') as
       | { mainModule: string; execPath(): string }
@@ -288,6 +388,8 @@ export async function normalizeProcessSources(
         : 'createBunProcessLauncher' in native
           ? native.createBunProcessLauncher()
           : native.createNodeProcessLauncher()
+    /** Wrapping follows launcher selection so a caller override receives the same command hook. */
+    const selectedLauncher = short.supervision?.launcher ?? launcher
     /** Each full source receives a fresh secret transported only in its existing stdin bootstrap. */
     const { randomBytes } = await import('node:crypto')
     const token = short.token ?? randomBytes(32).toString('base64url')
@@ -317,7 +419,7 @@ export async function normalizeProcessSources(
           createUnitBudget({ kind: 'process', maxUnits: 1, scheduler }),
         isolation: 'best-effort',
         ...short.supervision,
-        launcher: short.supervision?.launcher ?? launcher,
+        launcher: short.wrap ? wrapLauncher(selectedLauncher, short.wrap) : selectedLauncher,
         report:
           short.supervision?.report ??
           ((error) => {

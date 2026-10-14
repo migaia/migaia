@@ -1,6 +1,6 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createGenerationController,
-  type IAbortSignal,
   type IGenerationController,
   type IGenerationToken
 } from '@migaia/lifecycle'

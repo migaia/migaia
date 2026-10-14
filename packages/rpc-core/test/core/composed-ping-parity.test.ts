@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
 import { createFullEndpoint } from '../../dist/core/full.js'
 import { createEndpoint } from '../../dist/core/index.js'
@@ -11,7 +12,6 @@ import {
   registerEndpointTimePortObserver,
   type IRpcTimePortEvent
 } from '../../dist/core/internal/test-observer.js'
-import type { IRpcAbortSignal } from '../../dist/core/typing.js'
 import type { IRpcTransport } from '../../dist/core/transport.js'
 
 /**
@@ -210,7 +210,7 @@ describe('composed root ping() parity', () => {
     })
     let firstAbortAddCount = 0
     let firstAbortRemoveCount = 0
-    const firstSignal: IRpcAbortSignal = {
+    const firstSignal: IAbortSignal = {
       aborted: false,
       addEventListener: () => {
         firstAbortAddCount += 1
@@ -221,7 +221,7 @@ describe('composed root ping() parity', () => {
     }
     let collisionAbortAddCount = 0
     let collisionAbortRemoveCount = 0
-    const collisionSignal: IRpcAbortSignal = {
+    const collisionSignal: IAbortSignal = {
       aborted: false,
       addEventListener: () => {
         collisionAbortAddCount += 1

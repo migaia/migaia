@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type {
   IAdapterListenerPreparation,
   IAdapterListenerSession
@@ -27,7 +28,6 @@ import { processSessionManager } from '../resilience/index.js'
 import type { IProcessResilience } from '../resilience/types.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 import type { IProcessServeListenerIngress, IProcessServeEndpointFactory } from './types.js'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IRpcProviderLimits } from '@migaia/rpc-core'
 import { readAdapterAbortReason as resolveAbortReason } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IProcessSessionIdentity } from '../resilience/types.js'

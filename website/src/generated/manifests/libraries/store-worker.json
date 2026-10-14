@@ -115,7 +115,7 @@
               {
                 "type": "list",
                 "items": [
-                  "`request<Input, Output>(payload: Input, options?: { signal?: IRpcAbortSignal; transfer?: readonly Transferable[] }): Promise<Output>` —— 发起一次 RPC 调用；`signal` 用于取消，`transfer` 指定零拷贝转移列表；非法 `options` 或 hostile getter 以带 `INVALID_OPTION` 的 rejected Promise 返回",
+                  "`request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly Transferable[] }): Promise<Output>` —— 发起一次 RPC 调用；`signal` 用于取消，`transfer` 指定零拷贝转移列表；非法 `options` 或 hostile getter 以带 `INVALID_OPTION` 的 rejected Promise 返回",
                   "`disposed`(只读 getter)—— 是否已 `close()`/`dispose()`",
                   "`close(): void` —— 同步标记不可用(幂等)，此后 `request()` 立即拒绝，但不释放底层 endpoint",
                   "`dispose(): Promise<void>` —— 唯一异步释放入口：先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`；失败会 reject，重复调用复用同一个 Promise"
@@ -148,7 +148,7 @@
               {
                 "type": "list",
                 "items": [
-                  "`compute: (payload: Input, context: { signal: IRpcAbortSignal }) => Output | Promise<Output>`（必填）—— 真正干活的函数；`compute` 抛出的异常会被 RPC 端点框架捕获转成失败响应，不会逃逸成 Worker 的 unhandled error",
+                  "`compute: (payload: Input, context: { signal: IAbortSignal }) => Output | Promise<Output>`（必填）—— 真正干活的函数；`compute` 抛出的异常会被 RPC 端点框架捕获转成失败响应，不会逃逸成 Worker 的 unhandled error",
                   "`postMessage: (message: unknown) => void`（必填）—— Worker 侧发消息回主线程的函数，通常传 `(message) => self.postMessage(message)`",
                   "`options.timeoutMs?: number` —— Worker 侧对每次请求处理设的超时，默认不设"
                 ]
@@ -602,7 +602,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function createWorkerHandler<Input, Output>(\n  compute: (payload: Input, context: { signal: IRpcAbortSignal }) => Output | Promise<Output>,\n  postMessage: (message: unknown) => void,\n  options?: { readonly timeoutMs?: number }\n): ManagedRpcHandler;"
+                "code": "function createWorkerHandler<Input, Output>(\n  compute: (payload: Input, context: { signal: IAbortSignal }) => Output | Promise<Output>,\n  postMessage: (message: unknown) => void,\n  options?: { readonly timeoutMs?: number }\n): ManagedRpcHandler;"
               },
               {
                 "type": "list",
@@ -1657,21 +1657,21 @@
         {
           "name": "createWorkerHandler",
           "kind": "function",
-          "signature": "export declare function createWorkerHandler<Input, Output>(compute: (payload: Input, context: { signal: IRpcAbortSignal; }) => Output | Promise<Output>, postMessage: (message: unknown) => void, options?: { readonly timeoutMs?: number; }): IManagedRpcHandler;",
+          "signature": "export declare function createWorkerHandler<Input, Output>(compute: (payload: Input, context: { signal: IAbortSignal; }) => Output | Promise<Output>, postMessage: (message: unknown) => void, options?: { readonly timeoutMs?: number; }): IManagedRpcHandler;",
           "declarationLine": 27,
           "source": "packages/store-worker/dist/worker.d.ts",
           "purpose": "createWorkerHandler is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createWorkerHandler.",
           "advanced": "No additional advanced behavior is declared for createWorkerHandler.",
           "parameters": [
-            "compute: (payload: Input, context: { signal: IRpcAbortSignal; }) => Output | Promise<Output>",
+            "compute: (payload: Input, context: { signal: IAbortSignal; }) => Output | Promise<Output>",
             "postMessage: (message: unknown) => void",
             "options: { readonly timeoutMs?: number; } (optional)"
           ],
           "parameterDetails": [
             {
               "name": "compute",
-              "type": "(payload: Input, context: { signal: IRpcAbortSignal; }) => Output | Promise<Output>",
+              "type": "(payload: Input, context: { signal: IAbortSignal; }) => Output | Promise<Output>",
               "optional": false
             },
             {
@@ -1695,13 +1695,13 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function createWorkerHandler<Input, Output>(compute: (payload: Input, context: { signal: IRpcAbortSignal; }) => Output | Promise<Output>, postMessage: (message: unknown) => void, options?: { readonly timeoutMs?: number; }): IManagedRpcHandler;"
+            "export declare function createWorkerHandler<Input, Output>(compute: (payload: Input, context: { signal: IAbortSignal; }) => Output | Promise<Output>, postMessage: (message: unknown) => void, options?: { readonly timeoutMs?: number; }): IManagedRpcHandler;"
           ],
           "overloadParameterDetails": [
             [
               {
                 "name": "compute",
-                "type": "(payload: Input, context: { signal: IRpcAbortSignal; }) => Output | Promise<Output>",
+                "type": "(payload: Input, context: { signal: IAbortSignal; }) => Output | Promise<Output>",
                 "optional": false
               },
               {
@@ -1752,7 +1752,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/worker.d.ts:createWorkerHandler:export declare function createWorkerHandler<Input, Output>(compute: (payload: Input, context: { signal: IRpcAbortSignal; }) => Output | Promise<Output>, postMessage: (message: unknown) => void, options?: { readonly timeoutMs?: number; }): IManagedRpcHandler;",
+          "identity": "packages/store-worker/dist/worker.d.ts:createWorkerHandler:export declare function createWorkerHandler<Input, Output>(compute: (payload: Input, context: { signal: IAbortSignal; }) => Output | Promise<Output>, postMessage: (message: unknown) => void, options?: { readonly timeoutMs?: number; }): IManagedRpcHandler;",
           "guidance": [
             {
               "id": "4-managedrpchandler-生命周期细节",
@@ -1948,7 +1948,7 @@
         {
           "name": "IWorkerComputedOptions",
           "kind": "type",
-          "signature": "export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & { readonly runtime?: IRuntime; readonly transfer?: (input: Input) => readonly Transferable[]; };",
+          "signature": "export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & { readonly runtime?: IRuntime; readonly transfer?: (input: Input) => readonly unknown[]; };",
           "declarationLine": 32,
           "source": "packages/store-worker/dist/worker.d.ts",
           "purpose": "IWorkerComputedOptions is part of this module's public type contract.",
@@ -1965,7 +1965,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & { readonly runtime?: IRuntime; readonly transfer?: (input: Input) => readonly Transferable[]; };"
+            "export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & { readonly runtime?: IRuntime; readonly transfer?: (input: Input) => readonly unknown[]; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2004,7 +2004,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/worker.d.ts:IWorkerComputedOptions:export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & { readonly runtime?: IRuntime; readonly transfer?: (input: Input) => readonly Transferable[]; };",
+          "identity": "packages/store-worker/dist/worker.d.ts:IWorkerComputedOptions:export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & { readonly runtime?: IRuntime; readonly transfer?: (input: Input) => readonly unknown[]; };",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],
@@ -2355,7 +2355,7 @@
         {
           "name": "WorkerAdapter",
           "kind": "class",
-          "signature": "export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IRpcAbortSignal; transfer?: readonly Transferable[]; }): Promise<Output>; /** 同步标记不可用：仅置 `disposed = true`，不释放底层 endpoint。幂等。 */ close(): void; /** * 唯一异步释放入口：先 `close()`，再等待 endpoint 初始化并执行 `endpoint.dispose()`。 不吞清理错误（失败会 reject），重复调用复用同一个 * Promise。 */ dispose(): Promise<void>; }",
+          "signature": "export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** 同步标记不可用：仅置 `disposed = true`，不释放底层 endpoint。幂等。 */ close(): void; /** * 唯一异步释放入口：先 `close()`，再等待 endpoint 初始化并执行 `endpoint.dispose()`。 不吞清理错误（失败会 reject），重复调用复用同一个 * Promise。 */ dispose(): Promise<void>; }",
           "declarationLine": 8,
           "source": "packages/store-worker/dist/worker.d.ts",
           "purpose": "WorkerAdapter is part of this module's public class contract.",
@@ -2397,7 +2397,7 @@
             {
               "name": "request",
               "kind": "method",
-              "signature": "request<Input, Output>(payload: Input, options?: { signal?: IRpcAbortSignal; transfer?: readonly Transferable[]; }): Promise<Output>;",
+              "signature": "request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>;",
               "description": null,
               "parameterDetails": [
                 {
@@ -2407,7 +2407,7 @@
                 },
                 {
                   "name": "options",
-                  "type": "{ signal?: IRpcAbortSignal; transfer?: readonly Transferable[]; }",
+                  "type": "{ signal?: IAbortSignal; transfer?: readonly unknown[]; }",
                   "optional": true
                 }
               ],
@@ -2432,7 +2432,7 @@
           ],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IRpcAbortSignal; transfer?: readonly Transferable[]; }): Promise<Output>; /** 同步标记不可用：仅置 `disposed = true`，不释放底层 endpoint。幂等。 */ close(): void; /** * 唯一异步释放入口：先 `close()`，再等待 endpoint 初始化并执行 `endpoint.dispose()`。 不吞清理错误（失败会 reject），重复调用复用同一个 * Promise。 */ dispose(): Promise<void>; }"
+            "export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** 同步标记不可用：仅置 `disposed = true`，不释放底层 endpoint。幂等。 */ close(): void; /** * 唯一异步释放入口：先 `close()`，再等待 endpoint 初始化并执行 `endpoint.dispose()`。 不吞清理错误（失败会 reject），重复调用复用同一个 * Promise。 */ dispose(): Promise<void>; }"
           ],
           "overloadParameterDetails": [
             [
@@ -2484,7 +2484,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/worker.d.ts:WorkerAdapter:export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IRpcAbortSignal; transfer?: readonly Transferable[]; }): Promise<Output>; /** 同步标记不可用：仅置 `disposed = true`，不释放底层 endpoint。幂等。 */ close(): void; /** * 唯一异步释放入口：先 `close()`，再等待 endpoint 初始化并执行 `endpoint.dispose()`。 不吞清理错误（失败会 reject），重复调用复用同一个 * Promise。 */ dispose(): Promise<void>; }",
+          "identity": "packages/store-worker/dist/worker.d.ts:WorkerAdapter:export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** 同步标记不可用：仅置 `disposed = true`，不释放底层 endpoint。幂等。 */ close(): void; /** * 唯一异步释放入口：先 `close()`，再等待 endpoint 初始化并执行 `endpoint.dispose()`。 不吞清理错误（失败会 reject），重复调用复用同一个 * Promise。 */ dispose(): Promise<void>; }",
           "guidance": [
             {
               "id": "8-1-通用-rpc-错误",
@@ -2676,7 +2676,7 @@
             },
             {
               "name": "transfer",
-              "type": "(input: Input) => readonly Transferable[]",
+              "type": "(input: Input) => readonly unknown[]",
               "optional": true,
               "description": ""
             }
@@ -2706,7 +2706,7 @@
             },
             {
               "name": "transfer",
-              "type": "(input: Input) => readonly Transferable[]",
+              "type": "(input: Input) => readonly unknown[]",
               "optional": true,
               "description": "构造入口会先验证 `adapter`、`selectInput` 与可选 `transfer`，并只读取 runtime/Resource 已知 options 一次；不会通过 object-rest 枚举未知属性。非法 callback 或 hostile getter 在 Resource ownership/auto-start 前同步抛带 `INVALID_OPTION` 的 Store Worker 错误，getter 原异常保留在 `cause`。",
               "descriptionEn": "",
@@ -2786,9 +2786,9 @@
       ],
       "aliases": [
         {
-          "identity": "packages/store-worker/dist/serialize/worker.d.ts:createSerializeWorkerHandler:export declare function createSerializeWorkerHandler(parser: ISerializeParser, post: (message: unknown, transfer?: readonly Transferable[]) => void): IManagedRpcHandler;",
+          "identity": "packages/store-worker/dist/serialize/worker.d.ts:createSerializeWorkerHandler:export declare function createSerializeWorkerHandler(parser: ISerializeParser, post: (message: unknown, transfer?: readonly unknown[]) => void): IManagedRpcHandler;",
           "name": "createSerializeWorkerHandler",
-          "signature": "export declare function createSerializeWorkerHandler(parser: ISerializeParser, post: (message: unknown, transfer?: readonly Transferable[]) => void): IManagedRpcHandler;",
+          "signature": "export declare function createSerializeWorkerHandler(parser: ISerializeParser, post: (message: unknown, transfer?: readonly unknown[]) => void): IManagedRpcHandler;",
           "source": "packages/store-worker/dist/serialize/worker.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./serialize/*",
@@ -2836,7 +2836,7 @@
         {
           "name": "createSerializeWorkerHandler",
           "kind": "function",
-          "signature": "export declare function createSerializeWorkerHandler(parser: ISerializeParser, post: (message: unknown, transfer?: readonly Transferable[]) => void): IManagedRpcHandler;",
+          "signature": "export declare function createSerializeWorkerHandler(parser: ISerializeParser, post: (message: unknown, transfer?: readonly unknown[]) => void): IManagedRpcHandler;",
           "declarationLine": 52,
           "source": "packages/store-worker/dist/serialize/worker.d.ts",
           "purpose": "Worker 侧的对端。把一个普通 parser 装进 worker，按上面的报文协议应答。 与 core/worker.ts 里的 createWorkerHandler 同一手法：错误一律转成回包，绝不让 异常逃逸成 worker 的 unhandled error——那会静默吞掉请求方的 Promise。",
@@ -2844,7 +2844,7 @@
           "advanced": "No additional advanced behavior is declared for createSerializeWorkerHandler.",
           "parameters": [
             "parser: ISerializeParser",
-            "post: (message: unknown, transfer?: readonly Transferable[]) => void"
+            "post: (message: unknown, transfer?: readonly unknown[]) => void"
           ],
           "parameterDetails": [
             {
@@ -2854,7 +2854,7 @@
             },
             {
               "name": "post",
-              "type": "(message: unknown, transfer?: readonly Transferable[]) => void",
+              "type": "(message: unknown, transfer?: readonly unknown[]) => void",
               "optional": false
             }
           ],
@@ -2870,7 +2870,7 @@
           "members": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
-            "export declare function createSerializeWorkerHandler(parser: ISerializeParser, post: (message: unknown, transfer?: readonly Transferable[]) => void): IManagedRpcHandler;"
+            "export declare function createSerializeWorkerHandler(parser: ISerializeParser, post: (message: unknown, transfer?: readonly unknown[]) => void): IManagedRpcHandler;"
           ],
           "overloadParameterDetails": [
             [
@@ -2881,7 +2881,7 @@
               },
               {
                 "name": "post",
-                "type": "(message: unknown, transfer?: readonly Transferable[]) => void",
+                "type": "(message: unknown, transfer?: readonly unknown[]) => void",
                 "optional": false
               }
             ]
@@ -2922,7 +2922,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/serialize/worker.d.ts:createSerializeWorkerHandler:export declare function createSerializeWorkerHandler(parser: ISerializeParser, post: (message: unknown, transfer?: readonly Transferable[]) => void): IManagedRpcHandler;",
+          "identity": "packages/store-worker/dist/serialize/worker.d.ts:createSerializeWorkerHandler:export declare function createSerializeWorkerHandler(parser: ISerializeParser, post: (message: unknown, transfer?: readonly unknown[]) => void): IManagedRpcHandler;",
           "guidance": [
             {
               "id": "8-1-通用-rpc-错误",
@@ -3373,7 +3373,7 @@
         {
           "name": "transferablesOf",
           "kind": "function",
-          "signature": "export declare function transferablesOf(chunk: ISerializeChunk, ownership: IByteOwnership): Transferable[];",
+          "signature": "export declare function transferablesOf(chunk: ISerializeChunk, ownership: IByteOwnership): unknown[];",
           "declarationLine": 4,
           "source": "packages/store-worker/dist/serialize/transferables.d.ts",
           "purpose": "Builds a transfer list without placing non-transferable shared memory in it.",
@@ -3392,14 +3392,14 @@
               "optional": false
             }
           ],
-          "returns": "Transferable[]",
+          "returns": "unknown[]",
           "errors": ["No documented errors are declared for transferablesOf."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for transferablesOf.",
           "examples": [],
           "members": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
-            "export declare function transferablesOf(chunk: ISerializeChunk, ownership: IByteOwnership): Transferable[];"
+            "export declare function transferablesOf(chunk: ISerializeChunk, ownership: IByteOwnership): unknown[];"
           ],
           "overloadParameterDetails": [
             [
@@ -3415,7 +3415,7 @@
               }
             ]
           ],
-          "overloadReturns": ["Transferable[]"],
+          "overloadReturns": ["unknown[]"],
           "whenToUse": "Use transferablesOf when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when transferablesOf does not match the required inputs or return contract.",
           "sections": [
@@ -3451,7 +3451,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/serialize/transferables.d.ts:transferablesOf:export declare function transferablesOf(chunk: ISerializeChunk, ownership: IByteOwnership): Transferable[];",
+          "identity": "packages/store-worker/dist/serialize/transferables.d.ts:transferablesOf:export declare function transferablesOf(chunk: ISerializeChunk, ownership: IByteOwnership): unknown[];",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],

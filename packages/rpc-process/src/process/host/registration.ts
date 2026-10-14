@@ -1,5 +1,5 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { processSessionManager } from '../resilience/index.js'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IPluginRemoval } from '@migaia/plugin-host'
 import { createAdapterId as defaultRpcId } from '@migaia/rpc-core/adapter/internal-advanced'
 import { readAdapterAbortReason as resolveAbortReason } from '@migaia/rpc-core/adapter/internal-advanced'

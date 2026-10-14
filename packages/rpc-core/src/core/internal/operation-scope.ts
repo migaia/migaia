@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { createRpcLifecycleError, createRpcTimeoutError } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import {
@@ -6,7 +7,7 @@ import {
   type IGenerationToken
 } from '@migaia/lifecycle'
 
-import { resolveAbortReason, type IAbortSignal } from './async-control.js'
+import { resolveAbortReason } from './async-control.js'
 
 /**
  * Owns one public operation's deadline and cancellation signal.

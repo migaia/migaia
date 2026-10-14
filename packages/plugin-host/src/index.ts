@@ -39,6 +39,7 @@ export {
 } from './host-runtime.js'
 export { definePlugin, isDefinedPlugin } from './define-plugin.js'
 export { defineFeature } from './define-feature.js'
+export { readPluginDependencies, type IPluginDependency } from './dependency-reader.js'
 export { getPluginRuntimeIntegration } from './core.js'
 export type {
   IPluginRuntimeIntegration,
@@ -88,6 +89,8 @@ export type {
   IPluginDependencyPlan,
   IDefinedPluginConstraint,
   IPluginFeatureCore,
+  IPluginFeatureName,
+  IPluginFeatureOutput,
   IPluginFeatureOptions,
   IPluginDisposer,
   IPluginAwaitable,

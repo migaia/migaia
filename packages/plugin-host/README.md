@@ -168,6 +168,8 @@ import type { IPlugin, IPluginConfig, IPluginDisposer, IPluginResource } from '@
 - `dispose?: () => void | Promise<void>`（可选）—— 插件级清理。
 - `[Symbol.dispose]?: () => void` / `[Symbol.asyncDispose]?: () => void | Promise<void>`（可选）—— 未声明 `dispose` 时的清理兜底，也接受本包导出的 `disposeKey`/`asyncDisposeKey`。
 
+`readPluginDependencies(pluginOrAdmission)` 从 Feature 引用读取 `{ provider, required }` 列表，包含本地 Feature 的完整依赖闭包，按首次引用排序，同一 provider 的必需引用优先。它接受 `definePlugin` 结果、有效原始描述符和 composition admission；admission 形式直接读取已捕获的定义，不再调用 getter，其他输入经标准 admission 快照读取一次。读取不会执行 setup、install 或 Feature 工厂，非法输入保留 admission 的原生错误。根入口也导出 `IPluginDependency`、`IPluginFeatureName` 和 `IPluginFeatureOutput`；`getFeature()` 引用类型保留 provider 的名称字面量。
+
 `install()` 返回值只有**可枚举的 data property** 会被挂载到 host；非枚举 key 会被有意忽略并经 `diagnostic` 上报（`EXTENSION_NON_ENUMERABLE_IGNORED`）；getter/setter 形式的属性直接抛 `TypeError`。**保留键不能作为 extension key**：`then`（否则 `await host.use(plugin)` 会把返回值误当成 thenable 解包）、本包的 `disposeKey`/`asyncDisposeKey`（及宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`，若存在），命中会抛 `EXTENSION_RESERVED`；与 Host 上已有属性冲突抛 `EXTENSION_DUPLICATE`；与 `Object.prototype` 成员（如 `toString`）冲突抛 `EXTENSION_OBJECT_PROTOTYPE`。`catch`、`finally` 可以正常使用。
 
 **插件 core**（安装时 `install(core)`/`update(next, core)` 拿到的对象）在子类领域方法之上叠加：

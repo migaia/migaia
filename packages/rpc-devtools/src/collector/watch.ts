@@ -1,5 +1,5 @@
+import type { IRpcContext } from '@migaia/rpc-core'
 import { type IRpcProbeEventView } from '@migaia/rpc-core/probe'
-import type { IRpcAbortSignal } from '@migaia/rpc-core'
 import type { IRpcDevtoolsQuery, IRpcDevtoolsWatchBatch } from '../contract/service.js'
 import type { IRpcDevtoolsWireEvent } from '../contract/wire.js'
 import { RpcDevtoolsErrorCode } from '../error-code.js'
@@ -38,7 +38,7 @@ export class CollectorWatcher {
   /** The collector's original lifetime guard covers handles whose first next follows close. */
   #assertOpen: (() => void) | undefined
   /** A mounted service borrows its existing stream scope to wake this owner on remote cancellation. */
-  #signal: IRpcAbortSignal | undefined
+  #signal: IRpcContext['signal'] | undefined
 
   /** Allocate bounded storage and compile filters once, before any watcher joins ingestion. */
   constructor(
@@ -49,7 +49,7 @@ export class CollectorWatcher {
     readSequence: () => number,
     onError?: (error: unknown) => void,
     assertOpen?: () => void,
-    signal?: IRpcAbortSignal
+    signal?: IRpcContext['signal']
   ) {
     /** Watch uses the same cold validation domain as query before allocating retained storage. */
     const filter = compileQuery(input)

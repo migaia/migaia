@@ -14,7 +14,7 @@
 pnpm --filter <consumer-package> add @migaia/storage-contract@workspace:^
 ```
 
-依赖 `@migaia/lifecycle`（仅用其 `IAbortSignal` 类型，用于协作式取消）。
+依赖 `@migaia/utils`（其中 `IAbortSignal` 类型用于协作式取消）。
 
 ## 目录
 

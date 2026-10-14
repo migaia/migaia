@@ -1,5 +1,5 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { createRuntime } from '@migaia/reactive'
-import { type IAbortSignal } from '@migaia/lifecycle'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { Resource } from '@migaia/resource'
 import { describe, expect, it, vi } from 'vitest'

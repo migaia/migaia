@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { ProviderExecutor } from '../../dist/core/internal/provider-executor.js'
@@ -10,7 +11,6 @@ import { RpcContractErrorCode } from '@migaia/rpc-contract'
 import { createRpcIdempotencyStore } from '../../dist/core/idempotency-store.js'
 import type { IRpcRuntimeEnvelope, IRpcRuntimeGeneration } from '@migaia/rpc-contract'
 import type { IRpcProviderController } from '../../dist/core/internal/plugin-shared-keys.js'
-import type { IRpcAbortSignal } from '../../dist/core/typing.js'
 import { RpcTimeoutError } from '../../dist/core/errors.js'
 import { serializeRpcError } from '@migaia/rpc-contract'
 import { deserializeRpcError } from '../../dist/core/internal/error-wire-metadata.js'
@@ -311,7 +311,7 @@ it.each(['class', 'constructor', 'tag', 'decode', 'wire-deadline'] as const)(
     /** The public provider error is thrown by the actual registered stream callback. */
     let calls = 0
     /** The original controller proves that terminal presentation did not invoke live cancellation. */
-    let signal: IRpcAbortSignal | undefined
+    let signal: IAbortSignal | undefined
     harness.registry.registerStream(`${RpcRuntimeStreamPrefix}value`, () => {
       calls++
       signal = [...harness.controllers.values()][0]!.signal
@@ -474,7 +474,7 @@ it('[A59][A66] same provider/key queues across callers, other keys run, and fina
     complete = resolve
   })
   const effects: string[] = []
-  let signal: IRpcAbortSignal | undefined
+  let signal: IAbortSignal | undefined
   harness.registry.register('hold', async (context) => {
     effects.push('hold')
     signal = context.signal

@@ -408,7 +408,7 @@ launcher 返回的 handle 提供 `identity`、`port`、`exited`、`terminate`、
 ```ts doc-test=check
 import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'
 import type { IThreadSpec } from '@migaia/supervision/threads'
-import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils'
 import type { IScheduler } from '@migaia/utils/scheduler'
 
 /** 调用方提供真实入口与生命周期；返回后负责关闭 channel、terminate 并等待 exited。 */

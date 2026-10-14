@@ -1,10 +1,10 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   SerializeCodecError,
   assertSerializeType,
   encodeSerializeTextChunk,
   validateSerializeChunk,
   isChunkShape,
-  type ISerializeAbortSignal,
   type ISerializeChunk,
   type ISerializeContext,
   type ISerializeOutput,
@@ -41,7 +41,7 @@ import { composeSerializeSignal } from './signal.js'
 import { snapshotSerializeSignal } from './signal-snapshot.js'
 import { attachSecondaryErrors, safeErrorReason } from '@migaia/utils/error'
 
-const NEVER_ABORTED: ISerializeAbortSignal = {
+const NEVER_ABORTED: IAbortSignal = {
   aborted: false,
   reason: undefined,
   addEventListener() {},
@@ -214,7 +214,7 @@ async function collectChunks(
     type: string
     phase: ISerializePhase
     context: string
-    signal: ISerializeAbortSignal
+    signal: IAbortSignal
   },
   encoder: ITextEncoder,
   report: (error: unknown) => void
@@ -363,7 +363,6 @@ export function chunkToBytes(chunk: ISerializeChunk, encoder: ITextEncoder): Uin
 }
 
 export type {
-  ISerializeAbortSignal,
   ISerializeChunk,
   ISerializeCleanupError,
   ISerializeContext,
@@ -386,7 +385,7 @@ export type {
  */
 function raceAbort<T>(
   task: Promise<T>,
-  signal: ISerializeAbortSignal,
+  signal: IAbortSignal,
   details: { readonly type: string; readonly phase: ISerializePhase; readonly context: string }
 ): Promise<T> {
   const abortError = (): unknown => {
@@ -464,7 +463,7 @@ type IParserSnapshot = {
 /** Immutable per-operation option snapshot captured before parser work or lease tracking. */
 type ISerializeOperationOptionsSnapshot = {
   readonly type: string
-  readonly signal?: ISerializeAbortSignal
+  readonly signal?: IAbortSignal
   readonly context: string
 }
 
@@ -917,8 +916,8 @@ export function createSerializeRegistry(
   // composed signal：caller + closing，first-observed-wins；closing 已 aborted 才 closing reason 优先。
   // 返回 `dispose` 供 operation settle 后移除两个 listener（R-3「settle 后移除两个 listener」，防长期 caller signal 上的监听器泄漏）。
   const composeSignal = (
-    caller?: ISerializeAbortSignal
-  ): { readonly signal: ISerializeAbortSignal; readonly dispose: () => void } =>
+    caller?: IAbortSignal
+  ): { readonly signal: IAbortSignal; readonly dispose: () => void } =>
     composeSerializeSignal(caller, closing.signal, report)
 
   const doClose = (): void => {

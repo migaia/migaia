@@ -1,7 +1,8 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import type { IRpcPluginInstallScope } from '../typing.js'
-import type { IRpcAbortSignal, IRpcContext } from '../typing.js'
+import type { IRpcContext } from '../typing.js'
 import type {
   IRpcCandidatePingPort,
   IRpcDiscoveryResolverPort,
@@ -82,7 +83,7 @@ export type IProviderInstallation = Readonly<{
     method: string,
     handler: (
       message: unknown,
-      createContext: (signal: IRpcAbortSignal) => IRpcContext
+      createContext: (signal: IAbortSignal) => IRpcContext
     ) => void | Promise<void>
   ) => () => void
 }>

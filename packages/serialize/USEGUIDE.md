@@ -68,7 +68,6 @@ import {
   type ISerializeTypeError,
   type ISerializeRangeError,
   type ISerializeLifecycleError,
-  type ISerializeAbortSignal,
   type ITextEncoder,
   type ITextDecoder,
   type IEncodeStreamOptions,
@@ -116,7 +115,7 @@ pnpm add cbor-x
 
 缺少该 peer 时，导入此子路径抛 `ERR_MODULE_NOT_FOUND`，消息包含 `cbor-x`。
 
-运行时依赖 `@migaia/lifecycle` 的按需子路径（`/scheduler`、`/abort`、`/scope`、`/quiescence`）与 `@migaia/utils`（Base64/UTF-8 底层算法、`attachErrorIdentity` 错误身份标注）。registry 的 pending/drain、closing controller 与 parser scope 直接复用 lifecycle leaf；Serialize 仍只拥有 codec registry、stream、context 与自身错误投影。协作式取消信号类型 `ISerializeAbortSignal` 是包内独立定义的结构化类型（`{ aborted, reason?, addEventListener, removeEventListener }`），不依赖 DOM `AbortSignal`，但原生 `AbortSignal` 满足这个结构，可以直接传入。
+运行时依赖 `@migaia/lifecycle` 的按需子路径（`/scheduler`、`/abort`、`/scope`、`/quiescence`）与 `@migaia/utils`（Base64/UTF-8 底层算法、`attachErrorIdentity` 错误身份标注）。registry 的 pending/drain、closing controller 与 parser scope 直接复用 lifecycle leaf；Serialize 仍只拥有 codec registry、stream、context 与自身错误投影。协作式取消信号类型 `IAbortSignal` 是包内独立定义的结构化类型（`{ aborted, reason?, addEventListener, removeEventListener }`），不依赖 DOM `AbortSignal`，但原生 `AbortSignal` 满足这个结构，可以直接传入。
 
 ---
 
@@ -177,7 +176,7 @@ const isChunkShape: (value: unknown) => value is ISerializeChunk;
 
 ```ts
 type ISerializeContext = {
-  readonly signal: ISerializeAbortSignal;
+  readonly signal: IAbortSignal;
   readonly context: string;
 };
 ```
@@ -293,7 +292,7 @@ type ISerializeRegistry = {
     value: unknown,
     options?: {
       readonly type?: string;
-      readonly signal?: ISerializeAbortSignal;
+      readonly signal?: IAbortSignal;
       readonly context?: string;
     }
   ): Promise<ISerializeChunk>;
@@ -301,7 +300,7 @@ type ISerializeRegistry = {
     chunk: ISerializeChunk,
     options?: {
       readonly type?: string;
-      readonly signal?: ISerializeAbortSignal;
+      readonly signal?: IAbortSignal;
       readonly context?: string;
     }
   ): Promise<unknown>;
@@ -323,7 +322,7 @@ type ISerializeRegistry = {
 `encode`/`decode` 的 `options`：
 
 - `type?: string` —— 省略时用 `primaryType`；传了但 registry 里没有注册这个 `type` 会抛 `SerializeCodecError`／`CODEC_NOT_FOUND`（"no serialize plugin registered for type: ..."），`context` 字段固定为 `'registry'`（与调用方传入的 `context` 无关）
-- `signal?: ISerializeAbortSignal` —— 与 registry 内部因 `close()`/`dispose()` 触发的关闭信号**复合**（first-observed-wins）：任一方先 abort，操作立即以 `SerializeCodecError`／`ABORTED` 结束，不等 parser 真正返回
+- `signal?: IAbortSignal` —— 与 registry 内部因 `close()`/`dispose()` 触发的关闭信号**复合**（first-observed-wins）：任一方先 abort，操作立即以 `SerializeCodecError`／`ABORTED` 结束，不等 parser 真正返回
 - `context?: string` —— 省略时为 `'anonymous'`；出错时拼进消息，定位是哪个调用点
 
 `registry.decode()` 的校验顺序：先检查 registry 是否已 `close()`/`dispose()`（是则抛 `REGISTRY_DISPOSED`，见下），再检查 `type` 是否已注册（否则 `CODEC_NOT_FOUND`），最后才校验 `chunk` 自身形状（否则 `INVALID_CHUNK`）——三者互斥，按此优先级依次判定。
@@ -548,7 +547,7 @@ type IFrameBudgetOptions = {
   readonly maxItems?: number; // 默认 250_000
   readonly initialItems?: number; // 默认 2_048
   readonly yieldTo?: () => Promise<void>;
-  readonly signal?: ISerializeAbortSignal;
+  readonly signal?: IAbortSignal;
   readonly scheduler: IScheduler; // 必填
 };
 
@@ -609,7 +608,7 @@ function decodeStream(
   options?: {
     readonly type?: string;
     readonly context?: string;
-    readonly signal?: ISerializeAbortSignal;
+    readonly signal?: IAbortSignal;
   }
 ): AsyncGenerator<unknown, void, undefined>;
 ```
@@ -756,7 +755,7 @@ import {
   decodeStream,
   encodeStream,
   sliceByFrameBudget,
-  type ISerializeAbortSignal,
+  type IAbortSignal,
   type ISerializeChunk,
   type ISerializeChunkType,
   type ISerializeContext,
@@ -801,7 +800,7 @@ import {
   createSerializeRegistry,
   chunkToText,
   chunkToBytes,
-  type ISerializeAbortSignal,
+  type IAbortSignal,
   type ISerializeChunk,
   type ISerializeCleanupError,
   type ISerializeContext,

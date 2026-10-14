@@ -4102,7 +4102,7 @@
                   "rows": [
                     [
                       "`@migaia/lifecycle/abort`",
-                      "`createAbortController`、`observeAbortSubscription`、`IAbortSignal`、`IAbortController`、`IObservedAbortSubscription`、`IObservedAbortFailureSink`"
+                      "`createAbortController`、`observeAbortSubscription`、`IAbortController`、`IObservedAbortSubscription`、`IObservedAbortFailureSink`（结构化 signal 类型 `IAbortSignal` 由 `@migaia/utils` 提供）"
                     ],
                     ["`@migaia/lifecycle/scheduler`", "scheduler、snapshot与时间校验"],
                     ["`@migaia/lifecycle/quiescence`", "quiescence/lease/pending trackers"],
@@ -6622,6 +6622,10 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "`readPluginDependencies(pluginOrAdmission)` 从 Feature 引用读取 `{ provider, required }` 列表，包含本地 Feature 的完整依赖闭包，按首次引用排序，同一 provider 的必需引用优先。它接受 `definePlugin` 结果、有效原始描述符和 composition admission；admission 形式直接读取已捕获的定义，不再调用 getter，其他输入经标准 admission 快照读取一次。读取不会执行 setup、install 或 Feature 工厂，非法输入保留 admission 的原生错误。根入口也导出 `IPluginDependency`、`IPluginFeatureName` 和 `IPluginFeatureOutput`；`getFeature()` 引用类型保留 provider 的名称字面量。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "`install()` 返回值只有可枚举的 data property 会被挂载到 host；非枚举 key 会被有意忽略并经 `diagnostic` 上报（`EXTENSION_NON_ENUMERABLE_IGNORED`）；getter/setter 形式的属性直接抛 `TypeError`。保留键不能作为 extension key：`then`（否则 `await host.use(plugin)` 会把返回值误当成 thenable 解包）、本包的 `disposeKey`/`asyncDisposeKey`（及宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`，若存在），命中会抛 `EXTENSION_RESERVED`；与 Host 上已有属性冲突抛 `EXTENSION_DUPLICATE`；与 `Object."
                 },
                 {
@@ -7530,6 +7534,19 @@
                 {
                   "type": "paragraph",
                   "text": "Feature 引用同时表达能力与依赖。Host 会按引用拓扑排序，所以调用方传入顺序不影响安装；必需 provider 缺失、禁用或移除时分别抛前置条件错误。可选依赖用 `provider.getFeature('format', { optional: true })` 声明。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`readPluginDependencies(input)` 与 Host 共用 Feature 依赖解析，返回只读的 `{ provider, required }` 列表。它遍历本地 Feature 的完整闭包，按 provider 首次引用排序；同一 provider 同时被必需和可选引用时，`required` 为 `true`。输入可以是 `definePlugin` 结果、有效原始描述符，或 `openComposition(host).createPluginAdmission(plugin)` 创建的 admission。admission 形式读取安装使用的同一快照，不会再次读取 getter；其他输入只经标准 admission 快照读取一次。读取不会运行 setup、install 或 Feature 工厂，非法输入直接抛 admission 的原生错误。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { readPluginDependencies } from '@migaia/plugin-host'\nimport type {\n  IPluginDependency,\n  IPluginFeatureName,\n  IPluginFeatureOutput\n} from '@migaia/plugin-host'\nimport { openComposition } from '@migaia/plugin-host/composition'\n\nconst dependencies: readonly IPluginDependency[] = readPluginDependencies(consumer)\n// [{ provider: 'provider', required: true }]\nconst admission = openComposition(host).createPluginAdmission(consumer)\nreadPluginDependencies(admission)"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`IPluginFeatureName<TPlugin>` 和 `IPluginFeatureOutput<TPlugin, TName>` 从根入口导出。`IFeatureReference<TOutput, TOptional, TProvider>` 的第三个参数默认 `string`；`getFeature()` 的两个重载都保留 provider 的名称字面量，供组合层推导依赖。"
                 }
               ]
             },
@@ -11600,7 +11617,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包不包含任何平台代码：没有 `node:` 导入，也不依赖 DOM。启动进程、创建 Worker 由其它包负责。"
+                  "text": "本包没有 `node:` 导入。Coroutine 使用支持宿主的全局 `MessageChannel`，在当前事件循环运行；启动进程、创建 Worker 由其它包负责。"
                 }
               ]
             },
@@ -11614,6 +11631,7 @@
                   "rows": [
                     ["调用子进程或本机其它进程", "`@migaia/rpc-process`"],
                     ["调用 Worker 线程", "`@migaia/rpc-threads`"],
+                    ["在同进程运行受监督的 task", "本包 `./remote` 的 `createCoroutinePlugin`"],
                     [
                       "iframe、SharedWorker、可靠有序的 RTCDataChannel",
                       "`@migaia/rpc-browser` 的 `createBrowserPeer`"
@@ -11666,7 +11684,7 @@
                     ],
                     [
                       "`./remote`",
-                      "`createRuntimePeer`、`createManagedRuntimePeer`、`createRuntimePlugin`、出口与事件常量、`RPC_REMOTE_ERROR_SOURCE`"
+                      "`createRuntimePeer`、`createManagedRuntimePeer`、`createRuntimePlugin`、`createCoroutinePlugin`、出口与事件常量、`RPC_REMOTE_ERROR_SOURCE`"
                     ],
                     ["`./testing`", "`createPeerPair`：内存中两个真实 Peer，用于测试"],
                     ["`./adapters/memory`", "`createMemoryTransportPair`"],
@@ -11721,6 +11739,20 @@
                   "type": "code",
                   "language": "ts",
                   "code": "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\n\nconst server = await createEndpoint({\n  id: 'server',\n  transport: right,\n  middlewares: [connect({ transport: right })]\n})\nserver.provide('add', (context) => {\n  const [a, b] = context.data as [number, number]\n  return context.success(a + b)\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['server'],\n  transport: left,\n  middlewares: [connect({ transport: left })]\n})\nconsole.log(await client.send<number>('server', 'add', [20, 22])) // 42\n\nawait client.dispose()\nawait server.dispose()"
+                }
+              ]
+            },
+            {
+              "id": "coroutine-task",
+              "heading": "Coroutine task",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createCoroutinePlugin({ name, task })` 创建受监督的同进程 task；task 内通过 `createCoroutinePlugin({ name, connect })` 把子 Host 接入当前代次的连接。两端使用 `host.coroutine` 调用，并沿用出口的事件与管理 API。`connect` 是 task 收到的 opaque 值；task 与 connect 必须二选一。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Task resolve 表示正常退出，reject 表示崩溃。Stop 通过 task 的 `signal` 协作取消，task 在 `finally` 中释放子 Host 后才结束；阻塞事件循环的 task 无法强制终止。`replace(name, { task })` 更换下一代任务。完整例子见 USEGUIDE 的 Coroutine 节。"
                 }
               ]
             },
@@ -12110,7 +12142,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`createRuntimePlugin`（以及平台包的 `createProcessPlugin`、`createThreadPlugin`）返回一个可以用 `@migaia/plugin-host` 安装的插件。安装后，同一平台的所有连接共享一个出口：`host.process` 或 `host.thread`（名称见 `RuntimePluginKey`）。"
+                  "text": "`createRuntimePlugin`、本包的 `createCoroutinePlugin`，以及平台包的 `createProcessPlugin`、`createThreadPlugin` 返回可以用 `@migaia/plugin-host` 安装的插件。同一运行时家族的连接共享一个出口：`host.process`、`host.thread` 或 `host.coroutine`（名称见 `RuntimePluginKey`）。"
                 },
                 {
                   "type": "table",
@@ -12126,7 +12158,7 @@
                     ],
                     [
                       "`on(event, listener)`",
-                      "订阅事件，返回可重复调用的取消函数。事件名见 `RuntimeEventName`：`ready`、`exit`、`degraded`、`restart`、`liquidated`"
+                      "订阅事件，返回可重复调用的取消函数。事件名见 `RuntimeEventName`：`ready`、`exit`、`degraded`、`restart`、`terminal`、`liquidated`"
                     ],
                     [
                       "`watch(options?)`",
@@ -12138,7 +12170,7 @@
                     ],
                     [
                       "`stop` / `kill` / `restart` / `replace`",
-                      "只对由 spawn 创建的连接有效；对 connect / listen 连接以 `CAPABILITY_CONFLICT` 拒绝"
+                      "只对由 spawn 或 coroutine task 创建的执行单元有效；对 connect / listen 连接以 `CAPABILITY_CONFLICT` 拒绝"
                     ]
                   ]
                 },
@@ -12149,6 +12181,39 @@
                     "目录就绪 ≠ 远端安装完成：连接 ready 只说明方法目录已交换，不说明对端 Host 的某个插件安装事务已提交。需要等待远端安装完成时，用应用自己的确认信号。",
                     "查询格式：`list` / `get` / `describe` 默认返回对象；可选参数指定为文本格式输出。"
                   ]
+                }
+              ]
+            },
+            {
+              "id": "calls-during-install",
+              "heading": "Calls during install",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "A local Feature method in `expose` is callable from the moment the peer can reach it; calls that arrive during install are held until the plugin commits, and are refused with `TARGET_UNKNOWN` if it does not. This guarantee covers local Feature `expose` entries only; forward and catalog entries are not covered."
+                }
+              ]
+            },
+            {
+              "id": "3-1-coroutine-task",
+              "heading": "3.1 Coroutine task",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createCoroutinePlugin({ name, task, supervisor? })` 是父模式：创建受监督的 task，每个代次拥有自己的 `MessageChannel`。Task 收到 `signal`、`heartbeat()` 与 opaque `connect`；子模式 `createCoroutinePlugin({ name, connect })` 只接入该连接，不创建执行单元。两模式都支持 `provide` 与 `expose`；使用 `expose` 时先安装本端 provider 插件，再安装 runtime 插件。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineHost } from '@migaia/plugin-host'\nimport { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\n/** 父模式拥有 task 与每个代次的消息端口。 */\nconst service = createCoroutinePlugin<{ math: { double(value: number): number } }>({\n  name: 'math',\n  task: async ({ connect, signal }) => {\n    /** 子模式通过 task 的 opaque connect 发布本端 provider。 */\n    const parent = createCoroutinePlugin({\n      name: 'parent',\n      connect,\n      provide: { math: { double: (value: number) => value * 2 } }\n    })\n    /** Task 负责释放自己创建的子 Host。 */\n    const childHost = defineHost<Record<string, never>, never, readonly [typeof parent]>({\n      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n    })\n    try {\n      await childHost.use(parent)\n      /** Task settlement 就是退出；收到协作取消前持续提供服务。 */\n      await new Promise<void>((resolve) => {\n        if (signal.aborted) resolve()\n        else signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n    } finally {\n      await childHost.dispose()\n    }\n  }\n})\n/** 父 Host 释放时停止它拥有的 coroutine task。 */\nconst host = defineHost<Record<string, never>, never, readonly [typeof service]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\ntry {\n  await host.use(service)\n  console.log(await host.coroutine!.request('math', 'math.double', 21)) // 42\n} finally {\n  await host.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`task` 与 `connect` 必须二选一；`connect` 只能使用当前 task 收到的值，不能传 `MessagePort`。父模式可通过 `supervisor` 配置现有监督策略，默认预算为每个插件一个 coroutine 单元。`host.coroutine.replace('math', { task: nextTask })` 更换任务；非函数 task 在替换前以 `INVALID_CONFIG` 拒绝，旧单元继续提供服务。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Task resolve 产生正常退出，reason 为 `exited`；reject 产生崩溃，reason 为 `crashed`，后续处理遵循监督策略。终止重启链的错误通过 `terminal` 事件提供 `{ source, code }`，`name` 是插件连接名。Stop 的 signal 取消是协作式的，端口在 task 结束后关闭；忽略取消的 task 可延迟结束，预算租约保留到实际 settlement。Coroutine 共享父事件循环，无法强制停止阻塞事件循环的 task。"
                 }
               ]
             },
@@ -13371,7 +13436,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createThreadPool } from '@migaia/rpc-pool'\n\nconst pool = await createThreadPool<{ double(value: number): number }>({\n  spawn: new URL('./worker.js', import.meta.url), size: 2\n})\ntry {\n  console.log(await Promise.all([pool.request('double', 21), pool.request('double', 10)]))\n  await pool.resize(3)\n  console.log(pool.stats())\n} finally {\n  await pool.close()\n}"
+                  "code": "import { createThreadPool } from '@migaia/rpc-pool'\n\nconst pool = await createThreadPool<{ double(value: number): number }>({\n  spawn: new URL('./worker.js', import.meta.url),\n  size: 2\n})\ntry {\n  console.log(await Promise.all([pool.request('double', 21), pool.request('double', 10)]))\n  await pool.resize(3)\n  console.log(pool.stats())\n} finally {\n  await pool.close()\n}"
                 }
               ]
             },
@@ -13386,12 +13451,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({ provide: { add: (value: { a: number; b: number }) => value.a + value.b } })"
+                  "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: { add: (value: { a: number; b: number }) => value.a + value.b }\n})"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createProcessPool } from '@migaia/rpc-pool'\n\nconst pool = await createProcessPool<{ add(value: { a: number; b: number }): number }>({\n  spawn: new URL('./service.js', import.meta.url), size: 2, maxQueue: 16\n})\ntry {\n  console.log(await pool.request('add', { a: 20, b: 22 }))\n} finally {\n  await pool.close()\n}"
+                  "code": "import { createProcessPool } from '@migaia/rpc-pool'\n\nconst pool = await createProcessPool<{ add(value: { a: number; b: number }): number }>({\n  spawn: new URL('./service.js', import.meta.url),\n  size: 2,\n  maxQueue: 16\n})\ntry {\n  console.log(await pool.request('add', { a: 20, b: 22 }))\n} finally {\n  await pool.close()\n}"
                 }
               ]
             },
@@ -13412,6 +13477,7 @@
                     "`resize(size)` 按调用顺序增减成员，缩容等正在使用的成员完成。`close()` 停止新接纳并排空已接受的队列，重复调用返回同一 Promise。",
                     "`idleTimeoutMs` 设置为不超过 2147483647 毫秒的有限正数时，闲置成员通过原 `peer.close()` 退役，下一个任务通过原公开工厂补回目标大小。",
                     "原 supervisor 负责崩溃重启与重新绑定。默认裸 spawn 使用原 on-failure 策略和五次预算；不重置用户预算。恢复期间原 Peer 可以拒绝 `CLOSED`；恢复后未来新调用使用同一个 Peer。池不自动重放失败业务调用。",
+                    "`probe` 接受 `@migaia/rpc-core/probe` 的一个 Probe 或只读 Probe 数组，并原样交给每个成员的公开 Peer 工厂；真实握手、ready 和重启仍由原 Peer 发出。多个成员共享 Probe 时用事件的 `endpointId` 区分成员。",
                     "派发后的 call options 和 signal 原样传给 Peer；排队阶段取消为 DOMException AbortError，`CALL_ABORTED` 的 cause 是原 reason。`timeoutMs` 从原 Peer 接收操作时起算，池不另建队列 deadline。"
                   ]
                 },
@@ -13450,7 +13516,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: {\n    double: (value: number) => value * 2,\n    mark: (_value: number) => undefined,\n    values: async function* (count: number) { for (let index = 0; index < count; index++) yield index }\n  }\n})"
+                  "code": "import { createThreadPeer } from '@migaia/rpc-threads'\n\nawait createThreadPeer({\n  provide: {\n    double: (value: number) => value * 2,\n    mark: (_value: number) => undefined,\n    values: async function* (count: number) {\n      for (let index = 0; index < count; index++) yield index\n    }\n  }\n})"
                 },
                 {
                   "type": "code",
@@ -13465,7 +13531,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。"
+                  "text": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "两个池工厂都接受 `defineProbe()` 返回的原始 Probe 或只读 Probe 数组。`probe` 原样进入每个成员的 `createThreadPeer` / `createProcessPeer`，握手、ready 和监督重启事件沿原 Peer 路径发出。共享 Probe 的回调用 `endpointId` 区分成员；`seq` 仍属于对应端点，而非整个池的统一序号。"
                 }
               ]
             },
@@ -13581,7 +13651,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`@migaia/rpc-core` 与 `@migaia/rpc-contract` 是 peer 依赖，三者版本必须完全一致（当前 `0.0.7`）。运行时依赖 `@migaia/supervision`（进程监督与预算）、`@migaia/lifecycle`、`@migaia/plugin-host`、`@migaia/utils`，会随包安装。"
+                  "text": "`@migaia/rpc-core` 与 `@migaia/rpc-contract` 是 peer 依赖，三者版本必须完全一致（当前 `0.0.7`）。运行时依赖 `@migaia/supervision`（进程监督与预算）、`@migaia/plugin-host`、`@migaia/utils`，会随包安装。"
                 },
                 {
                   "type": "paragraph",
@@ -13677,6 +13747,10 @@
                 {
                   "type": "paragraph",
                   "text": "REPL、`--eval`、单文件可执行程序、Electron 或测试运行器没有可用的自派生主入口时，会以注册的配置错误拒绝，不猜测调用位置。Deno 默认子入口只获得 bootstrap 所需的 env 权限；需要额外运行权限时使用显式 command/args。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "需要把子进程放进外部沙箱时，短对象的 `wrap(command)` 可包装运行时计算出的启动命令，重启与替换时同样生效。库不提供沙箱工具或配置；`sandbox-exec`、`bwrap` 示例及 stdin/stdout、环境与退出码转发要求见 Running the child in an external sandbox。"
                 }
               ]
             },
@@ -13846,7 +13920,15 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 导入与平台适配器 2. 子进程端：自动连回父进程 3. spawn 来源：启动并拥有子进程 4. 调用 API 5. 连接已运行的服务：connect 与 listen 6. 交给 PluginHost 管理：createProcessPlugin 7. 容量、背压与诊断 8. 错误处理 9. 各平台说明 10. 高阶用法：自己提供字节通道 11. 常见问题"
+                  "text": "1. 导入与平台适配器 2. 子进程端：自动连回父进程 3. spawn 来源：启动并拥有子进程"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "4. 调用 API 5. 连接已运行的服务：connect 与 listen 6. 交给 PluginHost 管理：createProcessPlugin 7. 容量、背压与诊断 8. 错误处理 9. 各平台说明 10. 高阶用法：自己提供字节通道 11. 常见问题"
+                },
+                {
+                  "type": "list",
+                  "items": ["Running the child in an external sandbox"]
                 }
               ]
             },
@@ -13971,7 +14053,58 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "短对象的 `args`、`cwd`、`env`、`stdio`、`limits`、`permissions`、`supervision` 可以覆盖默认值。默认每源创建一个 process budget、随机 stdin token、byte channel 与 best-effort supervisor。省略 `report` 使用 `console.error`；默认终止能力提示每进程只报一次，`onNotice` 接收原提示对象。完整来源不改变现有行为。"
+                  "text": "短对象的 `args`、`cwd`、`env`、`stdio`、`limits`、`permissions`、`supervision` 可以覆盖默认值；`wrap` 可包装计算出的启动命令。默认每源创建一个 process budget、随机 stdin token、byte channel 与 best-effort supervisor。省略 `report` 使用 `console.error`；默认终止能力提示每进程只报一次，`onNotice` 接收原提示对象。完整来源不改变现有行为。"
+                }
+              ]
+            },
+            {
+              "id": "running-the-child-in-an-external-sandbox",
+              "heading": "Running the child in an external sandbox",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "短对象的 `wrap(command)` 接收 rpc 按当前 Node、Bun 或 Deno 运行时计算出的 `IProcessLaunchCommand`，返回新的 `command`、`args`、`cwd` 与 `env`。首次启动、每次 restart 和 replace 都调用一次；自定义 `supervision.launcher` 也经过这个回调。rpc 不导入沙箱工具，也不提供沙箱配置文件，安装与策略由应用负责。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "macOS 上可用 `sandbox-exec` 加载应用自己维护的 profile。下面保留原运行时命令、参数、工作目录与环境设置；应用的 profile 必须允许子入口及其依赖所需的读取："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\n/** The application owns this profile and its permitted filesystem operations. */\nconst profile = '/absolute/path/to/application.sb'\n/** The peer owns the sandboxed child and closes it with the original launcher. */\nconst child = await createProcessPeer<{ echo(value: string): string }>({\n  spawn: {\n    entry: new URL('./service.ts', import.meta.url),\n    /** Keep runtime detection and wrap only the resulting command. */\n    wrap: (command) => ({\n      ...command,\n      command: '/usr/bin/sandbox-exec',\n      args: ['-f', profile, command.command, ...command.args]\n    })\n  }\n})\ntry { console.log(await child.request('echo', 'hello')) } finally { await child.close() }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Linux 上可用 `bwrap`。这个例子把现有文件系统挂为只读，提供 `/proc` 与 `/dev`，并隔离网络；需要写入的应用应按自己的策略增加可写挂载："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\n/** The peer owns the child launched through the application's bubblewrap policy. */\nconst child = await createProcessPeer<{ echo(value: string): string }>({\n  spawn: {\n    entry: new URL('./service.ts', import.meta.url),\n    /** Preserve the original runtime arguments, cwd and environment. */\n    wrap: (command) => ({\n      ...command,\n      command: '/usr/bin/bwrap',\n      args: [\n        '--ro-bind', '/', '/', '--proc', '/proc', '--dev', '/dev',\n        '--unshare-net', '--die-with-parent', '--', command.command, ...command.args\n      ]\n    })\n  }\n})\ntry { console.log(await child.request('echo', 'hello')) } finally { await child.close() }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`./service.ts` 使用第 2 节的自动来源模式，并在 `provide` 中声明 `echo`。以上都是平台示例，运行前由应用安装相应工具并准备自己的策略。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "包装器必须遵守两个规则："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "stdin/stdout 直接连到子进程。 stdin 承载 token bootstrap，随后 stdin/stdout 承载 RPC 字节通道；不要分离、消费这些流或把包装器日志写到 stdout。",
+                    "完整转发子进程环境与退出码。 保留 `env.inherit` 和 `env.set`；原生 launcher 在 `wrap` 返回后才加入 `PROCESS_RUNTIME_API_ENV`（`MIGAIA_RPC_RUNTIME_API_BOOTSTRAP`）。容器包装器要用例如 `-e MIGAIA_RPC_RUNTIME_API_BOOTSTRAP` 把该变量转入容器，同时转发其余环境变量。包装器应返回子进程的原退出码，不能把非零退出改成成功；这让监督层正确区分正常退出与崩溃。"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`wrap` 不接收 `stdio`、`bootstrap`、`limits` 或 `permissions`，返回对象中的这些额外字段会被忽略。完整 `kind: 'spawn'` 来源继续由调用方直接持有 `supervision.launcher` 与 `spec`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "非函数 `wrap` 在准备来源时拒绝。回调抛错或返回非法字段会使本次启动失败，带 `PROCESS_PLUGIN_INVALID_OPTION` 的原生 `TypeError` 位于 supervision 的 `LAUNCH_FAILED` cause 链上；回调抛出的原值保留在该 `TypeError.cause`。经 `host.use` 安装时，最外层仍是 `PLUGIN_INSTALL_FAILED`。"
                 },
                 {
                   "type": "paragraph",
@@ -15301,7 +15434,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'\nimport type { IThreadSpec } from '@migaia/supervision/threads'\nimport type { IAbortSignal } from '@migaia/lifecycle'\nimport type { IScheduler } from '@migaia/utils/scheduler'\n\n/** 调用方提供真实入口与生命周期；返回后负责关闭 channel、terminate 并等待 exited。 */\nexport async function openWorkerChannel(\n  threadSpec: IThreadSpec,\n  signal: IAbortSignal,\n  scheduler: IScheduler\n) {\n  const launcher = createNodeThreadLauncher()\n  const handle = await launcher.launch(threadSpec, { signal })\n  try {\n    const channel = await handle.open(signal, { scheduler })\n    return { handle, channel }\n  } catch (primary) {\n    handle.terminate()\n    await handle.exited\n    throw primary\n  }\n}"
+                  "code": "import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'\nimport type { IThreadSpec } from '@migaia/supervision/threads'\nimport type { IAbortSignal } from '@migaia/utils'\nimport type { IScheduler } from '@migaia/utils/scheduler'\n\n/** 调用方提供真实入口与生命周期；返回后负责关闭 channel、terminate 并等待 exited。 */\nexport async function openWorkerChannel(\n  threadSpec: IThreadSpec,\n  signal: IAbortSignal,\n  scheduler: IScheduler\n) {\n  const launcher = createNodeThreadLauncher()\n  const handle = await launcher.launch(threadSpec, { signal })\n  try {\n    const channel = await handle.open(signal, { scheduler })\n    return { handle, channel }\n  } catch (primary) {\n    handle.terminate()\n    await handle.exited\n    throw primary\n  }\n}"
                 },
                 {
                   "type": "paragraph",
@@ -15539,7 +15672,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`encode`/`decode` 的 `options?`：`type?: string`（默认 `primaryType`）、`signal?: ISerializeAbortSignal`、`context?: string`（默认 `'anonymous'`，出错时拼进消息定位是哪个调用点）。"
+                  "text": "`encode`/`decode` 的 `options?`：`type?: string`（默认 `primaryType`）、`signal?: IAbortSignal`、`context?: string`（默认 `'anonymous'`，出错时拼进消息定位是哪个调用点）。"
                 },
                 {
                   "type": "paragraph",
@@ -15822,7 +15955,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  isChunkShape,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeCodecError,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  jsonPlugin,\n  jsonParser,\n  SerializeChunkKind,\n  SerializeOutput,\n  SerializePhase,\n  SerializeCleanupPolicy,\n  SerializeCleanupKind,\n  SerializePluginType,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type ISerializeAbortSignal,\n  type ITextEncoder,\n  type ITextDecoder,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions,\n  type IJsonPluginOptions,\n  type ISerializeChunkKind,\n  type ISerializeOutputFormat,\n  type ISerializeCleanupPolicy,\n  type ISerializeCleanupKind,\n  type ISerializePluginType\n} from '@migaia/serialize';"
+                  "code": "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  isChunkShape,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeCodecError,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  jsonPlugin,\n  jsonParser,\n  SerializeChunkKind,\n  SerializeOutput,\n  SerializePhase,\n  SerializeCleanupPolicy,\n  SerializeCleanupKind,\n  SerializePluginType,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type ITextEncoder,\n  type ITextDecoder,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions,\n  type IJsonPluginOptions,\n  type ISerializeChunkKind,\n  type ISerializeOutputFormat,\n  type ISerializeCleanupPolicy,\n  type ISerializeCleanupKind,\n  type ISerializePluginType\n} from '@migaia/serialize';"
                 },
                 {
                   "type": "paragraph",
@@ -15891,7 +16024,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "运行时依赖 `@migaia/lifecycle` 的按需子路径（`/scheduler`、`/abort`、`/scope`、`/quiescence`）与 `@migaia/utils`（Base64/UTF-8 底层算法、`attachErrorIdentity` 错误身份标注）。registry 的 pending/drain、closing controller 与 parser scope 直接复用 lifecycle leaf；Serialize 仍只拥有 codec registry、stream、context 与自身错误投影。协作式取消信号类型 `ISerializeAbortSignal` 是包内独立定义的结构化类型（`{ aborted, reason?"
+                  "text": "运行时依赖 `@migaia/lifecycle` 的按需子路径（`/scheduler`、`/abort`、`/scope`、`/quiescence`）与 `@migaia/utils`（Base64/UTF-8 底层算法、`attachErrorIdentity` 错误身份标注）。registry 的 pending/drain、closing controller 与 parser scope 直接复用 lifecycle leaf；Serialize 仍只拥有 codec registry、stream、context 与自身错误投影。协作式取消信号类型 `IAbortSignal` 是包内独立定义的结构化类型（`{ aborted, reason?"
                 },
                 {
                   "type": "paragraph",
@@ -15981,7 +16114,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ISerializeContext = {\n  readonly signal: ISerializeAbortSignal;\n  readonly context: string;\n};"
+                  "code": "type ISerializeContext = {\n  readonly signal: IAbortSignal;\n  readonly context: string;\n};"
                 },
                 {
                   "type": "paragraph",
@@ -16130,7 +16263,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ISerializeRegistry = {\n  readonly primaryType: string;\n  readonly types: readonly string[];\n  has(type: string): boolean;\n  encode(\n    value: unknown,\n    options?: {\n      readonly type?: string;\n      readonly signal?: ISerializeAbortSignal;\n      readonly context?: string;\n    }\n  ): Promise<ISerializeChunk>;\n  decode(\n    chunk: ISerializeChunk,\n    options?: {\n      readonly type?: string;\n      readonly signal?: ISerializeAbortSignal;\n      readonly context?: string;\n    }\n  ): Promise<unknown>;\n  close(): void;\n  dispose(options?: { readonly deadlineAt?: number }): Promise<void>;\n};"
+                  "code": "type ISerializeRegistry = {\n  readonly primaryType: string;\n  readonly types: readonly string[];\n  has(type: string): boolean;\n  encode(\n    value: unknown,\n    options?: {\n      readonly type?: string;\n      readonly signal?: IAbortSignal;\n      readonly context?: string;\n    }\n  ): Promise<ISerializeChunk>;\n  decode(\n    chunk: ISerializeChunk,\n    options?: {\n      readonly type?: string;\n      readonly signal?: IAbortSignal;\n      readonly context?: string;\n    }\n  ): Promise<unknown>;\n  close(): void;\n  dispose(options?: { readonly deadlineAt?: number }): Promise<void>;\n};"
                 },
                 {
                   "type": "table",
@@ -16189,7 +16322,7 @@
                   "type": "list",
                   "items": [
                     "`type?: string` —— 省略时用 `primaryType`；传了但 registry 里没有注册这个 `type` 会抛 `SerializeCodecError`／`CODEC_NOT_FOUND`（\"no serialize plugin registered for type: ...\"），`context` 字段固定为 `'registry'`（与调用方传入的 `context` 无关）",
-                    "`signal?: ISerializeAbortSignal` —— 与 registry 内部因 `close()`/`dispose()` 触发的关闭信号复合（first-observed-wins）：任一方先 abort，操作立即以 `SerializeCodecError`／`ABORTED` 结束，不等 parser 真正返回",
+                    "`signal?: IAbortSignal` —— 与 registry 内部因 `close()`/`dispose()` 触发的关闭信号复合（first-observed-wins）：任一方先 abort，操作立即以 `SerializeCodecError`／`ABORTED` 结束，不等 parser 真正返回",
                     "`context?: string` —— 省略时为 `'anonymous'`；出错时拼进消息，定位是哪个调用点"
                   ]
                 },
@@ -16616,7 +16749,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IFrameBudgetOptions = {\n  readonly targetMs?: number; // 默认 8\n  readonly minItems?: number; // 默认 64\n  readonly maxItems?: number; // 默认 250_000\n  readonly initialItems?: number; // 默认 2_048\n  readonly yieldTo?: () => Promise<void>;\n  readonly signal?: ISerializeAbortSignal;\n  readonly scheduler: IScheduler; // 必填\n};\n\nfunction sliceByFrameBudget<T>(\n  items: readonly T[],\n  options: IFrameBudgetOptions\n): AsyncGenerator<readonly T[], void, undefined>;"
+                  "code": "type IFrameBudgetOptions = {\n  readonly targetMs?: number; // 默认 8\n  readonly minItems?: number; // 默认 64\n  readonly maxItems?: number; // 默认 250_000\n  readonly initialItems?: number; // 默认 2_048\n  readonly yieldTo?: () => Promise<void>;\n  readonly signal?: IAbortSignal;\n  readonly scheduler: IScheduler; // 必填\n};\n\nfunction sliceByFrameBudget<T>(\n  items: readonly T[],\n  options: IFrameBudgetOptions\n): AsyncGenerator<readonly T[], void, undefined>;"
                 },
                 {
                   "type": "paragraph",
@@ -16695,7 +16828,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function decodeStream(\n  registry: ISerializeRegistry,\n  chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>,\n  options?: {\n    readonly type?: string;\n    readonly context?: string;\n    readonly signal?: ISerializeAbortSignal;\n  }\n): AsyncGenerator<unknown, void, undefined>;"
+                  "code": "function decodeStream(\n  registry: ISerializeRegistry,\n  chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>,\n  options?: {\n    readonly type?: string;\n    readonly context?: string;\n    readonly signal?: IAbortSignal;\n  }\n): AsyncGenerator<unknown, void, undefined>;"
                 },
                 {
                   "type": "paragraph",
@@ -16861,7 +16994,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';"
+                  "code": "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type IAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';"
                 },
                 {
                   "type": "paragraph",
@@ -16904,7 +17037,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';"
+                  "code": "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type IAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';"
                 },
                 {
                   "type": "paragraph",
@@ -17183,7 +17316,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "依赖 `@migaia/lifecycle`（仅用其 `IAbortSignal` 类型，用于协作式取消）。"
+                  "text": "依赖 `@migaia/utils`（其中 `IAbortSignal` 类型用于协作式取消）。"
                 }
               ]
             },
@@ -32168,7 +32301,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "`request<Input, Output>(payload: Input, options?: { signal?: IRpcAbortSignal; transfer?: readonly Transferable[] }): Promise<Output>` —— 发起一次 RPC 调用；`signal` 用于取消，`transfer` 指定零拷贝转移列表；非法 `options` 或 hostile getter 以带 `INVALID_OPTION` 的 rejected Promise 返回",
+                    "`request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly Transferable[] }): Promise<Output>` —— 发起一次 RPC 调用；`signal` 用于取消，`transfer` 指定零拷贝转移列表；非法 `options` 或 hostile getter 以带 `INVALID_OPTION` 的 rejected Promise 返回",
                     "`disposed`(只读 getter)—— 是否已 `close()`/`dispose()`",
                     "`close(): void` —— 同步标记不可用(幂等)，此后 `request()` 立即拒绝，但不释放底层 endpoint",
                     "`dispose(): Promise<void>` —— 唯一异步释放入口：先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`；失败会 reject，重复调用复用同一个 Promise"
@@ -32201,7 +32334,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "`compute: (payload: Input, context: { signal: IRpcAbortSignal }) => Output | Promise<Output>`（必填）—— 真正干活的函数；`compute` 抛出的异常会被 RPC 端点框架捕获转成失败响应，不会逃逸成 Worker 的 unhandled error",
+                    "`compute: (payload: Input, context: { signal: IAbortSignal }) => Output | Promise<Output>`（必填）—— 真正干活的函数；`compute` 抛出的异常会被 RPC 端点框架捕获转成失败响应，不会逃逸成 Worker 的 unhandled error",
                     "`postMessage: (message: unknown) => void`（必填）—— Worker 侧发消息回主线程的函数，通常传 `(message) => self.postMessage(message)`",
                     "`options.timeoutMs?: number` —— Worker 侧对每次请求处理设的超时，默认不设"
                   ]
@@ -32655,7 +32788,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createWorkerHandler<Input, Output>(\n  compute: (payload: Input, context: { signal: IRpcAbortSignal }) => Output | Promise<Output>,\n  postMessage: (message: unknown) => void,\n  options?: { readonly timeoutMs?: number }\n): ManagedRpcHandler;"
+                  "code": "function createWorkerHandler<Input, Output>(\n  compute: (payload: Input, context: { signal: IAbortSignal }) => Output | Promise<Output>,\n  postMessage: (message: unknown) => void,\n  options?: { readonly timeoutMs?: number }\n): ManagedRpcHandler;"
                 },
                 {
                   "type": "list",
@@ -33379,7 +33512,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "运行时中立的静态组合根：一次声明完整的 capability 集合，按依赖顺序启动，并在全部 entry 就绪后安全取值。Tray 基于 `@migaia/capability/graph`，Graph 负责启动、依赖、释放与 Promise 身份；Tray 只提供更小、更适合应用装配的公开面。"
+                  "text": "Tray 提供静态 capability 组合与完整 PluginHost 实例管理。静态组合使用 `createTrayGraph`，Graph 负责启动与释放；实例层使用 `defineTrayHost` / `createTray({ hosts })`，RPC 与 supervision 负责 coroutine、Worker 和子进程的连接及执行。"
                 }
               ]
             },
@@ -33393,7 +33526,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "不适用：运行期动态增删、通知 UI、跨 realm/Worker 传输、宿主强制终止。这些能力不在 Tray core 内，避免让静态组合根承担领域和平台策略。"
+                  "text": "静态 Graph 的边界限于同 realm；运行期完整 Host 实例由下面 Hosts 层管理。跨机器发现、browser Worker、UI、持久消息与 failover retry 不在当前范围。"
                 }
               ]
             },
@@ -33408,7 +33541,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "静态组合根从 `@migaia/tray` 导入；PluginHost 托管组合从 `@migaia/tray/host` 导入。"
+                  "text": "静态 Graph 和 Hosts 实例 API 从 `@migaia/tray` 导入；单个 PluginHost 托管组合从 `@migaia/tray/host` 导入。"
                 }
               ]
             },
@@ -33419,7 +33552,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTrayGraph(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -33428,7 +33561,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "`createTray()` 只接收完整数组；key 必须是非空字符串且不能重复，`requires` 只能引用同一数组内的其他 entry。",
+                    "`createTrayGraph()` 只接收完整数组；key 必须是非空字符串且不能重复，`requires` 只能引用同一数组内的其他 entry。",
                     "`start()` 必须返回或 resolve 为 `{ value, release }`；依赖可通过 `context.get()` 读取。",
                     "必须先 `await tray.ready()` 再 `get()`。未就绪、失败、未知 key 或已释放时都会显式失败，不返回半初始化值。",
                     "`dispose()` 由 Graph 按依赖逆序释放，幂等并保留清理失败。"
@@ -33456,6 +33589,66 @@
               ]
             },
             {
+              "id": "hosts-实例发现与生命周期",
+              "heading": "Hosts：实例发现与生命周期",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "根入口的 `defineTrayHost` / `createTray({ hosts })` 管理完整 PluginHost 实例； `createTrayGraph(entries)` 继续管理静态 capability 集合。每个实例与父 Host 独立。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "entry 只连接父 registry，不再 spawn。Bun/Deno 与 browser Worker 尚未验证。"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "省略 runtime 使用 `coroutine`：共享事件循环，适合轻量 I/O host，停止是合作式的。",
+                    "`thread` 使用独立 Worker isolate，必须提供 entry，可设置 `limits.heapBytes`。",
+                    "`process` 使用子进程，必须提供 entry，可设置 `sandbox: { name, wrap }` 接入外部沙箱。",
+                    "Node Worker/process entry 导入共享 host 定义后执行 `await serveTrayHost(host)`；"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`defineTrayHost` 的必填字段是 `name`、`plugins` 与 `exposes`。`exposes` 使用 `plugin.feature` 路径，remote 调用使用 `plugin.feature.method` 路径。 可选 `config(input)` 在每次实例初始化时验证配置；`supervisor` 接收 `restart: { mode, maxRestarts, windowMs, initialDelayMs }` 与 `startupTimeoutMs`。 `entry` 接收 `string | URL`，仅适用于 `thread` / `process`； `limits: { heapBytes }` 仅适用于 `thread`，`sandbox: { name, wrap }` 仅适用于 `process`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray`；`hosts` 必须是 `defineTrayHost` 返回的定义数组。`probe` 接收一个 `IRpcProbe` 或其只读数组， `report(error)` 接收运行与清理诊断，默认使用 `console.error`。 子入口 `serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`， 在子 realm 内等待退出请求与插件清理，然后结束 Worker 或进程。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`plugins(info, trayPlugin)` 在每次 generation init 时调用；`info` 包含 id、host、 generation 和 validator 的 config 输出。插件通过 `defineFeature(factory, { tray: trayPlugin.getFeature('tray') })` 声明依赖， 从 `deps.tray.self()` 读取身份，`await deps.tray.to(otherHost, id)` 得到 admission-bound remote，`deps.tray.exit(error?)` 结束当前实例。第一次 exit 决定结果：无错误是 clean exit， 有错误是 crash；PluginHost disposer 执行后才结束 task/realm。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "根入口只导出 `ITrayClientPlugin` 类型，不提供 runtime client 单例。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "remote 的统一调用形式是 `request|notify|stream(path, payload, options?)`； `options` 的类型为 `ITrayCallOptions`，只包含 `signal?: AbortSignal` 与 `timeoutMs?: number`。 零 payload 可省略，带 options 时写 `request(path, undefined, { timeoutMs })`； 业务对象中的 `undefined` 字段会被拒绝，只有 wire envelope 的 absent payload/config 被省略。 Uint8Array 可跨所有三个 runtime；非 portable config 在创建连接前拒绝。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`list({ host?, runtime?, state? })` 返回冻结 snapshot，`get(id)` 合并 RPC unit detail。 `on(event, listener)` / `watch({ signal? })` 仅观察生命周期；记录冻结，没有 emit。 watch 保留最近 100 条未读记录，不是持久日志。每个实例的 stop/restart/replace/remove 按调用顺序进入队列；replace 的 config 只在新 generation init 成功后提交。 停止前先运行 child PluginHost cleanup（graceMs 默认 5000）；失败或超时会 report 并继续停止。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "实例 remove 后旧 remote 永久拒绝 `TRAY_INSTANCE_UNKNOWN`，同 id 的重新 spawn 不会复活 旧 admission。非 ready 调用立即拒绝 `TRAY_INSTANCE_NOT_READY`；已发送调用通过原 RPC receipt 完成，不被移到新 generation。target 业务错误的 source/code/cause chain 原样通过； Tray 验证和 start 错误使用自己的稳定 code，并保留原错误于 cause。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； routing namespace 和 pub/sub 由后续 mesh 实现。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
+                }
+              ]
+            },
+            {
               "id": "高阶组合示例-托管-pluginhost-动态加载-依赖阻塞与确定性卸载",
               "heading": "高阶组合示例 · 托管 PluginHost：动态加载、依赖阻塞与确定性卸载",
               "blocks": [
@@ -33466,7 +33659,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, type IPlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = {\n  name: 'provider',\n  install: () => ({ providerValue: 1 })\n} satisfies IPlugin<AppHost, { readonly providerValue: number }>\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use({ name: 'late', requires: ['provider'], install: () => ({ late: true }) })\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
+                  "code": "import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = definePlugin({\n  name: 'provider',\n  features: { value: defineFeature(() => ({ value: 1 })) },\n  install: () => ({ providerValue: 1 })\n})\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use(definePlugin({\n  name: 'late',\n  features: {\n    value: defineFeature(() => ({}), { provider: provider.getFeature('value') })\n  },\n  install: () => ({ late: true })\n}))\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
                 },
                 {
                   "type": "paragraph",
@@ -33500,6 +33693,28 @@
                   "text": "unUse/replace` 继续遵循原有 queue 与 lease 语义；callback 不应捕获 concrete Host 做 self mutation。"
                 }
               ]
+            },
+            {
+              "id": "routing-and-publish-subscribe",
+              "heading": "Routing and publish/subscribe",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`tray.routing.roundRobin(host)` and `tray.routing('roundRobin', host)` share one sequence and select a ready instance for each request, notify or stream. `leastInFlight` selects the fewest pending business calls, with spawn order breaking ties. Custom policies use `defineRoutingPolicy(name, pick)` and are registered by `createTray({ routing })` or a host DSL's `routing` tuple."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Child plugins declare custom names in their own host DSL and call both forms through `deps.tray.routing`. The picker runs synchronously on the parent. Calls never retry or fail over."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`tray.publish(topic, payload)` and `deps.tray.publish(topic, payload)` fan out to current subscribers at most once. `subscribe(topic, (payload, meta) => .)` keeps business topics separate from lifecycle events. Frozen `meta.from` is authenticated by the parent: `{ id, host, generation }` for an instance, `{ parent: true }` for a parent publication. Payload fields cannot impersonate the sender."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Subscriptions end with their admission and generation; messages sent while an instance is not ready are missed. There is no replay, persistence or delivery acknowledgement."
+                }
+              ]
             }
           ]
         },
@@ -33511,7 +33726,179 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "README 负责快速上手；本文给出公开契约、失败语义与生产边界。Tray 是 `@migaia/capability/graph` 的静态、同 realm 组合层，不复制 Graph 的生命周期或调度实现。"
+                  "text": "README 负责快速上手；本文给出静态 Graph 和 Hosts 层的公开契约、失败语义与生产边界。Graph、PluginHost、RPC 与 supervision 分别保留原有生命周期与执行所有权。"
+                }
+              ]
+            },
+            {
+              "id": "hosts-实例发现与生命周期",
+              "heading": "Hosts：实例发现与生命周期",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "根入口的 `defineTrayHost` / `createTray({ hosts })` 管理完整 PluginHost 实例； `createTrayGraph(entries)` 继续管理静态 capability 集合。每个实例与父 Host 独立。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "entry 只连接父 registry，不再 spawn。Bun/Deno 与 browser Worker 尚未验证。"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "省略 runtime 使用 `coroutine`：共享事件循环，适合轻量 I/O host，停止是合作式的。",
+                    "`thread` 使用独立 Worker isolate，必须提供 entry，可设置 `limits.heapBytes`。",
+                    "`process` 使用子进程，必须提供 entry，可设置 `sandbox: { name, wrap }` 接入外部沙箱。",
+                    "Node Worker/process entry 导入共享 host 定义后执行 `await serveTrayHost(host)`；"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "host-定义与构造选项",
+              "heading": "Host 定义与构造选项",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`defineTrayHost(definition)` 返回冻结且带身份标记的 `ITrayHost<TName, TConfig, TPlugins, TExposes, TRouting>`。必填字段为 `name`、 `plugins(instance, trayPlugin)` 与 `exposes`；定义阶段不调用插件工厂或配置验证器。 `exposes` 是只读的 `plugin.feature` 路径数组；方法调用使用 `plugin.feature.method`。 结构复制品不具备原定义的身份，不能传给 registry 或 `instance()`。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["字段", "类型与默认值", "使用条件"],
+                  "rows": [
+                    [
+                      "`runtime`",
+                      "`'coroutine' \\",
+                      "'thread' \\",
+                      "'process'`；默认 `'coroutine'`",
+                      "选择实例运行方式"
+                    ],
+                    ["`entry`", "`string \\", "URL`", "thread / process 必填；coroutine 禁止"],
+                    [
+                      "`config`",
+                      "`(input: unknown) => TConfig`；默认无验证器",
+                      "每次初始化时验证并转换配置，输出交给 `plugins`"
+                    ],
+                    [
+                      "`supervisor`",
+                      "`ITraySupervisorPolicy`；默认使用运行时策略",
+                      "`restart` 支持 `mode`、`maxRestarts`、`windowMs`、`initialDelayMs`；另支持 `startupTimeoutMs`"
+                    ],
+                    [
+                      "`limits`",
+                      "`Readonly<{ heapBytes?: number }>`；默认未指定",
+                      "仅 thread 可用"
+                    ],
+                    [
+                      "`sandbox`",
+                      "`ITraySandbox`；默认未指定",
+                      "仅 process 可用；包含 `name` 与同步 `wrap(command)`"
+                    ],
+                    [
+                      "`routing`",
+                      "`TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定",
+                      "保存共享 policy 定义；执行与命名空间由 mesh 实现"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`supervisor.restart.mode` 接收 `'never' | 'on-failure' | 'always'`。 `sandbox.wrap` 的输入与输出均为 RPC Process 的 `IProcessLaunchCommand`： `{ command, args, cwd?, env }`；返回完整的新命令，保留所需环境与工作目录。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，当前只完成定义校验。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块，例如："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "// worker.mjs：共享定义模块已由应用提供。\nimport { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
+                }
+              ]
+            },
+            {
+              "id": "registry-与-remote-的返回类型",
+              "heading": "Registry 与 remote 的返回类型",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`undefined` 时，`config` 必填。`instance(host, id)` 同步返回同类型的 remote。"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`spawn(name, { id, config? })` 返回 `Promise<ITrayRemote<H>>`；当 host 的配置类型不允许"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "其中 `generation` 保留为 Tray 的数值 generation，其他连接详情由 RPC 提供。"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`list(filter?)` 返回 `readonly ITrayInstance[]`；`get(id)` 返回 `Promise<ITrayInstanceDetail>`，"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`stop(id, { graceMs? })`、`remove(id, { graceMs? })`、`dispose({ graceMs? })` 返回 `Promise<void>`。"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`restart(id)`、`replace(id, { config? })` 返回 `Promise<ITrayInstance>`。"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`AsyncIterableIterator<ITrayInstanceEventRecord>`。"
+                },
+                {
+                  "type": "list",
+                  "items": ["`on(event, listener)` 返回取消订阅函数；`watch({ signal? })` 返回"]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`stream` 返回方法元素类型的 `AsyncIterableIterator`。"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "remote 的 `request` 返回方法结果的 `Promise`，`notify` 返回 `Promise<void>`，"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`plugins(info, trayPlugin)` 在每次 generation init 时调用；`info` 包含 id、host、 generation 和 validator 的 config 输出。插件通过 `defineFeature(factory, { tray: trayPlugin.getFeature('tray') })` 声明依赖， 从 `deps.tray.self()` 读取身份，`await deps.tray.to(otherHost, id)` 得到 admission-bound remote，`deps.tray.exit(error?)` 结束当前实例。第一次 exit 决定结果：无错误是 clean exit， 有错误是 crash；PluginHost disposer 执行后才结束 task/realm。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "根入口只导出 `ITrayClientPlugin` 类型，不提供 runtime client 单例。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "remote 的统一调用形式是 `request|notify|stream(path, payload, options?)`； `ITrayCallOptions` 只包含 `signal?: AbortSignal` 与 `timeoutMs?: number`。 零 payload 可省略，带 options 时写 `request(path, undefined, { timeoutMs })`； 业务对象中的 `undefined` 字段会被拒绝，只有 wire envelope 的 absent payload/config 被省略。 Uint8Array 可跨所有三个 runtime；非 portable config 在创建连接前拒绝。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`list({ host?, runtime?, state? })` 返回冻结 snapshot，`get(id)` 合并 RPC unit detail。 `on(event, listener)` / `watch({ signal? })` 仅观察生命周期；记录冻结，没有 emit。 watch 保留最近 100 条未读记录，不是持久日志。每个实例的 stop/restart/replace/remove 按调用顺序进入队列；replace 的 config 只在新 generation init 成功后提交。 停止前先运行 child PluginHost cleanup（graceMs 默认 5000）；失败或超时会 report 并继续停止。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "实例 remove 后旧 remote 永久拒绝 `TRAY_INSTANCE_UNKNOWN`，同 id 的重新 spawn 不会复活 旧 admission。非 ready 调用立即拒绝 `TRAY_INSTANCE_NOT_READY`；已发送调用通过原 RPC receipt 完成，不被移到新 generation。target 业务错误的 source/code/cause chain 原样通过； Tray 验证和 start 错误使用自己的稳定 code，并保留原错误于 cause。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； routing namespace 和 pub/sub 由后续 mesh 实现。返回值为冻结的 `ITrayRoutingPolicy<TName>`；`pick(candidates: readonly ITrayInstance[], context: ITrayRoutingContext)` 同步返回一个实例 id，`context` 包含 `host: string` 与 `sequence: number`。 定义时不调用 `pick`。名称必须符合 `^[a-z][A-Za-z0-9]*$`，不能是 `roundRobin`、 `leastInFlight` 或函数、对象的保留属性名；名称或回调非法时抛 `TRAY_ROUTING_INVALID`。"
                 }
               ]
             },
@@ -33522,7 +33909,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'"
+                  "code": "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'"
                 },
                 {
                   "type": "paragraph",
@@ -33549,7 +33936,7 @@
                   "items": [
                     "`key`：必填、trim 后非空、全 Tray 唯一。",
                     "`kind`：必填；用于 Graph 诊断和拓扑语义，不改变 `value` 的 TypeScript 类型。",
-                    "`requires`：可选；每个 key 必须存在于同一次 `createTray()` 的 entry 数组，不能引用自身。",
+                    "`requires`：可选；每个 key 必须存在于同一次 `createTrayGraph()` 的 entry 数组，不能引用自身。",
                     "`readiness`：可选的外部门状态快照，只接受 `ready | blocked | failed`。它在首次 `ready()` 时读取一次并缓存结果。",
                     "`start`：必填；Graph 在依赖就绪后调用。返回值必须包含 `value` 与可调用的 `release`。"
                   ]
@@ -33569,13 +33956,13 @@
               ]
             },
             {
-              "id": "3-createtray-与-admission",
-              "heading": "3. createTray() 与 admission",
+              "id": "3-createtraygraph-与-admission",
+              "heading": "3. createTrayGraph() 与 admission",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray"
+                  "code": "function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph"
                 },
                 {
                   "type": "paragraph",
@@ -33611,13 +33998,13 @@
               ]
             },
             {
-              "id": "5-itray-api",
-              "heading": "5. ITray API",
+              "id": "5-itraygraph-api",
+              "heading": "5. ITrayGraph API",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ITray = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
+                  "code": "type ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
                 },
                 {
                   "type": "list",
@@ -33799,7 +34186,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`await createHost(options)` 的唯一 concrete Host 由 `options.create()` 构造。Tray 随后一次性快照 plugin、`requires`、config 与 disposer，建立 Dynamic Capability Graph，再通过 PluginHost prepared admission 发布 ready definition。任何 factory/admission/setup/commit 失败都会回滚未发布候选；失败的 duplicate/cycle/replacement candidate 不会成为以后 restart 的隐式来源。"
+                  "text": "`await createHost(options)` 的唯一 concrete Host 由 `options.create()` 构造。Tray 随后一次性快照 plugin 的 Feature、config 与 disposer，使用 PluginHost 的公开 `readPluginDependencies(admission)` 读取同一个 admission 快照的 provider 与 required/optional 强度，建立 Dynamic Capability Graph，再通过 PluginHost prepared admission 发布 ready definition。任何 factory/admission/setup/commit 失败都会回滚未发布候选；失败的 duplicate/cycle/replacement candidate 不会成为以后 restart 的隐式来源。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "必需的 Feature provider 缺失时 consumer 保持 `blocked`；可选 provider 缺失不阻塞 consumer， 存在时先于 consumer 安装。插件依赖只由 Feature references 声明，不接受旧插件依赖字段。 `createHost`、`use` 和 `replace` 在图变更之前完成 admission；非法描述子以 `TRAY_INVALID_ENTRY` 拒绝，PluginHost 的原始错误直接保留在 `cause`。进入图变更后的失败继续返回 mutation result。"
                 },
                 {
                   "type": "paragraph",
@@ -33838,7 +34229,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "类型策略以稳定性优先：有限、literal、最多 128 个 definition 时，`ITrayResolvedHost` 推导 exact ready closure；widened name、widened `requires` 或超过预算时返回 `ITrayHostDynamic`。dynamic view 仍保留 concrete Host 的 constructor baseline extension/config 类型，运行期管理的未知 key 为 `unknown`。"
+                  "text": "类型策略以稳定性优先：有限、literal、最多 128 个 definition 时，`ITrayResolvedHost` 推导 exact ready closure；widened name、任意 widened Feature provider 或超过预算时返回 `ITrayHostDynamic`。dynamic view 仍保留 concrete Host 的 constructor baseline extension/config 类型，运行期管理的未知 key 为 `unknown`。"
                 },
                 {
                   "type": "paragraph",
@@ -33883,6 +34274,58 @@
                 {
                   "type": "paragraph",
                   "text": "Loader/Adapter/Runtime 契约错误分别使用 `LOADER_*`、`ADAPTER_*`、`RUNTIME_*` 码；原始 native error 保留 identity、type、stack 与 cause。artifact secondary cleanup 使用 `ARTIFACT_CLEANUP_FAILED` 作为观察码，不能替换更早 mutation primary。"
+                }
+              ]
+            },
+            {
+              "id": "routing",
+              "heading": "Routing",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Both namespace forms select a ready instance for every operation: `tray.routing.roundRobin(host)` and `tray.routing('roundRobin', host)` use one shared cursor. `leastInFlight` picks the fewest pending request, notify and stream operations; spawn order breaks ties. A routed remote has `host` and no fixed `id`. Call `request|notify|stream(path, payload, options?"
+                },
+                {
+                  "type": "paragraph",
+                  "text": ")`; signal and timeoutMs occupy only the third slot, with `undefined` payload for a zero-argument method. Cancellation and the remaining deadline reach the selected target."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Define custom policies with `defineRoutingPolicy('first', candidates => candidates[0]!id)`. The parent registers the union of `createTray({ routing })` and every host DSL's `routing` tuple. Child plugins declare the policies they use in that host tuple and call `deps.tray.routing.first(host)` or `deps.tray.routing('first', host)`. Built-ins require no declaration."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Only the name crosses RPC; the synchronous picker runs on the parent and must be short."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Unregistered or undeclared names fail with `TRAY_ROUTING_UNKNOWN`. Invalid names, duplicate names from different policy identities, non-candidate results and thrown pickers fail with `TRAY_ROUTING_INVALID`; a thrown picker stays on `cause`. An empty ready set fails with `TRAY_HOST_UNAVAILABLE`. Calls never move to another instance or retry."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`inFlight` on `list()` and `get()` counts pending business sends for one admission; init and topic delivery are excluded."
+                }
+              ]
+            },
+            {
+              "id": "publish-subscribe",
+              "heading": "Publish/subscribe",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Parent `tray.subscribe(topic, listener)` returns a synchronous unsubscribe receipt. Child `await deps.tray.subscribe(topic, listener)` returns an asynchronous, idempotent receipt; the first local listener registers one parent membership and the last release removes it. Reinstalling plugins after restart re-subscribes in the new generation. Old sender operations cannot affect that membership."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The listener receives `(payload, meta)`. Frozen `meta.from` is authenticated by the parent and equals `{ id, host, generation }` for an instance publisher or `{ parent: true }` for `tray.publish`. Metadata is separate from payload, so payload fields cannot forge the sender. A topic named `spawned` remains a business topic and does not trigger lifecycle listeners."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Delivery is at most once to each current subscription. A non-ready subscriber misses a publication. There is no persistence, replay or delivery acknowledgement. Topics are non-empty strings and payloads must be portable. Synchronous listener throws and async rejections are reported on their side; later listeners still run."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A rejected delivery send is reported on the parent, and a failed delivery handler is reported on the child. Neither failure rejects the publisher."
                 }
               ]
             }

@@ -1,3 +1,4 @@
+import type { IRpcContext } from '@migaia/rpc-core'
 import {
   defineProbe,
   readProbeStages,
@@ -10,7 +11,6 @@ import {
   type IRpcProbeEventView
 } from '@migaia/rpc-core/probe'
 import type { IRuntimePeerProvide } from '@migaia/rpc-core/remote'
-import type { IRpcAbortSignal } from '@migaia/rpc-core'
 import { encodeRpcDevtoolsRecord, decodeRpcDevtoolsRecord } from '../contract/record-codec.js'
 import type { IRpcDevtools, IRpcDevtoolsOptions } from '../collector-types.js'
 import type {
@@ -237,7 +237,7 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
   const watch = (
     input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>,
     content = true,
-    signal?: IRpcAbortSignal
+    signal?: IRpcContext['signal']
   ) => {
     assertOpen()
     if (watchPending === undefined)

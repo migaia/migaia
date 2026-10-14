@@ -1,7 +1,7 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import type { IDisposable } from '@migaia/reactive'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import {
   createStore,
   createStoreSync,

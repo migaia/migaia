@@ -1,5 +1,5 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IRpcHandshakeOffer } from '@migaia/rpc-contract'
 import type { IRpcIdempotencyStore } from '../core/idempotency-store.js'
 import type { IRuntimePeer, IRuntimePeerOptions } from '../remote/runtime-api/peer.js'

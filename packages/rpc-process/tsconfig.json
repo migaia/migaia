@@ -1,18 +1,13 @@
 {
-  // Whole-package dev typecheck (source + tests together) — the equivalent
-  // of the app's own `tsconfig.app.json`. Includes DOM lib because the
-  // web-worker adapter needs it; `tsconfig.contract.json`/`tsconfig.core.json`
-  // are the separate, narrower configs that prove parts of this package
-  // don't actually need it. `"types": ["vite/client"]` is here only for
-  // `architecture.test.ts`'s `import.meta.glob` — a devDependency-time
-  // convenience for this package's own tests, not something the shipped
-  // library code relies on (`tsconfig.build.json` excludes tests entirely).
+  // Whole-package source typecheck against the ES library plus Node types only (no DOM). Node
+  // types stay because this package owns native Node/Bun/Deno adapters; browser-only shapes are
+  // structural. Tests use `tsconfig.test.json`, which adds DOM and test types.
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tsbuildinfo",
     "target": "es2023",
-    "lib": ["ES2023", "DOM"],
+    "lib": ["ES2023", "ESNext.Disposable"],
     "module": "esnext",
-    "types": ["vite/client", "node"],
+    "types": ["node"],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
@@ -29,5 +24,5 @@
   // Redeclares AbortController/AbortSignal/etc. globally — collides with the
   // real ones from `lib.dom.d.ts` in this config (unlike the core proof,
   // which has no DOM lib to collide with).
-  "exclude": ["src/core/ambient.d.ts"]
+  "exclude": []
 }

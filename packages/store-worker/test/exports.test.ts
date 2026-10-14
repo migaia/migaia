@@ -1,7 +1,8 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it } from 'vitest'
 import type { ISerializeChunk, ISerializeParser } from '@migaia/serialize'
 import { SerializeChunkKind } from '@migaia/serialize'
-import { isRpcRemoteError, type IRpcAbortSignal, type IRpcEndpoint } from '@migaia/rpc-core'
+import { isRpcRemoteError, type IRpcEndpoint } from '@migaia/rpc-core'
 import { WorkerAdapter, createWorkerHandler, workerComputed, workerParser } from '../src/index'
 import * as storeWorker from '../src/index'
 import { toManagedRpcHandler } from '../src/managed-rpc-handler'
@@ -185,7 +186,7 @@ describe('A8/A9 store-worker exports', () => {
 
   it('caller abort reaches a real provider context signal and late settlement is ignored', async () => {
     const port = createLinkedWorkerPort()
-    let providerSignal: IRpcAbortSignal | undefined
+    let providerSignal: IAbortSignal | undefined
     let lateResolve!: () => void
     installLinkedWorkerHandler(port, async (_payload, context) => {
       providerSignal = context.signal

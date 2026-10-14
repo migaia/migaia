@@ -35,6 +35,7 @@ import type { IRuntimePeer } from './peer.js'
 import type { IRpcRuntimeStep, IRpcRuntimeOutcomeResult } from '@migaia/rpc-contract/runtime'
 import type { IRpcRuntimeStepOutcome } from '@migaia/rpc-contract/v1'
 import { RuntimeApiErrorText } from './constants.js'
+import { wrapCoroutineTask, reporterOf, type ICoroutineReplaceSpec } from './coroutine-task.js'
 
 /** Only the exact original facade retains its lifecycle publisher, without a connection registry. */
 const eventPublisher = new WeakMap<object, IRuntimeEventPublisher>()
@@ -157,7 +158,9 @@ export type IRuntimeOutletControls<K> = Readonly<{
     name: string,
     spec?: K extends 'process'
       ? import('@migaia/supervision/process').IProcessSpec
-      : import('@migaia/supervision/threads').IThreadSpec
+      : K extends 'coroutine'
+        ? ICoroutineReplaceSpec
+        : import('@migaia/supervision/threads').IThreadSpec
   ): Promise<IReplaceOutcome>
 }>
 
@@ -267,7 +270,7 @@ export function createRuntimeOutlet(
           (!Number.isFinite(options.graceMs) || options.graceMs < 0)) ||
         (options &&
           Object.hasOwn(options, 'signal') &&
-          (kind === RuntimePluginKey.thread || options.signal !== RuntimeProcessSignal.graceful))
+          (kind !== RuntimePluginKey.process || options.signal !== RuntimeProcessSignal.graceful))
       )
         throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.stopInvalid)
       return controlled(name).execution.stop(
@@ -284,10 +287,26 @@ export function createRuntimeOutlet(
       })
     },
     replace: (name, spec) => {
+      /** Coroutine replacement accepts only a user task before entering the supervisor queue. */
+      const coroutineSpec = spec as unknown as ICoroutineReplaceSpec | undefined
+      if (
+        kind === RuntimePluginKey.coroutine &&
+        spec !== undefined &&
+        typeof coroutineSpec?.task !== 'function'
+      )
+        throw createRpcError(
+          RpcCoreErrorCode.invalidConfig,
+          RuntimeApiErrorText.coroutineReplaceInvalid
+        )
       /** Return the original outcome only after the replacement's outlet receipt is addressable. */
       const record = controlled(name)
+      /** The lower task owner supplies fresh generation ports and the same family reporter. */
+      const replacement =
+        kind === RuntimePluginKey.coroutine && coroutineSpec !== undefined
+          ? { task: wrapCoroutineTask(coroutineSpec.task, reporterOf(record.execution)) }
+          : spec
       return record.execution
-        .replace(spec === undefined ? undefined : { spec })
+        .replace(replacement === undefined ? undefined : { spec: replacement })
         .then(async (outcome) => {
           if (outcome.kind === 'replaced') await record.whenReady?.()
           return outcome
@@ -437,5 +456,6 @@ declare module '@migaia/plugin-host' {
       : unknown
     readonly process?: IRuntimeTypedOutlet<TInstalled, 'process'>
     readonly thread?: IRuntimeTypedOutlet<TInstalled, 'thread'>
+    readonly coroutine?: IRuntimeTypedOutlet<TInstalled, 'coroutine'>
   }
 }

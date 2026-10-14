@@ -2,6 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
+    "lib": ["ES2024", "ESNext.Disposable", "DOM", "DOM.Iterable"],
     "rootDir": ".",
     "types": ["vite/client", "@playwright/test"],
     "jsx": "react-jsx"

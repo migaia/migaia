@@ -1,6 +1,6 @@
 import { normalizePortable } from '@migaia/rpc-contract'
 import { serializeRpcError } from '@migaia/rpc-contract/errors'
-import type { IRpcContext, IRpcAbortSignal } from '@migaia/rpc-core'
+import type { IRpcContext } from '@migaia/rpc-core'
 import { RpcDevtoolsErrorCode } from '../error-code.js'
 import { RpcDevtoolsErrorText } from '../error-text.js'
 import { identifyDevtoolsError } from '../errors.js'
@@ -18,7 +18,7 @@ export type ICollectorServiceOwner = Pick<
   watch(
     input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>,
     content?: boolean,
-    signal?: IRpcAbortSignal
+    signal?: IRpcContext['signal']
   ): ReturnType<IRpcDevtools['watch']>
   stopRecord(content: boolean): IRpcDevtoolsRecord
   /** The collector owns exclusion of actual service endpoint identities. */

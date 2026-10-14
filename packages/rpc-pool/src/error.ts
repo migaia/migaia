@@ -11,7 +11,7 @@ export function tagPoolError<T extends Error>(error: T, code: IRpcPoolErrorCode)
 }
 
 /** A queued cancellation retains the exact caller reason on its native AbortError. */
-export function queuedPoolAbort(reason: unknown): DOMException {
+export function queuedPoolAbort(reason: unknown): Error {
   /** DOMException has no cause constructor option, so preserve the reason on the existing object. */
   const error = new DOMException(RpcPoolText.aborted, RpcPoolText.abortName)
   Object.defineProperty(error, 'cause', { value: reason })

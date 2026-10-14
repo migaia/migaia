@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IScheduler } from '@migaia/utils/scheduler'
 
 /**
@@ -23,13 +24,6 @@ import {
   SerializePhase
 } from './format-constants.js'
 
-export type ISerializeAbortSignal = {
-  readonly aborted: boolean
-  readonly reason?: unknown
-  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void
-  removeEventListener(type: 'abort', listener: () => void): void
-}
-
 /**
  * 序列化分段协议。
  *
@@ -48,7 +42,7 @@ export type ISerializeChunkType = ISerializeChunk[0]
 
 export type ISerializeContext = {
   /** 协作式取消。parser 若忽略它，框架仍会丢弃其结果并以 AbortError 结束。 */
-  readonly signal: ISerializeAbortSignal
+  readonly signal: IAbortSignal
   /** 出错时拼进消息，用来定位是哪个 store / 哪个 key 出的事。 */
   readonly context: string
 }
@@ -251,7 +245,7 @@ export type ISerializeRegistry = {
     value: unknown,
     options?: {
       readonly type?: string
-      readonly signal?: ISerializeAbortSignal
+      readonly signal?: IAbortSignal
       readonly context?: string
     }
   ): Promise<ISerializeChunk>
@@ -259,7 +253,7 @@ export type ISerializeRegistry = {
     chunk: ISerializeChunk,
     options?: {
       readonly type?: string
-      readonly signal?: ISerializeAbortSignal
+      readonly signal?: IAbortSignal
       readonly context?: string
     }
   ): Promise<unknown>

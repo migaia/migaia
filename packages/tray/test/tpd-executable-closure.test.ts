@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'
 import {
   PluginHost,
+  defineFeature,
+  definePlugin,
   type IPluginDependencyMutationOptions,
   type IPluginDependencyPlan,
   type IPluginHostCore,
@@ -41,10 +43,25 @@ const hostOptions = (
   shutdown: { mode: 'bounded' as const }
 })
 
-const plugin = (name: string, requires: readonly string[] = []) =>
+/** Creates raw descriptors with Feature-owned provider dependencies. */
+const plugin = (name: string, providers: readonly string[] = []) =>
   ({
     name,
-    requires,
+    features: {
+      value: defineFeature(
+        () => ({}),
+        Object.fromEntries(
+          providers.map((provider) => [
+            provider,
+            definePlugin({
+              name: provider,
+              features: { value: defineFeature(() => ({})) },
+              install: () => ({})
+            }).getFeature('value')
+          ])
+        )
+      )
+    },
     install: (core: IPluginHostCore<string>) => {
       core.onDispose(() => undefined)
       return { [name]: name }

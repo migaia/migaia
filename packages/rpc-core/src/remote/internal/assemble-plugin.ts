@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRemoteBinding } from '../types.js'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import type { IFeature } from '@migaia/plugin-host'

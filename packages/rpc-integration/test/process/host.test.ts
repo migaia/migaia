@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { hostFixture, runtimeHostFixture } from './fixtures/host-control.js'
@@ -8,7 +9,7 @@ import { createRemoteHost } from '@migaia/rpc-core/remote'
 import { runtimeSources, runtimeTestHost } from '../../../rpc-core/test/runtime-api/fixture.js'
 import { RemoteMethodName } from '@migaia/rpc-core/remote'
 import type { IRemoteRetryPort } from '@migaia/rpc-core/remote'
-import { createLifecycleScope, type IAbortSignal } from '@migaia/lifecycle'
+import { createLifecycleScope } from '@migaia/lifecycle'
 
 describe('process Host facade admission and ownership', () => {
   it('[K221/A1] drains an external retry port without changing its call count or Promise', async () => {

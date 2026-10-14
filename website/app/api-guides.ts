@@ -8820,7 +8820,7 @@ try {
         description:
           'Optional cooperative cancellation observed before each slice and during default yields.',
         defaultValue: 'undefined',
-        type: 'ISerializeAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'Stop work when its owner closes.',
         example: 'controller.signal'
       }
@@ -8888,7 +8888,7 @@ try {
         name: 'signal',
         description: '每片前及 default yield 期间观察的 optional cooperative cancellation。',
         defaultValue: 'undefined',
-        type: 'ISerializeAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'owner close 时停止 work。',
         example: 'controller.signal'
       }
@@ -9016,7 +9016,7 @@ try {
         name: 'signal',
         description: 'Caller cancellation composed with stream ownership.',
         defaultValue: 'undefined',
-        type: 'ISerializeAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'Cancel on navigation or disposal.',
         example: 'controller.signal'
       }
@@ -9117,7 +9117,7 @@ try {
         name: 'signal',
         description: '与 stream ownership 组合的 caller cancellation。',
         defaultValue: 'undefined',
-        type: 'ISerializeAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'navigation 或 disposal 时取消。',
         example: 'controller.signal'
       }
@@ -9188,7 +9188,7 @@ try {
         name: 'signal',
         description: 'Cooperative cancellation observed between chunks.',
         defaultValue: 'undefined',
-        type: 'ISerializeAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'Stop consuming when the owner closes.',
         example: 'controller.signal'
       }
@@ -9232,7 +9232,7 @@ try {
         name: 'signal',
         description: 'chunk 之间观察的 cooperative cancellation。',
         defaultValue: 'undefined',
-        type: 'ISerializeAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'owner close 时停止消费。',
         example: 'controller.signal'
       }
@@ -9287,7 +9287,7 @@ try {
         name: 'signal',
         description: 'Cancellation checked before and during iterator consumption.',
         defaultValue: 'undefined',
-        type: 'ISerializeAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'Abort an expensive collection.',
         example: 'controller.signal'
       },
@@ -9330,7 +9330,7 @@ try {
         name: 'signal',
         description: 'iterator consumption 前及期间检查的 cancellation。',
         defaultValue: 'undefined',
-        type: 'ISerializeAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'abort expensive collection。',
         example: 'controller.signal'
       },
@@ -23418,7 +23418,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Takes one immutable admission snapshot from an external readiness source, reading state before error exactly once. It is a low-level Host-to-Graph bridge, not a live subscription.',
-      quickStart: `import { snapshotGraphReadiness } from '@migaia/capability'\nimport { createTray } from '@migaia/tray'\n\nconst remoteHealth = { ok: true, error: undefined }\nconst serviceEntry = { key: 'service', kind: 'service', start: () => ({ value: 'ready', release: () => undefined }) }\nconst readiness = snapshotGraphReadiness({\n  state: remoteHealth.ok ? 'ready' : 'blocked',\n  error: remoteHealth.error\n})\n\nconst tray = createTray([{ ...serviceEntry, readiness }])\nconsole.log(tray)`,
+      quickStart: `import { snapshotGraphReadiness } from '@migaia/capability'\nimport { createTrayGraph } from '@migaia/tray'\n\nconst remoteHealth = { ok: true, error: undefined }\nconst serviceEntry = { key: 'service', kind: 'service', start: () => ({ value: 'ready', release: () => undefined }) }\nconst readiness = snapshotGraphReadiness({\n  state: remoteHealth.ok ? 'ready' : 'blocked',\n  error: remoteHealth.error\n})\n\nconst tray = createTrayGraph([{ ...serviceEntry, readiness }])\nconsole.log(tray)`,
       scenarios: [
         'A composition root must admit an external readiness fact before starting its graph.',
         'Getter order and one-time reads matter because the source can be stateful or cross a proxy boundary.',
@@ -23434,7 +23434,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '从外部 readiness source 取得一次不可变准入快照，严格先读 state、再读 error，且各读一次。它是 Host 到 Graph 的低层桥接，不是实时订阅。',
-      quickStart: `import { snapshotGraphReadiness } from '@migaia/capability'\nimport { createTray } from '@migaia/tray'\n\nconst remoteHealth = { ok: true, error: undefined }\nconst serviceEntry = { key: 'service', kind: 'service', start: () => ({ value: 'ready', release: () => undefined }) }\nconst readiness = snapshotGraphReadiness({\n  state: remoteHealth.ok ? 'ready' : 'blocked',\n  error: remoteHealth.error\n})\n\nconst tray = createTray([{ ...serviceEntry, readiness }])\nconsole.log(tray)`,
+      quickStart: `import { snapshotGraphReadiness } from '@migaia/capability'\nimport { createTrayGraph } from '@migaia/tray'\n\nconst remoteHealth = { ok: true, error: undefined }\nconst serviceEntry = { key: 'service', kind: 'service', start: () => ({ value: 'ready', release: () => undefined }) }\nconst readiness = snapshotGraphReadiness({\n  state: remoteHealth.ok ? 'ready' : 'blocked',\n  error: remoteHealth.error\n})\n\nconst tray = createTrayGraph([{ ...serviceEntry, readiness }])\nconsole.log(tray)`,
       scenarios: [
         '组合根启动 Graph 前必须接纳一份外部 readiness 事实。',
         'source 可能有状态或跨 Proxy 边界，因此 getter 顺序和只读一次必须固定。',
@@ -23669,11 +23669,601 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       options: []
     }
   },
+  'tray:index:defineTrayHost': {
+    en: {
+      purpose:
+        'Validates and freezes a branded host DSL, preserving PluginHost Feature types and declared routing policy names. Returns ITrayHost.',
+      quickStart:
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconsole.log(agent.name, agent.runtime)",
+      scenarios: [
+        'Declare a shared coroutine, Node Worker or child-process host before registry startup.',
+        'Configure typed exposed Features, instance config validation and runtime-specific launch options.'
+      ],
+      avoidWhen: [
+        'Cross-machine discovery or browser Workers are required.',
+        'The application only needs a static same-realm capability graph; use createTrayGraph.'
+      ],
+      options: [
+        {
+          name: 'definition.name',
+          description:
+            'Non-empty shared host identity retained in spawn names and instance snapshots.',
+          defaultValue: 'required',
+          optional: false,
+          type: 'TName extends string',
+          whenToUse:
+            'Non-empty shared host identity retained in spawn names and instance snapshots.',
+          example: "name: 'agent'"
+        },
+        {
+          name: 'definition.plugins',
+          description:
+            "Runs once during each child generation init. Declare deps.tray with trayPlugin.getFeature('tray'); the parent does not invoke this factory.",
+          defaultValue: 'required',
+          optional: false,
+          type: '(instance: ITrayInstanceInfo<TName, TConfig>, trayPlugin: ITrayClientPlugin<TRouting>) => TPlugins',
+          whenToUse:
+            "Runs once during each child generation init. Declare deps.tray with trayPlugin.getFeature('tray'); the parent does not invoke this factory.",
+          example: 'plugins: (info, trayPlugin) => [businessPlugin]'
+        },
+        {
+          name: 'definition.exposes',
+          description:
+            'Allowlist of plugin.feature paths; remote calls append the method name. Reserved internal plugin names and duplicate paths reject.',
+          defaultValue: 'required',
+          optional: false,
+          type: 'readonly TExposes[]',
+          whenToUse:
+            'Allowlist of plugin.feature paths; remote calls append the method name. Reserved internal plugin names and duplicate paths reject.',
+          example: "exposes: ['node.svc']"
+        },
+        {
+          name: 'definition.runtime',
+          description: 'Select a cooperative coroutine, Node Worker isolate or child process.',
+          defaultValue: "'coroutine'",
+          optional: true,
+          type: "'coroutine' | 'thread' | 'process'",
+          whenToUse: 'Select a cooperative coroutine, Node Worker isolate or child process.',
+          example: "runtime: 'thread'"
+        },
+        {
+          name: 'definition.entry',
+          description:
+            'Required for thread and process hosts; forbidden for coroutine hosts. The child entry calls serveTrayHost with the shared definition.',
+          defaultValue: 'required for thread/process',
+          optional: true,
+          type: 'string | URL',
+          whenToUse:
+            'Required for thread and process hosts; forbidden for coroutine hosts. The child entry calls serveTrayHost with the shared definition.',
+          example: "entry: new URL('./worker.mjs', import.meta.url)"
+        },
+        {
+          name: 'definition.config',
+          description:
+            'Validates and transforms config during child init; plugins receive the validator output.',
+          defaultValue: 'undefined',
+          optional: true,
+          type: '(input: unknown) => TConfig',
+          whenToUse:
+            'Validates and transforms config during child init; plugins receive the validator output.',
+          example: 'config: (input) => input as { language: string }'
+        },
+        {
+          name: 'definition.supervisor',
+          description:
+            'Projects restart.mode, maxRestarts, windowMs, initialDelayMs and startupTimeoutMs to the canonical rpc supervisor.',
+          defaultValue: 'undefined',
+          optional: true,
+          type: 'ITraySupervisorPolicy',
+          whenToUse:
+            'Projects restart.mode, maxRestarts, windowMs, initialDelayMs and startupTimeoutMs to the canonical rpc supervisor.',
+          example:
+            "supervisor: { restart: { mode: 'on-failure', maxRestarts: 2, windowMs: 60000 }, startupTimeoutMs: 5000 }"
+        },
+        {
+          name: 'definition.limits',
+          description: 'Thread-only heap limit; rejected on coroutine and process hosts.',
+          defaultValue: 'undefined',
+          optional: true,
+          type: 'Readonly<{ heapBytes?: number }>',
+          whenToUse: 'Thread-only heap limit; rejected on coroutine and process hosts.',
+          example: 'limits: { heapBytes: 64 * 1024 * 1024 }'
+        },
+        {
+          name: 'definition.sandbox',
+          description:
+            'Process-only external wrapper. wrap receives and returns IProcessLaunchCommand with command, args, cwd and env.',
+          defaultValue: 'undefined',
+          optional: true,
+          type: 'ITraySandbox',
+          whenToUse:
+            'Process-only external wrapper. wrap receives and returns IProcessLaunchCommand with command, args, cwd and env.',
+          example: "sandbox: { name: 'external', wrap: (command) => command }"
+        },
+        {
+          name: 'definition.routing',
+          description:
+            'Retains shared policy identities and literal names. Routing execution and namespaces are implemented by mesh.',
+          defaultValue: 'undefined',
+          optional: true,
+          type: 'TRouting extends readonly ITrayRoutingPolicy[]',
+          whenToUse:
+            'Retains shared policy identities and literal names. Routing execution and namespaces are implemented by mesh.',
+          example: 'routing: [first]'
+        }
+      ]
+    },
+    zh: {
+      purpose:
+        '验证并冻结带身份标记的 host DSL，保留 PluginHost Feature 类型与声明的路由 policy 名称；返回 ITrayHost。',
+      quickStart:
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconsole.log(agent.name, agent.runtime)",
+      scenarios: [
+        '在 registry 启动前声明共享的 coroutine、Node Worker 或子进程 host。',
+        '配置具有类型约束的公开 Feature、实例配置验证与运行时启动选项。'
+      ],
+      avoidWhen: [
+        '需要跨机器发现或浏览器 Worker。',
+        '应用只需要静态同 realm capability 图；应使用 createTrayGraph。'
+      ],
+      options: [
+        {
+          name: 'definition.name',
+          description: '非空的共享 host 身份；保留在 spawn 名称与实例快照中。',
+          defaultValue: '必填',
+          optional: false,
+          type: 'TName extends string',
+          whenToUse: '非空的共享 host 身份；保留在 spawn 名称与实例快照中。',
+          example: "name: 'agent'"
+        },
+        {
+          name: 'definition.plugins',
+          description:
+            "每个子实例 generation 初始化时调用一次。通过 trayPlugin.getFeature('tray') 声明 deps.tray 依赖；父 registry 不调用此工厂。",
+          defaultValue: '必填',
+          optional: false,
+          type: '(instance: ITrayInstanceInfo<TName, TConfig>, trayPlugin: ITrayClientPlugin<TRouting>) => TPlugins',
+          whenToUse:
+            "每个子实例 generation 初始化时调用一次。通过 trayPlugin.getFeature('tray') 声明 deps.tray 依赖；父 registry 不调用此工厂。",
+          example: 'plugins: (info, trayPlugin) => [businessPlugin]'
+        },
+        {
+          name: 'definition.exposes',
+          description:
+            '允许调用的 plugin.feature 路径；remote 调用再附加方法名。保留的内部插件名与重复路径会被拒绝。',
+          defaultValue: '必填',
+          optional: false,
+          type: 'readonly TExposes[]',
+          whenToUse:
+            '允许调用的 plugin.feature 路径；remote 调用再附加方法名。保留的内部插件名与重复路径会被拒绝。',
+          example: "exposes: ['node.svc']"
+        },
+        {
+          name: 'definition.runtime',
+          description: '选择合作式 coroutine、Node Worker 独立 isolate 或子进程。',
+          defaultValue: "'coroutine'",
+          optional: true,
+          type: "'coroutine' | 'thread' | 'process'",
+          whenToUse: '选择合作式 coroutine、Node Worker 独立 isolate 或子进程。',
+          example: "runtime: 'thread'"
+        },
+        {
+          name: 'definition.entry',
+          description:
+            'thread 与 process 必填，coroutine 禁止。子入口导入共享定义并调用 serveTrayHost。',
+          defaultValue: 'thread/process 必填',
+          optional: true,
+          type: 'string | URL',
+          whenToUse:
+            'thread 与 process 必填，coroutine 禁止。子入口导入共享定义并调用 serveTrayHost。',
+          example: "entry: new URL('./worker.mjs', import.meta.url)"
+        },
+        {
+          name: 'definition.config',
+          description: '子实例初始化时验证并转换配置；plugins 接收验证器的输出。',
+          defaultValue: '未指定',
+          optional: true,
+          type: '(input: unknown) => TConfig',
+          whenToUse: '子实例初始化时验证并转换配置；plugins 接收验证器的输出。',
+          example: 'config: (input) => input as { language: string }'
+        },
+        {
+          name: 'definition.supervisor',
+          description:
+            '把 restart.mode、maxRestarts、windowMs、initialDelayMs 与 startupTimeoutMs 传给 RPC 的 supervision。',
+          defaultValue: '使用运行时默认策略',
+          optional: true,
+          type: 'ITraySupervisorPolicy',
+          whenToUse:
+            '把 restart.mode、maxRestarts、windowMs、initialDelayMs 与 startupTimeoutMs 传给 RPC 的 supervision。',
+          example:
+            "supervisor: { restart: { mode: 'on-failure', maxRestarts: 2, windowMs: 60000 }, startupTimeoutMs: 5000 }"
+        },
+        {
+          name: 'definition.limits',
+          description: '仅 thread 可设置 heap 上限；coroutine 与 process 会拒绝此字段。',
+          defaultValue: '未指定',
+          optional: true,
+          type: 'Readonly<{ heapBytes?: number }>',
+          whenToUse: '仅 thread 可设置 heap 上限；coroutine 与 process 会拒绝此字段。',
+          example: 'limits: { heapBytes: 64 * 1024 * 1024 }'
+        },
+        {
+          name: 'definition.sandbox',
+          description:
+            '仅 process 可接入外部命令包装器。wrap 输入与输出均为 IProcessLaunchCommand，包含 command、args、cwd 与 env。',
+          defaultValue: '未指定',
+          optional: true,
+          type: 'ITraySandbox',
+          whenToUse:
+            '仅 process 可接入外部命令包装器。wrap 输入与输出均为 IProcessLaunchCommand，包含 command、args、cwd 与 env。',
+          example: "sandbox: { name: 'external', wrap: (command) => command }"
+        },
+        {
+          name: 'definition.routing',
+          description: '保留共享 policy 身份与字面量名称；路由执行和命名空间由 mesh 实现。',
+          defaultValue: '未指定',
+          optional: true,
+          type: 'TRouting extends readonly ITrayRoutingPolicy[]',
+          whenToUse: '保留共享 policy 身份与字面量名称；路由执行和命名空间由 mesh 实现。',
+          example: 'routing: [first]'
+        }
+      ]
+    }
+  },
   'tray:index:createTray': {
     en: {
       purpose:
+        'Creates the central instance registry and returns ITray. Management runs in per-instance queues; remotes stay bound to their record admission.',
+      quickStart:
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent], report: (error) => console.error(error) })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello', { timeoutMs: 1000 }))\n  await tray.restart('alice')\n  console.log(tray.list({ host: 'agent', state: 'ready' }))\n} finally {\n  await tray.dispose({ graceMs: 5000 })\n}",
+      scenarios: [
+        'Spawn, discover, restart, replace and remove complete PluginHost instances.',
+        'Observe frozen lifecycle events and call exposed methods by instance id.'
+      ],
+      avoidWhen: [
+        'Use createTrayGraph(entries) for a static same-realm capability graph.',
+        'Cross-machine discovery, durable messaging or failover retries are required.'
+      ],
+      options: [
+        {
+          name: 'options.hosts',
+          description:
+            'Complete admitted host inventory from defineTrayHost. Structural copies and duplicate host names reject.',
+          defaultValue: 'required',
+          optional: false,
+          type: 'THosts extends readonly ITrayHost<any, any, any, any, any>[]',
+          whenToUse:
+            'Complete admitted host inventory from defineTrayHost. Structural copies and duplicate host names reject.',
+          example: 'hosts: [agent, worker]'
+        },
+        {
+          name: 'options.routing',
+          description:
+            'Accepts trusted shared policy definitions. This release validates the contract; mesh provides routing execution.',
+          defaultValue: 'undefined',
+          optional: true,
+          type: 'TRouting extends readonly ITrayRoutingPolicy[]',
+          whenToUse:
+            'Accepts trusted shared policy definitions. This release validates the contract; mesh provides routing execution.',
+          example: 'routing: [first]'
+        },
+        {
+          name: 'options.probe',
+          description:
+            'Observe parent-side rpc message and connection activity for managed instances.',
+          defaultValue: 'undefined',
+          optional: true,
+          type: 'IRpcProbe | readonly IRpcProbe[]',
+          whenToUse:
+            'Observe parent-side rpc message and connection activity for managed instances.',
+          example: 'probe: countingProbe'
+        },
+        {
+          name: 'options.report',
+          description:
+            'Receives contained supervision, cleanup, listener and relay diagnostics with their native classification.',
+          defaultValue: 'console.error',
+          optional: true,
+          type: '(error: unknown) => void',
+          whenToUse:
+            'Receives contained supervision, cleanup, listener and relay diagnostics with their native classification.',
+          example: 'report: (error) => console.error(error)'
+        }
+      ]
+    },
+    zh: {
+      purpose:
+        '创建中央实例 registry 并返回 ITray。每个实例按队列执行管理操作；remote 绑定其创建时的记录身份。',
+      quickStart:
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent], report: (error) => console.error(error) })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello', { timeoutMs: 1000 }))\n  await tray.restart('alice')\n  console.log(tray.list({ host: 'agent', state: 'ready' }))\n} finally {\n  await tray.dispose({ graceMs: 5000 })\n}",
+      scenarios: [
+        '创建、发现、重启、替换与移除完整 PluginHost 实例。',
+        '观察冻结的生命周期事件，并按实例 id 调用公开方法。'
+      ],
+      avoidWhen: [
+        '静态同 realm capability 图应使用 createTrayGraph(entries)。',
+        '需要跨机器发现、持久消息或失败重试切换。'
+      ],
+      options: [
+        {
+          name: 'options.hosts',
+          description: 'defineTrayHost 返回的完整定义集合。结构复制品与重复的 host 名称会被拒绝。',
+          defaultValue: '必填',
+          optional: false,
+          type: 'THosts extends readonly ITrayHost<any, any, any, any, any>[]',
+          whenToUse: 'defineTrayHost 返回的完整定义集合。结构复制品与重复的 host 名称会被拒绝。',
+          example: 'hosts: [agent, worker]'
+        },
+        {
+          name: 'options.routing',
+          description: '接收可信的共享 policy 定义；当前版本完成契约校验，路由执行由 mesh 提供。',
+          defaultValue: '未指定',
+          optional: true,
+          type: 'TRouting extends readonly ITrayRoutingPolicy[]',
+          whenToUse: '接收可信的共享 policy 定义；当前版本完成契约校验，路由执行由 mesh 提供。',
+          example: 'routing: [first]'
+        },
+        {
+          name: 'options.probe',
+          description: '观察实例父侧的 RPC 消息与连接活动。',
+          defaultValue: '未指定',
+          optional: true,
+          type: 'IRpcProbe | readonly IRpcProbe[]',
+          whenToUse: '观察实例父侧的 RPC 消息与连接活动。',
+          example: 'probe: countingProbe'
+        },
+        {
+          name: 'options.report',
+          description: '接收 supervision、清理、监听器与 relay 的运行诊断，并保留原有错误分类。',
+          defaultValue: 'console.error',
+          optional: true,
+          type: '(error: unknown) => void',
+          whenToUse: '接收 supervision、清理、监听器与 relay 的运行诊断，并保留原有错误分类。',
+          example: 'report: (error) => console.error(error)'
+        }
+      ]
+    }
+  },
+  'tray:index:serveTrayHost': {
+    en: {
+      purpose:
+        'Serves one Node Worker or child-process host through its parent connection. Returns Promise<void>; PluginHost cleanup completes before the realm exits.',
+      quickStart:
+        "import { defineTrayHost, serveTrayHost } from '@migaia/tray'\n\nconst worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.mjs', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})\nconsole.log(worker.name, worker.runtime)\n// Invoke this function only from the Node Worker entry.\nexport const runWorkerEntry = () => serveTrayHost(worker, { report: console.error })",
+      scenarios: [
+        'Invoke from a Node Worker or child-process entry after importing the shared host definition.',
+        'Configure child-side probes and report cleanup or crash diagnostics before realm exit.'
+      ],
+      avoidWhen: [
+        'The code runs in the parent registry or uses the coroutine runtime.',
+        'The entry is a browser Worker; this entry supports Node Worker and process realms.'
+      ],
+      options: [
+        {
+          name: 'definition',
+          description:
+            'Pass the trusted thread or process host imported from the same shared definition module in this realm. Coroutine definitions reject.',
+          defaultValue: 'required',
+          optional: false,
+          type: 'unknown (validated ITrayHost)',
+          whenToUse:
+            'Pass the trusted thread or process host imported from the same shared definition module in this realm. Coroutine definitions reject.',
+          example: 'serveTrayHost(worker)'
+        },
+        {
+          name: 'options.probe',
+          description:
+            'Observe the child-side rpc connection; parent-side probes are configured on createTray separately.',
+          defaultValue: 'undefined',
+          optional: true,
+          type: 'IRpcProbe | readonly IRpcProbe[]',
+          whenToUse:
+            'Observe the child-side rpc connection; parent-side probes are configured on createTray separately.',
+          example: 'serveTrayHost(worker, { probe: countingProbe })'
+        },
+        {
+          name: 'options.report',
+          description:
+            'Receives child cleanup and crash diagnostics before the realm exits. The first deps.tray.exit decides clean or crash outcome.',
+          defaultValue: 'console.error',
+          optional: true,
+          type: '(error: unknown) => void',
+          whenToUse:
+            'Receives child cleanup and crash diagnostics before the realm exits. The first deps.tray.exit decides clean or crash outcome.',
+          example: 'serveTrayHost(worker, { report: console.error })'
+        }
+      ]
+    },
+    zh: {
+      purpose:
+        '通过父侧连接服务一个 Node Worker 或子进程 host。返回 Promise<void>；PluginHost 清理完成后才结束该 realm。',
+      quickStart:
+        "import { defineTrayHost, serveTrayHost } from '@migaia/tray'\n\nconst worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.mjs', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})\nconsole.log(worker.name, worker.runtime)\n// 仅在 Node Worker 入口调用此函数。\nexport const runWorkerEntry = () => serveTrayHost(worker, { report: console.error })",
+      scenarios: [
+        '在 Node Worker 或子进程入口导入共享 host 定义后调用。',
+        '配置子侧 probe，并在 realm 退出前报告清理或崩溃诊断。'
+      ],
+      avoidWhen: [
+        '代码在父 registry 中运行，或 host 使用 coroutine runtime。',
+        '入口运行于浏览器 Worker；当前入口只支持 Node Worker 与进程 realm。'
+      ],
+      options: [
+        {
+          name: 'definition',
+          description:
+            '传入本 realm 从共享定义模块导入的可信 thread 或 process host；coroutine 定义会被拒绝。',
+          defaultValue: '必填',
+          optional: false,
+          type: 'unknown（运行时校验为 ITrayHost）',
+          whenToUse:
+            '传入本 realm 从共享定义模块导入的可信 thread 或 process host；coroutine 定义会被拒绝。',
+          example: 'serveTrayHost(worker)'
+        },
+        {
+          name: 'options.probe',
+          description: '观察子侧 RPC 连接；父侧 probe 在 createTray 上单独配置。',
+          defaultValue: '未指定',
+          optional: true,
+          type: 'IRpcProbe | readonly IRpcProbe[]',
+          whenToUse: '观察子侧 RPC 连接；父侧 probe 在 createTray 上单独配置。',
+          example: 'serveTrayHost(worker, { probe: countingProbe })'
+        },
+        {
+          name: 'options.report',
+          description:
+            '在 realm 退出前接收子侧清理与崩溃诊断。第一次 deps.tray.exit 决定正常退出或崩溃结果。',
+          defaultValue: 'console.error',
+          optional: true,
+          type: '(error: unknown) => void',
+          whenToUse:
+            '在 realm 退出前接收子侧清理与崩溃诊断。第一次 deps.tray.exit 决定正常退出或崩溃结果。',
+          example: 'serveTrayHost(worker, { report: console.error })'
+        }
+      ]
+    }
+  },
+  'tray:index:leastInFlight': {
+    en: {
+      purpose:
+        'Routes each operation to the ready instance with the fewest pending business sends. Spawn order breaks ties; init and topic delivery never contribute to inFlight.',
+      quickStart:
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, leastInFlight } from '@migaia/tray'\n\nconst node = definePlugin({\n  name: 'node',\n  features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n  install: () => ({})\n})\nconst agent = defineTrayHost({\n  name: 'agent', plugins: () => [node] as const, exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\nawait tray.spawn('agent', { id: 'agent-1' })\nconsole.log(leastInFlight.name, await tray.routing.leastInFlight(agent).request('node.svc.hello'))\nconsole.log(await tray.routing('leastInFlight', agent).request('node.svc.hello'))\nawait tray.dispose()",
+      scenarios: [
+        'Distribute requests among ready instances of one host.',
+        'Use the same built-in policy from parent code or deps.tray without declaration.'
+      ],
+      avoidWhen: [
+        'The application requires failover or automatic retries.',
+        'The application requires durable or replayed topic delivery.'
+      ],
+      options: []
+    },
+    zh: {
+      purpose:
+        '选择待完成业务调用最少的 ready 实例，同数量时按生成顺序选择。init 和 topic delivery 不计入 inFlight。',
+      quickStart:
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, leastInFlight } from '@migaia/tray'\n\nconst node = definePlugin({\n  name: 'node',\n  features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n  install: () => ({})\n})\nconst agent = defineTrayHost({\n  name: 'agent', plugins: () => [node] as const, exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\nawait tray.spawn('agent', { id: 'agent-1' })\nconsole.log(leastInFlight.name, await tray.routing.leastInFlight(agent).request('node.svc.hello'))\nconsole.log(await tray.routing('leastInFlight', agent).request('node.svc.hello'))\nawait tray.dispose()",
+      scenarios: [
+        '在同一 host 的多个 ready 实例之间分配业务调用。',
+        '父侧和 deps.tray 使用同一内置策略，无需在 DSL 声明。'
+      ],
+      avoidWhen: ['需要自动故障转移或重试。', '需要持久化或重放 topic 消息。'],
+      options: []
+    }
+  },
+  'tray:index:roundRobin': {
+    en: {
+      purpose:
+        'Routes each operation cyclically through ready instances in spawn order. Both callable namespace forms share one host/policy sequence; no call is retried.',
+      quickStart:
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, roundRobin } from '@migaia/tray'\n\nconst node = definePlugin({\n  name: 'node',\n  features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n  install: () => ({})\n})\nconst agent = defineTrayHost({\n  name: 'agent', plugins: () => [node] as const, exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\nawait tray.spawn('agent', { id: 'agent-1' })\nconsole.log(roundRobin.name, await tray.routing.roundRobin(agent).request('node.svc.hello'))\nconsole.log(await tray.routing('roundRobin', agent).request('node.svc.hello'))\nawait tray.dispose()",
+      scenarios: [
+        'Distribute requests among ready instances of one host.',
+        'Use the same built-in policy from parent code or deps.tray without declaration.'
+      ],
+      avoidWhen: [
+        'The application requires failover or automatic retries.',
+        'The application requires durable or replayed topic delivery.'
+      ],
+      options: []
+    },
+    zh: {
+      purpose:
+        '按生成顺序循环选择 ready 实例。成员形式和 callable 形式共享同一 host/policy 顺序，每次业务操作选一次，不重试。',
+      quickStart:
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, roundRobin } from '@migaia/tray'\n\nconst node = definePlugin({\n  name: 'node',\n  features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n  install: () => ({})\n})\nconst agent = defineTrayHost({\n  name: 'agent', plugins: () => [node] as const, exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\nawait tray.spawn('agent', { id: 'agent-1' })\nconsole.log(roundRobin.name, await tray.routing.roundRobin(agent).request('node.svc.hello'))\nconsole.log(await tray.routing('roundRobin', agent).request('node.svc.hello'))\nawait tray.dispose()",
+      scenarios: [
+        '在同一 host 的多个 ready 实例之间分配业务调用。',
+        '父侧和 deps.tray 使用同一内置策略，无需在 DSL 声明。'
+      ],
+      avoidWhen: ['需要自动故障转移或重试。', '需要持久化或重放 topic 消息。'],
+      options: []
+    }
+  },
+  'tray:index:defineRoutingPolicy': {
+    en: {
+      purpose:
+        'Defines a frozen, branded ITrayRoutingPolicy<TName> identity with a private synchronous picker. Register it in createTray routing or a host DSL routing tuple; both namespace call forms execute the picker only on the parent.',
+      quickStart:
+        "import { defineRoutingPolicy, defineTrayHost } from '@migaia/tray'\n\nconst first = defineRoutingPolicy('first', (candidates) => candidates[0]!.id)\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [] as const,\n  exposes: [],\n  routing: [first]\n})\nconsole.log(first.name, agent.routing?.[0]?.name)",
+      scenarios: [
+        'Share a policy definition between a host DSL and its parent registry.',
+        'Retain a literal policy name in a host routing tuple while keeping its picker private.'
+      ],
+      avoidWhen: [
+        'The application needs automatic failover or retries; routing keeps one selected instance.',
+        'A policy needs an asynchronous picker; pick must return an instance id synchronously.'
+      ],
+      options: [
+        {
+          name: 'name',
+          description:
+            'Matches ^[a-z][A-Za-z0-9]*$ and excludes roundRobin, leastInFlight and reserved function/object property names. Invalid names throw TRAY_ROUTING_INVALID.',
+          defaultValue: 'required',
+          optional: false,
+          type: 'TName extends string',
+          whenToUse:
+            'Matches ^[a-z][A-Za-z0-9]*$ and excludes roundRobin, leastInFlight and reserved function/object property names. Invalid names throw TRAY_ROUTING_INVALID.',
+          example: "'first'"
+        },
+        {
+          name: 'pick',
+          description:
+            'Synchronous callback returns a candidate instance id. Context contains host and sequence. Definition does not invoke it; the parent invokes it once per routed operation.',
+          defaultValue: 'required',
+          optional: false,
+          type: '(candidates: readonly ITrayInstance[], context: ITrayRoutingContext) => string',
+          whenToUse:
+            'Synchronous callback returns a candidate instance id. Context contains host and sequence. Definition does not invoke it; the parent invokes it once per routed operation.',
+          example: '(candidates, context) => candidates[context.sequence % candidates.length]!.id'
+        }
+      ]
+    },
+    zh: {
+      purpose:
+        '定义冻结且带身份标记的 ITrayRoutingPolicy<TName>，内部保存同步选择回调。host 的 routing 元组使用此纯契约；在 createTray 的 routing 或 host DSL 元组注册后，两种命名空间形式都只在父侧执行回调。',
+      quickStart:
+        "import { defineRoutingPolicy, defineTrayHost } from '@migaia/tray'\n\nconst first = defineRoutingPolicy('first', (candidates) => candidates[0]!.id)\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [] as const,\n  exposes: [],\n  routing: [first]\n})\nconsole.log(first.name, agent.routing?.[0]?.name)",
+      scenarios: [
+        '在 host DSL 与父 registry 之间共享同一 policy 定义。',
+        '在 host 的 routing 元组中保留字面量 policy 名称，同时隐藏其选择回调。'
+      ],
+      avoidWhen: [
+        '应用需要自动故障转移或重试；路由始终保留本次选择。',
+        'policy 需要异步选择回调；pick 必须同步返回实例 id。'
+      ],
+      options: [
+        {
+          name: 'name',
+          description:
+            '须符合 ^[a-z][A-Za-z0-9]*$，且不能是 roundRobin、leastInFlight 或函数、对象的保留属性名；非法名称抛 TRAY_ROUTING_INVALID。',
+          defaultValue: '必填',
+          optional: false,
+          type: 'TName extends string',
+          whenToUse:
+            '须符合 ^[a-z][A-Za-z0-9]*$，且不能是 roundRobin、leastInFlight 或函数、对象的保留属性名；非法名称抛 TRAY_ROUTING_INVALID。',
+          example: "'first'"
+        },
+        {
+          name: 'pick',
+          description:
+            '同步返回候选实例 id；context 包含 host 与 sequence。定义阶段不调用回调，每次路由业务操作由父侧调用一次。',
+          defaultValue: '必填',
+          optional: false,
+          type: '(candidates: readonly ITrayInstance[], context: ITrayRoutingContext) => string',
+          whenToUse:
+            '同步返回候选实例 id；context 包含 host 与 sequence。定义阶段不调用回调，每次路由业务操作由父侧调用一次。',
+          example: '(candidates, context) => candidates[context.sequence % candidates.length]!.id'
+        }
+      ]
+    }
+  },
+  'tray:index:createTrayGraph': {
+    en: {
+      purpose:
         'Creates one immutable static composition root. It admits the complete entry graph synchronously, starts entries only after the first ready() call, and releases owned values and auxiliary resources in reverse dependency order.',
-      quickStart: `import { createTray, type ITrayKey } from '@migaia/tray'\n\nconst createClient = (config: { baseUrl: string }) => ({\n  run: async () => fetch(\`\${config.baseUrl}/health\`).then((response) => response.json())\n})\nconst configKey = 'config' as ITrayKey\nconst serviceKey = 'service' as ITrayKey\n\nconst tray = createTray([\n  { key: configKey, kind: 'value', start: () => ({ value: { baseUrl: '/api' }, release: () => undefined }) },\n  {\n    key: serviceKey,\n    kind: 'service',\n    requires: [configKey],\n    start: ({ get }) => ({ value: createClient(get(configKey)), release: () => undefined })\n  }\n])\n\ntry {\n  await tray.ready()\n  const service = tray.get(serviceKey)\n  await service.run()\n} finally {\n  await tray.dispose()\n}`,
+      quickStart: `import { createTrayGraph, type ITrayKey } from '@migaia/tray'\n\nconst createClient = (config: { baseUrl: string }) => ({\n  run: async () => fetch(\`\${config.baseUrl}/health\`).then((response) => response.json())\n})\nconst configKey = 'config' as ITrayKey\nconst serviceKey = 'service' as ITrayKey\n\nconst tray = createTrayGraph([\n  { key: configKey, kind: 'value', start: () => ({ value: { baseUrl: '/api' }, release: () => undefined }) },\n  {\n    key: serviceKey,\n    kind: 'service',\n    requires: [configKey],\n    start: ({ get }) => ({ value: createClient(get(configKey)), release: () => undefined })\n  }\n])\n\ntry {\n  await tray.ready()\n  const service = tray.get(serviceKey)\n  await service.run()\n} finally {\n  await tray.dispose()\n}`,
       scenarios: [
         'The complete set of configuration, services, resources, and derived values is known before startup.',
         'Entries must start after their declared dependencies and release in reverse dependency order.',
@@ -23692,8 +24282,8 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'required',
           optional: false,
           type: 'readonly ITrayEntryDefinition<unknown>[]',
-          whenToUse: 'Declare the entire static composition root before calling createTray().',
-          example: 'createTray([configEntry, serviceEntry])'
+          whenToUse: 'Declare the entire static composition root before calling createTrayGraph().',
+          example: 'createTrayGraph([configEntry, serviceEntry])'
         },
         {
           name: 'entries[].key',
@@ -23751,7 +24341,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '创建一个不可变静态组合根。它同步接纳完整 entry graph，只在首次 ready() 后启动，并按依赖逆序释放主 value 与辅助资源。',
-      quickStart: `import { createTray, type ITrayKey } from '@migaia/tray'\n\nconst createClient = (config: { baseUrl: string }) => ({\n  run: async () => fetch(\`\${config.baseUrl}/health\`).then((response) => response.json())\n})\nconst configKey = 'config' as ITrayKey\nconst serviceKey = 'service' as ITrayKey\n\nconst tray = createTray([\n  { key: configKey, kind: 'value', start: () => ({ value: { baseUrl: '/api' }, release: () => undefined }) },\n  {\n    key: serviceKey,\n    kind: 'service',\n    requires: [configKey],\n    start: ({ get }) => ({ value: createClient(get(configKey)), release: () => undefined })\n  }\n])\n\ntry {\n  await tray.ready()\n  const service = tray.get(serviceKey)\n  await service.run()\n} finally {\n  await tray.dispose()\n}`,
+      quickStart: `import { createTrayGraph, type ITrayKey } from '@migaia/tray'\n\nconst createClient = (config: { baseUrl: string }) => ({\n  run: async () => fetch(\`\${config.baseUrl}/health\`).then((response) => response.json())\n})\nconst configKey = 'config' as ITrayKey\nconst serviceKey = 'service' as ITrayKey\n\nconst tray = createTrayGraph([\n  { key: configKey, kind: 'value', start: () => ({ value: { baseUrl: '/api' }, release: () => undefined }) },\n  {\n    key: serviceKey,\n    kind: 'service',\n    requires: [configKey],\n    start: ({ get }) => ({ value: createClient(get(configKey)), release: () => undefined })\n  }\n])\n\ntry {\n  await tray.ready()\n  const service = tray.get(serviceKey)\n  await service.run()\n} finally {\n  await tray.dispose()\n}`,
       scenarios: [
         '配置、服务、资源与派生值的完整集合在启动前已经确定。',
         'entry 必须在声明依赖后启动，并按依赖逆序释放。',
@@ -23770,8 +24360,8 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: '必填',
           optional: false,
           type: 'readonly ITrayEntryDefinition<unknown>[]',
-          whenToUse: '调用 createTray() 前声明完整静态组合根。',
-          example: 'createTray([configEntry, serviceEntry])'
+          whenToUse: '调用 createTrayGraph() 前声明完整静态组合根。',
+          example: 'createTrayGraph([configEntry, serviceEntry])'
         },
         {
           name: 'entries[].key',
@@ -23833,7 +24423,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         'The application needs exact inferred extensions for a bounded literal plugin tuple and a dynamic facade beyond that budget.'
       ],
       avoidWhen: [
-        'The complete capability set is static before startup; createTray() is smaller and has no mutation layer.',
+        'The complete capability set is static before startup; createTrayGraph() is smaller and has no mutation layer.',
         'Callers intend to mutate the escaped concrete Host directly; that breaks Graph and Host receipt identity and fails closed.',
         'The host requires process isolation or forced termination rather than cooperative cancellation and cleanup.'
       ],
@@ -23925,7 +24515,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         '有限 literal 插件 tuple 需要 exact extension 推导，超出预算后需要 dynamic facade。'
       ],
       avoidWhen: [
-        '完整能力集合在启动前固定；createTray() 更小且没有 mutation 层。',
+        '完整能力集合在启动前固定；createTrayGraph() 更小且没有 mutation 层。',
         '调用方准备直接 mutation escaped concrete Host；这会破坏 Graph 与 Host receipt 身份并 fail closed。',
         '宿主需要进程隔离或强制终止，而不是协作取消与清理。'
       ],
@@ -24430,7 +25020,7 @@ try {
         'Shutdown must either wait for real callback settlement or return a bounded physical-completion observation.'
       ],
       avoidWhen: [
-        'The composition is immutable and callers only need createTray(), ready(), and get().',
+        'The composition is immutable and callers only need createTrayGraph(), ready(), and get().',
         'Work can ignore cancellation forever; same-realm JavaScript cannot be forcibly terminated by Runtime.',
         'The caller intends Runtime disposal to dispose the managed Host; those ownership boundaries are separate.'
       ],
@@ -24524,7 +25114,7 @@ try {
         '关闭时需要等待任务真实结束，或在有界等待后继续观察物理清理结果。'
       ],
       avoidWhen: [
-        '组合在启动前已经固定，调用方只需要 createTray()、ready() 与 get()。',
+        '组合在启动前已经固定，调用方只需要 createTrayGraph()、ready() 与 get()。',
         '任务会永久忽略取消；Runtime 无法强制终止同一 JavaScript realm 内不合作的代码。',
         '调用方希望释放 Runtime 时顺便释放 Host；二者的所有权边界彼此独立。'
       ],
@@ -25228,6 +25818,60 @@ try {
           type: 'ILoggerRuntimeManager["fetch"]',
           whenToUse: '没有合适全局 fetch 的宿主在安装 HTTP 插件前提供。',
           example: 'setLoggerRuntimeManager({ ...manager, fetch: (url, init) => fetch(url, init) })'
+        }
+      ]
+    }
+  },
+  /** The public dependency reader projects the same Feature graph used by admission and install. */
+  'plugin-host:index:readPluginDependencies': {
+    en: {
+      purpose:
+        'Reads a readonly provider dependency list from a plugin or its composition admission, including nested local Feature dependencies. Providers keep first-reference order and required references win over optional references. An admission reuses its captured definition without calling getters; other inputs use one canonical admission snapshot. Reading runs no setup, install, or Feature factory, and admission errors pass through unchanged.',
+      quickStart: `import { defineFeature, definePlugin, PluginHost, readPluginDependencies } from '@migaia/plugin-host'\nimport { openComposition } from '@migaia/plugin-host/composition'\n\nconst config = definePlugin({\n  name: 'config',\n  features: { value: defineFeature(() => ({ value: 'ready' })) },\n  install: () => ({})\n})\nconst metrics = definePlugin({\n  name: 'metrics',\n  features: { value: defineFeature(() => ({ value: 0 })) },\n  install: () => ({})\n})\nconst required = defineFeature(() => ({}), { config: config.getFeature('value') })\nconst optional = defineFeature(() => ({}), {\n  config: config.getFeature('value', { optional: true }),\n  metrics: metrics.getFeature('value', { optional: true })\n})\nconst descriptor = { name: 'consumer', features: { required, optional }, install: () => ({}) }\nconst consumer = definePlugin(descriptor)\nconsole.log(readPluginDependencies(consumer))\nconsole.log(readPluginDependencies(descriptor))\n// Both return [{ provider: 'config', required: true }, { provider: 'metrics', required: false }].\n\nconst host = new PluginHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n})\ntry {\n  const admission = openComposition(host).createPluginAdmission(descriptor)\n  console.log(readPluginDependencies(admission))\n} finally {\n  await host.dispose()\n}`,
+      scenarios: [
+        'Inspect required and optional providers before installing a plugin, using the same Feature closure as PluginHost.',
+        'A composition layer already captured an admission and must read its dependencies without reading a stateful descriptor getter again.'
+      ],
+      avoidWhen: [
+        'You need current provider availability or plugin readiness; this list describes declared dependencies, not live Host state.',
+        'You need to run a Feature or install a plugin; use the Host lifecycle and Feature operations for those actions.'
+      ],
+      options: [
+        {
+          name: 'plugin',
+          description:
+            'A definePlugin result, a valid raw plugin descriptor, or an admission returned by openComposition(host).createPluginAdmission(plugin). Invalid input throws the canonical admission error with its native type, identity, stack, source, and code unchanged.',
+          defaultValue: 'required',
+          optional: false,
+          type: 'unknown',
+          whenToUse:
+            'Pass the admission when dependency projection and installation must share one snapshot; otherwise pass the plugin input directly.',
+          example: 'readPluginDependencies(admission)'
+        }
+      ]
+    },
+    zh: {
+      purpose:
+        '从插件或其 composition admission 读取只读 provider 依赖列表，包含本地 Feature 的完整依赖闭包。结果按首次引用排序，同一 provider 的必需引用优先于可选引用。admission 形式复用已捕获的定义，不调用 getter；其他输入使用一次规范 admission 快照。读取不会执行 setup、install 或 Feature 工厂，admission 错误原样传出。',
+      quickStart: `import { defineFeature, definePlugin, PluginHost, readPluginDependencies } from '@migaia/plugin-host'\nimport { openComposition } from '@migaia/plugin-host/composition'\n\nconst config = definePlugin({\n  name: 'config',\n  features: { value: defineFeature(() => ({ value: 'ready' })) },\n  install: () => ({})\n})\nconst metrics = definePlugin({\n  name: 'metrics',\n  features: { value: defineFeature(() => ({ value: 0 })) },\n  install: () => ({})\n})\nconst required = defineFeature(() => ({}), { config: config.getFeature('value') })\nconst optional = defineFeature(() => ({}), {\n  config: config.getFeature('value', { optional: true }),\n  metrics: metrics.getFeature('value', { optional: true })\n})\nconst descriptor = { name: 'consumer', features: { required, optional }, install: () => ({}) }\nconst consumer = definePlugin(descriptor)\nconsole.log(readPluginDependencies(consumer))\nconsole.log(readPluginDependencies(descriptor))\n// 两种输入都返回 [{ provider: 'config', required: true }, { provider: 'metrics', required: false }]。\n\nconst host = new PluginHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n})\ntry {\n  const admission = openComposition(host).createPluginAdmission(descriptor)\n  console.log(readPluginDependencies(admission))\n} finally {\n  await host.dispose()\n}`,
+      scenarios: [
+        '安装插件前，使用 PluginHost 相同的 Feature 闭包检查必需与可选 provider。',
+        '组合层已捕获 admission，需要读取其依赖，又不能再次触发原始描述符的有状态 getter。'
+      ],
+      avoidWhen: [
+        '需要查询 provider 当前可用性或插件就绪状态；列表描述声明的依赖，不代表 Host 的实时状态。',
+        '需要执行 Feature 或安装插件；这些操作应使用 Host 生命周期与 Feature 入口。'
+      ],
+      options: [
+        {
+          name: 'plugin',
+          description:
+            'definePlugin 结果、有效原始插件描述符，或 openComposition(host).createPluginAdmission(plugin) 返回的 admission。无效输入直接抛规范 admission 错误，保留原生类型、对象身份、stack、source 和 code。',
+          defaultValue: '必填',
+          optional: false,
+          type: 'unknown',
+          whenToUse: '依赖投影与安装必须共享同一快照时传 admission；否则直接传插件输入。',
+          example: 'readPluginDependencies(admission)'
         }
       ]
     }

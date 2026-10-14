@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import * as runtimePeerOwner from '../../../rpc-core/dist/remote/runtime-api/peer.js'
 import { readRuntimePreparationContext } from '../../../rpc-core/dist/remote/runtime-api/launch-context.js'
 import type { IRemoteChannelResources } from '../../../rpc-core/dist/remote/types.js'
@@ -55,7 +56,6 @@ import type { ProviderAdmissionRegistry } from '../../../rpc-core/dist/core/inte
 import type { IProviderAdmissionScope } from '../../../rpc-core/dist/core/internal/provider-admission.js'
 import type { RequestReplayLedger } from '../../../rpc-core/dist/core/internal/request-replay-ledger.js'
 import { EndpointOwnerKey } from '../../../rpc-core/dist/core/endpoint-kernel.js'
-import type { IRpcAbortSignal } from '../../../rpc-core/dist/core/typing.js'
 import { RpcError, RpcCoreErrorCode } from '../../../rpc-core/dist/core/errors.js'
 import { RpcCoreErrorText } from '../../../rpc-core/dist/core/error-text.js'
 import type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract'
@@ -942,7 +942,7 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
     const owners = [owner(), owner(), owner()] as const
     const carriers: ReturnType<typeof runtimeSources>[] = []
     /** C holds its actual business completion after its start point. */
-    let signal: IRpcAbortSignal | undefined
+    let signal: IAbortSignal | undefined
     let effects = 0
     let release!: () => void
     const held = new Promise<void>((resolve) => {
@@ -971,7 +971,7 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
           {
             provide: {
               service: {
-                value: async (_payload: unknown, context: { signal: IRpcAbortSignal }) => {
+                value: async (_payload: unknown, context: { signal: IAbortSignal }) => {
                   effects++
                   signal = context.signal
                   await held
@@ -982,7 +982,7 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
                   )
                   return 42
                 },
-                values: (_payload: unknown, context: { signal: IRpcAbortSignal }) => {
+                values: (_payload: unknown, context: { signal: IAbortSignal }) => {
                   effects++
                   signal = context.signal
                   return (async function* () {
