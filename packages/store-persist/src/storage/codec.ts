@@ -27,8 +27,9 @@ function legacyReviver(_key: string, value: unknown): unknown {
 }
 
 /**
- * 默认 codec：等价于 storage-web 的 `jsonCodec` 再加 Map/Set 往返支持——本包不 import `@migaia/storage-web`
- * 的具体值，只按结构复刻这一份零依赖实现，避免让"默认 codec 是什么"这件事 额外背上一条运行时依赖。
+ * Provides the default JSON codec with round-trip support for `Map` and `Set`. It delegates to
+ * `storage-contract`'s `collectionsJsonCodec` and also reads legacy collection tags. The package
+ * does not depend on concrete `@migaia/storage-web` values.
  */
 export const defaultJsonCodec: ICodec = Object.freeze({
   name: COLLECTIONS_JSON_CODEC_NAME,

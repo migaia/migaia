@@ -1,22 +1,26 @@
 /**
- * Storage-web 内部 operation cleanup 观测机制（不进 storage-contract、不对外暴露、不用全局 singleton）。
- *
- * 契约见 `docs/store-persist/storage-web-integration.sdd.md` §4.4：`removeEventListener` 的 cleanup
- * 失败不抛、 不改变主操作结果，但必须经 reporter 观测（AGENTS.md「catch 不重抛必须 report」）。
+ * Observes operation cleanup failures within storage-web. Stays outside storage-contract and the
+ * public package API, with no global singleton. Enforces
+ * `docs/store-persist/storage-web-integration.sdd.md` §4.4: `removeEventListener` cleanup failures
+ * do not throw or alter the primary operation result. A reporter observes them, as required by the
+ * AGENTS.md rule for catches that do not rethrow.
  */
 export type IStorageOperationReporter = (error: unknown) => void | PromiseLike<void>
 
-/** 内部传播载体：每次 operation 一个 runtime，沿内部调用链传递。 */
+/** Carries one runtime per operation through the internal call chain. */
 export type IStorageOperationRuntime = {
   readonly reporter: IStorageOperationReporter
 }
 
-/** 默认 reporter：直接进入最后诊断边界（web adapter 允许 console）。 */
+/**
+ * Creates the default reporter at the final diagnostic boundary, where the web adapter may use
+ * `console`.
+ */
 export function createStorageOperationReporter(): IStorageOperationReporter {
   return (error) => console.error('[storage-web] operation cleanup failed', error)
 }
 
-/** 每个 public operation 入口创建一次，非 singleton。 */
+/** Creates one runtime at each public operation entry. Does not share a singleton. */
 export function createStorageOperationRuntime(): IStorageOperationRuntime {
   return { reporter: createStorageOperationReporter() }
 }
@@ -31,7 +35,10 @@ function reportReporterFailure(error: unknown): void {
   }
 }
 
-/** 统一观测入口：cleanup 错误经 primary reporter 观测；同步抛错或异步拒绝走 fallback。 */
+/**
+ * Reports cleanup failures through the primary reporter. Falls back if the reporter throws or
+ * rejects.
+ */
 export function reportCleanupError(reporter: IStorageOperationReporter, error: unknown): void {
   let result: void | PromiseLike<void>
   try {

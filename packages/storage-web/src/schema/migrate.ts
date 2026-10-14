@@ -19,12 +19,13 @@ export type IMigrationContext = {
   readonly signal?: IWebAbortSignal
 }
 
-/** 迁移函数一律 async，允许迁移过程中读取其他存储或发请求。 */
+/** Runs migrations asynchronously so they can read other storage or make requests. */
 export type IMigration = (previous: unknown, ctx: IMigrationContext) => Promise<unknown>
 
 /**
- * 公开入口：创建新 runtime（一次 operation 一个 reporter），见 `docs/store-persist/storage-web-integration.sdd.md`
- * §4.4「公开 API 兼作内部步骤的拆分」。
+ * Creates a new runtime at the public entry, with one reporter per operation. See
+ * `docs/store-persist/storage-web-integration.sdd.md` §4.4 on separating public APIs from their
+ * internal steps.
  */
 export const runMigrations = async (
   value: unknown,
@@ -38,10 +39,10 @@ export const runMigrations = async (
 }
 
 /**
- * 内部实现：接收所属 operation 的 runtime，不自行创建第二个 reporter。
- *
- * 按序执行 `fromVersion → toVersion` 之间声明的迁移。缺失某一版本的迁移函数 视为该版本没有数据形状变化（no-op），不是错误。单条记录迁移失败不影响
- * 其他记录——调用方负责逐条捕获，这里只保证单次调用内的错误归一化。
+ * Uses the owning operation's runtime without creating another reporter. Runs declared migrations
+ * in order from `fromVersion` to `toVersion`. A missing version's migration means the data shape is
+ * unchanged and is a no-op. A failure for one record does not affect other records because the
+ * caller catches failures per record. This function normalizes errors within one call.
  */
 export const runMigrationsWithRuntime = async (
   runtime: IStorageOperationRuntime,

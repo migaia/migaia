@@ -15,10 +15,11 @@ type IRuntimeFieldSource = {
 }
 
 /**
- * 为扩展层创建一条受控 Source。
+ * Creates a controlled source for extension layers.
  *
- * 调用方只拿到 track/notify/dispose 三个能力，拿不到 node、subs、version 或 Tracker， 因而不能制造单边依赖、伪造版本、通知另一张 Runtime
- * 图。
+ * Callers receive `track`, `notify`, `commit`, `dispose`, and read-only observation and disposal
+ * state. The node, `subs`, `version`, and tracker stay private. Callers cannot create one-sided
+ * edges, fabricate versions, or notify another runtime's graph.
  */
 export function createFieldSource(runtime: IRuntime, debugName?: string): IRuntimeFieldSource {
   const node: IObservable = {

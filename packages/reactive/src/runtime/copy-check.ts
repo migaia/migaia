@@ -92,7 +92,7 @@ function registryOf(create: boolean): IRegistry | undefined {
 /** 节点上的跨副本诊断品牌；真正的归属权威仍是每份模块私有的 WeakMap。 */
 const ownershipCopyKey = (): symbol => Symbol.for('@morning-watch/store.ownership-copy')
 
-/** 为本副本创建的受管对象加不可变品牌，供另一份模块 fail closed。 */
+/** Brands objects managed by this library copy immutably so another copy rejects foreign ownership. */
 export function brandOwnedValue(value: object): void {
   const key = ownershipCopyKey()
   const descriptor = Object.getOwnPropertyDescriptor(value, key)
@@ -116,7 +116,10 @@ export function brandOwnedValue(value: object): void {
   })
 }
 
-/** 本地 WeakMap miss 时识别另一副本的受管对象，避免把它降级成普通值放行。 */
+/**
+ * Detects managed objects from another copy after a local WeakMap miss instead of accepting them as
+ * ordinary values.
+ */
 export function assertNoForeignOwnershipBrand(value: object): void {
   const descriptor = Object.getOwnPropertyDescriptor(value, ownershipCopyKey())
   if (!descriptor) return
@@ -141,7 +144,7 @@ export function assertNoForeignOwnershipBrand(value: object): void {
  */
 let pendingCopyWarning: string | undefined
 
-/** 取出并清空待上报的多副本诊断；Runtime 构造时消费。 */
+/** Returns and clears the pending multiple-copy diagnostic. Runtime construction consumes it. */
 export const consumePendingCopyWarning = (): string | undefined => {
   const warning = pendingCopyWarning
   pendingCopyWarning = undefined
@@ -149,9 +152,11 @@ export const consumePendingCopyWarning = (): string | undefined => {
 }
 
 /**
- * 登记本副本。`createRuntime()` 与所有权/内部面边界调用，幂等且有本地 fast path。
+ * Registers this library copy at `createRuntime()` and ownership or internals boundaries.
+ * Registration is idempotent and uses a local fast path.
  *
- * `copy` 参数只为测试模拟「另一份模块」——生产路径永远用本副本的身份。
+ * The `copy` parameter lets tests simulate another module copy. Production paths always use this
+ * copy's identity.
  */
 export function noteRuntimeCopy(copy: symbol = THIS_COPY): void {
   if (copy === THIS_COPY && thisCopyNoted) return
@@ -164,13 +169,17 @@ export function noteRuntimeCopy(copy: symbol = THIS_COPY): void {
   }
 }
 
-/** 当前进程里已进入 Runtime/所有权正确性边界的副本数。单纯 import 不计数。 */
+/**
+ * Returns the number of copies that enter runtime or ownership correctness boundaries. Importing
+ * alone does not count.
+ */
 export const runtimeCopyCount = (): number => registryOf(false)?.copies.size ?? 0
 
 /**
- * 要求单副本，否则抛错。
+ * Throws unless the process uses a single registered library copy.
  *
- * 给「宁可启动失败也不要静默陈旧数据」的应用用。库自身不调用它——是否可接受多副本 是部署决策，不是库能替调用方做的判断。
+ * Applications can choose startup failure over undetected stale data. The library does not call
+ * this itself because accepting multiple copies is a deployment decision.
  */
 export function assertSingleRuntimeCopy(): void {
   // 调用断言的只读副本也算一份；否则「另一份已登记 + 本副本未建 Runtime」会误判。
@@ -184,7 +193,7 @@ export function assertSingleRuntimeCopy(): void {
   }
 }
 
-/** 仅供测试：清掉模拟出来的副本，避免用例之间互相影响。 */
+/** Clears simulated library copies for tests so cases do not affect each other. */
 export function resetRuntimeCopiesForTest(): void {
   Reflect.deleteProperty(globalThis, registryKey())
   thisCopyNoted = false

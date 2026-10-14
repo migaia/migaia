@@ -13,7 +13,10 @@ import type {
 } from './context.js'
 import type { ITransactionScope } from './transaction.js'
 
-/** 同步通道。仅同步后端提供；由该后端的实现直接驱动，异步方法是它的薄包装。 */
+/**
+ * Exposes the synchronous channel only on synchronous backends. The backend drives it directly, and
+ * asynchronous methods wrap it.
+ */
 export type ISyncKeyValueStore = {
   get(key: string): string | null
   set(key: string, value: string, options?: ISyncWriteOptions): void
@@ -23,7 +26,7 @@ export type ISyncKeyValueStore = {
   clearValues(): void
 }
 
-/** L0：所有后端都实现的字符串键值通道。 */
+/** Defines the L0 string key-value channel implemented by every backend. */
 export type IKeyValueStore = {
   readonly backend: IBackendKind
   readonly capabilities: IStorageCapabilities
@@ -37,19 +40,22 @@ export type IKeyValueStore = {
   clearAll(ctx?: IOperationContext): Promise<void>
   dispose(): Promise<void>
 
-  /** 仅同步后端提供；IndexedDB 等异步后端上为 undefined。 */
+  /**
+   * Exists only on synchronous backends. Asynchronous backends such as IndexedDB expose
+   * `undefined`.
+   */
   readonly sync?: ISyncKeyValueStore
 }
 
 /**
- * 把某个 `IKeyValueStore` 变体的 `sync` 字段从 optional 收紧成必然存在。
- * localStorage/sessionStorage/memoryStorage/cookies 这些同步后端的工厂函数用它标注返回类型。
+ * Requires the `sync` channel on a variant of `IKeyValueStore`. Factory functions for localStorage,
+ * sessionStorage, memoryStorage, and cookies use it for their return types.
  */
 export type ISyncCapableStore<TStore extends { readonly sync?: object }> = TStore & {
   readonly sync: NonNullable<TStore['sync']>
 }
 
-/** L1：结构化后端额外提供的字节与对象通道。 */
+/** Defines the additional L1 byte and object channels supplied by structured backends. */
 export type IRecordStore<TValue = unknown> = IKeyValueStore & {
   getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>
   setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>
@@ -232,7 +238,10 @@ export const snapshotRecordStore = <T = unknown>(
 export const isKeyValueStore = (store: unknown): store is IKeyValueStore =>
   inspectStoreShape(store, false).valid
 
-/** 运行时收窄到 IRecordStore；能力或最小方法形状不足时立即抛契约级 unsupported。 */
+/**
+ * Narrows a store to `IRecordStore` at runtime. Immediately throws the contract `unsupported` error
+ * when capabilities or required methods are missing.
+ */
 export const asRecordStore = <T = unknown>(store: IKeyValueStore): IRecordStore<T> => {
   const inspection = inspectStoreShape(store, true)
   if (!inspection.valid)

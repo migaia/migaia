@@ -19,9 +19,9 @@ import {
 import { ReactiveErrorText } from '../error-text.js'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 
-// 可写原子——反应式图里唯一的"真值来源"，Computed/Effect 都是从它（或从彼此）派生。
-// 每个节点持有自己的 runtime：同一 runtime 内的节点才共享依赖图/版本时钟。
-// 只通过 type 引用 runtime（不 import 任何 runtime 值），彻底断开与 Runtime 类的循环依赖。
+// Writable atom: the source value from which `Computed` and `Effect` derive their results.
+// Each node owns a runtime reference. Only nodes in the same runtime share a graph and version clock.
+// The runtime type import avoids a runtime dependency on the concrete `Runtime` class.
 export class Signal<T> implements IObservable, IDisposable {
   #subs = new Set<IObserver>()
   readonly subs: ReadonlySet<IObserver>
@@ -103,16 +103,18 @@ export class Signal<T> implements IObservable, IDisposable {
   peek(): T {
     this.#assertActive()
     return this.#value
-  } // 不建立依赖读取
+  } // Reads without creating a dependency.
 
   /**
-   * 释放：断开全部下游边。
+   * Disposes the signal and disconnects all downstream edges.
    *
-   * Computed 与 Effect 一直有 dispose，Signal 没有——于是任何「我建的源节点用完了」 的场景（collections 的 per-cell、AtomStore
-   * 的实例释放）只能去 import `runtime/internals` 拿 tracker 自己断边，也就是为了一个本该公开的操作而拿到
-   * 整张图的权限。补齐这个对称性之后，那些豁免就不必要了。
+   * This public operation gives source owners, such as collection cells and `AtomStore` instances,
+   * a release path without importing `runtime/internals` and gaining access to the whole graph.
+   * `Computed` and `Effect` expose the same lifecycle operation.
    *
-   * 语义与 Computed 一致：释放是终态。先标记 disposed 再通知下游，强制重跑的 Effect 因此会读到明确错误，而不会重新订阅这个已释放节点。
+   * Disposal is terminal, as it is for `Computed`. The signal is marked disposed before downstream
+   * notification. A forced effect rerun therefore reads an explicit error instead of resubscribing
+   * to a disposed node.
    */
   dispose(): void {
     if (this.#disposed) return

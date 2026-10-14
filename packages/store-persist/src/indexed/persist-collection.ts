@@ -5,9 +5,10 @@ import type { IPersistHandle, IPersistStorage, IPersistUnit } from '../core/type
 import { snapshotPersistOptions } from '../core/options.js'
 
 /**
- * `persistCollection()` 支持的四种 store-indexed 集合。全部都有 `snapshot()`（tracked 读， 内部读了一个结构性 Signal，包进
- * `runtime.effect()` 就能感知任何结构变化）与 `replace(state)`（原子整体替换——`ObservableMap`/`ObservableSet`
- * 的这个方法是本轮跟这份 SDD 一起补的，之前只有 `ObservableObject`/`ObservableArray` 有）。
+ * Supports the four `store-indexed` collections through snapshots and whole-state replacement.
+ * `snapshot()` tracks a structural signal, so `runtime.effect()` observes structural changes.
+ * `replace(state)` atomically replaces the complete state. `ObservableMap` and `ObservableSet` add
+ * the same replacement capability already available on `ObservableObject` and `ObservableArray`.
  */
 export type IPersistableCollection<TState> = {
   readonly runtime: IRuntime
@@ -47,9 +48,9 @@ function toPersistUnit<TState>(collection: IPersistableCollection<TState>): IPer
   }
 }
 
-// 不用重载——四种集合各自的 snapshot()/replace() 具体类型不同，但都结构性满足
-// IPersistableCollection<TState>，直接让 TS 从传入的 collection 参数推导 TState，
-// 比为每种集合单独写一条重载签名更简单，也不会撞上"重载签名跟实现签名不兼容"这类噪音。
+// Each collection provides its own `snapshot()` and `replace()` types and structurally satisfies `IPersistableCollection`.
+// TypeScript infers the state type from the collection instead of requiring overloads for each collection.
+// This avoids overload and implementation signature mismatches.
 export function persistCollection<TState>(
   collection: IPersistableCollection<TState>,
   options: IPersistCollectionOptions<TState>

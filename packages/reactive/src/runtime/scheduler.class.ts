@@ -28,7 +28,7 @@ const attachCauseSafely = (error: Error, cause: unknown): boolean => {
   }
 }
 
-// 调度器：待冲刷队列、批处理深度、冲刷状态、可插拔触发策略全部收在这一个类里。
+// Owns the pending flush queue, batch depth, flush state, and replaceable trigger strategy.
 export class Scheduler {
   /**
    * 自触发环保护：effect 写了自己也读的 signal 会导致无限重入。
@@ -84,18 +84,21 @@ export class Scheduler {
     this.#strategy = strategy
   }
 
-  /** 把一项加入待冲刷队列；不在批处理里就立刻申请一次冲刷 */
+  /** Enqueues an item and requests a flush immediately when no batch is active. */
   enqueue(item: IFlushable): void {
     this.#queued.add(item)
     if (this.batchDepth === 0) this.requestFlush()
   }
 
-  /** 从队列移除（比如 effect dispose 时，避免已销毁的实例还留在队列里） */
+  /** Removes an item from the queue, for example when an effect is disposed. */
   dequeue(item: IFlushable): void {
     this.#queued.delete(item)
   }
 
-  /** 申请一次冲刷——signal 写入/notifySource 也会各自调用它； 重复调用是安全的，scheduled/flushing 两个标记天然去重，不会重复触发 */
+  /**
+   * Requests a flush. Signal writes and source notifications also use this path. Scheduling and
+   * flushing flags deduplicate repeated requests.
+   */
   requestFlush(): void {
     if (this.#scheduled || this.#flushing) return
     this.#scheduled = true
@@ -200,10 +203,11 @@ export class Scheduler {
   }
 
   /**
-   * 冲刷全部待执行项（合并为一轮）。
+   * Flushes all pending items as one scheduling transaction.
    *
-   * 冲刷期间重入返回 `deferred`。最外层 while 最终仍会排空新加入的队列，但内层 `flush()` 无法兑现「返回时本次待办已经执行」；返回判别值让调用方看见这个
-   * 差异，同时不把合法的 action/devtools 重入升级成 observer 错误。
+   * A reentrant call during flushing returns `deferred`. The outer loop drains newly enqueued work,
+   * but the inner call cannot promise completion before returning. The result exposes this
+   * distinction without treating valid action or DevTools reentrancy as an observer failure.
    */
   flush(): IFlushResult {
     if (this.#flushing) return 'deferred'
@@ -258,8 +262,12 @@ export class Scheduler {
   }
 
   /**
-   * 显式批处理：进入时计深度，最外层退出才真正冲刷一次。 错误优先级：若 fn（业务动作）抛错 A，且随后 flush 又抛错 B，优先抛出业务错误 A（B 附在 cause 上），
-   * 避免原始业务错误被 finally 里的 flush 错误覆盖掉。
+   * Runs an explicit batch. Entry increments batch depth; only the outermost exit flushes.
+   *
+   * If the business action throws and the final flush also fails, the business error takes
+   * priority. When that error accepts a `cause`, the flush error is attached without replacing it.
+   * Otherwise an aggregate retains both original failures, so final cleanup cannot hide the
+   * business failure.
    */
   runBatched<T>(fn: () => T): T {
     this.batchDepth++

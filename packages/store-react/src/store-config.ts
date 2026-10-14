@@ -6,41 +6,56 @@ import { EMPTY_EXPERIMENTAL_ENCODING, StoreProviderState } from './provider-stat
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 /**
- * 应用级 Store 配置（挂在 StoreProvider 上）。
+ * Configures application features and readiness on `StoreProvider`.
  *
- * 与 Runtime / AtomStore 隔离正交： - Provider 的 registry/runtime = 图的所有权 - config = 这棵树声明要哪些增强、就绪前是否挡住子树
+ * Provider registries and runtimes own the graph independently of this configuration. The
+ * configuration selects enhancements and whether readiness blocks the subtree.
  *
- * `features.wasm === true` 时必须同时提供 `ready`（通常放入 `ensureWasm` from
- * `@migaia/store-wasm`），否则在开发期直接抛错——避免「开了开关却没人 init」。
+ * When `features.wasm === true`, supply `ready`, usually with `ensureWasm` from
+ * `@migaia/store-wasm`. Without a barrier, normalization creates a rejected readiness promise, and
+ * the provider reports the configuration error before rendering its subtree.
  */
 
 export type IStoreFeatureExperimental = Readonly<Record<string, boolean>>
 
 export type IStoreFeatures = {
-  /** 声明本树会使用 wasm 字段。 默认 false：不强制就绪屏障。 true：必须配合 `ready` 完成 init（见 StoreProvider）。 */
+  /**
+   * Declares that the subtree uses WASM fields. Defaults to `false`, which requires no readiness
+   * barrier. When `true`, `ready` must complete initialization before the provider renders its
+   * subtree.
+   */
   readonly wasm?: boolean
-  /** 实验特性白名单。未列出或非严格 `true` 视为关闭。 实验 API 应 `assertStoreFeature('experimental.xxx')`。 */
+  /**
+   * Allows experimental features only when their entry is exactly `true`. Missing entries are
+   * disabled. Experimental APIs check `assertStoreFeature('experimental.xxx')`.
+   */
   readonly experimental?: IStoreFeatureExperimental
 }
 
-/** 就绪屏障：Promise 或零参工厂（便于传 `ensureWasm`）。 */
+/** Provides a readiness promise or a zero-argument factory, such as `ensureWasm`. */
 export type IStoreReadyBarrier = Promise<unknown> | (() => Promise<unknown> | unknown)
 
 export type IStoreProviderDefaults = {
   /**
-   * 仅挂在 config 快照上供业务读取（useStoreConfig）， **不会**自动传给 createStore——createStore 仍要自己写
-   * options.warnAsyncActions。
+   * Exposes a default in the configuration snapshot for application code using `useStoreConfig`. It
+   * is not forwarded to `createStore`; set `options.warnAsyncActions` there explicitly.
    */
   readonly warnAsyncActions?: boolean
 }
 
 export type IStoreProviderConfig = {
   readonly features?: IStoreFeatures
-  /** 子树渲染前必须 settle 的屏障。 例：`ready: [ensureWasm]`（从 `@migaia/store-wasm` 引入）。 */
+  /**
+   * Requires all barriers to fulfill before the subtree renders. For example, use `ready:
+   * [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`.
+   */
   readonly ready?: readonly IStoreReadyBarrier[]
-  /** 屏障未完成时的占位。 */
+  /** Displays this fallback while readiness barriers are pending. */
   readonly fallback?: ReactNode
-  /** 只读业务默认值快照；Provider 不会把这些值自动写入各 Store。 */
+  /**
+   * Exposes a read-only snapshot of application defaults. The provider does not apply them to
+   * individual stores.
+   */
   readonly defaults?: IStoreProviderDefaults
 }
 
@@ -48,7 +63,10 @@ export type IReadyStatus = (typeof StoreProviderState)[keyof typeof StoreProvide
 
 export type ITrackedReady = {
   readonly promise: Promise<void>
-  /** 同步可读；已 settle 的 Promise 在 track 后于微任务内更新，首帧可能仍 pending。 */
+  /**
+   * Reads status synchronously. Tracking an already settled promise updates status in a microtask,
+   * so the first frame may still be pending.
+   */
   status(): IReadyStatus
   error(): unknown
 }
@@ -59,7 +77,7 @@ export type IStoreConfigValue = {
     readonly experimental: Readonly<Record<string, boolean>>
   }
   readonly defaults: IStoreProviderDefaults
-  /** 归一化后的就绪跟踪；无屏障时为 null。 */
+  /** Provides normalized readiness tracking, or `null` when no barrier exists. */
   readonly ready: ITrackedReady | null
 }
 
@@ -286,19 +304,28 @@ export function assertStoreFeature(
   }
 }
 
-/** 完整配置；无 Provider 时返回 null（与 registry 不同，配置是可选的）。 */
+/**
+ * Returns the complete configuration, or `null` without a provider. Configuration is optional,
+ * unlike the registry.
+ */
 export function useStoreConfig(): IStoreConfigValue | null {
   return useContext(StoreConfigContext)
 }
 
-/** 查询特性开关。 - 无 Provider：一律 false（不抛），便于可选增强 - 有 Provider：读归一化后的 features */
+/**
+ * Reads normalized feature flags from the provider. Returns `false` without a provider instead of
+ * throwing.
+ */
 export function useStoreFeature(path: IStoreFeaturePath): boolean {
   const config = useStoreConfig()
   if (!config) return false
   return readStoreFeature(config, path)
 }
 
-/** 实验 / 增强 API 入口处调用：未开启则抛明确错误。 无 Provider 也抛（实验 API 不允许「默默在树外半开」）。 */
+/**
+ * Guards an experimental or enhanced API at its entry point. Throws when the feature is disabled or
+ * no provider exists.
+ */
 export function useAssertStoreFeature(path: IStoreFeaturePath, apiName?: string): void {
   const config = useStoreConfig()
   assertStoreFeature(config, path, apiName)

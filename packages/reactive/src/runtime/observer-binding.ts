@@ -7,36 +7,38 @@ import { ReactiveErrorCode } from '../error-code.js'
 import { ReactiveErrorText } from '../error-text.js'
 
 /**
- * 一次捕获提交的完整结果。
+ * Outcome of a capture commit.
  *
- * - `committed`：依赖边已安装；
- * - `stale`：捕获后依赖已变化，token 已消费，必须重新捕获；
- * - `no-observer`：提交目标尚不存在，token 未消费，可在 observer 就绪后重试。
+ * - `committed`: dependency edges are installed.
+ * - `stale`: dependencies change after capture; the token is consumed and requires a fresh capture.
+ * - `no-observer`: the target does not exist yet; the token remains reusable when the observer is
+ *   ready.
  */
 export type IObserverCommitResult = 'committed' | 'stale' | 'no-observer'
 export type IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer'
 
 /**
- * 三段式绑定的公开接口。
+ * Public interface for capture, observation, and commit.
  *
- * 并发安全的宿主适配层都要做同一件事：**render 期只读地捕获依赖，commit 期才把这份 依赖装到订阅者上**。中间的渲染可能被 React 丢弃，所以捕获不能建边；而 commit 时
- * 依赖可能已经变了，所以提交必须能失败并让调用方重取。
+ * Concurrent host adapters capture dependencies read-only during render and install them during
+ * commit. React can discard an intermediate render, so capture cannot create edges. Dependencies
+ * can change before commit, so commit can fail and request a fresh capture.
  *
- * 此前这条路只有本仓库的 React 适配层走得通——它直接 import `runtime/internals` 拿 tracker，而那个模块由 `architecture.test.ts`
- * 的豁免名单守着。也就是说： **并发安全的唯一实现路径是一份特权**，第三方（Vue/Solid/Svelte 适配层，或另一套 React
- * 绑定）做不出等价的东西，只能退回「订阅即建边」，把已经修好的撕裂窗口重新 打开。
+ * This replaces privileged access to `runtime/internals` in the repository's React adapter.
+ * Third-party Vue, Solid, Svelte, or React adapters can use the same concurrent-safe path without
+ * creating edges at subscription time and reopening the tearing window.
  *
- * 所以把它变成公开面。这里交出去的能力恰好是三段式所需，不多一点：
- *
- * - `capture` 不建边、不入队、不改版本，只记下「这次读了谁、当时是什么版本」；
- * - `ICapture` 是带品牌的不透明 token，依赖集合存在 Tracker 的私有 WeakMap 里， 拿到它既读不出依赖也改不了版本；
- * - `commit` 只能把 token 装到**创建这个绑定时指定的那个 observer** 上，装不到 别人身上，也不能凭空制造单边依赖。
+ * `capture` records reads and versions without creating edges, enqueueing work, or changing
+ * versions. `ICapture` is an opaque branded token whose dependencies stay in the tracker's private
+ * WeakMap. Token holders cannot inspect those dependencies or modify versions. `commit` installs
+ * the token only on this binding's observer, never on another observer or as a one-sided edge.
  */
 export type IObserverBinding = {
   /**
-   * 渲染期捕获。
+   * Captures dependencies during render.
    *
-   * 只记录读到了哪些节点及其版本，不建立依赖边——被丢弃的渲染因此不会留下订阅。
+   * Records the nodes read and their versions without creating dependency edges. Discarded renders
+   * therefore leave no subscriptions.
    */
   capture<R>(read: () => R): ICapture<R>
   /**
@@ -45,10 +47,11 @@ export type IObserverBinding = {
    */
   observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer
   /**
-   * 提交期安装依赖。
+   * Installs captured dependencies during commit.
    *
-   * 返回三态结果，明确区分「需要重新捕获」与「订阅者尚不存在」。调用方只应在 `stale` 时作废快照并重新取值，而**不是**在 commit 阶段去 pull 脏节点——
-   * 那会把用户的求值错误抛在 commit 里，绕过 Error Boundary。
+   * Three outcomes distinguish a required fresh capture from a missing observer. Invalidate the
+   * snapshot and reread only for `stale`. Do not pull dirty nodes during commit, because evaluation
+   * errors would bypass the Error Boundary.
    */
   commit(capture: ICapture<unknown>): IObserverCommitResult
   /** Force one committed observer run and report whether its dependency set changed. */
@@ -56,10 +59,11 @@ export type IObserverBinding = {
 }
 
 /**
- * 为一个订阅者建立绑定。
+ * Creates a binding for one observer.
  *
- * 捕获发生在 render 期，observer 只在宿主订阅阶段存在。绑定自持 Effect：适配层 能完成 capture/observe/commit/retrack，却拿不到
- * deps、版本或强制调度入口。
+ * Capture runs during render; the observer exists only during host subscription. The binding owns
+ * its `Effect` and exposes `capture`, `observe`, `commit`, and `retrack`. Adapters cannot access
+ * dependencies, versions, or forced scheduling ports.
  */
 export function createObserverBinding(runtime: IRuntime): IObserverBinding {
   const tracker = internalsOf(runtime).tracker

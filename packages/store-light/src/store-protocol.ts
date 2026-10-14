@@ -3,20 +3,24 @@ import type { IDisposable, IRuntime } from '@migaia/reactive'
 import { StoreFieldMode } from './field-mode-constants.js'
 
 /**
- * Store 门面对外开放的扩展协议。
+ * Defines extension protocols owned by the store facade.
  *
- * 这里的三样东西原本散落在 `wasm/field.ts`、`middleware.ts` 和 `raw.ts`，于是 `reactive-store.ts` 反过来静态 import 了
- * Wasm 与中间件——对象门面本该只是内核的 facade，却认识了平台实现的具体类型。
+ * Field builders, mutation policies, and raw values previously lived in separate WASM, middleware,
+ * and raw modules. That made `reactive-store.ts` import concrete platform implementations into the
+ * facade.
  *
- * 方向反过来：**Store 定义协议，扩展去实现**。Wasm 字段、变更策略都只是这些接口 的实现者，Store 不需要知道它们存在。
+ * The store defines the protocols and extensions implement them. WASM fields and mutation policies
+ * implement these interfaces without the store depending on their concrete types.
  */
 
-// —— 字段构造协议 ——
-//
-// symbol 品牌识别而非鸭子类型：字段值本身可能是任意形状，靠结构猜会误判。
+// Field construction protocol.
+// Symbol branding distinguishes builders from arbitrary field values without structural guessing.
 export const FIELD_BUILDER = Symbol('store.field-builder')
 
-/** Runtime 为字段签发的最小响应式能力，不暴露依赖图内部结构。 */
+/**
+ * Provides the runtime's minimal reactive field capabilities without exposing dependency graph
+ * internals.
+ */
 export type IFieldSource = IDisposable & {
   track(): void
   notify(): void
@@ -26,9 +30,11 @@ export type IFieldSource = IDisposable & {
 }
 
 /**
- * 构造上下文：runtime 供创建普通节点，createSource 供自定义存储接入同一张图， signal 让 Store dispose 时能中止在途初始化。
+ * Provides `runtime` for ordinary nodes and `createSource` for custom storage in the same graph.
+ * `signal` aborts in-flight initialization when the store is disposed.
  *
- * 刻意不传 scope——所有权登记是 Store 的职责。让 Builder 自己登记的话，第三方实现 一旦「创建了资源却忘了登记」，$dispose 就漏释放，而 Store 无从察觉。
+ * The store owns resource registration, so this context does not expose its scope. Delegating
+ * registration to builders could leak resources when a third-party builder omits registration.
  */
 export type IFieldContext = {
   runtime: IRuntime
@@ -67,18 +73,18 @@ export function isFieldBuilder(value: unknown): value is IFieldBuilder<IDisposab
   )
 }
 
-// —— 变更守卫协议 ——
-//
-// Store 与 collections 只需要「能不能改」这一个问题的答案。具体策略（actions-only、
-// 严格模式等）属于中间件层，不该出现在门面的类型里。
+// Mutation guard protocol.
+// Stores and collections ask only whether mutation is allowed.
+// Policies such as `actions-only` belong to middleware instead of the facade types.
 export type IMutationGuard = {
   assertMutationAllowed(operation?: string): void
 }
 
 /**
- * Store 门面额外需要的一件事：把一次动作标记为「正在动作内」，好让守卫放行其中的写入。
+ * Marks an action scope so the mutation guard permits writes within it.
  *
- * 与 IMutationGuard 分开，是因为 collections 只需要问「能不能改」，不该被迫实现 动作作用域。按需要的最小面拆接口，实现方自然满足更大的那个。
+ * Collections need only `IMutationGuard`, not action scopes. The store facade uses this additional
+ * capability.
  */
 export type IMutationPolicy = IMutationGuard & {
   runInAction<T>(fn: () => T): T

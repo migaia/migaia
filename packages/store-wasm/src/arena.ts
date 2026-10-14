@@ -44,7 +44,7 @@ export const registry = {
   }
 }
 
-// 显式释放一个分配（字段 dispose 时调用）。dealloc_bytes 对未知 id 是 no-op，天然抗重复。
+// Explicitly frees an allocation during field disposal. `dealloc_bytes` ignores unknown IDs, so repeated release is safe.
 export function deallocate(id: number): void {
   dealloc_bytes(id)
 }

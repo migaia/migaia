@@ -9,10 +9,11 @@ import {
 } from './trace-constants.js'
 
 /**
- * Runtime 是本库创建并登记内部面的封闭对象，不是可结构伪造的 SPI。
+ * A runtime is a registered object created by this library, not a structurally fabricated SPI.
  *
- * 符号不从公共入口导出；真实权限仍由 internals WeakMap 校验，这个品牌只让类型契约 与运行时事实一致。扩展应组合
- * `createRuntime()`，而不是手写一个缺少内部面的对象。
+ * The public entry does not export this symbol. The internals WeakMap still checks actual
+ * authority. This brand aligns the type contract with runtime ownership. Compose `createRuntime()`
+ * instead of creating an object without registered internals.
  */
 export const RUNTIME_BRAND: unique symbol = Symbol('store.runtime')
 
@@ -97,31 +98,45 @@ export type IRuntimeTraceEvent =
     }
 
 /**
- * 运行时消费接口——一套时钟 + 依赖追踪 + 调度器 + 节点工厂。同一 IRuntime 内的节点共享一张依赖图/一条版本时钟， 不同 IRuntime 完全隔离。只有本库 Runtime
- * 实现它；节点/wasm 字段/React 适配层只依赖这个消费面，不碰具体类。 （这里 import type 反引用 Signal/Computed
- * 仅为类型，全部被擦除，不产生任何运行时循环依赖。）
+ * Consumer interface for one clock, dependency tracker, scheduler, and node factories. Nodes in one
+ * `IRuntime` share a graph and version clock. Different runtimes are isolated. Only the library's
+ * `Runtime` implements this interface. Nodes, Wasm fields, and React adapters depend on this view
+ * rather than the concrete class. Type-only references to `Signal` and `Computed` are erased and
+ * create no runtime dependency cycle.
  */
 export type IRuntime = {
   readonly [RUNTIME_BRAND]: true
-  // clock / tracker / scheduler / notify 已移出公共面：它们能绕过所有权校验、
-  // observed 生命周期、trace 与调度原子性。内部面见 runtime/internals.ts，
-  // 边界用 WeakMap 而非 private —— 后者编译后照样可访问。
-  /** Bump 版本 + 向下游标脏（wasm 字段等自定义 Source 复用同一条通知管线） */
+  // The public view excludes the clock, tracker, scheduler, and notification port, which could bypass ownership,
+  // observation lifecycle, trace records, and scheduling atomicity. See `runtime/internals.ts`.
+  // A WeakMap enforces the boundary at runtime; TypeScript `private` alone would not.
+  /**
+   * Creates a writable node owned by this runtime and sharing its dependency graph and version
+   * clock.
+   */
   signal<T>(value: T, options?: IReactiveNodeOptions): ISignal<T>
   computed<T>(fn: () => T, config?: IComputedConfig<T>): IComputedValue<T>
   effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer
   batch<T>(fn: () => T): T
   untracked<T>(fn: () => T): T
-  /** 同步冲刷当前队列。observer 内重入时外层 flush 仍拥有队列，返回 `deferred`； 最外层调用完成并排空队列时返回 `completed`。 */
+  /**
+   * Flushes synchronously. Reentrant observer calls return `deferred`; the outer call returns
+   * `completed` after draining the queue.
+   */
   flush(): IFlushResult
-  /** 受控地替换冲刷策略；只改变何时 flush，不交出 Scheduler 队列本身。 */
+  /** Replaces flush timing through a controlled strategy without exposing the scheduler queue. */
   setSchedulerStrategy(strategy: ISchedulerStrategy): void
-  /** 只读版本观测；不交出可递增的 VersionClock。 */
+  /** Reads the current version without exposing an incrementable `VersionClock`. */
   currentVersion(): number
-  /** 执行并追踪一段真实 action。调用方只能提供 name 与函数，不能伪造 start/end/error 阶段或任意注入 trace event。 */
+  /**
+   * Runs and traces an action. Callers provide only its name and function, never fabricated phases
+   * or trace events.
+   */
   runTracedAction<T>(name: string, fn: () => T): T
   reportError(error: unknown, context: IRuntimeErrorReportContext): void
-  /** 诊断面只读：事件只能由受信内核产生，调用方不能伪造 action/依赖记录。 */
+  /**
+   * Subscribes to read-only diagnostics. Only the trusted kernel emits action and dependency
+   * records.
+   */
   subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer
 }
 
@@ -144,45 +159,52 @@ export type IRuntimeErrorReportContext = {
 }
 
 /**
- * 运行时宿主能力注入面（`docs/contracts/runtime-neutrality.sdd.md` R-9）。
+ * Host capability injection boundary (`docs/contracts/runtime-neutrality.sdd.md` R-9).
  *
- * 与 `@migaia/utils/scheduler` 的时钟分离一致：`now()` 单调（对应 `IScheduler.now()`），只用于 duration； `timestamp()`
- * 为 epoch 事件时间戳（对应 `IWallClock.timestamp()`）；二者不得混用。默认值见 `default-runtime-adapter.ts`。
+ * As in `@migaia/utils/scheduler`, `now()` is monotonic and measures durations
+ * (`IScheduler.now()`). `timestamp()` supplies epoch event time (`IWallClock.timestamp()`). Do not
+ * mix the two clocks. See `default-runtime-adapter.ts` for defaults.
  */
 export type IReactiveRuntimeAdapter = {
-  /** 调度一次微任务。 */
+  /** Schedules one microtask. */
   scheduleMicrotask(task: () => void): void
-  /** 单调时间，用于 duration。 */
+  /** Supplies monotonic time for durations. */
   now(): number
-  /** 事件时间戳，可与 duration 分离。 */
+  /** Supplies event timestamps independently of duration measurements. */
   timestamp(): number
-  /** 默认错误出口。 */
+  /** Default error reporting channel. */
   reportError(error: unknown, context: IRuntimeErrorContext): void
 }
 
 export type IRuntimeOptions = {
-  /** 宿主能力注入面；缺省项回落到 `defaultRuntimeAdapter`。 */
+  /** Injects host capabilities. Missing entries use `defaultRuntimeAdapter`. */
   adapter?: Partial<IReactiveRuntimeAdapter>
   onError?: (error: unknown, context: IRuntimeErrorContext) => void
   onTrace?: (event: IRuntimeTraceEvent) => void
   /**
-   * 一次冲刷里单个 observer 允许的最大执行次数，默认 100。单个 observer 超限视为自触发环：抛错并清空队列。
+   * Maximum executions for one observer within one flush. The default is 100. Exceeding the limit
+   * is treated as a self-triggering cycle and throws after clearing the queue.
    *
-   * 可配置，因为它是策略参数而非物理常数——很长的派生链每轮只推进一级也会吃轮次。
+   * The limit is configurable scheduling policy, not a physical constant.
    */
   maxFlushPasses?: number
   /**
-   * 无观察者 Computed 的挂起时机，默认走 adapter 的 `scheduleMicrotask`。
+   * Schedules suspension of an unobserved `Computed`. Defaults to the adapter's
+   * `scheduleMicrotask`.
    *
-   * 与调度策略分开：挂起是回收，不是冲刷。写死之后这条路径不受任何配置控制， rAF/idle 策略下时机对不上，测试也只能靠等微任务。
+   * Suspension is cleanup, so its timing is separate from flushing. This configurable channel can
+   * align cleanup with animation-frame or idle policies without requiring callers or tests to wait
+   * for a hard-coded microtask.
    */
   scheduleIdle?: (task: () => void) => void
 }
 
 /**
- * 内核内部图协议。它刻意不从 `@migaia/reactive` 公共入口导出。
+ * Kernel graph protocol exposed as a type from the `@migaia/reactive` public entry.
  *
- * 第三方扩展应组合公开 Signal，而不是手工实现并修改 subs/version；平台内置的 Wasm/SAB 来源通过受约束的内部入口接图，并必须先登记 Runtime 所有权。
+ * Third-party extensions compose public signals instead of implementing and changing `subs` or
+ * `version`. Built-in Wasm and SAB sources join the graph through restricted internal entry points.
+ * They must register runtime ownership first.
  */
 export type IObservable = {
   readonly runtime: IRuntime
@@ -190,14 +212,17 @@ export type IObservable = {
   /** Reverse edges are maintained by the Runtime tracker, not extension code. */
   readonly subs: ReadonlySet<IObserver>
   readonly version: number
-  pull?(): void // 惰性节点（如 Computed）在被读取前先落定版本；纯数据节点（如 Signal）不需要
-  // 纯同步状态检查：不得求值、修改依赖图或抛出用户计算错误。
+  pull?(): void // Settles lazy node versions before reading; data nodes do not need it.
+  // Pure synchronous state check. It must not evaluate, mutate the graph, or throw user computation errors.
   isStale?(): boolean
-  onObserved?(): void // 第一个下游订阅建立
-  onUnobserved?(): void // 最后一个下游订阅离开
+  onObserved?(): void // Runs when the first downstream subscription is established.
+  onUnobserved?(): void // Runs when the last downstream subscription leaves.
 }
 
-/** 一个会去读取 IObservable、需要在其变化时收到通知的一端——Computed/Effect 都实现它。 */
+/**
+ * Reads `IObservable` values and receives change notifications. `Computed` and `Effect` implement
+ * this observer role.
+ */
 export type IObserver = {
   readonly runtime: IRuntime
   readonly disposed: boolean
@@ -208,30 +233,41 @@ export type IObserver = {
   onDependencyDisconnected(observable: IObservable): void
 }
 
-/** Effect/自定义响应式来源的收尾回调——对应它们建立时留下的、需要在重跑或销毁前撤销的副作用 （取消订阅、清定时器、释放资源……），命名对应 Effect 已有的 dispose() 语义。 */
+/**
+ * Cleanup callback for an effect or custom source. Reverses side effects before rerun or disposal,
+ * such as subscriptions, timers, or resource ownership.
+ */
 export type IDisposer = () => void
 
 /**
- * 有明确所有权/生命周期的资源：能被显式释放，且可查询是否已释放。 Computed/Effect/Scope（以及未来的 wasm 字段、worker 订阅）都实现它，交给 Scope 统一按
- * LIFO 释放。
+ * Resource with explicit ownership and lifecycle, supporting disposal and a disposal-state query.
+ * `Computed`, `Effect`, and scopes use this contract for LIFO release by the owning scope. It also
+ * serves future Wasm fields or worker subscriptions.
  */
 export type IDisposable = {
   dispose(): void
   readonly disposed: boolean
 }
 
-/** 冲刷触发策略——决定"待处理的响应式副作用什么时候真正执行"。默认是微任务合并， 可换成 rAF/idle/优先级队列等；Scheduler 类持有一个策略实例，而不是自己是策略。 */
+/**
+ * Controls when pending reactive effects execute. Defaults to merged microtasks and can use
+ * animation frames, idle callbacks, or priority queues. `Scheduler` owns a strategy instance.
+ */
 export type ISchedulerStrategy = (flush: () => void) => void
 
-/** 显式 flush 的完成状态；判别字符串避免 boolean truthiness 隐藏重入语义。 */
+/**
+ * Outcome of an explicit flush. Distinct strings expose reentrancy instead of hiding it behind
+ * boolean truthiness.
+ */
 export type IFlushResult = 'completed' | 'deferred'
 
 /**
- * 冲刷队列里一项的最小形状：只要求"一次冲刷时如何处理我"。Effect 是目前唯一的实现者， 但这里刻意不直接引用 Effect 类——如果引用了，Scheduler 所在文件就要 import
- * Effect， Effect 所在文件又要 import Scheduler，形成循环依赖。用结构类型断开这个环。
+ * Minimal queued-item contract describing how a flush processes the item. `Effect` is the current
+ * implementation, but this structural view avoids a direct class reference. Otherwise importing
+ * `Effect` from `Scheduler` would create a circular dependency.
  */
 export type IFlushable = {
   tick(): void
-  /** 环保护触发时要如实报出被丢弃的待办，靠这个名字定位。 */
+  /** Identifies discarded pending work when loop protection triggers. */
   readonly debugName?: string
 }

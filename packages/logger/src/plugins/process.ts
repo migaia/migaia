@@ -14,13 +14,17 @@ import { getLoggerSchedulerDomain } from '../scheduler-domain.js'
 import { observeLoggerReporterResult } from '../thenable.js'
 
 export type IProcessPluginConfig = {
-  /** 是否捕获 uncaughtException/unhandledRejection 并记为 fatal 日志，默认 true */
+  /**
+   * Logs `uncaughtException` and `unhandledRejection` events as fatal entries when enabled.
+   * Defaults to `true`.
+   */
   captureCrashes?: boolean
-  /** 优雅关闭最多等待 flush 完成的时间（毫秒），超时后强制退出，默认 3000 */
+  /** Maximum graceful-shutdown wait in milliseconds before forced exit. Defaults to 3000. */
   shutdownTimeoutMs?: number
   /**
-   * 是否劫持 process.exit()，让应用代码里任意位置调用 process.exit() 也会先等 flush。 默认关闭，因为这会把 process.exit()
-   * 从"立即终止"变成"发起异步 flush 后才终止"， 如果你的代码依赖 process.exit() 同步阻断执行，开启前务必评估影响。
+   * Intercepts `process.exit()` so application calls wait for flushing before exit. Disabled by
+   * default because exit becomes asynchronous instead of terminating immediately. Evaluate this
+   * change before enabling it when application code relies on synchronous termination.
    */
   interceptProcessExit?: boolean
 }

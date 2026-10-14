@@ -1,46 +1,50 @@
 /**
- * `@migaia/store-worker` 错误码的唯一声明处。
+ * Declares the public error codes for `@migaia/store-worker` in one place.
  *
- * 契约见 `docs/contracts/error-codes.md`：错误由 `(source, code)` 二元组唯一定位，`source` 恒为
- * `'@migaia/store-worker'`。抛出点必须引用本文件的常量，不得内联字面量。
+ * The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The
+ * `source` is always `'@migaia/store-worker'`. Throw sites use these constants instead of inline
+ * literals.
  *
- * 码值是公开 API 的一部分，改名等同破坏性变更（`docs/contracts/error-code-rollout.sdd.md` §1.2）。
+ * Code values are public API. Renaming a code is a breaking change
+ * (`docs/contracts/error-code-rollout.sdd.md` §1.2).
  */
 export const StoreWorkerErrorCode = {
   /** Worker parser/adapter options were not an object at the JavaScript boundary. */
   invalidOption: 'INVALID_OPTION',
   /**
-   * Worker 适配器已释放后继续调用。
+   * A worker adapter is called after disposal.
    *
-   * 调用方不得复用已释放的适配器；重新创建适配器实例。
+   * Create a new adapter instead of reusing the disposed instance.
    */
   adapterDisposed: 'ADAPTER_DISPOSED',
 
   /**
-   * Worker 侧的序列化请求被协作式取消（AbortSignal）。
+   * Worker serialization is cooperatively cancelled through `AbortSignal`.
    *
-   * 调用方按取消处理；`ownership: 'transfer'` 时输入已 detach 不可重试。
+   * Treat this as cancellation. With `ownership: 'transfer'`, the input is already detached and
+   * cannot be retried.
    */
   requestAborted: 'REQUEST_ABORTED',
 
   /**
-   * 发给 worker 的请求 chunk 形状非法。
+   * A request chunk sent to the worker has an invalid shape.
    *
-   * 调用方检查请求负载是否符合 `ISerializeChunk` 形状；这是协议错误。
+   * Check that the payload satisfies `ISerializeChunk`. This is a protocol error.
    */
   invalidRequestChunk: 'INVALID_REQUEST_CHUNK',
 
   /**
-   * Worker 返回的 chunk 形状非法。
+   * A chunk returned by the worker has an invalid shape.
    *
-   * 调用方检查 worker 侧 parser 输出；这是 worker 实现错误。
+   * Check the worker parser output. This is a worker implementation error.
    */
   invalidResponseChunk: 'INVALID_RESPONSE_CHUNK',
 
   /**
-   * 合并 worker 产出的 wire chunk 失败（空列表，或把 value 段并入字节流）。
+   * Worker wire chunks cannot be merged because the list is empty or a value chunk is mixed into a
+   * byte stream.
    *
-   * 调用方检查 worker parser 的输出分段；这是 parser 实现错误。
+   * Check the worker parser output chunks. This is a parser implementation error.
    */
   chunkMergeFailed: 'CHUNK_MERGE_FAILED',
 

@@ -1,4 +1,4 @@
-/** 每次调用返回一个全新的、彼此隔离的 Storage 实现，避免测试间数据串扰。 */
+/** Creates fresh, isolated storage on each call to prevent data from leaking between tests. */
 export const fakeWebStorage = (): Storage => {
   const map = new Map<string, string>()
   return {

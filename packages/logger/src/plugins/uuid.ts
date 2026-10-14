@@ -3,8 +3,10 @@ import { getLoggerRuntimeManager } from '../runtime-manager.js'
 
 export type IUuidPluginConfig = {
   /**
-   * 是否让 uuid 跟着日志一起出现在渲染出来的输出里（控制台 pretty 格式的前缀、 JSON 格式里的 id 字段），默认 false。 注意：不管这个开关是否打开，uuid
-   * 本身始终会写入 entry.data.uuid —— 关掉的只是"要不要显示"，不影响 http/batch 这类下游 sink 拿到它用于 链路追踪/去重，这两件事是独立的。
+   * Shows the UUID in rendered output, such as the pretty prefix or the JSON `uuid` field. Defaults
+   * to `false`. The plugin always writes the UUID to `entry.data.uuid`, regardless of display
+   * settings. HTTP and batch sinks can still use it for tracing or deduplication when rendered
+   * display is disabled.
    */
   display?: boolean
 }

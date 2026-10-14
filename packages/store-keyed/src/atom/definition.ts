@@ -18,10 +18,10 @@ import { StoreKeyedErrorText } from '../error-text.js'
 // coexist in one Realm (for example an app bundle plus a worker/devtools copy).
 const DEFINITION = Symbol.for('morning-watch.store.atom-definition')
 
-/** 在某个 store 内读另一个定义的当前值。 */
+/** Reads another definition's current value within a store. */
 export type IAtomGet = <T>(definition: IAtomDefinition<T>) => T
 
-/** 在某个 store 内写另一个可写定义。 */
+/** Writes another writable definition within a store. */
 export type IAtomSet = <T, Args extends readonly unknown[], Result>(
   definition: IWritableAtomDefinition<T, Args, Result>,
   ...args: Args
@@ -42,16 +42,17 @@ type IDefinitionBase = {
   readonly debugLabel?: string
 }
 
-/** 源定义：只有初值。 */
+/** Describes a source atom with its initial value. */
 export type IPrimitiveDefinition<T> = IDefinitionBase & {
   readonly kind: typeof AtomKind.primitive
   readonly init: T
 }
 
 /**
- * 每个 AtomStore 首次实例化时各自创建初值。
+ * Creates an independent initial value when each `AtomStore` first instantiates the definition.
  *
- * 对象、数组及其它可变容器不应作为跨 Provider/SSR scope 共享的模板引用； 独立 kind 避免把“函数值”误判成初始化函数。
+ * Objects, arrays, and other mutable containers must not share template references across provider
+ * or SSR scopes. A separate kind distinguishes a function value from an initialization factory.
  */
 export type IPrimitiveFactoryDefinition<T> = IDefinitionBase & {
   readonly kind: typeof AtomKind.primitiveFactory
@@ -60,15 +61,15 @@ export type IPrimitiveFactoryDefinition<T> = IDefinitionBase & {
   readonly previewSafe: boolean
 }
 
-/** 派生定义：只有读函数。 */
+/** Describes a derived atom through its read function. */
 export type IDerivedDefinition<T> = IDefinitionBase & {
   readonly kind: typeof AtomKind.derived
   readonly read: IAtomRead<T>
-  /** 自定义相等比较。这里只是个参数，怎么用由 store 层决定。 */
+  /** Provides an equality comparison for the store layer to apply. */
   readonly equals?: (a: T, b: T) => boolean
 }
 
-/** 可写派生定义：读一份、写另一份。 */
+/** Describes a derived atom that reads one value and writes another. */
 export type IWritableDerivedDefinition<
   T,
   Args extends readonly unknown[],
@@ -99,7 +100,7 @@ export type IAtomDefinition<T> =
   | IDerivedDefinition<T>
   | IErasedWritableDerived<T>
 
-/** 能被 set 的定义：源定义，或带 write 的派生定义。 */
+/** Accepts writes to a source definition or a derived definition with `write`. */
 export type IWritableAtomDefinition<
   T,
   Args extends readonly unknown[] = readonly [IAtomUpdate<T>],
@@ -136,7 +137,7 @@ export function assertNotThenable(value: unknown, context: string): void {
   }
 }
 
-// —— 构造器：只组装描述，不碰任何运行时 ——
+// Constructors assemble descriptions without accessing a runtime.
 
 export function atomDef<T>(init: T, debugLabel?: string): IPrimitiveDefinition<T> {
   assertNotThenable(init, 'atomDef(init)')
