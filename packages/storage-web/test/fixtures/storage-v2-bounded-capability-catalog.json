@@ -86,17 +86,7 @@
     {
       "name": "reactive-graph",
       "owner": "@migaia/reactive",
-      "routes": [
-        "@migaia/reactive",
-        "@migaia/reactive/internals",
-        "@migaia/reactive/node-factories",
-        "@migaia/reactive/node-internals",
-        "@migaia/reactive/ownership",
-        "@migaia/reactive/reactive/computed.class",
-        "@migaia/reactive/reactive/signal.class",
-        "@migaia/reactive/runtime",
-        "@migaia/reactive/source"
-      ],
+      "routes": ["@migaia/reactive", "@migaia/reactive/extension", "@migaia/reactive/internals"],
       "symbols": ["*"],
       "consumers": [
         "@migaia/resource",

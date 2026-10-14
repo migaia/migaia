@@ -25,21 +25,31 @@ export type IReactiveNodeOptions = {
  * Public writable node view. Graph bookkeeping stays behind Runtime internals; consumers only
  * receive value/lifecycle operations.
  */
-export type ISignal<T> = IDisposable & {
+export type IReactiveSignal<T> = IDisposable & {
   readonly runtime: IRuntime
   readonly debugName?: string
   readonly observed: boolean
+  readonly version: number
   value: T
   peek(): T
+  /** Registers observation callbacks and returns a token that removes only those callbacks. */
+  addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void }): IDisposer
 }
 
 /** Public read-only derived value view. */
-export type IComputedValue<T> = IDisposable & {
+export type IReactiveComputed<T> = IDisposable & {
   readonly runtime: IRuntime
   readonly debugName?: string
   readonly observed: boolean
+  readonly version: number
   readonly value: T
   peek(): T
+}
+
+/** Public scheduled-effect lifecycle; dependency bookkeeping remains on the graph node. */
+export type IReactiveEffect = IDisposable & {
+  readonly runtime: IRuntime
+  readonly debugName?: string
 }
 
 /** Public, immutable identity for a reactive graph node. */
@@ -101,8 +111,8 @@ export type IRuntimeTraceEvent =
  * Consumer interface for one clock, dependency tracker, scheduler, and node factories. Nodes in one
  * `IRuntime` share a graph and version clock. Different runtimes are isolated. Only the library's
  * `Runtime` implements this interface. Nodes, Wasm fields, and React adapters depend on this view
- * rather than the concrete class. Type-only references to `Signal` and `Computed` are erased and
- * create no runtime dependency cycle.
+ * rather than the concrete class. Public factories expose value and lifecycle operations without
+ * graph mutation methods.
  */
 export type IRuntime = {
   readonly [RUNTIME_BRAND]: true
@@ -113,9 +123,10 @@ export type IRuntime = {
    * Creates a writable node owned by this runtime and sharing its dependency graph and version
    * clock.
    */
-  signal<T>(value: T, options?: IReactiveNodeOptions): ISignal<T>
-  computed<T>(fn: () => T, config?: IComputedConfig<T>): IComputedValue<T>
-  effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer
+  signal<T>(value: T, options?: IReactiveNodeOptions): IReactiveSignal<T>
+  computed<T>(fn: () => T, config?: IComputedConfig<T>): IReactiveComputed<T>
+  /** Creates an immediately executed effect whose handle owns idempotent disposal. */
+  effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IReactiveEffect
   batch<T>(fn: () => T): T
   untracked<T>(fn: () => T): T
   /**
@@ -123,10 +134,6 @@ export type IRuntime = {
    * `completed` after draining the queue.
    */
   flush(): IFlushResult
-  /** Replaces flush timing through a controlled strategy without exposing the scheduler queue. */
-  setSchedulerStrategy(strategy: ISchedulerStrategy): void
-  /** Reads the current version without exposing an incrementable `VersionClock`. */
-  currentVersion(): number
   /**
    * Runs and traces an action. Callers provide only its name and function, never fabricated phases
    * or trace events.
@@ -197,10 +204,12 @@ export type IRuntimeOptions = {
    * for a hard-coded microtask.
    */
   scheduleIdle?: (task: () => void) => void
+  /** Selects flush timing at creation; the runtime does not expose strategy replacement. */
+  schedulerStrategy?: ISchedulerStrategy
 }
 
 /**
- * Kernel graph protocol exposed as a type from the `@migaia/reactive` public entry.
+ * Kernel graph protocol exposed as a type from the `@migaia/reactive/extension` entry.
  *
  * Third-party extensions compose public signals instead of implementing and changing `subs` or
  * `version`. Built-in Wasm and SAB sources join the graph through restricted internal entry points.

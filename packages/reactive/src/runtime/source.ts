@@ -5,7 +5,8 @@ import { createReactiveError } from '../errors.js'
 import { ReactiveErrorCode } from '../error-code.js'
 import { ReactiveErrorText } from '../error-text.js'
 
-type IRuntimeFieldSource = {
+/** Controlled source lifecycle and notification capabilities without exposing the graph node. */
+export type IRuntimeFieldSource = {
   track(): void
   notify(): void
   commit<T>(write: () => T): T

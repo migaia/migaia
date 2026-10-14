@@ -1,3 +1,4 @@
+import { internalRuntimeOf } from '../src/entry/extension.js'
 import { describe, expect, it } from 'vitest'
 import {
   createRuntime,
@@ -6,7 +7,7 @@ import {
   type IRuntimeTraceEvent
 } from '../src/index.js'
 import { ReactiveTraceReason } from '../src/runtime/trace-constants.js'
-import { createFieldSource } from '../src/runtime/source.js'
+import { createFieldSource } from '../src/entry/extension.js'
 
 type IObserverRunEvent = Extract<
   IRuntimeTraceEvent,
@@ -35,11 +36,12 @@ describe('RT28 diagnostic failures preserve graph commit', () => {
         }
       },
       onError: (error) => reported.push(error),
-      onTrace: (event) => events.push(event)
+      onTrace: (event) => events.push(event),
+      schedulerStrategy: (flush) => {
+        scheduled.push(flush)
+      }
     })
-    runtime.setSchedulerStrategy((flush) => {
-      scheduled.push(flush)
-    })
+
     const source = runtime.signal(0)
     const computed = runtime.computed(() => source.value * 2)
     const values: number[] = []
@@ -82,7 +84,7 @@ describe('RT28 diagnostic failures preserve graph commit', () => {
       0
     )
 
-    stop()
+    stop.dispose()
     source.dispose()
     computed.dispose()
   })
@@ -102,9 +104,9 @@ describe('RT28 diagnostic failures preserve graph commit', () => {
       onError: (error) => reported.push(error),
       onTrace: () => {}
     })
-    const source = runtime.signal(1)
+    const source = internalRuntimeOf(runtime).signal(1)
     let computedRuns = 0
-    const computed = runtime.computed(() => {
+    const computed = internalRuntimeOf(runtime).computed(() => {
       computedRuns++
       return source.value + 1
     })
@@ -127,7 +129,7 @@ describe('RT28 diagnostic failures preserve graph commit', () => {
     })
     expect(effectRuns).toBe(1)
     expect(computed.subs).toHaveLength(1)
-    stop()
+    stop.dispose()
     computed.dispose()
     source.dispose()
   })
@@ -170,7 +172,7 @@ describe('RT28 diagnostic failures preserve graph commit', () => {
     expect(runs).toBe(1)
     expect(runtime.flush()).toBe('completed')
 
-    stop()
+    stop.dispose()
     source.dispose()
   })
 
@@ -185,11 +187,12 @@ describe('RT28 diagnostic failures preserve graph commit', () => {
           return 400
         }
       },
-      onTrace: () => {}
+      onTrace: () => {},
+      schedulerStrategy: (flush) => {
+        scheduled.push(flush)
+      }
     })
-    runtime.setSchedulerStrategy((flush) => {
-      scheduled.push(flush)
-    })
+
     const source = createFieldSource(runtime, 'round28-source')
     let runs = 0
     const stop = runtime.effect(() => {
@@ -205,7 +208,7 @@ describe('RT28 diagnostic failures preserve graph commit', () => {
     expect(runs).toBe(2)
     expect(runtime.flush()).toBe('completed')
 
-    stop()
+    stop.dispose()
     source.dispose()
   })
 })

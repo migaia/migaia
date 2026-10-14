@@ -1,25 +1,29 @@
+import { internalRuntimeOf } from '../src/entry/extension.js'
+import type { IReactiveEffect } from '../src/index.js'
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '../src/index.js'
-import { createObserverBinding } from '../src/runtime/observer-binding.js'
+import { createObserverBinding } from '../src/entry/extension.js'
 
 describe('RT24 effect terminal reentrancy', () => {
   it('RT24-T01: cleanup self-disposal stops rerun, removes edges, and leaves queue empty', () => {
     const scheduled: Array<() => void> = []
-    const runtime = createRuntime()
-    runtime.setSchedulerStrategy((flush) => {
-      scheduled.push(flush)
+    const runtime = createRuntime({
+      schedulerStrategy: (flush) => {
+        scheduled.push(flush)
+      }
     })
-    const source = runtime.signal(0)
+
+    const source = internalRuntimeOf(runtime).signal(0)
     let runs = 0
     let cleanups = 0
-    let stop: (() => void) | undefined
+    let stop: IReactiveEffect | undefined
 
     stop = runtime.effect(() => {
       runs++
       void source.value
       return () => {
         cleanups++
-        stop?.()
+        stop?.dispose()
       }
     })
 
@@ -33,15 +37,15 @@ describe('RT24 effect terminal reentrancy', () => {
     expect(runtime.flush()).toBe('completed')
     expect(scheduled).toHaveLength(0)
 
-    stop()
-    stop()
+    stop.dispose()
+    stop.dispose()
     expect(cleanups).toBe(1)
     source.dispose()
   })
 
   it('RT24-T02: cleanup-triggered binding retrack returns terminal no-observer', () => {
     const runtime = createRuntime()
-    const source = runtime.signal(0)
+    const source = internalRuntimeOf(runtime).signal(0)
     const binding = createObserverBinding(runtime)
     let runs = 0
     let cleanups = 0
@@ -70,16 +74,16 @@ describe('RT24 effect terminal reentrancy', () => {
 
   it('RT24-T03: body self-disposal cannot commit its captured dependency edge', () => {
     const runtime = createRuntime()
-    const source = runtime.signal(0)
+    const source = internalRuntimeOf(runtime).signal(0)
     let runs = 0
     let cleanups = 0
     let shouldDispose = false
-    let stop: (() => void) | undefined
+    let stop: IReactiveEffect | undefined
 
     stop = runtime.effect(() => {
       runs++
       void source.value
-      if (shouldDispose) stop?.()
+      if (shouldDispose) stop?.dispose()
       return () => {
         cleanups++
       }
@@ -92,23 +96,23 @@ describe('RT24 effect terminal reentrancy', () => {
     expect(cleanups).toBe(2)
     expect(source.subs).toHaveLength(0)
 
-    stop()
-    stop()
+    stop.dispose()
+    stop.dispose()
     expect(cleanups).toBe(2)
     source.dispose()
   })
 
   it('RT30-T01: switching A to B rolls back B when B onObserved disposes the effect', () => {
     const runtime = createRuntime()
-    const sourceA = runtime.signal(0)
-    const sourceB = runtime.signal(0)
+    const sourceA = internalRuntimeOf(runtime).signal(0)
+    const sourceB = internalRuntimeOf(runtime).signal(0)
     let runs = 0
     let readB = false
-    let stop: (() => void) | undefined
+    let stop: IReactiveEffect | undefined
 
     sourceB.addObservedHooks({
       onObserved: () => {
-        stop?.()
+        stop?.dispose()
       }
     })
     stop = runtime.effect(() => {
@@ -130,7 +134,7 @@ describe('RT24 effect terminal reentrancy', () => {
     expect(runtime.flush()).toBe('completed')
     expect(runs).toBe(2)
 
-    stop?.()
+    stop?.dispose()
     sourceA.dispose()
     sourceB.dispose()
   })

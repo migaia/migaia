@@ -6,7 +6,7 @@ import {
 } from '@migaia/serialize'
 import { createRuntime, ReactiveErrorPhase } from '@migaia/reactive'
 import type { IRuntime, IRuntimeOptions } from '@migaia/reactive'
-import { claimOwnership } from '@migaia/reactive/ownership'
+import { claimOwnership } from '@migaia/reactive/extension'
 import type { IResourceCacheSnapshot } from '@migaia/resource'
 import { base64ToBytes, bytesToBase64 } from '@migaia/serialize'
 import {

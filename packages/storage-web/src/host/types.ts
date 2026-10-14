@@ -1,6 +1,6 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import type { IComputedValue, IRuntime } from '@migaia/reactive/runtime'
+import type { IReactiveComputed, IRuntime } from '@migaia/reactive'
 import type { IKeyValueStore, IStorageChange } from '@migaia/storage-contract'
 import type { IPlugin, IMergePluginExts } from '@migaia/plugin-host'
 
@@ -202,7 +202,7 @@ export type ILiveQueryState<T> =
 
 /** Non-disposable read-only projection of the same-runtime computed state node. */
 export type ILiveQueryStateView<T> = Pick<
-  IComputedValue<ILiveQueryState<T>>,
+  IReactiveComputed<ILiveQueryState<T>>,
   'runtime' | 'debugName' | 'observed' | 'value' | 'peek'
 >
 

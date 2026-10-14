@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'
-import type { IObservable, IObserver } from '@migaia/reactive/runtime'
+import { createRuntime } from '@migaia/reactive'
+import type { IObservable, IObserver } from '@migaia/reactive/extension'
 import { getDependencyTree, getObserverTree } from '../src/index'
 
 // Structural mocks: getDependencyTree/getObserverTree only read `deps`/`subs`/`debugName`/
@@ -15,6 +15,44 @@ const asObserver = (o: IMockObserver) => o as unknown as IObserver
 const asObservable = (o: IMockObservable) => o as unknown as IObservable
 
 describe('getDependencyTree', () => {
+  it('A5 accepts public effect handles and traverses the computed-to-signal chain', () => {
+    /** One runtime owns the public handles and the dependency graph inspected below. */
+    const runtime = createRuntime()
+    /** Named writable source lets the forward and reverse trees identify the same node. */
+    const price = runtime.signal(10, { debugName: 'price' })
+    /** Derived value establishes the second level of the effect dependency tree. */
+    const total = runtime.computed(() => price.value * 2, { debugName: 'total' })
+    /** The public effect handle is also the existing observer inspected by devtools. */
+    const effect = runtime.effect(
+      () => {
+        void total.value
+      },
+      { debugName: 'price-watcher' }
+    )
+    try {
+      expect(getDependencyTree(effect)).toMatchObject({
+        label: 'price-watcher',
+        children: [{ label: 'total', children: [{ label: 'price', children: [] }] }]
+      })
+      expect(getDependencyTree(total)).toMatchObject({
+        label: 'total',
+        children: [{ label: 'price', children: [] }]
+      })
+      expect(getObserverTree(price)).toMatchObject({
+        label: 'price',
+        children: [{ label: 'total', children: [{ label: 'price-watcher', children: [] }] }]
+      })
+      expect(getObserverTree(total)).toMatchObject({
+        label: 'total',
+        children: [{ label: 'price-watcher', children: [] }]
+      })
+    } finally {
+      effect.dispose()
+      total.dispose()
+      price.dispose()
+    }
+  })
+
   it('rejects non-finite or fractional maxDepth before traversal', () => {
     const root = asObserver({ debugName: 'root', deps: new Set() })
     for (const depth of [Number.NaN, Number.POSITIVE_INFINITY, -1, 1.5]) {
@@ -122,13 +160,12 @@ describe('getDependencyTree', () => {
 
   it('integrates with real Signal/Computed/Effect: labels, versions, and nesting are correct', () => {
     const runtime = createRuntime()
-    const source = new Signal(1, runtime, { debugName: 'countSignal' })
-    const doubled = new Computed(() => source.value * 2, runtime, { debugName: 'doubled' })
-    const watcher = new Effect(
+    const source = runtime.signal(1, { debugName: 'countSignal' })
+    const doubled = runtime.computed(() => source.value * 2, { debugName: 'doubled' })
+    const watcher = runtime.effect(
       () => {
         void doubled.value
       },
-      runtime,
       { debugName: 'watcher' }
     )
     runtime.flush()
@@ -239,13 +276,12 @@ describe('getObserverTree', () => {
 
   it('integrates with real Signal/Computed/Effect: reverse traversal from the signal', () => {
     const runtime = createRuntime()
-    const source = new Signal(1, runtime, { debugName: 'countSignal' })
-    const doubled = new Computed(() => source.value * 2, runtime, { debugName: 'doubled' })
-    const watcher = new Effect(
+    const source = runtime.signal(1, { debugName: 'countSignal' })
+    const doubled = runtime.computed(() => source.value * 2, { debugName: 'doubled' })
+    const watcher = runtime.effect(
       () => {
         void doubled.value
       },
-      runtime,
       { debugName: 'watcher' }
     )
     runtime.flush()

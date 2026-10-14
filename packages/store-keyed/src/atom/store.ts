@@ -1,16 +1,17 @@
 import {
-  Effect,
   ReactiveErrorPhase,
-  Signal,
-  type IComputedValue,
+  type IReactiveComputed,
   type IDisposer,
-  type IObservable,
   type IRuntime,
-  type ISignal
+  type IReactiveSignal
 } from '@migaia/reactive'
 import { internalsOf } from '@migaia/reactive/internals'
-import { internalRuntimeOf } from '@migaia/reactive/node-factories'
-import { claimOwnership } from '@migaia/reactive/ownership'
+import {
+  claimOwnership,
+  currentRuntimeVersion,
+  internalRuntimeOf,
+  type IObservable
+} from '@migaia/reactive/extension'
 import { createSyncLifecycleScope, type ISyncLifecycleScope } from '@migaia/lifecycle'
 import {
   createStoreKeyedAggregateError,
@@ -63,7 +64,7 @@ function reportAtomFailure(
  */
 
 type IInstance<T> = {
-  readonly node: ISignal<T> | IComputedValue<T>
+  readonly node: IReactiveSignal<T> | IReactiveComputed<T>
   readonly disposed: boolean
   read(): T
   peek(): T
@@ -284,7 +285,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
   }
 
   /** 源节点的释放：断开下游边。Signal 现在自带 dispose，不必再走内部面。 */
-  const releaseSignal = (node: Signal<unknown>): void => {
+  const releaseSignal = (node: IReactiveSignal<unknown> & IObservable): void => {
     node.dispose()
   }
 
@@ -294,7 +295,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
       let initial: T
       if (definition.kind === AtomKind.primitive) {
         initial = cloneInitial(definition.init)
-      } else if (preview?.version === runtime.currentVersion()) {
+      } else if (preview?.version === currentRuntimeVersion(runtime)) {
         previews.delete(definition as IAtomDefinition<unknown>)
         initial = preview.value as T
       } else {
@@ -311,7 +312,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
         },
         read: () => node.value,
         peek: () => node.peek(),
-        dispose: () => releaseSignal(node as Signal<unknown>)
+        dispose: () => releaseSignal(node as IReactiveSignal<unknown> & IObservable)
       }
     }
     // 派生：读函数收的是本 store 的 get，因此依赖解析永远在同一张实例表内
@@ -341,7 +342,8 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     const key = target as IAtomDefinition<unknown>
     const existing = instances.get(key)
     if (existing) return existing.peek() as T
-    const version = runtime.currentVersion()
+    /** Preview cache entries are valid only within the current runtime clock generation. */
+    const version = currentRuntimeVersion(runtime)
     const cached = previews.get(key)
     if (cached?.version === version) return cached.value as T
     if (previewStack.has(key)) {
@@ -432,7 +434,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     return runtime.batch(() => {
       return runtime.untracked(() => {
         if (target.kind === AtomKind.primitive || target.kind === AtomKind.primitiveFactory) {
-          const node = instanceOf(target).node as Signal<unknown>
+          const node = instanceOf(target).node as IReactiveSignal<unknown> & IObservable
           const [update] = args as unknown as [IAtomUpdate<unknown>]
           node.value =
             typeof update === 'function'
@@ -486,7 +488,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
       let first = true
       // 用 Effect 订阅而不是把节点交出去：所有权校验、observed 生命周期、
       // trace 都留在内核手里，实例化策略也保持可替换
-      const effect = new Effect(() => {
+      const effect = runtime.effect(() => {
         void instanceOf(definition).read()
         if (first) {
           first = false
@@ -501,7 +503,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
         } catch (error) {
           reportAtomFailure(runtime, error, ReactiveErrorPhase.subscriptionListener)
         }
-      }, runtime)
+      })
       let active = true
       const unsubscribe = () => {
         if (!active) return

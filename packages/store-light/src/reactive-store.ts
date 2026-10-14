@@ -1,7 +1,11 @@
-import { defaultRuntime, Effect, ReactiveErrorPhase } from '@migaia/reactive'
-import type { IDisposable, IDisposer, IRuntime } from '@migaia/reactive'
-import type { Signal } from '@migaia/reactive/reactive/signal.class'
-import type { Computed } from '@migaia/reactive/reactive/computed.class'
+import { defaultRuntime, ReactiveErrorPhase } from '@migaia/reactive'
+import type {
+  IDisposable,
+  IDisposer,
+  IReactiveComputed,
+  IReactiveSignal,
+  IRuntime
+} from '@migaia/reactive'
 import {
   isFieldBuilder,
   isRaw,
@@ -11,9 +15,15 @@ import {
   type IMutationPolicy,
   type IRaw
 } from './store-protocol.js'
-import { assertOwnedBy, claimOwnership, ownerOf } from '@migaia/reactive/ownership'
-import { createFieldSource } from '@migaia/reactive/source'
-import { internalRuntimeOf } from '@migaia/reactive/node-factories'
+import {
+  assertOwnedBy,
+  claimOwnership,
+  ownerOf,
+  createFieldSource,
+  internalRuntimeOf,
+  type IObservable,
+  type IObserver
+} from '@migaia/reactive/extension'
 import { createLifecycleScope, type ILifecycleScope } from '@migaia/lifecycle'
 import {
   createStoreLightAggregateError,
@@ -285,9 +295,10 @@ function createStoreCore<S extends Record<string, unknown>>(
   const store = {} as Record<string, unknown>
   const contextMembers = new Set<PropertyKey>()
 
-  // 分类后的底层节点
-  const signals = new Map<string, Signal<unknown>>()
-  const computeds = new Map<string, Computed<unknown>>()
+  /** Store-owned writable nodes retain graph relationships for field subscription and disposal. */
+  const signals = new Map<string, IReactiveSignal<unknown> & IObservable>()
+  /** Derived fields retain observer operations while their public values remain read-only. */
+  const computeds = new Map<string, IReactiveComputed<unknown> & IObservable & IObserver>()
   const wasmFields = new Map<string, unknown>()
   const fieldSources = new Set<ReturnType<typeof createFieldSource>>()
   const createTrackedFieldSource = (debugName?: string) => {
@@ -650,7 +661,7 @@ function createStoreCore<S extends Record<string, unknown>>(
       // nodes here is required for complete external-store semantics when a computed has no
       // direct source signal in this store.
       const e = ownReactiveNode(
-        new Effect(
+        runtime.effect(
           () => {
             for (const n of signals.values()) void n.value
             for (const n of computeds.values()) void n.value
@@ -669,7 +680,6 @@ function createStoreCore<S extends Record<string, unknown>>(
             }
             initialRun = false
           },
-          runtime,
           { debugName: `${debugName}.$subscribe` }
         )
       )

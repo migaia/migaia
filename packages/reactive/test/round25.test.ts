@@ -1,3 +1,5 @@
+import { internalRuntimeOf } from '../src/entry/extension.js'
+import type { IReactiveEffect } from '../src/index.js'
 import { describe, expect, it } from 'vitest'
 import {
   createRuntime,
@@ -5,7 +7,7 @@ import {
   ReactiveTraceType,
   type IRuntimeTraceEvent
 } from '../src/index.js'
-import { createObserverBinding } from '../src/runtime/observer-binding.js'
+import { createObserverBinding } from '../src/entry/extension.js'
 
 type IObserverRunEvent = Extract<
   IRuntimeTraceEvent,
@@ -23,21 +25,24 @@ describe('RT25 observer-run trace closure', () => {
   it('RT25-T01: cleanup self-dispose closes one successful terminal span', () => {
     const events: IRuntimeTraceEvent[] = []
     const scheduled: Array<() => void> = []
-    const runtime = createRuntime({ onTrace: (event) => events.push(event) })
-    runtime.setSchedulerStrategy((flush) => {
-      scheduled.push(flush)
+    const runtime = createRuntime({
+      onTrace: (event) => events.push(event),
+      schedulerStrategy: (flush) => {
+        scheduled.push(flush)
+      }
     })
-    const source = runtime.signal(0)
+
+    const source = internalRuntimeOf(runtime).signal(0)
     let runs = 0
     let cleanups = 0
-    let stop: (() => void) | undefined
+    let stop: IReactiveEffect | undefined
 
     stop = runtime.effect(() => {
       runs++
       void source.value
       return () => {
         cleanups++
-        stop?.()
+        stop?.dispose()
       }
     })
 
@@ -58,8 +63,8 @@ describe('RT25 observer-run trace closure', () => {
     expect(runtime.flush()).toBe('completed')
     expect(scheduled).toHaveLength(0)
 
-    stop()
-    stop()
+    stop.dispose()
+    stop.dispose()
     expect(cleanups).toBe(1)
     source.dispose()
   })
@@ -67,7 +72,7 @@ describe('RT25 observer-run trace closure', () => {
   it('RT25-T02: terminal binding retrack closes one successful observer span', () => {
     const events: IRuntimeTraceEvent[] = []
     const runtime = createRuntime({ onTrace: (event) => events.push(event) })
-    const source = runtime.signal(0)
+    const source = internalRuntimeOf(runtime).signal(0)
     const binding = createObserverBinding(runtime)
     let runs = 0
     let cleanups = 0
@@ -110,11 +115,12 @@ describe('RT25 observer-run trace closure', () => {
     const reported: unknown[] = []
     const runtime = createRuntime({
       onError: (error) => reported.push(error),
-      onTrace: (event) => events.push(event)
+      onTrace: (event) => events.push(event),
+      schedulerStrategy: (flush) => {
+        scheduled.push(flush)
+      }
     })
-    runtime.setSchedulerStrategy((flush) => {
-      scheduled.push(flush)
-    })
+
     const source = runtime.signal(0)
     let cleanups = 0
 
@@ -143,7 +149,7 @@ describe('RT25 observer-run trace closure', () => {
     expect(traces.filter((event) => event.phase === ReactiveTracePhase.end)).toHaveLength(1)
     expect(cleanups).toBe(1)
 
-    stop()
+    stop.dispose()
     source.dispose()
   })
 
@@ -157,9 +163,9 @@ describe('RT25 observer-run trace closure', () => {
     })
     const beforeDispose = observerRunEvents(events)
 
-    stop()
-    stop()
-    stop()
+    stop.dispose()
+    stop.dispose()
+    stop.dispose()
 
     expect(observerRunEvents(events)).toEqual(beforeDispose)
     expect(observerRunEvents(events).map((event) => event.phase)).toEqual([

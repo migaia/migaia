@@ -1,13 +1,13 @@
 import { defaultRuntime } from '@migaia/reactive'
-import type { IDisposable, IRuntime } from '@migaia/reactive'
-import type { Signal } from '@migaia/reactive/reactive/signal.class'
+import type { IDisposable, IReactiveSignal, IRuntime } from '@migaia/reactive'
 import type { IMutationGuard } from '@migaia/store-light'
-import { claimOwnership } from '@migaia/reactive/ownership'
 import {
+  claimOwnership,
   internalRuntimeOf,
   isRuntimeTracking,
-  isAnyRuntimeTracking
-} from '@migaia/reactive/node-factories'
+  isAnyRuntimeTracking,
+  type IObservable
+} from '@migaia/reactive/extension'
 import { ReactiveCellPool } from './reactive-cell-pool.js'
 import {
   createStoreIndexedError,
@@ -117,8 +117,8 @@ abstract class ObservableCollectionBase implements IDisposable {
   readonly runtime: IRuntime
   #mutationGuard?: IMutationGuard
   protected readonly debugName: string
-  // 只收自己建的 Signal：释放要调它们的 dispose()，那是公开面上的操作
-  #nodes = new Set<Signal<unknown>>()
+  /** Collection-owned nodes stay registered until release or terminal collection disposal. */
+  #nodes = new Set<IReactiveSignal<unknown> & IObservable>()
   #disposed = false
 
   protected constructor(
@@ -168,12 +168,14 @@ abstract class ObservableCollectionBase implements IDisposable {
     return this.#disposed
   }
 
-  protected own<T>(node: Signal<T>): Signal<T> {
-    this.#nodes.add(node as Signal<unknown>)
+  /** Registers a created node for disposal while preserving its graph protocol. */
+  protected own<T>(node: IReactiveSignal<T> & IObservable): IReactiveSignal<T> & IObservable {
+    this.#nodes.add(node as IReactiveSignal<unknown> & IObservable)
     return node
   }
 
-  protected release(node: Signal<unknown>): boolean {
+  /** Releases ownership only after the last observer disconnects. */
+  protected release(node: IReactiveSignal<unknown> & IObservable): boolean {
     if (node.subs.size > 0) return false
     return this.#nodes.delete(node)
   }
@@ -208,8 +210,10 @@ export class ObservableObject<T extends Record<string, unknown>> extends Observa
     (node) => this.own(node),
     (node) => this.release(node)
   )
-  #structure: Signal<number>
-  #revision: Signal<number>
+  /** Invalidates object key enumeration when the stored shape changes. */
+  #structure: IReactiveSignal<number> & IObservable
+  /** Invalidates cached object snapshots after any committed mutation. */
+  #revision: IReactiveSignal<number> & IObservable
   #snapshotCache: Readonly<T> | undefined
   #snapshotRevision = -1
 
@@ -372,7 +376,8 @@ export class ObservableObject<T extends Record<string, unknown>> extends Observa
     return this.#cells.pruneStale((key) => this.#values.has(key))
   }
 
-  #cell(key: string): Signal<unknown> {
+  /** Obtains the owned per-key node, including absent values needed by live observers. */
+  #cell(key: string): IReactiveSignal<unknown> & IObservable {
     return this.#cells.getOrCreate(key, () =>
       internalRuntimeOf(this.runtime).signal(
         this.#values.has(key) ? this.#values.get(key) : ABSENT,
@@ -393,8 +398,10 @@ export class ObservableArray<T> extends ObservableCollectionBase {
     (node) => this.own(node),
     (node) => this.release(node)
   )
-  #structure: Signal<number>
-  #revision: Signal<number>
+  /** Invalidates array structure observers when length or index membership changes. */
+  #structure: IReactiveSignal<number> & IObservable
+  /** Invalidates cached array snapshots after any committed mutation. */
+  #revision: IReactiveSignal<number> & IObservable
   #snapshotCache: readonly T[] | undefined
   #snapshotRevision = -1
 
@@ -540,7 +547,8 @@ export class ObservableArray<T> extends ObservableCollectionBase {
     return this.#cells.pruneStale(() => false)
   }
 
-  #cell(index: number): Signal<T | typeof ABSENT> {
+  /** Obtains the owned per-index node without losing observations beyond the current bounds. */
+  #cell(index: number): IReactiveSignal<T | typeof ABSENT> & IObservable {
     return this.#cells.getOrCreate(index, () =>
       internalRuntimeOf(this.runtime).signal(
         index < this.#values.length ? this.#values[index] : ABSENT,
@@ -585,8 +593,10 @@ export class ObservableMap<K, V> extends ObservableCollectionBase {
     (node) => this.own(node),
     (node) => this.release(node)
   )
-  #structure: Signal<number>
-  #iteration: Signal<number>
+  /** Invalidates map size and key observations when membership changes. */
+  #structure: IReactiveSignal<number> & IObservable
+  /** Invalidates map value iteration when a member value changes. */
+  #iteration: IReactiveSignal<number> & IObservable
 
   constructor(
     initial: ReadonlyMap<K, V> | Iterable<readonly [K, V]> = [],
@@ -743,7 +753,8 @@ export class ObservableMap<K, V> extends ObservableCollectionBase {
     return this.#cells.pruneStale((key) => this.#values.has(key))
   }
 
-  #cell(key: K): Signal<V | typeof ABSENT> {
+  /** Obtains the owned per-key node while retaining tombstones observed by subscribers. */
+  #cell(key: K): IReactiveSignal<V | typeof ABSENT> & IObservable {
     return this.#cells.getOrCreate(key, () =>
       internalRuntimeOf(this.runtime).signal(
         this.#values.has(key) ? (this.#values.get(key) as V) : ABSENT,
@@ -796,7 +807,8 @@ export class ObservableSet<T> extends ObservableCollectionBase {
     (node) => this.own(node),
     (node) => this.release(node)
   )
-  #structure: Signal<number>
+  /** Invalidates set size and iteration observations when membership changes. */
+  #structure: IReactiveSignal<number> & IObservable
 
   constructor(
     initial: Iterable<T> = [],
@@ -895,7 +907,8 @@ export class ObservableSet<T> extends ObservableCollectionBase {
     return this.#cells.pruneStale((value) => this.#values.has(value))
   }
 
-  #cell(value: T): Signal<boolean> {
+  /** Obtains the owned membership node for this value. */
+  #cell(value: T): IReactiveSignal<boolean> & IObservable {
     return this.#cells.getOrCreate(value, () =>
       internalRuntimeOf(this.runtime).signal(this.#values.has(value), {
         debugName: `${this.debugName}.member`

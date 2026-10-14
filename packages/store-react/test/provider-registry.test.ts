@@ -1,7 +1,7 @@
 /* oxlint-disable unicorn/no-thenable -- adversarial fixtures verify lifecycle thenable admission. */
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { claimOwnership } from '@migaia/reactive/ownership'
+import { claimOwnership } from '@migaia/reactive/extension'
 import { createStoreRegistry, createStoreToken, StoreRegistry } from '../src/provider-registry'
 
 describe('createStoreToken', () => {

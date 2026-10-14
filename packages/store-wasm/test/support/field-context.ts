@@ -4,7 +4,7 @@
 // createRuntime() for the graph, createFieldSource() for the per-field Source capability.
 import { createRuntime } from '@migaia/reactive'
 import type { IRuntime } from '@migaia/reactive'
-import { createFieldSource } from '@migaia/reactive/source'
+import { createFieldSource } from '@migaia/reactive/extension'
 import type { IFieldContext } from '../../src/field'
 
 export function makeFieldContext(runtime: IRuntime = createRuntime()): {

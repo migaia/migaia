@@ -1,5 +1,10 @@
 import { use, useCallback, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react'
-import { defaultRuntime, type IDisposer, type IRuntime, type ISignal } from '@migaia/reactive'
+import {
+  defaultRuntime,
+  type IDisposer,
+  type IRuntime,
+  type IReactiveSignal
+} from '@migaia/reactive'
 import type { Resource, IResourceState } from '@migaia/resource'
 import { useNodeValue } from './useNode.js'
 import {
@@ -8,7 +13,7 @@ import {
   type IStoreShape,
   type IStoreResource
 } from '@migaia/store-light'
-import { createObserverBinding, type ICapture } from '@migaia/reactive/runtime'
+import { createObserverBinding, type ICapture } from '@migaia/reactive/extension'
 import { notifyReact } from './notify-react.js'
 
 export function useStoreResource<T>(resource: IStoreResource<T>): T {
@@ -282,7 +287,8 @@ export function useTracked<T>(
   return snapshot.value
 }
 
-export function useSignal<T>(s: ISignal<T>) {
+/** Subscribes to a public signal view and retains a setter bound to that signal's identity. */
+export function useSignal<T>(s: IReactiveSignal<T>) {
   // 快路径：Signal 的依赖集合恒为它自己，不需要 useTracked 的捕获/提交记账
   const value = useNodeValue(s, s.runtime)
   const set = useCallback(

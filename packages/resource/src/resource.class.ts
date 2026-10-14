@@ -2,15 +2,16 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   ReactiveErrorPhase,
   type IDisposable,
-  type IObservable,
-  type IObserver,
+  type IReactiveSignal,
   type IRuntime
-} from '@migaia/reactive/runtime'
-import type { Signal } from '@migaia/reactive/reactive/signal.class'
-import { internalsOf } from '@migaia/reactive/internals'
-import { internalRuntimeOf } from '@migaia/reactive/node-factories'
-import { claimOwnership } from '@migaia/reactive/ownership'
-import { registerDeps, registerDepVersions } from '@migaia/reactive/node-internals'
+} from '@migaia/reactive'
+import {
+  internalRuntimeOf,
+  claimOwnership,
+  type IObservable,
+  type IObserver
+} from '@migaia/reactive/extension'
+import { internalsOf, registerDeps, registerDepVersions } from '@migaia/reactive/internals'
 import { attachSecondaryErrors, tryReadProperty } from '@migaia/utils/error'
 import {
   assimilateCapturedThen,
@@ -404,7 +405,8 @@ export class Resource<T> implements IObserver, IDisposable {
   readonly depVersions: ReadonlyMap<IObservable, number>
   readonly runtime: IRuntime
   debugName?: string
-  #stateSignal: Signal<IResourceState<T>>
+  /** Resource-owned state node exposes subscriber count for the existing suspension lifecycle. */
+  #stateSignal: IReactiveSignal<IResourceState<T>> & IObservable
   #fetcher: IResourceFetcher<T>
   #ttl: number
   #staleWhileRevalidate: boolean
@@ -1163,7 +1165,7 @@ export class Resource<T> implements IObserver, IDisposable {
     if (this.#refreshScheduled) return
     this.#refreshScheduled = true
     // 与 Computed 挂起同一条 idle 通道：Resource 不得私自 queueMicrotask，
-    // 否则 setSchedulerStrategy / scheduleIdle 对异步失效无效。
+    // 否则 schedulerStrategy / scheduleIdle 对异步失效无效。
     internalsOf(this.runtime).deferIdle(() => {
       if (!this.#refreshScheduled || this.#terminal.lifecycle !== LifecycleState.open) return
       this.#refreshScheduled = false

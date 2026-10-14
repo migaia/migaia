@@ -6,7 +6,7 @@ import {
   createSyncLifecycleScope,
   type IGenerationRequest
 } from '@migaia/lifecycle'
-import { createRuntime, type ISignal } from '@migaia/reactive'
+import { createRuntime, type IReactiveSignal } from '@migaia/reactive'
 import { describe, expect, it } from 'vitest'
 
 type IModelState =
@@ -22,7 +22,7 @@ type IDeferredQuery = {
 
 type IOwnershipModel = {
   readonly events: ReturnType<typeof createEventChannel<void>>
-  readonly state: ISignal<IModelState>
+  readonly state: IReactiveSignal<IModelState>
   readonly queries: IDeferredQuery[]
   readonly microtasks: Array<() => void>
   readonly refresh: () => IGenerationRequest
@@ -121,8 +121,8 @@ const createOwnershipModel = (): IOwnershipModel => {
   ownDisposer(state, () => state.dispose())
   ownDisposer(invalidation, () => invalidation.dispose())
   ownDisposer(generations, () => generations.dispose())
-  ownDisposer(stopRefreshEffect, stopRefreshEffect)
-  ownDisposer(stopReentrantEffect, stopReentrantEffect)
+  ownDisposer(stopRefreshEffect, () => stopRefreshEffect.dispose())
+  ownDisposer(stopReentrantEffect, () => stopReentrantEffect.dispose())
   ownDisposer(unsubscribe, unsubscribe)
   ownDisposer(events, () => events.clear())
 

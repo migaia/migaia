@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { Computed, Effect, Signal, createRuntime } from '../src'
+import { createRuntime } from '../src/index.js'
 
 describe('reactive foundation', () => {
   it('propagates signal changes through computed and effect', () => {
     const runtime = createRuntime()
-    const source = new Signal(1, runtime)
-    const derived = new Computed(() => source.value * 2, runtime)
+    const source = runtime.signal(1)
+    const derived = runtime.computed(() => source.value * 2)
     const values: number[] = []
-    const effect = new Effect(() => {
+    const effect = runtime.effect(() => {
       values.push(derived.value)
-    }, runtime)
+    })
 
     expect(derived.value).toBe(2)
     source.value = 3

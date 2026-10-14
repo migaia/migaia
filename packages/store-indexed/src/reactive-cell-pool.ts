@@ -1,4 +1,5 @@
-import type { Signal } from '@migaia/reactive/reactive/signal.class'
+import type { IReactiveSignal } from '@migaia/reactive'
+import type { IObservable } from '@migaia/reactive/extension'
 import { KeyedCellRegistry, scheduleLazyCellRelease } from './keyed-cell-registry.js'
 
 /**
@@ -13,16 +14,24 @@ import { KeyedCellRegistry, scheduleLazyCellRelease } from './keyed-cell-registr
  * `ObservableCollectionBase#nodes`).
  */
 export class ReactiveCellPool<K, V> {
-  #cells = new KeyedCellRegistry<K, Signal<V>>()
-  readonly #own: (node: Signal<V>) => Signal<V>
-  readonly #release: (node: Signal<unknown>) => boolean
+  /** Materialized nodes share the collection's ownership and subscriber lifecycle. */
+  #cells = new KeyedCellRegistry<K, IReactiveSignal<V> & IObservable>()
+  /** Registers each materialized node with its collection's disposal bookkeeping. */
+  readonly #own: (node: IReactiveSignal<V> & IObservable) => IReactiveSignal<V> & IObservable
+  /** Removes collection ownership only after a node becomes dormant. */
+  readonly #release: (node: IReactiveSignal<unknown> & IObservable) => boolean
 
-  constructor(own: (node: Signal<V>) => Signal<V>, release: (node: Signal<unknown>) => boolean) {
+  /** Uses the collection's existing ownership callbacks for every pooled node. */
+  constructor(
+    own: (node: IReactiveSignal<V> & IObservable) => IReactiveSignal<V> & IObservable,
+    release: (node: IReactiveSignal<unknown> & IObservable) => boolean
+  ) {
     this.#own = own
     this.#release = release
   }
 
-  get(key: K): Signal<V> | undefined {
+  /** Reads an existing node without materializing a speculative lease. */
+  get(key: K): (IReactiveSignal<V> & IObservable) | undefined {
     return this.#cells.get(key)
   }
 
@@ -36,7 +45,10 @@ export class ReactiveCellPool<K, V> {
    * last observer disconnects, and — the tombstone case, a cell nobody ever subscribed to —
    * reclaimed at the end of the current microtask so a stray peek/read doesn't pin it forever.
    */
-  getOrCreate(key: K, create: () => Signal<V>): Signal<V> {
+  getOrCreate(
+    key: K,
+    create: () => IReactiveSignal<V> & IObservable
+  ): IReactiveSignal<V> & IObservable {
     const existing = this.#cells.get(key)
     if (existing) return existing
     const cell = this.#own(create())
@@ -51,7 +63,7 @@ export class ReactiveCellPool<K, V> {
   }
 
   /** Drop `key`'s cell now if it is exactly `cell` and has no remaining observers. */
-  releaseIfDormant(key: K, cell: Signal<unknown>): boolean {
+  releaseIfDormant(key: K, cell: IReactiveSignal<unknown> & IObservable): boolean {
     if (this.#cells.get(key) !== cell) return false
     if (!this.#release(cell)) return false
     this.#cells.delete(key)
@@ -73,11 +85,13 @@ export class ReactiveCellPool<K, V> {
     return this.#cells.keys()
   }
 
-  entries(): IterableIterator<[K, Signal<V>]> {
+  /** Iterates materialized nodes without changing their ownership. */
+  entries(): IterableIterator<[K, IReactiveSignal<V> & IObservable]> {
     return this.#cells.entries()
   }
 
-  [Symbol.iterator](): IterableIterator<[K, Signal<V>]> {
+  /** Exposes the same materialized-node iteration to collection consumers. */
+  [Symbol.iterator](): IterableIterator<[K, IReactiveSignal<V> & IObservable]> {
     return this.#cells.entries()
   }
 

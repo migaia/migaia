@@ -24,7 +24,7 @@ describe('M-T7 (§7 批次 2): request generation and suspension generation stay
     const stop = runtime.effect(() => {
       expect(resource.state).toBeDefined()
     })
-    stop()
+    stop.dispose()
 
     blocking.resolve(42)
     await flushAsync()
@@ -46,7 +46,7 @@ describe('M-T7 (§7 批次 2): request generation and suspension generation stay
     expect(resource.state).toEqual({ status: 'success', data: 10 })
     expect(resource.deps.size).toBeGreaterThan(0)
 
-    stopFirst() // 排一次挂起（挂起代数 N）
+    stopFirst.dispose() // 排一次挂起（挂起代数 N）
     const stopSecond = runtime.effect(() => {
       expect(resource.state).toBeDefined()
     })
@@ -60,7 +60,7 @@ describe('M-T7 (§7 批次 2): request generation and suspension generation stay
     await flushAsync()
     expect(resource.state).toEqual({ status: 'success', data: 20 })
 
-    stopSecond()
+    stopSecond.dispose()
     resource.dispose()
   })
 
@@ -74,7 +74,7 @@ describe('M-T7 (§7 批次 2): request generation and suspension generation stay
     await flushAsync()
     expect(resource.deps.size).toBeGreaterThan(0)
 
-    stop() // 排一次挂起，且不再重新观察
+    stop.dispose() // 排一次挂起，且不再重新观察
     await flushAsync()
 
     expect(resource.deps.size).toBe(0)

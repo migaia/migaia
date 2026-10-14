@@ -33,6 +33,7 @@ function toPersistUnit<TState>(collection: IPersistableCollection<TState>): IPer
     restore: (state) => collection.replace(state),
     subscribe: (onChange) => {
       let first = true
+      /** The subscription owns the public effect handle while exposing the existing disposer API. */
       const effect = collection.runtime.effect(() => {
         // 读一次 snapshot() 建立追踪依赖；首次运行是 Effect 构造自带的同步执行，
         // 不是真正的"变化"，必须跳过，否则 hydrate 之前就会误触发一次写回。
@@ -43,7 +44,7 @@ function toPersistUnit<TState>(collection: IPersistableCollection<TState>): IPer
         }
         onChange()
       })
-      return effect
+      return () => effect.dispose()
     }
   }
 }

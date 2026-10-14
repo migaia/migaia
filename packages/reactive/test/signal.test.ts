@@ -1,13 +1,17 @@
+import type { Computed } from '../src/reactive/computed.class.js'
+import { currentRuntimeVersion } from '../src/entry/extension.js'
 import { describe, expect, it } from 'vitest'
-import { Signal, createRuntime } from '../src'
+import { createRuntime } from '../src/index.js'
 
 describe('Signal', () => {
   it('rebuilds conditional dependencies after an untracked preview', () => {
     const runtime = createRuntime()
-    const branch = new Signal(true, runtime)
-    const left = new Signal(1, runtime)
-    const right = new Signal(10, runtime)
-    const computed = runtime.computed(() => (branch.value ? left.value : right.value))
+    const branch = runtime.signal(true)
+    const left = runtime.signal(1)
+    const right = runtime.signal(10)
+    const computed = runtime.computed(() =>
+      branch.value ? left.value : right.value
+    ) as Computed<number>
     expect(computed.value).toBe(1)
     branch.value = false
     expect(computed.preview()).toBe(10)
@@ -22,12 +26,12 @@ describe('Signal', () => {
 
   it('commits a same-version preview without evaluating the derivation twice', () => {
     const runtime = createRuntime()
-    const signal = new Signal(1, runtime)
+    const signal = runtime.signal(1)
     let runs = 0
     const computed = runtime.computed(() => {
       runs++
       return signal.value
-    })
+    }) as Computed<number>
     expect(computed.value).toBe(1)
     signal.value = 2
     expect(computed.preview()).toBe(2)
@@ -39,8 +43,8 @@ describe('Signal', () => {
 
   it('starts at the version consumed by construction and only advances on a real change', () => {
     const runtime = createRuntime()
-    const s = new Signal(1, runtime)
-    expect(s.version).toBe(runtime.currentVersion())
+    const s = runtime.signal(1)
+    expect(s.version).toBe(currentRuntimeVersion(runtime))
     const startVersion = s.version
     s.value = 1 // Object.is same value -> short-circuit, no version bump
     expect(s.version).toBe(startVersion)
@@ -51,7 +55,7 @@ describe('Signal', () => {
 
   it('peek() reads the current value without establishing a dependency', () => {
     const runtime = createRuntime()
-    const s = new Signal(10, runtime)
+    const s = runtime.signal(10)
     let runs = 0
     const dispose = runtime.effect(() => {
       runs++
@@ -62,26 +66,26 @@ describe('Signal', () => {
     runtime.flush()
     expect(runs).toBe(1) // no dependency was built, so no rerun
     expect(s.peek()).toBe(20)
-    dispose()
+    dispose.dispose()
     s.dispose()
   })
 
   it('observed reflects whether the signal currently has any subscriber', () => {
     const runtime = createRuntime()
-    const s = new Signal(1, runtime)
+    const s = runtime.signal(1)
     expect(s.observed).toBe(false)
     const dispose = runtime.effect(() => {
       void s.value
     })
     expect(s.observed).toBe(true)
-    dispose()
+    dispose.dispose()
     expect(s.observed).toBe(false)
     s.dispose()
   })
 
   it('dispose() is idempotent and disconnects all subscribers', () => {
     const runtime = createRuntime()
-    const s = new Signal(1, runtime)
+    const s = runtime.signal(1)
     const dispose = runtime.effect(() => {
       void s.value
     })
@@ -89,12 +93,12 @@ describe('Signal', () => {
     s.dispose()
     expect(s.disposed).toBe(true)
     expect(() => s.dispose()).not.toThrow()
-    dispose()
+    dispose.dispose()
   })
 
   it('reading, writing, or peeking a disposed signal throws instead of returning stale data', () => {
     const runtime = createRuntime()
-    const s = new Signal(1, runtime)
+    const s = runtime.signal(1)
     s.dispose()
     expect(() => s.value).toThrow('cannot use a disposed signal')
     expect(() => {
@@ -105,7 +109,7 @@ describe('Signal', () => {
 
   it('addObservedHooks fires onObserved/onUnobserved exactly at first-subscriber/last-unsubscriber edges', () => {
     const runtime = createRuntime()
-    const s = new Signal(1, runtime)
+    const s = runtime.signal(1)
     const events: string[] = []
     s.addObservedHooks({
       onObserved: () => events.push('observed'),
@@ -119,15 +123,15 @@ describe('Signal', () => {
       void s.value
     })
     expect(events).toEqual(['observed']) // second subscriber: no additional edge event
-    disposeA()
+    disposeA.dispose()
     expect(events).toEqual(['observed']) // still one subscriber left
-    disposeB()
+    disposeB.dispose()
     expect(events).toEqual(['observed', 'unobserved'])
   })
 
   it('addObservedHooks returns a token that removes only that hook', () => {
     const runtime = createRuntime()
-    const s = new Signal(1, runtime)
+    const s = runtime.signal(1)
     const events: string[] = []
     const remove = s.addObservedHooks({ onObserved: () => events.push('a') })
     s.addObservedHooks({ onObserved: () => events.push('b') })
@@ -136,13 +140,13 @@ describe('Signal', () => {
       void s.value
     })
     expect(events).toEqual(['b'])
-    dispose()
+    dispose.dispose()
   })
 
   it('aggregates errors from multiple failing lifecycle hooks and reports them via onError', () => {
     const errors: unknown[] = []
     const runtime = createRuntime({ onError: (error) => errors.push(error) })
-    const s = new Signal(1, runtime)
+    const s = runtime.signal(1)
     s.addObservedHooks({
       onObserved: () => {
         throw new Error('hook-1')
@@ -159,14 +163,14 @@ describe('Signal', () => {
     expect(errors).toHaveLength(1)
     expect(errors[0]).toBeInstanceOf(AggregateError)
     expect((errors[0] as AggregateError).errors).toHaveLength(2)
-    dispose()
+    dispose.dispose()
   })
 
   it('reading a signal from another Runtime while tracking dependencies throws cross-runtime error', () => {
     const runtimeA = createRuntime()
     const runtimeB = createRuntime()
-    const foreign = new Signal(1, runtimeB)
-    expect(() => new Signal(1, runtimeA).runtime).not.toThrow()
+    const foreign = runtimeB.signal(1)
+    expect(() => runtimeA.signal(1).runtime).not.toThrow()
     expect(() =>
       runtimeA.effect(() => {
         expect(foreign.value).toBeDefined()

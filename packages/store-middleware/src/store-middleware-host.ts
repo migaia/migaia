@@ -5,8 +5,12 @@ import {
   type IPlugin,
   type IPluginHostOptions
 } from '@migaia/plugin-host'
-import { ReactiveErrorPhase, type IDisposer, type IRuntime } from '@migaia/reactive'
-import type { IRuntimeErrorPhase } from '@migaia/reactive/runtime'
+import {
+  ReactiveErrorPhase,
+  type IDisposer,
+  type IRuntime,
+  type IRuntimeErrorContext
+} from '@migaia/reactive'
 import type { IReactiveStore } from '@migaia/store-light'
 import { createStoreMiddlewareAggregateError, createStoreMiddlewareError } from './errors.js'
 import { StoreMiddlewareErrorCode } from './error-code.js'
@@ -28,7 +32,7 @@ import { snapshotOwnDescriptors } from '@migaia/utils/object'
 function reportMiddlewareFailure(
   runtime: IRuntime,
   error: unknown,
-  phase: IRuntimeErrorPhase
+  phase: IRuntimeErrorContext['phase']
 ): void {
   try {
     runtime.reportError(error, { phase })
@@ -162,7 +166,7 @@ export function createStoreMiddlewareHost<S>(
         applyState(state)
       },
       reportError: (error, phase) =>
-        reportMiddlewareFailure(runtime, error, phase as IRuntimeErrorPhase)
+        reportMiddlewareFailure(runtime, error, phase as IRuntimeErrorContext['phase'])
     }),
     // Store 绑定先释放，再委托 plugin-host 清理；`next()` 由句柄保证恰好执行一次。
     dispose: async (next) => {

@@ -25,7 +25,7 @@ describe('ObservableObject', () => {
     obj.set('a', 10)
     expect(runsA).toBe(2) // tracked key changed: rerun
 
-    disposeEffect()
+    disposeEffect.dispose()
     obj.dispose()
   })
 
@@ -41,7 +41,7 @@ describe('ObservableObject', () => {
     obj.set('a', 999)
     expect(runs).toBe(1)
 
-    disposeEffect()
+    disposeEffect.dispose()
     obj.dispose()
   })
 
@@ -63,7 +63,7 @@ describe('ObservableObject', () => {
     obj.delete('newKey') // key removed: structure bumped
     expect(runs).toBe(3)
 
-    disposeEffect()
+    disposeEffect.dispose()
     obj.dispose()
   })
 
@@ -82,7 +82,7 @@ describe('ObservableObject', () => {
     obj.set('a', 2)
     expect(runs).toBe(2)
 
-    disposeEffect()
+    disposeEffect.dispose()
     obj.dispose()
   })
 
@@ -105,7 +105,7 @@ describe('ObservableObject', () => {
     expect(obj.delete('missing')).toBe(false)
     expect(runs).toBe(1)
 
-    disposeEffect()
+    disposeEffect.dispose()
     obj.dispose()
   })
 
@@ -120,7 +120,7 @@ describe('ObservableObject', () => {
     expect(obj.delete('a')).toBe(true)
     expect(seen).toEqual([1, undefined])
 
-    disposeEffect()
+    disposeEffect.dispose()
     obj.dispose()
   })
 
@@ -170,7 +170,7 @@ describe('ObservableObject', () => {
     expect(obj.peek('c')).toBe(4)
     expect([...obj.keys()].sort()).toEqual(['b', 'c'])
 
-    disposeEffect()
+    disposeEffect.dispose()
     obj.dispose()
   })
 
@@ -183,7 +183,7 @@ describe('ObservableObject', () => {
     obj.delete('a') // cell persists: the effect above is still watching it
     expect(obj.prune()).toBe(0)
 
-    disposeEffect()
+    disposeEffect.dispose()
     obj.dispose()
   })
 
