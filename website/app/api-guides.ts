@@ -20180,7 +20180,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Validates an SSR snapshot, serializes it as JSON, and escapes HTML-significant characters so the text is safe inside an application/json script element.',
-      quickStart: `import { createSSRRequestScope, serializeSSRState } from '@migaia/store-ssr'\n\nconst scope = createSSRRequestScope()\nconst text = serializeSSRState(scope.dehydrate())\nconst script = \`<script type=\"application/json\" id=\"__STORE_STATE__\">\${text}</script>\`\nconsole.log('SSR state script:', script)\nawait scope.disposeAsync()`,
+      quickStart: `import { createSSRRequestScope, serializeSSRState } from '@migaia/store-ssr'\n\nconst scope = createSSRRequestScope()\nconst text = serializeSSRState(scope.dehydrate())\nconst script = \`<script type="application/json" id="__STORE_STATE__">\${text}</script>\`\nconsole.log('SSR state script:', script)\nawait scope.disposeAsync()`,
       scenarios: [
         'A template already owns the script element markup.',
         'A validated snapshot must cross the HTML boundary.',
@@ -20206,7 +20206,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '先校验 SSR snapshot，再序列化 JSON，并转义 HTML 敏感字符，使文本可安全放入 application/json script element。',
-      quickStart: `import { createSSRRequestScope, serializeSSRState } from '@migaia/store-ssr'\n\nconst scope = createSSRRequestScope()\nconst text = serializeSSRState(scope.dehydrate())\nconst script = \`<script type=\"application/json\" id=\"__STORE_STATE__\">\${text}</script>\`\nconsole.log('SSR state script:', script)\nawait scope.disposeAsync()`,
+      quickStart: `import { createSSRRequestScope, serializeSSRState } from '@migaia/store-ssr'\n\nconst scope = createSSRRequestScope()\nconst text = serializeSSRState(scope.dehydrate())\nconst script = \`<script type="application/json" id="__STORE_STATE__">\${text}</script>\`\nconsole.log('SSR state script:', script)\nawait scope.disposeAsync()`,
       scenarios: [
         'template 已经拥有 script element markup。',
         '已校验 snapshot 必须穿过 HTML 边界。',
@@ -28482,7 +28482,7 @@ try {
           title: '直接实例：持有生命周期并进行非追踪读取',
           description:
             '直接构造 Computed 可显式持有实例、检查 disposed，并在宿主销毁时释放。peek() 会取得最新值，但不会让当前观察者订阅这个 Computed。',
-          code: "import { Computed, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst lastName = runtime.signal('Lovelace')\nconst fullName = new Computed(\n  () => \`\${firstName.value} ${lastName.value}`,\n  runtime,\n  { debugName: 'profile.full-name' }\n)\n\nconsole.log(fullName.peek()) // Ada Lovelace\nfullName.dispose()\nconsole.log(fullName.disposed) // true"
+          code: "import { Computed, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst lastName = runtime.signal('Lovelace')\nconst fullName = new Computed(\n  () => `${firstName.value} ${lastName.value}`,\n  runtime,\n  { debugName: 'profile.full-name' }\n)\n\nconsole.log(fullName.peek()) // Ada Lovelace\nfullName.dispose()\nconsole.log(fullName.disposed) // true"
         }
       ],
       options: [
@@ -28561,7 +28561,7 @@ try {
           title: 'Direct instance: own the lifecycle and read without tracking',
           description:
             'Direct construction retains the Computed instance, exposes disposed, and allows explicit host teardown. peek() returns the latest value without subscribing the current observer to this Computed.',
-          code: "import { Computed, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst lastName = runtime.signal('Lovelace')\nconst fullName = new Computed(\n  () => \`\${firstName.value} ${lastName.value}`,\n  runtime,\n  { debugName: 'profile.full-name' }\n)\n\nconsole.log(fullName.peek()) // Ada Lovelace\nfullName.dispose()\nconsole.log(fullName.disposed) // true"
+          code: "import { Computed, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst lastName = runtime.signal('Lovelace')\nconst fullName = new Computed(\n  () => `${firstName.value} ${lastName.value}`,\n  runtime,\n  { debugName: 'profile.full-name' }\n)\n\nconsole.log(fullName.peek()) // Ada Lovelace\nfullName.dispose()\nconsole.log(fullName.disposed) // true"
         }
       ],
       options: [
