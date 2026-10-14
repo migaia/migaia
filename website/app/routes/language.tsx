@@ -1,4 +1,4 @@
-import { Link } from 'react-router'
+import { Link, type MetaFunction as IMetaFunction } from 'react-router'
 import { copyFor } from '../copy.js'
 import { domainPath, type ILocale } from '../route-contract.js'
 
@@ -6,6 +6,21 @@ import { domainPath, type ILocale } from '../route-contract.js'
 const STARTER_LIBRARY = 'utils'
 
 type ILanguageRouteProps = { readonly params: { readonly lang?: string } }
+
+/** Localized home purpose shared by the introduction and its search description. */
+const LANGUAGE_DESCRIPTION = {
+  zh: '从一个目标开始，沿着真实的类库、模块与 API 走到可验证结果。',
+  en: 'Start with a goal and follow a verified path through libraries, modules, and APIs.'
+} as const
+
+/** Uses the same home title in each locale and preserves the page's authored purpose. */
+export const meta: IMetaFunction = ({ params }) => [
+  { title: 'migaia' },
+  {
+    name: 'description',
+    content: LANGUAGE_DESCRIPTION[params.lang === 'zh' ? 'zh' : 'en']
+  }
+]
 
 /** Renders the first-use journey: capability map, quickstart, goals, and architecture preview. */
 function Language({ params }: ILanguageRouteProps) {
@@ -18,11 +33,7 @@ function Language({ params }: ILanguageRouteProps) {
       <h1>
         {chinese ? '用清晰、可组合的类库构建系统。' : 'Build with clear, composable libraries.'}
       </h1>
-      <p className="lede">
-        {chinese
-          ? '从一个目标开始，沿着真实的类库、模块与 API 走到可验证结果。'
-          : 'Start with a goal and follow a verified path through libraries, modules, and APIs.'}
-      </p>
+      <p className="lede">{LANGUAGE_DESCRIPTION[locale]}</p>
       <div className="actions">
         <Link className="button button-primary" to={domainPath(locale, 'docs')}>
           {chinese ? '开始查文档' : 'Start with Docs'}

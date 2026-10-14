@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Link,
   Links,
   Meta,
+  type MetaFunction as IMetaFunction,
   Outlet,
   Scripts,
   ScrollRestoration,
@@ -24,10 +25,20 @@ import {
 } from './components/ui/dialog.js'
 import { Input } from './components/ui/input.js'
 import { Button } from './components/ui/button.js'
+import type { IPageNavigationContext } from './components/page-navigation.js'
 
 type IThemeMode = 'light' | 'dark' | 'time'
 type ITimePhase = 'sunrise' | 'sunset' | 'night' | 'midnight'
 type IThemeChoice = IThemeMode | ITimePhase
+
+/** Existing recovery-page purpose used when no page route supplies more specific metadata. */
+const ROOT_DESCRIPTION = 'The path does not map to a current library or documented topic.'
+
+/** Keeps the document titled when a route resolves to the shared recovery boundary. */
+export const meta: IMetaFunction = () => [
+  { title: 'migaia' },
+  { name: 'description', content: ROOT_DESCRIPTION }
+]
 
 /** Persistent browser key for the reader-selected color mode. */
 const THEME_STORAGE_KEY = 'migaia-theme'
@@ -101,7 +112,7 @@ function localeFromPath(pathname: string): ILocale {
 }
 
 /** Renders global navigation, demand-loaded search, language selection, and theme control. */
-function ShellHeader() {
+function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactNode }) {
   const [searchOpen, setSearchOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -121,6 +132,9 @@ function ShellHeader() {
       : `/${alternateLocale}${canonicalPathname}`
   }${location.search}${location.hash}`
   const copy = copyFor(locale)
+
+  /** Page navigation links close the existing menu after React Router changes the route. */
+  useEffect(() => setMobileNavOpen(false), [location.pathname])
 
   /** Loads Pagefind only after the user opens search. */
   async function openSearch() {
@@ -282,6 +296,7 @@ function ShellHeader() {
               </Link>
             ))}
           </nav>
+          {pageNavigation ? <div className="mobile-page-navigation">{pageNavigation}</div> : null}
         </dialog>
       ) : null}
       <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
@@ -317,12 +332,16 @@ function ShellHeader() {
 
 /** Renders the active route inside the shared orientation shell. */
 function App() {
+  /** The active outlet supplies category links without moving its article into the header. */
+  const [pageNavigation, setPageNavigation] = useState<React.ReactNode>(null)
+  /** A stable registration boundary keeps route updates from repeatedly installing the same menu. */
+  const navigationContext = useMemo<IPageNavigationContext>(() => ({ setPageNavigation }), [])
   return (
     <>
-      <ShellHeader />
+      <ShellHeader pageNavigation={pageNavigation} />
       <RouteTransition />
       <RouteScrollReset />
-      <Outlet />
+      <Outlet context={navigationContext} />
     </>
   )
 }
@@ -379,7 +398,7 @@ export function ErrorBoundary() {
     <main className="page-shell">
       <p className="eyebrow">Not found</p>
       <h1>That page is not available.</h1>
-      <p className="lede">The path does not map to a current library or documented topic.</p>
+      <p className="lede">{ROOT_DESCRIPTION}</p>
       <div className="actions">
         <Link className="button button-primary" to={`/${locale}/docs`}>
           Browse Docs
