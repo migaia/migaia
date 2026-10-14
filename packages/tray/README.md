@@ -154,7 +154,7 @@ watch 保留最近 100 条未读记录，不是持久日志。每个实例的 st
 Tray 验证和 start 错误使用自己的稳定 code，并保留原错误于 cause。
 
 `defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`；
-routing namespace 和 pub/sub 由后续 mesh 实现。`pick(candidates, context)` 同步返回实例 id，
+注册后通过 `tray.routing.<name>(host)` 或 `tray.routing('<name>', host)` 选实例；pub/sub 见 USEGUIDE。`pick(candidates, context)` 同步返回实例 id，
 `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`，
 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。
 

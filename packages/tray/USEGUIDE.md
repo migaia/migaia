@@ -52,14 +52,14 @@ try {
 | `supervisor` | `ITraySupervisorPolicy`；默认使用运行时策略 | `restart` 支持 `mode`、`maxRestarts`、`windowMs`、`initialDelayMs`；另支持 `startupTimeoutMs` |
 | `limits` | `Readonly<{ heapBytes?: number }>`；默认未指定 | 仅 thread 可用 |
 | `sandbox` | `ITraySandbox`；默认未指定 | 仅 process 可用；包含 `name` 与同步 `wrap(command)` |
-| `routing` | `TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定 | 保存共享 policy 定义；执行与命名空间由 mesh 实现 |
+| `routing` | `TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定 | 声明子实例插件可用的 policy；父端把它并入 registry 注册集，子端经 `deps.tray.routing` 调用（见 Routing） |
 
 `supervisor.restart.mode` 接收 `'never' | 'on-failure' | 'always'`。
 `sandbox.wrap` 的输入与输出均为 RPC Process 的 `IProcessLaunchCommand`：
 `{ command, args, cwd?, env }`；返回完整的新命令，保留所需环境与工作目录。
 
 `createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。
-`hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，当前只完成定义校验。
+`hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。
 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void`
 接收运行与清理诊断，默认使用 `console.error`。
 
@@ -115,7 +115,7 @@ watch 保留最近 100 条未读记录，不是持久日志。每个实例的 st
 Tray 验证和 start 错误使用自己的稳定 code，并保留原错误于 cause。
 
 `defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`；
-routing namespace 和 pub/sub 由后续 mesh 实现。返回值为冻结的
+注册后通过 `tray.routing.<name>(host)` 或 `tray.routing('<name>', host)` 使用（见 Routing、Publish/subscribe）。返回值为冻结的
 `ITrayRoutingPolicy<TName>`；`pick(candidates: readonly ITrayInstance[], context: ITrayRoutingContext)`
 同步返回一个实例 id，`context` 包含 `host: string` 与 `sequence: number`。
 定义时不调用 `pick`。名称必须符合 `^[a-z][A-Za-z0-9]*$`，不能是 `roundRobin`、
