@@ -72,7 +72,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`@migaia/rpc-core` 与 `@migaia/rpc-contract` 是 peer 依赖，三者版本必须完全一致（当前 `0.0.7`）。运行时依赖 `@migaia/supervision`（进程监督与预算）、`@migaia/lifecycle`、`@migaia/plugin-host`、`@migaia/utils`，会随包安装。"
+                "text": "`@migaia/rpc-core` 与 `@migaia/rpc-contract` 是 peer 依赖，三者版本必须完全一致（当前 `0.0.7`）。运行时依赖 `@migaia/supervision`（进程监督与预算）、`@migaia/plugin-host`、`@migaia/utils`，会随包安装。"
               },
               {
                 "type": "paragraph",
@@ -2573,7 +2573,7 @@
         {
           "name": "IListenProcessByteChannel",
           "kind": "type",
-          "signature": "export type IListenProcessByteChannel = (options: Readonly<{ address: string; /** Stable, non-secret owner for safe recovery of an abandoned Unix socket path. */ serviceId?: string; signal?: import('@migaia/rpc-core').IRpcAbortSignal; auth: Readonly<{ mode: 'required'; verify(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>; }>; onConnection(pending: IProcessPendingByteConnection): void | Promise<void>; report(error: unknown): void; }>) => Promise<IProcessByteListener>;",
+          "signature": "export type IListenProcessByteChannel = (options: Readonly<{ address: string; /** Stable, non-secret owner for safe recovery of an abandoned Unix socket path. */ serviceId?: string; signal?: import('@migaia/utils/promise').IAbortSignal; auth: Readonly<{ mode: 'required'; verify(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>; }>; onConnection(pending: IProcessPendingByteConnection): void | Promise<void>; report(error: unknown): void; }>) => Promise<IProcessByteListener>;",
           "declarationLine": 84,
           "source": "packages/rpc-process/dist/process/types.d.ts",
           "purpose": "Platform deep paths implement the same authenticated listener port.",
@@ -2589,7 +2589,7 @@
           "aliasOf": "IListenProcessByteChannel",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IListenProcessByteChannel = (options: Readonly<{ address: string; /** Stable, non-secret owner for safe recovery of an abandoned Unix socket path. */ serviceId?: string; signal?: import('@migaia/rpc-core').IRpcAbortSignal; auth: Readonly<{ mode: 'required'; verify(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>; }>; onConnection(pending: IProcessPendingByteConnection): void | Promise<void>; report(error: unknown): void; }>) => Promise<IProcessByteListener>;"
+            "export type IListenProcessByteChannel = (options: Readonly<{ address: string; /** Stable, non-secret owner for safe recovery of an abandoned Unix socket path. */ serviceId?: string; signal?: import('@migaia/utils/promise').IAbortSignal; auth: Readonly<{ mode: 'required'; verify(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>; }>; onConnection(pending: IProcessPendingByteConnection): void | Promise<void>; report(error: unknown): void; }>) => Promise<IProcessByteListener>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2628,7 +2628,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/types.d.ts:IListenProcessByteChannel:export type IListenProcessByteChannel = (options: Readonly<{ address: string; /** Stable, non-secret owner for safe recovery of an abandoned Unix socket path. */ serviceId?: string; signal?: import('@migaia/rpc-core').IRpcAbortSignal; auth: Readonly<{ mode: 'required'; verify(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>; }>; onConnection(pending: IProcessPendingByteConnection): void | Promise<void>; report(error: unknown): void; }>) => Promise<IProcessByteListener>;",
+          "identity": "packages/rpc-process/dist/process/types.d.ts:IListenProcessByteChannel:export type IListenProcessByteChannel = (options: Readonly<{ address: string; /** Stable, non-secret owner for safe recovery of an abandoned Unix socket path. */ serviceId?: string; signal?: import('@migaia/utils/promise').IAbortSignal; auth: Readonly<{ mode: 'required'; verify(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>; }>; onConnection(pending: IProcessPendingByteConnection): void | Promise<void>; report(error: unknown): void; }>) => Promise<IProcessByteListener>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -2832,7 +2832,7 @@
         {
           "name": "IProcessCommonOptions",
           "kind": "type",
-          "signature": "export type IProcessCommonOptions = Readonly<{ peerId: string; signal?: import('@migaia/rpc-core').IRpcAbortSignal; handshakeTimeoutMs?: number; scheduler?: IScheduler; report(error: unknown): void; ipc: Readonly<{ connectionId: string; sessionId: string; processId?: string; maxPendingData?: number; maxPendingControl?: number; log(record: IIpcLogRecord): void | Promise<void>; stderr?: (listener: (chunk: Uint8Array) => void) => () => void; }>; }>;",
+          "signature": "export type IProcessCommonOptions = Readonly<{ peerId: string; signal?: import('@migaia/utils/promise').IAbortSignal; handshakeTimeoutMs?: number; scheduler?: IScheduler; report(error: unknown): void; ipc: Readonly<{ connectionId: string; sessionId: string; processId?: string; maxPendingData?: number; maxPendingControl?: number; log(record: IIpcLogRecord): void | Promise<void>; stderr?: (listener: (chunk: Uint8Array) => void) => () => void; }>; }>;",
           "declarationLine": 23,
           "source": "packages/rpc-process/dist/process/types.d.ts",
           "purpose": "Per-connection identity, diagnostics, and lifecycle ports supplied by the owner.",
@@ -2848,7 +2848,7 @@
           "aliasOf": "IProcessCommonOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IProcessCommonOptions = Readonly<{ peerId: string; signal?: import('@migaia/rpc-core').IRpcAbortSignal; handshakeTimeoutMs?: number; scheduler?: IScheduler; report(error: unknown): void; ipc: Readonly<{ connectionId: string; sessionId: string; processId?: string; maxPendingData?: number; maxPendingControl?: number; log(record: IIpcLogRecord): void | Promise<void>; stderr?: (listener: (chunk: Uint8Array) => void) => () => void; }>; }>;"
+            "export type IProcessCommonOptions = Readonly<{ peerId: string; signal?: import('@migaia/utils/promise').IAbortSignal; handshakeTimeoutMs?: number; scheduler?: IScheduler; report(error: unknown): void; ipc: Readonly<{ connectionId: string; sessionId: string; processId?: string; maxPendingData?: number; maxPendingControl?: number; log(record: IIpcLogRecord): void | Promise<void>; stderr?: (listener: (chunk: Uint8Array) => void) => () => void; }>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2887,7 +2887,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/types.d.ts:IProcessCommonOptions:export type IProcessCommonOptions = Readonly<{ peerId: string; signal?: import('@migaia/rpc-core').IRpcAbortSignal; handshakeTimeoutMs?: number; scheduler?: IScheduler; report(error: unknown): void; ipc: Readonly<{ connectionId: string; sessionId: string; processId?: string; maxPendingData?: number; maxPendingControl?: number; log(record: IIpcLogRecord): void | Promise<void>; stderr?: (listener: (chunk: Uint8Array) => void) => () => void; }>; }>;",
+          "identity": "packages/rpc-process/dist/process/types.d.ts:IProcessCommonOptions:export type IProcessCommonOptions = Readonly<{ peerId: string; signal?: import('@migaia/utils/promise').IAbortSignal; handshakeTimeoutMs?: number; scheduler?: IScheduler; report(error: unknown): void; ipc: Readonly<{ connectionId: string; sessionId: string; processId?: string; maxPendingData?: number; maxPendingControl?: number; log(record: IIpcLogRecord): void | Promise<void>; stderr?: (listener: (chunk: Uint8Array) => void) => () => void; }>; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3151,7 +3151,7 @@
           "name": "IProcessLaunchCommand",
           "kind": "type",
           "signature": "export type IProcessLaunchCommand = Readonly<{ command: string; args: readonly string[]; cwd?: string; env: Readonly<IProcessEnv>; }>;",
-          "declarationLine": 10,
+          "declarationLine": 11,
           "source": "packages/rpc-process/dist/process/adapters/short-source.d.ts",
           "purpose": "Caller-owned command data excludes the channel, bootstrap and supervision authority.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessLaunchCommand.",
@@ -4044,7 +4044,7 @@
         {
           "name": "IProcessRegistrationListenOptions",
           "kind": "type",
-          "signature": "export type IProcessRegistrationListenOptions = Readonly<{ wire: 'native'; listen: IListenProcessByteChannel; address: string; /** Unix rendezvous paths require a stable owner identity before binding. */ serviceId?: string; offer: IRpcHandshakeOffer; createConnectionContext(pending: IProcessPendingByteConnection): Readonly<{ peerId: string; ipc: IProcessCommonOptions['ipc']; }>; verifyToken(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>; onCandidate(candidate: IProcessSessionLease & Readonly<{ signal: IAbortSignal; }>): 'adopt' | 'reject' | Promise<'adopt' | 'reject'>; scheduler?: IScheduler; handshakeTimeoutMs?: number; signal?: AbortSignal; }>;",
+          "signature": "export type IProcessRegistrationListenOptions = Readonly<{ wire: 'native'; listen: IListenProcessByteChannel; address: string; /** Unix rendezvous paths require a stable owner identity before binding. */ serviceId?: string; offer: IRpcHandshakeOffer; createConnectionContext(pending: IProcessPendingByteConnection): Readonly<{ peerId: string; ipc: IProcessCommonOptions['ipc']; }>; verifyToken(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>; onCandidate(candidate: IProcessSessionLease & Readonly<{ signal: IAbortSignal; }>): 'adopt' | 'reject' | Promise<'adopt' | 'reject'>; scheduler?: IScheduler; handshakeTimeoutMs?: number; signal?: IAbortSignal; }>;",
           "declarationLine": 81,
           "source": "packages/rpc-process/dist/process/resilience/types.d.ts",
           "purpose": "Authenticated native candidates can be adopted once or rejected without a second handshake.",
@@ -4060,7 +4060,7 @@
           "aliasOf": "IProcessRegistrationListenOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IProcessRegistrationListenOptions = Readonly<{ wire: 'native'; listen: IListenProcessByteChannel; address: string; /** Unix rendezvous paths require a stable owner identity before binding. */ serviceId?: string; offer: IRpcHandshakeOffer; createConnectionContext(pending: IProcessPendingByteConnection): Readonly<{ peerId: string; ipc: IProcessCommonOptions['ipc']; }>; verifyToken(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>; onCandidate(candidate: IProcessSessionLease & Readonly<{ signal: IAbortSignal; }>): 'adopt' | 'reject' | Promise<'adopt' | 'reject'>; scheduler?: IScheduler; handshakeTimeoutMs?: number; signal?: AbortSignal; }>;"
+            "export type IProcessRegistrationListenOptions = Readonly<{ wire: 'native'; listen: IListenProcessByteChannel; address: string; /** Unix rendezvous paths require a stable owner identity before binding. */ serviceId?: string; offer: IRpcHandshakeOffer; createConnectionContext(pending: IProcessPendingByteConnection): Readonly<{ peerId: string; ipc: IProcessCommonOptions['ipc']; }>; verifyToken(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>; onCandidate(candidate: IProcessSessionLease & Readonly<{ signal: IAbortSignal; }>): 'adopt' | 'reject' | Promise<'adopt' | 'reject'>; scheduler?: IScheduler; handshakeTimeoutMs?: number; signal?: IAbortSignal; }>;"
           ],
           "overloadParameterDetails": [[], []],
           "overloadReturns": [],
@@ -4099,7 +4099,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/resilience/types.d.ts:IProcessRegistrationListenOptions:export type IProcessRegistrationListenOptions = Readonly<{ wire: 'native'; listen: IListenProcessByteChannel; address: string; /** Unix rendezvous paths require a stable owner identity before binding. */ serviceId?: string; offer: IRpcHandshakeOffer; createConnectionContext(pending: IProcessPendingByteConnection): Readonly<{ peerId: string; ipc: IProcessCommonOptions['ipc']; }>; verifyToken(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>; onCandidate(candidate: IProcessSessionLease & Readonly<{ signal: IAbortSignal; }>): 'adopt' | 'reject' | Promise<'adopt' | 'reject'>; scheduler?: IScheduler; handshakeTimeoutMs?: number; signal?: AbortSignal; }>;",
+          "identity": "packages/rpc-process/dist/process/resilience/types.d.ts:IProcessRegistrationListenOptions:export type IProcessRegistrationListenOptions = Readonly<{ wire: 'native'; listen: IListenProcessByteChannel; address: string; /** Unix rendezvous paths require a stable owner identity before binding. */ serviceId?: string; offer: IRpcHandshakeOffer; createConnectionContext(pending: IProcessPendingByteConnection): Readonly<{ peerId: string; ipc: IProcessCommonOptions['ipc']; }>; verifyToken(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>; onCandidate(candidate: IProcessSessionLease & Readonly<{ signal: IAbortSignal; }>): 'adopt' | 'reject' | Promise<'adopt' | 'reject'>; scheduler?: IScheduler; handshakeTimeoutMs?: number; signal?: IAbortSignal; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4749,7 +4749,7 @@
           "name": "IProcessShortSourceOptions",
           "kind": "type",
           "signature": "export type IProcessShortSourceOptions = Readonly<{ token?: string; verify?: IProcessServeListenerIngress['verify']; connectTimeoutMs?: number; }>;",
-          "declarationLine": 38,
+          "declarationLine": 39,
           "source": "packages/rpc-process/dist/process/adapters/short-source.d.ts",
           "purpose": "Plugin closures forward only source configuration after Core captures the original Host identity.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessShortSourceOptions.",
@@ -4812,8 +4812,8 @@
         {
           "name": "IProcessShortSpawn",
           "kind": "type",
-          "signature": "export type IProcessShortSpawn = Readonly<{ entry?: string | URL; base?: string | URL; command?: string; args?: readonly string[]; cwd?: string; env?: Partial<IProcessEnv>; /** Rewrite the computed command once per launch; rpc retains the channel and bootstrap. */ wrap?: (command: IProcessLaunchCommand) => IProcessLaunchCommand; stdio?: IProcessSpec['stdio']; limits?: IProcessSpec['limits']; permissions?: IProcessSpec['permissions']; wire?: ProcessPluginWire; contract?: IRemoteContract; token?: string; offer?: IRpcHandshakeOffer; establish?: IProcessPluginEstablish; supervision?: Partial<IProcessSupervisorOptions<INodeProcessHandle>>; onNotice?(notice: unknown): void; }>;",
-          "declarationLine": 17,
+          "signature": "export type IProcessShortSpawn = Readonly<{ entry?: IUrlLike; base?: IUrlLike; command?: string; args?: readonly string[]; cwd?: string; env?: Partial<IProcessEnv>; /** Rewrite the computed command once per launch; rpc retains the channel and bootstrap. */ wrap?: (command: IProcessLaunchCommand) => IProcessLaunchCommand; stdio?: IProcessSpec['stdio']; limits?: IProcessSpec['limits']; permissions?: IProcessSpec['permissions']; wire?: ProcessPluginWire; contract?: IRemoteContract; token?: string; offer?: IRpcHandshakeOffer; establish?: IProcessPluginEstablish; supervision?: Partial<IProcessSupervisorOptions<INodeProcessHandle>>; onNotice?(notice: unknown): void; }>;",
+          "declarationLine": 18,
           "source": "packages/rpc-process/dist/process/adapters/short-source.d.ts",
           "purpose": "Ordinary launch configuration overrides defaults without granting launch or handshake authority.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessShortSpawn.",
@@ -4828,7 +4828,7 @@
           "aliasOf": "IProcessShortSpawn",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IProcessShortSpawn = Readonly<{ entry?: string | URL; base?: string | URL; command?: string; args?: readonly string[]; cwd?: string; env?: Partial<IProcessEnv>; /** Rewrite the computed command once per launch; rpc retains the channel and bootstrap. */ wrap?: (command: IProcessLaunchCommand) => IProcessLaunchCommand; stdio?: IProcessSpec['stdio']; limits?: IProcessSpec['limits']; permissions?: IProcessSpec['permissions']; wire?: ProcessPluginWire; contract?: IRemoteContract; token?: string; offer?: IRpcHandshakeOffer; establish?: IProcessPluginEstablish; supervision?: Partial<IProcessSupervisorOptions<INodeProcessHandle>>; onNotice?(notice: unknown): void; }>;"
+            "export type IProcessShortSpawn = Readonly<{ entry?: IUrlLike; base?: IUrlLike; command?: string; args?: readonly string[]; cwd?: string; env?: Partial<IProcessEnv>; /** Rewrite the computed command once per launch; rpc retains the channel and bootstrap. */ wrap?: (command: IProcessLaunchCommand) => IProcessLaunchCommand; stdio?: IProcessSpec['stdio']; limits?: IProcessSpec['limits']; permissions?: IProcessSpec['permissions']; wire?: ProcessPluginWire; contract?: IRemoteContract; token?: string; offer?: IRpcHandshakeOffer; establish?: IProcessPluginEstablish; supervision?: Partial<IProcessSupervisorOptions<INodeProcessHandle>>; onNotice?(notice: unknown): void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4867,7 +4867,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/adapters/short-source.d.ts:IProcessShortSpawn:export type IProcessShortSpawn = Readonly<{ entry?: string | URL; base?: string | URL; command?: string; args?: readonly string[]; cwd?: string; env?: Partial<IProcessEnv>; /** Rewrite the computed command once per launch; rpc retains the channel and bootstrap. */ wrap?: (command: IProcessLaunchCommand) => IProcessLaunchCommand; stdio?: IProcessSpec['stdio']; limits?: IProcessSpec['limits']; permissions?: IProcessSpec['permissions']; wire?: ProcessPluginWire; contract?: IRemoteContract; token?: string; offer?: IRpcHandshakeOffer; establish?: IProcessPluginEstablish; supervision?: Partial<IProcessSupervisorOptions<INodeProcessHandle>>; onNotice?(notice: unknown): void; }>;",
+          "identity": "packages/rpc-process/dist/process/adapters/short-source.d.ts:IProcessShortSpawn:export type IProcessShortSpawn = Readonly<{ entry?: IUrlLike; base?: IUrlLike; command?: string; args?: readonly string[]; cwd?: string; env?: Partial<IProcessEnv>; /** Rewrite the computed command once per launch; rpc retains the channel and bootstrap. */ wrap?: (command: IProcessLaunchCommand) => IProcessLaunchCommand; stdio?: IProcessSpec['stdio']; limits?: IProcessSpec['limits']; permissions?: IProcessSpec['permissions']; wire?: ProcessPluginWire; contract?: IRemoteContract; token?: string; offer?: IRpcHandshakeOffer; establish?: IProcessPluginEstablish; supervision?: Partial<IProcessSupervisorOptions<INodeProcessHandle>>; onNotice?(notice: unknown): void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5388,8 +5388,8 @@
         {
           "name": "IRuntimeProcessPeerOptions",
           "kind": "type",
-          "signature": "export type IRuntimeProcessPeerOptions<THandle extends IProcessHandle = IProcessHandle> = Omit<IRuntimeProcessFullPeerOptions<THandle>, 'spawn' | 'connect' | 'listen' | 'report'> & IProcessShortSourceOptions & Readonly<{ spawn?: IRuntimePeerSource | ISpawnProcessPluginDeployment<THandle> | true | string | URL | IProcessShortSpawn; connect?: IRuntimePeerSource | IConnectProcessPluginDeployment | string; listen?: IRuntimePeerSource | IRuntimeProcessListen | string; report?(error: unknown): void; }>;",
-          "declarationLine": 18,
+          "signature": "export type IRuntimeProcessPeerOptions<THandle extends IProcessHandle = IProcessHandle> = Omit<IRuntimeProcessFullPeerOptions<THandle>, 'spawn' | 'connect' | 'listen' | 'report'> & IProcessShortSourceOptions & Readonly<{ spawn?: IRuntimePeerSource | ISpawnProcessPluginDeployment<THandle> | true | IUrlLike | IProcessShortSpawn; connect?: IRuntimePeerSource | IConnectProcessPluginDeployment | string; listen?: IRuntimePeerSource | IRuntimeProcessListen | string; report?(error: unknown): void; }>;",
+          "declarationLine": 19,
           "source": "packages/rpc-process/dist/process/runtime-peer.d.ts",
           "purpose": "Short forms select ordinary sources; Core still captures the original options' Host provenance.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeProcessPeerOptions.",
@@ -5404,7 +5404,7 @@
           "aliasOf": "IRuntimeProcessPeerOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRuntimeProcessPeerOptions<THandle extends IProcessHandle = IProcessHandle> = Omit<IRuntimeProcessFullPeerOptions<THandle>, 'spawn' | 'connect' | 'listen' | 'report'> & IProcessShortSourceOptions & Readonly<{ spawn?: IRuntimePeerSource | ISpawnProcessPluginDeployment<THandle> | true | string | URL | IProcessShortSpawn; connect?: IRuntimePeerSource | IConnectProcessPluginDeployment | string; listen?: IRuntimePeerSource | IRuntimeProcessListen | string; report?(error: unknown): void; }>;"
+            "export type IRuntimeProcessPeerOptions<THandle extends IProcessHandle = IProcessHandle> = Omit<IRuntimeProcessFullPeerOptions<THandle>, 'spawn' | 'connect' | 'listen' | 'report'> & IProcessShortSourceOptions & Readonly<{ spawn?: IRuntimePeerSource | ISpawnProcessPluginDeployment<THandle> | true | IUrlLike | IProcessShortSpawn; connect?: IRuntimePeerSource | IConnectProcessPluginDeployment | string; listen?: IRuntimePeerSource | IRuntimeProcessListen | string; report?(error: unknown): void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5443,7 +5443,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-process/dist/process/runtime-peer.d.ts:IRuntimeProcessPeerOptions:export type IRuntimeProcessPeerOptions<THandle extends IProcessHandle = IProcessHandle> = Omit<IRuntimeProcessFullPeerOptions<THandle>, 'spawn' | 'connect' | 'listen' | 'report'> & IProcessShortSourceOptions & Readonly<{ spawn?: IRuntimePeerSource | ISpawnProcessPluginDeployment<THandle> | true | string | URL | IProcessShortSpawn; connect?: IRuntimePeerSource | IConnectProcessPluginDeployment | string; listen?: IRuntimePeerSource | IRuntimeProcessListen | string; report?(error: unknown): void; }>;",
+          "identity": "packages/rpc-process/dist/process/runtime-peer.d.ts:IRuntimeProcessPeerOptions:export type IRuntimeProcessPeerOptions<THandle extends IProcessHandle = IProcessHandle> = Omit<IRuntimeProcessFullPeerOptions<THandle>, 'spawn' | 'connect' | 'listen' | 'report'> & IProcessShortSourceOptions & Readonly<{ spawn?: IRuntimePeerSource | ISpawnProcessPluginDeployment<THandle> | true | IUrlLike | IProcessShortSpawn; connect?: IRuntimePeerSource | IConnectProcessPluginDeployment | string; listen?: IRuntimePeerSource | IRuntimeProcessListen | string; report?(error: unknown): void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
