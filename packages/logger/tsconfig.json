@@ -1,5 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "noEmit": true, "types": ["node"] },
-  "include": ["src", "*.test.ts"]
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2024", "ESNext.Disposable", "DOM"],
+    "types": []
+  },
+  "include": ["src"]
 }
