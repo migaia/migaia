@@ -11,7 +11,7 @@ import {
 
 export type { IMutationGuard, IMutationPolicy } from '@migaia/store-light'
 
-/** 严格写入策略；默认关闭，避免改变既有 Store 行为。 */
+/** Controls strict mutation policy. Defaults to `off` to preserve existing store behavior. */
 export type IMutationPolicyMode = 'off' | 'actions-only'
 
 export class MutationPolicy implements IMutationGuard {
@@ -97,7 +97,10 @@ export type IMiddlewareEvent<S> =
   | IMiddlewareStateEvent<S>
   | IMiddlewareErrorEvent
 
-/** 迁移适配器使用的旧 middleware 形状；新代码请使用 IStoreMiddlewarePlugin。 */
+/**
+ * Provides the legacy middleware context used by migration adapters. New code uses
+ * `IStoreMiddlewarePlugin`.
+ */
 export type IMiddlewareContext<S> = {
   readonly runtime: IRuntime
   readonly getState: () => S
@@ -132,7 +135,7 @@ export type IReduxDevToolsConnection<S> = {
   subscribe(listener: (message: IReduxDevToolsMessage) => void): IDisposer
 }
 
-/** 将 Redux DevTools 消息转换为 Store middleware 领域事件。 */
+/** Converts Redux DevTools messages into store middleware domain events. */
 export function createReduxDevToolsAdapter<S>(
   connection: IReduxDevToolsConnection<S>
 ): IDevToolsAdapter<S> {

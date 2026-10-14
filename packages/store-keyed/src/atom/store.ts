@@ -107,7 +107,10 @@ export type IAtomStore = {
   readonly runtime: IRuntime
   readonly disposed: boolean
   get<T>(definition: IAtomDefinition<T>): T
-  /** 非追踪读：适配层的 getSnapshot 不该在别人的捕获窗口里建边。 */
+  /**
+   * Reads without tracking, so an adapter snapshot does not create edges in another dependency
+   * capture.
+   */
   peek<T>(definition: IAtomDefinition<T>): T
   /** React/concurrent speculative read; value may be discarded after the turn. */
   preview<T>(definition: IAtomDefinition<T>): T
@@ -116,35 +119,37 @@ export type IAtomStore = {
     ...args: Args
   ): Result
   /**
-   * 订阅一个定义。返回退订函数。
+   * Subscribes to a definition and returns an unsubscribe function.
    *
-   * 这是适配层唯一需要的东西——比交出节点窄得多，实例化策略因此可以自由演进。
+   * Adapters subscribe through this boundary instead of accessing graph nodes, leaving
+   * instantiation strategies independent.
    */
   sub<T>(definition: IAtomDefinition<T>, onChange: () => void): IDisposer
-  /** 只读派生可以路由到任意同值类型定义。 */
+  /** Routes a read-only derived definition to any definition with the same value type. */
   override<T>(
     definition: IDerivedDefinition<T>,
     replacement: IAtomDefinition<NoInfer<T>>
   ): IDisposer
-  /** Primitive 只能替换为同一种固定 set(update) 写语义。 */
+  /** Replaces a primitive only with a definition that preserves standard `set(update)` semantics. */
   override<T>(
     definition: IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>,
     replacement: IPrimitiveDefinition<NoInfer<T>> | IPrimitiveFactoryDefinition<NoInfer<T>>
   ): IDisposer
-  /** 自定义 writable derived 必须保留完全相同的 Args/Result。 */
+  /** Preserves the exact `Args` and `Result` contract of a writable derived definition. */
   override<T, Args extends readonly unknown[], Result>(
     definition: IWritableDerivedDefinition<T, Args, Result>,
     replacement: IWritableDerivedDefinition<NoInfer<T>, NoInfer<Args>, NoInfer<Result>>
   ): IDisposer
-  /** 这个定义在本 store 内是否已有观察者。窄查询，不交出节点。 */
+  /** Reports whether this store has observers for the definition without exposing its graph node. */
   isObserved<T>(definition: IAtomDefinition<T>): boolean
   /**
-   * 释放单个定义的实例。
+   * Releases the instance for one definition.
    *
-   * 与 dispose 整个 store 相对：实例式旧 API 一个实例一份定义，它 dispose 时 只该释放自己那一份，不能连累同一 store 里的其它定义。
+   * Unlike disposing the whole store, disposal of a legacy atom instance releases only its own
+   * definition. Other definitions in the same store remain intact.
    */
   release<T>(definition: IAtomDefinition<T>): boolean
-  /** 已实例化的定义数量。释放行为的可观测点。 */
+  /** Reports the number of instantiated definitions so release behavior is observable. */
   readonly size: number
   dispose(): void
 }

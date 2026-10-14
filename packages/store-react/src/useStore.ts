@@ -106,9 +106,9 @@ function createTrackingInstance<T>(
   }
 }
 
-// 稳定订阅 + 无限渲染防护：
-// - 已提交 read 存 ref；订阅 effect 只读 ref.current，内联 selector（每渲染新引用）不改 subscribe 身份，不重建订阅。
-// - getSnapshot 返回包含 selector 值的原子快照，并用 equality 复用旧快照；React 检查的值和 hook 返回值完全相同。
+// Keeps subscriptions stable and prevents render loops.
+// The committed reader is stored in a ref. The subscription effect reads that ref, so inline selectors do not recreate subscriptions.
+// `getSnapshot` returns an atomic selector snapshot and reuses equal snapshots. React checks the same value returned by the hook.
 export function useTracked<T>(
   read: () => T,
   isEqual: (a: T, b: T) => boolean = Object.is,
@@ -294,7 +294,7 @@ export function useSignal<T>(s: ISignal<T>) {
   return [value, set] as const
 }
 
-// 甜 store 的精细订阅 hook（use-前缀标识符，适配 React Compiler）。
+// Provides selective store subscriptions with a `use`-prefixed hook name for React Compiler.
 export function useStore<S extends Record<string, unknown>, R>(
   store: IReactiveStore<S>,
   selector: (state: IStoreShape<S>) => R,
@@ -305,7 +305,7 @@ export function useStore<S extends Record<string, unknown>, R>(
   return useTracked(read, isEqual, store.$runtime)
 }
 
-// 订阅一个 resource 的状态——状态变化（pending/success/error）自动重渲染。
+// Subscribes to resource state and renders again when state changes, such as `pending`, `success`, or `error`.
 export function useResource<T>(res: Resource<T>): IResourceState<T> {
   // Resource identity already captures the complete read semantics. Keep this
   // selector stable so each state transition can reuse the Effect candidate.

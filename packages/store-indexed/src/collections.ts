@@ -243,17 +243,17 @@ export class ObservableObject<T extends Record<string, unknown>> extends Observa
     return (value === ABSENT ? undefined : value) as T[K]
   }
 
-  // peek 是非追踪读，绝不能顺手建 cell：cell 由 ReactiveCellPool 的观察者钩子回收，
-  // 而从未被观察过的 cell 不会触发 onUnobserved，会一直挂在 nodes/cells 上。
-  // 遍历十万个 key 做 peek 就会实体化十万个没人订阅的 Signal。
+  // `peek` does not track or create cells. `ReactiveCellPool` reclaims cells through observer hooks.
+  // A never-observed cell never triggers `onUnobserved`, so it remains in `nodes` or `cells`.
+  // Creating cells while peeking at 100,000 keys would materialize 100,000 unsubscribed `Signal` instances.
   peek<K extends keyof T & string>(key: K): T[K] {
     this.assertActive()
     assertObjectKey(key)
     return this.#values.get(key) as T[K]
   }
 
-  // 存在性只随「键集合」变化，structure 正好在增删键时 bump（改值不 bump），
-  // 因此追踪 structure 比追踪值 cell 更精确，且同样不分配。
+  // Existence changes only with the key set. `structure` increments for key insertion or deletion, not value changes.
+  // Tracking `structure` is therefore more precise than tracking a value cell and needs no allocation.
   has(key: keyof T & string): boolean {
     this.assertActive()
     assertObjectKey(key)
@@ -629,7 +629,7 @@ export class ObservableMap<K, V> extends ObservableCollectionBase {
     return value === ABSENT ? undefined : value
   }
 
-  // 同 ObservableObject：非追踪读不建 cell，否则未被观察的 cell 永不回收。
+  // As in `ObservableObject`, untracked reads do not create cells because never-observed cells cannot be reclaimed.
   peek(key: K): V | undefined {
     this.assertActive()
     return this.#values.get(key)

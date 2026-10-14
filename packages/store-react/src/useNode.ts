@@ -4,19 +4,24 @@ import { assertReactiveOwnedBy } from '@migaia/reactive/ownership'
 import { notifyReact } from './notify-react.js'
 
 /**
- * 稳定节点的专用订阅路径。
+ * Provides subscriptions for stable nodes with a fixed `{node}` dependency set.
  *
- * `useTracked` 要应付任意闭包与动态依赖，所以每次更新都得做：render 期捕获依赖、 commit 期提交捕获、候选值与版本号记账、selector 换了还要重追踪依赖。
+ * `useTracked` supports arbitrary closures and changing dependencies. It captures dependencies
+ * during render, commits captures, records candidate values and versions, and retracks changed
+ * selectors. `useSignal` and `useAtomValue` do not need that bookkeeping because their node
+ * identity and dependency set are stable.
  *
- * 但 `useSignal` / `useAtomValue` 的**依赖集合恒为 `{node}`**——节点身份稳定， 依赖不会变。上面那套一样都不需要，它们付的是通用性的钱而没有享受通用性。
+ * This path retains required commit validation. It makes no performance guarantee. Effect lifecycle
+ * and `useSyncExternalStore` scheduling still have a cost.
  *
- * 这条路径只砍掉不需要的记账，**不砍必要的提交验证**。它不是性能承诺； Effect 生命周期与 useSyncExternalStore 调度成本仍然存在。
+ * Subscriptions use `Effect`, preserving ownership checks, observed and unobserved lifecycle, and
+ * tracing. `peek()` reads the current value without tracking, including rereads between render and
+ * subscription or after an abandoned transition. Snapshots are not cached separately from the node
+ * value.
  *
- * - 订阅仍走 Effect，所有权校验、observed/unobserved 生命周期、trace 全部保留
- * - 读取用 `peek()`：非追踪、且永远返回当前值，因此 React 在 render 与 subscribe 之间、或 transition 被中止后重读，拿到的都是最新值，不存在撕裂窗口
- * - 不缓存快照：值就在节点里，缓存反而制造「缓存与真值不一致」的可能
- *
- * 刻意不照搬 jotai 绕开 useSyncExternalStore 的做法：那建立在它自己的内部约束上， 整体搬过来有很大概率把已经修过的 selector/并发窗口重新引入。
+ * This path keeps `useSyncExternalStore` rather than adopting Jotai's bypass, which depends on
+ * different internal constraints. Bypassing it here could reintroduce selector and concurrency
+ * failures.
  */
 export type IStableNode<T> = {
   readonly value: T

@@ -5,10 +5,10 @@ import type { IPersistHandle, IPersistStorage, IPersistUnit } from '../core/type
 import { snapshotPersistOptions } from '../core/options.js'
 
 /**
- * `persist()` 实际用到的 store 能力面，只有 4 个成员。
+ * Defines the four store capabilities used by `persist()`.
  *
- * 故意在这里定义、不从 `@migaia/store-light` 借用它的 `IReactiveStore`：store-persist 是通用持久化层，
- * 依赖方向不该倒过来。`@migaia/store-light` 产出的 store 结构上完全满足这个接口，传进来不需要任何改动。
+ * The generic persistence layer owns this boundary instead of depending on `store-light`'s
+ * `IReactiveStore`. Stores from `@migaia/store-light` satisfy it structurally without adaptation.
  */
 export type IPersistableStore = {
   readonly $runtime: IRuntime

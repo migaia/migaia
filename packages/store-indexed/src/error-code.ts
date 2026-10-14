@@ -1,39 +1,34 @@
 /**
- * `@migaia/store-indexed` 错误码的唯一声明处。
- *
- * 契约见 `docs/contracts/error-codes.md`：错误由 `(source, code)` 二元组唯一定位，`source` 恒为
- * `'@migaia/store-indexed'`。抛出点必须引用本文件的常量，不得内联字面量。
- *
- * 码值是公开 API 的一部分，改名等同破坏性变更（`docs/contracts/error-code-rollout.sdd.md` §1.2）。
+ * Owns the error-code declarations for `@migaia/store-indexed`. Under
+ * `docs/contracts/error-codes.md`, `(source, code)` uniquely identifies an error. The `source` is
+ * always `'@migaia/store-indexed'`. Throw sites reference these constants instead of inline
+ * literals. Code values are public API. Renaming a code is a breaking change
+ * (`error-code-rollout.sdd.md` §1.2).
  */
 export const StoreIndexedErrorCode = {
   /** Collection constructor options were not an object at the JavaScript boundary. */
   invalidOption: 'INVALID_OPTION',
   /**
-   * 集合已 `dispose()` 后继续读写。
-   *
-   * 调用方应新建集合，不要复用已释放实例。
+   * Rejects reads or writes after collection disposal. Create a new collection instead of reusing
+   * the disposed instance.
    */
   collectionDisposed: 'COLLECTION_DISPOSED',
 
   /**
-   * `ObservableArray` 下标越界。
-   *
-   * 调用方检查下标是否在 `[0, length)`；这是永久性参数错误，不要重试同一下标。
+   * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0,
+   * length)`. Correct the index instead of retrying the same invalid input.
    */
   indexOutOfRange: 'INDEX_OUT_OF_RANGE',
 
   /**
-   * `ObservableArray` 下标不是整数。
-   *
-   * 调用方修正下标；数组索引必须为整数。
+   * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be
+   * integers.
    */
   invalidIndex: 'INVALID_INDEX',
 
   /**
-   * 在一次 tracked 读取中读取了属于另一个 Runtime 的集合。
-   *
-   * 调用方让集合与订阅它的 effect/observer 使用同一 Runtime；`peek` 不受此限制。
+   * Rejects a tracked collection read from another runtime. Use the same runtime for the collection
+   * and its observing effect or observer. Untracked `peek` reads are exempt.
    */
   crossRuntime: 'CROSS_RUNTIME'
 } as const

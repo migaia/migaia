@@ -1,19 +1,24 @@
 import type { IRpcEndpoint } from '@migaia/rpc-core'
 
 /**
- * Worker 侧托管的 RPC 消息处理器。
+ * Defines a managed RPC message handler for the worker side.
  *
- * 生命周期遵循 `lifecycle-extraction.sdd.md` §4.1：`disposeAsync()` 不存在，`dispose()` 是唯一 异步释放入口并恒返回
- * `Promise<void>`；同步的「停止接受新工作」用 `close()`，它只标记不可用、 不执行用户清理。
+ * Following `lifecycle-extraction.sdd.md` §4.1, `dispose()` is the only asynchronous disposal entry
+ * point. It always returns `Promise<void>`; there is no `disposeAsync()`. `close()` synchronously
+ * stops accepting work without running user cleanup.
  */
 export type IManagedRpcHandler = {
   (message: unknown): Promise<void>
   /**
-   * 唯一异步释放入口。先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`； 不吞清理错误（失败会 reject），重复调用复用同一个
-   * Promise。
+   * Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup
+   * failures reject the promise instead of being swallowed. Repeated calls return the same
+   * promise.
    */
   dispose(): Promise<void>
-  /** 同步标记不可用：仅置 `disposed = true`，不执行底层释放。幂等。 */
+  /**
+   * Synchronously marks the handler unavailable by setting `disposed = true`. It does not release
+   * the endpoint. Repeated calls have no additional effect.
+   */
   close(): void
   readonly pendingCount: number
   readonly disposed: boolean

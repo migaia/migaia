@@ -123,7 +123,7 @@ export type IStoreShape<S> = {
   readonly [K in IBuilderKeys<S>]: S[K] extends IFieldBuilder<infer F> ? F : never
 } & {
   [K in Exclude<keyof S, IBuilderKeys<S>>]: S[K] extends IRaw<infer T>
-    ? T // raw(fn) → 普通函数值字段
+    ? T // `raw(fn)` becomes a regular function-valued field.
     : S[K] extends IFieldBuilder<infer F>
       ? F
       : S[K] extends (...args: infer A) => infer R
@@ -153,7 +153,7 @@ export type IWritableStorePatch<S> = Partial<
 >
 
 export type ISubscribeOptions = {
-  // 默认 false；设 true 时订阅建立后立即调用一次 listener。
+  // Defaults to `false`. When `true`, calls the listener once immediately after subscribing.
   fireImmediately?: boolean
 }
 
@@ -163,33 +163,37 @@ export type IHydrateOptions = {
   readonly onUnknown?: (key: string) => void
 }
 
-// $-前缀的运行时 API，挂成不可枚举属性，避免和用户字段撞名
+// Runtime APIs use the `$` prefix and non-enumerable properties to avoid collisions with user fields.
 export type IReactiveStoreApi<S> = {
-  // 本 store 所有节点所属的 runtime——React 适配层据此在同一个 runtime 上建 effect，保证同图。
-  // 暴露接口而非具体类：调用方只需要「在同一张图上建节点」这组能力。
+  // Owns all nodes in this store. React adapters create effects in the same runtime to share the graph.
+  // The interface exposes the capabilities callers need without requiring a concrete runtime class.
   $runtime: IRuntime
-  // 是否含异步字段（wasm 等）。为 false 时整个 store 同步就绪，React 适配层无需 Suspense 门控，
-  // 纯同步 store 不需要 Suspense 门控；异步 Store 由 createAsyncStore/Provider 在创建边界解决。
+  // Reports whether the store has asynchronous fields, such as WASM fields.
+  // A synchronous store is immediately ready and needs no Suspense barrier.
+  // `createAsyncStore` and the provider handle asynchronous readiness at the creation boundary.
   $async: boolean
   $snapshot(): IStoreShape<S>
   $subscribe(fn: () => void, options?: ISubscribeOptions): IDisposer
-  // 批量写入：整个 recipe 在一个 batch 里执行，改多个字段只触发一次通知。
-  // 注意：这是「批处理」不是「事务」——recipe 中途抛错不回滚已改字段（改名自 $patch 以免误导为 Immer draft）。
-  // draft 就是 store 本身：写普通字段走 signal setter；写 computed（只读）会抛错。
+  // Runs the entire `recipe` in one batch, so multiple writes produce one notification.
+  // An exception does not roll back writes. This is batching rather than a transaction.
+  // `draft` is the store itself. Plain field writes use signal setters; read-only computed writes throw.
   $batch(recipe: (draft: IStoreShape<S>) => void): void
-  // 低层批量赋值（次要 API）：编译期只接受可写 signal 字段，运行期仍防御非法动态输入。
+  // Provides low-level batch assignment. Types accept only writable signal fields; runtime checks reject invalid dynamic input.
   $set(patch: IWritableStorePatch<S>): void
-  // 仅取可持久化的标量字段（signal 支撑的）——computed（派生）/wasm/方法都排除。持久化层用。
+  // Returns signal-backed fields for persistence. Computed fields, WASM fields, and methods are excluded.
   $plain(): Record<string, unknown>
-  // 宽松写回 signal 字段（持久化 hydration 用）：只写已知 signal 键，未知/派生/wasm 键静默跳过，一次事务。
+  // Hydrates known signal fields in one batch. Unknown, computed, and WASM keys are ignored by default.
+  // `options.unknown` can report or reject unknown keys. Writes are not rolled back on failure.
   $hydrate(partial: Record<string, unknown>, options?: IHydrateOptions): void
-  // 是否已释放。释放后所有公开读写/动作统一抛错——不留「部分字段能用、部分不能用」的半死状态。
+  // Reports disposal. Public reads, writes, and actions throw after disposal instead of leaving partly usable state.
   readonly $disposed: boolean
   /**
-   * 把外部资源挂进本 store 的所有权作用域（典型：collections）。
+   * Registers an external resource, such as a collection, with this store's ownership scope.
    *
-   * 中型场景的正确拆法是「store 持根 UI/动作，collections 承载热路径结构」； 没有 $own 时两者共 Runtime 却各管 dispose，根一释放结构节点就泄漏。
-   * 资源必须未归属或已归属本 Runtime；跨 Runtime 直接拒绝。
+   * A store can hold root UI state and actions while collections hold frequently accessed
+   * structures. Sharing a runtime alone does not share disposal ownership; `$own` prevents those
+   * structures from leaking when the root is disposed. The resource must be unowned or owned by
+   * this `Runtime`. Cross-runtime resources are rejected.
    */
   $own<T extends IDisposable>(resource: T): T
   /**
@@ -207,23 +211,25 @@ export type IReactiveStoreApi<S> = {
 export type IReactiveStore<S> = IStoreShape<S> & IReactiveStoreApi<S>
 
 /**
- * CreateStore 的输入形状：字段/getter/方法 + **ThisType**。
+ * Provides fields, getters, methods, and `ThisType` for a store definition.
  *
- * 没有 ThisType 时，方法里的 `this` 仍是「输入字面量」类型——wasm 字段还是 IFieldBuilder，写 `this.price.value`
- * 会类型报错，逼人去用外置函数。 加上之后，`this` 是解析后的 IReactiveStore（IFieldBuilder → 真实字段）。
+ * Without `ThisType`, method `this` retains the input literal type, so a WASM field remains an
+ * `IFieldBuilder`. `this.price.value` would then fail type checking and require external functions.
+ * Here `this` is the resolved `IReactiveStore`, with builders replaced by their created fields.
  */
 export type IStoreDefinition<S extends Record<string, unknown>> = S & ThisType<IReactiveStore<S>>
 
 export type ICreateStoreOptions = {
   /**
-   * 显式隔离运行时；缺省用 defaultRuntime。
+   * Isolates the runtime explicitly. Defaults to `defaultRuntime`.
    *
-   * 收 `IRuntime` 而不是 `Runtime` 具体类：门面只用得到接口上的东西
-   * （signal/computed/effect/batch/createScope…），收具体类等于要求第三方 必须继承本库的类才能替换运行时。
+   * The facade accepts `IRuntime` because it uses only interface capabilities such as node
+   * creation, batching, and scopes. A concrete `Runtime` requirement would force replacement
+   * runtimes to inherit the library class.
    */
   runtime?: IRuntime
   debugName?: string
-  // 显式诊断开关；默认关闭，独立库不猜测 process/import.meta 等构建环境。
+  // Explicitly enables diagnostics. Defaults to `false`; the library does not infer build mode from `process` or `import.meta`.
   warnAsyncActions?: boolean
   /**
    * Optional MobX-style strict mutation policy. Direct field writes must run inside an
