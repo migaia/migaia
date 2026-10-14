@@ -18,7 +18,7 @@ pnpm add @migaia/tray
 
 ## 最小可运行示例
 
-```ts
+```ts doc-test=check
 import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'
 
 const key = (value: string): ITrayKey => value as ITrayKey
@@ -65,16 +65,19 @@ try {
 
 所有 Tray 自有边界错误都带 `source: '@migaia/tray'` 与稳定 `code`。生产代码按 `(source, code)` 分支，不依赖 message：
 
-```ts
-import { TRAY_SOURCE, TrayErrorCode } from '@migaia/tray'
+```ts doc-test=check
+import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'
 
-try {
-  tray.get(apiKey)
-} catch (error) {
-  const diagnostic = error as { source?: string; code?: string }
-  if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {
-    // 等待 ready()，或处理启动/就绪门失败。
-  } else {
+/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */
+function readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {
+  try {
+    return tray.get(apiKey)
+  } catch (error) {
+    const diagnostic = error as { source?: string; code?: string }
+    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {
+      // 等待 ready()，或处理启动/就绪门失败。
+      return undefined
+    }
     throw error
   }
 }
@@ -87,16 +90,21 @@ try {
 根入口的 `defineTrayHost` / `createTray({ hosts })` 管理完整 PluginHost 实例；
 `createTrayGraph(entries)` 继续管理静态 capability 集合。每个实例与父 Host 独立。
 
-```ts
+```ts doc-test=check
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createTray, defineTrayHost } from '@migaia/tray'
 
 const echo = defineFeature(() => ({ echo: (value: string) => value }))
 const agent = defineTrayHost({
   name: 'agent',
-  plugins: () => [definePlugin({
-    name: 'node', features: { svc: echo }, install: () => ({})
-  })] as const,
+  plugins: () =>
+    [
+      definePlugin({
+        name: 'node',
+        features: { svc: echo },
+        install: () => ({})
+      })
+    ] as const,
   exposes: ['node.svc']
 })
 const tray = createTray({ hosts: [agent] })
@@ -158,7 +166,6 @@ Tray 验证和 start 错误使用自己的稳定 code，并保留原错误于 ca
 `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`，
 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。
 
-
 ## 高阶组合示例
 
 ### 托管 PluginHost：动态加载、依赖阻塞与确定性卸载
@@ -166,7 +173,7 @@ Tray 验证和 start 错误使用自己的稳定 code，并保留原错误于 ca
 `@migaia/tray/host` 是 Tray 的 Host stage/decorator，不创建第二个运行时身份。`createHost()`
 异步完成 admission、依赖图启动与 Host 发布后才返回；返回值实现异步显式资源管理：
 
-```ts
+```ts doc-test=check
 import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createHost } from '@migaia/tray/host'
 
@@ -187,13 +194,15 @@ await using host = await createHost({
   shutdown: { mode: 'bounded' }
 })
 
-await host.use(definePlugin({
-  name: 'late',
-  features: {
-    value: defineFeature(() => ({}), { provider: provider.getFeature('value') })
-  },
-  install: () => ({ late: true })
-}))
+await host.use(
+  definePlugin({
+    name: 'late',
+    features: {
+      value: defineFeature(() => ({}), { provider: provider.getFeature('value') })
+    },
+    install: () => ({ late: true })
+  })
+)
 await host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。
 ```
 
@@ -207,7 +216,7 @@ pipeline lease、插件 disposer 与资源 disposer，未完成前不会启动�
 
 三个能力只从显式子路径导入，不由 Tray 根入口聚合：
 
-```ts
+```ts doc-test=check
 import { defineLoader, loadIntoHost } from '@migaia/tray/loader'
 import { defineAdapter } from '@migaia/tray/adapter'
 import { createRuntime } from '@migaia/tray/runtime'
@@ -226,7 +235,6 @@ Runtime callback 同时收到只绑定当前 run、插件名称与 generation �
 等待同一 ticket 的 completion 会立即得到 `RUNTIME_CONTRACT_INVALID`，而 callback 返回 ticket
 后可在外层等待 `ticket.completion`。外部 `host.unUse/replace` 继续遵循原有 queue 与 lease
 语义；callback 不应捕获 concrete Host 做 self mutation。
-
 
 ## Routing and publish/subscribe
 
