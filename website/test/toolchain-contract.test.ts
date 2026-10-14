@@ -2514,15 +2514,19 @@ test('SITE-T-STORAGE-WEB-REACTIVE-PLUGINS documents honest visibility and every 
 
 test('SITE-T-REACTIVE-GUIDES documents the primary graph path and every public option', () => {
   const targets = [
-    ['reactive', 'Signal', ['debugName']],
-    ['reactive', 'Computed', ['equals', 'keepAlive', 'debugName']],
-    ['reactive', 'Effect', ['debugName']],
+    ['index', 'IReactiveSignal', ['debugName']],
+    ['index', 'IReactiveComputed', ['equals', 'keepAlive', 'debugName']],
+    ['index', 'IReactiveEffect', ['debugName']],
     [
-      'runtime',
+      'index',
       'createRuntime',
-      ['adapter', 'onError', 'onTrace', 'maxFlushPasses', 'scheduleIdle']
+      ['adapter', 'onError', 'onTrace', 'maxFlushPasses', 'scheduleIdle', 'schedulerStrategy']
     ],
-    ['runtime', 'Runtime', ['adapter', 'onError', 'onTrace', 'maxFlushPasses', 'scheduleIdle']],
+    [
+      'index',
+      'IRuntime',
+      ['adapter', 'onError', 'onTrace', 'maxFlushPasses', 'scheduleIdle', 'schedulerStrategy']
+    ],
     ['index', 'defaultRuntime', []]
   ] as const
 

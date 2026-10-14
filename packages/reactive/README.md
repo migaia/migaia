@@ -24,7 +24,7 @@
 - **完全隔离的 Runtime**：不同 `Runtime` 的节点分属不同依赖图和版本时钟，混用会立即抛错，不会有全局单例串状态的问题。
 - **惰性 + 缓存的 Computed**：没有订阅者时不计算；多个下游共享同一个上游变化（diamond 依赖）只重算一次；没人观察的 `Computed` 会在空闲时自动挂起（断开依赖、释放订阅），无需手动管理。
 - **显式生命周期**：`Signal`/`Computed`/`Effect` 都要 `dispose()`；`Scope` 提供集中持有与一次性释放。读取已释放节点会立刻抛出明确错误，不会静默返回陈旧值。
-- **可控的调度**：默认微任务合并触发；可用 `setSchedulerStrategy` 换成 `requestAnimationFrame`/`idle`/自定义策略；`batch()` 显式合并多次写入为一次副作用刷新；`flush()` 手动同步冲刷。
+- **可控的调度**：默认微任务合并触发；创建 Runtime 时可用 `schedulerStrategy` 选项设为 `requestAnimationFrame`/`idle`/自定义策略；`batch()` 显式合并多次写入为一次副作用刷新；`flush()` 手动同步冲刷。
 - **失控保护**：自触发无限循环会在超过 `maxFlushPasses`（默认 100 轮）后抛错并如实报告被丢弃了哪些待办，而不是让标签页卡死。
 - **诊断即观测，不侵入业务**：trace 事件、错误上报都走独立通道，不会成为业务状态的一部分。
 
@@ -34,27 +34,26 @@
 pnpm add @migaia/reactive
 ```
 
-| 入口                                                                                             | 内容与边界                                                                                      |
-| ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `@migaia/reactive`                                                                               | 日常 API：`Signal`、`Computed`、`Effect`、`createRuntime`、`defaultRuntime` 和公开类型/错误码。 |
-| `@migaia/reactive/runtime`                                                                       | Runtime、调度和 observer binding，供框架适配层使用。                                            |
-| `@migaia/reactive/ownership`、`/source`                                                          | 所有权断言与受控 source，供上层基础库使用。                                                     |
-| `@migaia/reactive/internals`、`/node-internals`、`/node-factories`、`/copy-check`、`/reactive/*` | 内核扩展面；只在实现新的 reactive 基础设施时使用，不是一般应用 API。                            |
+| 入口 | 内容与边界 |
+| --- | --- |
+| `@migaia/reactive` | Runtime 工厂、`IReactiveSignal`/`IReactiveComputed`/`IReactiveEffect`、诊断常量与错误码。 |
+| `@migaia/reactive/extension` | 所有权、受控 source、observer binding、图协议类型与只读版本查询。 |
+| `@migaia/reactive/internals` | tracker/scheduler/clock 与可变依赖边；供需要危险能力的节点实现层使用。 |
 
 ## 5. 五分钟上手
 
 ```ts
-import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive';
+import { createRuntime } from '@migaia/reactive';
 
 const runtime = createRuntime();
 
-const count = new Signal(1, runtime);
-const doubled = new Computed(() => count.value * 2, runtime);
+const count = runtime.signal(1);
+const doubled = runtime.computed(() => count.value * 2);
 
 const seen: number[] = [];
-const effect = new Effect(() => {
+const effect = runtime.effect(() => {
   seen.push(doubled.value);
-}, runtime); // 构造时立即同步跑一次：seen = [2]
+}); // 创建时立即同步跑一次：seen = [2]
 
 count.value = 3;
 runtime.flush(); // 手动冲刷待处理的副作用：seen = [2, 6]
@@ -64,7 +63,7 @@ doubled.dispose();
 count.dispose();
 ```
 
-这段代码建立的是一张由当前 `runtime` 独占的依赖图。`Effect` 构造时会立即执行一次；执行过程中读取 `doubled.value`，使 `Effect → Computed → Signal` 三层依赖自动登记，所以 `seen` 首先得到 `2`。这不是手工订阅，之后也不需要再次告诉 `Effect` 它依赖了谁。
+这段代码建立的是一张由当前 `runtime` 独占的依赖图。`runtime.effect()` 创建时会立即执行一次；执行过程中读取 `doubled.value`，使 `Effect → Computed → Signal` 三层依赖自动登记，所以 `seen` 首先得到 `2`。这不是手工订阅，之后也不需要再次告诉 `Effect` 它依赖了谁。
 
 `count.value = 3` 只会使 `doubled` 失效并把 `effect` 放入待执行队列，不会在 setter 内立刻重跑副作用。`runtime.flush()` 同步排空该 runtime 的队列：`doubled` 在被读取时按需重算为 `6`，随后 `effect` 把它写入 `seen`。生产代码通常让默认微任务自动 flush；测试、SSR 或需要确定提交边界的代码才显式调用 `flush()`。
 
@@ -85,21 +84,15 @@ count.dispose();
 
 ## 7. 包内入口一览
 
-| 入口                                                                                                 | 提供什么                                                                     | 适用人群                                      |
-| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------- |
-| `@migaia/reactive`（主入口）                                                                         | `Signal`/`Computed`/`Effect`/`createRuntime`/`defaultRuntime` 及全部公共类型 | 日常使用，绝大多数场景只需要这一个入口        |
-| `@migaia/reactive/runtime`                                                                           | `createObserverBinding` 等面向框架适配层的并发安全绑定原语                   | 自己实现 React/Vue/Solid 一类响应式绑定的作者 |
-| `@migaia/reactive/ownership`                                                                         | 「某节点属于哪个 `Runtime`」的登记与断言                                     | 在本包之上构建 Store/集合/资源类库的作者      |
-| `@migaia/reactive/internals` / `@migaia/reactive/node-internals` / `@migaia/reactive/node-factories` | 内核内部面（clock/tracker/scheduler、可变依赖边、具体节点类工厂）            | 同上，仅供需要手工接入依赖图的节点实现层使用  |
-| `@migaia/reactive/source`                                                                            | `createFieldSource()`——为扩展层创建一条受控 Source                           | 同上                                          |
+应用作者从根入口使用工厂和窄节点类型。Store、集合、资源及框架适配层作者从 `/extension` 取得受控扩展能力；需要直接操作内部服务或可变图边时使用 `/internals`。三个节点类保持内部实现，不作为值导出。
 
 > 通用的「一组资源集中释放」的所有权容器（原 `Scope`/`createScope()`）已随 `docs/lifecycle/migration.sdd.md` §4.1 整体移出本包，改用 `@migaia/lifecycle` 的 `LifecycleScope`/`SyncLifecycleScope`。
 
 ## 8. 生命周期、错误与边界
 
 1. **不要跨 `Runtime` 混用节点**——一个 `Runtime` 创建的 `Signal` 被另一个 `Runtime` 的 `Computed`/`Effect` 读取会直接抛错。
-2. **`Signal`/`Computed`/`Effect` 构造参数顺序是"先业务参数、后 `runtime`"**：`new Signal(value, runtime, options?)`、`new Computed(fn, runtime, config?)`、`new Effect(fn, runtime, options?)`。
-3. **`new Effect(...)` 构造时会同步立即执行一次**，不是等到依赖变化才第一次运行。
+2. **统一经 Runtime 工厂创建节点**：`runtime.signal(value, options?)`、`runtime.computed(fn, config?)`、`runtime.effect(fn, options?)`，均支持 `dispose()`/`disposed`。
+3. **`runtime.effect(...)` 创建时会同步立即执行一次**，不是等到依赖变化才第一次运行。
 4. **`Signal.value = 相同值`（`Object.is` 判定）不会触发任何通知**，也不会推进版本号。
 5. **没有订阅者的 `Computed` 会被自动挂起**（断开依赖、下次读取重新计算），需要"即使暂时没人订阅也保持热态"时传 `{ keepAlive: true }`。
 6. **`dispose()` 之后的节点读取会立刻抛错**，不会静默返回旧值——这是有意设计，避免"看起来能用但永不更新"的幽灵状态。

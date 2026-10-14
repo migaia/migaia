@@ -6,7 +6,7 @@
 
 **适用**：需要同一份状态定义在多个独立作用域下各自持有一份值——每个 React Provider 一份、每个 SSR 请求一份、每个测试用例一份、每个 AI 对话一份。典型场景：`familyDef` 按对话/频道 id 产出定义、`focusDef`/`splitDef` 把大对象或列表拆成可独立订阅写入的子定义、`store.override()` 在测试里替换某个定义的实现而不改动被测代码引用的 token。
 
-**不适用**：整个应用只有一份全局状态、永远不需要多作用域隔离——直接用 `@migaia/reactive` 的 `Signal`/`Computed` 或更薄的 atom 库即可，不需要 definition/store 两层间接。本包不依赖 React、不依赖 DOM，也不提供 Provider/Hook；那是 `@migaia/store-react` 的职责。`familyDef`/`createFamily` 类原语只做同步初值/派生缓存，不支持异步初始值（`atomDef`/`atomDefFactory` 的初值/工厂遇到 thenable 会直接拒绝）。
+**不适用**：整个应用只有一份全局状态、永远不需要多作用域隔离——直接用 `runtime.signal()`/`runtime.computed()` 或更薄的 atom 库即可，不需要 definition/store 两层间接。本包不依赖 React、不依赖 DOM，也不提供 Provider/Hook；那是 `@migaia/store-react` 的职责。`familyDef`/`createFamily` 类原语只做同步初值/派生缓存，不支持异步初始值（`atomDef`/`atomDefFactory` 的初值/工厂遇到 thenable 会直接拒绝）。
 
 ## 安装
 
@@ -174,7 +174,7 @@ store.peek(doubled);
 store.preview(doubled);
 ```
 
-单参数同上。已有真实实例时直接走 `peek()` 语义；否则计算一个只在当前 `runtime.currentVersion()` 内有效的临时值，一个 microtask 后若始终未提交就自动丢弃。`primitive-factory` 必须标记 `previewSafe: true` 才能在这里执行，否则抛 `Error('[store] atom factory is not marked preview-safe')`；出现循环自我依赖抛 `Error('[store] circular atom preview detected')`。
+单参数同上。已有真实实例时直接走 `peek()` 语义；否则计算一个只在当前版本时钟值内有效（由 `@migaia/reactive/extension` 的 `currentRuntimeVersion(runtime)` 读取）的临时值，一个 microtask 后若始终未提交就自动丢弃。`primitive-factory` 必须标记 `previewSafe: true` 才能在这里执行，否则抛 `Error('[store] atom factory is not marked preview-safe')`；出现循环自我依赖抛 `Error('[store] circular atom preview detected')`。
 
 **`store.set(definition, ...args)`｜5 秒上手** —— 写：
 

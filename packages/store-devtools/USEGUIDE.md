@@ -56,7 +56,7 @@ type IActionTrace = {
 type IStoreDevTools = {
   readonly history: readonly IStoreHistoryEntry[];
   readonly actions: readonly IActionTrace[];
-  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive/runtime
+  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive
   record(label?: string): IStoreHistoryEntry;
   recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;
   jumpTo(id: number): void;
@@ -223,7 +223,7 @@ import {
 } from '@migaia/store-devtools';
 ```
 
-`getDependencyTree`/`getObserverTree` 不依赖 `createStoreDevTools`，可独立使用，参数类型 `IObservable`/`IObserver` 来自 `@migaia/reactive/runtime`（内核内部图协议子路径，刻意不从 `@migaia/reactive` 主入口导出——第三方通常应该组合公开的 `Signal`/`Computed`/`Effect`，而不是直接操作图节点；本包需要读取节点内部的 `deps`/`subs`/`version` 才能画依赖图，所以走这条子路径导入）。
+`getDependencyTree`/`getObserverTree` 不依赖 `createStoreDevTools`，可独立使用。公开句柄类型 `IReactiveSignal`/`IReactiveComputed`/`IReactiveEffect` 来自 `@migaia/reactive`；实现层图协议 `IObservable`/`IObserver` 来自 `@migaia/reactive/extension`。传入 Runtime 工厂创建的真实节点即可，本包按既有图关系读取 `deps`/`subs`/`version`。
 
 ```ts
 type IDependencyTreeNode = {
@@ -234,8 +234,14 @@ type IDependencyTreeNode = {
   circular?: boolean; // 该节点在当前递归路径上被重复访问
 };
 
-function getDependencyTree(observer: IObserver, maxDepth?: number): IDependencyTreeNode;
-function getObserverTree(observable: IObservable, maxDepth?: number): IDependencyTreeNode;
+function getDependencyTree(
+  root: IObserver | IReactiveEffect | IReactiveComputed<unknown>,
+  maxDepth?: number
+): IDependencyTreeNode;
+function getObserverTree(
+  root: IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>,
+  maxDepth?: number
+): IDependencyTreeNode;
 ```
 
 ### `maxDepth` 校验

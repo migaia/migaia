@@ -1968,7 +1968,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Effect, createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst positions = sharedInt32Array(runtime, 2, { initialValues: [0, 0] })\nconst draw = (x: number, y: number) => console.log({ x, y })\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })\nworker.postMessage({ buffer: positions.buffer })\n\nconst stopWatch = positions.watch()\nconst render = new Effect(() => {\n  draw(positions.get(0), positions.get(1))\n}, runtime)\n\npositions.update(0, (x) => x + 1)\nstopWatch()\nrender.dispose()\npositions.dispose()\nworker.terminate()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst positions = sharedInt32Array(runtime, 2, { initialValues: [0, 0] })\nconst draw = (x: number, y: number) => console.log({ x, y })\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })\nworker.postMessage({ buffer: positions.buffer })\n\nconst stopWatch = positions.watch()\nconst render = runtime.effect(() => {\n  draw(positions.get(0), positions.get(1))\n})\n\npositions.update(0, (x) => x + 1)\nstopWatch()\nrender.dispose()\npositions.dispose()\nworker.terminate()"
               }
             ]
           },
@@ -2010,7 +2010,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Effect, createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst positions = sharedInt32Array(runtime, 2, { initialValues: [0, 0] })\nconst draw = (x: number, y: number) => console.log({ x, y })\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })\nworker.postMessage({ buffer: positions.buffer })\n\nconst stopWatch = positions.watch()\nconst render = new Effect(() => {\n  draw(positions.get(0), positions.get(1))\n}, runtime)\n\npositions.update(0, (x) => x + 1)\nstopWatch()\nrender.dispose()\npositions.dispose()\nworker.terminate()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst positions = sharedInt32Array(runtime, 2, { initialValues: [0, 0] })\nconst draw = (x: number, y: number) => console.log({ x, y })\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })\nworker.postMessage({ buffer: positions.buffer })\n\nconst stopWatch = positions.watch()\nconst render = runtime.effect(() => {\n  draw(positions.get(0), positions.get(1))\n})\n\npositions.update(0, (x) => x + 1)\nstopWatch()\nrender.dispose()\npositions.dispose()\nworker.terminate()"
               }
             ]
           },
@@ -5101,7 +5101,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Effect, createRuntime } from '@migaia/reactive'\nimport { getDependencyTree, getObserverTree } from '@migaia/store-devtools'\n\nconst runtime = createRuntime()\nconst priceSignal = runtime.signal(10)\nconst totalEffect = new Effect(() => {\n  console.log('total', priceSignal.value * 2)\n}, runtime)\n\nconst upstream = getDependencyTree(totalEffect, 5)\nconst downstream = getObserverTree(priceSignal, 5)\nconsole.log(JSON.stringify({ upstream, downstream }, null, 2))\ntotalEffect.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { getDependencyTree, getObserverTree } from '@migaia/store-devtools'\n\nconst runtime = createRuntime()\nconst priceSignal = runtime.signal(10)\nconst totalEffect = runtime.effect(() => {\n  console.log('total', priceSignal.value * 2)\n})\n\nconst upstream = getDependencyTree(totalEffect, 5)\nconst downstream = getObserverTree(priceSignal, 5)\nconsole.log(JSON.stringify({ upstream, downstream }, null, 2))\ntotalEffect.dispose()"
               },
               {
                 type: 'table',
@@ -5147,7 +5147,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Effect, createRuntime } from '@migaia/reactive'\nimport { getDependencyTree, getObserverTree } from '@migaia/store-devtools'\n\nconst runtime = createRuntime()\nconst priceSignal = runtime.signal(10)\nconst totalEffect = new Effect(() => {\n  console.log('total', priceSignal.value * 2)\n}, runtime)\n\nconst upstream = getDependencyTree(totalEffect, 5)\nconst downstream = getObserverTree(priceSignal, 5)\nconsole.log(JSON.stringify({ upstream, downstream }, null, 2))\ntotalEffect.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { getDependencyTree, getObserverTree } from '@migaia/store-devtools'\n\nconst runtime = createRuntime()\nconst priceSignal = runtime.signal(10)\nconst totalEffect = runtime.effect(() => {\n  console.log('total', priceSignal.value * 2)\n})\n\nconst upstream = getDependencyTree(totalEffect, 5)\nconst downstream = getObserverTree(priceSignal, 5)\nconsole.log(JSON.stringify({ upstream, downstream }, null, 2))\ntotalEffect.dispose()"
               },
               {
                 type: 'table',
@@ -8196,7 +8196,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Effect, createRuntime } from '@migaia/reactive'\nimport { ObservableMap } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst users = new ObservableMap<string, User>([], runtime, { debugName: 'users' })\nusers.set('ada', { name: 'Ada' })\nusers.set('grace', { name: 'Grace' })\n\nconst view = new Effect(() => render(users.get('ada')), runtime)\nusers.set('grace', { name: 'Grace Hopper' }) // 不重跑 view\nusers.set('ada', { name: 'Ada Lovelace' }) // 重跑 view\n\nview.dispose()\nusers.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { ObservableMap } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst users = new ObservableMap<string, User>([], runtime, { debugName: 'users' })\nusers.set('ada', { name: 'Ada' })\nusers.set('grace', { name: 'Grace' })\n\nconst view = runtime.effect(() => render(users.get('ada')))\nusers.set('grace', { name: 'Grace Hopper' }) // 不重跑 view\nusers.set('ada', { name: 'Ada Lovelace' }) // 重跑 view\n\nview.dispose()\nusers.dispose()"
               },
               {
                 type: 'list',
@@ -8228,7 +8228,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Effect, createRuntime } from '@migaia/reactive'\nimport { ObservableMap } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst users = new ObservableMap<string, User>([], runtime, { debugName: 'users' })\nusers.set('ada', { name: 'Ada' })\nusers.set('grace', { name: 'Grace' })\n\nconst view = new Effect(() => render(users.get('ada')), runtime)\nusers.set('grace', { name: 'Grace Hopper' }) // does not rerun view\nusers.set('ada', { name: 'Ada Lovelace' }) // reruns view\n\nview.dispose()\nusers.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { ObservableMap } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst users = new ObservableMap<string, User>([], runtime, { debugName: 'users' })\nusers.set('ada', { name: 'Ada' })\nusers.set('grace', { name: 'Grace' })\n\nconst view = runtime.effect(() => render(users.get('ada')))\nusers.set('grace', { name: 'Grace Hopper' }) // does not rerun view\nusers.set('ada', { name: 'Ada Lovelace' }) // reruns view\n\nview.dispose()\nusers.dispose()"
               },
               {
                 type: 'list',
@@ -10276,7 +10276,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createFieldSource } from '@migaia/reactive/source'\nimport { FIELD_BUILDER, StoreFieldMode } from '@migaia/store-light'\n\nconst customField = {\n  [FIELD_BUILDER]: true,\n  mode: StoreFieldMode.sync,\n  create(context: { runtime: Parameters<typeof createFieldSource>[0]; own(resource: unknown): void }) {\n    const source = createFieldSource(context.runtime)\n    context.own(source)\n    return source\n  }\n}"
+                code: "import { createFieldSource } from '@migaia/reactive/extension'\nimport { FIELD_BUILDER, StoreFieldMode } from '@migaia/store-light'\n\nconst customField = {\n  [FIELD_BUILDER]: true,\n  mode: StoreFieldMode.sync,\n  create(context: { runtime: Parameters<typeof createFieldSource>[0]; own(resource: unknown): void }) {\n    const source = createFieldSource(context.runtime)\n    context.own(source)\n    return source\n  }\n}"
               },
               {
                 type: 'list',
@@ -10318,7 +10318,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createFieldSource } from '@migaia/reactive/source'\nimport { FIELD_BUILDER, StoreFieldMode } from '@migaia/store-light'\n\nconst customField = {\n  [FIELD_BUILDER]: true,\n  mode: StoreFieldMode.sync,\n  create(context: { runtime: Parameters<typeof createFieldSource>[0]; own(resource: unknown): void }) {\n    const source = createFieldSource(context.runtime)\n    context.own(source)\n    return source\n  }\n}"
+                code: "import { createFieldSource } from '@migaia/reactive/extension'\nimport { FIELD_BUILDER, StoreFieldMode } from '@migaia/store-light'\n\nconst customField = {\n  [FIELD_BUILDER]: true,\n  mode: StoreFieldMode.sync,\n  create(context: { runtime: Parameters<typeof createFieldSource>[0]; own(resource: unknown): void }) {\n    const source = createFieldSource(context.runtime)\n    context.own(source)\n    return source\n  }\n}"
               },
               {
                 type: 'list',
@@ -23735,7 +23735,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\ntype IUser = { id: string; name: string }\n/** 模拟一个 30 毫秒后返回的接口。 */\nconst fetchUser = async (id: string, signal: AbortSignal): Promise<IUser> => {\n  await new Promise((resolve) => setTimeout(resolve, 30))\n  signal.throwIfAborted()\n  return { id, name: id === '1' ? 'Ada' : 'Grace' }\n}\n\nconst runtime = createRuntime()\nconst user = new Resource<IUser>(\n  // 运行时就是 AbortSignal，但类型声明较窄，传给需要 AbortSignal 的 API 时要断言\n  ({ signal }) => fetchUser('1', signal as AbortSignal),\n  runtime\n)\n\n// 在 Effect 里读取 state：状态变化时自动重新运行\nconst stop = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.pending) console.log('加载中…')\n  if (state.status === ResourceStatus.success) console.log('用户:', state.data.name)\n  if (state.status === ResourceStatus.error) console.log('出错:', state.error)\n})\n\nawait user.promise // 等这次请求完成\nruntime.flush() // 让 Effect 立即读到新状态\nstop()\nuser.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\ntype IUser = { id: string; name: string }\n/** 模拟一个 30 毫秒后返回的接口。 */\nconst fetchUser = async (id: string, signal: AbortSignal): Promise<IUser> => {\n  await new Promise((resolve) => setTimeout(resolve, 30))\n  signal.throwIfAborted()\n  return { id, name: id === '1' ? 'Ada' : 'Grace' }\n}\n\nconst runtime = createRuntime()\nconst user = new Resource<IUser>(\n  // 运行时就是 AbortSignal，但类型声明较窄，传给需要 AbortSignal 的 API 时要断言\n  ({ signal }) => fetchUser('1', signal as AbortSignal),\n  runtime\n)\n\n// 在 Effect 里读取 state：状态变化时自动重新运行\nconst stop = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.pending) console.log('加载中…')\n  if (state.status === ResourceStatus.success) console.log('用户:', state.data.name)\n  if (state.status === ResourceStatus.error) console.log('出错:', state.error)\n})\n\nawait user.promise // 等这次请求完成\nruntime.flush() // 让 Effect 立即读到新状态\nstop.dispose()\nuser.dispose()"
               },
               {
                 type: 'paragraph',
@@ -23767,7 +23767,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('1')\n\nconst user = new Resource(\n  async ({ signal }) => {\n    const id = userId.value // 在第一个 await 之前读取：userId 成为依赖\n    console.log('请求用户', id)\n    signal.addEventListener('abort', () => console.log('取消请求', id))\n    await new Promise((resolve) => setTimeout(resolve, id === '1' ? 50 : 10))\n    return `user-${id}`\n  },\n  runtime\n)\n\nconst stop = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.success) console.log('显示:', state.data)\n})\n\nuserId.value = '2' // 依赖变化：取消旧请求，发起新请求\nawait new Promise((resolve) => setTimeout(resolve, 100))\nstop()\nuser.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('1')\n\nconst user = new Resource(\n  async ({ signal }) => {\n    const id = userId.value // 在第一个 await 之前读取：userId 成为依赖\n    console.log('请求用户', id)\n    signal.addEventListener('abort', () => console.log('取消请求', id))\n    await new Promise((resolve) => setTimeout(resolve, id === '1' ? 50 : 10))\n    return `user-${id}`\n  },\n  runtime\n)\n\nconst stop = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.success) console.log('显示:', state.data)\n})\n\nuserId.value = '2' // 依赖变化：取消旧请求，发起新请求\nawait new Promise((resolve) => setTimeout(resolve, 100))\nstop.dispose()\nuser.dispose()"
               },
               {
                 type: 'paragraph',
@@ -23861,7 +23861,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\ntype IUser = { id: string; name: string }\n/** A fake endpoint that answers after 30 ms. */\nconst fetchUser = async (id: string, signal: AbortSignal): Promise<IUser> => {\n  await new Promise((resolve) => setTimeout(resolve, 30))\n  signal.throwIfAborted()\n  return { id, name: id === '1' ? 'Ada' : 'Grace' }\n}\n\nconst runtime = createRuntime()\nconst user = new Resource<IUser>(\n  // At runtime this is an AbortSignal, but its declared type is narrower, so assert it for APIs that need AbortSignal\n  ({ signal }) => fetchUser('1', signal as AbortSignal),\n  runtime\n)\n\n// Read state inside an Effect so it reruns on every change\nconst stop = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.pending) console.log('loading…')\n  if (state.status === ResourceStatus.success) console.log('user:', state.data.name)\n  if (state.status === ResourceStatus.error) console.log('failed:', state.error)\n})\n\nawait user.promise // wait for this request\nruntime.flush() // let the Effect see the new state now\nstop()\nuser.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\ntype IUser = { id: string; name: string }\n/** A fake endpoint that answers after 30 ms. */\nconst fetchUser = async (id: string, signal: AbortSignal): Promise<IUser> => {\n  await new Promise((resolve) => setTimeout(resolve, 30))\n  signal.throwIfAborted()\n  return { id, name: id === '1' ? 'Ada' : 'Grace' }\n}\n\nconst runtime = createRuntime()\nconst user = new Resource<IUser>(\n  // At runtime this is an AbortSignal, but its declared type is narrower, so assert it for APIs that need AbortSignal\n  ({ signal }) => fetchUser('1', signal as AbortSignal),\n  runtime\n)\n\n// Read state inside an Effect so it reruns on every change\nconst stop = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.pending) console.log('loading…')\n  if (state.status === ResourceStatus.success) console.log('user:', state.data.name)\n  if (state.status === ResourceStatus.error) console.log('failed:', state.error)\n})\n\nawait user.promise // wait for this request\nruntime.flush() // let the Effect see the new state now\nstop.dispose()\nuser.dispose()"
               },
               {
                 type: 'paragraph',
@@ -23893,7 +23893,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('1')\n\nconst user = new Resource(\n  async ({ signal }) => {\n    const id = userId.value // read before the first await, so userId becomes a dependency\n    console.log('request user', id)\n    signal.addEventListener('abort', () => console.log('abort request', id))\n    await new Promise((resolve) => setTimeout(resolve, id === '1' ? 50 : 10))\n    return `user-${id}`\n  },\n  runtime\n)\n\nconst stop = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.success) console.log('show:', state.data)\n})\n\nuserId.value = '2' // dependency changed: abort the old request, start a new one\nawait new Promise((resolve) => setTimeout(resolve, 100))\nstop()\nuser.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('1')\n\nconst user = new Resource(\n  async ({ signal }) => {\n    const id = userId.value // read before the first await, so userId becomes a dependency\n    console.log('request user', id)\n    signal.addEventListener('abort', () => console.log('abort request', id))\n    await new Promise((resolve) => setTimeout(resolve, id === '1' ? 50 : 10))\n    return `user-${id}`\n  },\n  runtime\n)\n\nconst stop = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.success) console.log('show:', state.data)\n})\n\nuserId.value = '2' // dependency changed: abort the old request, start a new one\nawait new Promise((resolve) => setTimeout(resolve, 100))\nstop.dispose()\nuser.dispose()"
               },
               {
                 type: 'paragraph',
@@ -23986,7 +23986,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nlet version = 0\nconst runtime = createRuntime()\nconst prices = new Resource(\n  async () => {\n    await new Promise((resolve) => setTimeout(resolve, 20))\n    version += 1\n    return `价格表 v${version}`\n  },\n  runtime,\n  { ttl: 1000, staleWhileRevalidate: true }\n)\n\nconst stop = runtime.effect(() => {\n  const state = prices.state\n  if (state.status === ResourceStatus.pending) console.log('加载中…')\n  if (state.status === ResourceStatus.success)\n    console.log(state.data, state.refreshing ? '（后台刷新中）' : '')\n})\n\nawait prices.promise\nruntime.flush()\nawait prices.refetch() // 刷新期间继续显示旧数据，而不是回到“加载中”\nruntime.flush()\nstop()\nprices.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nlet version = 0\nconst runtime = createRuntime()\nconst prices = new Resource(\n  async () => {\n    await new Promise((resolve) => setTimeout(resolve, 20))\n    version += 1\n    return `价格表 v${version}`\n  },\n  runtime,\n  { ttl: 1000, staleWhileRevalidate: true }\n)\n\nconst stop = runtime.effect(() => {\n  const state = prices.state\n  if (state.status === ResourceStatus.pending) console.log('加载中…')\n  if (state.status === ResourceStatus.success)\n    console.log(state.data, state.refreshing ? '（后台刷新中）' : '')\n})\n\nawait prices.promise\nruntime.flush()\nawait prices.refetch() // 刷新期间继续显示旧数据，而不是回到“加载中”\nruntime.flush()\nstop.dispose()\nprices.dispose()"
               },
               {
                 type: 'paragraph',
@@ -24052,7 +24052,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nlet version = 0\nconst runtime = createRuntime()\nconst prices = new Resource(\n  async () => {\n    await new Promise((resolve) => setTimeout(resolve, 20))\n    version += 1\n    return `price list v${version}`\n  },\n  runtime,\n  { ttl: 1000, staleWhileRevalidate: true }\n)\n\nconst stop = runtime.effect(() => {\n  const state = prices.state\n  if (state.status === ResourceStatus.pending) console.log('loading…')\n  if (state.status === ResourceStatus.success)\n    console.log(state.data, state.refreshing ? '(refreshing in background)' : '')\n})\n\nawait prices.promise\nruntime.flush()\nawait prices.refetch() // old data stays visible during refresh instead of returning to loading\nruntime.flush()\nstop()\nprices.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nlet version = 0\nconst runtime = createRuntime()\nconst prices = new Resource(\n  async () => {\n    await new Promise((resolve) => setTimeout(resolve, 20))\n    version += 1\n    return `price list v${version}`\n  },\n  runtime,\n  { ttl: 1000, staleWhileRevalidate: true }\n)\n\nconst stop = runtime.effect(() => {\n  const state = prices.state\n  if (state.status === ResourceStatus.pending) console.log('loading…')\n  if (state.status === ResourceStatus.success)\n    console.log(state.data, state.refreshing ? '(refreshing in background)' : '')\n})\n\nawait prices.promise\nruntime.flush()\nawait prices.refetch() // old data stays visible during refresh instead of returning to loading\nruntime.flush()\nstop.dispose()\nprices.dispose()"
               },
               {
                 type: 'paragraph',
@@ -24657,10 +24657,10 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['API', '作用'],
                 rows: [
                   ['createRuntime(options?)', '创建一张独立的依赖图。所有节点都要属于某个 Runtime'],
-                  ['new Signal(value, runtime)', '可写的值。.value 读写，.peek() 读取但不建立依赖'],
-                  ['new Computed(fn, runtime, config?)', '从其他值派生的只读值，惰性计算并缓存'],
+                  ['runtime.signal(value)', '可写的值。.value 读写，.peek() 读取但不建立依赖'],
+                  ['runtime.computed(fn, config?)', '从其他值派生的只读值，惰性计算并缓存'],
                   [
-                    'new Effect(fn, runtime)',
+                    'runtime.effect(fn)',
                     '副作用。创建时立即运行一次，依赖变化后重新运行；fn 可以返回清理函数'
                   ],
                   ['runtime.batch(fn)', '把多次写入合并成一次更新'],
@@ -24733,15 +24733,15 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Creates an independent graph; every node belongs to one Runtime'
                   ],
                   [
-                    'new Signal(value, runtime)',
+                    'runtime.signal(value)',
                     'A writable value. .value reads and writes; .peek() reads without a dependency'
                   ],
                   [
-                    'new Computed(fn, runtime, config?)',
+                    'runtime.computed(fn, config?)',
                     'A read-only derived value, computed lazily and cached'
                   ],
                   [
-                    'new Effect(fn, runtime)',
+                    'runtime.effect(fn)',
                     'A side effect. Runs once on creation and again after dependencies change; fn may return a cleanup'
                   ],
                   ['runtime.batch(fn)', 'Merges several writes into one update'],
@@ -24779,7 +24779,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   'reactive:getting-started': {
     zh: {
       title: '快速开始：第一张依赖图',
-      lede: '安装包，用两个 Signal、一个 Computed 和一个 Effect 计算并打印总价，并理解每个构造参数。',
+      lede: '安装包，用两个 Signal、一个 Computed 和一个 Effect 计算并打印总价，并理解节点工厂的参数。',
       document: {
         sections: [
           {
@@ -24804,7 +24804,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\n\nconst price = new Signal(10, runtime)\nconst quantity = new Signal(2, runtime)\nconst total = new Computed(() => price.value * quantity.value, runtime)\n\nconst effect = new Effect(() => {\n  console.log('总价:', total.value)\n}, runtime)\n\nquantity.value = 3\nruntime.flush() // 立即执行待处理的 Effect（不调用时会在下一个微任务自动执行）\n\neffect.dispose()\ntotal.dispose()\nquantity.dispose()\nprice.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\n\nconst price = runtime.signal(10)\nconst quantity = runtime.signal(2)\nconst total = runtime.computed(() => price.value * quantity.value)\n\nconst effect = runtime.effect(() => {\n  console.log('总价:', total.value)\n})\n\nquantity.value = 3\nruntime.flush() // 立即执行待处理的 Effect（不调用时会在下一个微任务自动执行）\n\neffect.dispose()\ntotal.dispose()\nquantity.dispose()\nprice.dispose()"
               },
               {
                 type: 'paragraph',
@@ -24817,15 +24817,15 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: 'createRuntime() 创建一张依赖图。new Signal(10, runtime) 创建一个初始值为 10 的可写值；new Computed(fn, runtime) 创建一个派生值，fn 里读到了 price 和 quantity，于是它依赖这两个 Signal。'
+                text: 'createRuntime() 创建一张依赖图。runtime.signal(10) 创建一个初始值为 10 的可写值；runtime.computed(fn) 创建一个派生值，fn 里读到了 price 和 quantity，于是它依赖这两个 Signal。'
               },
               {
                 type: 'paragraph',
-                text: 'new Effect(fn, runtime) 创建时立即运行一次，打印 20，同时记录它读到了 total。给 quantity 赋值后，total 被标记为过期，Effect 进入待执行队列。runtime.flush() 立即执行队列：Effect 重新运行，读取 total 时它按需重新计算为 30。'
+                text: 'runtime.effect(fn) 创建时立即运行一次，打印 20，同时记录它读到了 total。给 quantity 赋值后，total 被标记为过期，Effect 进入待执行队列。runtime.flush() 立即执行队列：Effect 重新运行，读取 total 时它按需重新计算为 30。'
               },
               {
                 type: 'paragraph',
-                text: '所有构造函数的参数顺序都是“先业务参数，后 runtime”：new Signal(value, runtime, options?)、new Computed(fn, runtime, config?)、new Effect(fn, runtime, options?)。options 里可以传 debugName，出错时用它标识节点。'
+                text: '每个节点都通过所属 Runtime 的工厂创建：runtime.signal(value, options?)、runtime.computed(fn, config?)、runtime.effect(fn, options?)。options 里可以传 debugName，出错时用它标识节点。'
               }
             ]
           },
@@ -24840,7 +24840,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst name = new Signal('Ada', runtime)\nconst effect = new Effect(() => console.log('你好,', name.value), runtime)\n\nname.value = 'Grace'\nname.value = 'Linus'\nconsole.log('赋值语句执行完了')\nawait Promise.resolve() // 等一个微任务：Effect 只重新运行一次，读到最后的值\n\neffect.dispose()\nname.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst name = runtime.signal('Ada')\nconst effect = runtime.effect(() => console.log('你好,', name.value))\n\nname.value = 'Grace'\nname.value = 'Linus'\nconsole.log('赋值语句执行完了')\nawait Promise.resolve() // 等一个微任务：Effect 只重新运行一次，读到最后的值\n\neffect.dispose()\nname.dispose()"
               },
               {
                 type: 'paragraph',
@@ -24863,12 +24863,12 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: '也可以用 Runtime 上的快捷方法创建节点，不必每次传 runtime：'
+                text: '节点工厂统一由 Runtime 提供；句柄由宿主负责释放：'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst count = runtime.signal(1)\nconst doubled = runtime.computed(() => count.value * 2)\nconst stop = runtime.effect(() => console.log('doubled =', doubled.value)) // 返回的是停止函数\n\ncount.value = 2\nruntime.flush()\nstop()\ndoubled.dispose()\ncount.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst count = runtime.signal(1)\nconst doubled = runtime.computed(() => count.value * 2)\nconst stop = runtime.effect(() => console.log('doubled =', doubled.value)) // 返回 IReactiveEffect 句柄\n\ncount.value = 2\nruntime.flush()\nstop.dispose()\ndoubled.dispose()\ncount.dispose()"
               },
               {
                 type: 'paragraph',
@@ -24881,7 +24881,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: '注意 runtime.effect() 返回的是停止函数，而不是 Effect 对象。'
+                text: 'runtime.effect() 返回 IReactiveEffect 句柄；调用 dispose() 幂等停止，disposed 反映释放状态。'
               }
             ]
           }
@@ -24898,13 +24898,13 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         },
         {
           label: 'Signal API',
-          path: 'docs/reactive/reactive/Signal'
+          path: 'docs/reactive/api/IReactiveSignal'
         }
       ]
     },
     en: {
       title: 'Quick start: your first dependency graph',
-      lede: 'Install the package, compute and print a total with two Signals, a Computed, and an Effect, and learn each constructor argument.',
+      lede: 'Install the package, compute and print a total with two Signals, a Computed, and an Effect, and learn the node factory arguments.',
       document: {
         sections: [
           {
@@ -24929,7 +24929,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\n\nconst price = new Signal(10, runtime)\nconst quantity = new Signal(2, runtime)\nconst total = new Computed(() => price.value * quantity.value, runtime)\n\nconst effect = new Effect(() => {\n  console.log('total:', total.value)\n}, runtime)\n\nquantity.value = 3\nruntime.flush() // run pending Effects now (otherwise they run in the next microtask)\n\neffect.dispose()\ntotal.dispose()\nquantity.dispose()\nprice.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\n\nconst price = runtime.signal(10)\nconst quantity = runtime.signal(2)\nconst total = runtime.computed(() => price.value * quantity.value)\n\nconst effect = runtime.effect(() => {\n  console.log('total:', total.value)\n})\n\nquantity.value = 3\nruntime.flush() // run pending Effects now (otherwise they run in the next microtask)\n\neffect.dispose()\ntotal.dispose()\nquantity.dispose()\nprice.dispose()"
               },
               {
                 type: 'paragraph',
@@ -24942,15 +24942,15 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: 'createRuntime() creates a graph. new Signal(10, runtime) creates a writable value starting at 10; new Computed(fn, runtime) creates a derived value whose fn reads price and quantity, so it depends on both Signals.'
+                text: 'createRuntime() creates a graph. runtime.signal(10) creates a writable value starting at 10; runtime.computed(fn) creates a derived value whose fn reads price and quantity, so it depends on both Signals.'
               },
               {
                 type: 'paragraph',
-                text: 'new Effect(fn, runtime) runs immediately, printing 20 and recording that it read total. Assigning quantity marks total stale and queues the Effect. runtime.flush() runs the queue: the Effect reruns and reading total recomputes it to 30.'
+                text: 'runtime.effect(fn) runs immediately, printing 20 and recording that it read total. Assigning quantity marks total stale and queues the Effect. runtime.flush() runs the queue: the Effect reruns and reading total recomputes it to 30.'
               },
               {
                 type: 'paragraph',
-                text: 'Every constructor takes business arguments first, then runtime: new Signal(value, runtime, options?), new Computed(fn, runtime, config?), new Effect(fn, runtime, options?). options may carry a debugName that identifies the node in errors.'
+                text: 'Create each node through its owning Runtime factory: runtime.signal(value, options?), runtime.computed(fn, config?), runtime.effect(fn, options?). options may carry a debugName that identifies the node in errors.'
               }
             ]
           },
@@ -24965,7 +24965,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst name = new Signal('Ada', runtime)\nconst effect = new Effect(() => console.log('hello,', name.value), runtime)\n\nname.value = 'Grace'\nname.value = 'Linus'\nconsole.log('assignments finished')\nawait Promise.resolve() // wait one microtask: the Effect reruns once and sees the last value\n\neffect.dispose()\nname.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst name = runtime.signal('Ada')\nconst effect = runtime.effect(() => console.log('hello,', name.value))\n\nname.value = 'Grace'\nname.value = 'Linus'\nconsole.log('assignments finished')\nawait Promise.resolve() // wait one microtask: the Effect reruns once and sees the last value\n\neffect.dispose()\nname.dispose()"
               },
               {
                 type: 'paragraph',
@@ -24988,12 +24988,12 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: 'Runtime shortcuts create nodes without passing runtime each time:'
+                text: 'Runtime provides the node factories; the host owns and releases their handles:'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst count = runtime.signal(1)\nconst doubled = runtime.computed(() => count.value * 2)\nconst stop = runtime.effect(() => console.log('doubled =', doubled.value)) // returns a stop function\n\ncount.value = 2\nruntime.flush()\nstop()\ndoubled.dispose()\ncount.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst count = runtime.signal(1)\nconst doubled = runtime.computed(() => count.value * 2)\nconst stop = runtime.effect(() => console.log('doubled =', doubled.value)) // returns an IReactiveEffect handle\n\ncount.value = 2\nruntime.flush()\nstop.dispose()\ndoubled.dispose()\ncount.dispose()"
               },
               {
                 type: 'paragraph',
@@ -25006,7 +25006,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: 'Note that runtime.effect() returns a stop function, not an Effect object.'
+                text: 'runtime.effect() returns an IReactiveEffect handle. Call dispose() to stop it idempotently and read disposed to inspect release state.'
               }
             ]
           }
@@ -25023,7 +25023,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         },
         {
           label: 'Signal API',
-          path: 'docs/reactive/reactive/Signal'
+          path: 'docs/reactive/api/IReactiveSignal'
         }
       ]
     }
@@ -25041,7 +25041,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Computed, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst count = new Signal(1, runtime)\nlet runs = 0\nconst doubled = new Computed(() => {\n  runs += 1\n  return count.value * 2\n}, runtime)\n\nconsole.log('创建后计算次数:', runs) // 没人读取，还没计算\nconsole.log(doubled.value, doubled.value) // 读两次\nconsole.log('读取后计算次数:', runs) // 只算了一次，第二次用缓存\ncount.value = 5\nconsole.log(doubled.value, '计算次数:', runs) // 依赖变了，读取时重新计算\n\ndoubled.dispose()\ncount.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst count = runtime.signal(1)\nlet runs = 0\nconst doubled = runtime.computed(() => {\n  runs += 1\n  return count.value * 2\n})\n\nconsole.log('创建后计算次数:', runs) // 没人读取，还没计算\nconsole.log(doubled.value, doubled.value) // 读两次\nconsole.log('读取后计算次数:', runs) // 只算了一次，第二次用缓存\ncount.value = 5\nconsole.log(doubled.value, '计算次数:', runs) // 依赖变了，读取时重新计算\n\ndoubled.dispose()\ncount.dispose()"
               },
               {
                 type: 'paragraph',
@@ -25065,7 +25065,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = new Signal('Ada', runtime)\nconst upper = new Computed(() => firstName.value.toUpperCase(), runtime)\nconst length = new Computed(() => firstName.value.length, runtime)\n\n// Effect 同时依赖两个 Computed，而它们来自同一个 Signal\nconst effect = new Effect(() => console.log(`${upper.value} (${length.value} 个字母)`), runtime)\n\nfirstName.value = 'Grace'\nruntime.flush() // Effect 只运行一次，不会先看到新的 upper 和旧的 length\n\neffect.dispose()\nupper.dispose()\nlength.dispose()\nfirstName.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst upper = runtime.computed(() => firstName.value.toUpperCase())\nconst length = runtime.computed(() => firstName.value.length)\n\n// Effect 同时依赖两个 Computed，而它们来自同一个 Signal\nconst effect = runtime.effect(() => console.log(`${upper.value} (${length.value} 个字母)`))\n\nfirstName.value = 'Grace'\nruntime.flush() // Effect 只运行一次，不会先看到新的 upper 和旧的 length\n\neffect.dispose()\nupper.dispose()\nlength.dispose()\nfirstName.dispose()"
               },
               {
                 type: 'paragraph',
@@ -25089,7 +25089,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst user = new Signal({ id: 1, name: 'Ada', lastSeen: 100 }, runtime)\n// 只关心 id 和 name；lastSeen 变化时认为结果“没变”\nconst profile = new Computed(\n  () => ({ id: user.value.id, name: user.value.name }),\n  runtime,\n  (previous, next) => previous.id === next.id && previous.name === next.name\n)\nconst effect = new Effect(() => console.log('渲染资料:', profile.value.name), runtime)\n\nuser.value = { ...user.value, lastSeen: 200 }\nruntime.flush() // profile 判定为相等，Effect 不重新运行\nuser.value = { ...user.value, name: 'Grace' }\nruntime.flush()\n\neffect.dispose()\nprofile.dispose()\nuser.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst user = runtime.signal({ id: 1, name: 'Ada', lastSeen: 100 })\n// 只关心 id 和 name；lastSeen 变化时认为结果“没变”\nconst profile = runtime.computed(() => ({ id: user.value.id, name: user.value.name }), (previous, next) => previous.id === next.id && previous.name === next.name)\nconst effect = runtime.effect(() => console.log('渲染资料:', profile.value.name))\n\nuser.value = { ...user.value, lastSeen: 200 }\nruntime.flush() // profile 判定为相等，Effect 不重新运行\nuser.value = { ...user.value, name: 'Grace' }\nruntime.flush()\n\neffect.dispose()\nprofile.dispose()\nuser.dispose()"
               },
               {
                 type: 'paragraph',
@@ -25113,7 +25113,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst room = new Signal('general', runtime)\n\nconst effect = new Effect(() => {\n  const current = room.value\n  console.log('加入房间', current)\n  return () => console.log('离开房间', current) // 下次重新运行前、以及 dispose 时调用\n}, runtime)\n\nroom.value = 'random'\nruntime.flush()\neffect.dispose()\nroom.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst room = runtime.signal('general')\n\nconst effect = runtime.effect(() => {\n  const current = room.value\n  console.log('加入房间', current)\n  return () => console.log('离开房间', current) // 下次重新运行前、以及 dispose 时调用\n})\n\nroom.value = 'random'\nruntime.flush()\neffect.dispose()\nroom.dispose()"
               },
               {
                 type: 'paragraph',
@@ -25137,7 +25137,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst query = new Signal('apple', runtime)\nconst pageSize = new Signal(10, runtime)\n\nconst effect = new Effect(() => {\n  // 只在 query 变化时搜索；pageSize 用 peek() 读取，不建立依赖\n  console.log(`搜索 ${query.value}，每页 ${pageSize.peek()} 条`)\n}, runtime)\n\npageSize.value = 20\nruntime.flush() // pageSize 变化不触发 Effect\nquery.value = 'banana'\nruntime.flush() // query 变化触发，读到最新的 pageSize\n\neffect.dispose()\nquery.dispose()\npageSize.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst query = runtime.signal('apple')\nconst pageSize = runtime.signal(10)\n\nconst effect = runtime.effect(() => {\n  // 只在 query 变化时搜索；pageSize 用 peek() 读取，不建立依赖\n  console.log(`搜索 ${query.value}，每页 ${pageSize.peek()} 条`)\n})\n\npageSize.value = 20\nruntime.flush() // pageSize 变化不触发 Effect\nquery.value = 'banana'\nruntime.flush() // query 变化触发，读到最新的 pageSize\n\neffect.dispose()\nquery.dispose()\npageSize.dispose()"
               },
               {
                 type: 'paragraph',
@@ -25167,7 +25167,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         },
         {
           label: 'Computed API',
-          path: 'docs/reactive/reactive/Computed'
+          path: 'docs/reactive/api/IReactiveComputed'
         }
       ]
     },
@@ -25183,7 +25183,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Computed, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst count = new Signal(1, runtime)\nlet runs = 0\nconst doubled = new Computed(() => {\n  runs += 1\n  return count.value * 2\n}, runtime)\n\nconsole.log('computations after creation:', runs) // nobody has read it, so nothing ran\nconsole.log(doubled.value, doubled.value) // read twice\nconsole.log('computations after reading:', runs) // computed once; the second read used the cache\ncount.value = 5\nconsole.log(doubled.value, 'computations:', runs) // the dependency changed, so reading recomputes\n\ndoubled.dispose()\ncount.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst count = runtime.signal(1)\nlet runs = 0\nconst doubled = runtime.computed(() => {\n  runs += 1\n  return count.value * 2\n})\n\nconsole.log('computations after creation:', runs) // nobody has read it, so nothing ran\nconsole.log(doubled.value, doubled.value) // read twice\nconsole.log('computations after reading:', runs) // computed once; the second read used the cache\ncount.value = 5\nconsole.log(doubled.value, 'computations:', runs) // the dependency changed, so reading recomputes\n\ndoubled.dispose()\ncount.dispose()"
               },
               {
                 type: 'paragraph',
@@ -25207,7 +25207,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = new Signal('Ada', runtime)\nconst upper = new Computed(() => firstName.value.toUpperCase(), runtime)\nconst length = new Computed(() => firstName.value.length, runtime)\n\n// The Effect depends on two Computeds that share one Signal\nconst effect = new Effect(() => console.log(`${upper.value} (${length.value} letters)`), runtime)\n\nfirstName.value = 'Grace'\nruntime.flush() // the Effect runs once and never sees a new upper with an old length\n\neffect.dispose()\nupper.dispose()\nlength.dispose()\nfirstName.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst upper = runtime.computed(() => firstName.value.toUpperCase())\nconst length = runtime.computed(() => firstName.value.length)\n\n// The Effect depends on two Computeds that share one Signal\nconst effect = runtime.effect(() => console.log(`${upper.value} (${length.value} letters)`))\n\nfirstName.value = 'Grace'\nruntime.flush() // the Effect runs once and never sees a new upper with an old length\n\neffect.dispose()\nupper.dispose()\nlength.dispose()\nfirstName.dispose()"
               },
               {
                 type: 'paragraph',
@@ -25231,7 +25231,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst user = new Signal({ id: 1, name: 'Ada', lastSeen: 100 }, runtime)\n// Only id and name matter; a lastSeen change counts as \"unchanged\"\nconst profile = new Computed(\n  () => ({ id: user.value.id, name: user.value.name }),\n  runtime,\n  (previous, next) => previous.id === next.id && previous.name === next.name\n)\nconst effect = new Effect(() => console.log('render profile:', profile.value.name), runtime)\n\nuser.value = { ...user.value, lastSeen: 200 }\nruntime.flush() // profile is equal, so the Effect does not rerun\nuser.value = { ...user.value, name: 'Grace' }\nruntime.flush()\n\neffect.dispose()\nprofile.dispose()\nuser.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst user = runtime.signal({ id: 1, name: 'Ada', lastSeen: 100 })\n// Only id and name matter; a lastSeen change counts as \"unchanged\"\nconst profile = runtime.computed(() => ({ id: user.value.id, name: user.value.name }), (previous, next) => previous.id === next.id && previous.name === next.name)\nconst effect = runtime.effect(() => console.log('render profile:', profile.value.name))\n\nuser.value = { ...user.value, lastSeen: 200 }\nruntime.flush() // profile is equal, so the Effect does not rerun\nuser.value = { ...user.value, name: 'Grace' }\nruntime.flush()\n\neffect.dispose()\nprofile.dispose()\nuser.dispose()"
               },
               {
                 type: 'paragraph',
@@ -25255,7 +25255,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst room = new Signal('general', runtime)\n\nconst effect = new Effect(() => {\n  const current = room.value\n  console.log('join room', current)\n  return () => console.log('leave room', current) // called before the next run and on dispose\n}, runtime)\n\nroom.value = 'random'\nruntime.flush()\neffect.dispose()\nroom.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst room = runtime.signal('general')\n\nconst effect = runtime.effect(() => {\n  const current = room.value\n  console.log('join room', current)\n  return () => console.log('leave room', current) // called before the next run and on dispose\n})\n\nroom.value = 'random'\nruntime.flush()\neffect.dispose()\nroom.dispose()"
               },
               {
                 type: 'paragraph',
@@ -25279,7 +25279,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst query = new Signal('apple', runtime)\nconst pageSize = new Signal(10, runtime)\n\nconst effect = new Effect(() => {\n  // Search only when query changes; peek() reads pageSize without a dependency\n  console.log(`search ${query.value}, ${pageSize.peek()} per page`)\n}, runtime)\n\npageSize.value = 20\nruntime.flush() // a pageSize change does not trigger the Effect\nquery.value = 'banana'\nruntime.flush() // a query change triggers it and reads the latest pageSize\n\neffect.dispose()\nquery.dispose()\npageSize.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst query = runtime.signal('apple')\nconst pageSize = runtime.signal(10)\n\nconst effect = runtime.effect(() => {\n  // Search only when query changes; peek() reads pageSize without a dependency\n  console.log(`search ${query.value}, ${pageSize.peek()} per page`)\n})\n\npageSize.value = 20\nruntime.flush() // a pageSize change does not trigger the Effect\nquery.value = 'banana'\nruntime.flush() // a query change triggers it and reads the latest pageSize\n\neffect.dispose()\nquery.dispose()\npageSize.dispose()"
               },
               {
                 type: 'paragraph',
@@ -25309,7 +25309,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         },
         {
           label: 'Computed API',
-          path: 'docs/reactive/reactive/Computed'
+          path: 'docs/reactive/api/IReactiveComputed'
         }
       ]
     }
@@ -25327,7 +25327,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst first = new Signal('Ada', runtime)\nconst last = new Signal('Lovelace', runtime)\nconst full = new Computed(() => `${first.value} ${last.value}`, runtime)\nconst effect = new Effect(() => console.log('全名:', full.value), runtime)\n\nruntime.batch(() => {\n  first.value = 'Grace'\n  last.value = 'Hopper'\n}) // batch 结束时统一执行一次，不会出现 \"Grace Lovelace\"\n\neffect.dispose()\nfull.dispose()\nfirst.dispose()\nlast.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst first = runtime.signal('Ada')\nconst last = runtime.signal('Lovelace')\nconst full = runtime.computed(() => `${first.value} ${last.value}`)\nconst effect = runtime.effect(() => console.log('全名:', full.value))\n\nruntime.batch(() => {\n  first.value = 'Grace'\n  last.value = 'Hopper'\n}) // batch 结束时统一执行一次，不会出现 \"Grace Lovelace\"\n\neffect.dispose()\nfull.dispose()\nfirst.dispose()\nlast.dispose()"
               },
               {
                 type: 'paragraph',
@@ -25372,12 +25372,13 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '原生实现',
                     '替换 scheduleMicrotask、now、timestamp、reportError，用于测试或特殊运行环境'
                   ],
-                  ['scheduleIdle', '微任务', '没人订阅的 Computed 在何时断开依赖']
+                  ['scheduleIdle', '微任务', '没人订阅的 Computed 在何时断开依赖'],
+                  ['schedulerStrategy', '微任务', '创建时决定自动调用 flush 的时机']
                 ]
               },
               {
                 type: 'paragraph',
-                text: 'runtime.setSchedulerStrategy(strategy) 可以把自动执行的时机从“下一个微任务”换成 requestAnimationFrame 等，strategy 收到一个 flush 函数，决定何时调用它。'
+                text: '创建 Runtime 时传入 createRuntime({ schedulerStrategy: strategy })，可以把自动执行的时机从“下一个微任务”换成 requestAnimationFrame 等。strategy 收到一个 flush 函数，决定何时调用它；策略在创建时确定。'
               }
             ]
           },
@@ -25404,7 +25405,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         },
         {
           label: 'createRuntime API',
-          path: 'docs/reactive/runtime/createRuntime'
+          path: 'docs/reactive/api/createRuntime'
         }
       ]
     },
@@ -25420,7 +25421,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst first = new Signal('Ada', runtime)\nconst last = new Signal('Lovelace', runtime)\nconst full = new Computed(() => `${first.value} ${last.value}`, runtime)\nconst effect = new Effect(() => console.log('full name:', full.value), runtime)\n\nruntime.batch(() => {\n  first.value = 'Grace'\n  last.value = 'Hopper'\n}) // runs once when batch ends; \"Grace Lovelace\" never appears\n\neffect.dispose()\nfull.dispose()\nfirst.dispose()\nlast.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst first = runtime.signal('Ada')\nconst last = runtime.signal('Lovelace')\nconst full = runtime.computed(() => `${first.value} ${last.value}`)\nconst effect = runtime.effect(() => console.log('full name:', full.value))\n\nruntime.batch(() => {\n  first.value = 'Grace'\n  last.value = 'Hopper'\n}) // runs once when batch ends; \"Grace Lovelace\" never appears\n\neffect.dispose()\nfull.dispose()\nfirst.dispose()\nlast.dispose()"
               },
               {
                 type: 'paragraph',
@@ -25465,12 +25466,13 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'native',
                     'Replaces scheduleMicrotask, now, timestamp, reportError for tests or unusual hosts'
                   ],
-                  ['scheduleIdle', 'microtask', 'When unobserved Computeds disconnect']
+                  ['scheduleIdle', 'microtask', 'When unobserved Computeds disconnect'],
+                  ['schedulerStrategy', 'microtask', 'Selects automatic flush timing at creation']
                 ]
               },
               {
                 type: 'paragraph',
-                text: 'runtime.setSchedulerStrategy(strategy) moves automatic runs from the next microtask to, for example, requestAnimationFrame; strategy receives a flush function and decides when to call it.'
+                text: 'Pass createRuntime({ schedulerStrategy: strategy }) at creation to move automatic runs from the next microtask to, for example, requestAnimationFrame. The strategy receives a flush function and decides when to call it; the runtime keeps its creation-time policy.'
               }
             ]
           },
@@ -25497,7 +25499,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         },
         {
           label: 'createRuntime API',
-          path: 'docs/reactive/runtime/createRuntime'
+          path: 'docs/reactive/api/createRuntime'
         }
       ]
     }
@@ -25515,7 +25517,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Computed, Signal, createRuntime, ReactiveErrorCode } from '@migaia/reactive'\n\nconst a = createRuntime()\nconst b = createRuntime()\n\nconst count = new Signal(1, a)\nconst wrong = new Computed(() => count.value * 2, b) // 依赖了另一个 Runtime 的 Signal\ntry {\n  wrong.value\n} catch (error) {\n  console.log((error as { code: string }).code === ReactiveErrorCode.crossRuntime, (error as { code: string }).code)\n}\n\ncount.dispose()\ntry {\n  count.value\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nwrong.dispose()"
+                code: "import { createRuntime, ReactiveErrorCode } from '@migaia/reactive'\n\nconst a = createRuntime()\nconst b = createRuntime()\n\nconst count = a.signal(1)\nconst wrong = b.computed(() => count.value * 2) // 依赖了另一个 Runtime 的 Signal\ntry {\n  wrong.value\n} catch (error) {\n  console.log((error as { code: string }).code === ReactiveErrorCode.crossRuntime, (error as { code: string }).code)\n}\n\ncount.dispose()\ntry {\n  count.value\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nwrong.dispose()"
               },
               {
                 type: 'paragraph',
@@ -25539,7 +25541,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime({ maxFlushPasses: 5 })\nconst a = new Signal(0, runtime)\nconst b = new Signal(0, runtime)\n// 错误：两个 Effect 互相写对方读取的 Signal，形成无限循环\nconst syncB = new Effect(() => {\n  b.value = a.value + 1\n}, runtime)\nconst syncA = new Effect(() => {\n  a.value = b.value + 1\n}, runtime)\n\ntry {\n  runtime.flush()\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nsyncA.dispose()\nsyncB.dispose()\na.dispose()\nb.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime({ maxFlushPasses: 5 })\nconst a = runtime.signal(0)\nconst b = runtime.signal(0)\n// 错误：两个 Effect 互相写对方读取的 Signal，形成无限循环\nconst syncB = runtime.effect(() => {\n  b.value = a.value + 1\n})\nconst syncA = runtime.effect(() => {\n  a.value = b.value + 1\n})\n\ntry {\n  runtime.flush()\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nsyncA.dispose()\nsyncB.dispose()\na.dispose()\nb.dispose()"
               },
               {
                 type: 'paragraph',
@@ -25622,7 +25624,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Computed, Signal, createRuntime, ReactiveErrorCode } from '@migaia/reactive'\n\nconst a = createRuntime()\nconst b = createRuntime()\n\nconst count = new Signal(1, a)\nconst wrong = new Computed(() => count.value * 2, b) // depends on a Signal from another Runtime\ntry {\n  wrong.value\n} catch (error) {\n  console.log((error as { code: string }).code === ReactiveErrorCode.crossRuntime, (error as { code: string }).code)\n}\n\ncount.dispose()\ntry {\n  count.value\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nwrong.dispose()"
+                code: "import { createRuntime, ReactiveErrorCode } from '@migaia/reactive'\n\nconst a = createRuntime()\nconst b = createRuntime()\n\nconst count = a.signal(1)\nconst wrong = b.computed(() => count.value * 2) // depends on a Signal from another Runtime\ntry {\n  wrong.value\n} catch (error) {\n  console.log((error as { code: string }).code === ReactiveErrorCode.crossRuntime, (error as { code: string }).code)\n}\n\ncount.dispose()\ntry {\n  count.value\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nwrong.dispose()"
               },
               {
                 type: 'paragraph',
@@ -25646,7 +25648,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime({ maxFlushPasses: 5 })\nconst a = new Signal(0, runtime)\nconst b = new Signal(0, runtime)\n// Bug: two Effects write the Signal the other reads, looping forever\nconst syncB = new Effect(() => {\n  b.value = a.value + 1\n}, runtime)\nconst syncA = new Effect(() => {\n  a.value = b.value + 1\n}, runtime)\n\ntry {\n  runtime.flush()\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nsyncA.dispose()\nsyncB.dispose()\na.dispose()\nb.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime({ maxFlushPasses: 5 })\nconst a = runtime.signal(0)\nconst b = runtime.signal(0)\n// Bug: two Effects write the Signal the other reads, looping forever\nconst syncB = runtime.effect(() => {\n  b.value = a.value + 1\n})\nconst syncA = runtime.effect(() => {\n  a.value = b.value + 1\n})\n\ntry {\n  runtime.flush()\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nsyncA.dispose()\nsyncB.dispose()\na.dispose()\nb.dispose()"
               },
               {
                 type: 'paragraph',

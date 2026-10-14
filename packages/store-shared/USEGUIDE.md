@@ -378,7 +378,7 @@ seq 推进为 seq+2（committed）
 
 ## 9. 响应式集成细节
 
-- **两者都是 `IObservable`**：内部通过 `@migaia/reactive` 的 `internalsOf`/`registerSubs`/`registerVersion`/`claimOwnership` 接入所属 `Runtime` 的依赖图，行为和普通的 `Signal`/`Computed` 节点一致——可以被 `Effect`/`Computed` 追踪，`isStale()` 可查询是否有未同步的远端变化。
+- **两者都是 `IObservable`**：内部通过 `@migaia/reactive/internals` 的 `internalsOf`/`registerSubs`/`registerVersion` 与 `@migaia/reactive/extension` 的 `claimOwnership` 接入所属 `Runtime` 的依赖图，行为和普通的 `Signal`/`Computed` 节点一致——可以被 `Effect`/`Computed` 追踪，`isStale()` 可查询是否有未同步的远端变化。
 - **单一归属**：构造时调用 `claimOwnership(this, runtime)` 登记归属；同一个 JS 对象不能被登记到第二个 `Runtime`（会抛 `@migaia/reactive` 所有权系统的错误）。**这意味着共享的是 `SharedArrayBuffer`，而不是 JS 对象本身**——另一个线程/`Runtime` 要读同一份数据，必须用同一个 `buffer` 单独 `new` 一份自己的实例。
 - **`SharedInt32Array` 的按需物化**：`get(index)` 只有在检测到当前处于依赖追踪上下文（`internalsOf(runtime).tracker.isTracking()` 为真，即身处 `Effect`/`Computed` 内部）时才会为该下标创建一个内部的响应式 cell 并登记依赖；在追踪上下文之外调用 `get()`（比如普通同步代码里的一次性读取）走直读路径，不产生任何 cell 对象。
 - **cell 的自动回收**：`Effect`/`Computed` 可能在提交观察之前就放弃一次"投机读"（比如 `Computed` 重新计算时依赖发生了变化）。为此新物化的 cell 会在下一个微任务里检查是否仍有订阅者，没有就自动断开并从内部 Map 里移除，不需要手动处理。
@@ -408,7 +408,7 @@ seq 推进为 seq+2（committed）
 
 ```ts
 // main.ts
-import { createRuntime, Effect } from '@migaia/reactive';
+import { createRuntime } from '@migaia/reactive';
 import { sharedInt32Array } from '@migaia/store-shared';
 
 const runtime = createRuntime();
@@ -419,9 +419,9 @@ worker.postMessage({ buffer: positions.buffer });
 
 const stopWatch = positions.watch(); // worker 的写入自动推送进来
 
-const render = new Effect(() => {
+const render = runtime.effect(() => {
   drawEntity(0, positions.get(0), positions.get(1));
-}, runtime);
+});
 
 window.addEventListener('beforeunload', () => {
   render.dispose();

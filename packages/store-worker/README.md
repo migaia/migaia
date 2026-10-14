@@ -111,9 +111,9 @@ import { WorkerAdapter, workerComputed } from '@migaia/store-worker';
 **`workerComputed`｜10 秒上手** —— 把 `WorkerAdapter.request()` 接进 `@migaia/resource` 的 `Resource`：
 
 ```ts
-import { Signal, defaultRuntime } from '@migaia/reactive';
+import { defaultRuntime } from '@migaia/reactive';
 
-const values = new Signal([1, 2, 3], defaultRuntime);
+const values = defaultRuntime.signal([1, 2, 3]);
 const sum = workerComputed(adapter, () => values.value);
 
 console.log(await sum.refetch()); // 6
@@ -324,12 +324,12 @@ self.onmessage = (event) => {
 ```ts
 // main.ts
 import { WorkerAdapter, workerComputed } from '@migaia/store-worker';
-import { Signal, defaultRuntime } from '@migaia/reactive';
+import { defaultRuntime } from '@migaia/reactive';
 
 const worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });
 const adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });
 
-const rows = new Signal<readonly Row[]>([], defaultRuntime);
+const rows = defaultRuntime.signal<readonly Row[]>([]);
 const totals = workerComputed(adapter, () => rows.value, {
   ttl: 30_000,
   staleWhileRevalidate: true,
