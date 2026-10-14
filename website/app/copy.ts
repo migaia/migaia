@@ -18,9 +18,9 @@ export const WebsiteCopy = {
     searchEmpty: 'Type to search the documentation.',
     searchUnknown: 'No matching result yet. Try a library or API name.',
     homeEyebrow: 'Migaia TypeScript libraries',
-    homeTitle: 'Manage state, async tasks, and isolated hosts.',
+    homeTitle: 'Manage application state, background tasks, and plugin processes.',
     homeDescription:
-      'Choose composable libraries for reactive state, browser persistence, cancellable Worker tasks, cross-runtime calls, and supervised plugin or agent processes.',
+      'Choose libraries for reactive state, browser persistence, cancellable Worker tasks, cross-runtime calls, and plugin or agent process management.',
     capabilityMap: 'Capability map',
     shortestPath: 'Choose the shortest useful path.',
     foundation: 'Foundation',
@@ -37,17 +37,17 @@ export const WebsiteCopy = {
     homeScenarios: [
       {
         title: 'Run cancellable heavy computation in a Worker',
-        body: 'Keep the UI responsive and cancel stale work through Resources and cooperative RPC tasks.',
+        body: 'Move expensive work off the main thread and stop stale calculations with tasks that respond to cancellation.',
         libraries: ['store-worker', 'resource', 'rpc-threads']
       },
       {
         title: 'Manage isolated plugin or agent processes',
-        body: 'Start and discover host instances, share execution budgets, monitor health, and restart failures.',
+        body: 'Start and find plugin hosts, limit how many run at once, check their health, and restart failures.',
         libraries: ['tray', 'supervision']
       },
       {
         title: 'Call across browser windows and iframes',
-        body: 'Expose methods over browser channels with explicit origin and connection boundaries.',
+        body: 'Let windows and iframes call each other while checking where messages come from.',
         libraries: ['rpc-browser']
       },
       {
@@ -57,7 +57,7 @@ export const WebsiteCopy = {
       },
       {
         title: 'Isolate state for each SSR request',
-        body: 'Give each request its own Runtime and hydrate server snapshots in the browser.',
+        body: 'Keep each request’s state separate and restore its initial state in the browser.',
         libraries: ['store-ssr']
       }
     ],
@@ -73,10 +73,10 @@ export const WebsiteCopy = {
       'Track changing inputs, cancel stale requests, and expose loading, success, and failure states.',
     capabilityPluginHost: 'Capability + Plugin Host',
     capabilityPluginHostText:
-      'Enable optional features by policy, then install, consume, replace, and release their implementations.',
+      'Enable optional features by policy, install or replace plugins, and release their resources on shutdown.',
     traySupervision: 'Tray + Supervision',
     traySupervisionText:
-      'Manage plugin or agent instances with execution budgets, health checks, and failure restarts.',
+      'Limit how many plugin or agent instances run at once, check their health, and restart failures.',
     webRpcSerialize: 'RPC Peer + Serialize',
     webRpcSerializeText:
       'Make typed remote calls through RPC Peer and encode and decode application data with Serialize.',
@@ -140,9 +140,9 @@ export const WebsiteCopy = {
     searchEmpty: '输入内容以搜索文档。',
     searchUnknown: '没有匹配结果，请尝试类库名或 API 名。',
     homeEyebrow: 'Migaia TypeScript 类库',
-    homeTitle: '管理状态、异步任务与隔离宿主。',
+    homeTitle: '管理应用状态、后台任务与插件进程。',
     homeDescription:
-      '按需组合响应式状态、浏览器持久化、可取消的 Worker 任务、跨运行时调用，以及插件或 agent 进程的监督治理。',
+      '按需组合响应式状态、浏览器持久化、可取消的 Worker 任务与跨运行时调用，并管理插件或 agent 进程。',
     capabilityMap: '能力地图',
     shortestPath: '选择最短且有效的路径。',
     foundation: '基础能力',
@@ -159,17 +159,17 @@ export const WebsiteCopy = {
     homeScenarios: [
       {
         title: '在 Worker 中运行可取消的重计算',
-        body: '保持界面响应，通过 Resource 和协作响应取消的 RPC 任务终止过期工作。',
+        body: '把耗时任务移出主线程，让任务响应取消请求，在输入变化时停止旧计算。',
         libraries: ['store-worker', 'resource', 'rpc-threads']
       },
       {
         title: '管理一组隔离的插件或 agent 进程',
-        body: '启动和发现宿主实例，共享执行预算，检查健康并在故障后重启。',
+        body: '启动和查找插件宿主，限制同时运行数量，检查健康并在故障后重启。',
         libraries: ['tray', 'supervision']
       },
       {
         title: '浏览器跨窗口与 iframe 调用',
-        body: '通过浏览器通道暴露方法，明确来源校验和连接边界。',
+        body: '让窗口和 iframe 相互调用方法，同时检查消息来源。',
         libraries: ['rpc-browser']
       },
       {
@@ -179,7 +179,7 @@ export const WebsiteCopy = {
       },
       {
         title: '请求级 SSR 状态',
-        body: '让每个请求持有独立 Runtime，并把服务端快照复水到浏览器。',
+        body: '隔离每个请求的状态，并把服务端初始状态恢复到浏览器。',
         libraries: ['store-ssr']
       }
     ],
@@ -192,9 +192,9 @@ export const WebsiteCopy = {
     reactiveResource: 'Reactive + Resource',
     reactiveResourceText: '跟踪变化的输入，取消过期请求，并统一暴露加载、成功与失败状态。',
     capabilityPluginHost: 'Capability + Plugin Host',
-    capabilityPluginHostText: '按策略启用可选能力，再安装、消费、替换并释放对应实现。',
+    capabilityPluginHostText: '按策略启用可选能力，再安装或替换插件，并在退出时释放资源。',
     traySupervision: 'Tray + Supervision',
-    traySupervisionText: '统一管理插件或 agent 实例，控制执行预算、健康检查与故障重启。',
+    traySupervisionText: '限制同时运行的插件或 agent 实例数量，检查健康并在故障后重启。',
     webRpcSerialize: 'RPC Peer + Serialize',
     webRpcSerializeText: '通过 RPC Peer 定义类型安全的远程调用，用 Serialize 编解码应用数据。',
     libraryIndex: '类库索引',
