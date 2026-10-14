@@ -1,7 +1,8 @@
 /**
- * `@migaia/serialize` 主入口：聚合 re-export core / plugins / registry 三者。
+ * Main `@migaia/serialize` entry combining core, plugins, and registry exports.
  *
- * Core 不 import index（防循环）；registry 依赖 core + lifecycle。
+ * Core does not import this entry, preventing a dependency cycle. The registry depends on core and
+ * lifecycle.
  */
 export * from './core.js'
 export * from './plugins.js'

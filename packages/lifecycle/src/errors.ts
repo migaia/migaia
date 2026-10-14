@@ -19,7 +19,10 @@ export type ILifecycleError = Error & {
   readonly phase?: string
   readonly detail?: Readonly<Record<string, unknown>>
   readonly cause?: unknown
-  /** 冻结的次要失败快照（如 cleanup 失败），不与 `cause` 混用；primary 保持原错误身份。 */
+  /**
+   * Stores a frozen snapshot of secondary failures such as cleanup errors. Keeps them separate from
+   * `cause` so the primary error retains its identity.
+   */
   readonly errors?: readonly unknown[]
 }
 
@@ -140,7 +143,10 @@ export function createLifecycleFailure(
   return createLifecycleError(code, message, { cause: error })
 }
 
-/** 入参校验错误：原生 `RangeError` + 指定 code（`docs/contracts/error-codes.md` §2.2 保持原生类型）。 */
+/**
+ * Creates a native `RangeError` for input validation and attaches the supplied code. Preserves the
+ * native type required by `docs/contracts/error-codes.md` §2.2.
+ */
 export function createLifecycleRangeError(
   code: string,
   message: string,

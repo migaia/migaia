@@ -2,16 +2,19 @@ import { createReactiveError, tagReactiveError } from '../errors.js'
 import { ReactiveErrorCode } from '../error-code.js'
 import { ReactiveErrorText } from '../error-text.js'
 
-// 单调版本时钟：memo 失效判定、脏检查短路、时间旅行锚点都靠同一个递增计数器。
+// Monotonic version counter shared by memo invalidation, stale-check shortcuts, and time-travel anchors.
 export class VersionClock {
   #version = 0
   #maxVersion: number
 
   /**
-   * 生产上限是 `Number.MAX_SAFE_INTEGER`。即使持续每秒产生一百万个真实变更，也要 约 285 年才耗尽。原地归零会与仍存活节点的旧版本碰撞并制造漏更新，因此耗尽 后故意
-   * fail-stop；恢复方式是释放 Store / Scope 持有的节点、丢弃旧 Runtime，再新建一份，而不是重置同一张依赖图。终态断边不领取版本，所以时钟耗尽不妨碍清理。
+   * The production limit is `Number.MAX_SAFE_INTEGER`. Even one million real changes per second
+   * takes about 285 years to exhaust it. Resetting the counter would collide with live node
+   * versions and cause missed updates, so exhaustion stops writes. Dispose nodes held by stores or
+   * scopes, discard the old runtime, and create another runtime. Terminal disconnection consumes no
+   * version, so exhaustion does not prevent cleanup.
    *
-   * `maxVersion` 仅用于把终态缩小后做确定性测试，Runtime 不覆盖默认值。
+   * `maxVersion` reduces the limit for deterministic tests. `Runtime` keeps the default limit.
    */
   constructor(maxVersion = Number.MAX_SAFE_INTEGER) {
     if (!Number.isSafeInteger(maxVersion) || maxVersion < 1) {
@@ -23,7 +26,7 @@ export class VersionClock {
     this.#maxVersion = maxVersion
   }
 
-  /** 领取下一个版本号——signal/computed 的值真的变了就调一次 */
+  /** Allocates the next version when a signal or computed value changes. */
   next(): number {
     if (this.#version >= this.#maxVersion) {
       throw createReactiveError(
@@ -34,7 +37,7 @@ export class VersionClock {
     return ++this.#version
   }
 
-  /** 当前版本号——只读查看，不消耗 */
+  /** Reads the current version without consuming another version. */
   current(): number {
     return this.#version
   }

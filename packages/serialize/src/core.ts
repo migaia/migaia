@@ -1,9 +1,12 @@
 /**
- * `@migaia/serialize/core`：chunk/codec/parser contract、纯变换、错误类型、stream。
+ * `@migaia/serialize/core` exports chunk, codec, and parser contracts, pure transformations,
+ * errors, and streams.
  *
- * Core 只静态依赖 `@migaia/lifecycle/abort` 的取消 leaf；timer 经 `scheduler` 注入、Encoding 经
- * `ITextEncoder`/`ITextDecoder` 注入（见 R-4）。本入口不 re-export registry（`createSerializeRegistry` 依赖
- * lifecycle 其他 leaf）。Packed consumers 必须保留 abort 必要闭包并 tree-shake 无关 lifecycle 模块。
+ * Core's lifecycle dependency is limited to the cancellation leaf `@migaia/lifecycle/abort`. Timers
+ * use an injected `scheduler`; encoding uses injected `ITextEncoder` and `ITextDecoder`
+ * capabilities (R-4). This entry does not reexport the registry, which depends on other lifecycle
+ * leaves. Packed consumers retain the required abort dependency closure and tree-shake unrelated
+ * lifecycle modules.
  */
 export {
   SERIALIZE_TYPE_PATTERN,

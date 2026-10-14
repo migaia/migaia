@@ -1,66 +1,80 @@
 /**
- * `@migaia/serialize` 错误码的唯一声明处。
+ * The single declaration site for `@migaia/serialize` error codes.
  *
- * 契约见 `docs/contracts/error-codes.md`：错误由 `(source, code)` 二元组唯一定位，`source` 恒为
- * `'@migaia/serialize'`。抛出点必须引用本文件的常量，不得内联字面量。
+ * See `docs/contracts/error-codes.md`. The pair `(source, code)` uniquely identifies an error.
+ * `source` is always `'@migaia/serialize'`. Throw sites use these constants instead of inline
+ * values.
  *
- * 码值是公开 API 的一部分，改名等同破坏性变更（`docs/contracts/error-code-rollout.sdd.md` §1.2）。
+ * Code values are public API. Renaming a code is a breaking change. See
+ * `docs/contracts/error-code-rollout.sdd.md` §1.2.
  */
 export const SerializeErrorCode = {
   /**
-   * `registry.dispose()` 之后又调用 `encode`/`decode`。
+   * Thrown when `encode` or `decode` is called after the registry closes or disposal begins.
    *
-   * 调用方应新建 registry，不要复用已释放实例。落实 registry 的两阶段「先切断新请求，再释放」契约。
+   * Create another registry instead of reusing this instance. Enforces the two-phase contract that
+   * rejects new requests before releasing resources.
    */
   registryDisposed: 'REGISTRY_DISPOSED',
 
   /**
-   * 请求的 `type` 没有对应的注册 parser。
+   * Thrown when no registered parser matches the requested `type`.
    *
-   * 调用方检查插件是否已注册、存档格式标签是否正确；这是稳定的配置/格式问题，不要重试同一 type。
+   * Check plugin registration and the archive format tag. This is a stable configuration or format
+   * failure; retrying the same type does not fix it.
    */
   codecNotFound: 'CODEC_NOT_FOUND',
 
   /**
-   * 编码期失败：parser `encode` 抛错、流式编码中途失败、或产出为空。
+   * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no
+   * chunks are produced.
    *
-   * 原始异常在 `cause`；调用方按 `chunkIndex`/`bytesConsumed` 定位损坏位置。
+   * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to
+   * locate the failure.
    */
   encodeFailed: 'ENCODE_FAILED',
 
   /**
-   * 解码期失败：parser `decode` 抛错、或流式解码中途失败。
+   * Thrown when the parser's `decode` or streaming decoding fails.
    *
-   * 原始异常在 `cause`；调用方按 `chunkIndex`/`bytesConsumed` 定位损坏位置。
+   * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the
+   * failure.
    */
   decodeFailed: 'DECODE_FAILED',
 
   /**
-   * Chunk 形状非法（不是 `[type, data]` 对、text/bytes 数据类型错、未知形态标签、 或 value 段被用于只接受线材的载体）。
+   * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload,
+   * unknown kind, or a value chunk used by a carrier that accepts only wire data.
    *
-   * 调用方检查 parser 输出与输入 chunk；这是 parser 实现错误或存档损坏，不是后端问题。
+   * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not
+   * a backend failure.
    */
   invalidChunk: 'INVALID_CHUNK',
 
   /**
-   * 编解码被协作式取消（`AbortSignal` 在 parser 返回后被中止）。
+   * Thrown when encoding or decoding is cancelled through an abort signal.
    *
-   * 调用方按取消处理，可用新 signal 重试；与 `ENCODE_FAILED`/`DECODE_FAILED` 的不可恢复失败区分。
+   * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from
+   * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors.
    */
   aborted: 'ABORTED',
 
   /**
-   * 入参校验失败：非法插件 type、空插件表、重复插件 type、帧预算/maxInFlight 非法、scheduler 结构非法（非 `{ now, schedule }` 鸭子类型）。
+   * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list,
+   * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }`
+   * capabilities.
    *
-   * 调用方修正参数；具体是哪个参数见消息文案。
+   * Correct the input. The message identifies the invalid option.
    */
   /** Text emitters also reject nonportable own data and values the selected format cannot express. */
   invalidOption: 'INVALID_OPTION',
 
   /**
-   * 环境能力缺失：`createSerializeRegistry` 构造期探测不到 `TextEncoder`/`TextDecoder`（Encoding API）。
+   * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder`
+   * capabilities.
    *
-   * 调用方要么注入 `encoder`/`decoder`，要么在具备 Encoding API 的宿主运行；原始缺失原因在 `cause`。
+   * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the
+   * original capability failure.
    */
   envUnsupported: 'ENV_UNSUPPORTED'
 } as const

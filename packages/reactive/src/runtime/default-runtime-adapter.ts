@@ -1,10 +1,13 @@
 import type { IReactiveRuntimeAdapter } from './types.js'
 
 /**
- * 默认 runtime adapter：唯一的宿主 API 边界（`docs/contracts/runtime-neutrality.sdd.md` R-9）。
+ * Default runtime adapter and the sole host API boundary
+ * (`docs/contracts/runtime-neutrality.sdd.md` R-9).
  *
- * 核心算法模块不得直接引用 `queueMicrotask`/`performance`/`Date`/`console`；这些访问全部收敛到这里。 构造 `createRuntime({
- * adapter })` 可完整替换；默认诊断 `reportError` 是 no-op，不直接 `console.error`。
+ * Core algorithms do not access `queueMicrotask`, `performance`, `Date`, or `console` directly.
+ * This adapter owns those host accesses. Pass `createRuntime({ adapter })` to replace its
+ * capabilities. The default diagnostic `reportError` is a no-op and never calls `console.error`
+ * directly.
  */
 export const defaultRuntimeAdapter: IReactiveRuntimeAdapter = {
   scheduleMicrotask(task) {

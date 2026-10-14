@@ -36,8 +36,9 @@ export type ILifecycleScopeOptions = {
   /** Shared absolute deadline forwarded to every owned resource's release (L-T32). */
   readonly deadlineAt?: number
   /**
-   * 时间域来源（R-9）：graceful timeout / deadline 经它驱动，缺省 `systemScheduler`。透传给
-   * `DisposeTransaction`，使注入方（如 plugin-host）的 teardown 与 mutation queue 处于同一时间域。
+   * Supplies the clock domain for graceful timeouts and deadlines under R-9. Defaults to
+   * `systemScheduler` and forwards it to `DisposeTransaction`. This keeps injected teardown and
+   * mutation queues, such as those in `plugin-host`, in one clock domain.
    */
   readonly scheduler?: IScheduler
 }

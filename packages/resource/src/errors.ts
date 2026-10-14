@@ -2,15 +2,19 @@
 export const RESOURCE_SOURCE = '@migaia/resource'
 
 /**
- * 全仓统一的结构契约（`docs/contracts/error-codes.md` §2）：错误以属性形式携带 `source`/`code`， 从不替换错误本身——依赖 `instanceof
- * DOMException`/`RangeError` 等类型判断的调用方不受影响。
+ * Defines the workspace structural error contract (`docs/contracts/error-codes.md` §2). `source`
+ * and `code` attach as properties without replacing the error. Callers retain native type checks
+ * such as `instanceof DOMException` and `instanceof RangeError`.
  */
 export type IResourceError = Error & {
   readonly source: string
   readonly code: string
 }
 
-/** 构造一个携带 `(source, code)` 的普通 `Error`，从不改写 `stack`——引擎在构造时就已经填好， 本函数不会重新赋值，原始抛出点始终可见。 */
+/**
+ * Creates an `Error` carrying `(source, code)` without rewriting `stack`. The engine fills the
+ * stack at construction, and this function preserves it.
+ */
 export function createResourceError(
   code: string,
   message: string,
@@ -21,10 +25,12 @@ export function createResourceError(
 }
 
 /**
- * 给已经构造好的错误对象（`DOMException`/`RangeError` 等）补上 `(source, code)`， 不触碰
- * `message`/`name`/构造函数带来的其它字段——用于类型本身对调用方有意义、不能被 `createResourceError` 的纯 `Error`
- * 替代的场景（`REQUEST_ABORTED`/`REQUEST_CANCELLED` 必须保持 `DOMException` 且 `name === 'AbortError'`）。泛型不约束到
- * `Error`：TypeScript 的 `DOMException` 类型不是 `Error` 的子类型，但两者在运行时都是可挂只读属性的普通对象。
+ * Attaches `(source, code)` to an existing error such as `DOMException` or `RangeError`. Preserves
+ * `message`, `name`, and other constructor-owned fields. Use it when callers rely on the native
+ * type instead of the plain `Error` from `createResourceError`. `REQUEST_ABORTED` and
+ * `REQUEST_CANCELLED` retain `DOMException` with `name === 'AbortError'`. The generic permits
+ * attaching identity to native error objects without requiring callers to narrow them to `Error`.
+ * Both support attached readonly properties at runtime.
  */
 export function tagResourceError<E extends object>(error: E, code: string): E {
   return attachErrorIdentity(error as Error, { source: RESOURCE_SOURCE, code }) as E
