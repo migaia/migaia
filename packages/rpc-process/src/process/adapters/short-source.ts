@@ -1,3 +1,5 @@
+import { isUrlObject, type IUrlLike } from '@migaia/utils'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { systemScheduler, systemWallClock, type IScheduler } from '@migaia/utils/scheduler'
 import { createUnitBudget, SUPERVISION_SOURCE, SupervisionErrorCode } from '@migaia/supervision'
@@ -18,7 +20,6 @@ import {
 } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IAdapterPeerPreparation } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IRpcHandshakeOffer } from '@migaia/rpc-contract'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IRemoteContract } from '@migaia/rpc-core/remote'
 import { createProcessTransport } from '../handshake.js'
 import { createNativeProcessOffer } from '../offer.js'
@@ -58,8 +59,8 @@ export type IProcessLaunchCommand = Readonly<{
 
 /** Ordinary launch configuration overrides defaults without granting launch or handshake authority. */
 export type IProcessShortSpawn = Readonly<{
-  entry?: string | URL
-  base?: string | URL
+  entry?: IUrlLike
+  base?: IUrlLike
   command?: string
   args?: readonly string[]
   cwd?: string
@@ -320,11 +321,7 @@ export async function normalizeProcessSources(
   if (
     typeof options.spawn !== 'function' &&
     options.spawn !== undefined &&
-    !(
-      typeof options.spawn === 'object' &&
-      !(options.spawn instanceof URL) &&
-      'kind' in options.spawn
-    )
+    !(typeof options.spawn === 'object' && !isUrlObject(options.spawn) && 'kind' in options.spawn)
   ) {
     /** Lazy deep paths continue to own native launch; connect/listen do not acquire launchers. */
     const native =
@@ -337,7 +334,7 @@ export async function normalizeProcessSources(
     const { default: process } = await import('node:process')
     /** Object short forms contain only ordinary user-selected launch defaults. */
     const short: IProcessShortSpawn =
-      typeof options.spawn === 'object' && !(options.spawn instanceof URL)
+      typeof options.spawn === 'object' && !isUrlObject(options.spawn)
         ? options.spawn
         : { entry: options.spawn === true ? undefined : options.spawn }
     if (short.wrap !== undefined && typeof short.wrap !== 'function')

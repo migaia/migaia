@@ -11,6 +11,7 @@ export type {
 } from './object-path.js'
 export type { IProbePropertyResult } from './object.js'
 export type { IAbortSignal, IDeferred } from './promise.js'
+export type { IUrlLike } from './url.js'
 
 /** Groups a discriminated union by one top-level property-key field. */
 export type IDiscriminatedByField<F extends PropertyKey, T extends Record<F, PropertyKey>> = {

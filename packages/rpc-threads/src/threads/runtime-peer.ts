@@ -1,3 +1,4 @@
+import type { IUrlLike } from '@migaia/utils'
 import {
   createThreadSupervisor,
   type IThreadHandle,
@@ -41,9 +42,9 @@ export type IRuntimeThreadSpawn<THandle extends IThreadHandle = IThreadHandle> =
 
 /** Entry-only deployment fills the existing source's launcher, budget and channel defaults. */
 export type IRuntimeThreadShortSpawn<THandle extends IThreadHandle = IThreadHandle> = Readonly<{
-  entry: true | string | URL
+  entry: true | IUrlLike
   /** Explicit module URL or URL string changes only relative entry resolution. */
-  base?: string | URL
+  base?: IUrlLike
   name?: IThreadSpec['name']
   data?: IThreadSpec['data']
   limits?: IThreadSpec['limits']
@@ -65,8 +66,7 @@ export type IRuntimeThreadPeerOptions<THandle extends IThreadHandle = IThreadHan
       | IRuntimeThreadSpawn<THandle>
       | IRuntimeThreadShortSpawn<THandle>
       | true
-      | string
-      | URL
+      | IUrlLike
   }>
 
 /** Construct real owned execution through the same binding and remote generation owner. */

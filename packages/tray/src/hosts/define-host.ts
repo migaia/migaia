@@ -1,3 +1,4 @@
+import { isUrlObject, readUrlHref, type IUrlLike } from '@migaia/utils'
 import { TrayErrorCode } from '../error-code.js'
 import { createTrayError } from '../errors.js'
 import { TrayHostField, TrayInternal, TrayRestartMode, TrayRuntime } from './constants.js'
@@ -101,7 +102,7 @@ export function defineTrayHost<
     runtime === TrayRuntime.coroutine
       ? fields.entry !== undefined
       : !(
-          fields.entry instanceof URL ||
+          isUrlObject(fields.entry) ||
           (typeof fields.entry === 'string' && fields.entry.length > 0)
         )
   )
@@ -133,8 +134,7 @@ export function defineTrayHost<
     plugins: fields.plugins,
     exposes: Object.freeze(exposes)
   }
-  if (fields.entry !== undefined)
-    snapshot.entry = fields.entry instanceof URL ? fields.entry.href : fields.entry
+  if (fields.entry !== undefined) snapshot.entry = readUrlHref(fields.entry as IUrlLike)
   if (fields.config !== undefined) snapshot.config = fields.config
   if (routing !== undefined) snapshot.routing = Object.freeze(routing)
   if (fields.limits !== undefined) {
