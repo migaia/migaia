@@ -6,10 +6,16 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 export type ILocaleKey = 'en' | 'zh'
 
 export class PluginHostError<TDetail = IPluginHostErrorDetail> extends Error {
-  /** `(source, code)` 二元组的 source 部分，恒为 `'@migaia/plugin-host'`（`docs/contracts/error-codes.md` §2）。 */
+  /**
+   * The `source` component of `(source, code)`, always `'@migaia/plugin-host'`
+   * (`docs/contracts/error-codes.md` §2).
+   */
   readonly source: string
   readonly code: IPluginHostErrorCode
-  /** 结构化诊断（如 queue timeout 的 `owner`/`waitedMs`）；不与 `cause` 混用。 */
+  /**
+   * Structured diagnostics, such as queue timeout `owner` and `waitedMs`, kept separate from
+   * `cause`.
+   */
   readonly detail?: TDetail
   constructor(
     code: IPluginHostErrorCode,
@@ -58,9 +64,10 @@ export function formatPluginHostDiagnostic(target: object, message: string): str
 }
 
 /**
- * 给已经构造好的错误对象（`TypeError` 等）补上 `(source, code)`，不触碰 `message`/`name`/`stack`/构造函数带来的其它字段——
- * 用于入参校验这类必须保持原生类型（调用方按 `instanceof TypeError` 分支）的场景。返回类型把 `source`/`code` 交叉进原类型，
- * 使类型层面可访问（`docs/contracts/error-codes.md` §2）。
+ * Attaches `(source, code)` to an existing error without changing `message`, `name`, `stack`, or
+ * other fields. Use this for input validation that retains a native type for checks such as
+ * `instanceof TypeError`. The return type exposes `source` and `code` while preserving the original
+ * error type. See `docs/contracts/error-codes.md` §2.
  */
 export function tagPluginHostError<E extends Error>(
   error: E,
@@ -72,7 +79,10 @@ export function tagPluginHostError<E extends Error>(
   }
 }
 
-/** 入参校验错误：原生 `TypeError` + `INVALID_OPTION`（`docs/contracts/error-codes.md` §7 裸抛扫描门禁）。 */
+/**
+ * Creates a native input-validation `TypeError` tagged with `INVALID_OPTION`
+ * (`docs/contracts/error-codes.md` §7).
+ */
 export function createPluginHostTypeError(
   message: string,
   options?: { readonly cause?: unknown }

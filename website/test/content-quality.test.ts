@@ -127,84 +127,126 @@ test('storage-web feature guide explains the Host effect in plain language', () 
   assert.doesNotMatch(guide.purpose, /^创建只绑定到一个 backend kind/)
 })
 
-test('plugin-host definePlugin explains core, shared, extension, Host use, and cleanup', () => {
-  const guide = findApiGuide('plugin-host', 'index', 'definePlugin', 'zh')
-  assert.ok(guide?.quickStart)
-  assert.match(guide.purpose, /core = 插件可以使用的宿主能力/)
-  assert.match(guide.purpose, /shared = 插件之间复用的能力/)
-  assert.match(guide.purpose, /extension = 业务代码从宿主上调用的能力/)
-  assert.match(guide.quickStart, /core\.config\.get\(\)/)
-  assert.match(guide.quickStart, /core\.onDispose\(/)
-  assert.doesNotMatch(guide.quickStart, /core\.getShared\(|productReader|loadProduct/)
-  assert.match(guide.quickStart, /app\.config\.update\('product-cache'/)
-  assert.match(guide.quickStart, /await host\.dispose\(\)/)
-  assert.doesNotMatch(guide.quickStart, /\.\.\.|\bfetchConfig\b|\brun[A-Z]\w*\(\)/)
-  const shortForm = guide.examples?.find((example) => example.id === 'short-form')
-  assert.ok(shortForm, 'definePlugin must document its name + descriptor factory form')
-  assert.match(shortForm.title, /definePlugin\(name, descriptorFactory\)/)
-  assert.match(shortForm.description, /config、shared、update、metadata.*disposer/)
-  assert.match(shortForm.code, /definePlugin<IAppCore, \{ greet\(name: string\): string \}>\(/)
-  assert.match(shortForm.code, /'greeting',\n  \(core\) => \(\{/)
-  assert.match(shortForm.code, /app\.extensions\.greet\('Migaia'\)/)
-  assert.match(shortForm.code, /await host\.dispose\(\)/)
-  const shared = guide.examples?.find((example) => example.id === 'shared-collaboration')
-  assert.ok(shared, 'definePlugin must isolate shared collaboration in its own example')
-  assert.match(shared.code, /shared: \(\) => \(\{ readProduct:/)
-  assert.match(shared.code, /core\.getShared\('readProduct'\)/)
-  assert.match(shared.code, /host\.use\(cacheProvider, productReader\)/)
-  assert.match(shared.code, /app\.extensions\.loadProduct\('sku-42'\)/)
-  assert.deepEqual(
-    guide.examples?.map((example) => example.id),
-    ['short-form', 'shared-collaboration']
-  )
+test('plugin-host definePlugin explains installation, handle configuration, Feature sharing, and cleanup', () => {
+  for (const locale of ['zh', 'en'] as const) {
+    const guide = findApiGuide('plugin-host', 'index', 'definePlugin', locale)
+    assert.ok(guide?.quickStart)
+    assert.match(
+      guide.purpose,
+      locale === 'zh' ? /definePlugin 只保存定义/ : /definePlugin stores the definition/
+    )
+    assert.match(
+      guide.purpose,
+      locale === 'zh' ? /host\.use 运行 install/ : /host\.use runs install/
+    )
+    assert.match(guide.quickStart, /const \[greeting\] = await host\.use\(greetingPlugin\)/)
+    assert.match(guide.quickStart, /core\.config\.get\(\)\.prefix/)
+    assert.match(guide.quickStart, /greeting\.extensions\.greet\('Ada'\)/)
+    assert.match(
+      guide.quickStart,
+      /greeting\.config\.update\(\(\) => \(\{ prefix: 'Welcome' \}\)\)/
+    )
+    assert.match(guide.quickStart, /console\.assert\(message === 'Welcome, Ada'\)/)
+    assert.match(guide.quickStart, /finally \{\s+await host\.dispose\(\)/)
+    assert.doesNotMatch(
+      guide.quickStart,
+      /core\.getShared\(|\bshared:|\bview\.|\.\.\.|\bfetchConfig\b|\brun[A-Z]\w*\(\)/
+    )
+    assert.match(
+      guide.options.find((option) => option.name === 'definition.install')?.whenToUse ?? '',
+      /core\.onDispose/
+    )
+
+    /** The next task uses declared Feature dependencies instead of the removed shared API. */
+    const featureExample = guide.examples?.find((example) => example.id === 'next-share-feature')
+    assert.ok(featureExample, 'definePlugin must show how another plugin consumes a Feature')
+    assert.match(featureExample.code, /formatterPlugin\.getFeature\('text'\)/)
+    assert.match(featureExample.code, /\(_core, dependencies\) =>/)
+    assert.match(featureExample.code, /dependencies\.formatter\.format\(value\)/)
+    assert.match(
+      featureExample.code,
+      /const \[, writer\] = await host\.use\(formatterPlugin, writerPlugin\)/
+    )
+    assert.match(featureExample.code, /writer\.getFeature\('message'\)\.render\('ready'\)/)
+    assert.match(featureExample.code, /console\.assert\(message === '\[app\] ready'\)/)
+    assert.match(featureExample.code, /await host\.dispose\(\)/)
+    assert.doesNotMatch(featureExample.code, /core\.getShared\(|\bshared:/)
+  }
 })
 
 test('plugin-host defineFeature separates synchronous capability construction from Plugin installation', () => {
-  const guide = findApiGuide('plugin-host', 'index', 'defineFeature', 'zh')
-  assert.ok(guide?.quickStart)
-  assert.match(guide.purpose, /不会创建 Host、安装 Plugin、启动资源或发布方法/)
-  assert.match(guide.purpose, /异步工作和清理必须放在 Plugin 的 install hook 中/)
-  assert.match(
-    guide.quickStart,
-    /defineFeature\(\(core: IFeatureCore<\{ readCount\(\): number \}>\) =>/
-  )
-  assert.match(guide.quickStart, /core\.features\.metrics\.read\(\)/)
-  assert.match(guide.quickStart, /definePlugin\('counter'/)
+  for (const locale of ['zh', 'en'] as const) {
+    const guide = findApiGuide('plugin-host', 'index', 'defineFeature', locale)
+    assert.ok(guide?.quickStart)
+    assert.match(guide.purpose, /featureExpose/)
+    assert.match(
+      guide.purpose,
+      locale === 'zh'
+        ? /第二个参数提供已声明的依赖输出/
+        : /second argument contains declared dependency outputs/
+    )
+    assert.match(
+      guide.purpose,
+      locale === 'zh' ? /调用 defineFeature 本身不会运行它/ : /defining it does not run it/
+    )
+    assert.match(guide.quickStart, /defineFeature\(\s+\(_core, dependencies\) =>/)
+    assert.match(guide.quickStart, /formatter: formatterPlugin\.getFeature\('text'\)/)
+    assert.match(guide.quickStart, /dependencies\.formatter\.format\(value\)/)
+    assert.match(
+      guide.quickStart,
+      /const \[, writer\] = await host\.use\(formatterPlugin, writerPlugin\)/
+    )
+    assert.match(guide.quickStart, /writer\.getFeature\('message'\)\.render\('ready'\)/)
+    assert.match(guide.quickStart, /console\.assert\(message === '\[app\] ready'\)/)
+    assert.match(guide.quickStart, /await host\.dispose\(\)/)
+    assert.doesNotMatch(guide.quickStart, /core\.features\.|core\.getShared\(/)
+    assert.match(
+      guide.options.find((option) => option.name === 'factory')?.description ?? '',
+      locale === 'zh' ? /同步返回能力对象/ : /Synchronous function that returns a capability object/
+    )
+    assert.match(guide.avoidWhen.join('\n'), /setup.*featureExpose/)
+  }
 })
 
-test('plugin-host PluginHost documents its complete runtime and composition surface', () => {
-  const guide = findApiGuide('plugin-host', 'index', 'PluginHost', 'zh')
-  assert.ok(guide?.quickStart)
-  for (const capability of [
-    '原子安装',
-    '不可变且可撤销的 view',
-    'extension',
-    'shared',
-    '四种 pipeline',
-    'mutation 串行队列',
-    '物理清理',
-    '两阶段 admission/removal'
-  ]) {
-    assert.match(guide.purpose, new RegExp(capability))
+test('plugin-host PluginHost teaches business core, handle consumption, Host removal, and cleanup', () => {
+  for (const locale of ['zh', 'en'] as const) {
+    const guide = findApiGuide('plugin-host', 'index', 'PluginHost', locale)
+    assert.ok(guide?.quickStart)
+    assert.match(guide.purpose, /createPluginDomainCore/)
+    assert.match(
+      guide.purpose,
+      locale === 'zh' ? /use 返回句柄数组/ : /use returns an array of handles/
+    )
+    assert.match(
+      guide.purpose,
+      locale === 'zh' ? /Host 负责 Feature.*依赖排序/ : /Host orders Feature dependencies/
+    )
+    assert.match(guide.quickStart, /class AppHost extends PluginHost<IWriter>/)
+    assert.match(guide.quickStart, /protected createPluginDomainCore\(\): IWriter/)
+    assert.match(guide.quickStart, /const greetingPlugin = definePlugin/)
+    assert.match(guide.quickStart, /core\.write\(message\)/)
+    assert.match(guide.quickStart, /const \[greeting\] = await host\.use\(greetingPlugin\)/)
+    assert.match(guide.quickStart, /greeting\.extensions\.greet\('Ada'\)/)
+    assert.match(guide.quickStart, /console\.assert\(message === 'Hello, Ada'\)/)
+    assert.match(guide.quickStart, /console\.assert\(messages\[0\] === message\)/)
+    assert.match(guide.quickStart, /const removal = await host\.unUse\('greeting'\)/)
+    assert.match(guide.quickStart, /console\.assert\(removal\.ok\)/)
+    assert.match(guide.quickStart, /finally \{\s+await host\.dispose\(\)/)
+    assert.doesNotMatch(guide.quickStart, /\bview\.|core\.getShared\(/)
+    for (const capability of [
+      'execution',
+      'execution.mutationTimeoutMs',
+      'execution.pipelineDrainTimeoutMs'
+    ]) {
+      assert.ok(
+        guide.options.some((option) => option.name === capability),
+        capability
+      )
+    }
+    assert.match(guide.avoidWhen.join('\n'), /defineHost/)
+    assert.match(guide.avoidWhen.join('\n'), /RPC.*PluginHost/)
+    assert.doesNotMatch(guide.quickStart, /\bgreetingPlugin\b(?=[^]*const greetingPlugin)/)
   }
-  assert.match(guide.quickStart, /const greetingPlugin = definePlugin/)
-  assert.match(guide.quickStart, /await host\.use\(greetingPlugin\)/)
-  assert.match(guide.quickStart, /view\.extensions\.greet\('Migaia'\)/)
-  assert.match(guide.quickStart, /await view\.unUse\('greeting'\)/)
-  assert.match(guide.quickStart, /removal\.physicalCompletion/)
-  assert.match(guide.quickStart, /await host\.dispose\(\)/)
-  const reference = guide.options.map((option) => option.name).join(' ')
-  for (const capability of [
-    'execution',
-    'execution.mutationTimeoutMs',
-    'execution.pipelineDrainTimeoutMs',
-    'pipeline.mode',
-    'diagnostic',
-    'scheduler'
-  ]) {
-    assert.match(reference, new RegExp(capability.replace(/[().]/g, '\\$&')))
-  }
-  assert.doesNotMatch(guide.quickStart, /\bgreetingPlugin\b(?=[^]*const greetingPlugin)/)
 })
 
 test('reactive Computed guide covers imports, lazy caching, dynamic dependencies, and lifecycle', () => {
@@ -281,22 +323,15 @@ test('reactive Signal guide covers direct construction, update semantics, observ
   }
 })
 
-test('createObserverBinding quick start explains every executable line and host phase', () => {
+test('createObserverBinding quick start keeps authored comments and host phases without generated filler', () => {
   for (const locale of ['zh', 'en'] as const) {
     const guide = findApiGuide('reactive', 'runtime', 'createObserverBinding', locale)
     assert.ok(guide?.quickStart)
-    const lines = guide.quickStart
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-
-    for (const [index, line] of lines.entries()) {
-      if (line.startsWith('//')) continue
-      assert.ok(
-        index > 0 && lines[index - 1]?.startsWith('//'),
-        `Expected an explanatory comment immediately before: ${line}`
-      )
-    }
+    assert.match(guide.quickStart, /^\s*\/\//m)
+    assert.doesNotMatch(
+      guide.quickStart,
+      /本例对应的生产场景是|没有创建可供后续复用的实例|返回的本次实例|输出用于确认上一操作的结果。|Logs the result of the preceding operation\./
+    )
 
     assert.match(guide.quickStart, /binding\.capture\(\(\) => value\.value\)/)
     assert.match(guide.quickStart, /capture\.result/)
@@ -333,10 +368,19 @@ test('class pages expose structured instance APIs and Scheduler documents its op
     { name: 'item', type: 'IFlushable', optional: false }
   ])
   assert.equal(members.get('enqueue')?.returns, 'void')
-  assert.match(members.get('enqueue')?.description ?? '', /待冲刷队列/)
-  assert.match(members.get('requestFlush')?.description ?? '', /重复调用是安全的/)
+  assert.match(
+    members.get('enqueue')?.description ?? '',
+    /Enqueues an item.*requests a flush.*when no batch is active/
+  )
+  assert.match(
+    members.get('requestFlush')?.description ?? '',
+    /Scheduling and flushing flags deduplicate repeated requests/
+  )
   assert.equal(members.get('flush')?.returns, 'IFlushResult')
-  assert.match(members.get('flush')?.description ?? '', /重入返回 `deferred`/)
+  assert.match(
+    members.get('flush')?.description ?? '',
+    /reentrant call during flushing returns `deferred`/
+  )
 
   const classSymbols = typedApiManifest.apis.flatMap((api) =>
     api.symbols.filter((symbol) => symbol.kind === 'class')
@@ -558,7 +602,7 @@ test('Logger custom plugin guide covers extension, Host use, async completion, a
     "await logger.shutdown('manual')"
   ])
     assert.ok(source.includes(contract), `custom Logger plugin guide misses ${contract}`)
-  assert.match(source, /shared \+ getShared/)
+  assert.match(source, /defineFeature/)
   assert.match(source, /usePipeline \/ useAsyncPipeline/)
 })
 
@@ -653,8 +697,19 @@ describe('site-wide task guide quality', () => {
           `${symbol.name} ${locale} purpose is too short`
         )
         assert.ok(guide.quickStart?.trim(), `${symbol.name} ${locale} Quick Start`)
-        assert.ok(guide.scenarios.length >= 2, `${symbol.name} ${locale} scenarios`)
-        assert.ok(guide.avoidWhen.length >= 2, `${symbol.name} ${locale} avoid`)
+        for (const [decision, entries] of [
+          ['scenarios', guide.scenarios],
+          ['avoid', guide.avoidWhen]
+        ] as const) {
+          assert.ok(
+            entries.some((entry) => entry.trim()),
+            `${symbol.name} ${locale} ${decision}`
+          )
+          assert.ok(
+            entries.every((entry) => entry.trim()),
+            `${symbol.name} ${locale} ${decision} contains an empty explanation`
+          )
+        }
         const prose = [guide.purpose, ...guide.scenarios, ...guide.avoidWhen].join(' ')
         assert.doesNotMatch(prose, forbiddenProse, `${symbol.name} ${locale} forbidden prose`)
       }

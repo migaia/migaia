@@ -235,14 +235,17 @@ test(
             )
             if (width === 320) {
               const mobileState = await page.evaluate(() => ({
-                desktopRail: getComputedStyle(document.querySelector('.left-rail')).display,
-                mobileNav: getComputedStyle(document.querySelector('.mobile-module-nav')).display,
+                desktopRailVisible:
+                  (document.querySelector('.left-rail-sticky')?.getClientRects().length ?? 0) > 0,
+                mobileNavExists: Boolean(document.querySelector('.mobile-module-nav')),
+                pageTocClosed: !document.querySelector('.page-toc')?.open,
                 typeBody: document.querySelector('.type-reference-body')
                   ? getComputedStyle(document.querySelector('.type-reference-body')).display
                   : null
               }))
-              assert.equal(mobileState.desktopRail, 'none')
-              assert.equal(mobileState.mobileNav, 'block')
+              assert.equal(mobileState.desktopRailVisible, false)
+              assert.equal(mobileState.mobileNavExists, false)
+              assert.equal(mobileState.pageTocClosed, true)
               if (mobileState.typeBody !== null) assert.equal(mobileState.typeBody, 'block')
             }
           })
@@ -344,7 +347,7 @@ test(
   async () => {
     const journeys = [
       ['/en/docs', '/en/docs/utils'],
-      ['/en/guides', '/en/guides/utils'],
+      ['/en/guides', '/en/docs/utils'],
       ['/en/docs', '/en/docs/utils'],
       ['/en/architecture', '/en/architecture/rpc']
     ]
@@ -408,12 +411,12 @@ test(
 test('SITE-T-TYPE-FRAGMENT preserves code when resolving a legacy type fragment', async () => {
   await withChrome(async (browser) => {
     await withPage(browser, { width: 1280, height: 900 }, async (page) => {
-      await page.goto(`${pageUrl('/zh/docs/utils/promise')}#utils-promise--IAbortSignal`)
+      await page.goto(`${pageUrl('/zh/docs/utils/api/promise')}#utils-promise--IAbortSignal`)
       await page.getByRole('main').waitFor()
       const declaration = page.locator('#utils-promise--IAbortSignal .code-frame')
       await declaration.waitFor()
       assert.match(await declaration.innerText(), /IAbortSignal/)
-      await page.goto(pageUrl('/zh/docs/utils/promise'))
+      await page.goto(pageUrl('/zh/docs/utils/api/promise'))
       const typeCount = await page.locator('.type-declaration').count()
       assert.ok(typeCount > 0)
       assert.equal(
@@ -430,9 +433,9 @@ test('SITE-T-TYPE-FRAGMENT preserves code when resolving a legacy type fragment'
 test('SITE-T-NO-INDEX canonicalizes root modules without exposing index', async () => {
   await withChrome(async (browser) => {
     await withPage(browser, { width: 1280, height: 900 }, async (page) => {
-      await page.goto(`${baseUrl}/zh/docs/event-subscriber/createEventChannel/`)
+      await page.goto(`${baseUrl}/zh/docs/event-subscriber/api/createEventChannel/`)
       assert.match(await page.locator('h1').innerText(), /createEventChannel/)
-      await page.goto(`${baseUrl}/zh/docs/event-subscriber/`)
+      await page.goto(`${baseUrl}/zh/docs/event-subscriber/api/`)
       assert.match(await page.locator('main').innerText(), /createEventChannel/)
       assert.equal(await page.locator('a[href*="/event-subscriber/index"]').count(), 0)
     })
@@ -443,27 +446,91 @@ test('SITE-T-TOC keeps API anchors in the correct responsive rail', async () => 
   await withChrome(async (browser) => {
     for (const width of [1280, 768, 320]) {
       await withPage(browser, { width, height: 900 }, async (page) => {
-        await page.goto(`${baseUrl}/zh/docs/event-subscriber/createEventHub/`)
+        await page.goto(`${baseUrl}/zh/docs/event-subscriber/api/createEventHub/`)
         const layout = await page.evaluate(() => {
           const article = document.querySelector('.article-column')
-          const mobile = document.querySelector('.mobile-toc')
+          const mobile = document.querySelector('.page-toc')
           const right = document.querySelector('.right-rail')
           return {
             articleTop: article?.getBoundingClientRect().top ?? 0,
             mobileDisplay: mobile ? getComputedStyle(mobile).display : '',
             mobileTop: mobile?.getBoundingClientRect().top ?? 0,
-            rightDisplay: right ? getComputedStyle(right).display : ''
+            rightDisplay: right ? getComputedStyle(right).display : '',
+            articleBeforeMobile: Boolean(
+              article &&
+              mobile &&
+              article.compareDocumentPosition(mobile) & Node.DOCUMENT_POSITION_FOLLOWING
+            ),
+            mobileClosed: mobile?.tagName === 'DETAILS' && !mobile.open
           }
         })
-        if (width > 620) {
-          assert.notEqual(layout.rightDisplay, 'none')
-          assert.equal(layout.mobileDisplay, 'none')
-        } else {
-          assert.equal(layout.rightDisplay, 'none')
-          assert.equal(layout.mobileDisplay, 'block')
-          assert.ok(layout.mobileTop < layout.articleTop)
-        }
+        assert.notEqual(layout.mobileDisplay, 'none')
+        assert.ok(layout.mobileTop >= layout.articleTop)
+        assert.equal(layout.articleBeforeMobile, true)
+        assert.equal(layout.mobileClosed, true)
       })
+    }
+    /** Representative API, guide, and package routes expose their title on the first screen. */
+    const mobileRoutes = [
+      'docs/tray/api/createTray',
+      'docs/rpc-core/api/createEndpoint',
+      'docs/rpc-core/getting-started',
+      'docs/utils'
+    ]
+    for (const locale of ['zh', 'en']) {
+      for (const route of mobileRoutes) {
+        /** A fresh page proves initial layout without preserving the previous route's scroll. */
+        const path = `/${locale}/${route}`
+        for (const width of [1280, 375]) {
+          await withPage(browser, { width, height: width === 375 ? 812 : 900 }, async (page) => {
+            await visit(page, path)
+            /** Coordinates and styles describe the initial reading surface. */
+            const position = await page.evaluate(() => {
+              /** Article owns the page name and opening purpose. */
+              const article = document.querySelector('main .article-column')
+              /** The heading identifies the route independently of navigation. */
+              const heading = article?.querySelector('h1')
+              /** The opening purpose excludes decorative section labels. */
+              const purpose = article?.querySelector('p:not(.eyebrow)')
+              /** Computed article values capture responsive reading layout. */
+              const articleStyle = article ? getComputedStyle(article) : null
+              /** Paragraph values reflect overrides such as the introductory lede. */
+              const purposeStyle = purpose ? getComputedStyle(purpose) : null
+              return {
+                headingTop: heading?.getBoundingClientRect().top ?? null,
+                purposeTop: purpose?.getBoundingClientRect().top ?? null,
+                article: {
+                  fontSize: articleStyle?.fontSize ?? null,
+                  lineHeight: articleStyle?.lineHeight ?? null,
+                  maxWidth: articleStyle?.maxWidth ?? null,
+                  rectWidth: article?.getBoundingClientRect().width ?? null
+                },
+                purpose: {
+                  fontSize: purposeStyle?.fontSize ?? null,
+                  lineHeight: purposeStyle?.lineHeight ?? null,
+                  maxWidth: purposeStyle?.maxWidth ?? null,
+                  rectWidth: purpose?.getBoundingClientRect().width ?? null
+                }
+              }
+            })
+            console.log(`[SITE-T-TOC] ${JSON.stringify({ path, width, ...position })}`)
+            if (width === 375) {
+              assert.ok(
+                position.headingTop !== null &&
+                  position.headingTop >= 0 &&
+                  position.headingTop < 500,
+                `375px title is below the first screen: ${path} ${JSON.stringify(position)}`
+              )
+              assert.ok(
+                position.purposeTop !== null &&
+                  position.purposeTop >= 0 &&
+                  position.purposeTop < 812,
+                `375px purpose is below the first screen: ${path} ${JSON.stringify(position)}`
+              )
+            }
+          })
+        }
+      }
     }
   })
 })
@@ -471,13 +538,13 @@ test('SITE-T-TOC keeps API anchors in the correct responsive rail', async () => 
 test('SITE-T-ROUTE-SCROLL starts a newly selected API at the page top', async () => {
   await withChrome(async (browser) => {
     await withPage(browser, { width: 1280, height: 900 }, async (page) => {
-      await page.goto(`${baseUrl}/zh/docs/event-subscriber/createEventChannel/`)
+      await page.goto(`${baseUrl}/zh/docs/event-subscriber/api/createEventChannel/`)
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
       assert.ok((await page.evaluate(() => window.scrollY)) > 0)
 
-      const nextApi = page.locator('a[href="/zh/docs/event-subscriber/createEventHub"]').first()
+      const nextApi = page.locator('a[href="/zh/docs/event-subscriber/api/createEventHub"]').first()
       await nextApi.evaluate((link) => link.click())
-      await page.waitForURL(/\/zh\/docs\/event-subscriber\/createEventHub\/?$/)
+      await page.waitForURL(/\/zh\/docs\/event-subscriber\/api\/createEventHub\/?$/)
       await page.waitForFunction(() => window.scrollY === 0)
 
       assert.equal(await page.evaluate(() => window.scrollY), 0)
@@ -489,15 +556,15 @@ test('SITE-T-ROUTE-SCROLL starts a newly selected API at the page top', async ()
 test('SITE-T-SUPPORTING-CONTRACT separates source markers and explains their real use', async () => {
   await withChrome(async (browser) => {
     await withPage(browser, { width: 600, height: 778 }, async (page) => {
-      await page.goto(`${baseUrl}/zh/docs/event-subscriber/`)
+      await page.goto(`${baseUrl}/zh/docs/event-subscriber/api/`)
       const contract = page.locator(
-        '.error-contracts a[href="/zh/docs/event-subscriber/EVENT_SUBSCRIBER_SOURCE"]'
+        '.error-contracts a[href="/zh/docs/event-subscriber/api/EVENT_SUBSCRIBER_SOURCE"]'
       )
       await contract.waitFor()
       assert.match(await contract.locator('xpath=..').innerText(), /稳定来源标识/)
 
       await contract.click()
-      await page.waitForURL(/\/zh\/docs\/event-subscriber\/EVENT_SUBSCRIBER_SOURCE\/?$/)
+      await page.waitForURL(/\/zh\/docs\/event-subscriber\/api\/EVENT_SUBSCRIBER_SOURCE\/?$/)
       await page.locator('h1', { hasText: 'EVENT_SUBSCRIBER_SOURCE' }).waitFor()
       assert.match(await page.locator('main').innerText(), /契约识别示例/)
       assert.match(await page.locator('.code-frame').first().innerText(), /error\.source/)
@@ -534,7 +601,7 @@ test('SITE-T-LEFT-RAIL gives long desktop API menus an independent scroll bounda
 test('SITE-T-LEFT-RAIL-ROUTE keeps menu order and the selected API visible across routes', async () => {
   await withChrome(async (browser) => {
     await withPage(browser, { width: 1800, height: 900 }, async (page) => {
-      await page.goto(`${baseUrl}/zh/docs/lifecycle/createLifecycleUnit/`)
+      await page.goto(`${baseUrl}/zh/docs/lifecycle/api/createLifecycleUnit/`)
       const rail = page.locator('.left-rail')
       await rail.waitFor()
       const viewport = rail.locator('[data-radix-scroll-area-viewport]')
@@ -548,8 +615,8 @@ test('SITE-T-LEFT-RAIL-ROUTE keeps menu order and the selected API visible acros
       }))
       assert.ok(before.scrollTop > 0)
 
-      await viewport.locator('a[href="/zh/docs/lifecycle/boundedWait"]').click()
-      await page.waitForURL(/\/zh\/docs\/lifecycle\/boundedWait\/?$/)
+      await viewport.locator('a[href="/zh/docs/lifecycle/api/boundedWait"]').click()
+      await page.waitForURL(/\/zh\/docs\/lifecycle\/api\/boundedWait\/?$/)
       await page.locator('h1', { hasText: 'boundedWait' }).waitFor()
       const after = await viewport.evaluate((element) => ({
         links: Array.from(element.querySelectorAll('a')).map((link) => link.getAttribute('href')),
@@ -559,7 +626,7 @@ test('SITE-T-LEFT-RAIL-ROUTE keeps menu order and the selected API visible acros
       assert.deepEqual(after.links, before.links)
       assert.ok(after.scrollTop >= 0)
       assert.equal(
-        await viewport.locator('a.active[href="/zh/docs/lifecycle/boundedWait"]').count(),
+        await viewport.locator('a.active[href="/zh/docs/lifecycle/api/boundedWait"]').count(),
         1
       )
     })
@@ -573,11 +640,11 @@ test(
     await withChrome(async (browser) => {
       await withPage(browser, { width: 1280, height: 900 }, async (page) => {
         for (const library of libraryIndex.libraries) {
-          await page.goto(`${baseUrl}/zh/docs/${library.slug}/`)
+          await page.goto(`${baseUrl}/zh/docs/${library.slug}/api/`)
           await page.locator('#api-index').waitFor()
           assert.equal(await page.locator('.module-learning-path').count(), 0)
           assert.equal(
-            await page.locator(`a[href="/zh/guides/${library.slug}"]`).count(),
+            await page.locator(`a[href="/zh/docs/${library.slug}"]`).count(),
             1,
             `${library.slug} missing task-guide continuation`
           )
@@ -697,8 +764,8 @@ test(
             const symbolPath = apiSymbolPath(symbol, api.symbols)
             const route =
               api.module === 'index'
-                ? `/zh/docs/${api.library}/${symbolPath}`
-                : `/zh/docs/${api.library}/${api.module}/${symbolPath}`
+                ? `/zh/docs/${api.library}/api/${symbolPath}`
+                : `/zh/docs/${api.library}/api/${api.module}/${symbolPath}`
             await page.goto(pageUrl(route))
             await page.locator('.single-api-reference').waitFor()
             assert.equal(
@@ -752,8 +819,8 @@ test(
             const symbolPath = apiSymbolPath(symbol, api.symbols)
             const route =
               api.module === 'index'
-                ? `/zh/docs/${api.library}/${symbolPath}`
-                : `/zh/docs/${api.library}/${api.module}/${symbolPath}`
+                ? `/zh/docs/${api.library}/api/${symbolPath}`
+                : `/zh/docs/${api.library}/api/${api.module}/${symbolPath}`
             await page.goto(pageUrl(route))
             const article = page.locator('.single-api-reference')
             await article.waitFor()
@@ -794,8 +861,8 @@ test(
             const symbolPath = apiSymbolPath(symbol, api.symbols)
             const route =
               api.module === 'index'
-                ? `/zh/docs/${api.library}/${symbolPath}`
-                : `/zh/docs/${api.library}/${api.module}/${symbolPath}`
+                ? `/zh/docs/${api.library}/api/${symbolPath}`
+                : `/zh/docs/${api.library}/api/${api.module}/${symbolPath}`
             await page.goto(pageUrl(route))
             const article = page.locator('.single-api-reference')
             await article.waitFor()
@@ -862,8 +929,8 @@ test(
       '/en',
       '/en/docs',
       '/en/docs/utils',
-      '/en/guides/utils/getting-started',
-      '/en/architecture/utils'
+      '/en/docs/utils/getting-started',
+      '/en/docs/utils'
     ]
     await withChrome(async (browser) => {
       for (const path of routes) {

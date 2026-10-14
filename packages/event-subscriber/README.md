@@ -1,6 +1,6 @@
 # `@migaia/event-subscriber`
 
-轻量、runtime-neutral 的 transient event fan-out 原语：登记 listener，在发布入口取得稳定快照，把同一个事件可靠地分发给目标 listener。零运行时依赖，`sideEffects: false`。
+轻量、runtime-neutral 的 transient event fan-out 原语：登记 listener，在发布入口取得稳定快照，把同一个事件可靠地分发给目标 listener。唯一的运行时依赖是 `@migaia/utils`，`sideEffects: false`。
 
 ## 适用与不适用场景
 
@@ -14,7 +14,7 @@
 pnpm add @migaia/event-subscriber
 ```
 
-只有 root 导出，没有子路径导出，零 workspace 运行时依赖。
+提供两个入口：root `@migaia/event-subscriber`，以及订阅 helper 子路径 `@migaia/event-subscriber/subscriber`。唯一的 workspace 运行时依赖是 `@migaia/utils`。
 
 ## 目录
 
@@ -58,6 +58,8 @@ unsubscribe()
 - `dispatchPolicy?: EventDispatchPolicy` —— `recursive`（默认）保持 canonical nested publish 的同步递归顺序；只有需要“当前快照全部完成后再交付重入值”的消费者才显式使用 `queued`
 - `admissionPolicy?: EventAdmissionPolicy` —— `multiple`（默认）为每次订阅建立独立 registration；显式 `unique` 时，同一 listener 函数在一个 channel 内只保留一份，重复订阅得到绑定同一代 registration 的 disposer。重复订阅的 `taskId` 必须与现有 registration 相同，否则抛 `INVALID_OPTIONS` `TypeError`；旧 disposer 不会移除退订或 `clear()` 后的新订阅。Hub 与以 wrapper 注册的 helper 不按原始 listener 去重
 - `publishBudget?: number` —— 单次顶层同步发布事务最多调用的 listener 数，默认 `100_000`；必须是正安全整数。预算耗尽时停止继续展开并抛 `PUBLISH_FAILED`，防止递归或重入发布无限占用线程
+- `removalPolicy?: 'handle' | 'listener-all'` —— 调用订阅句柄时解除多少登记。默认 `handle` 只解除这个句柄自己的那次登记；`listener-all` 同时解除同一 listener 在该 channel 上的全部登记
+- `throwOnAborted?: boolean` —— 默认 `false`：用已经 aborted 的 signal 调用 `subscribeUntil` 时不建立 registration，返回空操作的 unsubscribe；设为 `true` 时改为抛 `ABORTED` `TypeError`
 
 返回的 `channel` 上的方法与字段：
 
@@ -319,7 +321,7 @@ if (error.code === EventSubscriberErrorCode.publishFailed) {
 }
 ```
 
-全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。
+全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。
 
 **`EVENT_SUBSCRIBER_SOURCE`｜3 秒上手** —— 常量字符串 `'@migaia/event-subscriber'`，等同任意包边界错误的 `source` 字段。
 

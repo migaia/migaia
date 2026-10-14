@@ -77,19 +77,23 @@ export type IEntityOptions<
   TIndexes extends IEntityIndexDefinitions<TDomain> | undefined = undefined
 > = {
   readonly name: string
-  /** 领域对象上作为主键的属性名。 */
+  /** Names the domain object property used as its primary key. */
   readonly key: Extract<keyof TDomain, string>
-  /** 默认 passthrough：零校验直接透传。 */
+  /** Defaults to `passthrough`, which returns values without validation. */
   readonly schema?: ISchemaAdapter<TDomain, TStored>
   /**
-   * 在所有后端上统一生效，经 selectCodec 按 store.capabilities 选路 （见 §7）——显式配置的 codec 不会被结构化后端绕过。未提供时按后端
-   * 类型选默认值：结构化后端（IndexedDB/memory）默认 structuredCodec （原样存对象，利用原生 structured clone）；KV-only 后端默认
-   * jsonCodec。
+   * Applies on every backend through `selectCodec` using `store.capabilities` (see §7). Structured
+   * backends do not bypass an explicitly configured codec. When omitted, IndexedDB and memory
+   * default to `structuredCodec`, preserving objects through native structured cloning.
+   * Key-value-only backends default to `jsonCodec`.
    */
   readonly codec?: ICodec<unknown, unknown>
   readonly version?: number
   readonly migrations?: Record<number, IMigration>
-  /** 默认 true：持久化数据会跨版本存活，读到脏数据比写入脏数据更常见。 */
+  /**
+   * Defaults to `true` because persisted data survives version changes, making invalid reads more
+   * common than invalid writes.
+   */
   readonly validateOnRead?: boolean
   readonly onDiagnostic?: (message: string) => void
   readonly defaultOrderBy?: IRecordComparator<TDomain>
@@ -100,7 +104,10 @@ export type IEntityOptions<
 export type IRecordComparator<TRecord> = (left: TRecord, right: TRecord) => number
 
 export type IListOptions<TRecord = unknown, TKey extends IStorageKey = IStorageKey> = {
-  /** V2 record key 先隔离 entity；legacy 兼容记录在显式 migrate 前仍需全库扫描。 */
+  /**
+   * V2 record keys isolate the entity first. Legacy records require a full-store scan until
+   * explicit migration.
+   */
   readonly range?: IKeyRange<TKey>
   /** Indexed queries use IIndexedListOptions so their index key remains correlated. */
   readonly index?: never
@@ -157,7 +164,10 @@ export type IRepository<
   get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>
   put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>
   remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>
-  /** V2 结构化记录按 entity 物理前缀扫描并用共享 comparator 过滤；legacy 兼容记录会暂时走全库扫描。 */
+  /**
+   * Scans V2 structured records by their physical entity prefix and filters with the shared
+   * comparator. Legacy records temporarily require a full-store scan.
+   */
   list(
     options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>,
     ctx?: IOperationContext
@@ -184,7 +194,10 @@ export type IRepository<
     ctx?: IOperationContext
   ): AsyncIterableIterator<TDomain>
   migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>
-  /** 仅结构化后端支持（有真正的事务回滚）；KV-only 后端抛 UNSUPPORTED_CAPABILITY。 */
+  /**
+   * Requires a structured backend with transaction rollback. Key-value-only backends throw
+   * `UNSUPPORTED_CAPABILITY`.
+   */
   batch<T>(
     run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,
     ctx?: IOperationContext

@@ -248,8 +248,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/wasm/getting-started",
-      "architecturePath": "/en/architecture/wasm",
+      "guidePath": "/en/docs/wasm/getting-started",
+      "architecturePath": "/en/docs/wasm",
       "symbols": [
         {
           "name": "alloc_bytes",

@@ -18,7 +18,7 @@ export type ITrayRoutingPick = (
 ) => string
 /** Trusted selection metadata is available only for identities authored by this module. */
 const policies = new WeakMap<object, ITrayRoutingPick>()
-/** Built-in names are reserved for the mesh owner's always-available policies. */
+/** 内置 policy 名称保留给 Tray 父端 routing registry 的常驻 policy。 */
 export const TrayRoutingBuiltinName = {
   roundRobin: 'roundRobin',
   leastInFlight: 'leastInFlight'

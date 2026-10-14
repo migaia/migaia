@@ -1413,8 +1413,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "abort",
@@ -10378,8 +10378,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "defineByteAdapter",
@@ -11006,8 +11006,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createMemoryTransportPair",
@@ -11172,8 +11172,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createBrowserMessagePortTransport",
@@ -11563,8 +11563,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createWebWorkerTransport",
@@ -11905,8 +11905,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createClientEndpoint",
@@ -11988,8 +11988,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createComposedEndpoint",
@@ -12319,8 +12319,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createControlFeature",
@@ -12464,8 +12464,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createDiscoveryFeature",
@@ -12609,8 +12609,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createOneWayFeature",
@@ -12817,8 +12817,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createOutboundFeature",
@@ -12962,8 +12962,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createProviderAdmissionScope",
@@ -13301,8 +13301,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createFullEndpoint",
@@ -13445,8 +13445,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "IIpcBacklogEvent",
@@ -14094,8 +14094,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createIpcLogFeature",
@@ -14192,8 +14192,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createIpcSendQueueFeature",
@@ -14375,8 +14375,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "defineProbe",
@@ -16171,8 +16171,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createProviderEndpoint",
@@ -16252,8 +16252,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createCoroutinePlugin",
@@ -22663,8 +22663,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createCanonicalChunkFeature",
@@ -23066,8 +23066,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createPeerPair",
@@ -23254,8 +23254,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "IRpcCandidateStatus",
@@ -24092,8 +24092,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "collectListenerCleanupFailures",

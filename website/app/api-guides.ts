@@ -422,72 +422,72 @@ const optionTranslations: Readonly<
     zh: '可选 generator sentinel 集；undefined、halt 与 continue 必须保持不同身份。'
   },
   'plugin-host:index:defineHost:host': {
-    en: 'Host execution, pipeline, queue, disposal, and diagnostic policies used by the functional handle.',
-    zh: '函数式 Host handle 使用的执行、pipeline、队列、清理与诊断策略。'
+    en: 'Required Host configuration. Supply both execution time limits before installing plugins.',
+    zh: '必填的 Host 配置。安装插件前必须提供 execution 的两个时间限制。'
   },
   'plugin-host:index:defineHost:domainCore': {
-    en: 'Creates the domain capabilities for one plugin registration. The request identifies the plugin and its index within the current batch.',
-    zh: '为单个插件 registration 创建领域能力；request 会给出插件名及其在当前批次内的序号。'
+    en: 'Supplies business methods for each plugin installation. request identifies the plugin and its position within this use batch.',
+    zh: '每次插件安装时提供业务方法。request 给出插件名称及其在本次 use 批次中的序号。'
   },
   'plugin-host:index:defineHost:translateDisposalError': {
-    en: 'Translates a package-owned disposal failure at the Host boundary without changing plugin cleanup ownership.',
-    zh: '在 Host 边界转换包内清理失败，不改变插件 cleanup 的所有权。'
+    en: "Converts a Host cleanup error for an application's error handler while retaining the original cleanup owner.",
+    zh: '为应用错误处理转换 Host 清理错误，不改变原有资源清理职责。'
   },
   'plugin-host:index:defineHost:dispose': {
-    en: 'Wraps terminal disposal. Call next exactly once; repeated handle.dispose() calls share the same Promise.',
-    zh: '包装终态清理；必须恰好调用一次 next，重复调用 handle.dispose() 会共享同一个 Promise。'
+    en: 'Wraps Host cleanup. Return next() so installed plugins still release. Repeated handle.dispose calls reuse the first result.',
+    zh: '包装 Host 清理。返回 next() 的结果，确保已安装插件仍被释放。重复调用 handle.dispose 复用首次结果。'
   },
   'plugin-host:index:defineHost:receiver': {
-    en: 'Optional this receiver for callable extensions; omit it to bind extension calls to the returned handle.',
-    zh: '可选的 extension 方法 this receiver；省略时绑定到返回的 handle。'
+    en: 'Registers an additional object for the same composition operations as the returned Host.',
+    zh: '为另一个对象登记与返回的 Host 相同的 composition 操作。'
   },
   'plugin-host:*:*:identity': {
-    en: 'Optional public Host identity input. The caller supplies a readable name; the runtime assigns a unique id independently.',
-    zh: '可选的公开宿主身份输入；调用方提供可读名称，运行时会独立分配唯一标识。'
+    en: 'Optional readable Host name. The runtime supplies a unique id separately.',
+    zh: '可选的 Host 可读名称。运行时另外生成唯一 id。'
   },
   'plugin-host:*:*:identity.name': {
-    en: 'Human-readable Host label used in diagnostics; omit it for the default label without affecting the unique runtime id.',
-    zh: '诊断中使用的宿主可读名称；省略时采用默认名称，不影响运行时分配的唯一标识。'
+    en: 'Readable Host name shown in diagnostics. Omitting it uses the default name.',
+    zh: '诊断信息中的 Host 可读名称。省略时使用默认名称。'
   },
   'plugin-host:*:*:execution': {
-    en: 'Required time limits for plugin changes and removal. Set each child field explicitly so a stalled hook cannot silently block the host forever.',
-    zh: '插件安装、更新与移除使用的必填时间限制；必须明确填写子项，避免卡住的 hook 无限阻塞 Host。'
+    en: 'Required wait limits for plugin operations and running pipeline work. Supply both child fields explicitly.',
+    zh: '插件操作与正在运行的 pipeline 所需的等待上限。两个子项必须明确填写。'
   },
   'plugin-host:*:*:execution.mutationTimeoutMs': {
-    en: 'Maximum time for one admitted plugin install, update, or removal hook. false waits without a deadline and should be reserved for controlled hosts.',
-    zh: '单次插件安装、更新或移除 hook 的最长执行时间；false 表示永久等待，只适合能够自行保证 hook 结束的受控宿主。'
+    en: 'Maximum wait for a plugin hook result. Timeout rejects the wait and prevents a late result from committing. It does not forcibly stop the hook. false removes the deadline.',
+    zh: '等待插件 hook 结果的最长时间。超时拒绝等待，并禁止迟到结果提交。它不会强制停止 hook。false 表示不设截止时间。'
   },
   'plugin-host:*:*:execution.pipelineDrainTimeoutMs': {
-    en: 'Maximum wait for currently running pipeline calls to finish before logical plugin removal continues. false waits until every active call exits.',
-    zh: '移除插件前等待正在运行的 pipeline 调用结束的最长时间；false 会一直等到所有活动调用退出。'
+    en: 'Maximum wait for running pipeline work during cleanup. false waits until all work finishes.',
+    zh: '清理时等待正在运行的 pipeline 完成的最长时间。false 会等待全部完成。'
   },
   'plugin-host:*:*:pipeline': {
-    en: 'Pipeline behavior used when plugin stages run, including execution mode and violation handling. Omit it to use the Host defaults.',
-    zh: '插件 stage 运行时采用的 pipeline 行为，包括执行模式和违规处理；省略时使用 Host 默认策略。'
+    en: 'Selects how data-processing stages run. Omit it for the default sync mode.',
+    zh: '选择 pipeline（按顺序处理数据的函数链）的执行方式。省略时使用默认 sync 模式。'
   },
   'plugin-host:*:*:diagnostic': {
-    en: 'Receives non-fatal Host diagnostics with an optional stable error code. Use it to forward warnings to application logging or monitoring.',
-    zh: '接收不会直接终止操作的 Host 诊断及可选稳定错误码；可把这些信息转发到应用日志或监控系统。'
+    en: 'Reports warnings and contained failures. Its third argument carries the original error when one is available.',
+    zh: '报告警告与已处理的失败。存在原始错误时，通过第三个参数提供。'
   },
   'plugin-host:*:*:pipeline.mode': {
-    en: 'Chooses how pipeline stages are invoked. Select the mode required by the registered stage functions rather than converting values at each call site.',
-    zh: '选择 pipeline stage 的调用方式；应按已注册 stage 的函数形态选择，而不是在每个调用点临时转换。'
+    en: 'Selects sync, async, generator, or async-generator execution once at construction.',
+    zh: '构造时选择 sync、async、generator 或 async-generator 执行方式，之后不能切换。'
   },
   'plugin-host:*:*:scheduler': {
-    en: 'Clock and timer implementation used by queue admission, disposal deadlines, and other Host time budgets. Omit it to use the lifecycle system scheduler; inject one for deterministic tests or a host-specific clock.',
-    zh: 'queue admission、dispose deadline 等 Host 时间预算共用的时钟与 timer 实现；省略时使用 lifecycle system scheduler，确定性测试或特殊宿主可注入自己的 scheduler。'
+    en: 'Clock and timer implementation used for Host waiting limits. Omit it to use the system scheduler.',
+    zh: 'Host 等待限制共用的时钟与定时器。省略时使用 system scheduler。'
   },
   'plugin-host:*:*:queueAdmissionTimeoutMs': {
-    en: 'Maximum time a mutation may wait in the Host queue before it is rejected. undefined reports slow admission without rejecting, false disables both the timer and rejection, and a number enforces the deadline.',
-    zh: 'mutation 在 Host 队列中等待准入的最长时间；undefined 只报告等待过久但不拒绝，false 关闭 timer 与拒绝，number 会强制执行 deadline。'
+    en: 'Maximum queue wait before a plugin operation starts. undefined reports slow waits, false disables this timer, and a number rejects an operation that waits too long.',
+    zh: '插件操作开始前可在队列等待的最长时间。undefined 只报告等待过久。false 关闭该定时器。数字会拒绝等待超时的操作。'
   },
   'plugin-host:*:*:queueAdmissionDiagnosticMs': {
-    en: 'Warning threshold used only when queueAdmissionTimeoutMs is undefined. false disables the diagnostic timer; a number reports slow queue admission without cancelling the mutation.',
-    zh: '仅在 queueAdmissionTimeoutMs 为 undefined 时使用的警告阈值；false 关闭诊断 timer，number 会报告排队过久但不会取消 mutation。'
+    en: 'Queue warning threshold used when queueAdmissionTimeoutMs is undefined. It reports slow waits without cancelling the operation.',
+    zh: 'queueAdmissionTimeoutMs 为 undefined 时使用的排队警告阈值。只报告等待过久，不取消操作。'
   },
   'plugin-host:*:*:disposeStepTimeoutMs': {
-    en: 'Maximum wait for one resource disposer before the Host invokes its force-cleanup path. false permits an unbounded wait and should be reserved for disposers guaranteed to settle.',
-    zh: '等待单个资源 disposer 完成的最长时间，超时后 Host 会进入 force-cleanup 路径；false 表示永久等待，只适合保证一定结束的 disposer。'
+    en: 'Maximum wait for one cleanup step. A timeout records a failure and continues other cleanup; it does not stop the pending Promise. false waits without a deadline.',
+    zh: '单个清理步骤的最长等待时间。超时记录失败并继续其他清理，不会停止仍在运行的 Promise。false 表示不设截止时间。'
   },
   'logger:*:*:maxSize': {
     en: 'Maximum entries collected before the current batch is sent immediately; use a smaller value for lower latency and a larger value for fewer requests.',
@@ -614,34 +614,44 @@ const optionTranslations: Readonly<
     zh: '在 color 插件输出中显示生成的 UUID；无论是否显示，每条 entry 都保留 UUID 数据。'
   },
   'plugin-host:index:PluginHost:execution': {
-    zh: '必填执行预算组，分别约束已经开始的 lifecycle mutation 与逻辑撤销后的 pipeline drain。'
+    en: 'Required wait limits for plugin operations and running pipeline work. Supply both child fields explicitly.',
+    zh: '插件操作与正在运行的 pipeline 所需的等待上限。两个子项必须明确填写。'
   },
   'plugin-host:index:PluginHost:execution.mutationTimeoutMs': {
-    zh: '一次 install、update 或 removal hook 的最长执行时间；超时后该 operation 失去提交资格。'
+    en: 'Maximum wait for a plugin hook result. Timeout rejects the wait and prevents a late result from committing. It does not forcibly stop the hook. false removes the deadline.',
+    zh: '等待插件 hook 结果的最长时间。超时拒绝等待，并禁止迟到结果提交。它不会强制停止 hook。false 表示不设截止时间。'
   },
   'plugin-host:index:PluginHost:execution.pipelineDrainTimeoutMs': {
-    zh: '插件 stage 被逻辑撤销后，等待已经开始的 pipeline lease 归零的最长时间。'
+    en: 'Maximum wait for running pipeline work during cleanup. false waits until all work finishes.',
+    zh: '清理时等待正在运行的 pipeline 完成的最长时间。false 会等待全部完成。'
   },
   'plugin-host:index:PluginHost:pipeline': {
-    zh: '选择 Host 唯一且构造后不可切换的 pipeline 执行模型。'
+    en: 'Selects how data-processing stages run. Omit it for the default sync mode.',
+    zh: '选择 pipeline（按顺序处理数据的函数链）的执行方式。省略时使用默认 sync 模式。'
   },
   'plugin-host:index:PluginHost:pipeline.mode': {
-    zh: '根据同步、异步洋葱、generator 或 async-generator 控制流选择 pipeline 模式。'
+    en: 'Selects sync, async, generator, or async-generator execution once at construction.',
+    zh: '构造时选择 sync、async、generator 或 async-generator 执行方式，之后不能切换。'
   },
   'plugin-host:index:PluginHost:diagnostic': {
-    zh: '接收迟到调用、排队等待及回滚二次失败等非终止性诊断；回调失败会被隔离。'
+    en: 'Reports warnings and contained failures. Its third argument carries the original error when one is available.',
+    zh: '报告警告与已处理的失败。存在原始错误时，通过第三个参数提供。'
   },
   'plugin-host:index:PluginHost:scheduler': {
-    zh: '为 mutation、排队、drain 和 disposer timeout 提供统一时间域与排程。'
+    en: 'Clock and timer implementation used for Host waiting limits. Omit it to use the system scheduler.',
+    zh: 'Host 等待限制共用的时钟与定时器。省略时使用 system scheduler。'
   },
   'plugin-host:index:PluginHost:queueAdmissionTimeoutMs': {
-    zh: '限制尚未开始的 mutation 在 FIFO 队列中等待的时间；数字会拒绝超时任务，false 关闭 timer。'
+    en: 'Maximum queue wait before a plugin operation starts. undefined reports slow waits, false disables this timer, and a number rejects an operation that waits too long.',
+    zh: '插件操作开始前可在队列等待的最长时间。undefined 只报告等待过久。false 关闭该定时器。数字会拒绝等待超时的操作。'
   },
   'plugin-host:index:PluginHost:queueAdmissionDiagnosticMs': {
-    zh: '未启用 admission timeout 时，仅在排队越过阈值后报告诊断而不拒绝 mutation。'
+    en: 'Queue warning threshold used when queueAdmissionTimeoutMs is undefined. It reports slow waits without cancelling the operation.',
+    zh: 'queueAdmissionTimeoutMs 为 undefined 时使用的排队警告阈值。只报告等待过久，不取消操作。'
   },
   'plugin-host:index:PluginHost:disposeStepTimeoutMs': {
-    zh: '限制单个 disposer 或插件清理 hook；超时记录 cleanupErrors，但 Host 继续进入逻辑终态。'
+    en: 'Maximum wait for one cleanup step. A timeout records a failure and continues other cleanup; it does not stop the pending Promise. false waits without a deadline.',
+    zh: '单个清理步骤的最长等待时间。超时记录失败并继续其他清理，不会停止仍在运行的 Promise。false 表示不设截止时间。'
   },
   'storage-web:*:*:report': {
     en: 'Receives contained late rejections and cleanup failures from host installation or disposal; it never replaces the primary operation result or primary error.'
@@ -892,7 +902,8 @@ const optionTranslations: Readonly<
     zh: 'readiness barrier 等待期间显示的界面；应选择可安全展示、但不会被误认为已经加载的 Store 数据的内容。'
   },
   'store-react:index:normalizeStoreConfig:defaults': {
-    en: 'Read-only application defaults snapshot. StoreProvider does not write these values into individual stores.'
+    en: 'Read-only application defaults snapshot. StoreProvider does not write these values into individual stores.',
+    zh: '应用默认设置的只读快照。StoreProvider 不会将这些值自动写入各个 Store；业务代码需自行读取并传递给创建选项。'
   },
   'store-react:index:StoreRegistry:owned': {
     en: 'Transfers instance lifecycle to the registry. Owned values are disposed when the registry is released.'
@@ -3641,26 +3652,26 @@ const runtimeCompletionApiGuides = {
   }),
   'rpc-threads:index:createThreadPlugin': createStorageContractGuide({
     purposeEn:
-      'Creates the thread Plugin definition using the actual runtime resource and symmetric options: name, provide/expose and spawn/connect/listen. The legacy { spec, contract, host, ... } option branch is removed. Host installation shares the canonical thread slot, supervision and Remote retry owner; resources activate and publish at the original install commit and release through that Host scope.',
+      'Start here when a PluginHost should own a Worker connection. createThreadPlugin uses the native thread runtime by default. Install the definition with host.use, then call host.thread.request, notify or stream. Host disposal releases the connection and its owned Worker. Pass the optional second runtime argument only for a custom thread integration.',
     purposeZh:
-      '使用实际 runtime resource 与对称 options 创建 Plugin definition：name、provide/expose 和 spawn/connect/listen。旧的 { spec, contract, host, ... } options 分支已删除。Host 安装共享规范 thread slot、supervision 与 Remote retry owner；资源在原 install commit 激活和发布，通过同一 Host scope 释放。',
+      '需要由 PluginHost 管理 Worker 连接时，从 createThreadPlugin 开始。默认使用原生 thread runtime。通过 host.use 安装后，用 host.thread.request、notify 或 stream 调用。Host dispose 会释放连接和它拥有的 Worker。只有自定义 thread 集成才需要第二个 runtime 参数。',
     quickStart:
-      "import { createThreadPlugin } from '@migaia/rpc-threads'\n\n/** Install this definition through the actual Host operation owned by the deployment. */\nexport async function installCustomThreadPlugin(\n  options: Parameters<typeof createThreadPlugin>[0],\n  runtime: Parameters<typeof createThreadPlugin>[1],\n  install: (plugin: ReturnType<typeof createThreadPlugin>) => PromiseLike<void>\n) {\n  const plugin = createThreadPlugin(options, runtime)\n  await install(plugin)\n}",
+      "import { defineHost } from '@migaia/plugin-host'\nimport { createThreadPlugin } from '@migaia/rpc-threads'\n\n/** worker.js provides math.double through createThreadPeer({ provide }). */\ntype IWorkerApi = { math: { double(value: number): number } }\n/** The Host owns this native Worker connection. */\nconst worker = createThreadPlugin<IWorkerApi, Record<never, never>, 'worker'>({\n  name: 'worker',\n  spawn: new URL('./worker.js', import.meta.url)\n})\n/** The installed Plugin adds the thread outlet to this Host. */\nconst host = defineHost<Record<string, never>, never, readonly [typeof worker]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\ntry {\n  await host.use(worker)\n  console.assert(await host.thread!.request('worker', 'math.double', 21) === 42)\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
-      'A custom thread runtime integrates its owned launcher with an existing Host.',
-      'Advanced thread supervision must share the original Remote assembly and retry owner.'
+      'A PluginHost owns one or more Worker connections.',
+      'The application queries, restarts or replaces an owned Worker through host.thread.'
     ],
     scenariosZh: [
-      '自定义 thread runtime 把自有 launcher 集成到既有 Host。',
-      '高级 thread supervision 需要共享原 Remote 装配与 retry owner。'
+      'PluginHost 统一管理一个或多个 Worker 连接。',
+      '应用通过 host.thread 查询、restart 或 replace 自有 Worker。'
     ],
     avoidEn: [
-      'Do not publish a thread slot before the actual install batch commits.',
-      'Use the rpc-threads Plugin factory when no custom runtime resource is required.'
+      'Use createThreadPeer when the caller should own a standalone connection.',
+      'Use createProcessPlugin when the work needs a separate process.'
     ],
     avoidZh: [
-      '不要在实际 install batch commit 前发布 thread slot。',
-      '不需要自定义 runtime resource 时使用 rpc-threads Plugin 工厂。'
+      '调用方自己管理独立连接时，使用 createThreadPeer。',
+      '工作需要独立进程时，使用 createProcessPlugin。'
     ]
   }),
   'rpc-threads:index:readThreadBootstrap': createStorageContractGuide({
@@ -20169,7 +20180,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Validates an SSR snapshot, serializes it as JSON, and escapes HTML-significant characters so the text is safe inside an application/json script element.',
-      quickStart: `import { createSSRRequestScope, serializeSSRState } from '@migaia/store-ssr'\n\nconst scope = createSSRRequestScope()\nconst text = serializeSSRState(scope.dehydrate())\nconst script = \`<script type=\"application/json\" id=\"__STORE_STATE__\">\${text}</script>\`\nconsole.log('SSR state script:', script)\nawait scope.disposeAsync()`,
+      quickStart: `import { createSSRRequestScope, serializeSSRState } from '@migaia/store-ssr'\n\nconst scope = createSSRRequestScope()\nconst text = serializeSSRState(scope.dehydrate())\nconst script = \`<script type="application/json" id="__STORE_STATE__">\${text}</script>\`\nconsole.log('SSR state script:', script)\nawait scope.disposeAsync()`,
       scenarios: [
         'A template already owns the script element markup.',
         'A validated snapshot must cross the HTML boundary.',
@@ -20195,7 +20206,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '先校验 SSR snapshot，再序列化 JSON，并转义 HTML 敏感字符，使文本可安全放入 application/json script element。',
-      quickStart: `import { createSSRRequestScope, serializeSSRState } from '@migaia/store-ssr'\n\nconst scope = createSSRRequestScope()\nconst text = serializeSSRState(scope.dehydrate())\nconst script = \`<script type=\"application/json\" id=\"__STORE_STATE__\">\${text}</script>\`\nconsole.log('SSR state script:', script)\nawait scope.disposeAsync()`,
+      quickStart: `import { createSSRRequestScope, serializeSSRState } from '@migaia/store-ssr'\n\nconst scope = createSSRRequestScope()\nconst text = serializeSSRState(scope.dehydrate())\nconst script = \`<script type="application/json" id="__STORE_STATE__">\${text}</script>\`\nconsole.log('SSR state script:', script)\nawait scope.disposeAsync()`,
       scenarios: [
         'template 已经拥有 script element markup。',
         '已校验 snapshot 必须穿过 HTML 边界。',
@@ -23672,9 +23683,9 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
   'tray:index:defineTrayHost': {
     en: {
       purpose:
-        'Validates and freezes a branded host DSL, preserving PluginHost Feature types and declared routing policy names. Returns ITrayHost.',
+        'Start here to define a complete PluginHost instance. createTray({ hosts }) uses this frozen ITrayHost to spawn coroutine, thread or process instances.',
       quickStart:
-        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconsole.log(agent.name, agent.runtime)",
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  runtime: 'coroutine',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconsole.assert(agent.name === 'agent' && agent.runtime === 'coroutine')",
       scenarios: [
         'Declare a shared coroutine, Node Worker or child-process host before registry startup.',
         'Configure typed exposed Features, instance config validation and runtime-specific launch options.'
@@ -23682,6 +23693,15 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       avoidWhen: [
         'Cross-machine discovery or browser Workers are required.',
         'The application only needs a static same-realm capability graph; use createTrayGraph.'
+      ],
+      examples: [
+        {
+          id: 'runtime-options',
+          title: 'Choose thread or process',
+          description:
+            'Omitting runtime selects coroutine. thread and process require a child entry that calls serveTrayHost. limits is thread-only. sandbox is process-only. This example wraps the launch command with an application-provided sandbox-runner executable.',
+          code: "import { defineTrayHost } from '@migaia/tray'\n\nconst thread = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.mjs', import.meta.url),\n  limits: { heapBytes: 64 * 1024 * 1024 },\n  plugins: () => [] as const,\n  exposes: []\n})\nconst process = defineTrayHost({\n  name: 'process-worker',\n  runtime: 'process',\n  entry: new URL('./process-worker.mjs', import.meta.url),\n  sandbox: {\n    name: 'external',\n    wrap: (command) => ({\n      ...command,\n      command: 'sandbox-runner',\n      args: ['--', command.command, ...command.args]\n    })\n  },\n  plugins: () => [] as const,\n  exposes: []\n})\nconsole.assert(thread.runtime === 'thread' && process.runtime === 'process')"
+        }
       ],
       options: [
         {
@@ -23691,8 +23711,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'required',
           optional: false,
           type: 'TName extends string',
-          whenToUse:
-            'Non-empty shared host identity retained in spawn names and instance snapshots.',
+          whenToUse: 'Choose a stable definition name before registering hosts.',
           example: "name: 'agent'"
         },
         {
@@ -23702,8 +23721,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'required',
           optional: false,
           type: '(instance: ITrayInstanceInfo<TName, TConfig>, trayPlugin: ITrayClientPlugin<TRouting>) => TPlugins',
-          whenToUse:
-            "Runs once during each child generation init. Declare deps.tray with trayPlugin.getFeature('tray'); the parent does not invoke this factory.",
+          whenToUse: 'Build the child plugins and declare any Tray client dependency.',
           example: 'plugins: (info, trayPlugin) => [businessPlugin]'
         },
         {
@@ -23713,8 +23731,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'required',
           optional: false,
           type: 'readonly TExposes[]',
-          whenToUse:
-            'Allowlist of plugin.feature paths; remote calls append the method name. Reserved internal plugin names and duplicate paths reject.',
+          whenToUse: 'Expose the Features that remote callers need.',
           example: "exposes: ['node.svc']"
         },
         {
@@ -23723,7 +23740,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: "'coroutine'",
           optional: true,
           type: "'coroutine' | 'thread' | 'process'",
-          whenToUse: 'Select a cooperative coroutine, Node Worker isolate or child process.',
+          whenToUse: 'Choose the execution realm for this instance family.',
           example: "runtime: 'thread'"
         },
         {
@@ -23733,8 +23750,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'required for thread/process',
           optional: true,
           type: 'string | URL',
-          whenToUse:
-            'Required for thread and process hosts; forbidden for coroutine hosts. The child entry calls serveTrayHost with the shared definition.',
+          whenToUse: 'Set the child launch module for a thread or process definition.',
           example: "entry: new URL('./worker.mjs', import.meta.url)"
         },
         {
@@ -23744,8 +23760,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'undefined',
           optional: true,
           type: '(input: unknown) => TConfig',
-          whenToUse:
-            'Validates and transforms config during child init; plugins receive the validator output.',
+          whenToUse: 'Convert spawn input into the config your child plugins consume.',
           example: 'config: (input) => input as { language: string }'
         },
         {
@@ -23755,8 +23770,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'undefined',
           optional: true,
           type: 'ITraySupervisorPolicy',
-          whenToUse:
-            'Projects restart.mode, maxRestarts, windowMs, initialDelayMs and startupTimeoutMs to the canonical rpc supervisor.',
+          whenToUse: 'Choose restart budgets and startup timing for managed instances.',
           example:
             "supervisor: { restart: { mode: 'on-failure', maxRestarts: 2, windowMs: 60000 }, startupTimeoutMs: 5000 }"
         },
@@ -23766,7 +23780,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'undefined',
           optional: true,
           type: 'Readonly<{ heapBytes?: number }>',
-          whenToUse: 'Thread-only heap limit; rejected on coroutine and process hosts.',
+          whenToUse: 'Bound the heap of a Node Worker instance.',
           example: 'limits: { heapBytes: 64 * 1024 * 1024 }'
         },
         {
@@ -23776,28 +23790,26 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'undefined',
           optional: true,
           type: 'ITraySandbox',
-          whenToUse:
-            'Process-only external wrapper. wrap receives and returns IProcessLaunchCommand with command, args, cwd and env.',
+          whenToUse: 'Pass the application-owned external process launcher wrapper.',
           example: "sandbox: { name: 'external', wrap: (command) => command }"
         },
         {
           name: 'definition.routing',
           description:
-            'Retains shared policy identities and literal names. Routing execution and namespaces are implemented by mesh.',
+            'Registers custom policies with the parent Tray. Child plugins can use these names through deps.tray.routing.',
           defaultValue: 'undefined',
           optional: true,
           type: 'TRouting extends readonly ITrayRoutingPolicy[]',
-          whenToUse:
-            'Retains shared policy identities and literal names. Routing execution and namespaces are implemented by mesh.',
+          whenToUse: 'Declare custom policies that this host calls from its plugins.',
           example: 'routing: [first]'
         }
       ]
     },
     zh: {
       purpose:
-        '验证并冻结带身份标记的 host DSL，保留 PluginHost Feature 类型与声明的路由 policy 名称；返回 ITrayHost。',
+        '从这里定义完整 PluginHost 实例。返回冻结的 ITrayHost。createTray({ hosts }) 使用此定义创建 coroutine、thread 或 process 实例。',
       quickStart:
-        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconsole.log(agent.name, agent.runtime)",
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  runtime: 'coroutine',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconsole.assert(agent.name === 'agent' && agent.runtime === 'coroutine')",
       scenarios: [
         '在 registry 启动前声明共享的 coroutine、Node Worker 或子进程 host。',
         '配置具有类型约束的公开 Feature、实例配置验证与运行时启动选项。'
@@ -23806,6 +23818,15 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         '需要跨机器发现或浏览器 Worker。',
         '应用只需要静态同 realm capability 图；应使用 createTrayGraph。'
       ],
+      examples: [
+        {
+          id: 'runtime-options',
+          title: '选择 thread 或 process',
+          description:
+            '省略 runtime 使用 coroutine。thread 与 process 的子入口必须调用 serveTrayHost。limits 仅用于 thread。sandbox 仅用于 process。此示例用应用提供的 sandbox-runner executable 包装启动命令。',
+          code: "import { defineTrayHost } from '@migaia/tray'\n\nconst thread = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.mjs', import.meta.url),\n  limits: { heapBytes: 64 * 1024 * 1024 },\n  plugins: () => [] as const,\n  exposes: []\n})\nconst process = defineTrayHost({\n  name: 'process-worker',\n  runtime: 'process',\n  entry: new URL('./process-worker.mjs', import.meta.url),\n  sandbox: {\n    name: 'external',\n    wrap: (command) => ({\n      ...command,\n      command: 'sandbox-runner',\n      args: ['--', command.command, ...command.args]\n    })\n  },\n  plugins: () => [] as const,\n  exposes: []\n})\nconsole.assert(thread.runtime === 'thread' && process.runtime === 'process')"
+        }
+      ],
       options: [
         {
           name: 'definition.name',
@@ -23813,18 +23834,17 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: '必填',
           optional: false,
           type: 'TName extends string',
-          whenToUse: '非空的共享 host 身份；保留在 spawn 名称与实例快照中。',
+          whenToUse: '注册 hosts 前选定稳定的定义名称。',
           example: "name: 'agent'"
         },
         {
           name: 'definition.plugins',
           description:
-            "每个子实例 generation 初始化时调用一次。通过 trayPlugin.getFeature('tray') 声明 deps.tray 依赖；父 registry 不调用此工厂。",
+            "每个子实例 generation 初始化时调用一次。通过 trayPlugin.getFeature('tray') 声明 deps.tray 依赖；父侧 Tray 不调用此工厂。",
           defaultValue: '必填',
           optional: false,
           type: '(instance: ITrayInstanceInfo<TName, TConfig>, trayPlugin: ITrayClientPlugin<TRouting>) => TPlugins',
-          whenToUse:
-            "每个子实例 generation 初始化时调用一次。通过 trayPlugin.getFeature('tray') 声明 deps.tray 依赖；父 registry 不调用此工厂。",
+          whenToUse: '构造子实例的 plugin 元组，并声明需要的 Tray client 依赖。',
           example: 'plugins: (info, trayPlugin) => [businessPlugin]'
         },
         {
@@ -23834,8 +23854,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: '必填',
           optional: false,
           type: 'readonly TExposes[]',
-          whenToUse:
-            '允许调用的 plugin.feature 路径；remote 调用再附加方法名。保留的内部插件名与重复路径会被拒绝。',
+          whenToUse: '列出 remote 调用方需要使用的 Feature。',
           example: "exposes: ['node.svc']"
         },
         {
@@ -23844,7 +23863,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: "'coroutine'",
           optional: true,
           type: "'coroutine' | 'thread' | 'process'",
-          whenToUse: '选择合作式 coroutine、Node Worker 独立 isolate 或子进程。',
+          whenToUse: '为此实例类型选择执行 realm。',
           example: "runtime: 'thread'"
         },
         {
@@ -23854,8 +23873,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'thread/process 必填',
           optional: true,
           type: 'string | URL',
-          whenToUse:
-            'thread 与 process 必填，coroutine 禁止。子入口导入共享定义并调用 serveTrayHost。',
+          whenToUse: '为 thread 或 process 定义指定子入口模块。',
           example: "entry: new URL('./worker.mjs', import.meta.url)"
         },
         {
@@ -23864,7 +23882,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: '未指定',
           optional: true,
           type: '(input: unknown) => TConfig',
-          whenToUse: '子实例初始化时验证并转换配置；plugins 接收验证器的输出。',
+          whenToUse: '把 spawn 输入转换为子插件需要的 config。',
           example: 'config: (input) => input as { language: string }'
         },
         {
@@ -23874,8 +23892,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: '使用运行时默认策略',
           optional: true,
           type: 'ITraySupervisorPolicy',
-          whenToUse:
-            '把 restart.mode、maxRestarts、windowMs、initialDelayMs 与 startupTimeoutMs 传给 RPC 的 supervision。',
+          whenToUse: '设置实例的重启预算与启动时间限制。',
           example:
             "supervisor: { restart: { mode: 'on-failure', maxRestarts: 2, windowMs: 60000 }, startupTimeoutMs: 5000 }"
         },
@@ -23885,7 +23902,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: '未指定',
           optional: true,
           type: 'Readonly<{ heapBytes?: number }>',
-          whenToUse: '仅 thread 可设置 heap 上限；coroutine 与 process 会拒绝此字段。',
+          whenToUse: '限制 Node Worker 实例的 heap。',
           example: 'limits: { heapBytes: 64 * 1024 * 1024 }'
         },
         {
@@ -23895,17 +23912,16 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: '未指定',
           optional: true,
           type: 'ITraySandbox',
-          whenToUse:
-            '仅 process 可接入外部命令包装器。wrap 输入与输出均为 IProcessLaunchCommand，包含 command、args、cwd 与 env。',
+          whenToUse: '传入应用维护的外部进程启动包装器。',
           example: "sandbox: { name: 'external', wrap: (command) => command }"
         },
         {
           name: 'definition.routing',
-          description: '保留共享 policy 身份与字面量名称；路由执行和命名空间由 mesh 实现。',
+          description: '向父侧 Tray 注册自定义 policy。子插件通过 deps.tray.routing 使用这些名称。',
           defaultValue: '未指定',
           optional: true,
           type: 'TRouting extends readonly ITrayRoutingPolicy[]',
-          whenToUse: '保留共享 policy 身份与字面量名称；路由执行和命名空间由 mesh 实现。',
+          whenToUse: '声明此 host 的插件需要调用的自定义 policy。',
           example: 'routing: [first]'
         }
       ]
@@ -23914,9 +23930,9 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
   'tray:index:createTray': {
     en: {
       purpose:
-        'Creates the central instance registry and returns ITray. Management runs in per-instance queues; remotes stay bound to their record admission.',
+        'Create the Tray after defineTrayHost, then spawn instances and call their exposed Features. Use restart, replace and remove for lifecycle management. Use on and watch for lifecycle observation. Finish with dispose.',
       quickStart:
-        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent], report: (error) => console.error(error) })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello', { timeoutMs: 1000 }))\n  await tray.restart('alice')\n  console.log(tray.list({ host: 'agent', state: 'ready' }))\n} finally {\n  await tray.dispose({ graceMs: 5000 })\n}",
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst service = defineFeature(() => ({\n  echo: (value: string) => value,\n  log: (value: string) => { console.log(value) },\n  async *count(limit: number) {\n    for (let index = 0; index < limit; index++) yield index\n  }\n}))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: service }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent], report: console.error })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.assert(await alice.request('node.svc.echo', 'hello', { timeoutMs: 1000 }) === 'hello')\n  await alice.notify('node.svc.log', 'received')\n  /** Consume the complete stream after request and notify. */\n  const values: number[] = []\n  for await (const value of alice.stream('node.svc.count', 3)) values.push(value)\n  console.assert(values.join(',') === '0,1,2')\n  await tray.restart('alice')\n  await tray.replace('alice')\n  await tray.remove('alice')\n} finally {\n  await tray.dispose({ graceMs: 5000 })\n}",
       scenarios: [
         'Spawn, discover, restart, replace and remove complete PluginHost instances.',
         'Observe frozen lifecycle events and call exposed methods by instance id.'
@@ -23925,27 +23941,41 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         'Use createTrayGraph(entries) for a static same-realm capability graph.',
         'Cross-machine discovery, durable messaging or failover retries are required.'
       ],
+      examples: [
+        {
+          id: 'lifecycle-observation',
+          title: 'Observe instance lifecycle',
+          description:
+            'on returns an unsubscribe function. watch returns an async iterator of lifecycle records.',
+          code: "import { createTray, defineTrayHost, TrayInstanceEvent } from '@migaia/tray'\n\nconst agent = defineTrayHost({ name: 'agent', plugins: () => [] as const, exposes: [] })\nconst tray = createTray({ hosts: [agent] })\n/** Record the ready event emitted for this instance. */\nconst ready: string[] = []\nconst release = tray.on(TrayInstanceEvent.ready, (event) => { ready.push(event.id) })\nconst events = tray.watch()\ntry {\n  await tray.spawn('agent', { id: 'alice' })\n  console.assert(ready.includes('alice'))\n  console.assert((await events.next()).value?.id === 'alice')\n} finally {\n  release()\n  await events.return?.()\n  await tray.dispose()\n}"
+        },
+        {
+          id: 'publish-subscribe',
+          title: 'Publish business topics',
+          description:
+            'Listeners receive (payload, meta). The parent authenticates meta.from. Parent publications use { parent: true }. Instance publications use { id, host, generation }. Delivery has no persistence or replay.',
+          code: "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: (_info, trayPlugin) => [definePlugin({\n    name: 'node',\n    features: {\n      svc: defineFeature((_core, deps) => ({\n        announce: (payload: string) => deps.tray.publish('updates', payload)\n      }), { tray: trayPlugin.getFeature('tray') })\n    },\n    install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\n/** The consumer records publications from the parent and its child. */\nconst received: unknown[] = []\nconst unsubscribe = tray.subscribe('updates', (payload, meta) => {\n  received.push(payload)\n  if ('parent' in meta.from) console.assert(meta.from.parent === true)\n  else console.assert(meta.from.id === 'alice' && meta.from.host === 'agent')\n})\ntry {\n  tray.publish('updates', 'parent publication')\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  await alice.request('node.svc.announce', 'instance publication')\n  console.assert(received.join(',') === 'parent publication,instance publication')\n} finally {\n  unsubscribe()\n  await tray.dispose()\n}"
+        }
+      ],
       options: [
         {
           name: 'options.hosts',
           description:
-            'Complete admitted host inventory from defineTrayHost. Structural copies and duplicate host names reject.',
+            'Host definitions returned by defineTrayHost. Structural copies and duplicate host names reject.',
           defaultValue: 'required',
           optional: false,
           type: 'THosts extends readonly ITrayHost<any, any, any, any, any>[]',
-          whenToUse:
-            'Complete admitted host inventory from defineTrayHost. Structural copies and duplicate host names reject.',
+          whenToUse: 'Keep the same definitions for registry construction and instance access.',
           example: 'hosts: [agent, worker]'
         },
         {
           name: 'options.routing',
           description:
-            'Accepts trusted shared policy definitions. This release validates the contract; mesh provides routing execution.',
+            'Registers shared custom policies alongside each routing: [policy] in a host definition. tray.routing supports both member and callable forms.',
           defaultValue: 'undefined',
           optional: true,
           type: 'TRouting extends readonly ITrayRoutingPolicy[]',
-          whenToUse:
-            'Accepts trusted shared policy definitions. This release validates the contract; mesh provides routing execution.',
+          whenToUse: 'Share parent-side policies between hosts.',
           example: 'routing: [first]'
         },
         {
@@ -23955,8 +23985,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'undefined',
           optional: true,
           type: 'IRpcProbe | readonly IRpcProbe[]',
-          whenToUse:
-            'Observe parent-side rpc message and connection activity for managed instances.',
+          whenToUse: 'Observe RPC messages and connection activity on the parent side.',
           example: 'probe: countingProbe'
         },
         {
@@ -23966,17 +23995,16 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'console.error',
           optional: true,
           type: '(error: unknown) => void',
-          whenToUse:
-            'Receives contained supervision, cleanup, listener and relay diagnostics with their native classification.',
+          whenToUse: 'Send runtime diagnostics to the application reporter.',
           example: 'report: (error) => console.error(error)'
         }
       ]
     },
     zh: {
       purpose:
-        '创建中央实例 registry 并返回 ITray。每个实例按队列执行管理操作；remote 绑定其创建时的记录身份。',
+        'defineTrayHost 之后创建 Tray。spawn 创建实例。request、notify 和 stream 调用公开 Feature。restart、replace 和 remove 管理实例生命周期。on 和 watch 观察生命周期。最后调用 dispose。',
       quickStart:
-        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent], report: (error) => console.error(error) })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello', { timeoutMs: 1000 }))\n  await tray.restart('alice')\n  console.log(tray.list({ host: 'agent', state: 'ready' }))\n} finally {\n  await tray.dispose({ graceMs: 5000 })\n}",
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst service = defineFeature(() => ({\n  echo: (value: string) => value,\n  log: (value: string) => { console.log(value) },\n  async *count(limit: number) {\n    for (let index = 0; index < limit; index++) yield index\n  }\n}))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: service }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent], report: console.error })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.assert(await alice.request('node.svc.echo', 'hello', { timeoutMs: 1000 }) === 'hello')\n  await alice.notify('node.svc.log', 'received')\n  /** Consume the complete stream after request and notify. */\n  const values: number[] = []\n  for await (const value of alice.stream('node.svc.count', 3)) values.push(value)\n  console.assert(values.join(',') === '0,1,2')\n  await tray.restart('alice')\n  await tray.replace('alice')\n  await tray.remove('alice')\n} finally {\n  await tray.dispose({ graceMs: 5000 })\n}",
       scenarios: [
         '创建、发现、重启、替换与移除完整 PluginHost 实例。',
         '观察冻结的生命周期事件，并按实例 id 调用公开方法。'
@@ -23985,6 +24013,21 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         '静态同 realm capability 图应使用 createTrayGraph(entries)。',
         '需要跨机器发现、持久消息或失败重试切换。'
       ],
+      examples: [
+        {
+          id: 'lifecycle-observation',
+          title: '观察实例生命周期',
+          description: 'on 返回取消订阅函数。watch 返回生命周期记录的 async iterator。',
+          code: "import { createTray, defineTrayHost, TrayInstanceEvent } from '@migaia/tray'\n\nconst agent = defineTrayHost({ name: 'agent', plugins: () => [] as const, exposes: [] })\nconst tray = createTray({ hosts: [agent] })\n/** Record the ready event emitted for this instance. */\nconst ready: string[] = []\nconst release = tray.on(TrayInstanceEvent.ready, (event) => { ready.push(event.id) })\nconst events = tray.watch()\ntry {\n  await tray.spawn('agent', { id: 'alice' })\n  console.assert(ready.includes('alice'))\n  console.assert((await events.next()).value?.id === 'alice')\n} finally {\n  release()\n  await events.return?.()\n  await tray.dispose()\n}"
+        },
+        {
+          id: 'publish-subscribe',
+          title: '发布业务 topic',
+          description:
+            'listener 接收 (payload, meta)。父侧认证 meta.from。父侧发布使用 { parent: true }。实例发布使用 { id, host, generation }。消息不持久化，也不重放。',
+          code: "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: (_info, trayPlugin) => [definePlugin({\n    name: 'node',\n    features: {\n      svc: defineFeature((_core, deps) => ({\n        announce: (payload: string) => deps.tray.publish('updates', payload)\n      }), { tray: trayPlugin.getFeature('tray') })\n    },\n    install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\n/** The consumer records publications from the parent and its child. */\nconst received: unknown[] = []\nconst unsubscribe = tray.subscribe('updates', (payload, meta) => {\n  received.push(payload)\n  if ('parent' in meta.from) console.assert(meta.from.parent === true)\n  else console.assert(meta.from.id === 'alice' && meta.from.host === 'agent')\n})\ntry {\n  tray.publish('updates', 'parent publication')\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  await alice.request('node.svc.announce', 'instance publication')\n  console.assert(received.join(',') === 'parent publication,instance publication')\n} finally {\n  unsubscribe()\n  await tray.dispose()\n}"
+        }
+      ],
       options: [
         {
           name: 'options.hosts',
@@ -23992,16 +24035,17 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: '必填',
           optional: false,
           type: 'THosts extends readonly ITrayHost<any, any, any, any, any>[]',
-          whenToUse: 'defineTrayHost 返回的完整定义集合。结构复制品与重复的 host 名称会被拒绝。',
+          whenToUse: '构造 registry 与访问 instance 时复用同一组定义。',
           example: 'hosts: [agent, worker]'
         },
         {
           name: 'options.routing',
-          description: '接收可信的共享 policy 定义；当前版本完成契约校验，路由执行由 mesh 提供。',
+          description:
+            '注册共享自定义 policy，并合并每个 host 的 routing: [policy]。tray.routing 支持成员形式和 callable 形式。',
           defaultValue: '未指定',
           optional: true,
           type: 'TRouting extends readonly ITrayRoutingPolicy[]',
-          whenToUse: '接收可信的共享 policy 定义；当前版本完成契约校验，路由执行由 mesh 提供。',
+          whenToUse: '在多个 host 之间共享父侧 policy。',
           example: 'routing: [first]'
         },
         {
@@ -24010,7 +24054,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: '未指定',
           optional: true,
           type: 'IRpcProbe | readonly IRpcProbe[]',
-          whenToUse: '观察实例父侧的 RPC 消息与连接活动。',
+          whenToUse: '观察父侧 RPC 消息与连接活动。',
           example: 'probe: countingProbe'
         },
         {
@@ -24019,7 +24063,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'console.error',
           optional: true,
           type: '(error: unknown) => void',
-          whenToUse: '接收 supervision、清理、监听器与 relay 的运行诊断，并保留原有错误分类。',
+          whenToUse: '把运行诊断交给应用 reporter。',
           example: 'report: (error) => console.error(error)'
         }
       ]
@@ -24036,7 +24080,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         'Configure child-side probes and report cleanup or crash diagnostics before realm exit.'
       ],
       avoidWhen: [
-        'The code runs in the parent registry or uses the coroutine runtime.',
+        'The code runs in the parent Tray or uses the coroutine runtime.',
         'The entry is a browser Worker; this entry supports Node Worker and process realms.'
       ],
       options: [
@@ -24085,7 +24129,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         '配置子侧 probe，并在 realm 退出前报告清理或崩溃诊断。'
       ],
       avoidWhen: [
-        '代码在父 registry 中运行，或 host 使用 coroutine runtime。',
+        '代码在父侧 Tray 中运行，或 host 使用 coroutine runtime。',
         '入口运行于浏览器 Worker；当前入口只支持 Node Worker 与进程 realm。'
       ],
       options: [
@@ -24126,9 +24170,9 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
   'tray:index:leastInFlight': {
     en: {
       purpose:
-        'Routes each operation to the ready instance with the fewest pending business sends. Spawn order breaks ties; init and topic delivery never contribute to inFlight.',
+        'Routes each operation to the ready instance with the fewest pending business sends. Spawn order breaks ties. Instance startup and pub/sub delivery do not contribute to inFlight.',
       quickStart:
-        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, leastInFlight } from '@migaia/tray'\n\nconst node = definePlugin({\n  name: 'node',\n  features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n  install: () => ({})\n})\nconst agent = defineTrayHost({\n  name: 'agent', plugins: () => [node] as const, exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\nawait tray.spawn('agent', { id: 'agent-1' })\nconsole.log(leastInFlight.name, await tray.routing.leastInFlight(agent).request('node.svc.hello'))\nconsole.log(await tray.routing('leastInFlight', agent).request('node.svc.hello'))\nawait tray.dispose()",
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, leastInFlight } from '@migaia/tray'\n\nconst node = definePlugin({\n  name: 'node',\n  features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n  install: () => ({})\n})\nconst agent = defineTrayHost({\n  name: 'agent', plugins: () => [node] as const, exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\nawait tray.spawn('agent', { id: 'agent-1' })\nconsole.assert(leastInFlight.name === 'leastInFlight')\nconsole.assert(await tray.routing.leastInFlight(agent).request('node.svc.hello') === 'hello')\nconsole.assert(await tray.routing('leastInFlight', agent).request('node.svc.hello') === 'hello')\nawait tray.dispose()",
       scenarios: [
         'Distribute requests among ready instances of one host.',
         'Use the same built-in policy from parent code or deps.tray without declaration.'
@@ -24141,9 +24185,9 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     },
     zh: {
       purpose:
-        '选择待完成业务调用最少的 ready 实例，同数量时按生成顺序选择。init 和 topic delivery 不计入 inFlight。',
+        '选择待完成业务调用最少的 ready 实例。同数量时按 spawn 顺序选择。实例启动和 pub/sub 消息投递不计入 inFlight。',
       quickStart:
-        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, leastInFlight } from '@migaia/tray'\n\nconst node = definePlugin({\n  name: 'node',\n  features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n  install: () => ({})\n})\nconst agent = defineTrayHost({\n  name: 'agent', plugins: () => [node] as const, exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\nawait tray.spawn('agent', { id: 'agent-1' })\nconsole.log(leastInFlight.name, await tray.routing.leastInFlight(agent).request('node.svc.hello'))\nconsole.log(await tray.routing('leastInFlight', agent).request('node.svc.hello'))\nawait tray.dispose()",
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, leastInFlight } from '@migaia/tray'\n\nconst node = definePlugin({\n  name: 'node',\n  features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n  install: () => ({})\n})\nconst agent = defineTrayHost({\n  name: 'agent', plugins: () => [node] as const, exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\nawait tray.spawn('agent', { id: 'agent-1' })\nconsole.assert(leastInFlight.name === 'leastInFlight')\nconsole.assert(await tray.routing.leastInFlight(agent).request('node.svc.hello') === 'hello')\nconsole.assert(await tray.routing('leastInFlight', agent).request('node.svc.hello') === 'hello')\nawait tray.dispose()",
       scenarios: [
         '在同一 host 的多个 ready 实例之间分配业务调用。',
         '父侧和 deps.tray 使用同一内置策略，无需在 DSL 声明。'
@@ -24155,9 +24199,9 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
   'tray:index:roundRobin': {
     en: {
       purpose:
-        'Routes each operation cyclically through ready instances in spawn order. Both callable namespace forms share one host/policy sequence; no call is retried.',
+        'Routes each operation cyclically through ready instances in spawn order. Both namespace forms share one host/policy sequence. Calls are not retried.',
       quickStart:
-        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, roundRobin } from '@migaia/tray'\n\nconst node = definePlugin({\n  name: 'node',\n  features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n  install: () => ({})\n})\nconst agent = defineTrayHost({\n  name: 'agent', plugins: () => [node] as const, exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\nawait tray.spawn('agent', { id: 'agent-1' })\nconsole.log(roundRobin.name, await tray.routing.roundRobin(agent).request('node.svc.hello'))\nconsole.log(await tray.routing('roundRobin', agent).request('node.svc.hello'))\nawait tray.dispose()",
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, roundRobin } from '@migaia/tray'\n\nconst node = definePlugin({\n  name: 'node',\n  features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n  install: () => ({})\n})\nconst agent = defineTrayHost({\n  name: 'agent', plugins: () => [node] as const, exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\nawait tray.spawn('agent', { id: 'agent-1' })\nconsole.assert(roundRobin.name === 'roundRobin')\nconsole.assert(await tray.routing.roundRobin(agent).request('node.svc.hello') === 'hello')\nconsole.assert(await tray.routing('roundRobin', agent).request('node.svc.hello') === 'hello')\nawait tray.dispose()",
       scenarios: [
         'Distribute requests among ready instances of one host.',
         'Use the same built-in policy from parent code or deps.tray without declaration.'
@@ -24170,9 +24214,9 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     },
     zh: {
       purpose:
-        '按生成顺序循环选择 ready 实例。成员形式和 callable 形式共享同一 host/policy 顺序，每次业务操作选一次，不重试。',
+        '按 spawn 顺序循环选择 ready 实例。成员形式和 callable 形式共享同一 host/policy sequence。每次业务操作只选择一次。调用不会重试。',
       quickStart:
-        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, roundRobin } from '@migaia/tray'\n\nconst node = definePlugin({\n  name: 'node',\n  features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n  install: () => ({})\n})\nconst agent = defineTrayHost({\n  name: 'agent', plugins: () => [node] as const, exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\nawait tray.spawn('agent', { id: 'agent-1' })\nconsole.log(roundRobin.name, await tray.routing.roundRobin(agent).request('node.svc.hello'))\nconsole.log(await tray.routing('roundRobin', agent).request('node.svc.hello'))\nawait tray.dispose()",
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, roundRobin } from '@migaia/tray'\n\nconst node = definePlugin({\n  name: 'node',\n  features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n  install: () => ({})\n})\nconst agent = defineTrayHost({\n  name: 'agent', plugins: () => [node] as const, exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\nawait tray.spawn('agent', { id: 'agent-1' })\nconsole.assert(roundRobin.name === 'roundRobin')\nconsole.assert(await tray.routing.roundRobin(agent).request('node.svc.hello') === 'hello')\nconsole.assert(await tray.routing('roundRobin', agent).request('node.svc.hello') === 'hello')\nawait tray.dispose()",
       scenarios: [
         '在同一 host 的多个 ready 实例之间分配业务调用。',
         '父侧和 deps.tray 使用同一内置策略，无需在 DSL 声明。'
@@ -24184,12 +24228,12 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
   'tray:index:defineRoutingPolicy': {
     en: {
       purpose:
-        'Defines a frozen, branded ITrayRoutingPolicy<TName> identity with a private synchronous picker. Register it in createTray routing or a host DSL routing tuple; both namespace call forms execute the picker only on the parent.',
+        'Defines a named synchronous policy for ready instances. Register it in createTray routing or a routing: [policy] in a host definition. Both tray.routing.first(host) and the callable namespace execute the picker on the parent.',
       quickStart:
-        "import { defineRoutingPolicy, defineTrayHost } from '@migaia/tray'\n\nconst first = defineRoutingPolicy('first', (candidates) => candidates[0]!.id)\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [] as const,\n  exposes: [],\n  routing: [first]\n})\nconsole.log(first.name, agent.routing?.[0]?.name)",
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineRoutingPolicy, defineTrayHost } from '@migaia/tray'\n\nconst first = defineRoutingPolicy('first', (candidates) => candidates[0]!.id)\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node',\n    features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n    install: () => ({})\n  })] as const,\n  exposes: ['node.svc'],\n  routing: [first]\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  await tray.spawn('agent', { id: 'agent-1' })\n  await tray.spawn('agent', { id: 'agent-2' })\n  console.assert(await tray.routing.first(agent).request('node.svc.hello') === 'hello')\n  console.assert(await tray.routing('first', agent).request('node.svc.hello') === 'hello')\n  console.assert(await tray.routing.roundRobin(agent).request('node.svc.hello') === 'hello')\n  console.assert(await tray.routing('leastInFlight', agent).request('node.svc.hello') === 'hello')\n} finally {\n  await tray.dispose()\n}",
       scenarios: [
-        'Share a policy definition between a host DSL and its parent registry.',
-        'Retain a literal policy name in a host routing tuple while keeping its picker private.'
+        'Share a policy definition between a host DSL and its parent Tray.',
+        'Retain a literal policy name in a routing: [policy] in a host definition while keeping its picker private.'
       ],
       avoidWhen: [
         'The application needs automatic failover or retries; routing keeps one selected instance.',
@@ -24203,8 +24247,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'required',
           optional: false,
           type: 'TName extends string',
-          whenToUse:
-            'Matches ^[a-z][A-Za-z0-9]*$ and excludes roundRobin, leastInFlight and reserved function/object property names. Invalid names throw TRAY_ROUTING_INVALID.',
+          whenToUse: 'Pick a stable member name for the callable routing namespace.',
           example: "'first'"
         },
         {
@@ -24214,20 +24257,19 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'required',
           optional: false,
           type: '(candidates: readonly ITrayInstance[], context: ITrayRoutingContext) => string',
-          whenToUse:
-            'Synchronous callback returns a candidate instance id. Context contains host and sequence. Definition does not invoke it; the parent invokes it once per routed operation.',
+          whenToUse: 'Choose one of the ready instances passed to pick.',
           example: '(candidates, context) => candidates[context.sequence % candidates.length]!.id'
         }
       ]
     },
     zh: {
       purpose:
-        '定义冻结且带身份标记的 ITrayRoutingPolicy<TName>，内部保存同步选择回调。host 的 routing 元组使用此纯契约；在 createTray 的 routing 或 host DSL 元组注册后，两种命名空间形式都只在父侧执行回调。',
+        '为 ready 实例定义具名同步 policy。在 createTray 的 routing 或 host 的 routing: [policy]中注册。tray.routing.first(host) 与 callable 形式均在父侧执行 pick。',
       quickStart:
-        "import { defineRoutingPolicy, defineTrayHost } from '@migaia/tray'\n\nconst first = defineRoutingPolicy('first', (candidates) => candidates[0]!.id)\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [] as const,\n  exposes: [],\n  routing: [first]\n})\nconsole.log(first.name, agent.routing?.[0]?.name)",
+        "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineRoutingPolicy, defineTrayHost } from '@migaia/tray'\n\nconst first = defineRoutingPolicy('first', (candidates) => candidates[0]!.id)\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node',\n    features: { svc: defineFeature(() => ({ hello: () => 'hello' })) },\n    install: () => ({})\n  })] as const,\n  exposes: ['node.svc'],\n  routing: [first]\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  await tray.spawn('agent', { id: 'agent-1' })\n  await tray.spawn('agent', { id: 'agent-2' })\n  console.assert(await tray.routing.first(agent).request('node.svc.hello') === 'hello')\n  console.assert(await tray.routing('first', agent).request('node.svc.hello') === 'hello')\n  console.assert(await tray.routing.roundRobin(agent).request('node.svc.hello') === 'hello')\n  console.assert(await tray.routing('leastInFlight', agent).request('node.svc.hello') === 'hello')\n} finally {\n  await tray.dispose()\n}",
       scenarios: [
-        '在 host DSL 与父 registry 之间共享同一 policy 定义。',
-        '在 host 的 routing 元组中保留字面量 policy 名称，同时隐藏其选择回调。'
+        '在 host DSL 与父侧 Tray 之间共享同一 policy 定义。',
+        '在 host 的 routing: [policy]中保留字面量 policy 名称，同时隐藏其选择回调。'
       ],
       avoidWhen: [
         '应用需要自动故障转移或重试；路由始终保留本次选择。',
@@ -24241,8 +24283,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: '必填',
           optional: false,
           type: 'TName extends string',
-          whenToUse:
-            '须符合 ^[a-z][A-Za-z0-9]*$，且不能是 roundRobin、leastInFlight 或函数、对象的保留属性名；非法名称抛 TRAY_ROUTING_INVALID。',
+          whenToUse: '为 callable routing namespace 选择稳定的成员名。',
           example: "'first'"
         },
         {
@@ -24252,8 +24293,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: '必填',
           optional: false,
           type: '(candidates: readonly ITrayInstance[], context: ITrayRoutingContext) => string',
-          whenToUse:
-            '同步返回候选实例 id；context 包含 host 与 sequence。定义阶段不调用回调，每次路由业务操作由父侧调用一次。',
+          whenToUse: '从传入 pick 的 ready 实例中选择一个。',
           example: '(candidates, context) => candidates[context.sequence % candidates.length]!.id'
         }
       ]
@@ -24262,8 +24302,9 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
   'tray:index:createTrayGraph': {
     en: {
       purpose:
-        'Creates one immutable static composition root. It admits the complete entry graph synchronously, starts entries only after the first ready() call, and releases owned values and auxiliary resources in reverse dependency order.',
-      quickStart: `import { createTrayGraph, type ITrayKey } from '@migaia/tray'\n\nconst createClient = (config: { baseUrl: string }) => ({\n  run: async () => fetch(\`\${config.baseUrl}/health\`).then((response) => response.json())\n})\nconst configKey = 'config' as ITrayKey\nconst serviceKey = 'service' as ITrayKey\n\nconst tray = createTrayGraph([\n  { key: configKey, kind: 'value', start: () => ({ value: { baseUrl: '/api' }, release: () => undefined }) },\n  {\n    key: serviceKey,\n    kind: 'service',\n    requires: [configKey],\n    start: ({ get }) => ({ value: createClient(get(configKey)), release: () => undefined })\n  }\n])\n\ntry {\n  await tray.ready()\n  const service = tray.get(serviceKey)\n  await service.run()\n} finally {\n  await tray.dispose()\n}`,
+        'Creates a static dependency graph when the complete capability set is fixed before startup.',
+      quickStart:
+        "import { createTrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** The provider starts before the service that reads this config. */\nconst configKey = 'config' as ITrayKey\n/** The consumer exposes the greeting created from that config. */\nconst greetingKey = 'greeting' as ITrayKey\n/** Node 24 or Bun ESM owns this fixed set of startup entries. */\nconst graph = createTrayGraph([\n  {\n    key: configKey, kind: 'value',\n    start: () => ({ value: { prefix: 'Hello' }, release: () => undefined })\n  },\n  {\n    key: greetingKey, kind: 'service', requires: [configKey],\n    start: ({ get }) => {\n      /** Read the provider after it is ready. */\n      const config = get<{ prefix: string }>(configKey)\n      return {\n        value: { greet: (name: string) => `${config.prefix}, ${name}` },\n        release: () => undefined\n      }\n    }\n  }\n])\ntry {\n  await graph.ready()\n  /** Consume the service rather than discarding its result. */\n  const greeting = graph.get<{ greet(name: string): string }>(greetingKey)\n  console.assert(greeting.greet('Migaia') === 'Hello, Migaia')\n} finally {\n  await graph.dispose()\n}",
       scenarios: [
         'The complete set of configuration, services, resources, and derived values is known before startup.',
         'Entries must start after their declared dependencies and release in reverse dependency order.',
@@ -24278,7 +24319,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         {
           name: 'entries',
           description:
-            'Complete ordered entry inventory snapshotted during synchronous admission. Later mutations to the caller array or entry objects do not change the accepted topology.',
+            'Complete ordered entry definitions copied before startup. Later mutations to the caller array or entry objects do not change the accepted topology.',
           defaultValue: 'required',
           optional: false,
           type: 'readonly ITrayEntryDefinition<unknown>[]',
@@ -24339,9 +24380,9 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       ]
     },
     zh: {
-      purpose:
-        '创建一个不可变静态组合根。它同步接纳完整 entry graph，只在首次 ready() 后启动，并按依赖逆序释放主 value 与辅助资源。',
-      quickStart: `import { createTrayGraph, type ITrayKey } from '@migaia/tray'\n\nconst createClient = (config: { baseUrl: string }) => ({\n  run: async () => fetch(\`\${config.baseUrl}/health\`).then((response) => response.json())\n})\nconst configKey = 'config' as ITrayKey\nconst serviceKey = 'service' as ITrayKey\n\nconst tray = createTrayGraph([\n  { key: configKey, kind: 'value', start: () => ({ value: { baseUrl: '/api' }, release: () => undefined }) },\n  {\n    key: serviceKey,\n    kind: 'service',\n    requires: [configKey],\n    start: ({ get }) => ({ value: createClient(get(configKey)), release: () => undefined })\n  }\n])\n\ntry {\n  await tray.ready()\n  const service = tray.get(serviceKey)\n  await service.run()\n} finally {\n  await tray.dispose()\n}`,
+      purpose: '能力集合在启动前固定时，创建静态 dependency graph。',
+      quickStart:
+        "import { createTrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** The provider starts before the service that reads this config. */\nconst configKey = 'config' as ITrayKey\n/** The consumer exposes the greeting created from that config. */\nconst greetingKey = 'greeting' as ITrayKey\n/** Node 24 or Bun ESM owns this fixed set of startup entries. */\nconst graph = createTrayGraph([\n  {\n    key: configKey, kind: 'value',\n    start: () => ({ value: { prefix: 'Hello' }, release: () => undefined })\n  },\n  {\n    key: greetingKey, kind: 'service', requires: [configKey],\n    start: ({ get }) => {\n      /** Read the provider after it is ready. */\n      const config = get<{ prefix: string }>(configKey)\n      return {\n        value: { greet: (name: string) => `${config.prefix}, ${name}` },\n        release: () => undefined\n      }\n    }\n  }\n])\ntry {\n  await graph.ready()\n  /** Consume the service rather than discarding its result. */\n  const greeting = graph.get<{ greet(name: string): string }>(greetingKey)\n  console.assert(greeting.greet('Migaia') === 'Hello, Migaia')\n} finally {\n  await graph.dispose()\n}",
       scenarios: [
         '配置、服务、资源与派生值的完整集合在启动前已经确定。',
         'entry 必须在声明依赖后启动，并按依赖逆序释放。',
@@ -25822,171 +25863,446 @@ try {
       ]
     }
   },
-  /** The public dependency reader projects the same Feature graph used by admission and install. */
-  'plugin-host:index:readPluginDependencies': {
-    en: {
+  'plugin-host:index:defineHost': {
+    zh: {
       purpose:
-        'Reads a readonly provider dependency list from a plugin or its composition admission, including nested local Feature dependencies. Providers keep first-reference order and required references win over optional references. An admission reuses its captured definition without calling getters; other inputs use one canonical admission snapshot. Reading runs no setup, install, or Feature factory, and admission errors pass through unchanged.',
-      quickStart: `import { defineFeature, definePlugin, PluginHost, readPluginDependencies } from '@migaia/plugin-host'\nimport { openComposition } from '@migaia/plugin-host/composition'\n\nconst config = definePlugin({\n  name: 'config',\n  features: { value: defineFeature(() => ({ value: 'ready' })) },\n  install: () => ({})\n})\nconst metrics = definePlugin({\n  name: 'metrics',\n  features: { value: defineFeature(() => ({ value: 0 })) },\n  install: () => ({})\n})\nconst required = defineFeature(() => ({}), { config: config.getFeature('value') })\nconst optional = defineFeature(() => ({}), {\n  config: config.getFeature('value', { optional: true }),\n  metrics: metrics.getFeature('value', { optional: true })\n})\nconst descriptor = { name: 'consumer', features: { required, optional }, install: () => ({}) }\nconst consumer = definePlugin(descriptor)\nconsole.log(readPluginDependencies(consumer))\nconsole.log(readPluginDependencies(descriptor))\n// Both return [{ provider: 'config', required: true }, { provider: 'metrics', required: false }].\n\nconst host = new PluginHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n})\ntry {\n  const admission = openComposition(host).createPluginAdmission(descriptor)\n  console.log(readPluginDependencies(admission))\n} finally {\n  await host.dispose()\n}`,
+        '不用创建子类，就能安装插件并调用它返回的方法。defineHost 创建 Host（负责安装和释放插件的宿主）。use 返回按输入顺序排列的句柄数组。通过句柄的 extensions（插件返回的公开方法）处理业务结果。 完整例在已有 @migaia/plugin-host 的 Node 24 ESM 项目中运行。保存为 main.ts，执行 node main.ts。',
+      quickStart:
+        "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst greetingPlugin = definePlugin({\n  name: 'greeting',\n  install: () => ({ greet: (name: string) => `Hello, ${name}` })\n})\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  const [greeting] = await host.use(greetingPlugin)\n  const message = greeting.extensions.greet('Ada')\n  console.assert(message === 'Hello, Ada')\n  const removal = await host.unUse('greeting')\n  console.assert(removal.ok)\n} finally {\n  await host.dispose()\n}",
       scenarios: [
-        'Inspect required and optional providers before installing a plugin, using the same Feature closure as PluginHost.',
-        'A composition layer already captured an admission and must read its dependencies without reading a stateful descriptor getter again.'
+        '应用需要统一安装、配置和卸载插件。',
+        '应用希望用 domainCore 给插件提供自己的业务方法。'
       ],
       avoidWhen: [
-        'You need current provider availability or plugin readiness; this list describes declared dependencies, not live Host state.',
-        'You need to run a Feature or install a plugin; use the Host lifecycle and Feature operations for those actions.'
+        '已有 PluginHost 子类需要保留时，继续使用该子类。',
+        '扩展功能无需动态安装或释放时，直接组合函数即可。'
       ],
       options: [
         {
-          name: 'plugin',
-          description:
-            'A definePlugin result, a valid raw plugin descriptor, or an admission returned by openComposition(host).createPluginAdmission(plugin). Invalid input throws the canonical admission error with its native type, identity, stack, source, and code unchanged.',
-          defaultValue: 'required',
-          optional: false,
-          type: 'unknown',
-          whenToUse:
-            'Pass the admission when dependency projection and installation must share one snapshot; otherwise pass the plugin input directly.',
-          example: 'readPluginDependencies(admission)'
+          name: 'host',
+          description: '必填的 Host 配置。execution 的两个时间限制也必须填写。',
+          whenToUse: '设置插件操作和 pipeline（按顺序处理数据的函数链）的等待上限。',
+          type: 'IPluginHostOptions',
+          optional: false
+        },
+        {
+          name: 'domainCore',
+          description: '每次插件安装时提供业务方法。request 包含 pluginName、batchIndex 和 batch。',
+          whenToUse: '插件需要访问应用自己的读写方法时提供。',
+          type: '(request: IHostDomainCoreRequest) => TDomainCore',
+          optional: true
+        }
+      ],
+      examples: [
+        {
+          id: 'next-domain-core',
+          title: '下一步：提供业务方法',
+          description: '用 domainCore 记录插件产生的消息，并检查调用结果。',
+          code: "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\ntype IWriter = { write(message: string): void }\nconst messages: string[] = []\nconst greetingPlugin = definePlugin<IWriter, { greet(name: string): string }>(\n  'greeting',\n  (core) => ({\n    install: () => ({\n      greet: (name: string) => {\n        const message = `Hello, ${name}`\n        core.write(message)\n        return message\n      }\n    })\n  })\n)\nconst host = defineHost<IWriter>({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } },\n  domainCore: () => ({ write: (message) => { messages.push(message) } })\n})\ntry {\n  const [greeting] = await host.use(greetingPlugin)\n  const message = greeting.extensions.greet('Ada')\n  console.assert(messages[0] === message)\n  console.assert(message === 'Hello, Ada')\n} finally {\n  await host.dispose()\n}"
         }
       ]
     },
-    zh: {
+    en: {
       purpose:
-        '从插件或其 composition admission 读取只读 provider 依赖列表，包含本地 Feature 的完整依赖闭包。结果按首次引用排序，同一 provider 的必需引用优先于可选引用。admission 形式复用已捕获的定义，不调用 getter；其他输入使用一次规范 admission 快照。读取不会执行 setup、install 或 Feature 工厂，admission 错误原样传出。',
-      quickStart: `import { defineFeature, definePlugin, PluginHost, readPluginDependencies } from '@migaia/plugin-host'\nimport { openComposition } from '@migaia/plugin-host/composition'\n\nconst config = definePlugin({\n  name: 'config',\n  features: { value: defineFeature(() => ({ value: 'ready' })) },\n  install: () => ({})\n})\nconst metrics = definePlugin({\n  name: 'metrics',\n  features: { value: defineFeature(() => ({ value: 0 })) },\n  install: () => ({})\n})\nconst required = defineFeature(() => ({}), { config: config.getFeature('value') })\nconst optional = defineFeature(() => ({}), {\n  config: config.getFeature('value', { optional: true }),\n  metrics: metrics.getFeature('value', { optional: true })\n})\nconst descriptor = { name: 'consumer', features: { required, optional }, install: () => ({}) }\nconst consumer = definePlugin(descriptor)\nconsole.log(readPluginDependencies(consumer))\nconsole.log(readPluginDependencies(descriptor))\n// 两种输入都返回 [{ provider: 'config', required: true }, { provider: 'metrics', required: false }]。\n\nconst host = new PluginHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n})\ntry {\n  const admission = openComposition(host).createPluginAdmission(descriptor)\n  console.log(readPluginDependencies(admission))\n} finally {\n  await host.dispose()\n}`,
+        "Install plugins and call their returned methods without creating a subclass. defineHost creates the Host that installs and releases plugins. use returns handles in input order. Call the public methods through each handle's extensions and consume the result. Run each complete example in a Node 24 ESM project with @migaia/plugin-host installed. Save it as main.ts and run node main.ts.",
+      quickStart:
+        "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst greetingPlugin = definePlugin({\n  name: 'greeting',\n  install: () => ({ greet: (name: string) => `Hello, ${name}` })\n})\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  const [greeting] = await host.use(greetingPlugin)\n  const message = greeting.extensions.greet('Ada')\n  console.assert(message === 'Hello, Ada')\n  const removal = await host.unUse('greeting')\n  console.assert(removal.ok)\n} finally {\n  await host.dispose()\n}",
       scenarios: [
-        '安装插件前，使用 PluginHost 相同的 Feature 闭包检查必需与可选 provider。',
-        '组合层已捕获 admission，需要读取其依赖，又不能再次触发原始描述符的有状态 getter。'
+        'An application needs one owner for plugin installation, configuration, and removal.',
+        'Plugins need application methods supplied through domainCore.'
       ],
       avoidWhen: [
-        '需要查询 provider 当前可用性或插件就绪状态；列表描述声明的依赖，不代表 Host 的实时状态。',
-        '需要执行 Feature 或安装插件；这些操作应使用 Host 生命周期与 Feature 入口。'
+        'Keep an existing PluginHost subclass when its class API is still needed.',
+        'Compose functions directly when extensions need no dynamic installation or cleanup.'
+      ],
+      options: [
+        {
+          name: 'host',
+          description:
+            'Required Host configuration. Both execution time limits must also be supplied.',
+          whenToUse:
+            'Set wait limits for plugin operations and the pipeline of data-processing stages.',
+          type: 'IPluginHostOptions',
+          optional: false
+        },
+        {
+          name: 'domainCore',
+          description:
+            'Supplies business methods for each plugin installation. request contains pluginName, batchIndex, and batch.',
+          whenToUse: 'Provide it when plugins need application-owned read or write methods.',
+          type: '(request: IHostDomainCoreRequest) => TDomainCore',
+          optional: true
+        }
+      ],
+      examples: [
+        {
+          id: 'next-domain-core',
+          title: 'Next task: provide business methods',
+          description: "Record messages through domainCore and check the plugin's result.",
+          code: "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\ntype IWriter = { write(message: string): void }\nconst messages: string[] = []\nconst greetingPlugin = definePlugin<IWriter, { greet(name: string): string }>(\n  'greeting',\n  (core) => ({\n    install: () => ({\n      greet: (name: string) => {\n        const message = `Hello, ${name}`\n        core.write(message)\n        return message\n      }\n    })\n  })\n)\nconst host = defineHost<IWriter>({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } },\n  domainCore: () => ({ write: (message) => { messages.push(message) } })\n})\ntry {\n  const [greeting] = await host.use(greetingPlugin)\n  const message = greeting.extensions.greet('Ada')\n  console.assert(messages[0] === message)\n  console.assert(message === 'Hello, Ada')\n} finally {\n  await host.dispose()\n}"
+        }
+      ]
+    }
+  },
+  'plugin-host:index:definePlugin': {
+    zh: {
+      purpose:
+        '把业务方法定义成可安装的插件。definePlugin 只保存定义。host.use 运行 install，并把返回的方法放进句柄的 extensions。下面的 greet 每次读取当前 config（插件配置），更新后立即使用新前缀。 完整例在已有 @migaia/plugin-host 的 Node 24 ESM 项目中运行。保存为 main.ts，执行 node main.ts。',
+      quickStart:
+        "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst greetingPlugin = definePlugin({\n  name: 'greeting',\n  config: { prefix: 'Hello' },\n  install: (core) => ({\n    greet: (name: string) => `${core.config.get().prefix}, ${name}`\n  })\n})\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  const [greeting] = await host.use(greetingPlugin)\n  console.assert(greeting.extensions.greet('Ada') === 'Hello, Ada')\n  await greeting.config.update(() => ({ prefix: 'Welcome' }))\n  const message = greeting.extensions.greet('Ada')\n  console.assert(message === 'Welcome, Ada')\n} finally {\n  await host.dispose()\n}",
+      scenarios: [
+        '插件需要公开方法，并由 Host 管理配置和释放。',
+        '插件需要通过 Feature（插件安装后可调用的能力对象）共享业务能力。'
+      ],
+      avoidWhen: ['方法无需安装、配置或释放时，直接返回业务对象。'],
+      options: [
+        {
+          name: 'definition.name',
+          description: 'Host 内唯一的插件名称。名称必须非空，且不能包含点号。',
+          whenToUse: '选择可用于配置更新和卸载的稳定名称。',
+          type: 'string',
+          optional: false
+        },
+        {
+          name: 'definition.install',
+          description: '安装时接收 core，并返回公开方法对象。core.config.get() 读取当前插件配置。',
+          whenToUse: '在这里创建方法，并用 core.onDispose 登记需要释放的资源。',
+          type: '(core) => TExtension | Promise<TExtension>',
+          optional: false
+        },
+        {
+          name: 'definition.config',
+          description: '插件的初始配置。句柄的 config.update 更新该插件。',
+          whenToUse: '方法需要读取可更新的应用选项时提供。',
+          optional: true
+        },
+        {
+          name: 'definition.features',
+          description: '插件提供的具名 Feature 定义。通过 getFeature 创建可供其他插件使用的引用。',
+          whenToUse: '插件之间需要共享能力时声明。',
+          type: 'IFeatureRecord',
+          optional: true
+        }
+      ],
+      examples: [
+        {
+          id: 'next-share-feature',
+          title: '下一步：共享 Feature',
+          description: 'formatter 提供格式化能力，writer 通过依赖引用使用它。',
+          code: "import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst formatterPlugin = definePlugin({\n  name: 'formatter',\n  features: {\n    text: defineFeature(() => ({ format: (value: string) => `[app] ${value}` }))\n  },\n  install: () => ({})\n})\nconst messageFeature = defineFeature(\n  (_core, dependencies) => ({\n    render: (value: string) => dependencies.formatter.format(value)\n  }),\n  { formatter: formatterPlugin.getFeature('text') }\n)\nconst writerPlugin = definePlugin({\n  name: 'writer',\n  features: { message: messageFeature },\n  install: () => ({})\n})\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  const [, writer] = await host.use(formatterPlugin, writerPlugin)\n  const message = writer.getFeature('message').render('ready')\n  console.assert(message === '[app] ready')\n} finally {\n  await host.dispose()\n}"
+        }
+      ]
+    },
+    en: {
+      purpose:
+        "Define business methods as an installable plugin. definePlugin stores the definition. host.use runs install and returns its public methods through a handle's extensions. The greet method below reads current config on each call, so a config update changes its prefix. Run each complete example in a Node 24 ESM project with @migaia/plugin-host installed. Save it as main.ts and run node main.ts.",
+      quickStart:
+        "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst greetingPlugin = definePlugin({\n  name: 'greeting',\n  config: { prefix: 'Hello' },\n  install: (core) => ({\n    greet: (name: string) => `${core.config.get().prefix}, ${name}`\n  })\n})\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  const [greeting] = await host.use(greetingPlugin)\n  console.assert(greeting.extensions.greet('Ada') === 'Hello, Ada')\n  await greeting.config.update(() => ({ prefix: 'Welcome' }))\n  const message = greeting.extensions.greet('Ada')\n  console.assert(message === 'Welcome, Ada')\n} finally {\n  await host.dispose()\n}",
+      scenarios: [
+        'A plugin exposes methods while the Host owns its configuration and cleanup.',
+        'Plugins share business capabilities through Features.'
+      ],
+      avoidWhen: [
+        'Return a business object directly when its methods need no installation, configuration, or cleanup.'
+      ],
+      options: [
+        {
+          name: 'definition.name',
+          description:
+            'Unique plugin name within the Host. It must be non-empty and cannot contain a dot.',
+          whenToUse: 'Choose a stable name for configuration updates and removal.',
+          type: 'string',
+          optional: false
+        },
+        {
+          name: 'definition.install',
+          description:
+            "Receives core during installation and returns the public method object. core.config.get() reads this plugin's current configuration.",
+          whenToUse: 'Create methods here and register owned resources with core.onDispose.',
+          type: '(core) => TExtension | Promise<TExtension>',
+          optional: false
+        },
+        {
+          name: 'definition.config',
+          description:
+            "Initial plugin configuration. The handle's config.update updates this plugin.",
+          whenToUse: 'Supply it when methods read application options that can change.',
+          optional: true
+        },
+        {
+          name: 'definition.features',
+          description:
+            'Named Feature definitions supplied by this plugin. getFeature creates references for other plugins.',
+          whenToUse: 'Declare Features when plugins need to share capabilities.',
+          type: 'IFeatureRecord',
+          optional: true
+        }
+      ],
+      examples: [
+        {
+          id: 'next-share-feature',
+          title: 'Next task: share a Feature',
+          description:
+            'formatter supplies formatting methods that writer consumes through a dependency reference.',
+          code: "import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst formatterPlugin = definePlugin({\n  name: 'formatter',\n  features: {\n    text: defineFeature(() => ({ format: (value: string) => `[app] ${value}` }))\n  },\n  install: () => ({})\n})\nconst messageFeature = defineFeature(\n  (_core, dependencies) => ({\n    render: (value: string) => dependencies.formatter.format(value)\n  }),\n  { formatter: formatterPlugin.getFeature('text') }\n)\nconst writerPlugin = definePlugin({\n  name: 'writer',\n  features: { message: messageFeature },\n  install: () => ({})\n})\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  const [, writer] = await host.use(formatterPlugin, writerPlugin)\n  const message = writer.getFeature('message').render('ready')\n  console.assert(message === '[app] ready')\n} finally {\n  await host.dispose()\n}"
+        }
+      ]
+    }
+  },
+  'plugin-host:index:defineFeature': {
+    zh: {
+      purpose:
+        '让一个插件复用另一个插件的业务能力。defineFeature 定义 Feature（插件安装后可调用的能力对象）。factory 的第一个参数只有 featureExpose。第二个参数提供已声明的依赖输出。Host 在安装插件时调用 factory，调用 defineFeature 本身不会运行它。 完整例在已有 @migaia/plugin-host 的 Node 24 ESM 项目中运行。保存为 main.ts，执行 node main.ts。',
+      quickStart:
+        "import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst formatterPlugin = definePlugin({\n  name: 'formatter',\n  features: {\n    text: defineFeature(() => ({ format: (value: string) => `[app] ${value}` }))\n  },\n  install: () => ({})\n})\nconst messageFeature = defineFeature(\n  (_core, dependencies) => ({\n    render: (value: string) => dependencies.formatter.format(value)\n  }),\n  { formatter: formatterPlugin.getFeature('text') }\n)\nconst writerPlugin = definePlugin({\n  name: 'writer',\n  features: { message: messageFeature },\n  install: () => ({})\n})\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  const [, writer] = await host.use(formatterPlugin, writerPlugin)\n  const message = writer.getFeature('message').render('ready')\n  console.assert(message === '[app] ready')\n} finally {\n  await host.dispose()\n}",
+      scenarios: [
+        '一个插件需要调用另一个插件提供的方法。',
+        '同一插件的多个 Feature 需要复用已声明的能力。'
+      ],
+      avoidWhen: [
+        '只是公开当前插件的简单方法时，install 返回的 extensions 就足够。',
+        '创建 Feature 需要异步准备时，在插件 setup 中准备。通过 featureExpose 提供方法，再由同步 factory 使用这些方法。'
+      ],
+      options: [
+        {
+          name: 'factory',
+          description:
+            '同步返回能力对象的函数。参数是 (core, dependencies)。对象中的业务方法可以是 async 函数。',
+          whenToUse: '通过第二个参数读取声明的依赖，避免从全局变量取得其他插件。',
+          type: 'IFeatureFactory<TExpose, TDependencies, TOutput>',
+          optional: false
+        },
+        {
+          name: 'dependencies',
+          description:
+            '按名称列出本地 Feature 或 plugin.getFeature(name) 返回的引用。引用默认必需。',
+          whenToUse: 'factory 需要其他 Feature 的输出时提供。',
+          type: 'IFeatureDependencyRecord',
+          optional: true
+        }
+      ],
+      examples: [
+        {
+          id: 'next-inspect-dependencies',
+          title: '下一步：检查插件依赖',
+          description: '用 readPluginDependencies 确认 writer 安装前需要 formatter。',
+          code: "import { defineFeature, definePlugin, readPluginDependencies } from '@migaia/plugin-host'\n\nconst formatterPlugin = definePlugin({\n  name: 'formatter',\n  features: { text: defineFeature(() => ({ format: (value: string) => value.trim() })) },\n  install: () => ({})\n})\nconst writerPlugin = definePlugin({\n  name: 'writer',\n  features: {\n    text: defineFeature(\n      (_core, dependencies) => ({ format: (value: string) => dependencies.formatter.format(value) }),\n      { formatter: formatterPlugin.getFeature('text') }\n    )\n  },\n  install: () => ({})\n})\nconst dependencies = readPluginDependencies(writerPlugin)\nconsole.assert(dependencies[0]?.provider === 'formatter')\nconsole.assert(dependencies[0]?.required === true)"
+        }
+      ]
+    },
+    en: {
+      purpose:
+        "Let one plugin reuse another plugin's business capabilities. defineFeature describes a Feature that becomes callable after installation. The factory's first argument contains only featureExpose. Its second argument contains declared dependency outputs. The Host runs the factory during installation; defining it does not run it. Run each complete example in a Node 24 ESM project with @migaia/plugin-host installed. Save it as main.ts and run node main.ts.",
+      quickStart:
+        "import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst formatterPlugin = definePlugin({\n  name: 'formatter',\n  features: {\n    text: defineFeature(() => ({ format: (value: string) => `[app] ${value}` }))\n  },\n  install: () => ({})\n})\nconst messageFeature = defineFeature(\n  (_core, dependencies) => ({\n    render: (value: string) => dependencies.formatter.format(value)\n  }),\n  { formatter: formatterPlugin.getFeature('text') }\n)\nconst writerPlugin = definePlugin({\n  name: 'writer',\n  features: { message: messageFeature },\n  install: () => ({})\n})\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  const [, writer] = await host.use(formatterPlugin, writerPlugin)\n  const message = writer.getFeature('message').render('ready')\n  console.assert(message === '[app] ready')\n} finally {\n  await host.dispose()\n}",
+      scenarios: [
+        'One plugin needs methods supplied by another plugin.',
+        'Several Features within one plugin reuse declared capabilities.'
+      ],
+      avoidWhen: [
+        'Return extensions from install when the plugin only exposes simple public methods.',
+        'Prepare asynchronous resources in plugin setup. Supply methods through featureExpose for the synchronous factory to use.'
+      ],
+      options: [
+        {
+          name: 'factory',
+          description:
+            'Synchronous function that returns a capability object. Its arguments are (core, dependencies). Business methods on the object may be async.',
+          whenToUse:
+            'Read declared dependencies from the second argument instead of obtaining other plugins from globals.',
+          type: 'IFeatureFactory<TExpose, TDependencies, TOutput>',
+          optional: false
+        },
+        {
+          name: 'dependencies',
+          description:
+            'Named local Features or references returned by plugin.getFeature(name). References are required by default.',
+          whenToUse: "Supply it when the factory needs another Feature's output.",
+          type: 'IFeatureDependencyRecord',
+          optional: true
+        }
+      ],
+      examples: [
+        {
+          id: 'next-inspect-dependencies',
+          title: 'Next task: inspect plugin dependencies',
+          description:
+            'Use readPluginDependencies to confirm that writer needs formatter before installation.',
+          code: "import { defineFeature, definePlugin, readPluginDependencies } from '@migaia/plugin-host'\n\nconst formatterPlugin = definePlugin({\n  name: 'formatter',\n  features: { text: defineFeature(() => ({ format: (value: string) => value.trim() })) },\n  install: () => ({})\n})\nconst writerPlugin = definePlugin({\n  name: 'writer',\n  features: {\n    text: defineFeature(\n      (_core, dependencies) => ({ format: (value: string) => dependencies.formatter.format(value) }),\n      { formatter: formatterPlugin.getFeature('text') }\n    )\n  },\n  install: () => ({})\n})\nconst dependencies = readPluginDependencies(writerPlugin)\nconsole.assert(dependencies[0]?.provider === 'formatter')\nconsole.assert(dependencies[0]?.required === true)"
+        }
+      ]
+    }
+  },
+  'plugin-host:index:readPluginDependencies': {
+    zh: {
+      purpose:
+        '安装前列出插件需要的其他插件。Feature 是插件安装后可调用的能力对象。读取结果只描述声明的依赖，不代表插件当前已经安装。依赖顺序按首次引用排列。同一插件被多次引用时，只要一处必需，结果中的 required 就是 true。此调用不会执行 setup、install 或 Feature 工厂。 完整例在已有 @migaia/plugin-host 的 Node 24 ESM 项目中运行。保存为 main.ts，执行 node main.ts。',
+      quickStart:
+        "import { defineFeature, definePlugin, readPluginDependencies } from '@migaia/plugin-host'\n\nconst configPlugin = definePlugin({\n  name: 'config',\n  features: { value: defineFeature(() => ({ value: 'ready' })) },\n  install: () => ({})\n})\nconst metricsPlugin = definePlugin({\n  name: 'metrics',\n  features: { value: defineFeature(() => ({ value: 0 })) },\n  install: () => ({})\n})\nconst requiredFeature = defineFeature(\n  (_core, dependencies) => ({ read: () => dependencies.config.value }),\n  { config: configPlugin.getFeature('value') }\n)\nconst optionalFeature = defineFeature(\n  (_core, dependencies) => ({ count: () => dependencies.metrics?.value ?? 0 }),\n  {\n    config: configPlugin.getFeature('value', { optional: true }),\n    metrics: metricsPlugin.getFeature('value', { optional: true })\n  }\n)\nconst consumerPlugin = definePlugin({\n  name: 'consumer',\n  features: { required: requiredFeature, optional: optionalFeature },\n  install: () => ({})\n})\nconst dependencies = readPluginDependencies(consumerPlugin)\nconsole.assert(dependencies.length === 2)\nconsole.assert(dependencies[0]?.provider === 'config' && dependencies[0]?.required === true)\nconsole.assert(dependencies[1]?.provider === 'metrics' && dependencies[1]?.required === false)",
+      scenarios: ['安装前向用户展示必需和可选插件。', '组合工具需要检查已经捕获的插件定义。'],
+      avoidWhen: [
+        '需要调用业务方法时，用安装后句柄的 extensions 或 getFeature。',
+        '需要确认插件是否已安装时，检查 Host 的实际安装结果。'
       ],
       options: [
         {
           name: 'plugin',
           description:
-            'definePlugin 结果、有效原始插件描述符，或 openComposition(host).createPluginAdmission(plugin) 返回的 admission。无效输入直接抛规范 admission 错误，保留原生类型、对象身份、stack、source 和 code。',
-          defaultValue: '必填',
-          optional: false,
+            'definePlugin 返回的定义，也接受有效插件对象或 composition 工具已捕获的定义。',
+          whenToUse: '传入需要列出依赖的插件。',
           type: 'unknown',
-          whenToUse: '依赖投影与安装必须共享同一快照时传 admission；否则直接传插件输入。',
-          example: 'readPluginDependencies(admission)'
+          optional: false,
+          example: 'readPluginDependencies(consumerPlugin)'
+        }
+      ],
+      examples: [
+        {
+          id: 'next-install-providers',
+          title: '下一步：安装所需插件',
+          description: '先安装 formatter 与 writer，再通过 writer 的 Feature 处理消息。',
+          code: "import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst formatterPlugin = definePlugin({\n  name: 'formatter',\n  features: {\n    text: defineFeature(() => ({ format: (value: string) => `[app] ${value}` }))\n  },\n  install: () => ({})\n})\nconst messageFeature = defineFeature(\n  (_core, dependencies) => ({\n    render: (value: string) => dependencies.formatter.format(value)\n  }),\n  { formatter: formatterPlugin.getFeature('text') }\n)\nconst writerPlugin = definePlugin({\n  name: 'writer',\n  features: { message: messageFeature },\n  install: () => ({})\n})\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  const [, writer] = await host.use(formatterPlugin, writerPlugin)\n  const message = writer.getFeature('message').render('ready')\n  console.assert(message === '[app] ready')\n} finally {\n  await host.dispose()\n}"
+        }
+      ]
+    },
+    en: {
+      purpose:
+        'List the other plugins a plugin needs before installation. A Feature supplies capabilities callable after installation. The result describes declared dependencies, not whether a provider is installed. Providers appear in first-reference order. If any reference requires a provider, its required value is true. Reading runs no setup, install, or Feature factory. Run each complete example in a Node 24 ESM project with @migaia/plugin-host installed. Save it as main.ts and run node main.ts.',
+      quickStart:
+        "import { defineFeature, definePlugin, readPluginDependencies } from '@migaia/plugin-host'\n\nconst configPlugin = definePlugin({\n  name: 'config',\n  features: { value: defineFeature(() => ({ value: 'ready' })) },\n  install: () => ({})\n})\nconst metricsPlugin = definePlugin({\n  name: 'metrics',\n  features: { value: defineFeature(() => ({ value: 0 })) },\n  install: () => ({})\n})\nconst requiredFeature = defineFeature(\n  (_core, dependencies) => ({ read: () => dependencies.config.value }),\n  { config: configPlugin.getFeature('value') }\n)\nconst optionalFeature = defineFeature(\n  (_core, dependencies) => ({ count: () => dependencies.metrics?.value ?? 0 }),\n  {\n    config: configPlugin.getFeature('value', { optional: true }),\n    metrics: metricsPlugin.getFeature('value', { optional: true })\n  }\n)\nconst consumerPlugin = definePlugin({\n  name: 'consumer',\n  features: { required: requiredFeature, optional: optionalFeature },\n  install: () => ({})\n})\nconst dependencies = readPluginDependencies(consumerPlugin)\nconsole.assert(dependencies.length === 2)\nconsole.assert(dependencies[0]?.provider === 'config' && dependencies[0]?.required === true)\nconsole.assert(dependencies[1]?.provider === 'metrics' && dependencies[1]?.required === false)",
+      scenarios: [
+        'Show required and optional plugins before installation.',
+        'Composition tools inspect an already-captured plugin definition.'
+      ],
+      avoidWhen: [
+        "Use an installed handle's extensions or getFeature to call business methods.",
+        'Inspect actual Host installation results when current availability is needed.'
+      ],
+      options: [
+        {
+          name: 'plugin',
+          description:
+            'A definePlugin result, a valid plugin object, or a definition already captured by composition tools.',
+          whenToUse: 'Pass the plugin whose dependencies you want to list.',
+          type: 'unknown',
+          optional: false,
+          example: 'readPluginDependencies(consumerPlugin)'
+        }
+      ],
+      examples: [
+        {
+          id: 'next-install-providers',
+          title: 'Next task: install the required plugins',
+          description:
+            "Install formatter and writer, then process a message through writer's Feature.",
+          code: "import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst formatterPlugin = definePlugin({\n  name: 'formatter',\n  features: {\n    text: defineFeature(() => ({ format: (value: string) => `[app] ${value}` }))\n  },\n  install: () => ({})\n})\nconst messageFeature = defineFeature(\n  (_core, dependencies) => ({\n    render: (value: string) => dependencies.formatter.format(value)\n  }),\n  { formatter: formatterPlugin.getFeature('text') }\n)\nconst writerPlugin = definePlugin({\n  name: 'writer',\n  features: { message: messageFeature },\n  install: () => ({})\n})\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  const [, writer] = await host.use(formatterPlugin, writerPlugin)\n  const message = writer.getFeature('message').render('ready')\n  console.assert(message === '[app] ready')\n} finally {\n  await host.dispose()\n}"
         }
       ]
     }
   },
   'plugin-host:index:PluginHostError': {
-    en: {
+    zh: {
       purpose:
-        'Represents PluginHost state and protocol failures that callers may classify by the stable (source, code) pair. The original failure remains reachable through cause, while immutable structured diagnostics belong in detail.',
-      quickStart: `try {\n  await host.use(plugin)\n} catch (error) {\n  if (error instanceof PluginHostError) {\n    if (error.code === PluginHostErrorCode.pluginInstallFailed) {\n      console.error(error.detail?.failedName, error.cause)\n    }\n  }\n}`,
+        '识别插件安装失败，并保留底层错误供应用处理。按 PluginHostErrorCode 判断失败原因，用 cause 读取原始错误。无效参数可能抛出附有 code 的原生 TypeError，不能只依赖 instanceof PluginHostError。 完整例在已有 @migaia/plugin-host 的 Node 24 ESM 项目中运行。保存为 main.ts，执行 node main.ts。',
+      quickStart:
+        "import { defineHost, definePlugin, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nconst unavailable = new Error('Storage unavailable')\nconst cachePlugin = definePlugin({\n  name: 'cache',\n  install: (): Record<never, never> => { throw unavailable }\n})\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\nlet installationFailed = false\ntry {\n  await host.use(cachePlugin)\n} catch (error) {\n  if (!(error instanceof PluginHostError) || error.code !== PluginHostErrorCode.pluginInstallFailed) {\n    throw error\n  }\n  installationFailed = true\n  console.assert(error.cause === unavailable)\n} finally {\n  await host.dispose()\n}\nconsole.assert(installationFailed)",
       scenarios: [
-        'A host operation failed and the caller must branch on a stable semantic code rather than message text.',
-        'An installation or cleanup boundary must retain the primary cause together with immutable rollback or timeout diagnostics.',
-        'A PluginHost subclass translates its protected disposal boundary while preserving the original error chain.'
+        '安装失败后需要选择备用插件。',
+        '应用需要保留原始错误，供自己的错误处理界面使用。'
       ],
-      avoidWhen: [
-        'The failure is invalid caller input that must retain its native TypeError or RangeError identity with an attached code.',
-        'The value describes availability, lifecycle phase, or a graceful cleanup result rather than an exceptional failure.',
-        'The caller only wants display text; compare source and code for control flow and treat message as diagnostic text.'
-      ],
+      avoidWhen: ['只查询插件当前状态时，使用对应 Host 操作的结果。'],
       options: [
         {
           name: 'code',
-          description:
-            'Required stable semantic code owned by PluginHostErrorCode. Together with source it forms the public failure identity.',
-          defaultValue: 'required',
-          optional: false,
+          description: 'PluginHostErrorCode 中的稳定错误码。',
+          whenToUse: '自行创建包内错误时选择已有错误码。',
           type: 'IPluginHostErrorCode',
-          whenToUse:
-            'Choose the exact registered code for the boundary being reported; never invent a string.',
-          example: 'new PluginHostError(PluginHostErrorCode.hostDisposed, "host is disposed")'
+          optional: false,
+          example: 'PluginHostErrorCode.hostDisposed'
         },
         {
           name: 'message',
-          description:
-            'Required human-readable diagnostic text. It may add context but must not become the caller control-flow contract.',
-          defaultValue: 'required',
-          optional: false,
+          description: '供用户或诊断界面阅读的错误文本。',
+          whenToUse: '使用 ERROR_TEXT 中对应 code 的文案。',
           type: 'string',
-          whenToUse: 'Use the canonical text maintained by this capability for the selected code.',
-          example: 'new PluginHostError(PluginHostErrorCode.hostDisposed, ERROR_TEXT.HOST_DISPOSED)'
+          optional: false,
+          example: 'ERROR_TEXT.HOST_DISPOSED'
         },
         {
           name: 'options.cause',
-          description:
-            'Original primary failure retained by identity so stack, native type, and nested cause traversal remain available.',
-          defaultValue: 'undefined',
+          description: '保留触发当前错误的原始失败对象。',
+          whenToUse: '包装已有错误时提供。',
           type: 'unknown',
-          whenToUse:
-            'Provide it when translating a lower-level failure at the PluginHost boundary.',
-          example: 'new PluginHostError(code, message, { cause: originalError })'
+          optional: true
         },
         {
           name: 'options.detail',
-          description:
-            'Immutable structured diagnostics such as failed plugin name, rollback identities, queue owner, or waited duration. It is not a replacement for cause.',
-          defaultValue: 'undefined',
+          description: '附加应用需要的诊断数据。构造函数保留传入值，不自动冻结它。',
+          whenToUse: '需要保存插件名称等额外上下文时提供。',
           type: 'TDetail',
-          whenToUse:
-            'Provide it for machine-readable context that is not itself the primary exception; publish a frozen snapshot.',
-          example:
-            'new PluginHostError(code, message, { cause, detail: Object.freeze({ failedName }) })'
+          optional: true
+        }
+      ],
+      examples: [
+        {
+          id: 'next-fallback-plugin',
+          title: '下一步：安装备用插件',
+          description: '远端缓存安装失败后使用本地缓存，并检查实际读取结果。',
+          code: "import { defineHost, definePlugin, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nconst unavailable = new Error('Storage unavailable')\nconst remoteCache = definePlugin({\n  name: 'cache',\n  install: (): { read(): string } => { throw unavailable }\n})\nconst fallbackCache = definePlugin({\n  name: 'cache',\n  install: () => ({ read: () => 'local value' })\n})\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  try {\n    await host.use(remoteCache)\n  } catch (error) {\n    if (!(error instanceof PluginHostError) || error.code !== PluginHostErrorCode.pluginInstallFailed) {\n      throw error\n    }\n    const [cache] = await host.use(fallbackCache)\n    const value = cache.extensions.read()\n    console.assert(value === 'local value')\n  }\n} finally {\n  await host.dispose()\n}"
         }
       ]
     },
-    zh: {
+    en: {
       purpose:
-        '表示调用方可按稳定 `(source, code)` 二元组分类的 PluginHost 状态与协议失败。原始失败通过 cause 保持可达，不可变结构化诊断放入 detail。',
-      quickStart: `try {\n  await host.use(plugin)\n} catch (error) {\n  if (error instanceof PluginHostError) {\n    if (error.code === PluginHostErrorCode.pluginInstallFailed) {\n      console.error(error.detail?.failedName, error.cause)\n    }\n  }\n}`,
+        'Recognize a failed plugin installation while keeping the underlying failure available to the application. Compare error.code with PluginHostErrorCode entries to choose a response. Read the original error through cause. Invalid inputs may throw a native TypeError with a code, so instanceof PluginHostError alone is insufficient. Run each complete example in a Node 24 ESM project with @migaia/plugin-host installed. Save it as main.ts and run node main.ts.',
+      quickStart:
+        "import { defineHost, definePlugin, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nconst unavailable = new Error('Storage unavailable')\nconst cachePlugin = definePlugin({\n  name: 'cache',\n  install: (): Record<never, never> => { throw unavailable }\n})\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\nlet installationFailed = false\ntry {\n  await host.use(cachePlugin)\n} catch (error) {\n  if (!(error instanceof PluginHostError) || error.code !== PluginHostErrorCode.pluginInstallFailed) {\n    throw error\n  }\n  installationFailed = true\n  console.assert(error.cause === unavailable)\n} finally {\n  await host.dispose()\n}\nconsole.assert(installationFailed)",
       scenarios: [
-        'Host 操作失败，调用方需要按稳定语义码分支，而不是比较 message。',
-        '安装或清理边界必须同时保留主 cause，以及不可变的回滚或超时诊断。',
-        'PluginHost 子类需要转换受保护的 disposal 边界，同时保留原始错误链。'
+        'An installation failure requires a fallback plugin.',
+        'The application retains the original failure for its error handling UI.'
       ],
       avoidWhen: [
-        '失败来自调用方无效输入，必须保留原生 TypeError 或 RangeError 身份并附加 code。',
-        '值表达 availability、生命周期阶段或正常降级的清理结果，而不是异常失败。',
-        '调用方只需要展示文本；控制流应比较 source 与 code，message 仅用于诊断。'
+        'Use the result of the relevant Host operation when only current plugin state is needed.'
       ],
       options: [
         {
           name: 'code',
-          description:
-            '必填稳定语义码，由 PluginHostErrorCode 拥有；与 source 共同构成公开失败身份。',
-          defaultValue: '必填',
-          optional: false,
+          description: 'Stable error code from PluginHostErrorCode.',
+          whenToUse: 'Choose an existing code when constructing a package error.',
           type: 'IPluginHostErrorCode',
-          whenToUse: '选择当前边界已经登记的精确错误码，禁止临时创造字符串。',
-          example: 'new PluginHostError(PluginHostErrorCode.hostDisposed, "host is disposed")'
+          optional: false,
+          example: 'PluginHostErrorCode.hostDisposed'
         },
         {
           name: 'message',
-          description: '必填人类可读诊断文本；可以补充上下文，但不能成为调用方控制流契约。',
-          defaultValue: '必填',
-          optional: false,
+          description: 'Error text for a user or diagnostic UI.',
+          whenToUse: 'Use the ERROR_TEXT entry matching the selected code.',
           type: 'string',
-          whenToUse: '使用当前 code 对应、由本能力维护的规范文本。',
-          example: 'new PluginHostError(PluginHostErrorCode.hostDisposed, ERROR_TEXT.HOST_DISPOSED)'
+          optional: false,
+          example: 'ERROR_TEXT.HOST_DISPOSED'
         },
         {
           name: 'options.cause',
-          description: '按身份保留原始主失败，使 stack、原生类型与嵌套 cause 遍历继续可用。',
-          defaultValue: 'undefined',
+          description: 'Preserves the original object that caused the failure.',
+          whenToUse: 'Supply it when wrapping an existing failure.',
           type: 'unknown',
-          whenToUse: '在 PluginHost 边界转换下层失败时提供。',
-          example: 'new PluginHostError(code, message, { cause: originalError })'
+          optional: true
         },
         {
           name: 'options.detail',
           description:
-            '不可变结构化诊断，例如失败插件名、回滚身份、队列 owner 或等待时长；不能替代 cause。',
-          defaultValue: 'undefined',
+            'Additional diagnostic data. The constructor retains the supplied value without freezing it.',
+          whenToUse: 'Supply it when plugin names or other context are needed.',
           type: 'TDetail',
-          whenToUse: '需要机器读取但本身不是主异常的上下文使用，并发布冻结快照。',
-          example:
-            'new PluginHostError(code, message, { cause, detail: Object.freeze({ failedName }) })'
+          optional: true
+        }
+      ],
+      examples: [
+        {
+          id: 'next-fallback-plugin',
+          title: 'Next task: install a fallback plugin',
+          description:
+            'Use a local cache after remote cache installation fails and check the value it returns.',
+          code: "import { defineHost, definePlugin, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nconst unavailable = new Error('Storage unavailable')\nconst remoteCache = definePlugin({\n  name: 'cache',\n  install: (): { read(): string } => { throw unavailable }\n})\nconst fallbackCache = definePlugin({\n  name: 'cache',\n  install: () => ({ read: () => 'local value' })\n})\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  try {\n    await host.use(remoteCache)\n  } catch (error) {\n    if (!(error instanceof PluginHostError) || error.code !== PluginHostErrorCode.pluginInstallFailed) {\n      throw error\n    }\n    const [cache] = await host.use(fallbackCache)\n    const value = cache.extensions.read()\n    console.assert(value === 'local value')\n  }\n} finally {\n  await host.dispose()\n}"
         }
       ]
     }
@@ -25994,185 +26310,91 @@ try {
   'plugin-host:index:PluginHost': {
     zh: {
       purpose:
-        '作为领域宿主的抽象基类，它负责原子安装、不可变且可撤销的 view、extension 与 shared 发布、四种 pipeline、mutation 串行队列、两阶段 admission/removal 和逻辑撤销后的物理清理。构造时必须明确提供执行与 drain 预算。',
-      quickStart: `import { definePlugin, PluginHost } from '@migaia/plugin-host'\n\ntype ICore = { write(message: string): void }\n\nconst greetingPlugin = definePlugin<ICore, { greet(name: string): string }>(\n  'greeting',\n  (core) => ({ install: () => ({ greet: (name) => {\n    const message = 'Hello, ' + name\n    core.write(message)\n    return message\n  } }) })\n)\n\nclass AppHost extends PluginHost<ICore> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (message) => console.log(message) }\n  }\n}\n\nconst host = new AppHost({\n  execution: {\n    mutationTimeoutMs: 5_000,\n    pipelineDrainTimeoutMs: 5_000\n  }\n})\n\nconst view = await host.use(greetingPlugin)\nview.extensions.greet('Migaia')\n\nconst removal = await view.unUse('greeting')\nif (removal.physicalCompletion) await removal.physicalCompletion\nawait host.dispose()`,
-      scenarios: [
-        '应用需要按事务安装一组插件，并在其中一个安装失败时撤销整批候选状态。',
-        '插件需要发布扩展、共享能力或 pipeline stage，同时由 Host 统一追踪其所有权。',
-        '卸载必须先让能力从新 view 中消失，再等待在途 pipeline 与资源清理。'
-      ],
+        '给现有业务类增加插件安装和释放能力。继承 PluginHost 后，用 createPluginDomainCore 为插件提供业务方法。use 返回句柄数组，通过 extensions 调用插件方法。Host 负责 Feature（插件安装后可调用的能力对象）依赖排序，不需要应用预先排序。 完整例在已有 @migaia/plugin-host 的 Node 24 ESM 项目中运行。保存为 main.ts，执行 node main.ts。',
+      quickStart:
+        "import { definePlugin, PluginHost } from '@migaia/plugin-host'\n\ntype IWriter = { write(message: string): void }\nconst messages: string[] = []\nclass AppHost extends PluginHost<IWriter> {\n  protected createPluginDomainCore(): IWriter {\n    return { write: (message) => { messages.push(message) } }\n  }\n}\nconst greetingPlugin = definePlugin<IWriter, { greet(name: string): string }>(\n  'greeting',\n  (core) => ({\n    install: () => ({\n      greet: (name: string) => {\n        const message = `Hello, ${name}`\n        core.write(message)\n        return message\n      }\n    })\n  })\n)\nconst host = new AppHost({ execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } })\ntry {\n  const [greeting] = await host.use(greetingPlugin)\n  const message = greeting.extensions.greet('Ada')\n  console.assert(message === 'Hello, Ada')\n  console.assert(messages[0] === message)\n  const removal = await host.unUse('greeting')\n  console.assert(removal.ok)\n} finally {\n  await host.dispose()\n}",
+      scenarios: ['已有类需要提供可动态安装的扩展方法。', '业务类需要让插件调用自己的读写方法。'],
       avoidWhen: [
-        '功能集合在编译期固定且没有动态安装、撤销或资源所有权；直接组合对象更简单。',
-        '需要自动解析插件依赖图；PluginHost 只执行已排序的安装/卸载，不维护依赖关系。',
-        '需要跨进程插件沙箱或权限隔离；Host 只管理当前 JavaScript realm 内的组合。'
+        '应用只需要持有一个 Host 时，优先使用 defineHost。',
+        '需要进程或 Worker 隔离时，使用对应 RPC 插件。PluginHost 本身只在当前 JavaScript 环境执行。'
       ],
       options: [
         {
           name: 'execution',
-          description:
-            '必填的执行预算组。它分别约束已经取得执行权的 lifecycle mutation，以及插件 stage 被逻辑撤销后等待 pipeline lease 归零的时间。',
-          whenToUse: '每次构造都必须提供；只有明确接受无限等待时才把子项设为 false。'
+          description: '必填的等待时间限制。两个子项必须明确填写。',
+          whenToUse: '为插件操作与正在运行的 pipeline（按顺序处理数据的函数链）设置等待上限。',
+          optional: false
         },
         {
           name: 'execution.mutationTimeoutMs',
           description:
-            '限制一次已经开始的 install、update 或 removal hook。超时会撤销该 operation 的提交资格，并通过 operation.signal 要求协作实现停止工作。',
-          whenToUse:
-            '按插件最慢的正常 lifecycle 操作设置有界毫秒数；无法安全规定上限时显式使用 false。',
-          example:
-            'new AppHost({ execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } })'
+            '等待插件 hook 结果的最长时间。超时拒绝等待，并禁止迟到结果提交。它不会强制停止 hook。false 表示不设截止时间。',
+          whenToUse: '按业务操作正常所需时间设置。',
+          type: 'number | false',
+          optional: false
         },
         {
           name: 'execution.pipelineDrainTimeoutMs',
-          description:
-            '逻辑撤销插件 stage 后，等待该插件已经开始的 pipeline lease 归零的最长时间。超时不会恢复可见能力，而是通过 cleanupComplete 与 physicalCompletion 暴露未完成清理。',
-          whenToUse:
-            'pipeline 可能跨 await 或持有外部工作时设置有界值；必须等待全部执行结束时显式使用 false。'
-        },
+          description: '释放 Host 时等待正在运行的 pipeline 完成的最长时间。false 会等待全部完成。',
+          whenToUse: '业务类运行 pipeline 时设置适当的清理等待时间。',
+          type: 'number | false',
+          optional: false
+        }
+      ],
+      examples: [
         {
-          name: 'pipeline',
-          description:
-            '选择 Host 的单一 pipeline 执行模型。构造后不可切换，插件注册方法必须与所选模式匹配。',
-          defaultValue: "{ mode: 'sync' }",
-          whenToUse: '领域入口需要按插件顺序变换、拦截或包围一个值时设置。'
-        },
-        {
-          name: 'pipeline.mode',
-          description:
-            'sync 是返回后再进入下游的扁平链；async 是可在 await next() 后执行后置逻辑的洋葱模型；generator 与 async-generator 使用显式终止值。',
-          defaultValue: "'sync'",
-          whenToUse: '根据 stage 是否异步、是否需要洋葱后置逻辑或 generator 终止协议选择一次。'
-        },
-        {
-          name: 'diagnostic',
-          description:
-            '接收迟到 next、被忽略的非枚举扩展、安装回滚二次失败和只诊断模式下的排队等待。回调自身失败会被隔离。',
-          defaultValue: 'no-op',
-          whenToUse: '需要把非终止性 Host 异常信号送入日志、telemetry 或开发工具时设置。'
-        },
-        {
-          name: 'scheduler',
-          description:
-            '拥有 mutation、queue admission、pipeline drain 与 disposer timeout 的时间域和排程。构造时只读取一次。',
-          defaultValue: 'systemScheduler',
-          whenToUse: '测试需要确定性虚拟时间，或宿主不能使用系统 timer 时注入。'
-        },
-        {
-          name: 'queueAdmissionTimeoutMs',
-          description:
-            '限制尚未开始的 mutation 在 FIFO 队列中等待的时间。undefined 只诊断不拒绝；false 关闭相关 timer；数字超时后以 MUTATION_QUEUE_TIMEOUT 拒绝该排队任务。',
-          defaultValue: 'undefined',
-          whenToUse: '产品必须拒绝排队过久且尚未开始的配置或插件变更时设置数字。'
-        },
-        {
-          name: 'queueAdmissionDiagnosticMs',
-          description:
-            '仅在 queueAdmissionTimeoutMs 未配置时生效，等待越过阈值后发出诊断但继续排队。false 关闭诊断 timer。',
-          defaultValue: '1000',
-          whenToUse: '希望观测队列拥塞但不能据此拒绝 mutation 时调整。'
-        },
-        {
-          name: 'disposeStepTimeoutMs',
-          description:
-            '限制单个 pipeline disposer、插件 dispose hook 或 onDispose 资源清理步骤。超时记入 cleanupErrors，Host 继续向逻辑终态收敛。',
-          defaultValue: '5000',
-          whenToUse:
-            '外部资源清理可能挂起，且 Host 不能永久停在 closing 时保持有界值；false 表示无限等待。'
+          id: 'next-share-feature',
+          title: '下一步：用 Feature 共享能力',
+          description: '需要跨插件调用时，用 getFeature 引用，并检查 writer 的业务结果。',
+          code: "import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst formatterPlugin = definePlugin({\n  name: 'formatter',\n  features: {\n    text: defineFeature(() => ({ format: (value: string) => `[app] ${value}` }))\n  },\n  install: () => ({})\n})\nconst messageFeature = defineFeature(\n  (_core, dependencies) => ({\n    render: (value: string) => dependencies.formatter.format(value)\n  }),\n  { formatter: formatterPlugin.getFeature('text') }\n)\nconst writerPlugin = definePlugin({\n  name: 'writer',\n  features: { message: messageFeature },\n  install: () => ({})\n})\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  const [, writer] = await host.use(formatterPlugin, writerPlugin)\n  const message = writer.getFeature('message').render('ready')\n  console.assert(message === '[app] ready')\n} finally {\n  await host.dispose()\n}"
         }
       ]
     },
     en: {
       purpose:
-        'Provides the abstract base for a domain host that installs plugins atomically and publishes immutable views. It owns configuration, shared capabilities, pipelines, serialized mutations, and physical cleanup after logical revocation. Construction requires explicit execution and drain budgets.',
-      quickStart: `type ICore = { write(message: string): void }\n\nclass AppHost extends PluginHost<ICore> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (message) => console.log(message) }\n  }\n}\n\nconst host = new AppHost({\n  execution: {\n    mutationTimeoutMs: 5_000,\n    pipelineDrainTimeoutMs: 5_000\n  }\n})\n\nconst view = await host.use(greetingPlugin)\nview.extensions.greet('Migaia')\n\nconst removal = await view.unUse('greeting')\nif (removal.physicalCompletion) await removal.physicalCompletion\nawait host.dispose()`,
+        'Add plugin installation and cleanup to an existing business class. Extend PluginHost and supply application methods through createPluginDomainCore. use returns an array of handles whose extensions expose plugin methods. The Host orders Feature dependencies, so the application does not pre-sort them. Run each complete example in a Node 24 ESM project with @migaia/plugin-host installed. Save it as main.ts and run node main.ts.',
+      quickStart:
+        "import { definePlugin, PluginHost } from '@migaia/plugin-host'\n\ntype IWriter = { write(message: string): void }\nconst messages: string[] = []\nclass AppHost extends PluginHost<IWriter> {\n  protected createPluginDomainCore(): IWriter {\n    return { write: (message) => { messages.push(message) } }\n  }\n}\nconst greetingPlugin = definePlugin<IWriter, { greet(name: string): string }>(\n  'greeting',\n  (core) => ({\n    install: () => ({\n      greet: (name: string) => {\n        const message = `Hello, ${name}`\n        core.write(message)\n        return message\n      }\n    })\n  })\n)\nconst host = new AppHost({ execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } })\ntry {\n  const [greeting] = await host.use(greetingPlugin)\n  const message = greeting.extensions.greet('Ada')\n  console.assert(message === 'Hello, Ada')\n  console.assert(messages[0] === message)\n  const removal = await host.unUse('greeting')\n  console.assert(removal.ok)\n} finally {\n  await host.dispose()\n}",
       scenarios: [
-        'An application installs a plugin batch transactionally and revokes every candidate when one installation fails.',
-        'Plugins publish extensions, shared capabilities, or pipeline stages whose ownership must be tracked centrally.',
-        'Removal must hide capabilities from a new view before active pipelines and physical resources finish draining.'
+        'An existing class needs dynamically installed extension methods.',
+        'Plugins call application-owned read or write methods.'
       ],
       avoidWhen: [
-        'The feature set is compile-time fixed and has no dynamic installation, revocation, or resource ownership; direct object composition is simpler.',
-        'The system needs automatic dependency-graph resolution; PluginHost executes an already ordered plan and does not own dependency relationships.',
-        'The system needs a cross-process plugin sandbox or permission boundary; the Host composes code only inside the current JavaScript realm.'
+        'Prefer defineHost when the application only needs a Host value.',
+        'Use the matching RPC plugin for process or Worker isolation. PluginHost executes within the current JavaScript environment.'
       ],
       options: [
         {
           name: 'execution',
-          description:
-            'Required execution-budget group. It bounds an admitted lifecycle mutation separately from the wait for pipeline leases to reach zero after a plugin stage is logically revoked.',
+          description: 'Required wait limits. Supply both child fields explicitly.',
           whenToUse:
-            'Provide it for every construction; set a child field to false only when unbounded waiting is an explicit product decision.'
+            'Set wait limits for plugin operations and the pipeline of data-processing stages.',
+          optional: false
         },
         {
           name: 'execution.mutationTimeoutMs',
           description:
-            'Bounds one started install, update, or removal hook. Timeout revokes that operation’s commit authority and asks cooperative code to stop through operation.signal.',
-          whenToUse:
-            'Choose a bounded duration from the slowest legitimate lifecycle operation; use false explicitly when no safe limit exists.',
-          example:
-            'new AppHost({ execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } })'
+            'Maximum wait for a plugin hook result. Timeout rejects the wait and prevents a late result from committing. It does not forcibly stop the hook. false removes the deadline.',
+          whenToUse: 'Choose a limit based on normal business operation time.',
+          type: 'number | false',
+          optional: false
         },
         {
           name: 'execution.pipelineDrainTimeoutMs',
           description:
-            'Bounds the wait for already-started pipeline leases after a plugin stage is logically revoked. Timeout never republishes the capability; cleanupComplete and physicalCompletion expose unfinished cleanup.',
-          whenToUse:
-            'Use a bounded value for pipelines that cross awaits or own external work; use false only when removal must wait for every run.'
-        },
+            'Maximum wait for running pipeline work when disposing the Host. false waits for all work to finish.',
+          whenToUse: 'Set a cleanup wait limit when the business class runs pipelines.',
+          type: 'number | false',
+          optional: false
+        }
+      ],
+      examples: [
         {
-          name: 'pipeline',
+          id: 'next-share-feature',
+          title: 'Next task: share capabilities through a Feature',
           description:
-            'Selects the Host’s one pipeline execution model. It cannot change after construction, and plugin registration APIs must match it.',
-          defaultValue: "{ mode: 'sync' }",
-          whenToUse:
-            'Set it when a domain entry point is transformed, intercepted, or wrapped by ordered plugin stages.'
-        },
-        {
-          name: 'pipeline.mode',
-          description:
-            'sync is a flat chain that enters downstream after a stage returns; async is an onion model with post-next logic; generator and async-generator use explicit terminal values.',
-          defaultValue: "'sync'",
-          whenToUse:
-            'Choose once from stage asynchrony, the need for onion-style post logic, or generator terminal semantics.'
-        },
-        {
-          name: 'diagnostic',
-          description:
-            'Receives late next calls, ignored non-enumerable extensions, secondary rollback failures, and queue waits in diagnostic-only mode. Callback failure is contained.',
-          defaultValue: 'no-op',
-          whenToUse:
-            'Set it when non-terminal Host signals must reach logging, telemetry, or developer tooling.'
-        },
-        {
-          name: 'scheduler',
-          description:
-            'Owns the time domain and scheduling for mutation, queue admission, pipeline drain, and disposer timeouts. Construction snapshots it once.',
-          defaultValue: 'systemScheduler',
-          whenToUse:
-            'Inject it for deterministic virtual time in tests or when the host cannot use system timers.'
-        },
-        {
-          name: 'queueAdmissionTimeoutMs',
-          description:
-            'Bounds how long a not-yet-started mutation waits in the FIFO queue. undefined diagnoses without rejection, false disables its timer, and a number rejects the queued task with MUTATION_QUEUE_TIMEOUT.',
-          defaultValue: 'undefined',
-          whenToUse:
-            'Set a number when the product must reject configuration or plugin mutations that have not started within an admission SLA.'
-        },
-        {
-          name: 'queueAdmissionDiagnosticMs',
-          description:
-            'Applies only when queueAdmissionTimeoutMs is omitted. Crossing it reports queue pressure while the mutation remains queued; false disables the diagnostic timer.',
-          defaultValue: '1000',
-          whenToUse: 'Adjust it when queue congestion must be observed but cannot reject mutations.'
-        },
-        {
-          name: 'disposeStepTimeoutMs',
-          description:
-            'Bounds one pipeline disposer, plugin dispose hook, or onDispose resource step. Timeout records cleanupErrors while the Host continues toward logical terminal state.',
-          defaultValue: '5000',
-          whenToUse:
-            'Keep it bounded when external cleanup can hang and the Host must not remain closing forever; false waits without a limit.'
+            "Use getFeature references for cross-plugin calls and check writer's business result.",
+          code: "import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst formatterPlugin = definePlugin({\n  name: 'formatter',\n  features: {\n    text: defineFeature(() => ({ format: (value: string) => `[app] ${value}` }))\n  },\n  install: () => ({})\n})\nconst messageFeature = defineFeature(\n  (_core, dependencies) => ({\n    render: (value: string) => dependencies.formatter.format(value)\n  }),\n  { formatter: formatterPlugin.getFeature('text') }\n)\nconst writerPlugin = definePlugin({\n  name: 'writer',\n  features: { message: messageFeature },\n  install: () => ({})\n})\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  const [, writer] = await host.use(formatterPlugin, writerPlugin)\n  const message = writer.getFeature('message').render('ready')\n  console.assert(message === '[app] ready')\n} finally {\n  await host.dispose()\n}"
         }
       ]
     }
@@ -28260,7 +28482,7 @@ try {
           title: '直接实例：持有生命周期并进行非追踪读取',
           description:
             '直接构造 Computed 可显式持有实例、检查 disposed，并在宿主销毁时释放。peek() 会取得最新值，但不会让当前观察者订阅这个 Computed。',
-          code: "import { Computed, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst lastName = runtime.signal('Lovelace')\nconst fullName = new Computed(\n  () => \`\${firstName.value} ${lastName.value}`,\n  runtime,\n  { debugName: 'profile.full-name' }\n)\n\nconsole.log(fullName.peek()) // Ada Lovelace\nfullName.dispose()\nconsole.log(fullName.disposed) // true"
+          code: "import { Computed, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst lastName = runtime.signal('Lovelace')\nconst fullName = new Computed(\n  () => `${firstName.value} ${lastName.value}`,\n  runtime,\n  { debugName: 'profile.full-name' }\n)\n\nconsole.log(fullName.peek()) // Ada Lovelace\nfullName.dispose()\nconsole.log(fullName.disposed) // true"
         }
       ],
       options: [
@@ -28339,7 +28561,7 @@ try {
           title: 'Direct instance: own the lifecycle and read without tracking',
           description:
             'Direct construction retains the Computed instance, exposes disposed, and allows explicit host teardown. peek() returns the latest value without subscribing the current observer to this Computed.',
-          code: "import { Computed, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst lastName = runtime.signal('Lovelace')\nconst fullName = new Computed(\n  () => \`\${firstName.value} ${lastName.value}`,\n  runtime,\n  { debugName: 'profile.full-name' }\n)\n\nconsole.log(fullName.peek()) // Ada Lovelace\nfullName.dispose()\nconsole.log(fullName.disposed) // true"
+          code: "import { Computed, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst lastName = runtime.signal('Lovelace')\nconst fullName = new Computed(\n  () => `${firstName.value} ${lastName.value}`,\n  runtime,\n  { debugName: 'profile.full-name' }\n)\n\nconsole.log(fullName.peek()) // Ada Lovelace\nfullName.dispose()\nconsole.log(fullName.disposed) // true"
         }
       ],
       options: [

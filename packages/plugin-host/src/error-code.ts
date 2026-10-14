@@ -1,37 +1,41 @@
 /**
- * `@migaia/plugin-host` 错误码的唯一声明处。
+ * The single declaration site for `@migaia/plugin-host` error codes.
  *
- * 契约见 `docs/contracts/error-codes.md`：错误由 `(source, code)` 二元组唯一定位，`source` 恒为
- * `'@migaia/plugin-host'`。抛出点必须引用本文件的常量，不得内联字面量；本地化文本在 `error-text.ts`，两者按码名一一对应。
+ * See `docs/contracts/error-codes.md`. The pair `(source, code)` uniquely identifies an error.
+ * `source` is always `'@migaia/plugin-host'`. Throw sites use these constants instead of inline
+ * values. Localized messages live in `error-text.ts` and correspond to code names.
  *
- * 码值是公开 API 的一部分，改名等同破坏性变更。
+ * Code values are public API. Renaming a code is a breaking change.
  */
 export const PluginHostErrorCode = {
   /**
-   * Host 已完成 dispose 之后又收到任何 mutation 或注册调用时抛出。
+   * Thrown when a mutation or registration targets a host after disposal completes.
    *
-   * 终态不可逆：调用方必须新建 Host，不能复活这一个。落实两阶段生命周期契约中的 terminal 出口。
+   * The terminal state is irreversible. Create a new host instead of reviving this one. Enforces
+   * the terminal boundary of the two-phase lifecycle contract.
    */
   hostDisposed: 'HOST_DISPOSED',
 
   /**
-   * Host 处于 closing 窗口（`dispose()` 已开始、尚未到达 terminal）时收到 mutation。
+   * Thrown when a mutation targets a closing host after `dispose()` starts but before the terminal
+   * state.
    *
-   * 与 `HOST_DISPOSED` 分开是为了让调用方能区分「已经彻底关了」与「正在关，稍后重试也没用」，两者的诊断动作不同。
+   * This differs from `HOST_DISPOSED` so diagnostics distinguish disposal in progress from
+   * completed disposal. Retrying later cannot reopen either host.
    */
   hostDisposing: 'HOST_DISPOSING',
 
   /**
-   * 安装一个 `name` 已被占用的插件。
+   * Thrown when installing a plugin whose `name` is already occupied.
    *
-   * 插件名是 Host 内的唯一键；调用方应改名或先 `unUse()` 旧插件。
+   * Plugin names are unique host keys. Rename the plugin or `unUse()` the previous plugin first.
    */
   pluginDuplicate: 'PLUGIN_DUPLICATE',
 
   /**
-   * 对未安装的插件名调用 `unUse()` 等操作。
+   * Thrown when `unUse()` or another operation targets an uninstalled plugin name.
    *
-   * 调用方通常是重复卸载或名字写错；Host 状态不变。
+   * Check for repeated removal or a misspelled name. Host state stays unchanged.
    */
   pluginNotInstalled: 'PLUGIN_NOT_INSTALLED',
 
@@ -98,12 +102,16 @@ export const PluginHostErrorCode = {
   pluginDefinitionInvalid: 'PLUGIN_DEFINITION_INVALID',
 
   /**
-   * 插件 `install()` 抛错。原始安装错误**恒为 primary**（挂在 `cause` 上，按错误码契约 §3.2 保持 `===` 可达）。
+   * Thrown when a plugin's `install()` fails. The original installation error always remains
+   * primary and is reachable by identity through `cause`, as required by the error-code contract
+   * §3.2.
    *
-   * `detail` 保留失败插件名与按回滚顺序排列的原始 rollback identities；异步 `use()` 直接发布已完成的冻结 detail， 同步 `useSync()`
-   * 发布冻结快照并通过 `detail.completion` 提供最终冻结 detail。回滚/清理失败仍经
-   * `PLUGIN_INSTALL_ROLLBACK_FAILED`（诊断码）上报，永不覆盖原始构造错误（L-T39 / `docs/lifecycle/migration.sdd.md`
-   * §3.7.4 M-T44）。调用方应 await completion 后再做需要完整 secondary identity 的错误转换。
+   * `detail` retains the failed plugin name and original rollback failures in rollback order. Async
+   * `use()` publishes the completed frozen detail directly. Sync `useSync()` publishes a frozen
+   * snapshot and exposes the final frozen detail through `detail.completion`. Rollback or cleanup
+   * failures use the diagnostic code `PLUGIN_INSTALL_ROLLBACK_FAILED`. They never replace the
+   * original construction failure (L-T39 / `docs/lifecycle/migration.sdd.md` §3.7.4 M-T44). Await
+   * completion before converting errors that require complete secondary failure identities.
    */
   pluginInstallFailed: 'PLUGIN_INSTALL_FAILED',
 
@@ -114,30 +122,39 @@ export const PluginHostErrorCode = {
   setupRequiresAsyncInstall: 'SETUP_REQUIRES_ASYNC_INSTALL',
 
   /**
-   * 单个插件的 `unUse()` 或 `beforeRelease()` 过程中有清理步骤失败。
+   * Thrown when a cleanup step fails during one plugin's `unUse()` or `beforeRelease()`.
    *
-   * 失败被聚合后抛出，但卸载流程仍会走完 —— 一个 disposer 失败不阻断其余资源释放。调用方应把它当作资源泄漏告警而非状态回滚信号。
+   * Failures are aggregated after unloading finishes. One disposer failure does not stop remaining
+   * releases. Treat this as a resource-leak warning, not a signal that host state rolls back.
    */
   pluginDisposeFailed: 'PLUGIN_DISPOSE_FAILED',
 
   /**
-   * 插件 `install()` 返回的扩展属性名与 Host 上已存在的属性冲突；shared slot 只允许同 family 的确切注册贡献，不接受普通扩展或其它 family 占用同键。
+   * Thrown when an extension returned by `install()` conflicts with an existing host property. A
+   * shared slot accepts only canonical contributions from registrations in the same family.
+   * Ordinary extensions and other families cannot occupy the same key.
    *
-   * 普通扩展挂载仍独占；调用方需改扩展名或使用 canonical 同族贡献。冲突在挂载前检测， 不会发布半挂载状态。
+   * Ordinary extension properties remain exclusive. Rename the property or use a canonical
+   * same-family contribution. Conflict detection happens before mounting, so no partially mounted
+   * state is published.
    */
   extensionDuplicate: 'EXTENSION_DUPLICATE',
 
   /**
-   * 扩展属性名与 `Object.prototype` 上的键冲突（如 `toString`、`constructor`）。
+   * Thrown when an extension name conflicts with an `Object.prototype` key such as `toString` or
+   * `constructor`.
    *
-   * 允许挂载会污染原型链查找并可能被误用为原型污染入口，因此在挂载前拒绝。
+   * Rejecting it before mounting preserves prototype lookup and prevents a prototype-pollution
+   * entry point.
    */
   extensionObjectPrototype: 'EXTENSION_OBJECT_PROTOTYPE',
 
   /**
-   * 扩展属性名命中 Host 的保留键（`config`、`onDispose`、`usePipeline` 等）。
+   * Thrown when an extension uses a reserved host key such as `config`, `onDispose`, or
+   * `usePipeline`.
    *
-   * 保留键是 Host 自身协议的一部分，被覆盖会让插件之间互相破坏；调用方必须改名。
+   * Reserved keys belong to the host protocol. Overwriting them would let plugins disrupt each
+   * other. Choose another extension name.
    */
   extensionReserved: 'EXTENSION_RESERVED',
 
@@ -154,109 +171,128 @@ export const PluginHostErrorCode = {
   prerequisiteRemoved: 'PREREQUISITE_REMOVED',
 
   /**
-   * 在插件 `install()` 生命周期之外，或 setup 尝试结束后调用其上下文的 `onDispose()` 注册资源。
+   * Thrown when a plugin context registers an `onDispose()` resource outside installation or after
+   * setup ends.
    *
-   * 资源必须归属于当前尝试；迟到资源先被释放，再抛此码。调用方应在有效 setup 或 install 窗口登记。
+   * Resources belong to the current attempt. Late resources are released before this error is
+   * thrown. Register resources during the active setup or installation phase.
    */
   resourceOutsideInstall: 'RESOURCE_OUTSIDE_INSTALL',
 
   /**
-   * 在插件生命周期回调（setup / install / dispose / update / beforeRelease）内部反过来调用 Host 的 mutation API， 或
-   * setup / beforeRelease 进行中由外部调用 `config.update()`。
+   * Thrown when a plugin lifecycle callback (`setup`, `install`, `dispose`, `update`, or
+   * `beforeRelease`) reenters a host mutation API, or an external `config.update()` runs during
+   * setup or `beforeRelease`.
    *
-   * 重入会让安装事务的回滚边界无法确定。调用方应把后续 mutation 移到生命周期回调之外。
+   * Reentrancy makes installation rollback boundaries ambiguous. Move later mutations outside
+   * lifecycle callbacks.
    */
   lifecycleMutation: 'LIFECYCLE_MUTATION',
 
   /**
-   * 构造 Host 时传入了不在 `'sync' | 'async' | 'generator' | 'async-generator'` 内的 pipeline mode。
+   * Thrown during host construction for a pipeline mode outside `sync`, `async`, `generator`, or
+   * `async-generator`.
    *
-   * 配置期校验，Host 不会被构造出来。
+   * Configuration validation rejects the input before the host is constructed.
    */
   invalidPipelineMode: 'INVALID_PIPELINE_MODE',
 
   /**
-   * 向 Host 注册了与其 pipeline mode 不兼容的 stage。
+   * Thrown when a registered stage is incompatible with the host's pipeline mode.
    *
-   * 例如 sync 模式的 Host 收到 generator stage。模式决定了 stage 的执行与错误语义，不能混用；错误消息会同时给出 host 模式与 stage 模式。
+   * For example, a sync host cannot accept a generator stage. Modes define execution and error
+   * semantics and cannot be mixed. The message identifies both the host and stage modes.
    */
   pipelineModeMismatch: 'PIPELINE_MODE_MISMATCH',
 
   /**
-   * 同一次 pipeline step 内重复调用 `next()`。
+   * Thrown when `next()` is called twice within one pipeline step.
    *
-   * 每次调用只允许推进一次，重复调用会让同一个值被下游处理多次。调用方需要检查 stage 里的分支是否遗漏了 return。
+   * A step can advance only once. Repeated calls would process the same value downstream more than
+   * once. Check stage branches for a missing `return`.
    */
   pipelineNextDuplicate: 'PIPELINE_NEXT_DUPLICATE',
 
   /**
-   * Stage 已经返回或完成之后才调用 `next()`。
+   * Reports a `next()` call after the stage returns or completes.
    *
-   * 此时该值已无法安全进入 pipeline，调用被忽略。通常是 stage 内部把 `next()` 放进了未 await 的异步分支。
+   * The value can no longer enter the pipeline safely, so the call is ignored. An async branch that
+   * is not awaited is a common cause.
    */
   pipelineNextLate: 'PIPELINE_NEXT_LATE',
 
   /**
-   * Pipeline 正在执行期间注册新 stage。
+   * Thrown when a stage is registered while the pipeline is executing.
    *
-   * 执行中改变 stage 列表会让本次执行的行为取决于注册时机。调用方应在执行开始前完成注册。
+   * Changing stages during execution would make behavior depend on registration timing. Complete
+   * stage registration before execution starts.
    */
   pipelineExecuting: 'PIPELINE_EXECUTING',
 
   /**
-   * Async pipeline 的 stage 与 downstream 同时失败，二者聚合为一个 `AggregateError`（`errors` 顺序固定为 `[stageError,
-   * downstreamError]`）。
+   * Thrown when an async stage and its downstream both fail. An `AggregateError` retains `errors`
+   * in the fixed order `[stageError, downstreamError]`.
    *
-   * 落实 `docs/contracts/error-codes.md` §2/§3.2 的「包内新建的边界错误必须携带 `(source, code)`」；两个原始错误均以 `===` 保留于
-   * `errors[]`。调用方展开 `errors` 逐条处理，不要把它当成单一 stage 失败重试。
+   * Enforces the boundary error identity contract in `docs/contracts/error-codes.md` §2 and §3.2.
+   * Both original errors remain reachable by identity in `errors`. Handle each failure rather than
+   * retrying it as one stage failure.
    */
   pipelineFailed: 'PIPELINE_FAILED',
 
   /**
-   * 诊断码，**不抛出**。
+   * Diagnostic code that is reported, never thrown.
    *
-   * 插件 `install()` 抛错，**且回滚过程本身也失败**时，经 `diagnostic` 通道上报（`#reportRollbackFailure`）。原始安装错误**保持为
-   * primary**（顶层码 `PLUGIN_INSTALL_FAILED`、`cause === 原始错误`，见 L-T39 /
-   * `docs/lifecycle/migration.sdd.md` §3.7.4 M-T44）——本码只作为附加诊断信号，不得改写或替换 primary。这是 Host
-   * 状态可能不一致的信号：部分已安装插件未能干净卸载，调用方应视为不可恢复并重建 Host。
+   * Reports through `diagnostic` when `install()` fails and rollback also fails. The primary error
+   * retains `PLUGIN_INSTALL_FAILED` and `cause` equal to the original installation error. See L-T39
+   * / `docs/lifecycle/migration.sdd.md` §3.7.4 M-T44. This additional signal never rewrites or
+   * replaces the primary error. Some installed plugins may remain incompletely unloaded, leaving
+   * inconsistent host state. Treat the failure as unrecoverable and rebuild the host.
    */
   pluginInstallRollbackFailed: 'PLUGIN_INSTALL_ROLLBACK_FAILED',
 
   /**
-   * 诊断码，**不抛出**。
+   * Diagnostic code that is reported, never thrown.
    *
-   * 插件 `install()` 返回值上的非枚举键被有意跳过挂载时上报。非枚举键被忽略是设计行为，但必须可观测，否则插件作者会困惑于「属性为什么没出现在 host
-   * 上」。要暴露该属性需改成枚举属性。
+   * Reports a non-enumerable property intentionally skipped when mounting an `install()` result.
+   * Ignoring such keys is part of the contract, but reporting explains why they are absent from the
+   * host. Make the property enumerable to expose it.
    */
   extensionNonEnumerableIgnored: 'EXTENSION_NON_ENUMERABLE_IGNORED',
 
   /**
-   * Mutation 在 FIFO 队列中等待超过配置的入队上限，被移出队列并拒绝。
+   * Thrown when a mutation exceeds its configured FIFO admission wait and is removed and rejected.
    *
-   * 这是正式 SLA 不是缺陷。阈值由调用方配置（未配置时只发诊断、不拒绝）；底座侧对应 `@migaia/lifecycle` 的 `QUEUE_ADMISSION_TIMEOUT`，本码是
-   * plugin-host 边界上的包装，底座错误挂在 `cause` 上。
+   * The caller configures this admission limit. Without a limit, the host reports waits without
+   * rejecting them. This code wraps lifecycle `QUEUE_ADMISSION_TIMEOUT` at the plugin-host
+   * boundary. `cause` retains the original lifecycle error.
    *
-   * 语义是**终止**：该 mutation 不会再被执行。与 `DISPOSE_STEP_TIMEOUT` 的降级继续相反。
+   * The mutation is terminated and never executes. This differs from `DISPOSE_STEP_TIMEOUT`, which
+   * stops waiting and continues disposal.
    */
   mutationQueueTimeout: 'MUTATION_QUEUE_TIMEOUT',
 
   /**
-   * 单个 disposer（pipeline disposer / 插件 dispose 或 beforeRelease 钩子 / resource disposer）等待超过阈值仍未
-   * settle。
+   * Reported when one disposer exceeds its wait limit without settling. This includes pipeline
+   * disposers, plugin `dispose` or `beforeRelease` hooks, and resource disposers.
    *
-   * 覆盖 disposer 反过来 `await` 触发它的那次 `host.dispose()` 这种循环等待 —— 那种等待永远无法自行完成。
+   * A disposer that awaits the `host.dispose()` call responsible for running it cannot settle on
+   * its own.
    *
-   * 语义是**降级继续**：不中断 disposer 的执行（JS 无法安全撤销已在跑的 Promise 链），只停止等待并把这一步计为失败，让整个 dispose 事务仍能收敛到
-   * disposed。与 `MUTATION_QUEUE_TIMEOUT` 的终止语义相反。
+   * Disposal continues after recording the step as failed and ending the wait. The running disposer
+   * is not cancelled because JavaScript cannot safely revoke an active Promise chain. The
+   * transaction can still reach disposed state. This differs from `MUTATION_QUEUE_TIMEOUT`, which
+   * terminates the queued mutation.
    */
   disposeStepTimeout: 'DISPOSE_STEP_TIMEOUT',
 
   /**
-   * 入参校验失败（`TypeError`，类型不变、码作为附加字段挂上）：插件名/配置路径/pipeline stage/extension/domain core/资源 disposer
-   * 等输入不满足契约时抛出。
+   * Thrown as a native `TypeError` with an attached code when input violates its contract. Inputs
+   * include plugin names, configuration paths, stages, extensions, domain cores, and resource
+   * disposers.
    *
-   * 落实 `docs/contracts/error-codes.md` §7「裸抛扫描」门禁与 `error-code-rollout.sdd.md` §3「参数校验统一」归纳原则。调用方修正
-   * 输入后重试；这是编程错误，不是运行时状态问题。
+   * Enforces the untagged-error gate in `docs/contracts/error-codes.md` §7 and input-validation
+   * rules in `error-code-rollout.sdd.md` §3. Correct the input before retrying. This is a
+   * programming error, not a runtime state failure.
    */
   invalidOption: 'INVALID_OPTION',
   /** Config value violates the admitted plain-data grammar; caller must supply an allowed value. */
@@ -291,8 +327,10 @@ export const PluginHostErrorCode = {
 export type IPluginHostErrorCode = (typeof PluginHostErrorCode)[keyof typeof PluginHostErrorCode]
 
 /**
- * `(source, code)` 二元组中 `source` 的唯一声明处（`docs/contracts/error-codes.md` §2）。
+ * The single declaration site for `source` in `(source, code)` (`docs/contracts/error-codes.md`
+ * §2).
  *
- * 全仓每个离开 plugin-host 边界的错误都以此为 `source`，禁止在抛出点或 `error-text.ts` 手写该字符串字面量。
+ * Every error leaving the plugin-host boundary uses this value. Throw sites and `error-text.ts`
+ * must not repeat its string literal.
  */
 export const PLUGIN_HOST_SOURCE = '@migaia/plugin-host' as const

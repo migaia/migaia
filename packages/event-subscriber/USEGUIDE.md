@@ -9,7 +9,7 @@
 - [异步调用模块](#async-模块)：`invokeParallel`/`invokeParallelSettled`、`invokeSerial`/`invokeSerialSettled`、`invokeTask`/`invokeTaskSettled`
 - [Hub 模块](#hub-模块)：`createEventHub`
 - [订阅句柄](#订阅句柄)：`IEventChannelSubscription`、`IEventHubSubscription`
-- [错误码](#错误码)：`EventSubscriberErrorCode`（16 个码）逐条语义
+- [错误码](#错误码)：`EventSubscriberErrorCode`（17 个码）逐条语义
 - [诊断消息](#诊断消息)：内部稳定文本与公开使用边界
 - [状态常量](#状态常量)：`EventSubscriberState`
 - [高阶组合示例](#高阶组合示例)
@@ -35,7 +35,7 @@ import {
 } from '@migaia/event-subscriber'
 ```
 
-只有 root 导出，没有子路径导出，零 workspace 运行时依赖。
+提供两个入口：root `@migaia/event-subscriber`，以及订阅 helper 子路径 `@migaia/event-subscriber/subscriber`。唯一的 workspace 运行时依赖是 `@migaia/utils`。
 
 ### `createEventChannel`
 
@@ -51,6 +51,7 @@ type IEventChannelOptions<T> = {
   readonly admissionPolicy?: EventAdmissionPolicy
   readonly removalPolicy?: 'handle' | 'listener-all'
   readonly publishBudget?: number
+  readonly throwOnAborted?: boolean
   readonly style?: IEventApiStyle
   readonly valueConfig?: IValidatedEventValueConfig<T>
 }
@@ -91,6 +92,8 @@ unsubscribe()
 `publishBudget` 默认 `100_000`，必须是正安全整数。它限制一次顶层同步发布事务内实际调用的 listener 总数（包括 nested publish 展开的调用）；预算耗尽时停止继续展开，并以 `PUBLISH_FAILED` 抛出且在 `error.detail` 中记录已处理数量，避免递归或重入发布无限占用线程。
 
 `removalPolicy` 决定调用一个订阅句柄时解除多少登记。默认 `handle` 只解除该句柄所属的单次登记；`listener-all` 会同时解除同一 listener 在该 channel 上的全部登记。需要精确管理重复订阅时保持默认值；只有兼容“按函数整体移除”的调用方才选择 `listener-all`。其他值在构造阶段以 `INVALID_OPTIONS` 拒绝。
+
+`throwOnAborted` 默认 `false`：用已经 aborted 的 signal 调用 `subscribeUntil` 时不建立 registration，直接返回空操作的 unsubscribe。设为 `true` 时改为同步抛出 `ABORTED` `TypeError`，适合把“用已取消的 signal 订阅”视为调用方 bug 的场景。非布尔值在构造阶段以 `INVALID_OPTIONS` 拒绝。
 
 `valueConfig` 在 channel 构造时固定读取路径与可选 alias，把 payload 中的稳定路径投影到每次 listener 收到的 event context；它不保存、转换或重放 payload。需要按路径读取并保留完整原始 `event.value` 时使用，配置与失败语义见[静态 value path alias](#6-静态-value-path-alias)。
 
@@ -527,7 +530,7 @@ import {
 } from '@migaia/event-subscriber'
 ```
 
-稳定错误码表，**16 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。
+稳定错误码表，**17 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。
 
 | `EventSubscriberErrorCode` 键        | 码值                                    | 触发条件                                                                                                                                                 |
 | ------------------------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -541,6 +544,7 @@ import {
 | `taskNotUnique`                      | `TASK_NOT_UNIQUE`                       | 同上，匹配到多于 1 个 registration（错误携带 `taskId`/`matchCount`）                                                                                     |
 | `invalidTaskId`                      | `INVALID_TASK_ID`                       | 传入的 `taskId` 为空或不是字符串                                                                                                                         |
 | `invalidOptions`                     | `INVALID_OPTIONS`                       | 公开 options 对象或字段结构非法                                                                                                                          |
+| `aborted`                            | `ABORTED`                               | 设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`                                                                 |
 | `publishFailed`                      | `PUBLISH_FAILED`                        | 完整目标快照处理完毕后，一个或多个 listener 失败（`publish()`/`invokeParallel`/`invokeSerial`/`invokeTask` 的抛出通道）                                  |
 | `valueProjectionFailed`              | `VALUE_PROJECTION_FAILED`               | listener 的 value alias 路径缺失、被阻断或 getter 抛错                                                                                                   |
 | `unhandledListenerFailure`           | `UNHANDLED_LISTENER_FAILURE`            | fire-and-forget 的迟到 listener 失败在 `report` 处理失败或缺失后，到达终端诊断通道                                                                       |
@@ -558,7 +562,7 @@ import {
 
 `EventSubscriberErrorText` 是包内维护错误文案的唯一来源，但**不是公开导出**，业务代码不能从 `@migaia/event-subscriber` 导入它。生产代码应按上方公开的 `error.source` 与 `error.code` 分支；测试若要锁定面向用户的文案，可以直接断言实际抛出错误的 `message`，不要依赖内部源码路径。
 
-内部文本与 16 个错误码一一对应：`invalidListener`、`invalidReporter`、`invalidChannel`、`invalidSignal`、`invalidSubscriber`、`invalidEventKey`、`taskNotFound`、`taskNotUnique`、`invalidTaskId`、`invalidOptions`、`publishFailed`、`valueProjectionFailed`、`unhandledListenerFailure`、`subscriptionClosed`、`subscriptionHandleProjectionFailed`、`invocationClosed`。
+内部文本与 17 个错误码一一对应：`invalidListener`、`invalidReporter`、`invalidChannel`、`invalidSignal`、`invalidSubscriber`、`invalidEventKey`、`taskNotFound`、`taskNotUnique`、`invalidTaskId`、`invalidOptions`、`aborted`、`publishFailed`、`valueProjectionFailed`、`unhandledListenerFailure`、`subscriptionClosed`、`subscriptionHandleProjectionFailed`、`invocationClosed`。
 
 ---
 

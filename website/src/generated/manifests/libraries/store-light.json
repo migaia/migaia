@@ -1326,8 +1326,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-light/getting-started",
-      "architecturePath": "/en/architecture/store-light",
+      "guidePath": "/en/docs/store-light/getting-started",
+      "architecturePath": "/en/docs/store-light",
       "symbols": [
         {
           "name": "createAsyncStore",

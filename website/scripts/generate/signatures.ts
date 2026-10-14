@@ -197,17 +197,19 @@ function writeGeneratedProjection(name: string, value: Record<string, unknown>) 
 }
 
 /** Stable route families owned by the React Router route module. */
-const ROUTE_FAMILIES = [
-  { domain: 'docs', path: '/:lang/docs/*' },
-  { domain: 'guides', path: '/:lang/guides/*' },
-  { domain: 'architecture', path: '/:lang/architecture/*' }
-]
+const ROUTE_FAMILIES = [{ domain: 'docs', path: '/:lang/docs/*' }]
 
 /** Languages with canonical URL prefixes in every generated route. */
 const LOCALES = ['en', 'zh'] as const
 
-/** Domain names shared by navigation, route generation, and cross-domain edges. */
-const DOMAINS = ['docs', 'guides', 'architecture'] as const
+/**
+ * The single public content domain. Each library owns `/docs/<library>` (learning path),
+ * `/docs/<library>/<topic>` (guides) and `/docs/<library>/api/...` (API reference).
+ */
+const DOMAINS = ['docs'] as const
+
+/** Path segment that separates API reference pages from guide topics inside one library. */
+const API_SEGMENT = 'api'
 
 /** Maintained task topics owned by the Guide information architecture. */
 const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
@@ -338,11 +340,22 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
     'security-capacity-and-recovery'
   ],
   capability: ['graph', 'graph-dynamic', 'graph-topology'],
-  reactive: ['reactive', 'runtime'],
+  reactive: ['reactive', 'runtime', 'troubleshooting'],
   lifecycle: ['scope', 'disposal', 'abort', 'quiescence', 'scheduler', 'generation', 'errors'],
-  'event-subscriber': ['subscriptions', 'async-invocation'],
+  'event-subscriber': [
+    'subscriptions',
+    'publish-and-errors',
+    'async-invocation',
+    'hub',
+    'troubleshooting'
+  ],
   'middleware-pipeline': ['sync-and-async', 'generators', 'cancellation-and-errors'],
-  resource: ['caching-and-refresh', 'suspense-and-ssr', 'cancellation-and-retry'],
+  resource: [
+    'caching-and-refresh',
+    'suspense-and-ssr',
+    'cancellation-and-retry',
+    'troubleshooting'
+  ],
   serialize: [
     'chunk-shapes-and-wire-conversion',
     'registry-and-plugins',
@@ -358,9 +371,10 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
   ],
   'plugin-host': [
     'install-and-compose',
-    'configuration-and-shared',
+    'configuration',
     'pipelines',
-    'removal-and-rollback'
+    'removal-and-rollback',
+    'troubleshooting'
   ],
   logger: [
     'entries-hooks-and-sinks',
@@ -368,7 +382,8 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
     'custom-plugin',
     'pipelines',
     'flush-and-shutdown',
-    'runtime-and-forwarding'
+    'runtime-and-forwarding',
+    'troubleshooting'
   ],
   'rpc-core': [
     'endpoint-composition',
@@ -1729,16 +1744,6 @@ async function generateManifests() {
         ...(domain === 'docs'
           ? [
               {
-                path: `/${locale}/${domain}/${library.slug}/overview`,
-                locale,
-                domain,
-                library: library.slug
-              }
-            ]
-          : []),
-        ...(domain === 'guides'
-          ? [
-              {
                 path: `/${locale}/${domain}/${library.slug}/getting-started`,
                 locale,
                 domain,
@@ -1756,7 +1761,7 @@ async function generateManifests() {
           .filter(() => domain === 'docs')
           .flatMap((exportPath) => {
             const moduleSlug = moduleRouteSlug(exportPath)
-            const modulePath = `/${locale}/${domain}/${library.slug}${moduleSlug === 'index' ? '' : `/${moduleSlug}`}`
+            const modulePath = `/${locale}/${domain}/${library.slug}/${API_SEGMENT}${moduleSlug === 'index' ? '' : `/${moduleSlug}`}`
             const moduleEntry = {
               path: modulePath,
               locale,
@@ -1787,16 +1792,8 @@ async function generateManifests() {
   const routeEntries = Array.from(
     new Map(routeEntriesRaw.map((entry) => [entry.path, entry])).values()
   )
-  const contentRouteEntries = entries
-    .filter((entry) => knownLibraries.has(entry.library))
-    .map((entry) => ({
-      path: `/${entry.locale}/docs/${entry.library}${entry.slug ? `/${entry.slug}` : ''}`,
-      locale: entry.locale,
-      domain: 'docs',
-      library: entry.library
-    }))
   const allRouteEntries = Array.from(
-    new Map([...routeEntries, ...contentRouteEntries].map((entry) => [entry.path, entry])).values()
+    new Map(routeEntries.map((entry) => [entry.path, entry])).values()
   )
   const routes = {
     version: 1,
@@ -1881,8 +1878,8 @@ async function generateManifests() {
           'core-usage',
           'advanced-usage'
         ],
-        guidePath: `/en/guides/${library.slug}/getting-started`,
-        architecturePath: `/en/architecture/${library.slug}`,
+        guidePath: `/en/docs/${library.slug}/getting-started`,
+        architecturePath: `/en/docs/${library.slug}`,
         symbols,
         aliases
       }
@@ -1976,10 +1973,11 @@ async function generateManifests() {
   const domainRoutes = routeEntries.filter((entry) => entry.library)
   const apiRoutes = apis.flatMap((api) => {
     const docsPaths = LOCALES.map(
-      (locale) => `/${locale}/docs/${api.library}${api.module === 'index' ? '' : `/${api.module}`}`
+      (locale) =>
+        `/${locale}/docs/${api.library}/${API_SEGMENT}${api.module === 'index' ? '' : `/${api.module}`}`
     )
-    const guidePaths = LOCALES.map((locale) => `/${locale}/guides/${api.library}/getting-started`)
-    const architecturePaths = LOCALES.map((locale) => `/${locale}/architecture/${api.library}`)
+    const guidePaths = LOCALES.map((locale) => `/${locale}/docs/${api.library}/getting-started`)
+    const architecturePaths = LOCALES.map((locale) => `/${locale}/docs/${api.library}`)
     return docsPaths.flatMap((path, index) => [
       { from: path, to: guidePaths[index], type: 'api-guide' },
       { from: guidePaths[index], to: path, type: 'guide-api' },
@@ -2010,7 +2008,7 @@ async function generateManifests() {
         }
       ]),
       ...api.aliases.flatMap((alias) => {
-        const ownerPath = `/${LOCALES[index]}/docs/${api.library}${alias.ownerModule === 'index' ? '' : `/${alias.ownerModule}`}`
+        const ownerPath = `/${LOCALES[index]}/docs/${api.library}/${API_SEGMENT}${alias.ownerModule === 'index' ? '' : `/${alias.ownerModule}`}`
         const aliasPath = `${path}#${alias.name}`
         const ownerTarget = `${ownerPath}#${alias.ownerFragment}`
         return [

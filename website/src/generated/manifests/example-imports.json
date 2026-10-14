@@ -73,6 +73,7 @@
       "TopologyInvalidReason": "@migaia/capability/graph/topology"
     },
     "@migaia/event-subscriber": {
+      "IEventAbortSignal": "@migaia/event-subscriber/subscriber",
       "IEventChannelLike": "@migaia/event-subscriber/subscriber",
       "IEventContext": "@migaia/event-subscriber/subscriber",
       "IEventListener": "@migaia/event-subscriber/subscriber",

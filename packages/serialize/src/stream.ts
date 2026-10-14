@@ -461,32 +461,39 @@ const snapshotSerializeScheduler = (value: unknown): IScheduler | undefined => {
 }
 
 /**
- * 帧预算切片。
+ * Adaptive slicing to fit a frame budget.
  *
- * 实测（100 万条 → worker）：整包一次性编码会连续占住主线程 237ms，约合掉 14 帧； 切成 5 万条一片、片间让出后，最长单次阻塞降到 14.2ms —— 压在 60fps 的
- * 16.7ms 预算之内，一帧不掉，墙钟还快了 37%。但切过头同样有害：1 万条一片时最长阻塞 只有 3.1ms，可 100 次让出的固定开销把墙钟顶回了整包水平。
+ * A recorded one-million-item worker measurement shows 237 ms of continuous main-thread blocking
+ * for one-shot encoding, roughly 14 frames. Slices of 50,000 items with yields reduce the longest
+ * block to 14.2 ms. That measurement stays within the 16.7 ms budget at 60 fps, reports no dropped
+ * frames, and reduces wall time by 37%. Slices of 10,000 items reduce the longest block to 3.1 ms,
+ * but 100 yields return wall time to the one-shot level.
  *
- * 所以片大小不能按字节数写死，得按**实测耗时**反推。这里的做法是让生成器在 yield 之后挂起，消费者取下一片时才恢复——挂起与恢复之间的时差正好等于消费者
- * 处理这一片的真实耗时，据此调整下一片。
+ * Slice size follows measured processing time rather than a fixed byte count. The generator
+ * suspends after yielding and resumes when the consumer requests the next slice. The elapsed
+ * interval measures consumer processing time and controls the next slice size.
  */
 export type IFrameBudgetOptions = {
-  /** 每片目标耗时。默认 8ms：60fps 一帧 16.7ms，留一半余量给渲染与其他任务， 免得刚好卡在预算边缘时被别的工作顶出去。 */
+  /**
+   * Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for
+   * rendering and other work.
+   */
   readonly targetMs?: number
-  /** 片大小下界，防止把开销摊成纯消息成本。 */
+  /** Minimum slice size to keep per-message overhead from dominating processing. */
   readonly minItems?: number
-  /** 片大小上界，防止首片就把主线程占死。 */
+  /** Maximum slice size to limit how long one slice can occupy the main thread. */
   readonly maxItems?: number
-  /** 首片大小。太大则第一片必然超预算，所以刻意保守。 */
+  /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */
   readonly initialItems?: number
   /**
-   * 让出方式。缺省用 `scheduler.schedule(resolve, 0)`；可换成 `scheduler.yield()`（更精确）或
-   * requestIdleCallback（更保守）。
+   * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for
+   * finer scheduling or `requestIdleCallback` for a more conservative yield.
    */
   readonly yieldTo?: () => Promise<void>
   readonly signal?: IAbortSignal
   /**
-   * Runtime-neutral scheduler（**必填**，R-4：core 无默认 timer、不直接使用宿主
-   * `setTimeout`/`performance`/`Date.now`）。
+   * Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses
+   * host `setTimeout`, `performance`, or `Date.now`.
    */
   readonly scheduler: IScheduler
 }
@@ -622,9 +629,10 @@ const snapshotDecodeStreamOptions = (options: unknown): IDecodeStreamSnapshot =>
 }
 
 /**
- * 按帧预算把一个大数组切成若干片，片间让出主线程。
+ * Slices a large array to fit a frame budget and yields the main thread between slices.
  *
- * 用法是 `for await (const slice of sliceByFrameBudget(rows))`，循环体里做实际 工作——那段耗时会被自动量到，用来定下一片的大小。
+ * Use `for await (const slice of sliceByFrameBudget(rows, { scheduler }))` and process each slice
+ * in the loop. The generator measures that processing time to choose the next slice size.
  */
 export async function* sliceByFrameBudget<T>(
   items: readonly T[],
@@ -662,7 +670,11 @@ export async function* sliceByFrameBudget<T>(
 export type IEncodeStreamOptions = IFrameBudgetOptions & {
   readonly type?: string
   readonly context?: string
-  /** 同时在途的请求数上限，即背压。默认 1：编好一片就等它落地再编下一片， 峰值内存只有一片。调高可以让编码与 worker 处理重叠，代价是峰值内存翻倍。 */
+  /**
+   * Backpressure limit for concurrent requests. Defaults to 1, waiting for each encoded slice
+   * before encoding the next. Only one slice is in flight at that setting. Higher limits overlap
+   * encoding with worker processing at the cost of retaining more slices in memory.
+   */
   readonly maxInFlight?: number
 }
 
@@ -675,10 +687,11 @@ export type ICollectStreamOptions = {
 }
 
 /**
- * 把一个大数组编码成分段流，**不做拼装**。
+ * Encodes a large array as a chunk stream without assembling the full result.
  *
- * 与 registry.encode 的区别就在这里：encode 会把所有分段合并成一整块返回， 适合「最终要一个完整 blob」的场景；而落 IndexedDB、写文件、发 fetch
- * body 这类消费者能逐片吃下，拼装反而白白制造一个全量大对象的峰值内存。
+ * `registry.encode` merges each operation's chunks into one complete result for consumers that need
+ * a whole blob. Stream consumers such as IndexedDB, files, or fetch bodies can accept slices
+ * individually. Avoiding full-stream assembly avoids retaining another object containing all data.
  */
 export async function* encodeStream<T>(
   registry: ISerializeRegistry,
@@ -770,7 +783,7 @@ export async function* encodeStream<T>(
   }
 }
 
-/** 把分段流逐片解码，同样不做拼装。 */
+/** Decodes a chunk stream one piece at a time without assembling the full result. */
 export async function* decodeStream(
   registry: ISerializeRegistry,
   chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>,
@@ -828,7 +841,10 @@ export async function* decodeStream(
   }
 }
 
-/** 把分段流合并成一整块。只在消费者确实需要完整 blob 时才用——它会把整份数据 同时驻留在内存里，正是流式想避免的那笔峰值。 */
+/**
+ * Assembles a chunk stream into one result. Use only when the consumer needs a complete blob
+ * because all data stays in memory.
+ */
 export async function collectStream(
   chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>,
   encoder?: ITextEncoder,

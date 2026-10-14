@@ -1,4 +1,4 @@
-// 契约级错误
+// Contract errors
 export {
   StorageContractError,
   StorageContractErrorCode,
@@ -8,7 +8,7 @@ export {
   type IStorageContractErrorDetails
 } from './errors.js'
 
-// 公共类型
+// Public types
 export type {
   IOperationContext,
   IWriteOptions,

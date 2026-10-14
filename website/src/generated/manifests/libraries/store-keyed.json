@@ -1898,8 +1898,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-keyed/getting-started",
-      "architecturePath": "/en/architecture/store-keyed",
+      "guidePath": "/en/docs/store-keyed/getting-started",
+      "architecturePath": "/en/docs/store-keyed",
       "symbols": [
         {
           "name": "AtomKind",
@@ -6517,8 +6517,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-keyed/getting-started",
-      "architecturePath": "/en/architecture/store-keyed",
+      "guidePath": "/en/docs/store-keyed/getting-started",
+      "architecturePath": "/en/docs/store-keyed",
       "symbols": [
         {
           "name": "assertNotThenable",
@@ -8573,8 +8573,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-keyed/getting-started",
-      "architecturePath": "/en/architecture/store-keyed",
+      "guidePath": "/en/docs/store-keyed/getting-started",
+      "architecturePath": "/en/docs/store-keyed",
       "symbols": [
         {
           "name": "createAtomStore",
@@ -8820,8 +8820,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-keyed/getting-started",
-      "architecturePath": "/en/architecture/store-keyed",
+      "guidePath": "/en/docs/store-keyed/getting-started",
+      "architecturePath": "/en/docs/store-keyed",
       "symbols": [
         {
           "name": "atomGetter",

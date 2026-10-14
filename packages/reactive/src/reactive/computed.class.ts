@@ -17,7 +17,7 @@ export type IComputedOptions<T> = {
 }
 export type IComputedConfig<T> = IComputedOptions<T> | ((a: T, b: T) => boolean)
 
-// 惰性派生：写只标脏(push)，值只在被读时重算(pull)——没被订阅的 Computed 永不算
+// Lazy derivation: writes mark dirty (push), and reads recompute the value when needed (pull).
 export class Computed<T> implements IObservable, IObserver, IDisposable {
   #subs = new Set<IObserver>()
   readonly subs: ReadonlySet<IObserver>
@@ -64,8 +64,8 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
   get observed(): boolean {
     return !this.#disposed && this.subs.size > 0
   }
-  // 释放：断开对上游的全部依赖边（不再被上游通知）+ 清空下游集合。
-  // 读取已释放的 Computed 会抛错——绝不静默返回旧缓存，避免「看着能用但永不更新」的幽灵状态。
+  // Disposal removes all upstream dependency edges and clears downstream subscribers.
+  // Reading a disposed `Computed` throws instead of returning a stale cache that no longer updates.
   dispose(): void {
     if (this.#disposed) return
     this.#disposed = true
@@ -173,7 +173,7 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     }
     this.#previewCapture = undefined
     this.#recompute()
-  } // 惰性落定版本
+  } // Settles lazy node versions.
   #recompute(): void {
     if (this.#computing) {
       // 求值过程中又读到了自己：环。给出可理解的响应式错误，而不是让引擎栈溢出。

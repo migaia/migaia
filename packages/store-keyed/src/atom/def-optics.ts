@@ -29,16 +29,23 @@ import {
   KeyedSplitCache
 } from './optics-path.js'
 
-/** 与实例层 IAtomOptic 同形：不可变 get/set。 */
+/** Provides immutable `get` and `set` operations with the same shape as `IAtomOptic`. */
 export type IDefOptic<Source, Focus> = {
   get(source: Source): Focus
   set(source: Source, focus: Focus): Source
 }
 
-/** 可被 focus/optic/split 当「源」的可写定义（标准 set(update) 语义）。 */
+/**
+ * Provides a writable source for focus, optic, or split operations with standard `set(update)`
+ * semantics.
+ */
 export type IStandardWritableDef<T> = IWritableAtomDefinition<T, readonly [IAtomUpdate<T>], void>
 
-/** 只读投影。源任意可读 def；结果是 derivedDef。 equals 默认 Object.is——源对象其它字段变了、投影值不变则不通知下游。 */
+/**
+ * Creates a read-only projection from any readable definition through `derivedDef`. `equals`
+ * defaults to `Object.is`. Changes to other source fields do not notify downstream observers when
+ * the projection is unchanged.
+ */
 export function selectDef<Source, Selected>(
   source: IAtomDefinition<Source>,
   select: (value: Source) => Selected,
@@ -47,7 +54,7 @@ export function selectDef<Source, Selected>(
   return derivedDef((get) => select(get(source)), undefined, equals)
 }
 
-/** 自定义 lens 的可写投影。 */
+/** Creates a writable projection through a custom lens. */
 export function opticDef<Source, Focus>(
   source: IStandardWritableDef<Source>,
   optic: IDefOptic<Source, Focus>
@@ -101,11 +108,11 @@ export function focusDef<Source>(
 export type ISplitItemDef<T> = IWritableDerivedDefinition<T, readonly [IAtomUpdate<T>], void>
 
 /**
- * 列表源上的按 key 拆分。
+ * Splits a list source into item definitions by key.
  *
- * - `of(key)`：该 key 的可写 item def（token 稳定，可跨 store 复用）
- * - `items`：当前列表对应的 item def 数组（derived；重排保 identity）
- * - `insert` / `remove`：经 AtomStore 改源列表
+ * `of(key)` returns a stable writable item definition that can be reused across stores. `items`
+ * derives the current item definitions and preserves their identity during reordering. `insert` and
+ * `remove` update the source list through `AtomStore`.
  */
 export type ISplitDefinition<T, Key> = {
   readonly source: IStandardWritableDef<readonly T[]>
@@ -114,8 +121,9 @@ export type ISplitDefinition<T, Key> = {
   insert(store: IAtomStore, item: T, index?: number): void
   remove(store: IAtomStore, key: Key): boolean
   /**
-   * 丢掉已不在源列表中的 key 的 def 缓存。 不 release AtomStore 里已建实例——那是 store.release(def) 的职责。 不 prune 时，长期滚动的
-   * key 空间会让 cache Map 只增不减。
+   * Removes cached definitions for keys that are no longer in the source list. This does not
+   * release instances in `AtomStore`; use `store.release(def)` for that. Without pruning, a
+   * continually changing key space causes the cache map to grow indefinitely.
    */
   prune(store: IAtomStore): number
 }

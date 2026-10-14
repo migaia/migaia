@@ -1313,8 +1313,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/capability/getting-started",
-      "architecturePath": "/en/architecture/capability",
+      "guidePath": "/en/docs/capability/getting-started",
+      "architecturePath": "/en/docs/capability",
       "symbols": [
         {
           "name": "CAPABILITY_SOURCE",
@@ -5169,8 +5169,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/capability/getting-started",
-      "architecturePath": "/en/architecture/capability",
+      "guidePath": "/en/docs/capability/getting-started",
+      "architecturePath": "/en/docs/capability",
       "symbols": [
         {
           "name": "CAPABILITY_GRAPH_SOURCE",
@@ -5507,7 +5507,7 @@
               "name": "onError",
               "type": "(error: unknown) => void",
               "optional": true,
-              "description": "激活或释放失败的上报口。Reporter 自己抛错也不会破坏闸门状态机；原始错误仍可 通过 `error(name)` 查询。"
+              "description": "Reports activation or release failures. Reporter failures preserve gate state and `error(name)` diagnostics."
             }
           ],
           "identity": "packages/capability/dist/graph/index.d.ts:createCapabilityGraph:export declare function createCapabilityGraph(options?: ICapabilityGraphOptions): ICapabilityGraph;",
@@ -5519,7 +5519,7 @@
               "type": "(error: unknown) => void",
               "optional": true,
               "description": "`createCapabilityGraph(options?)` 在创建 lifecycle 根 scope 前读取 `options.onError`；getter failure 或非 callable 值抛 `GRAPH_INVALID_OPTION`。首次 `ready()` 只接受当前注册表，冻结后 `register()` 抛 `GRAPH_FROZEN`；terminal 后变更抛 `GRAPH_DISPOSED`。",
-              "descriptionEn": "",
+              "descriptionEn": "Reports activation or release failures. Reporter failures preserve gate state and `error(name)` diagnostics.",
               "descriptionZh": "`createCapabilityGraph(options?)` 在创建 lifecycle 根 scope 前读取 `options.onError`；getter failure 或非 callable 值抛 `GRAPH_INVALID_OPTION`。首次 `ready()` 只接受当前注册表，冻结后 `register()` 抛 `GRAPH_FROZEN`；terminal 后变更抛 `GRAPH_DISPOSED`。"
             }
           ],
@@ -6440,8 +6440,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/capability/getting-started",
-      "architecturePath": "/en/architecture/capability",
+      "guidePath": "/en/docs/capability/getting-started",
+      "architecturePath": "/en/docs/capability",
       "symbols": [
         {
           "name": "collectPlanEdges",
@@ -8057,8 +8057,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/capability/getting-started",
-      "architecturePath": "/en/architecture/capability",
+      "guidePath": "/en/docs/capability/getting-started",
+      "architecturePath": "/en/docs/capability",
       "symbols": [
         {
           "name": "createDynamicCapabilityGraph",
@@ -9173,8 +9173,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/capability/getting-started",
-      "architecturePath": "/en/architecture/capability",
+      "guidePath": "/en/docs/capability/getting-started",
+      "architecturePath": "/en/docs/capability",
       "symbols": [
         {
           "name": "buildCapabilityTopology",

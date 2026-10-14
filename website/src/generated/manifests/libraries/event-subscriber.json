@@ -14,7 +14,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "轻量、runtime-neutral 的 transient event fan-out 原语：登记 listener，在发布入口取得稳定快照，把同一个事件可靠地分发给目标 listener。零运行时依赖，`sideEffects: false`。"
+                "text": "轻量、runtime-neutral 的 transient event fan-out 原语：登记 listener，在发布入口取得稳定快照，把同一个事件可靠地分发给目标 listener。唯一的运行时依赖是 `@migaia/utils`，`sideEffects: false`。"
               }
             ]
           },
@@ -43,7 +43,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "只有 root 导出，没有子路径导出，零 workspace 运行时依赖。"
+                "text": "提供两个入口：root `@migaia/event-subscriber`，以及订阅 helper 子路径 `@migaia/event-subscriber/subscriber`。唯一的 workspace 运行时依赖是 `@migaia/utils`。"
               }
             ]
           },
@@ -98,7 +98,9 @@
                   "`terminalReport?: (error: unknown) => void | PromiseLike<void>` —— `report` 缺失/失败时的兜底诊断出口",
                   "`dispatchPolicy?: EventDispatchPolicy` —— `recursive`（默认）保持 canonical nested publish 的同步递归顺序；只有需要“当前快照全部完成后再交付重入值”的消费者才显式使用 `queued`",
                   "`admissionPolicy?: EventAdmissionPolicy` —— `multiple`（默认）为每次订阅建立独立 registration；显式 `unique` 时，同一 listener 函数在一个 channel 内只保留一份，重复订阅得到绑定同一代 registration 的 disposer。重复订阅的 `taskId` 必须与现有 registration 相同，否则抛 `INVALID_OPTIONS` `TypeError`；旧 disposer 不会移除退订或 `clear()` 后的新订阅。Hub 与以 wrapper 注册的 helper 不按原始 listener 去重",
-                  "`publishBudget?: number` —— 单次顶层同步发布事务最多调用的 listener 数，默认 `100_000`；必须是正安全整数。预算耗尽时停止继续展开并抛 `PUBLISH_FAILED`，防止递归或重入发布无限占用线程"
+                  "`publishBudget?: number` —— 单次顶层同步发布事务最多调用的 listener 数，默认 `100_000`；必须是正安全整数。预算耗尽时停止继续展开并抛 `PUBLISH_FAILED`，防止递归或重入发布无限占用线程",
+                  "`removalPolicy?: 'handle' | 'listener-all'` —— 调用订阅句柄时解除多少登记。默认 `handle` 只解除这个句柄自己的那次登记；`listener-all` 同时解除同一 listener 在该 channel 上的全部登记",
+                  "`throwOnAborted?: boolean` —— 默认 `false`：用已经 aborted 的 signal 调用 `subscribeUntil` 时不建立 registration，返回空操作的 unsubscribe；设为 `true` 时改为抛 `ABORTED` `TypeError`"
                 ]
               },
               {
@@ -402,11 +404,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`publishFailed`(`PUBLISH_FAILED`)、"
+                "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、"
               },
               {
                 "type": "paragraph",
-                "text": "`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
               },
               {
                 "type": "paragraph",
@@ -525,7 +527,7 @@
                   "异步调用模块：`invokeParallel`/`invokeParallelSettled`、`invokeSerial`/`invokeSerialSettled`、`invokeTask`/`invokeTaskSettled`",
                   "Hub 模块：`createEventHub`",
                   "订阅句柄：`IEventChannelSubscription`、`IEventHubSubscription`",
-                  "错误码：`EventSubscriberErrorCode`（16 个码）逐条语义",
+                  "错误码：`EventSubscriberErrorCode`（17 个码）逐条语义",
                   "诊断消息：内部稳定文本与公开使用边界",
                   "状态常量：`EventSubscriberState`",
                   "高阶组合示例",
@@ -545,7 +547,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "只有 root 导出，没有子路径导出，零 workspace 运行时依赖。"
+                "text": "提供两个入口：root `@migaia/event-subscriber`，以及订阅 helper 子路径 `@migaia/event-subscriber/subscriber`。唯一的 workspace 运行时依赖是 `@migaia/utils`。"
               }
             ]
           },
@@ -556,7 +558,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
+                "code": "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
               },
               {
                 "type": "paragraph",
@@ -590,6 +592,10 @@
               {
                 "type": "paragraph",
                 "text": "`removalPolicy` 决定调用一个订阅句柄时解除多少登记。默认 `handle` 只解除该句柄所属的单次登记；`listener-all` 会同时解除同一 listener 在该 channel 上的全部登记。需要精确管理重复订阅时保持默认值；只有兼容“按函数整体移除”的调用方才选择 `listener-all`。其他值在构造阶段以 `INVALID_OPTIONS` 拒绝。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`throwOnAborted` 默认 `false`：用已经 aborted 的 signal 调用 `subscribeUntil` 时不建立 registration，直接返回空操作的 unsubscribe。设为 `true` 时改为同步抛出 `ABORTED` `TypeError`，适合把“用已取消的 signal 订阅”视为调用方 bug 的场景。非布尔值在构造阶段以 `INVALID_OPTIONS` 拒绝。"
               },
               {
                 "type": "paragraph",
@@ -1002,7 +1008,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
               },
               {
                 "type": "table",
@@ -1046,6 +1052,11 @@
                   ],
                   ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                   ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                  [
+                    "`aborted`",
+                    "`ABORTED`",
+                    "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                  ],
                   [
                     "`publishFailed`",
                     "`PUBLISH_FAILED`",
@@ -1094,7 +1105,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "内部文本与 16 个错误码一一对应：`invalidListener`、`invalidReporter`、`invalidChannel`、`invalidSignal`、`invalidSubscriber`、`invalidEventKey`、`taskNotFound`、`taskNotUnique`、`invalidTaskId`、`invalidOptions`、`publishFailed`、`valueProjectionFailed`、`unhandledListenerFailure`、`subscriptionClosed`、`subscriptionHandleProjectionFailed`、`invocationClosed`。"
+                "text": "内部文本与 17 个错误码一一对应：`invalidListener`、`invalidReporter`、`invalidChannel`、`invalidSignal`、`invalidSubscriber`、`invalidEventKey`、`taskNotFound`、`taskNotUnique`、`invalidTaskId`、`invalidOptions`、`aborted`、`publishFailed`、`valueProjectionFailed`、`unhandledListenerFailure`、`subscriptionClosed`、`subscriptionHandleProjectionFailed`、`invocationClosed`。"
               }
             ]
           },
@@ -1236,14 +1247,14 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/event-subscriber/getting-started",
-      "architecturePath": "/en/architecture/event-subscriber",
+      "guidePath": "/en/docs/event-subscriber/getting-started",
+      "architecturePath": "/en/docs/event-subscriber",
       "symbols": [
         {
           "name": "createEventChannel",
           "kind": "function",
           "signature": "export declare function createEventChannel<T, R, const S extends IEventApiStyle | undefined, const V = undefined>(options: S extends IEventApiStyle ? IStyledEventChannelOptions<T, S, V> : IEventChannelOptions<T, undefined, V>): ICanonicalEventChannel<T, R, S, V> & (S extends IEventApiStyle ? IStyledEventChannel<T, R, S, V> : Record<never, never>);\nexport declare function createEventChannel<T, R = void, const V = undefined>(options: IEventChannelOptions<T, undefined, V>): ICanonicalEventChannel<T, R, undefined, V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'subscribe-publish'; }): ICanonicalEventChannel<T, R>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'on-emit'; }): ICanonicalEventChannel<T, R, 'on-emit', V> & IStyledEventChannel<T, R, 'on-emit', V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'on-trigger'; }): ICanonicalEventChannel<T, R, 'on-trigger', V> & IStyledEventChannel<T, R, 'on-trigger', V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'listen-fire'; }): ICanonicalEventChannel<T, R, 'listen-fire', V> & IStyledEventChannel<T, R, 'listen-fire', V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(options?: IEventChannelOptions<T, undefined, V>): ICanonicalEventChannel<T, R, undefined, V>;\nexport declare function createEventChannel<T, R = void, V = undefined>(options: IEventChannelOptions<T, IEventApiStyle | undefined, V>, projectionPlan: IEventProjectionPlan): ICanonicalEventChannel<T, R, undefined, V>;",
-          "declarationLine": 55,
+          "declarationLine": 54,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Creates a canonical transient channel backed by an O(1) linked registration list.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createEventChannel.",
@@ -1506,7 +1517,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
+                  "code": "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
                 },
                 {
                   "type": "paragraph",
@@ -1540,6 +1551,10 @@
                 {
                   "type": "paragraph",
                   "text": "`removalPolicy` 决定调用一个订阅句柄时解除多少登记。默认 `handle` 只解除该句柄所属的单次登记；`listener-all` 会同时解除同一 listener 在该 channel 上的全部登记。需要精确管理重复订阅时保持默认值；只有兼容“按函数整体移除”的调用方才选择 `listener-all`。其他值在构造阶段以 `INVALID_OPTIONS` 拒绝。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`throwOnAborted` 默认 `false`：用已经 aborted 的 signal 调用 `subscribeUntil` 时不建立 registration，直接返回空操作的 unsubscribe。设为 `true` 时改为同步抛出 `ABORTED` `TypeError`，适合把“用已取消的 signal 订阅”视为调用方 bug 的场景。非布尔值在构造阶段以 `INVALID_OPTIONS` 拒绝。"
                 },
                 {
                   "type": "paragraph",
@@ -1623,7 +1638,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -1667,6 +1682,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -1811,9 +1831,9 @@
               "name": "throwOnAborted",
               "type": "boolean",
               "optional": true,
-              "description": "Opt in to throwing on already-aborted canonical-channel admission after owned cleanup; the * default returns a rejected receipt without invoking listeners.",
+              "description": "`throwOnAborted` 默认 `false`：用已经 aborted 的 signal 调用 `subscribeUntil` 时不建立 registration，直接返回空操作的 unsubscribe。设为 `true` 时改为同步抛出 `ABORTED` `TypeError`，适合把“用已取消的 signal 订阅”视为调用方 bug 的场景。非布尔值在构造阶段以 `INVALID_OPTIONS` 拒绝。",
               "descriptionEn": "Opt in to throwing on already-aborted canonical-channel admission after owned cleanup; the * default returns a rejected receipt without invoking listeners.",
-              "descriptionZh": ""
+              "descriptionZh": "`throwOnAborted` 默认 `false`：用已经 aborted 的 signal 调用 `subscribeUntil` 时不建立 registration，直接返回空操作的 unsubscribe。设为 `true` 时改为同步抛出 `ABORTED` `TypeError`，适合把“用已取消的 signal 订阅”视为调用方 bug 的场景。非布尔值在构造阶段以 `INVALID_OPTIONS` 拒绝。"
             },
             {
               "name": "style",
@@ -2128,7 +2148,7 @@
           "errors": ["No documented errors are declared for defineEventApiStyle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineEventApiStyle.",
           "examples": [
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }",
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }",
             "const events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()",
             "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
           ],
@@ -2341,7 +2361,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -2385,6 +2405,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -2452,11 +2477,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`publishFailed`(`PUBLISH_FAILED`)、"
+                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -2488,7 +2513,7 @@
           "errors": ["No documented errors are declared for EventAdmissionPolicy."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for EventAdmissionPolicy.",
           "examples": [
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
           "members": [],
           "aliasOf": "EventAdmissionPolicy",
@@ -2705,7 +2730,7 @@
           "errors": ["No documented errors are declared for EventDispatchPolicy."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for EventDispatchPolicy.",
           "examples": [
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
           "members": [],
           "aliasOf": "EventDispatchPolicy",
@@ -2831,7 +2856,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -2875,6 +2900,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -2942,11 +2972,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`publishFailed`(`PUBLISH_FAILED`)、"
+                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -3057,11 +3087,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`publishFailed`(`PUBLISH_FAILED`)、"
+                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -3082,7 +3112,7 @@
           "name": "ICanonicalEventChannel",
           "kind": "type",
           "signature": "export type ICanonicalEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = IEventChannel<T, R, S, V> & { readonly [canonicalChannelBrand]: true; };",
-          "declarationLine": 134,
+          "declarationLine": 136,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "ICanonicalEventChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICanonicalEventChannel.",
@@ -3094,7 +3124,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICanonicalEventChannel.",
           "examples": [
             "import {\n  createEventChannel,\n  type ICanonicalEventChannel,\n  type IEventChannel,\n  type IEventChannelLike,\n  type IEventChannelOptions,\n  type IEventContext,\n  type IEventListener,\n  type IFilteredEventChannel,\n  type IUnsubscribe\n} from '@migaia/event-subscriber'",
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }",
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }",
             "function invokeParallelSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly IListenerResult<R>[]>\nfunction invokeParallel<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly Awaited<R>[]>",
             "function invokeSerialSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly IListenerResult<R>[]>\nfunction invokeSerial<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly Awaited<R>[]>",
             "function invokeTaskSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R>,\n  taskId: string,\n  value: T\n): Promise<IListenerResult<R>>\nfunction invokeTask<T, R>(\n  channel: ICanonicalEventChannel<T, R>,\n  taskId: string,\n  value: T\n): Promise<Awaited<R>>"
@@ -3227,7 +3257,7 @@
           "errors": ["No documented errors are declared for IEventApiStyle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventApiStyle.",
           "examples": [
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
           "members": [],
           "aliasOf": "IEventApiStyle",
@@ -3293,7 +3323,7 @@
           "errors": ["No documented errors are declared for IEventApiStyleNames."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventApiStyleNames.",
           "examples": [
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
           "members": [],
           "aliasOf": "IEventApiStyleNames",
@@ -3347,8 +3377,8 @@
         {
           "name": "IEventChannel",
           "kind": "type",
-          "signature": "export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; subscribeOnce(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; subscribeUntil(signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };",
-          "declarationLine": 109,
+          "signature": "export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; subscribeOnce(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; subscribeUntil(signal: IEventAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };",
+          "declarationLine": 111,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventChannel.",
@@ -3367,7 +3397,7 @@
           "aliasOf": "IEventChannel",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; subscribeOnce(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; subscribeUntil(signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };"
+            "export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; subscribeOnce(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; subscribeUntil(signal: IEventAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3406,7 +3436,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/types.d.ts:IEventChannel:export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; subscribeOnce(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; subscribeUntil(signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };",
+          "identity": "packages/event-subscriber/dist/types.d.ts:IEventChannel:export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; subscribeOnce(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; subscribeUntil(signal: IEventAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };",
           "guidance": [],
           "usageScore": 32,
           "configuration": [],
@@ -3416,7 +3446,7 @@
           "name": "IEventChannelOptions",
           "kind": "type",
           "signature": "export type IEventChannelOptions<T, S extends IEventApiStyle | undefined = undefined, V = undefined> = { readonly report?: (failure: IEventReport<T, V>) => void | PromiseLike<void>; readonly terminalReport?: (error: unknown) => void | PromiseLike<void>; /** Controls synchronous nested publishes while preserving listener snapshot semantics. */ readonly dispatchPolicy?: IEventDispatchPolicy; /** Selects whether one listener identity has one registration or each subscribe owns a new one. */ readonly admissionPolicy?: IEventAdmissionPolicy; /** Controls whether one subscription handle removes only itself or all matching listeners. */ readonly removalPolicy?: 'handle' | 'listener-all'; /** Maximum listener invocations in one top-level synchronous publish transaction. */ readonly publishBudget?: number; /** * Opt in to throwing on already-aborted canonical-channel admission after owned cleanup; the * default returns a rejected receipt without invoking listeners. */ readonly throwOnAborted?: boolean; readonly style?: IEventApiStyleOption<S>; readonly valueConfig?: IValidatedEventValueConfig<T, V>; };",
-          "declarationLine": 176,
+          "declarationLine": 178,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventChannelOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventChannelOptions.",
@@ -3428,7 +3458,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventChannelOptions.",
           "examples": [
             "import {\n  createEventChannel,\n  type ICanonicalEventChannel,\n  type IEventChannel,\n  type IEventChannelLike,\n  type IEventChannelOptions,\n  type IEventContext,\n  type IEventListener,\n  type IFilteredEventChannel,\n  type IUnsubscribe\n} from '@migaia/event-subscriber'",
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
           "members": [],
           "aliasOf": "IEventChannelOptions",
@@ -3614,7 +3644,7 @@
           "name": "IEventHub",
           "kind": "type",
           "signature": "export type IEventHub<C extends IEventMap, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe<K extends keyof C>(key: K, listener: IEventListener<C[K], void, IEventValueForKey<C[K], V>>): IEventHubSubscription<C, IEventHubNextUsedKey<C, never, K>, S, V>; publish<K extends keyof C>(key: K, value: C[K]): void; clear(key?: keyof C): void; size(key?: keyof C): number; };",
-          "declarationLine": 151,
+          "declarationLine": 153,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventHub is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventHub.",
@@ -3683,7 +3713,7 @@
           "name": "IEventHubOptions",
           "kind": "type",
           "signature": "export type IEventHubOptions<C extends IEventMap, S extends IEventApiStyle | undefined = undefined, V = undefined> = { readonly report?: (failure: IEventHubReport<C, V>) => void | PromiseLike<void>; readonly terminalReport?: (error: unknown) => void | PromiseLike<void>; readonly style?: IEventApiStyleOption<S>; readonly valueConfig?: IValidatedEventValueConfig<C[keyof C], V>; };",
-          "declarationLine": 145,
+          "declarationLine": 147,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventHubOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventHubOptions.",
@@ -3751,7 +3781,7 @@
           "name": "IEventHubReport",
           "kind": "type",
           "signature": "export type IEventHubReport<C extends IEventMap, V = undefined> = { [K in keyof C]: { readonly key: K; readonly event: IProjectedEventContext<C[K], IEventValueForKey<C[K], V>>; readonly error: unknown; }; }[keyof C];",
-          "declarationLine": 138,
+          "declarationLine": 140,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventHubReport is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventHubReport.",
@@ -3885,7 +3915,7 @@
           "name": "IEventInvocation",
           "kind": "type",
           "signature": "export type IEventInvocation<R> = { readonly taskId: string | undefined; invoke(): R | PromiseLike<R>; };",
-          "declarationLine": 59,
+          "declarationLine": 61,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "Opaque invocation entry used by consumers that must not receive listener ownership.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventInvocation.",
@@ -3949,7 +3979,7 @@
           "name": "IEventInvocationVisitor",
           "kind": "type",
           "signature": "export type IEventInvocationVisitor<R> = (entries: readonly IEventInvocation<R>[]) => void | PromiseLike<void>;",
-          "declarationLine": 64,
+          "declarationLine": 66,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "Callback supplied to the module-owned invocation scope.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventInvocationVisitor.",
@@ -4013,7 +4043,7 @@
           "name": "IEventMap",
           "kind": "type",
           "signature": "export type IEventMap = object;",
-          "declarationLine": 137,
+          "declarationLine": 139,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventMap is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventMap.",
@@ -4079,7 +4109,7 @@
           "name": "IEventReport",
           "kind": "type",
           "signature": "export type IEventReport<T, V = undefined> = { readonly event: IProjectedEventContext<T, V>; readonly error: unknown; };",
-          "declarationLine": 69,
+          "declarationLine": 71,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventReport is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventReport.",
@@ -4090,7 +4120,7 @@
           "errors": ["No documented errors are declared for IEventReport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventReport.",
           "examples": [
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
           "members": [],
           "aliasOf": "IEventReport",
@@ -4215,7 +4245,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -4259,6 +4289,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -4326,11 +4361,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`publishFailed`(`PUBLISH_FAILED`)、"
+                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -4415,7 +4450,7 @@
           "name": "IFilteredEventChannel",
           "kind": "type",
           "signature": "export type IFilteredEventChannel<T, R = void, V = undefined> = { readonly [filteredChannelBrand]: { readonly value: T; readonly result: R; readonly config: V; }; };",
-          "declarationLine": 127,
+          "declarationLine": 129,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IFilteredEventChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFilteredEventChannel.",
@@ -4484,7 +4519,7 @@
           "name": "IListenerResult",
           "kind": "type",
           "signature": "export type IListenerResult<R> = { readonly status: typeof EventSubscriberState.fulfilled; readonly value: Awaited<R>; } | { readonly status: typeof EventSubscriberState.rejected; readonly reason: unknown; };",
-          "declarationLine": 73,
+          "declarationLine": 75,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IListenerResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IListenerResult.",
@@ -4555,7 +4590,7 @@
           "name": "invokeEachLive",
           "kind": "const",
           "signature": "export declare const invokeEachLive: <T, R, V = undefined>(channel: ICanonicalEventChannel<T, R, undefined, V> | IFilteredEventChannel<T, R, V>, value: T, visitor: (invocation: IEventInvocation<R>) => void) => void;",
-          "declarationLine": 40,
+          "declarationLine": 39,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Visits registrations with append-live visibility while always releasing dispatch bookkeeping.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for invokeEachLive.",
@@ -4701,7 +4736,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -4745,6 +4780,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -4933,7 +4973,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -4977,6 +5017,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -5164,7 +5209,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -5208,6 +5253,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -5326,7 +5376,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -5370,6 +5420,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -5417,7 +5472,7 @@
           "name": "IStyledEventChannel",
           "kind": "type",
           "signature": "export type IStyledEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = IEventChannel<T, R, S, V> & IEventChannelStyleProjection<T, R, S, V>;",
-          "declarationLine": 124,
+          "declarationLine": 126,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IStyledEventChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStyledEventChannel.",
@@ -5481,7 +5536,7 @@
           "name": "IStyledEventHub",
           "kind": "type",
           "signature": "export type IStyledEventHub<C extends IEventMap, S extends IEventApiStyle | undefined = undefined, V = undefined> = IEventHub<C, S, V> & IEventHubStyleProjection<C, S, V>;",
-          "declarationLine": 175,
+          "declarationLine": 177,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IStyledEventHub is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStyledEventHub.",
@@ -5545,7 +5600,7 @@
           "name": "withSnapshotEntries",
           "kind": "const",
           "signature": "export declare const withSnapshotEntries: <T, R, V = undefined>(channel: ICanonicalEventChannel<T, R, undefined, V> | IFilteredEventChannel<T, R, V>, value: T, visitor: IEventInvocationVisitor<R>) => void | Promise<void>;",
-          "declarationLine": 38,
+          "declarationLine": 37,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Runs a callback over one immutable target snapshot and always closes its invocations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for withSnapshotEntries.",
@@ -5621,6 +5676,16 @@
       ],
       "aliases": [
         {
+          "identity": "packages/event-subscriber/dist/types.d.ts:IEventAbortSignal:export type IEventAbortSignal = IAbortSignal;",
+          "name": "IEventAbortSignal",
+          "signature": "export type IEventAbortSignal = IAbortSignal;",
+          "source": "packages/event-subscriber/dist/types.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./subscriber",
+          "ownerModule": "subscriber",
+          "ownerFragment": "event-subscriber-subscriber--IEventAbortSignal"
+        },
+        {
           "identity": "packages/event-subscriber/dist/types.d.ts:IEventChannelLike:export type IEventChannelLike<T, R = void, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; };",
           "name": "IEventChannelLike",
           "signature": "export type IEventChannelLike<T, R = void, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; };",
@@ -5691,9 +5756,9 @@
           "ownerFragment": "event-subscriber-subscriber--subscribeSubscriber"
         },
         {
-          "identity": "packages/event-subscriber/dist/channel.d.ts:subscribeUntil:export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
+          "identity": "packages/event-subscriber/dist/channel.d.ts:subscribeUntil:export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IEventAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
           "name": "subscribeUntil",
-          "signature": "export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
+          "signature": "export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IEventAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./subscriber",
@@ -5715,14 +5780,76 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/event-subscriber/getting-started",
-      "architecturePath": "/en/architecture/event-subscriber",
+      "guidePath": "/en/docs/event-subscriber/getting-started",
+      "architecturePath": "/en/docs/event-subscriber",
       "symbols": [
+        {
+          "name": "IEventAbortSignal",
+          "kind": "type",
+          "signature": "export type IEventAbortSignal = IAbortSignal;",
+          "declarationLine": 39,
+          "source": "packages/event-subscriber/dist/types.d.ts",
+          "purpose": "Public compatibility name for utils-owned structural abort-signal admission.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventAbortSignal.",
+          "advanced": "No additional advanced behavior is declared for IEventAbortSignal.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IEventAbortSignal."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventAbortSignal.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IEventAbortSignal",
+          "exportPath": "./subscriber",
+          "overloadSignatures": ["export type IEventAbortSignal = IAbortSignal;"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IEventAbortSignal when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IEventAbortSignal does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Public compatibility name for utils-owned structural abort-signal admission."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IEventAbortSignal from @migaia/event-subscriber/subscriber, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IEventAbortSignal when its type contract and declared inputs match the result you need. Choose a different public symbol when IEventAbortSignal does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventAbortSignal."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IEventAbortSignal."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/event-subscriber/dist/types.d.ts:IEventAbortSignal:export type IEventAbortSignal = IAbortSignal;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "event-subscriber-subscriber--IEventAbortSignal"
+        },
         {
           "name": "IEventChannelLike",
           "kind": "type",
           "signature": "export type IEventChannelLike<T, R = void, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; };",
-          "declarationLine": 80,
+          "declarationLine": 82,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventChannelLike is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventChannelLike.",
@@ -5791,7 +5918,7 @@
           "name": "IEventContext",
           "kind": "type",
           "signature": "export type IEventContext<T> = { readonly value: T; readonly aborted: boolean; readonly abortReason: unknown; readonly taskId: string | undefined; abort(reason?: unknown): void; setTaskId(taskId: string | undefined): void; };",
-          "declarationLine": 38,
+          "declarationLine": 40,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventContext is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventContext.",
@@ -5803,7 +5930,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventContext.",
           "examples": [
             "import {\n  createEventChannel,\n  type ICanonicalEventChannel,\n  type IEventChannel,\n  type IEventChannelLike,\n  type IEventChannelOptions,\n  type IEventContext,\n  type IEventListener,\n  type IFilteredEventChannel,\n  type IUnsubscribe\n} from '@migaia/event-subscriber'",
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }",
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }",
             "type IEventContext<T> = {\n  readonly value: T\n  readonly aborted: boolean\n  readonly abortReason: unknown\n  readonly taskId: string | undefined\n  abort(reason?: unknown): void\n  setTaskId(taskId: string | undefined): void\n}",
             "function subscribeSubscriber<T, R>(\n  channel: IEventChannelLike<T, R>,\n  subscriber: IEventSubscriber<T, R>\n): IUnsubscribe\n\ntype IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | PromiseLike<R> }",
             "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]",
@@ -5862,7 +5989,7 @@
           "name": "IEventListener",
           "kind": "type",
           "signature": "export type IEventListener<T, R = void, V = undefined> = (event: IProjectedEventContext<T, V>) => R | PromiseLike<R>;",
-          "declarationLine": 65,
+          "declarationLine": 67,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventListener is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventListener.",
@@ -5932,7 +6059,7 @@
           "name": "IEventSubscriber",
           "kind": "type",
           "signature": "export type IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | PromiseLike<R>; };",
-          "declarationLine": 66,
+          "declarationLine": 68,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventSubscriber is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventSubscriber.",
@@ -6003,7 +6130,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -6047,6 +6174,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -6114,11 +6246,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`publishFailed`(`PUBLISH_FAILED`)、"
+                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -6207,7 +6339,7 @@
           "name": "subscribeOnce",
           "kind": "const",
           "signature": "export declare const subscribeOnce: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
-          "declarationLine": 76,
+          "declarationLine": 75,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Installs once semantics on any event-subscriber-compatible structural channel.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for subscribeOnce.",
@@ -6341,7 +6473,7 @@
           "name": "subscribeSubscriber",
           "kind": "const",
           "signature": "export declare const subscribeSubscriber: <T, R>(channel: IEventChannelLike<T, R>, subscriber: { readonly handle?: unknown; }) => IUnsubscribe;",
-          "declarationLine": 72,
+          "declarationLine": 71,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Registers a subscriber object without introducing a class hierarchy.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for subscribeSubscriber.",
@@ -6445,7 +6577,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -6489,6 +6621,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -6535,8 +6672,8 @@
         {
           "name": "subscribeUntil",
           "kind": "const",
-          "signature": "export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
-          "declarationLine": 80,
+          "signature": "export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IEventAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
+          "declarationLine": 79,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Installs abort-linked subscription with a helper-owned overlay and closed race protocol.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for subscribeUntil.",
@@ -6557,7 +6694,7 @@
           "aliasOf": "subscribeUntil",
           "exportPath": "./subscriber",
           "overloadSignatures": [
-            "export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;"
+            "export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IEventAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6596,7 +6733,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/channel.d.ts:subscribeUntil:export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
+          "identity": "packages/event-subscriber/dist/channel.d.ts:subscribeUntil:export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IEventAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
           "guidance": [
             {
               "id": "subscribeuntil",
@@ -6633,7 +6770,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -6677,6 +6814,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -6767,7 +6909,7 @@
               ]
             }
           ],
-          "usageScore": 134,
+          "usageScore": 144,
           "configuration": [],
           "fragment": "event-subscriber-subscriber--subscribeUntil"
         }

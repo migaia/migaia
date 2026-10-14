@@ -17,7 +17,10 @@ import { ReactiveErrorText } from '../error-text.js'
  */
 const OWNERS = new WeakMap<object, IRuntime>()
 
-/** 登记归属。同一个对象重复登记到不同 Runtime 视为编程错误——那意味着它同时属于 两张图，之后任何一次校验都无法给出正确答案。 */
+/**
+ * Registers ownership. Assigning one object to different runtimes is a programming error because it
+ * would belong to two graphs.
+ */
 export function claimOwnership(value: object, runtime: IRuntime): void {
   const existing = OWNERS.get(value)
   if (existing && existing !== runtime) {
@@ -29,7 +32,10 @@ export function claimOwnership(value: object, runtime: IRuntime): void {
   OWNERS.set(value, runtime)
 }
 
-/** 查归属。未登记返回 undefined——调用方据此区分「不归任何图」与「归错图」。 */
+/**
+ * Returns ownership, or `undefined` for an unregistered value. Callers can distinguish no graph
+ * ownership from incorrect ownership.
+ */
 export function ownerOf(value: unknown): IRuntime | undefined {
   if (typeof value !== 'object' || value === null) return undefined
   const owner = OWNERS.get(value)
@@ -39,9 +45,11 @@ export function ownerOf(value: unknown): IRuntime | undefined {
 }
 
 /**
- * 断言归属。
+ * Asserts ownership for values registered with a runtime.
  *
- * 未登记的对象一律放行：第三方可以把自己的普通值注册进 Registry，那不涉及图。 只有**登记过且归属不符**才是错误——那才是两张图被接在一起的那一刻。
+ * Unregistered values are accepted because third-party ordinary registry values do not join the
+ * graph. Only registered values with a different owner fail, preventing two graphs from being
+ * joined.
  */
 export function assertOwnedBy(value: unknown, runtime: IRuntime, what: string): void {
   const owner = ownerOf(value)
@@ -54,9 +62,11 @@ export function assertOwnedBy(value: unknown, runtime: IRuntime, what: string): 
 }
 
 /**
- * 内核图边界使用的严格断言。
+ * Strict ownership assertion at kernel graph boundaries.
  *
- * 普通 Registry 值可以没有 owner；真正进入依赖图的节点则必须由受信工厂登记。 否则第三方只要伪造一个 `runtime` 字段，就能把可变的 subs/version 接进图里。
+ * Ordinary registry values may lack an owner. Nodes entering the dependency graph require trusted
+ * registration. A fabricated `runtime` field cannot attach mutable `subs` or `version` state to the
+ * graph.
  */
 export function assertReactiveOwnedBy(value: object, runtime: IRuntime, what: string): void {
   const owner = OWNERS.get(value)

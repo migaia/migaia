@@ -3,7 +3,10 @@ import { isUint8Array } from '../core/bytes.js'
 import type { ICodec } from './types.js'
 import { StorageCodecOutput } from '../constants.js'
 
-/** 调用方自带字节，走 setBytes 通道；遇 text-only 后端自动 base64 降级（体积 +33%）。 */
+/**
+ * Stores caller-supplied bytes through `setBytes`. Text-only backends use a base64 fallback with
+ * about 33% larger output.
+ */
 export const binaryCodec: ICodec<Uint8Array, Uint8Array> = Object.freeze({
   name: 'binary',
   output: StorageCodecOutput.binary,

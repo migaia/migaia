@@ -1,86 +1,96 @@
 /**
- * `@migaia/store-ssr` 错误码的唯一声明处。
+ * Declares the public error codes for `@migaia/store-ssr` in one place.
  *
- * 契约见 `docs/contracts/error-codes.md`：错误由 `(source, code)` 二元组唯一定位，`source` 恒为
- * `'@migaia/store-ssr'`。抛出点必须引用本文件的常量，不得内联字面量。
+ * The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The
+ * `source` is always `'@migaia/store-ssr'`. Throw sites use these constants instead of inline
+ * literals.
  *
- * 码值是公开 API 的一部分，改名等同破坏性变更（`docs/contracts/error-code-rollout.sdd.md` §1.2）。
+ * Code values are public API. Renaming a code is a breaking change
+ * (`docs/contracts/error-code-rollout.sdd.md` §1.2).
  */
 export const StoreSsrErrorCode = {
   /**
-   * 在请求 scope 释放（disposed）后继续注册/脱水/读取。
+   * Registration, dehydration, or reads continue after request scope disposal.
    *
-   * 调用方不得复用已释放的请求 scope；每个请求新建一个 `SSRRequestScope`。
+   * Create a new `SSRRequestScope` for each request instead of reusing the disposed scope.
    */
   scopeDisposed: 'SCOPE_DISPOSED',
 
   /**
-   * 请求 scope 释放时多个 store/resource 清理失败，作为 `AggregateError` 抛出。
+   * Multiple stores or resources fail to clean up during request scope disposal. An
+   * `AggregateError` exposes each cause through `errors[]`.
    *
-   * 各失败原因沿 `errors[]` 可达；调用方按释放失败处理。
+   * Treat this as a disposal failure.
    */
   scopeDisposalFailed: 'SCOPE_DISPOSAL_FAILED',
 
   /**
-   * `hydrate()` 对多个 store/resource 应用失败，作为 `AggregateError` 抛出（尽力而为，非原子）。
+   * `hydrate()` fails to apply state to multiple stores or resources. Hydration is best-effort and
+   * non-atomic. An `AggregateError` exposes each cause through `errors[]`.
    *
-   * 各失败原因沿 `errors[]` 可达；调用方按水合失败处理。
+   * Treat this as a hydration failure.
    */
   hydrateFailed: 'HYDRATE_FAILED',
 
   /**
-   * SSR 快照形状非法：`stores`/`resources` 不是纯对象，或某个资源快照字段非法。
+   * An SSR snapshot is invalid because `stores` or `resources` is not a plain object, or a resource
+   * snapshot field is invalid.
    *
-   * 调用方检查传入的 `ISSRState` 结构。
+   * Check the supplied `ISSRState` structure.
    */
   invalidSnapshot: 'INVALID_SNAPSHOT',
 
   /**
-   * 内联状态脚本 id 非法，或 `ISSRState.version` 不是受支持的 1。
+   * The inline state script ID is invalid or `ISSRState.version` is not the supported version `1`.
    *
-   * 调用方使用合法 id / 受支持的版本号。
+   * Use a valid ID and the supported version.
    */
   invalidStateScript: 'INVALID_STATE_SCRIPT',
 
   /**
-   * SSR store/resource 注册键非法（空串或 `__proto__`）。
+   * An SSR store or resource registration key is empty or equals `__proto__`.
    *
-   * 调用方使用非空、非保留的字符串键。
+   * Use a non-empty, non-reserved string key.
    */
   invalidStoreKey: 'INVALID_STORE_KEY',
 
   /**
-   * 载荷包含无法 JSON 序列化的值：循环引用、非有限数、非纯对象、 超节点/深度上限、或非 JSON 类型。
+   * The payload is not JSON-serializable because it contains cycles, non-finite numbers, non-plain
+   * objects, non-JSON types, or exceeds node or depth limits.
    *
-   * 调用方把状态收敛为可 JSON 序列化的纯值。
+   * Restrict state to JSON-serializable plain values.
    */
   serializeUnsupported: 'SERIALIZE_UNSUPPORTED',
 
   /**
-   * 入参校验失败：`timeoutMs` 非法、同时给 `runtime` 与 `runtimeOptions`、键重复。
+   * Input validation fails for `timeoutMs`, simultaneous `runtime` and `runtimeOptions`, or
+   * duplicate keys.
    *
-   * 调用方修正参数；具体是哪个参数见消息文案。
+   * Correct the input named in the error message.
    */
   invalidOption: 'INVALID_OPTION',
 
   /**
-   * 注册的 store/resource 属于另一个 Runtime，与本请求 scope 不隔离。
+   * A registered store or resource belongs to another `Runtime` and does not share this request
+   * scope isolation.
    *
-   * 调用方在同一 Runtime 内创建 store/resource 再注册。
+   * Create and register the store or resource within the same `Runtime`.
    */
   crossRuntime: 'CROSS_RUNTIME',
 
   /**
-   * Codec 契约/注册问题：encode 返回了 value chunk（应产出 wire 数据）， 或载荷引用的 codec 类型在读取侧未注册。
+   * A codec violates its output or registration contract. `encode` returns a value chunk instead of
+   * wire data, or the payload names a codec type not registered on the reader.
    *
-   * 调用方修正 codec 输出，或先注册对应 codec 再读取。
+   * Correct the codec output or register the codec before reading.
    */
   codecContract: 'CODEC_CONTRACT',
 
   /**
-   * `awaitResources()` 期间资源持续注册新资源，超过探测轮数上限仍未收敛。
+   * Resources keep registering new resources during `awaitResources()` and exceed the convergence
+   * round limit.
    *
-   * 调用方检查资源工厂/依赖是否形成了无限注册链。
+   * Check resource factories and dependencies for an infinite registration chain.
    */
   resourceRoundLimit: 'RESOURCE_ROUND_LIMIT',
 

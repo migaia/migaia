@@ -1,65 +1,73 @@
 /**
- * `@migaia/store-persist` 错误码的唯一声明处。
+ * Declares the public error codes for `@migaia/store-persist` in one place.
  *
- * 契约见 `docs/contracts/error-codes.md`：错误由 `(source, code)` 二元组唯一定位，`source` 恒为
- * `'@migaia/store-persist'`。抛出点必须引用本文件的常量，不得内联字面量。
+ * The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The
+ * `source` is always `'@migaia/store-persist'`. Throw sites use these constants instead of inline
+ * literals.
  *
- * 码值是公开 API 的一部分，改名等同破坏性变更（`docs/contracts/error-code-rollout.sdd.md` §1.2）。
+ * Code values are public API. Renaming a code is a breaking change
+ * (`docs/contracts/error-code-rollout.sdd.md` §1.2).
  */
 export const StorePersistErrorCode = {
   /**
-   * 没有为某个 key 解析到 codec。
+   * No codec resolves for a storage key.
    *
-   * 调用方为 `persist`/`persistUnit` 显式提供 `codec`，或确认默认 codec 可用。
+   * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available.
    */
   codecNotResolved: 'CODEC_NOT_RESOLVED',
 
   /**
-   * Codec 的产出形态与后端能力/契约不匹配（structured 不受支持、binary 未产出字节、text 未产出字符串等）。
+   * Codec output does not match the backend capabilities or contract. Examples include unsupported
+   * structured output, non-byte binary output, and non-string text output.
    *
-   * 调用方检查 codec 的 `output` 与后端 `capabilities`；这是配置/实现错配，不是瞬时失败。
+   * Check the codec `output` and backend `capabilities`. This is a configuration or implementation
+   * mismatch, not a transient failure.
    */
   codecOutputMismatch: 'CODEC_OUTPUT_MISMATCH',
 
   /**
-   * Binary codec 需要后端的 `getBytes`/`setBytes` 能力，但当前 storage 不具备。
+   * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them.
    *
-   * 调用方换一个 record-capable 后端（memory/IndexedDB），或改用 text codec。
+   * Use a record-capable backend such as memory or IndexedDB, or use a text codec.
    */
   backendCapability: 'BACKEND_CAPABILITY',
 
   /**
-   * 存档 envelope 非法或版本与当前 store 不匹配（缺 state、version 不可用、版本不一致需 migrate）。
+   * The saved envelope is invalid or incompatible with the current store version. Its state may be
+   * missing, its version invalid, or its version different without a migration.
    *
-   * 调用方检查存档是否被损坏、version 是否与 `persist` 配置一致；版本不一致时提供 `migrate`。
+   * Check the archive and configured `version`. Provide `migrate` for a version mismatch.
    */
   envelopeInvalid: 'ENVELOPE_INVALID',
 
   /**
-   * 编码失败（JSON codec 无法序列化该值）。
+   * The JSON codec fails to serialize a value.
    *
-   * 调用方检查待存值是否可 JSON 序列化；原始异常在 `cause`。
+   * Check whether the value is JSON-serializable. The original exception remains in `cause`.
    */
   encodeFailed: 'ENCODE_FAILED',
 
   /**
-   * Hydrate 与随后的写回都失败了（`AggregateError`，两个原因都沿链可达）。
+   * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its
+   * error chain.
    *
-   * 调用方展开 `error.errors` 分别处理；这是双重失败，不是单一瞬时错误。
+   * Inspect `error.errors` and handle each failure. This is a double failure, not one transient
+   * error.
    */
   hydrateAndWriteFailed: 'HYDRATE_AND_WRITE_FAILED',
 
   /**
-   * 持久化操作因 `dispose()` 被中止（错误名保持 `AbortError`）。
+   * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`.
    *
-   * 调用方按取消处理；dispose 后不再写回。
+   * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of
+   * active operations. An in-flight adapter may still complete.
    */
   abortedByDispose: 'ABORTED_BY_DISPOSE',
 
   /**
-   * 持久化配置入参非法（version 必须是安全非负整数等）。
+   * Persistence options are invalid, for example when `version` is not a safe non-negative integer.
    *
-   * 调用方修正配置后重试；这是永久性参数错误。
+   * Correct the configuration before retrying. This is a permanent input error.
    */
   invalidOption: 'INVALID_OPTION'
 } as const

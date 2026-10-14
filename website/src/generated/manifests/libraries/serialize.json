@@ -1819,8 +1819,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "emitOutput",
@@ -3329,8 +3329,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "asCodecValue",
@@ -4292,8 +4292,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "defineCBORCodec",
@@ -4451,8 +4451,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "identityCodec",
@@ -4600,8 +4600,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [],
       "aliases": [
         {
@@ -4629,8 +4629,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "defineJsonCodec",
@@ -4788,8 +4788,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "defineMessagePackCodec",
@@ -4947,8 +4947,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "defineProtobufCodec",
@@ -5173,8 +5173,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "assertSerializeType",
@@ -5757,7 +5757,7 @@
               "name": "signal",
               "type": "IAbortSignal",
               "optional": true,
-              "description": "结构化取消信号：只描述 `AbortSignal` 用到的那部分形状，不依赖 DOM lib.d.ts—— 这个包要在 Deno/Bun/小程序等不一定有全局 `AbortSignal` 类型的运行时里可用。 故意在这里复制一份而不是从 `@migaia/rpc/core` 里借用同名类型：serialize 是 store-persist/store-ssr/store-worker 依赖的底层 codec 原语，而 RPC core 是更上层的传输层；反向依赖会倒置层次，也会让只需要 codec 的消费者被迫依赖整个 RPC 包。 / import { SERIALIZE_SOURCE, createSerializeRangeError, createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.js' import { isUint8Array } from '@migaia/utils/bytes' import type { ISerializeErrorCode } from './error-code.js' import { SerializeChunkKind, SerializeCleanupKind, SerializeCleanupPolicy, SerializePhase } from './format-constants.js' /** 序列化分段协议。 每一段都自带形态标签，框架据此决定怎么把多段拼成完整结果——所以一次输出里 允许混用形态（例如先吐一段 text 头、再流式吐若干 bytes 体）。这是异步与流式 能力的落点：parser 可以返回单段、Promise、或异步可迭代对象。 三种形态各自的意义： text —— 字符串线材。落 localStorage、内联进 HTML 走这条。 bytes —— 字节线材。transfer 零拷贝、落 IndexedDB、喂 wasm 走这条。 value —— 已经是成品对象，不需要再解析。用于「直通」型 parser（例如 memory storage 或测试桩），避免为了走流程而做一次无谓的编解码往返。 / export type ISerializeChunk = | readonly [typeof SerializeChunkKind.text, string] | readonly [typeof SerializeChunkKind.bytes, Uint8Array] | readonly [typeof SerializeChunkKind.value, unknown] export type ISerializeChunkType = ISerializeChunk[0] export type ISerializeContext = { /** 协作式取消。parser 若忽略它，框架仍会丢弃其结果并以 AbortError 结束。"
+              "description": "结构化取消信号：只描述 `AbortSignal` 用到的那部分形状，不依赖 DOM lib.d.ts—— 这个包要在 Deno/Bun/小程序等不一定有全局 `AbortSignal` 类型的运行时里可用。 故意在这里复制一份而不是从 `@migaia/rpc/core` 里借用同名类型：serialize 是 store-persist/store-ssr/store-worker 依赖的底层 codec 原语，而 RPC core 是更上层的传输层；反向依赖会倒置层次，也会让只需要 codec 的消费者被迫依赖整个 RPC 包。 / import { SERIALIZE_SOURCE, createSerializeRangeError, createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.js' import { isUint8Array } from '@migaia/utils/bytes' import type { ISerializeErrorCode } from './error-code.js' import { SerializeChunkKind, SerializeCleanupKind, SerializeCleanupPolicy, SerializePhase } from './format-constants.js' /** Serialization chunk protocol. Each chunk carries a kind tag that controls assembly. One output can mix kinds, such as a text header followed by streamed byte chunks. Parsers can produce a single chunk, a Promise, or an async iterable. `text` carries wire text for localStorage or inline HTML. `bytes` carries wire bytes for zero-copy transfer, IndexedDB, or Wasm. `value` carries a complete object requiring no further parsing. Passthrough parsers, such as memory storage or test stubs, avoid an unnecessary encoding round trip. / export type ISerializeChunk = | readonly [typeof SerializeChunkKind.text, string] | readonly [typeof SerializeChunkKind.bytes, Uint8Array] | readonly [typeof SerializeChunkKind.value, unknown] export type ISerializeChunkType = ISerializeChunk[0] export type ISerializeContext = { /** Cancellation signal. Even if the parser ignores it, the registry rejects with `ABORTED` and discards the eventual result."
             },
             {
               "name": "empty",
@@ -5769,7 +5769,7 @@
               "name": "context",
               "type": "string",
               "optional": true,
-              "description": "出错时拼进消息，用来定位是哪个 store / 哪个 key 出的事。"
+              "description": "Included in failure messages to identify the affected store or key."
             }
           ],
           "identity": "packages/serialize/dist/stream.d.ts:collectStream:export declare function collectStream(chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>, encoder?: ITextEncoder, options?: ICollectStreamOptions): Promise<ISerializeChunk>;",
@@ -5978,7 +5978,7 @@
               "type": "string",
               "optional": true,
               "description": "`registry.encode`/`.decode` 传入未注册 `type` — `SerializeCodecError` — `CODEC_NOT_FOUND` — `context` 固定为 `'registry'`",
-              "descriptionEn": "",
+              "descriptionEn": "Included in failure messages to identify the affected store or key.",
               "descriptionZh": "`registry.encode`/`.decode` 传入未注册 `type` — `SerializeCodecError` — `CODEC_NOT_FOUND` — `context` 固定为 `'registry'`"
             }
           ],
@@ -6799,7 +6799,7 @@
               "name": "context",
               "type": "string",
               "optional": true,
-              "description": "出错时拼进消息，用来定位是哪个 store / 哪个 key 出的事。"
+              "description": "Included in failure messages to identify the affected store or key."
             },
             {
               "name": "maxInFlight",
@@ -6841,7 +6841,7 @@
               "name": "signal",
               "type": "IAbortSignal",
               "optional": true,
-              "description": "结构化取消信号：只描述 `AbortSignal` 用到的那部分形状，不依赖 DOM lib.d.ts—— 这个包要在 Deno/Bun/小程序等不一定有全局 `AbortSignal` 类型的运行时里可用。 故意在这里复制一份而不是从 `@migaia/rpc/core` 里借用同名类型：serialize 是 store-persist/store-ssr/store-worker 依赖的底层 codec 原语，而 RPC core 是更上层的传输层；反向依赖会倒置层次，也会让只需要 codec 的消费者被迫依赖整个 RPC 包。 / import { SERIALIZE_SOURCE, createSerializeRangeError, createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.js' import { isUint8Array } from '@migaia/utils/bytes' import type { ISerializeErrorCode } from './error-code.js' import { SerializeChunkKind, SerializeCleanupKind, SerializeCleanupPolicy, SerializePhase } from './format-constants.js' /** 序列化分段协议。 每一段都自带形态标签，框架据此决定怎么把多段拼成完整结果——所以一次输出里 允许混用形态（例如先吐一段 text 头、再流式吐若干 bytes 体）。这是异步与流式 能力的落点：parser 可以返回单段、Promise、或异步可迭代对象。 三种形态各自的意义： text —— 字符串线材。落 localStorage、内联进 HTML 走这条。 bytes —— 字节线材。transfer 零拷贝、落 IndexedDB、喂 wasm 走这条。 value —— 已经是成品对象，不需要再解析。用于「直通」型 parser（例如 memory storage 或测试桩），避免为了走流程而做一次无谓的编解码往返。 / export type ISerializeChunk = | readonly [typeof SerializeChunkKind.text, string] | readonly [typeof SerializeChunkKind.bytes, Uint8Array] | readonly [typeof SerializeChunkKind.value, unknown] export type ISerializeChunkType = ISerializeChunk[0] export type ISerializeContext = { /** 协作式取消。parser 若忽略它，框架仍会丢弃其结果并以 AbortError 结束。"
+              "description": "结构化取消信号：只描述 `AbortSignal` 用到的那部分形状，不依赖 DOM lib.d.ts—— 这个包要在 Deno/Bun/小程序等不一定有全局 `AbortSignal` 类型的运行时里可用。 故意在这里复制一份而不是从 `@migaia/rpc/core` 里借用同名类型：serialize 是 store-persist/store-ssr/store-worker 依赖的底层 codec 原语，而 RPC core 是更上层的传输层；反向依赖会倒置层次，也会让只需要 codec 的消费者被迫依赖整个 RPC 包。 / import { SERIALIZE_SOURCE, createSerializeRangeError, createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.js' import { isUint8Array } from '@migaia/utils/bytes' import type { ISerializeErrorCode } from './error-code.js' import { SerializeChunkKind, SerializeCleanupKind, SerializeCleanupPolicy, SerializePhase } from './format-constants.js' /** Serialization chunk protocol. Each chunk carries a kind tag that controls assembly. One output can mix kinds, such as a text header followed by streamed byte chunks. Parsers can produce a single chunk, a Promise, or an async iterable. `text` carries wire text for localStorage or inline HTML. `bytes` carries wire bytes for zero-copy transfer, IndexedDB, or Wasm. `value` carries a complete object requiring no further parsing. Passthrough parsers, such as memory storage or test stubs, avoid an unnecessary encoding round trip. / export type ISerializeChunk = | readonly [typeof SerializeChunkKind.text, string] | readonly [typeof SerializeChunkKind.bytes, Uint8Array] | readonly [typeof SerializeChunkKind.value, unknown] export type ISerializeChunkType = ISerializeChunk[0] export type ISerializeContext = { /** Cancellation signal. Even if the parser ignores it, the registry rejects with `ABORTED` and discards the eventual result."
             },
             {
               "name": "scheduler",
@@ -6998,7 +6998,7 @@
               "type": "string",
               "optional": true,
               "description": "`registry.encode`/`.decode` 传入未注册 `type` — `SerializeCodecError` — `CODEC_NOT_FOUND` — `context` 固定为 `'registry'`",
-              "descriptionEn": "",
+              "descriptionEn": "Included in failure messages to identify the affected store or key.",
               "descriptionZh": "`registry.encode`/`.decode` 传入未注册 `type` — `SerializeCodecError` — `CODEC_NOT_FOUND` — `context` 固定为 `'registry'`"
             },
             {
@@ -9692,7 +9692,7 @@
               "name": "signal",
               "type": "IAbortSignal",
               "optional": true,
-              "description": "结构化取消信号：只描述 `AbortSignal` 用到的那部分形状，不依赖 DOM lib.d.ts—— 这个包要在 Deno/Bun/小程序等不一定有全局 `AbortSignal` 类型的运行时里可用。 故意在这里复制一份而不是从 `@migaia/rpc/core` 里借用同名类型：serialize 是 store-persist/store-ssr/store-worker 依赖的底层 codec 原语，而 RPC core 是更上层的传输层；反向依赖会倒置层次，也会让只需要 codec 的消费者被迫依赖整个 RPC 包。 / import { SERIALIZE_SOURCE, createSerializeRangeError, createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.js' import { isUint8Array } from '@migaia/utils/bytes' import type { ISerializeErrorCode } from './error-code.js' import { SerializeChunkKind, SerializeCleanupKind, SerializeCleanupPolicy, SerializePhase } from './format-constants.js' /** 序列化分段协议。 每一段都自带形态标签，框架据此决定怎么把多段拼成完整结果——所以一次输出里 允许混用形态（例如先吐一段 text 头、再流式吐若干 bytes 体）。这是异步与流式 能力的落点：parser 可以返回单段、Promise、或异步可迭代对象。 三种形态各自的意义： text —— 字符串线材。落 localStorage、内联进 HTML 走这条。 bytes —— 字节线材。transfer 零拷贝、落 IndexedDB、喂 wasm 走这条。 value —— 已经是成品对象，不需要再解析。用于「直通」型 parser（例如 memory storage 或测试桩），避免为了走流程而做一次无谓的编解码往返。 / export type ISerializeChunk = | readonly [typeof SerializeChunkKind.text, string] | readonly [typeof SerializeChunkKind.bytes, Uint8Array] | readonly [typeof SerializeChunkKind.value, unknown] export type ISerializeChunkType = ISerializeChunk[0] export type ISerializeContext = { /** 协作式取消。parser 若忽略它，框架仍会丢弃其结果并以 AbortError 结束。"
+              "description": "结构化取消信号：只描述 `AbortSignal` 用到的那部分形状，不依赖 DOM lib.d.ts—— 这个包要在 Deno/Bun/小程序等不一定有全局 `AbortSignal` 类型的运行时里可用。 故意在这里复制一份而不是从 `@migaia/rpc/core` 里借用同名类型：serialize 是 store-persist/store-ssr/store-worker 依赖的底层 codec 原语，而 RPC core 是更上层的传输层；反向依赖会倒置层次，也会让只需要 codec 的消费者被迫依赖整个 RPC 包。 / import { SERIALIZE_SOURCE, createSerializeRangeError, createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.js' import { isUint8Array } from '@migaia/utils/bytes' import type { ISerializeErrorCode } from './error-code.js' import { SerializeChunkKind, SerializeCleanupKind, SerializeCleanupPolicy, SerializePhase } from './format-constants.js' /** Serialization chunk protocol. Each chunk carries a kind tag that controls assembly. One output can mix kinds, such as a text header followed by streamed byte chunks. Parsers can produce a single chunk, a Promise, or an async iterable. `text` carries wire text for localStorage or inline HTML. `bytes` carries wire bytes for zero-copy transfer, IndexedDB, or Wasm. `value` carries a complete object requiring no further parsing. Passthrough parsers, such as memory storage or test stubs, avoid an unnecessary encoding round trip. / export type ISerializeChunk = | readonly [typeof SerializeChunkKind.text, string] | readonly [typeof SerializeChunkKind.bytes, Uint8Array] | readonly [typeof SerializeChunkKind.value, unknown] export type ISerializeChunkType = ISerializeChunk[0] export type ISerializeContext = { /** Cancellation signal. Even if the parser ignores it, the registry rejects with `ABORTED` and discards the eventual result."
             },
             {
               "name": "scheduler",
@@ -10132,8 +10132,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "IJsonPluginOptions",
@@ -10506,8 +10506,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "chunkToBytes",
@@ -11180,7 +11180,7 @@
               "name": "cleanup.report",
               "type": "(d: ISerializeCleanupError) => void",
               "optional": false,
-              "description": "通用 registry 二次/迟到错误 reporter（可选；不提供时用本 registry 的固定静态 no-op fallback）。 承载两类语义：① iterator `return()` 的二次错误（active drain 期，`drainAsyncIterable` 上报）； ② deadline 后 detached task 的迟到 rejection（cleanup 后，`track` 上报，不重新接入 registry 生命周期）。 两类都不改变 primary rejection，也不改变 terminal。"
+              "description": "Optional reporter for secondary or late registry failures. Defaults to a fixed static no-op. Reports iterator `return()` failures during active draining through `drainAsyncIterable`. Also reports late rejections from detached work after the deadline and cleanup through `track`. Late work does not rejoin the registry lifecycle. Neither report changes the primary rejection or terminal state."
             },
             {
               "name": "onDrainTimeout",
@@ -11444,9 +11444,9 @@
               "name": "cleanup.report",
               "type": "(d: ISerializeCleanupError) => void",
               "optional": false,
-              "description": "通用 registry 二次/迟到错误 reporter（可选；不提供时用本 registry 的固定静态 no-op fallback）。 承载两类语义：① iterator `return()` 的二次错误（active drain 期，`drainAsyncIterable` 上报）； ② deadline 后 detached task 的迟到 rejection（cleanup 后，`track` 上报，不重新接入 registry 生命周期）。 两类都不改变 primary rejection，也不改变 terminal。",
-              "descriptionEn": "",
-              "descriptionZh": "通用 registry 二次/迟到错误 reporter（可选；不提供时用本 registry 的固定静态 no-op fallback）。 承载两类语义：① iterator `return()` 的二次错误（active drain 期，`drainAsyncIterable` 上报）； ② deadline 后 detached task 的迟到 rejection（cleanup 后，`track` 上报，不重新接入 registry 生命周期）。 两类都不改变 primary rejection，也不改变 terminal。"
+              "description": "Optional reporter for secondary or late registry failures. Defaults to a fixed static no-op. Reports iterator `return()` failures during active draining through `drainAsyncIterable`. Also reports late rejections from detached work after the deadline and cleanup through `track`. Late work does not rejoin the registry lifecycle. Neither report changes the primary rejection or terminal state.",
+              "descriptionEn": "Optional reporter for secondary or late registry failures. Defaults to a fixed static no-op. Reports iterator `return()` failures during active draining through `drainAsyncIterable`. Also reports late rejections from detached work after the deadline and cleanup through `track`. Late work does not rejoin the registry lifecycle. Neither report changes the primary rejection or terminal state.",
+              "descriptionZh": ""
             },
             {
               "name": "onDrainTimeout",

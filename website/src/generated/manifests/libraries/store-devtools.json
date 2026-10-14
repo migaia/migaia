@@ -785,8 +785,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-devtools/getting-started",
-      "architecturePath": "/en/architecture/store-devtools",
+      "guidePath": "/en/docs/store-devtools/getting-started",
+      "architecturePath": "/en/docs/store-devtools",
       "symbols": [
         {
           "name": "createStoreDevTools",

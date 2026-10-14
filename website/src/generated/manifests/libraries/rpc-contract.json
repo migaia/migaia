@@ -715,8 +715,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "createDescriptor",
@@ -2127,8 +2127,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "captureRpcBinaryData",
@@ -3216,8 +3216,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [],
       "aliases": [
         {
@@ -3295,8 +3295,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "assertRpcNativeBinaryFrameSize",
@@ -4006,8 +4006,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "prepareRpcBinary",
@@ -4478,8 +4478,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "classifyRpcContractError",
@@ -6842,8 +6842,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "assertRpcPhysicalFrameSize",
@@ -8158,8 +8158,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "createJsonRpcFrameDecoder",
@@ -8866,8 +8866,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "createRpcBootstrapFrameReceiver",
@@ -9824,8 +9824,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "messageFramer",
@@ -10068,8 +10068,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "acceptRpcHandshake",
@@ -11174,8 +11174,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "IRpcPortableBytes",
@@ -11656,8 +11656,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "IRpcByteRuntimeBootstrap",
@@ -14247,8 +14247,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "normalizeRuntimeEnvelope",
@@ -14680,8 +14680,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "createRuntimeCallEnvelope",
@@ -14908,8 +14908,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [],
       "aliases": []
     },
@@ -14926,8 +14926,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "checkRpcRuntimeStreamFinish",
@@ -16366,8 +16366,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "IRpcDiscoveryEnvelope",
@@ -17048,8 +17048,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "IRpcApplicationPayload",

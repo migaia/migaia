@@ -132,8 +132,9 @@ const defaultDiagnostic = (message: string): void => {
 }
 
 /**
- * 声明式定义一类 record。`connect()` 把定义绑定到具体 backend，产出可反复调用 get/put/remove/list/stream/batch 的仓储对象。 同一个
- * definition 可以 connect 到多个 backend，行为在两者上保持一致。
+ * Defines a record entity declaratively. `connect()` binds the definition to a backend and returns
+ * a repository for repeated `get`, `put`, `remove`, `list`, `stream`, and `batch` calls. The same
+ * definition can connect to multiple backends with consistent behavior.
  */
 export function defineEntity<TDomain, TStored = TDomain>(
   options: IEntityOptions<TDomain, TStored, never> & { readonly indexes?: undefined }

@@ -68,9 +68,10 @@ export class RpcError extends Error implements IRpcError {
 }
 
 /**
- * 给已构造的错误对象（`TypeError`/`RangeError` 等）补上 `(source, code)`，不触碰
- * `message`/`name`/`stack`/构造函数带来的其它字段—— 用于入参校验这类必须保持原生类型（调用方按 `instanceof TypeError`
- * 分支）的场景（`docs/contracts/error-codes.md` §2.2）。
+ * Attaches `(source, code)` to an existing error such as `TypeError` or `RangeError`. Preserves
+ * `message`, `name`, `stack`, and other fields supplied by the constructor. Use it for argument
+ * validation that must preserve the native error type for `instanceof TypeError` checks. See
+ * `docs/contracts/error-codes.md` §2.2.
  */
 export function tagRpcError<E extends Error>(
   error: E,
