@@ -119,7 +119,7 @@ export function selectUser(id: string): void {
 selectUser('2'); // 标脏 Resource；当前请求被替换，新请求使用 id = '2'
 
 export function disposeUserPanel(): void {
-  stopRendering();
+  stopRendering.dispose();
   user.dispose();
   userId.dispose();
 }
