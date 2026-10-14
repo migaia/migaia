@@ -2559,42 +2559,41 @@ function errorReferencePath(locale: ILocale, library: string | undefined): strin
 
 /** README-backed Chinese summaries explain what each library helps readers accomplish. */
 const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
-  capability: '通过功能开关管理能力的懒加载、启停与租户隔离，并用独立依赖图组织能力的启动和释放。',
-  'event-subscriber': '在本地模块间订阅和广播瞬时事件，并协调多个同步或异步监听器的执行。',
-  lifecycle: '统一管理资源所有权、异步结果代次、在途工作排空与可靠释放。',
-  logger: '按需组合日志过滤、格式化与输出插件，将日志送往控制台或服务并等待异步输出完成。',
+  capability: '按开关启停可选功能，为不同租户隔离功能开关，并按依赖启动和释放功能。',
+  'event-subscriber': '在本地模块间订阅和广播事件，并协调同步或异步监听器的执行。',
+  lifecycle: '将多项资源交给同一作用域管理，并在退出时等待任务结束和释放资源。',
+  logger: '将日志输出到控制台或服务，按需要过滤和格式化，并等待异步输出完成。',
   'middleware-pipeline':
-    '把处理步骤组合为可复用的同步、异步或生成器中间件流水线，支持短路与协作取消。',
-  'plugin-host': '为库或应用安装可按需装卸的插件，统一管理共享能力、配置、处理阶段与失败回滚。',
-  reactive: '用隔离的响应式运行时连接可写值、派生值与副作用，在输入变化时自动更新。',
-  resource: '随响应式输入变化加载异步数据，统一处理取消、重试、缓存刷新并防止旧结果覆盖新状态。',
+    '把处理步骤组合为同步、异步或生成器中间件管线，并在需要时提前结束或取消处理。',
+  'plugin-host': '为库或应用安装和卸载插件，配置共享能力与处理步骤，并在安装失败时回滚。',
+  reactive: '让状态变化自动更新派生值和副作用，并为不同使用场景隔离状态。',
+  resource: '随输入变化加载异步数据，取消过期请求、重试失败请求并刷新缓存。',
   'rpc-bridge-jsonrpc': '通过 JSON-RPC 调用 Python、Go、Rust 等语言实现的子进程或本机服务。',
   'rpc-browser': '在浏览器窗口、iframe、SharedWorker 与可靠有序的 WebRTC 通道之间调用函数。',
-  'rpc-contract': '为自定义 RPC 对端和载体提供统一的消息格式、握手、分帧与错误编解码。',
-  'rpc-core': '用统一的 RPC 调用接口连接不同载体，处理超时、取消、流式返回与错误还原。',
-  'rpc-devtools': '采集、查询和录制 RPC 元数据，并汇总多个宿主的时间线与调用统计。',
+  'rpc-contract': '为自定义 RPC 实现校验和编解码消息，让不同对端按同一协议通信。',
+  'rpc-core': '跨运行时调用远程函数，并为调用设置超时、取消和流式结果处理。',
+  'rpc-devtools': '采集、查询和录制 RPC 元数据，并查看多个宿主的时间线与调用统计。',
   'rpc-pool': '将 RPC 调用分配到线程池或进程池，并用有限队列承接繁忙时的请求。',
   'rpc-process': '在子进程或本机服务中运行隔离任务，并通过 RPC 调用和管理它们。',
-  'rpc-threads': '把重计算移到 Worker，并通过统一的 RPC 接口调用、管理和重启线程。',
-  serialize: '用可插拔编解码器和分段流，把应用值编码为可存储或传输的数据并还原。',
-  'storage-contract': '用统一接口描述键值和记录存储，让业务能力独立于具体存储后端。',
-  'storage-web': '通过统一存储契约访问 Web Storage、cookie、IndexedDB 和内存后端。',
-  'store-devtools': '记录 Store 状态和 action 历史，用时间旅行与依赖树定位状态变化。',
-  'store-indexed': '按键或索引订阅对象、数组、Map 和 Set，让集合更新只触发相关计算。',
-  'store-keyed': '在多个独立作用域中复用 Atom 定义，并按业务 key 拆分和订阅状态。',
-  'store-light': '管理普通对象状态和异步值，自动处理字段响应、派生缓存与 action 批量更新。',
-  'store-middleware': '为 Store 添加 action 与状态追踪、写入约束，以及 Redux DevTools 接入。',
-  'store-persist': '自动保存并恢复对象、键控和集合状态，统一处理复水、版本迁移与写入排队。',
-  'store-react':
-    '用 React hooks 和 Provider 订阅 Store、Atom 与可取消异步资源，并管理其作用域和生命周期。',
-  'store-shared': '让主线程与 Worker 直接共享响应式 int32 状态，减少数据克隆和消息传递。',
-  'store-ssr': '为每个 SSR 请求隔离 Store 与 Resource，并把服务端状态脱水后复水到浏览器。',
-  'store-wasm': '把响应式 Store 字段存入 WASM 线性内存，管理数值、字符串、数组和记录状态。',
-  'store-worker': '把耗时计算与序列化编解码移到 Worker，保留 Resource 的取消、去重和缓存能力。',
-  supervision: '为执行单元统一管理数量预算、健康检查、故障重启与有界退出。',
-  tray: '按依赖组合能力，并管理可发现、可调用、可重启的 PluginHost 实例，包括 Node Worker 与子进程。',
-  utils: '为库代码提供可复用的超时、中止、错误追踪、编解码与不可变对象工具。',
-  wasm: '使用 Rust 编译的 WASM 字节暂存区，并在 JSON 与 MessagePack 字节格式之间转码。'
+  'rpc-threads': '把重计算移到 Worker，并通过 RPC 调用、管理和重启线程。',
+  serialize: '把应用数据编码为可存储或传输的格式，并在读取时解码。',
+  'storage-contract': '为键值和记录存储定义统一接口，让应用可以接入不同存储后端。',
+  'storage-web': '通过统一接口读写 Web Storage、cookie、IndexedDB 和内存中的数据。',
+  'store-devtools': '查看 Store 的状态与 action 历史，通过时间旅行和依赖树定位状态变化。',
+  'store-indexed': '在对象、数组、Map 和 Set 中按键或索引订阅变化，让相关计算随集合更新。',
+  'store-keyed': '在独立作用域中按业务 key 管理状态，并只订阅需要的部分。',
+  'store-light': '管理对象状态、异步数据和更新操作，让相关计算随字段变化自动更新。',
+  'store-middleware': '跟踪 Store 的状态与 action、约束写入规则，并接入 Redux DevTools。',
+  'store-persist': '自动保存和恢复对象、按键管理的状态与集合，并在版本变化时迁移已保存数据。',
+  'store-react': '在 React 组件中使用 Store、Atom 与异步资源，并管理订阅和退出时的清理。',
+  'store-shared': '让主线程与 Worker 共同读写同一组响应式 32 位整数状态。',
+  'store-ssr': '隔离每个 SSR 请求的 Store 与 Resource，并将服务端初始状态恢复到浏览器。',
+  'store-wasm': '在 WASM 中管理可订阅的数值、字符串、数组和记录状态。',
+  'store-worker': '把耗时计算和数据编解码移到 Worker，并为请求使用取消、去重和缓存功能。',
+  supervision: '限制执行单元数量，检查健康状态，重启故障单元，并按时限管理关闭过程。',
+  tray: '启动、查找、调用和重启一组插件宿主，包括 Node Worker 与子进程，并在退出时释放它们。',
+  utils: '为代码添加超时、取消与错误追踪，并处理常见的数据转换和对象更新。',
+  wasm: '分配可复用的字节缓冲区，并在 JSON 与 MessagePack 之间转码。'
 } as const satisfies Readonly<Record<string, string>>
 
 /** Architecture-page summaries explain the pain, core capability, and governing design up front. */
@@ -2672,71 +2671,69 @@ const LIBRARY_ARCHITECTURE_LEDES_ZH = {
 /** README-backed English summaries mirror the same user-facing responsibilities. */
 const LIBRARY_REFERENCE_DESCRIPTIONS_EN = {
   capability:
-    'Controls lazy capability activation, shutdown, and tenant isolation, with separate dependency graphs for ordered startup and release.',
+    'Enable or disable optional features, keep tenant feature settings separate, and start and release features in dependency order.',
   'event-subscriber':
-    'Subscribes to and broadcasts transient local events while coordinating synchronous or asynchronous listeners.',
+    'Subscribe to and broadcast events between local modules and coordinate synchronous or asynchronous listeners.',
   lifecycle:
-    'Manages resource ownership, asynchronous generations, in-flight work draining, and coordinated disposal.',
+    'Manage resources within a shared scope and wait for ongoing work and cleanup when shutting down.',
   logger:
-    'Combines optional filtering, formatting, and output plugins to deliver logs to consoles or services and flush asynchronous output.',
+    'Send logs to a console or service, filter and format them as needed, and wait for asynchronous output to finish.',
   'middleware-pipeline':
-    'Composes reusable synchronous, asynchronous, or generator middleware pipelines with short-circuiting and cooperative cancellation.',
+    'Combine processing steps into synchronous, asynchronous, or generator middleware pipelines and stop or cancel processing when needed.',
   'plugin-host':
-    'Adds installable plugins to libraries or applications with shared features, configuration, processing stages, and installation rollback.',
+    'Install and remove plugins for libraries or applications, configure shared features and processing steps, and roll back failed installations.',
   reactive:
-    'Connects writable values, derived values, and effects in isolated reactive runtimes that update when inputs change.',
+    'Update derived values and effects when state changes and keep state separate across contexts.',
   resource:
-    'Loads async data from reactive inputs with cancellation, retries, refresh, and protection against stale results.',
+    'Load asynchronous data as inputs change, cancel stale requests, retry failures, and refresh cached results.',
   'rpc-bridge-jsonrpc':
-    'Calls child processes or local services implemented in Python, Go, Rust, and other languages through JSON-RPC.',
+    'Call child processes or local services implemented in Python, Go, Rust, and other languages through JSON-RPC.',
   'rpc-browser':
-    'Calls functions across browser windows, iframes, SharedWorkers, and reliable ordered WebRTC channels.',
+    'Call functions across browser windows, iframes, SharedWorkers, and reliable ordered WebRTC channels.',
   'rpc-contract':
-    'Builds compatible RPC peers and transports with shared message formats, handshakes, framing, and error codecs.',
+    'Validate, encode, and decode messages for custom RPC implementations so peers can communicate through the same protocol.',
   'rpc-core':
-    'Calls across transports through a shared RPC API with timeouts, cancellation, streaming, and restored errors.',
+    'Call remote functions across runtimes with timeouts, cancellation, and streaming results.',
   'rpc-devtools':
-    'Collects, queries, and records RPC metadata and combines timelines and call statistics across hosts.',
+    'Collect, query, and record RPC metadata and inspect timelines and call statistics across hosts.',
   'rpc-pool':
-    'Distributes RPC calls across thread or process pools and queues requests within bounded limits when busy.',
+    'Distribute RPC calls across thread or process pools and queue requests within bounded limits when busy.',
   'rpc-process':
-    'Runs isolated work in child processes or local services and calls and manages them through RPC.',
+    'Run isolated work in child processes or local services and call and manage them through RPC.',
   'rpc-threads':
-    'Moves heavy computation into Workers and calls, manages, and restarts them through a shared RPC API.',
-  serialize:
-    'Encodes and restores application values for storage or transport with pluggable codecs and chunked streams.',
+    'Move heavy computation into Workers and call, manage, and restart threads through RPC.',
+  serialize: 'Encode application data for storage or transmission and decode it when reading.',
   'storage-contract':
-    'Defines key-value and record storage interfaces so application features remain independent of storage backends.',
+    'Define common interfaces for key-value and record storage so applications can use different backends.',
   'storage-web':
-    'Accesses Web Storage, cookies, IndexedDB, and memory backends through one storage contract.',
+    'Read and write data in Web Storage, cookies, IndexedDB, and memory through a common interface.',
   'store-devtools':
-    'Diagnoses Store changes with state history, action traces, time travel, and dependency trees.',
+    'Inspect Store state and action history and use time travel and dependency trees to investigate changes.',
   'store-indexed':
-    'Subscribes to individual keys or indices in objects, arrays, Maps, and Sets so updates trigger only related computations.',
+    'Subscribe to keys or indices in objects, arrays, Maps, and Sets so related computations respond to collection updates.',
   'store-keyed':
-    'Reuses Atom definitions across isolated scopes and splits state into independently subscribed business keys.',
+    'Manage state by business key in separate scopes and subscribe only to the parts you need.',
   'store-light':
-    'Manages object state and asynchronous values with reactive fields, cached derivations, and batched actions.',
+    'Manage object state, asynchronous data, and updates so related computations respond to field changes.',
   'store-middleware':
-    'Adds action and state tracing, write policies, and Redux DevTools integration to Stores.',
+    'Trace Store state and actions, enforce write rules, and connect to Redux DevTools.',
   'store-persist':
-    'Automatically saves and restores object, keyed, and collection state while handling hydration, migrations, and queued writes.',
+    'Automatically save and restore object, keyed, and collection state and migrate saved data when versions change.',
   'store-react':
-    'Connects Stores, Atoms, and cancellable resources to React through hooks and Providers that manage scope and lifecycle.',
+    'Use Stores, Atoms, and asynchronous resources in React components and manage subscriptions and cleanup.',
   'store-shared':
-    'Shares reactive int32 state directly between the main thread and Workers to reduce cloning and message passing.',
+    'Read and write the same reactive 32-bit integer state from the main thread and Workers.',
   'store-ssr':
-    'Isolates Stores and Resources per SSR request and hydrates server state in the browser.',
-  'store-wasm':
-    'Stores reactive fields in WASM linear memory to manage numbers, strings, arrays, and records.',
+    "Keep Stores and Resources separate for each SSR request and restore the server's initial state in the browser.",
+  'store-wasm': 'Manage observable numbers, strings, arrays, and records in WASM.',
   'store-worker':
-    'Moves expensive computation and serialization into Workers while preserving Resource cancellation, deduplication, and caching.',
+    'Move expensive computation and data encoding and decoding into Workers and use cancellation, deduplication, and caching for requests.',
   supervision:
-    'Manages execution units with shared budgets, health checks, failure restarts, and bounded teardown.',
-  tray: 'Composes capabilities by dependency and manages discoverable, callable, restartable PluginHost instances, including Node Workers and child processes.',
+    'Limit execution units, check their health, restart failures, and manage shutdown within a time budget.',
+  tray: 'Start, find, call, and restart plugin hosts, including Node Workers and child processes, and release them on shutdown.',
   utils:
-    'Gives library authors reusable tools for deadlines, cancellation, error tracing, encoding, and immutable object updates.',
-  wasm: 'Allocates stable byte buffers in Rust-compiled WASM and transcodes between JSON and MessagePack bytes.'
+    'Add deadlines, cancellation, and error tracing to code and handle common data conversions and object updates.',
+  wasm: 'Allocate reusable byte buffers and transcode between JSON and MessagePack.'
 } as const satisfies Readonly<Record<string, string>>
 
 /** Unambiguous public product names that may appear without an npm package path. */
