@@ -2947,9 +2947,9 @@
           "name": "derivedFamilyDef",
           "kind": "function",
           "signature": "export declare function derivedFamilyDef<K extends IFamilyKey, T>(read: (key: K) => (get: IAtomGet) => T, options?: IFamilyDefOptions): IFamilyDef<K, T>;",
-          "declarationLine": 41,
+          "declarationLine": 45,
           "source": "packages/store-keyed/dist/family/definition.d.ts",
-          "purpose": "按键产出只读派生定义。",
+          "purpose": "Creates read-only derived definitions by key.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for derivedFamilyDef.",
           "advanced": "No additional advanced behavior is declared for derivedFamilyDef.",
           "parameters": [
@@ -3000,7 +3000,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "按键产出只读派生定义。"
+              "content": "Creates read-only derived definitions by key."
             },
             {
               "id": "getting-started",
@@ -3033,7 +3033,7 @@
               "name": "maxSize",
               "type": "number",
               "optional": true,
-              "description": "定义强缓存的上限。达到上限后按最久未取用降级为弱引用。 * * 仍被 AtomStore/组件持有的 token 会保持同 key 的 canonical identity；只有 token 已不可达且被 GC 后，后续 lookup 才可能创建新定义。"
+              "description": "Limits the strong definition cache. Entries least recently accessed become weak references when * the limit is exceeded. * * Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later * lookup can create a new definition only after the old token becomes unreachable and is * collected."
             },
             {
               "name": "debugLabel",
@@ -3223,7 +3223,7 @@
               "type": "number",
               "optional": true,
               "description": "`options` 校验细节：非对象（`null`/非 `object`）或读取 `maxSize`/`debugLabel` 本身抛错，会被规整为 `RangeError`，`code: 'INVALID_OPTION'`，消息 `[store] family maxSize must be a positive integer`；`debugLabel` 非字符串抛 `RangeError`，消息 `[store] family debugLabel must be a string`；`maxSize` 非正安全整数同样抛 `RangeError`。",
-              "descriptionEn": "",
+              "descriptionEn": "Limits the strong definition cache. Entries least recently accessed become weak references when * the limit is exceeded. * * Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later * lookup can create a new definition only after the old token becomes unreachable and is * collected.",
               "descriptionZh": "`options` 校验细节：非对象（`null`/非 `object`）或读取 `maxSize`/`debugLabel` 本身抛错，会被规整为 `RangeError`，`code: 'INVALID_OPTION'`，消息 `[store] family maxSize must be a positive integer`；`debugLabel` 非字符串抛 `RangeError`，消息 `[store] family debugLabel must be a string`；`maxSize` 非正安全整数同样抛 `RangeError`。"
             },
             {
@@ -3241,9 +3241,9 @@
           "name": "familyDef",
           "kind": "function",
           "signature": "export declare function familyDef<K extends IFamilyKey, T>(initial: (key: K) => T, options?: IFamilyDefOptions): IFamilyDef<K, T, IWritableAtomDefinition<T>>;",
-          "declarationLine": 39,
+          "declarationLine": 43,
           "source": "packages/store-keyed/dist/family/definition.d.ts",
-          "purpose": "按键产出可写源定义。",
+          "purpose": "Creates writable source definitions by key.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for familyDef.",
           "advanced": "No additional advanced behavior is declared for familyDef.",
           "parameters": ["initial: (key: K) => T", "options: IFamilyDefOptions (optional)"],
@@ -3293,7 +3293,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "按键产出可写源定义。"
+              "content": "Creates writable source definitions by key."
             },
             {
               "id": "getting-started",
@@ -3326,7 +3326,7 @@
               "name": "maxSize",
               "type": "number",
               "optional": true,
-              "description": "定义强缓存的上限。达到上限后按最久未取用降级为弱引用。 * * 仍被 AtomStore/组件持有的 token 会保持同 key 的 canonical identity；只有 token 已不可达且被 GC 后，后续 lookup 才可能创建新定义。"
+              "description": "Limits the strong definition cache. Entries least recently accessed become weak references when * the limit is exceeded. * * Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later * lookup can create a new definition only after the old token becomes unreachable and is * collected."
             },
             {
               "name": "debugLabel",
@@ -3516,7 +3516,7 @@
               "type": "number",
               "optional": true,
               "description": "`options` 校验细节：非对象（`null`/非 `object`）或读取 `maxSize`/`debugLabel` 本身抛错，会被规整为 `RangeError`，`code: 'INVALID_OPTION'`，消息 `[store] family maxSize must be a positive integer`；`debugLabel` 非字符串抛 `RangeError`，消息 `[store] family debugLabel must be a string`；`maxSize` 非正安全整数同样抛 `RangeError`。",
-              "descriptionEn": "",
+              "descriptionEn": "Limits the strong definition cache. Entries least recently accessed become weak references when * the limit is exceeded. * * Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later * lookup can create a new definition only after the old token becomes unreachable and is * collected.",
               "descriptionZh": "`options` 校验细节：非对象（`null`/非 `object`）或读取 `maxSize`/`debugLabel` 本身抛错，会被规整为 `RangeError`，`code: 'INVALID_OPTION'`，消息 `[store] family maxSize must be a positive integer`；`debugLabel` 非字符串抛 `RangeError`，消息 `[store] family debugLabel must be a string`；`maxSize` 非正安全整数同样抛 `RangeError`。"
             },
             {
@@ -3741,7 +3741,7 @@
           "name": "focusDef",
           "kind": "function",
           "signature": "export declare function focusDef<Source, K1 extends keyof Source>(source: IStandardWritableDef<Source>, key1: K1): IWritableDerivedDefinition<Source[K1], readonly [IAtomUpdate<Source[K1]>], void>;\nexport declare function focusDef<Source, K1 extends keyof Source, K2 extends keyof Source[K1]>(source: IStandardWritableDef<Source>, key1: K1, key2: K2): IWritableDerivedDefinition<Source[K1][K2], readonly [IAtomUpdate<Source[K1][K2]>], void>;\nexport declare function focusDef<Source, K1 extends keyof Source, K2 extends keyof Source[K1], K3 extends keyof Source[K1][K2]>(source: IStandardWritableDef<Source>, key1: K1, key2: K2, key3: K3): IWritableDerivedDefinition<Source[K1][K2][K3], readonly [IAtomUpdate<Source[K1][K2][K3]>], void>;",
-          "declarationLine": 20,
+          "declarationLine": 27,
           "source": "packages/store-keyed/dist/atom/def-optics.d.ts",
           "purpose": "focusDef is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for focusDef.",
@@ -4133,7 +4133,7 @@
           "signature": "export type IDefOptic<Source, Focus> = { get(source: Source): Focus; set(source: Source, focus: Focus): Source; };",
           "declarationLine": 10,
           "source": "packages/store-keyed/dist/atom/def-optics.d.ts",
-          "purpose": "与实例层 IAtomOptic 同形：不可变 get/set。",
+          "purpose": "Provides immutable `get` and `set` operations with the same shape as `IAtomOptic`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDefOptic.",
           "advanced": "No additional advanced behavior is declared for IDefOptic.",
           "parameters": ["This type declaration has no parameters."],
@@ -4157,7 +4157,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "与实例层 IAtomOptic 同形：不可变 get/set。"
+              "content": "Provides immutable `get` and `set` operations with the same shape as `IAtomOptic`."
             },
             {
               "id": "getting-started",
@@ -4195,10 +4195,10 @@
         {
           "name": "IFamilyDef",
           "kind": "type",
-          "signature": "export type IFamilyDef<K extends IFamilyKey, T, D extends IAtomDefinition<T> = IAtomDefinition<T>> = { (key: K): D; /** 已缓存的定义数。 */ readonly size: number; /** 显式破坏某个键的 canonical identity。已建实例不受影响；同 key 后续 lookup 会得到新 token，因此调用方必须先停止使用旧 token。 */ forget(key: K): boolean; clear(): void; };",
-          "declarationLine": 30,
+          "signature": "export type IFamilyDef<K extends IFamilyKey, T, D extends IAtomDefinition<T> = IAtomDefinition<T>> = { (key: K): D; /** Reports the number of strongly cached definitions. */ readonly size: number; /** * Explicitly breaks canonical identity for a key. Existing instances remain unchanged. Later * lookups return a new token, so callers must stop using the old token first. */ forget(key: K): boolean; clear(): void; };",
+          "declarationLine": 31,
           "source": "packages/store-keyed/dist/family/definition.d.ts",
-          "purpose": "D 是这个 family 产出的定义类型。 不能写死成 IAtomDefinition：familyDef 产出的是**可写**定义，写死会让 `scope.set(family(key), ...)` 在类型层被拒——类型在这里必须如实说话。",
+          "purpose": "Preserves the definition type produced by this family. `familyDef` produces writable definitions. Widening them to `IAtomDefinition` would reject `scope.set(family(key), ...)`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFamilyDef.",
           "advanced": "No additional advanced behavior is declared for IFamilyDef.",
           "parameters": ["This type declaration has no parameters."],
@@ -4212,7 +4212,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IFamilyDef<K extends IFamilyKey, T, D extends IAtomDefinition<T> = IAtomDefinition<T>> = { (key: K): D; /** 已缓存的定义数。 */ readonly size: number; /** 显式破坏某个键的 canonical identity。已建实例不受影响；同 key 后续 lookup 会得到新 token，因此调用方必须先停止使用旧 token。 */ forget(key: K): boolean; clear(): void; };"
+            "export type IFamilyDef<K extends IFamilyKey, T, D extends IAtomDefinition<T> = IAtomDefinition<T>> = { (key: K): D; /** Reports the number of strongly cached definitions. */ readonly size: number; /** * Explicitly breaks canonical identity for a key. Existing instances remain unchanged. Later * lookups return a new token, so callers must stop using the old token first. */ forget(key: K): boolean; clear(): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4222,7 +4222,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "D 是这个 family 产出的定义类型。 不能写死成 IAtomDefinition：familyDef 产出的是**可写**定义，写死会让 `scope.set(family(key), ...)` 在类型层被拒——类型在这里必须如实说话。"
+              "content": "Preserves the definition type produced by this family. `familyDef` produces writable definitions. Widening them to `IAtomDefinition` would reject `scope.set(family(key), ...)`."
             },
             {
               "id": "getting-started",
@@ -4251,7 +4251,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-keyed/dist/family/definition.d.ts:IFamilyDef:export type IFamilyDef<K extends IFamilyKey, T, D extends IAtomDefinition<T> = IAtomDefinition<T>> = { (key: K): D; /** 已缓存的定义数。 */ readonly size: number; /** 显式破坏某个键的 canonical identity。已建实例不受影响；同 key 后续 lookup 会得到新 token，因此调用方必须先停止使用旧 token。 */ forget(key: K): boolean; clear(): void; };",
+          "identity": "packages/store-keyed/dist/family/definition.d.ts:IFamilyDef:export type IFamilyDef<K extends IFamilyKey, T, D extends IAtomDefinition<T> = IAtomDefinition<T>> = { (key: K): D; /** Reports the number of strongly cached definitions. */ readonly size: number; /** * Explicitly breaks canonical identity for a key. Existing instances remain unchanged. Later * lookups return a new token, so callers must stop using the old token first. */ forget(key: K): boolean; clear(): void; };",
           "guidance": [],
           "usageScore": 20,
           "configuration": [],
@@ -4260,8 +4260,8 @@
         {
           "name": "IFamilyDefOptions",
           "kind": "type",
-          "signature": "export type IFamilyDefOptions = { /** * 定义强缓存的上限。达到上限后按最久未取用降级为弱引用。 * * 仍被 AtomStore/组件持有的 token 会保持同 key 的 canonical identity；只有 token 已不可达且被 GC 后，后续 lookup 才可能创建新定义。 */ readonly maxSize?: number; readonly debugLabel?: string; };",
-          "declarationLine": 15,
+          "signature": "export type IFamilyDefOptions = { /** * Limits the strong definition cache. Entries least recently accessed become weak references when * the limit is exceeded. * * Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later * lookup can create a new definition only after the old token becomes unreachable and is * collected. */ readonly maxSize?: number; readonly debugLabel?: string; };",
+          "declarationLine": 13,
           "source": "packages/store-keyed/dist/family/definition.d.ts",
           "purpose": "IFamilyDefOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFamilyDefOptions.",
@@ -4277,7 +4277,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IFamilyDefOptions = { /** * 定义强缓存的上限。达到上限后按最久未取用降级为弱引用。 * * 仍被 AtomStore/组件持有的 token 会保持同 key 的 canonical identity；只有 token 已不可达且被 GC 后，后续 lookup 才可能创建新定义。 */ readonly maxSize?: number; readonly debugLabel?: string; };"
+            "export type IFamilyDefOptions = { /** * Limits the strong definition cache. Entries least recently accessed become weak references when * the limit is exceeded. * * Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later * lookup can create a new definition only after the old token becomes unreachable and is * collected. */ readonly maxSize?: number; readonly debugLabel?: string; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4316,7 +4316,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-keyed/dist/family/definition.d.ts:IFamilyDefOptions:export type IFamilyDefOptions = { /** * 定义强缓存的上限。达到上限后按最久未取用降级为弱引用。 * * 仍被 AtomStore/组件持有的 token 会保持同 key 的 canonical identity；只有 token 已不可达且被 GC 后，后续 lookup 才可能创建新定义。 */ readonly maxSize?: number; readonly debugLabel?: string; };",
+          "identity": "packages/store-keyed/dist/family/definition.d.ts:IFamilyDefOptions:export type IFamilyDefOptions = { /** * Limits the strong definition cache. Entries least recently accessed become weak references when * the limit is exceeded. * * Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later * lookup can create a new definition only after the old token becomes unreachable and is * collected. */ readonly maxSize?: number; readonly debugLabel?: string; };",
           "guidance": [],
           "usageScore": 20,
           "configuration": [],
@@ -4326,9 +4326,9 @@
           "name": "IFamilyKey",
           "kind": "type",
           "signature": "export type IFamilyKey = string | number | symbol;",
-          "declarationLine": 14,
+          "declarationLine": 12,
           "source": "packages/store-keyed/dist/family/definition.d.ts",
-          "purpose": "按键产出**定义**的 family。 旧的 `atomFamily` 缓存的是已经绑死 Runtime 的实例，所以同一个 key 在两个 Scope 下拿到的是同一份状态——这正是「family 返回的东西不能跨 Scope 复用」的原因。 定义化之后分工清楚： - **family 缓存定义**（纯 token，无状态、无 Runtime） - **Scope 缓存实例**（真正的图节点与值） 于是 `chatFamily('conv-1')` 在任何 Scope 里都是同一个 token，但每个 Scope 各有 一份值。AI 对话里 per-conversation 的状态正是这个形状。",
+          "purpose": "IFamilyKey is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFamilyKey.",
           "advanced": "No additional advanced behavior is declared for IFamilyKey.",
           "parameters": ["This type declaration has no parameters."],
@@ -4350,7 +4350,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "按键产出**定义**的 family。 旧的 `atomFamily` 缓存的是已经绑死 Runtime 的实例，所以同一个 key 在两个 Scope 下拿到的是同一份状态——这正是「family 返回的东西不能跨 Scope 复用」的原因。 定义化之后分工清楚： - **family 缓存定义**（纯 token，无状态、无 Runtime） - **Scope 缓存实例**（真正的图节点与值） 于是 `chatFamily('conv-1')` 在任何 Scope 里都是同一个 token，但每个 Scope 各有 一份值。AI 对话里 per-conversation 的状态正是这个形状。"
+              "content": "IFamilyKey is part of this module's public type contract."
             },
             {
               "id": "getting-started",
@@ -4388,10 +4388,10 @@
         {
           "name": "ISplitDefinition",
           "kind": "type",
-          "signature": "export type ISplitDefinition<T, Key> = { readonly source: IStandardWritableDef<readonly T[]>; readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>; of(key: Key): ISplitItemDef<T>; insert(store: IAtomStore, item: T, index?: number): void; remove(store: IAtomStore, key: Key): boolean; /** * 丢掉已不在源列表中的 key 的 def 缓存。 不 release AtomStore 里已建实例——那是 store.release(def) 的职责。 不 prune 时，长期滚动的 * key 空间会让 cache Map 只增不减。 */ prune(store: IAtomStore): number; };",
-          "declarationLine": 31,
+          "signature": "export type ISplitDefinition<T, Key> = { readonly source: IStandardWritableDef<readonly T[]>; readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>; of(key: Key): ISplitItemDef<T>; insert(store: IAtomStore, item: T, index?: number): void; remove(store: IAtomStore, key: Key): boolean; /** * Removes cached definitions for keys that are no longer in the source list. This does not * release instances in `AtomStore`; use `store.release(def)` for that. Without pruning, a * continually changing key space causes the cache map to grow indefinitely. */ prune(store: IAtomStore): number; };",
+          "declarationLine": 38,
           "source": "packages/store-keyed/dist/atom/def-optics.d.ts",
-          "purpose": "列表源上的按 key 拆分。 - `of(key)`：该 key 的可写 item def（token 稳定，可跨 store 复用） - `items`：当前列表对应的 item def 数组（derived；重排保 identity） - `insert` / `remove`：经 AtomStore 改源列表",
+          "purpose": "Splits a list source into item definitions by key. `of(key)` returns a stable writable item definition that can be reused across stores. `items` derives the current item definitions and preserves their identity during reordering. `insert` and `remove` update the source list through `AtomStore`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISplitDefinition.",
           "advanced": "No additional advanced behavior is declared for ISplitDefinition.",
           "parameters": ["This type declaration has no parameters."],
@@ -4405,7 +4405,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ISplitDefinition<T, Key> = { readonly source: IStandardWritableDef<readonly T[]>; readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>; of(key: Key): ISplitItemDef<T>; insert(store: IAtomStore, item: T, index?: number): void; remove(store: IAtomStore, key: Key): boolean; /** * 丢掉已不在源列表中的 key 的 def 缓存。 不 release AtomStore 里已建实例——那是 store.release(def) 的职责。 不 prune 时，长期滚动的 * key 空间会让 cache Map 只增不减。 */ prune(store: IAtomStore): number; };"
+            "export type ISplitDefinition<T, Key> = { readonly source: IStandardWritableDef<readonly T[]>; readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>; of(key: Key): ISplitItemDef<T>; insert(store: IAtomStore, item: T, index?: number): void; remove(store: IAtomStore, key: Key): boolean; /** * Removes cached definitions for keys that are no longer in the source list. This does not * release instances in `AtomStore`; use `store.release(def)` for that. Without pruning, a * continually changing key space causes the cache map to grow indefinitely. */ prune(store: IAtomStore): number; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4415,7 +4415,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "列表源上的按 key 拆分。 - `of(key)`：该 key 的可写 item def（token 稳定，可跨 store 复用） - `items`：当前列表对应的 item def 数组（derived；重排保 identity） - `insert` / `remove`：经 AtomStore 改源列表"
+              "content": "Splits a list source into item definitions by key. `of(key)` returns a stable writable item definition that can be reused across stores. `items` derives the current item definitions and preserves their identity during reordering. `insert` and `remove` update the source list through `AtomStore`."
             },
             {
               "id": "getting-started",
@@ -4444,7 +4444,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-keyed/dist/atom/def-optics.d.ts:ISplitDefinition:export type ISplitDefinition<T, Key> = { readonly source: IStandardWritableDef<readonly T[]>; readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>; of(key: Key): ISplitItemDef<T>; insert(store: IAtomStore, item: T, index?: number): void; remove(store: IAtomStore, key: Key): boolean; /** * 丢掉已不在源列表中的 key 的 def 缓存。 不 release AtomStore 里已建实例——那是 store.release(def) 的职责。 不 prune 时，长期滚动的 * key 空间会让 cache Map 只增不减。 */ prune(store: IAtomStore): number; };",
+          "identity": "packages/store-keyed/dist/atom/def-optics.d.ts:ISplitDefinition:export type ISplitDefinition<T, Key> = { readonly source: IStandardWritableDef<readonly T[]>; readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>; of(key: Key): ISplitItemDef<T>; insert(store: IAtomStore, item: T, index?: number): void; remove(store: IAtomStore, key: Key): boolean; /** * Removes cached definitions for keys that are no longer in the source list. This does not * release instances in `AtomStore`; use `store.release(def)` for that. Without pruning, a * continually changing key space causes the cache map to grow indefinitely. */ prune(store: IAtomStore): number; };",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -4454,7 +4454,7 @@
           "name": "ISplitItemDef",
           "kind": "type",
           "signature": "export type ISplitItemDef<T> = IWritableDerivedDefinition<T, readonly [IAtomUpdate<T>], void>;",
-          "declarationLine": 23,
+          "declarationLine": 30,
           "source": "packages/store-keyed/dist/atom/def-optics.d.ts",
           "purpose": "ISplitItemDef is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISplitItemDef.",
@@ -4519,9 +4519,9 @@
           "name": "IStandardWritableDef",
           "kind": "type",
           "signature": "export type IStandardWritableDef<T> = IWritableAtomDefinition<T, readonly [IAtomUpdate<T>], void>;",
-          "declarationLine": 15,
+          "declarationLine": 18,
           "source": "packages/store-keyed/dist/atom/def-optics.d.ts",
-          "purpose": "可被 focus/optic/split 当「源」的可写定义（标准 set(update) 语义）。",
+          "purpose": "Provides a writable source for focus, optic, or split operations with standard `set(update)` semantics.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStandardWritableDef.",
           "advanced": "No additional advanced behavior is declared for IStandardWritableDef.",
           "parameters": ["This type declaration has no parameters."],
@@ -4546,7 +4546,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "可被 focus/optic/split 当「源」的可写定义（标准 set(update) 语义）。"
+              "content": "Provides a writable source for focus, optic, or split operations with standard `set(update)` semantics."
             },
             {
               "id": "getting-started",
@@ -4740,9 +4740,9 @@
           "name": "opticDef",
           "kind": "function",
           "signature": "export declare function opticDef<Source, Focus>(source: IStandardWritableDef<Source>, optic: IDefOptic<Source, Focus>): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>;",
-          "declarationLine": 19,
+          "declarationLine": 26,
           "source": "packages/store-keyed/dist/atom/def-optics.d.ts",
-          "purpose": "自定义 lens 的可写投影。",
+          "purpose": "Creates a writable projection through a custom lens.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for opticDef.",
           "advanced": "No additional advanced behavior is declared for opticDef.",
           "parameters": ["source: IStandardWritableDef<Source>", "optic: IDefOptic<Source, Focus>"],
@@ -4792,7 +4792,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "自定义 lens 的可写投影。"
+              "content": "Creates a writable projection through a custom lens."
             },
             {
               "id": "getting-started",
@@ -5314,9 +5314,9 @@
           "name": "selectDef",
           "kind": "function",
           "signature": "export declare function selectDef<Source, Selected>(source: IAtomDefinition<Source>, select: (value: Source) => Selected, equals?: (left: Selected, right: Selected) => boolean): IDerivedDefinition<Selected>;",
-          "declarationLine": 17,
+          "declarationLine": 24,
           "source": "packages/store-keyed/dist/atom/def-optics.d.ts",
-          "purpose": "只读投影。源任意可读 def；结果是 derivedDef。 equals 默认 Object.is——源对象其它字段变了、投影值不变则不通知下游。",
+          "purpose": "Creates a read-only projection from any readable definition through `derivedDef`. `equals` defaults to `Object.is`. Changes to other source fields do not notify downstream observers when the projection is unchanged.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for selectDef.",
           "advanced": "No additional advanced behavior is declared for selectDef.",
           "parameters": [
@@ -5376,7 +5376,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "只读投影。源任意可读 def；结果是 derivedDef。 equals 默认 Object.is——源对象其它字段变了、投影值不变则不通知下游。"
+              "content": "Creates a read-only projection from any readable definition through `derivedDef`. `equals` defaults to `Object.is`. Changes to other source fields do not notify downstream observers when the projection is unchanged."
             },
             {
               "id": "getting-started",
@@ -5602,7 +5602,7 @@
           "name": "splitDef",
           "kind": "function",
           "signature": "export declare function splitDef<T, Key = number>(source: IStandardWritableDef<readonly T[]>, keyOf?: (item: T, index: number) => Key): ISplitDefinition<T, Key>;",
-          "declarationLine": 43,
+          "declarationLine": 51,
           "source": "packages/store-keyed/dist/atom/def-optics.d.ts",
           "purpose": "splitDef is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for splitDef.",
@@ -6393,9 +6393,9 @@
           "ownerFragment": "store-keyed-atom/definition--IAtomSet"
         },
         {
-          "identity": "packages/store-keyed/dist/atom/store.d.ts:IAtomStore:export type IAtomStore = { readonly runtime: IRuntime; readonly disposed: boolean; get<T>(definition: IAtomDefinition<T>): T; /** 非追踪读：适配层的 getSnapshot 不该在别人的捕获窗口里建边。 */ peek<T>(definition: IAtomDefinition<T>): T; /** React/concurrent speculative read; value may be discarded after the turn. */ preview<T>(definition: IAtomDefinition<T>): T; set<T, Args extends readonly unknown[], Result>(definition: IWritableAtomDefinition<T, Args, Result>, ...args: Args): Result; /** * 订阅一个定义。返回退订函数。 * * 这是适配层唯一需要的东西——比交出节点窄得多，实例化策略因此可以自由演进。 */ sub<T>(definition: IAtomDefinition<T>, onChange: () => void): IDisposer; /** 只读派生可以路由到任意同值类型定义。 */ override<T>(definition: IDerivedDefinition<T>, replacement: IAtomDefinition<NoInfer<T>>): IDisposer; /** Primitive 只能替换为同一种固定 set(update) 写语义。 */ override<T>(definition: IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>, replacement: IPrimitiveDefinition<NoInfer<T>> | IPrimitiveFactoryDefinition<NoInfer<T>>): IDisposer; /** 自定义 writable derived 必须保留完全相同的 Args/Result。 */ override<T, Args extends readonly unknown[], Result>(definition: IWritableDerivedDefinition<T, Args, Result>, replacement: IWritableDerivedDefinition<NoInfer<T>, NoInfer<Args>, NoInfer<Result>>): IDisposer; /** 这个定义在本 store 内是否已有观察者。窄查询，不交出节点。 */ isObserved<T>(definition: IAtomDefinition<T>): boolean; /** * 释放单个定义的实例。 * * 与 dispose 整个 store 相对：实例式旧 API 一个实例一份定义，它 dispose 时 只该释放自己那一份，不能连累同一 store 里的其它定义。 */ release<T>(definition: IAtomDefinition<T>): boolean; /** 已实例化的定义数量。释放行为的可观测点。 */ readonly size: number; dispose(): void; };",
+          "identity": "packages/store-keyed/dist/atom/store.d.ts:IAtomStore:export type IAtomStore = { readonly runtime: IRuntime; readonly disposed: boolean; get<T>(definition: IAtomDefinition<T>): T; /** * Reads without tracking, so an adapter snapshot does not create edges in another dependency * capture. */ peek<T>(definition: IAtomDefinition<T>): T; /** React/concurrent speculative read; value may be discarded after the turn. */ preview<T>(definition: IAtomDefinition<T>): T; set<T, Args extends readonly unknown[], Result>(definition: IWritableAtomDefinition<T, Args, Result>, ...args: Args): Result; /** * Subscribes to a definition and returns an unsubscribe function. * * Adapters subscribe through this boundary instead of accessing graph nodes, leaving * instantiation strategies independent. */ sub<T>(definition: IAtomDefinition<T>, onChange: () => void): IDisposer; /** Routes a read-only derived definition to any definition with the same value type. */ override<T>(definition: IDerivedDefinition<T>, replacement: IAtomDefinition<NoInfer<T>>): IDisposer; /** Replaces a primitive only with a definition that preserves standard `set(update)` semantics. */ override<T>(definition: IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>, replacement: IPrimitiveDefinition<NoInfer<T>> | IPrimitiveFactoryDefinition<NoInfer<T>>): IDisposer; /** Preserves the exact `Args` and `Result` contract of a writable derived definition. */ override<T, Args extends readonly unknown[], Result>(definition: IWritableDerivedDefinition<T, Args, Result>, replacement: IWritableDerivedDefinition<NoInfer<T>, NoInfer<Args>, NoInfer<Result>>): IDisposer; /** Reports whether this store has observers for the definition without exposing its graph node. */ isObserved<T>(definition: IAtomDefinition<T>): boolean; /** * Releases the instance for one definition. * * Unlike disposing the whole store, disposal of a legacy atom instance releases only its own * definition. Other definitions in the same store remain intact. */ release<T>(definition: IAtomDefinition<T>): boolean; /** Reports the number of instantiated definitions so release behavior is observable. */ readonly size: number; dispose(): void; };",
           "name": "IAtomStore",
-          "signature": "export type IAtomStore = { readonly runtime: IRuntime; readonly disposed: boolean; get<T>(definition: IAtomDefinition<T>): T; /** 非追踪读：适配层的 getSnapshot 不该在别人的捕获窗口里建边。 */ peek<T>(definition: IAtomDefinition<T>): T; /** React/concurrent speculative read; value may be discarded after the turn. */ preview<T>(definition: IAtomDefinition<T>): T; set<T, Args extends readonly unknown[], Result>(definition: IWritableAtomDefinition<T, Args, Result>, ...args: Args): Result; /** * 订阅一个定义。返回退订函数。 * * 这是适配层唯一需要的东西——比交出节点窄得多，实例化策略因此可以自由演进。 */ sub<T>(definition: IAtomDefinition<T>, onChange: () => void): IDisposer; /** 只读派生可以路由到任意同值类型定义。 */ override<T>(definition: IDerivedDefinition<T>, replacement: IAtomDefinition<NoInfer<T>>): IDisposer; /** Primitive 只能替换为同一种固定 set(update) 写语义。 */ override<T>(definition: IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>, replacement: IPrimitiveDefinition<NoInfer<T>> | IPrimitiveFactoryDefinition<NoInfer<T>>): IDisposer; /** 自定义 writable derived 必须保留完全相同的 Args/Result。 */ override<T, Args extends readonly unknown[], Result>(definition: IWritableDerivedDefinition<T, Args, Result>, replacement: IWritableDerivedDefinition<NoInfer<T>, NoInfer<Args>, NoInfer<Result>>): IDisposer; /** 这个定义在本 store 内是否已有观察者。窄查询，不交出节点。 */ isObserved<T>(definition: IAtomDefinition<T>): boolean; /** * 释放单个定义的实例。 * * 与 dispose 整个 store 相对：实例式旧 API 一个实例一份定义，它 dispose 时 只该释放自己那一份，不能连累同一 store 里的其它定义。 */ release<T>(definition: IAtomDefinition<T>): boolean; /** 已实例化的定义数量。释放行为的可观测点。 */ readonly size: number; dispose(): void; };",
+          "signature": "export type IAtomStore = { readonly runtime: IRuntime; readonly disposed: boolean; get<T>(definition: IAtomDefinition<T>): T; /** * Reads without tracking, so an adapter snapshot does not create edges in another dependency * capture. */ peek<T>(definition: IAtomDefinition<T>): T; /** React/concurrent speculative read; value may be discarded after the turn. */ preview<T>(definition: IAtomDefinition<T>): T; set<T, Args extends readonly unknown[], Result>(definition: IWritableAtomDefinition<T, Args, Result>, ...args: Args): Result; /** * Subscribes to a definition and returns an unsubscribe function. * * Adapters subscribe through this boundary instead of accessing graph nodes, leaving * instantiation strategies independent. */ sub<T>(definition: IAtomDefinition<T>, onChange: () => void): IDisposer; /** Routes a read-only derived definition to any definition with the same value type. */ override<T>(definition: IDerivedDefinition<T>, replacement: IAtomDefinition<NoInfer<T>>): IDisposer; /** Replaces a primitive only with a definition that preserves standard `set(update)` semantics. */ override<T>(definition: IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>, replacement: IPrimitiveDefinition<NoInfer<T>> | IPrimitiveFactoryDefinition<NoInfer<T>>): IDisposer; /** Preserves the exact `Args` and `Result` contract of a writable derived definition. */ override<T, Args extends readonly unknown[], Result>(definition: IWritableDerivedDefinition<T, Args, Result>, replacement: IWritableDerivedDefinition<NoInfer<T>, NoInfer<Args>, NoInfer<Result>>): IDisposer; /** Reports whether this store has observers for the definition without exposing its graph node. */ isObserved<T>(definition: IAtomDefinition<T>): boolean; /** * Releases the instance for one definition. * * Unlike disposing the whole store, disposal of a legacy atom instance releases only its own * definition. Other definitions in the same store remain intact. */ release<T>(definition: IAtomDefinition<T>): boolean; /** Reports the number of instantiated definitions so release behavior is observable. */ readonly size: number; dispose(): void; };",
           "source": "packages/store-keyed/dist/atom/store.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./atom/store",
@@ -6423,9 +6423,9 @@
           "ownerFragment": "store-keyed-atom/definition--IAtomWriter"
         },
         {
-          "identity": "packages/store-keyed/dist/atom/definition.d.ts:IDerivedDefinition:export type IDerivedDefinition<T> = IDefinitionBase & { readonly kind: typeof AtomKind.derived; readonly read: IAtomRead<T>; /** 自定义相等比较。这里只是个参数，怎么用由 store 层决定。 */ readonly equals?: (a: T, b: T) => boolean; };",
+          "identity": "packages/store-keyed/dist/atom/definition.d.ts:IDerivedDefinition:export type IDerivedDefinition<T> = IDefinitionBase & { readonly kind: typeof AtomKind.derived; readonly read: IAtomRead<T>; /** Provides an equality comparison for the store layer to apply. */ readonly equals?: (a: T, b: T) => boolean; };",
           "name": "IDerivedDefinition",
-          "signature": "export type IDerivedDefinition<T> = IDefinitionBase & { readonly kind: typeof AtomKind.derived; readonly read: IAtomRead<T>; /** 自定义相等比较。这里只是个参数，怎么用由 store 层决定。 */ readonly equals?: (a: T, b: T) => boolean; };",
+          "signature": "export type IDerivedDefinition<T> = IDefinitionBase & { readonly kind: typeof AtomKind.derived; readonly read: IAtomRead<T>; /** Provides an equality comparison for the store layer to apply. */ readonly equals?: (a: T, b: T) => boolean; };",
           "source": "packages/store-keyed/dist/atom/definition.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./atom/definition",
@@ -6524,7 +6524,7 @@
           "name": "assertNotThenable",
           "kind": "function",
           "signature": "export declare function assertNotThenable(value: unknown, context: string): void;",
-          "declarationLine": 75,
+          "declarationLine": 76,
           "source": "packages/store-keyed/dist/atom/definition.d.ts",
           "purpose": "Rejects thenables: async initial values are not supported here, and a silently-stored unresolved Promise is far harder to debug than an immediate throw. `context` names the call site for the error message.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertNotThenable.",
@@ -6783,7 +6783,7 @@
           "name": "atomDef",
           "kind": "function",
           "signature": "export declare function atomDef<T>(init: T, debugLabel?: string): IPrimitiveDefinition<T>;",
-          "declarationLine": 76,
+          "declarationLine": 77,
           "source": "packages/store-keyed/dist/atom/definition.d.ts",
           "purpose": "atomDef is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for atomDef.",
@@ -7046,7 +7046,7 @@
           "name": "atomDefFactory",
           "kind": "function",
           "signature": "export declare function atomDefFactory<T>(create: () => T, debugLabel?: string): IPrimitiveFactoryDefinition<T>;",
-          "declarationLine": 77,
+          "declarationLine": 78,
           "source": "packages/store-keyed/dist/atom/definition.d.ts",
           "purpose": "atomDefFactory is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for atomDefFactory.",
@@ -7305,7 +7305,7 @@
           "name": "derivedDef",
           "kind": "function",
           "signature": "export declare function derivedDef<T>(read: IAtomRead<T>, debugLabel?: string, equals?: (a: T, b: T) => boolean): IDerivedDefinition<T>;",
-          "declarationLine": 84,
+          "declarationLine": 85,
           "source": "packages/store-keyed/dist/atom/definition.d.ts",
           "purpose": "derivedDef is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for derivedDef.",
@@ -7584,7 +7584,7 @@
           "name": "IAtomDefinition",
           "kind": "type",
           "signature": "export type IAtomDefinition<T> = IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T> | IDerivedDefinition<T> | IErasedWritableDerived<T>;",
-          "declarationLine": 66,
+          "declarationLine": 67,
           "source": "packages/store-keyed/dist/atom/definition.d.ts",
           "purpose": "IAtomDefinition is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAtomDefinition.",
@@ -7653,7 +7653,7 @@
           "signature": "export type IAtomGet = <T>(definition: IAtomDefinition<T>) => T;",
           "declarationLine": 14,
           "source": "packages/store-keyed/dist/atom/definition.d.ts",
-          "purpose": "在某个 store 内读另一个定义的当前值。",
+          "purpose": "Reads another definition's current value within a store.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAtomGet.",
           "advanced": "No additional advanced behavior is declared for IAtomGet.",
           "parameters": ["This type declaration has no parameters."],
@@ -7677,7 +7677,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "在某个 store 内读另一个定义的当前值。"
+              "content": "Reads another definition's current value within a store."
             },
             {
               "id": "getting-started",
@@ -7779,7 +7779,7 @@
           "signature": "export type IAtomSet = <T, Args extends readonly unknown[], Result>(definition: IWritableAtomDefinition<T, Args, Result>, ...args: Args) => Result;",
           "declarationLine": 16,
           "source": "packages/store-keyed/dist/atom/definition.d.ts",
-          "purpose": "在某个 store 内写另一个可写定义。",
+          "purpose": "Writes another writable definition within a store.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAtomSet.",
           "advanced": "No additional advanced behavior is declared for IAtomSet.",
           "parameters": ["This type declaration has no parameters."],
@@ -7801,7 +7801,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "在某个 store 内写另一个可写定义。"
+              "content": "Writes another writable definition within a store."
             },
             {
               "id": "getting-started",
@@ -7965,10 +7965,10 @@
         {
           "name": "IDerivedDefinition",
           "kind": "type",
-          "signature": "export type IDerivedDefinition<T> = IDefinitionBase & { readonly kind: typeof AtomKind.derived; readonly read: IAtomRead<T>; /** 自定义相等比较。这里只是个参数，怎么用由 store 层决定。 */ readonly equals?: (a: T, b: T) => boolean; };",
-          "declarationLine": 41,
+          "signature": "export type IDerivedDefinition<T> = IDefinitionBase & { readonly kind: typeof AtomKind.derived; readonly read: IAtomRead<T>; /** Provides an equality comparison for the store layer to apply. */ readonly equals?: (a: T, b: T) => boolean; };",
+          "declarationLine": 42,
           "source": "packages/store-keyed/dist/atom/definition.d.ts",
-          "purpose": "派生定义：只有读函数。",
+          "purpose": "Describes a derived atom through its read function.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDerivedDefinition.",
           "advanced": "No additional advanced behavior is declared for IDerivedDefinition.",
           "parameters": ["This type declaration has no parameters."],
@@ -7984,7 +7984,7 @@
           "members": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
-            "export type IDerivedDefinition<T> = IDefinitionBase & { readonly kind: typeof AtomKind.derived; readonly read: IAtomRead<T>; /** 自定义相等比较。这里只是个参数，怎么用由 store 层决定。 */ readonly equals?: (a: T, b: T) => boolean; };"
+            "export type IDerivedDefinition<T> = IDefinitionBase & { readonly kind: typeof AtomKind.derived; readonly read: IAtomRead<T>; /** Provides an equality comparison for the store layer to apply. */ readonly equals?: (a: T, b: T) => boolean; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7994,7 +7994,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "派生定义：只有读函数。"
+              "content": "Describes a derived atom through its read function."
             },
             {
               "id": "getting-started",
@@ -8023,7 +8023,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-keyed/dist/atom/definition.d.ts:IDerivedDefinition:export type IDerivedDefinition<T> = IDefinitionBase & { readonly kind: typeof AtomKind.derived; readonly read: IAtomRead<T>; /** 自定义相等比较。这里只是个参数，怎么用由 store 层决定。 */ readonly equals?: (a: T, b: T) => boolean; };",
+          "identity": "packages/store-keyed/dist/atom/definition.d.ts:IDerivedDefinition:export type IDerivedDefinition<T> = IDefinitionBase & { readonly kind: typeof AtomKind.derived; readonly read: IAtomRead<T>; /** Provides an equality comparison for the store layer to apply. */ readonly equals?: (a: T, b: T) => boolean; };",
           "guidance": [],
           "usageScore": 34,
           "configuration": [],
@@ -8035,7 +8035,7 @@
           "signature": "export type IPrimitiveDefinition<T> = IDefinitionBase & { readonly kind: typeof AtomKind.primitive; readonly init: T; };",
           "declarationLine": 25,
           "source": "packages/store-keyed/dist/atom/definition.d.ts",
-          "purpose": "源定义：只有初值。",
+          "purpose": "Describes a source atom with its initial value.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPrimitiveDefinition.",
           "advanced": "No additional advanced behavior is declared for IPrimitiveDefinition.",
           "parameters": ["This type declaration has no parameters."],
@@ -8059,7 +8059,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "源定义：只有初值。"
+              "content": "Describes a source atom with its initial value."
             },
             {
               "id": "getting-started",
@@ -8098,9 +8098,9 @@
           "name": "IPrimitiveFactoryDefinition",
           "kind": "type",
           "signature": "export type IPrimitiveFactoryDefinition<T> = IDefinitionBase & { readonly kind: typeof AtomKind.primitiveFactory; readonly create: () => T; /** Only explicitly marked factories may execute during speculative preview. */ readonly previewSafe: boolean; };",
-          "declarationLine": 34,
+          "declarationLine": 35,
           "source": "packages/store-keyed/dist/atom/definition.d.ts",
-          "purpose": "每个 AtomStore 首次实例化时各自创建初值。 对象、数组及其它可变容器不应作为跨 Provider/SSR scope 共享的模板引用； 独立 kind 避免把“函数值”误判成初始化函数。",
+          "purpose": "Creates an independent initial value when each `AtomStore` first instantiates the definition. Objects, arrays, and other mutable containers must not share template references across provider or SSR scopes. A separate kind distinguishes a function value from an initialization factory.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPrimitiveFactoryDefinition.",
           "advanced": "No additional advanced behavior is declared for IPrimitiveFactoryDefinition.",
           "parameters": ["This type declaration has no parameters."],
@@ -8124,7 +8124,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "每个 AtomStore 首次实例化时各自创建初值。 对象、数组及其它可变容器不应作为跨 Provider/SSR scope 共享的模板引用； 独立 kind 避免把“函数值”误判成初始化函数。"
+              "content": "Creates an independent initial value when each `AtomStore` first instantiates the definition. Objects, arrays, and other mutable containers must not share template references across provider or SSR scopes. A separate kind distinguishes a function value from an initialization factory."
             },
             {
               "id": "getting-started",
@@ -8163,7 +8163,7 @@
           "name": "isAtomDefinition",
           "kind": "const",
           "signature": "export declare const isAtomDefinition: (value: unknown) => value is IAtomDefinition<unknown>;",
-          "declarationLine": 69,
+          "declarationLine": 70,
           "source": "packages/store-keyed/dist/atom/definition.d.ts",
           "purpose": "isAtomDefinition is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isAtomDefinition.",
@@ -8229,9 +8229,9 @@
           "name": "IWritableAtomDefinition",
           "kind": "type",
           "signature": "export type IWritableAtomDefinition<T, Args extends readonly unknown[] = readonly [IAtomUpdate<T>], Result = void> = IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T> | IWritableDerivedDefinition<T, Args, Result>;",
-          "declarationLine": 68,
+          "declarationLine": 69,
           "source": "packages/store-keyed/dist/atom/definition.d.ts",
-          "purpose": "能被 set 的定义：源定义，或带 write 的派生定义。",
+          "purpose": "Accepts writes to a source definition or a derived definition with `write`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWritableAtomDefinition.",
           "advanced": "No additional advanced behavior is declared for IWritableAtomDefinition.",
           "parameters": ["This type declaration has no parameters."],
@@ -8255,7 +8255,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "能被 set 的定义：源定义，或带 write 的派生定义。"
+              "content": "Accepts writes to a source definition or a derived definition with `write`."
             },
             {
               "id": "getting-started",
@@ -8294,9 +8294,9 @@
           "name": "IWritableDerivedDefinition",
           "kind": "type",
           "signature": "export type IWritableDerivedDefinition<T, Args extends readonly unknown[], Result> = IDefinitionBase & { readonly kind: typeof AtomKind.writableDerived; readonly read: IAtomRead<T>; readonly write: IAtomWriter<Args, Result>; readonly equals?: (a: T, b: T) => boolean; };",
-          "declarationLine": 48,
+          "declarationLine": 49,
           "source": "packages/store-keyed/dist/atom/definition.d.ts",
-          "purpose": "可写派生定义：读一份、写另一份。",
+          "purpose": "Describes a derived atom that reads one value and writes another.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWritableDerivedDefinition.",
           "advanced": "No additional advanced behavior is declared for IWritableDerivedDefinition.",
           "parameters": ["This type declaration has no parameters."],
@@ -8321,7 +8321,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "可写派生定义：读一份、写另一份。"
+              "content": "Describes a derived atom that reads one value and writes another."
             },
             {
               "id": "getting-started",
@@ -8360,7 +8360,7 @@
           "name": "previewSafeAtomDefFactory",
           "kind": "function",
           "signature": "export declare function previewSafeAtomDefFactory<T>(create: () => T, debugLabel?: string): IPrimitiveFactoryDefinition<T>;",
-          "declarationLine": 83,
+          "declarationLine": 84,
           "source": "packages/store-keyed/dist/atom/definition.d.ts",
           "purpose": "Creates a factory whose body is explicitly allowed during speculative React preview. The function must be pure, deterministic, and free of externally visible effects because preview may be abandoned.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for previewSafeAtomDefFactory.",
@@ -8447,7 +8447,7 @@
           "name": "writableDef",
           "kind": "function",
           "signature": "export declare function writableDef<T, Args extends readonly unknown[], Result>(read: IAtomRead<T>, write: IAtomWriter<Args, Result>, debugLabel?: string, equals?: (a: T, b: T) => boolean): IWritableDerivedDefinition<T, Args, Result>;",
-          "declarationLine": 85,
+          "declarationLine": 86,
           "source": "packages/store-keyed/dist/atom/definition.d.ts",
           "purpose": "writableDef is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for writableDef.",
@@ -8580,7 +8580,7 @@
           "name": "createAtomStore",
           "kind": "function",
           "signature": "export declare function createAtomStore(runtime: IRuntime): IAtomStore;",
-          "declarationLine": 36,
+          "declarationLine": 41,
           "source": "packages/store-keyed/dist/atom/store.d.ts",
           "purpose": "createAtomStore is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createAtomStore.",
@@ -8664,7 +8664,7 @@
           "name": "defaultAtomStore",
           "kind": "function",
           "signature": "export declare function defaultAtomStore(runtime: IRuntime): IAtomStore;",
-          "declarationLine": 37,
+          "declarationLine": 42,
           "source": "packages/store-keyed/dist/atom/store.d.ts",
           "purpose": "defaultAtomStore is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defaultAtomStore.",
@@ -8740,7 +8740,7 @@
         {
           "name": "IAtomStore",
           "kind": "type",
-          "signature": "export type IAtomStore = { readonly runtime: IRuntime; readonly disposed: boolean; get<T>(definition: IAtomDefinition<T>): T; /** 非追踪读：适配层的 getSnapshot 不该在别人的捕获窗口里建边。 */ peek<T>(definition: IAtomDefinition<T>): T; /** React/concurrent speculative read; value may be discarded after the turn. */ preview<T>(definition: IAtomDefinition<T>): T; set<T, Args extends readonly unknown[], Result>(definition: IWritableAtomDefinition<T, Args, Result>, ...args: Args): Result; /** * 订阅一个定义。返回退订函数。 * * 这是适配层唯一需要的东西——比交出节点窄得多，实例化策略因此可以自由演进。 */ sub<T>(definition: IAtomDefinition<T>, onChange: () => void): IDisposer; /** 只读派生可以路由到任意同值类型定义。 */ override<T>(definition: IDerivedDefinition<T>, replacement: IAtomDefinition<NoInfer<T>>): IDisposer; /** Primitive 只能替换为同一种固定 set(update) 写语义。 */ override<T>(definition: IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>, replacement: IPrimitiveDefinition<NoInfer<T>> | IPrimitiveFactoryDefinition<NoInfer<T>>): IDisposer; /** 自定义 writable derived 必须保留完全相同的 Args/Result。 */ override<T, Args extends readonly unknown[], Result>(definition: IWritableDerivedDefinition<T, Args, Result>, replacement: IWritableDerivedDefinition<NoInfer<T>, NoInfer<Args>, NoInfer<Result>>): IDisposer; /** 这个定义在本 store 内是否已有观察者。窄查询，不交出节点。 */ isObserved<T>(definition: IAtomDefinition<T>): boolean; /** * 释放单个定义的实例。 * * 与 dispose 整个 store 相对：实例式旧 API 一个实例一份定义，它 dispose 时 只该释放自己那一份，不能连累同一 store 里的其它定义。 */ release<T>(definition: IAtomDefinition<T>): boolean; /** 已实例化的定义数量。释放行为的可观测点。 */ readonly size: number; dispose(): void; };",
+          "signature": "export type IAtomStore = { readonly runtime: IRuntime; readonly disposed: boolean; get<T>(definition: IAtomDefinition<T>): T; /** * Reads without tracking, so an adapter snapshot does not create edges in another dependency * capture. */ peek<T>(definition: IAtomDefinition<T>): T; /** React/concurrent speculative read; value may be discarded after the turn. */ preview<T>(definition: IAtomDefinition<T>): T; set<T, Args extends readonly unknown[], Result>(definition: IWritableAtomDefinition<T, Args, Result>, ...args: Args): Result; /** * Subscribes to a definition and returns an unsubscribe function. * * Adapters subscribe through this boundary instead of accessing graph nodes, leaving * instantiation strategies independent. */ sub<T>(definition: IAtomDefinition<T>, onChange: () => void): IDisposer; /** Routes a read-only derived definition to any definition with the same value type. */ override<T>(definition: IDerivedDefinition<T>, replacement: IAtomDefinition<NoInfer<T>>): IDisposer; /** Replaces a primitive only with a definition that preserves standard `set(update)` semantics. */ override<T>(definition: IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>, replacement: IPrimitiveDefinition<NoInfer<T>> | IPrimitiveFactoryDefinition<NoInfer<T>>): IDisposer; /** Preserves the exact `Args` and `Result` contract of a writable derived definition. */ override<T, Args extends readonly unknown[], Result>(definition: IWritableDerivedDefinition<T, Args, Result>, replacement: IWritableDerivedDefinition<NoInfer<T>, NoInfer<Args>, NoInfer<Result>>): IDisposer; /** Reports whether this store has observers for the definition without exposing its graph node. */ isObserved<T>(definition: IAtomDefinition<T>): boolean; /** * Releases the instance for one definition. * * Unlike disposing the whole store, disposal of a legacy atom instance releases only its own * definition. Other definitions in the same store remain intact. */ release<T>(definition: IAtomDefinition<T>): boolean; /** Reports the number of instantiated definitions so release behavior is observable. */ readonly size: number; dispose(): void; };",
           "declarationLine": 3,
           "source": "packages/store-keyed/dist/atom/store.d.ts",
           "purpose": "IAtomStore is part of this module's public type contract.",
@@ -8759,7 +8759,7 @@
           "members": [],
           "exportPath": "./atom/store",
           "overloadSignatures": [
-            "export type IAtomStore = { readonly runtime: IRuntime; readonly disposed: boolean; get<T>(definition: IAtomDefinition<T>): T; /** 非追踪读：适配层的 getSnapshot 不该在别人的捕获窗口里建边。 */ peek<T>(definition: IAtomDefinition<T>): T; /** React/concurrent speculative read; value may be discarded after the turn. */ preview<T>(definition: IAtomDefinition<T>): T; set<T, Args extends readonly unknown[], Result>(definition: IWritableAtomDefinition<T, Args, Result>, ...args: Args): Result; /** * 订阅一个定义。返回退订函数。 * * 这是适配层唯一需要的东西——比交出节点窄得多，实例化策略因此可以自由演进。 */ sub<T>(definition: IAtomDefinition<T>, onChange: () => void): IDisposer; /** 只读派生可以路由到任意同值类型定义。 */ override<T>(definition: IDerivedDefinition<T>, replacement: IAtomDefinition<NoInfer<T>>): IDisposer; /** Primitive 只能替换为同一种固定 set(update) 写语义。 */ override<T>(definition: IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>, replacement: IPrimitiveDefinition<NoInfer<T>> | IPrimitiveFactoryDefinition<NoInfer<T>>): IDisposer; /** 自定义 writable derived 必须保留完全相同的 Args/Result。 */ override<T, Args extends readonly unknown[], Result>(definition: IWritableDerivedDefinition<T, Args, Result>, replacement: IWritableDerivedDefinition<NoInfer<T>, NoInfer<Args>, NoInfer<Result>>): IDisposer; /** 这个定义在本 store 内是否已有观察者。窄查询，不交出节点。 */ isObserved<T>(definition: IAtomDefinition<T>): boolean; /** * 释放单个定义的实例。 * * 与 dispose 整个 store 相对：实例式旧 API 一个实例一份定义，它 dispose 时 只该释放自己那一份，不能连累同一 store 里的其它定义。 */ release<T>(definition: IAtomDefinition<T>): boolean; /** 已实例化的定义数量。释放行为的可观测点。 */ readonly size: number; dispose(): void; };"
+            "export type IAtomStore = { readonly runtime: IRuntime; readonly disposed: boolean; get<T>(definition: IAtomDefinition<T>): T; /** * Reads without tracking, so an adapter snapshot does not create edges in another dependency * capture. */ peek<T>(definition: IAtomDefinition<T>): T; /** React/concurrent speculative read; value may be discarded after the turn. */ preview<T>(definition: IAtomDefinition<T>): T; set<T, Args extends readonly unknown[], Result>(definition: IWritableAtomDefinition<T, Args, Result>, ...args: Args): Result; /** * Subscribes to a definition and returns an unsubscribe function. * * Adapters subscribe through this boundary instead of accessing graph nodes, leaving * instantiation strategies independent. */ sub<T>(definition: IAtomDefinition<T>, onChange: () => void): IDisposer; /** Routes a read-only derived definition to any definition with the same value type. */ override<T>(definition: IDerivedDefinition<T>, replacement: IAtomDefinition<NoInfer<T>>): IDisposer; /** Replaces a primitive only with a definition that preserves standard `set(update)` semantics. */ override<T>(definition: IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>, replacement: IPrimitiveDefinition<NoInfer<T>> | IPrimitiveFactoryDefinition<NoInfer<T>>): IDisposer; /** Preserves the exact `Args` and `Result` contract of a writable derived definition. */ override<T, Args extends readonly unknown[], Result>(definition: IWritableDerivedDefinition<T, Args, Result>, replacement: IWritableDerivedDefinition<NoInfer<T>, NoInfer<Args>, NoInfer<Result>>): IDisposer; /** Reports whether this store has observers for the definition without exposing its graph node. */ isObserved<T>(definition: IAtomDefinition<T>): boolean; /** * Releases the instance for one definition. * * Unlike disposing the whole store, disposal of a legacy atom instance releases only its own * definition. Other definitions in the same store remain intact. */ release<T>(definition: IAtomDefinition<T>): boolean; /** Reports the number of instantiated definitions so release behavior is observable. */ readonly size: number; dispose(): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8798,7 +8798,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-keyed/dist/atom/store.d.ts:IAtomStore:export type IAtomStore = { readonly runtime: IRuntime; readonly disposed: boolean; get<T>(definition: IAtomDefinition<T>): T; /** 非追踪读：适配层的 getSnapshot 不该在别人的捕获窗口里建边。 */ peek<T>(definition: IAtomDefinition<T>): T; /** React/concurrent speculative read; value may be discarded after the turn. */ preview<T>(definition: IAtomDefinition<T>): T; set<T, Args extends readonly unknown[], Result>(definition: IWritableAtomDefinition<T, Args, Result>, ...args: Args): Result; /** * 订阅一个定义。返回退订函数。 * * 这是适配层唯一需要的东西——比交出节点窄得多，实例化策略因此可以自由演进。 */ sub<T>(definition: IAtomDefinition<T>, onChange: () => void): IDisposer; /** 只读派生可以路由到任意同值类型定义。 */ override<T>(definition: IDerivedDefinition<T>, replacement: IAtomDefinition<NoInfer<T>>): IDisposer; /** Primitive 只能替换为同一种固定 set(update) 写语义。 */ override<T>(definition: IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>, replacement: IPrimitiveDefinition<NoInfer<T>> | IPrimitiveFactoryDefinition<NoInfer<T>>): IDisposer; /** 自定义 writable derived 必须保留完全相同的 Args/Result。 */ override<T, Args extends readonly unknown[], Result>(definition: IWritableDerivedDefinition<T, Args, Result>, replacement: IWritableDerivedDefinition<NoInfer<T>, NoInfer<Args>, NoInfer<Result>>): IDisposer; /** 这个定义在本 store 内是否已有观察者。窄查询，不交出节点。 */ isObserved<T>(definition: IAtomDefinition<T>): boolean; /** * 释放单个定义的实例。 * * 与 dispose 整个 store 相对：实例式旧 API 一个实例一份定义，它 dispose 时 只该释放自己那一份，不能连累同一 store 里的其它定义。 */ release<T>(definition: IAtomDefinition<T>): boolean; /** 已实例化的定义数量。释放行为的可观测点。 */ readonly size: number; dispose(): void; };",
+          "identity": "packages/store-keyed/dist/atom/store.d.ts:IAtomStore:export type IAtomStore = { readonly runtime: IRuntime; readonly disposed: boolean; get<T>(definition: IAtomDefinition<T>): T; /** * Reads without tracking, so an adapter snapshot does not create edges in another dependency * capture. */ peek<T>(definition: IAtomDefinition<T>): T; /** React/concurrent speculative read; value may be discarded after the turn. */ preview<T>(definition: IAtomDefinition<T>): T; set<T, Args extends readonly unknown[], Result>(definition: IWritableAtomDefinition<T, Args, Result>, ...args: Args): Result; /** * Subscribes to a definition and returns an unsubscribe function. * * Adapters subscribe through this boundary instead of accessing graph nodes, leaving * instantiation strategies independent. */ sub<T>(definition: IAtomDefinition<T>, onChange: () => void): IDisposer; /** Routes a read-only derived definition to any definition with the same value type. */ override<T>(definition: IDerivedDefinition<T>, replacement: IAtomDefinition<NoInfer<T>>): IDisposer; /** Replaces a primitive only with a definition that preserves standard `set(update)` semantics. */ override<T>(definition: IPrimitiveDefinition<T> | IPrimitiveFactoryDefinition<T>, replacement: IPrimitiveDefinition<NoInfer<T>> | IPrimitiveFactoryDefinition<NoInfer<T>>): IDisposer; /** Preserves the exact `Args` and `Result` contract of a writable derived definition. */ override<T, Args extends readonly unknown[], Result>(definition: IWritableDerivedDefinition<T, Args, Result>, replacement: IWritableDerivedDefinition<NoInfer<T>, NoInfer<Args>, NoInfer<Result>>): IDisposer; /** Reports whether this store has observers for the definition without exposing its graph node. */ isObserved<T>(definition: IAtomDefinition<T>): boolean; /** * Releases the instance for one definition. * * Unlike disposing the whole store, disposal of a legacy atom instance releases only its own * definition. Other definitions in the same store remain intact. */ release<T>(definition: IAtomDefinition<T>): boolean; /** Reports the number of instantiated definitions so release behavior is observable. */ readonly size: number; dispose(): void; };",
           "guidance": [],
           "usageScore": 74,
           "configuration": [],
@@ -8827,9 +8827,9 @@
           "name": "atomGetter",
           "kind": "function",
           "signature": "export declare function atomGetter(runtime: IRuntime): IAtomGetter;",
-          "declarationLine": 37,
+          "declarationLine": 39,
           "source": "packages/store-keyed/dist/reactive/atom.d.ts",
-          "purpose": "构造一个绑定到指定 Runtime 的 getter。 导出是因为它属于 atom 协议本身：async / family 这类扩展层要在自己的节点里 复用同一套跨 runtime 校验，不该各写一份。",
+          "purpose": "Creates a getter bound to the specified `Runtime`. Async and family extensions reuse the atom protocol's cross-runtime validation instead of implementing their own.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for atomGetter.",
           "advanced": "No additional advanced behavior is declared for atomGetter.",
           "parameters": ["runtime: IRuntime"],
@@ -8867,7 +8867,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "构造一个绑定到指定 Runtime 的 getter。 导出是因为它属于 atom 协议本身：async / family 这类扩展层要在自己的节点里 复用同一套跨 runtime 校验，不该各写一份。"
+              "content": "Creates a getter bound to the specified `Runtime`. Async and family extensions reuse the atom protocol's cross-runtime validation instead of implementing their own."
             },
             {
               "id": "getting-started",
@@ -9078,7 +9078,7 @@
           "name": "atomSetter",
           "kind": "function",
           "signature": "export declare function atomSetter(runtime: IRuntime): IAtomSetter;",
-          "declarationLine": 38,
+          "declarationLine": 40,
           "source": "packages/store-keyed/dist/reactive/atom.d.ts",
           "purpose": "atomSetter is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for atomSetter.",
@@ -9329,7 +9329,7 @@
           "name": "IAtomGetter",
           "kind": "type",
           "signature": "export type IAtomGetter = <T>(atom: IReadableAtom<T>) => T;",
-          "declarationLine": 27,
+          "declarationLine": 28,
           "source": "packages/store-keyed/dist/reactive/atom.d.ts",
           "purpose": "IAtomGetter is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAtomGetter.",
@@ -9392,7 +9392,7 @@
           "name": "IAtomRead",
           "kind": "type",
           "signature": "export type IAtomRead<T> = (get: IAtomGetter) => T;",
-          "declarationLine": 29,
+          "declarationLine": 30,
           "source": "packages/store-keyed/dist/reactive/atom.d.ts",
           "purpose": "IAtomRead is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAtomRead.",
@@ -9453,7 +9453,7 @@
           "name": "IAtomSetter",
           "kind": "type",
           "signature": "export type IAtomSetter = <T, Args extends readonly unknown[], Result>(atom: IWritableAtom<T, Args, Result>, ...args: Args) => Result;",
-          "declarationLine": 28,
+          "declarationLine": 29,
           "source": "packages/store-keyed/dist/reactive/atom.d.ts",
           "purpose": "IAtomSetter is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAtomSetter.",
@@ -9518,7 +9518,7 @@
           "name": "IAtomUpdate",
           "kind": "type",
           "signature": "export type IAtomUpdate<T> = T | ((previous: T) => T);",
-          "declarationLine": 31,
+          "declarationLine": 32,
           "source": "packages/store-keyed/dist/reactive/atom.d.ts",
           "purpose": "IAtomUpdate is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAtomUpdate.",
@@ -9581,7 +9581,7 @@
           "name": "IAtomWrite",
           "kind": "type",
           "signature": "export type IAtomWrite<Args extends readonly unknown[], Result> = (get: IAtomGetter, set: IAtomSetter, ...args: Args) => Result;",
-          "declarationLine": 30,
+          "declarationLine": 31,
           "source": "packages/store-keyed/dist/reactive/atom.d.ts",
           "purpose": "IAtomWrite is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAtomWrite.",
@@ -9643,10 +9643,10 @@
         {
           "name": "IReadableAtom",
           "kind": "type",
-          "signature": "export type IReadableAtom<T> = IDisposable & { readonly runtime: IRuntime; /** Pure definition bridge used by the Provider-scoped React adapter. */ readonly atomDefinition?: IAtomDefinition<any>; readonly value: T; readonly observed: boolean; read(): T; /** * 非追踪读。 * * React 适配层的 getSnapshot 可能在任意时刻被调用，包括另一个组件正在 捕获依赖的窗口内。用 `.value` 会把这次读记进别人的依赖集合，造成串边； * 必须有一条明确不建边的读法。 */ peek(): T; };",
-          "declarationLine": 9,
+          "signature": "export type IReadableAtom<T> = IDisposable & { readonly runtime: IRuntime; /** Pure definition bridge used by the Provider-scoped React adapter. */ readonly atomDefinition?: IAtomDefinition<any>; readonly value: T; readonly observed: boolean; read(): T; /** * Reads without tracking dependencies. * * React can call `getSnapshot` while another component captures dependencies. Reading `.value` * would add the atom to that component's dependencies, so this path creates no graph edge. */ peek(): T; };",
+          "declarationLine": 10,
           "source": "packages/store-keyed/dist/reactive/atom.d.ts",
-          "purpose": "Atom 协议：只有形状与跨 Runtime 校验，没有实现。 实例式的 `PrimitiveAtom`/`DerivedAtom` 已经搬到 `atom/legacy.ts`——它们建立在 Definition + AtomStore 之上，属于 facade 层。这个文件留在内核目录里，因为 async / family / react 都只需要这套类型，不该为此认识实例化层。",
+          "purpose": "Defines the atom protocol and cross-runtime validation without an atom implementation. `PrimitiveAtom` and `DerivedAtom` live in `atom/legacy.ts` as facades over definitions and `AtomStore`. Async, family, and React extensions use this protocol without depending on the instantiation layer.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IReadableAtom.",
           "advanced": "No additional advanced behavior is declared for IReadableAtom.",
           "parameters": ["This type declaration has no parameters."],
@@ -9661,7 +9661,7 @@
           "members": [],
           "exportPath": "./reactive/atom",
           "overloadSignatures": [
-            "export type IReadableAtom<T> = IDisposable & { readonly runtime: IRuntime; /** Pure definition bridge used by the Provider-scoped React adapter. */ readonly atomDefinition?: IAtomDefinition<any>; readonly value: T; readonly observed: boolean; read(): T; /** * 非追踪读。 * * React 适配层的 getSnapshot 可能在任意时刻被调用，包括另一个组件正在 捕获依赖的窗口内。用 `.value` 会把这次读记进别人的依赖集合，造成串边； * 必须有一条明确不建边的读法。 */ peek(): T; };"
+            "export type IReadableAtom<T> = IDisposable & { readonly runtime: IRuntime; /** Pure definition bridge used by the Provider-scoped React adapter. */ readonly atomDefinition?: IAtomDefinition<any>; readonly value: T; readonly observed: boolean; read(): T; /** * Reads without tracking dependencies. * * React can call `getSnapshot` while another component captures dependencies. Reading `.value` * would add the atom to that component's dependencies, so this path creates no graph edge. */ peek(): T; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -9671,7 +9671,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Atom 协议：只有形状与跨 Runtime 校验，没有实现。 实例式的 `PrimitiveAtom`/`DerivedAtom` 已经搬到 `atom/legacy.ts`——它们建立在 Definition + AtomStore 之上，属于 facade 层。这个文件留在内核目录里，因为 async / family / react 都只需要这套类型，不该为此认识实例化层。"
+              "content": "Defines the atom protocol and cross-runtime validation without an atom implementation. `PrimitiveAtom` and `DerivedAtom` live in `atom/legacy.ts` as facades over definitions and `AtomStore`. Async, family, and React extensions use this protocol without depending on the instantiation layer."
             },
             {
               "id": "getting-started",
@@ -9700,7 +9700,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-keyed/dist/reactive/atom.d.ts:IReadableAtom:export type IReadableAtom<T> = IDisposable & { readonly runtime: IRuntime; /** Pure definition bridge used by the Provider-scoped React adapter. */ readonly atomDefinition?: IAtomDefinition<any>; readonly value: T; readonly observed: boolean; read(): T; /** * 非追踪读。 * * React 适配层的 getSnapshot 可能在任意时刻被调用，包括另一个组件正在 捕获依赖的窗口内。用 `.value` 会把这次读记进别人的依赖集合，造成串边； * 必须有一条明确不建边的读法。 */ peek(): T; };",
+          "identity": "packages/store-keyed/dist/reactive/atom.d.ts:IReadableAtom:export type IReadableAtom<T> = IDisposable & { readonly runtime: IRuntime; /** Pure definition bridge used by the Provider-scoped React adapter. */ readonly atomDefinition?: IAtomDefinition<any>; readonly value: T; readonly observed: boolean; read(): T; /** * Reads without tracking dependencies. * * React can call `getSnapshot` while another component captures dependencies. Reading `.value` * would add the atom to that component's dependencies, so this path creates no graph edge. */ peek(): T; };",
           "guidance": [],
           "usageScore": 30,
           "configuration": [],
@@ -9710,7 +9710,7 @@
           "name": "IWritableAtom",
           "kind": "type",
           "signature": "export type IWritableAtom<T, Args extends readonly unknown[], Result> = IReadableAtom<T> & { write(...args: Args): Result; };",
-          "declarationLine": 24,
+          "declarationLine": 25,
           "source": "packages/store-keyed/dist/reactive/atom.d.ts",
           "purpose": "IWritableAtom is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWritableAtom.",

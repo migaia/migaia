@@ -1418,7 +1418,7 @@
           "name": "assertSSRState",
           "kind": "function",
           "signature": "export declare function assertSSRState(value: unknown): asserts value is ISSRState;",
-          "declarationLine": 159,
+          "declarationLine": 170,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "assertSSRState is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertSSRState.",
@@ -1495,7 +1495,7 @@
           "name": "createSSRRequestScope",
           "kind": "function",
           "signature": "export declare function createSSRRequestScope(options?: ISSRRequestScopeOptions): SSRRequestScope;",
-          "declarationLine": 118,
+          "declarationLine": 127,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "createSSRRequestScope is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSSRRequestScope.",
@@ -1607,7 +1607,7 @@
           "name": "createSSRStateScript",
           "kind": "function",
           "signature": "export declare function createSSRStateScript(state: ISSRState, elementId?: string): string;",
-          "declarationLine": 128,
+          "declarationLine": 137,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "createSSRStateScript is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSSRStateScript.",
@@ -1699,9 +1699,9 @@
           "name": "createSSRStateScriptWith",
           "kind": "function",
           "signature": "export declare function createSSRStateScriptWith(state: ISSRState, options: ISSRScriptOptions): Promise<string>;",
-          "declarationLine": 150,
+          "declarationLine": 161,
           "source": "packages/store-ssr/dist/ssr.d.ts",
-          "purpose": "Same as createSSRStateScript but routed through a serialize registry, so the payload format is the caller's choice. 内联进 HTML 的转义是**传输层**要求，与格式无关，但转义手法不能一刀切： `<` 这类转义只在 JSON 语法内有效，套到 YAML 或二进制上就是破坏数据。 所以只有 json 走那条便宜的转义；其余格式一律 base64——base64 字母表里根本 不含 `<` `>` `&` 与行分隔符，天然可安全内联，代价是体积涨三分之一。",
+          "purpose": "createSSRStateScriptWith is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSSRStateScriptWith.",
           "advanced": "No additional advanced behavior is declared for createSSRStateScriptWith.",
           "parameters": ["state: ISSRState", "options: ISSRScriptOptions"],
@@ -1751,7 +1751,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Same as createSSRStateScript but routed through a serialize registry, so the payload format is the caller's choice. 内联进 HTML 的转义是**传输层**要求，与格式无关，但转义手法不能一刀切： `<` 这类转义只在 JSON 语法内有效，套到 YAML 或二进制上就是破坏数据。 所以只有 json 走那条便宜的转义；其余格式一律 base64——base64 字母表里根本 不含 `<` `>` `&` 与行分隔符，天然可安全内联，代价是体积涨三分之一。"
+              "content": "createSSRStateScriptWith is part of this module's public function contract."
             },
             {
               "id": "getting-started",
@@ -2930,7 +2930,7 @@
           "name": "deserializeSSRState",
           "kind": "function",
           "signature": "export declare function deserializeSSRState(serialized: string): ISSRState;",
-          "declarationLine": 127,
+          "declarationLine": 136,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "deserializeSSRState is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for deserializeSSRState.",
@@ -3009,7 +3009,7 @@
           "name": "IAwaitResourcesOptions",
           "kind": "type",
           "signature": "export type IAwaitResourcesOptions = { readonly timeoutMs?: number; };",
-          "declarationLine": 56,
+          "declarationLine": 59,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "IAwaitResourcesOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAwaitResourcesOptions.",
@@ -3073,7 +3073,7 @@
         {
           "name": "IDehydrateAsyncOptions",
           "kind": "type",
-          "signature": "export type IDehydrateAsyncOptions = { /** 覆盖默认的「报给 Runtime.onError」行为。 */ readonly onResourceError?: (failure: ISSRResourceFailure) => void; /** 整个等待过程的总预算；超时的 resource 各记一条 failure，不无限期挂起渲染。 */ readonly timeoutMs?: number; };",
+          "signature": "export type IDehydrateAsyncOptions = { /** Overrides the default resource failure reporting through `Runtime.onError`. */ readonly onResourceError?: (failure: ISSRResourceFailure) => void; /** * Sets the total wait budget. Each timed-out resource becomes a failure instead of blocking * rendering indefinitely. */ readonly timeoutMs?: number; };",
           "declarationLine": 50,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "IDehydrateAsyncOptions is part of this module's public type contract.",
@@ -3090,7 +3090,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IDehydrateAsyncOptions = { /** 覆盖默认的「报给 Runtime.onError」行为。 */ readonly onResourceError?: (failure: ISSRResourceFailure) => void; /** 整个等待过程的总预算；超时的 resource 各记一条 failure，不无限期挂起渲染。 */ readonly timeoutMs?: number; };"
+            "export type IDehydrateAsyncOptions = { /** Overrides the default resource failure reporting through `Runtime.onError`. */ readonly onResourceError?: (failure: ISSRResourceFailure) => void; /** * Sets the total wait budget. Each timed-out resource becomes a failure instead of blocking * rendering indefinitely. */ readonly timeoutMs?: number; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3129,7 +3129,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-ssr/dist/ssr.d.ts:IDehydrateAsyncOptions:export type IDehydrateAsyncOptions = { /** 覆盖默认的「报给 Runtime.onError」行为。 */ readonly onResourceError?: (failure: ISSRResourceFailure) => void; /** 整个等待过程的总预算；超时的 resource 各记一条 failure，不无限期挂起渲染。 */ readonly timeoutMs?: number; };",
+          "identity": "packages/store-ssr/dist/ssr.d.ts:IDehydrateAsyncOptions:export type IDehydrateAsyncOptions = { /** Overrides the default resource failure reporting through `Runtime.onError`. */ readonly onResourceError?: (failure: ISSRResourceFailure) => void; /** * Sets the total wait budget. Each timed-out resource becomes a failure instead of blocking * rendering indefinitely. */ readonly timeoutMs?: number; };",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
@@ -3265,7 +3265,7 @@
           "name": "ISSRDocument",
           "kind": "type",
           "signature": "export type ISSRDocument = { getElementById(elementId: string): { readonly textContent: string | null; getAttribute(name: string): string | null; } | null; };",
-          "declarationLine": 130,
+          "declarationLine": 139,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Minimal document surface accepted by the runtime-neutral SSR decoder.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISSRDocument.",
@@ -3330,7 +3330,7 @@
           "name": "ISSRReadOptions",
           "kind": "type",
           "signature": "export type ISSRReadOptions = { readonly codecs: ISerializeRegistry; readonly elementId?: string; readonly document?: ISSRDocument; readonly signal?: IAbortSignal; };",
-          "declarationLine": 151,
+          "declarationLine": 162,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "ISSRReadOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISSRReadOptions.",
@@ -3842,7 +3842,7 @@
           "name": "ISSRScriptOptions",
           "kind": "type",
           "signature": "export type ISSRScriptOptions = { readonly codecs: ISerializeRegistry; readonly elementId?: string; readonly signal?: IAbortSignal; };",
-          "declarationLine": 138,
+          "declarationLine": 147,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "ISSRScriptOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISSRScriptOptions.",
@@ -4451,7 +4451,7 @@
           "name": "readSSRStateFromDocument",
           "kind": "function",
           "signature": "export declare function readSSRStateFromDocument(elementId?: string, documentValue?: ISSRDocument): ISSRState | undefined;",
-          "declarationLine": 137,
+          "declarationLine": 146,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Reads an SSR payload from an injected document-like host.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for readSSRStateFromDocument.",
@@ -4543,7 +4543,7 @@
           "name": "readSSRStateFromDocumentWith",
           "kind": "function",
           "signature": "export declare function readSSRStateFromDocumentWith(options: ISSRReadOptions): Promise<ISSRState | undefined>;",
-          "declarationLine": 158,
+          "declarationLine": 169,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Reads a codec-tagged SSR payload from an injected document-like host.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for readSSRStateFromDocumentWith.",
@@ -4682,7 +4682,7 @@
           "name": "serializeSSRState",
           "kind": "function",
           "signature": "export declare function serializeSSRState(state: ISSRState): string;",
-          "declarationLine": 120,
+          "declarationLine": 129,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "JSON text safe inside an application/json script element and HTML streams.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for serializeSSRState.",
@@ -4759,7 +4759,7 @@
           "name": "serializeTrustedSSRState",
           "kind": "function",
           "signature": "export declare function serializeTrustedSSRState(state: ITrustedSSRState): string;",
-          "declarationLine": 126,
+          "declarationLine": 135,
           "source": "packages/store-ssr/dist/ssr.d.ts",
           "purpose": "Serializes the value produced by `dehydrateTrusted()` — not a snapshot; see that method's doc comment. Call this immediately after `dehydrateTrusted()`, before anything else can mutate the state it references.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for serializeTrustedSSRState.",
@@ -4838,10 +4838,10 @@
         {
           "name": "SSRRequestScope",
           "kind": "class",
-          "signature": "export declare class SSRRequestScope { #private; readonly runtime: IRuntime; constructor(options?: ISSRRequestScopeOptions); get disposed(): boolean; register(key: string, store: ISSRStore, options?: ISSRRegistrationOptions): void; unregister(key: string, disposeOwned?: boolean): boolean; /** Remove a registration without disposing it; ownership transfers to the caller. */ detach(key: string): ISSRStore | undefined; registerResource(key: string, resource: ISSRResource, options?: ISSRRegistrationOptions): void; unregisterResource(key: string, disposeOwned?: boolean): boolean; detachResource(key: string): ISSRResource | undefined; /** * Applies validated JSON state best-effort rather than atomically. A store or resource can reject * its own hydration; every other entry is still attempted and failures are collected. The * contracts provide no stage/commit/rollback protocol, so successful changes remain applied. * Pending hydration records always reflect the entries actually consumed, including when a later * entry fails. Callers must handle partial application rather than assume rollback. */ hydrate(state: ISSRState): void; dehydrate(): ISSRState; /** * Returns live dehydration references without copying, freezing or validation. Later mutations * can change the payload before serialization, including across an await; this is not a snapshot. * Use only for known-safe JSON data that stays immutable through serialization, such as owned * documentation/demo fixtures. Request input or concurrently mutable stores must use dehydrate() * instead. Select this fast path only when skipping validation and copying is justified. */ dehydrateTrusted(): ITrustedSSRState; /** * 逐轮等待已注册的异步派生，返回失败清单，允许调用方选择整页失败或客户端重取。 新注册的瀑布式 resource 也参与后续轮次；按 Promise 身份去重，同一个 key 的 * retry/refetch 新 Promise 仍会被等待。单个 resource 失败不会阻断其他预取。 Promise getter 抛错与超时均计入清单。等待期间 scope 被 * dispose 时返回已有结果， 不把剩余 resource 算作失败。 */ awaitResources(options?: IAwaitResourcesOptions): Promise<readonly ISSRResourceFailure[]>; /** * 预取后取快照。失败的 resource 不进 payload，其余照常。 * * 缺省把失败报给 Runtime 的 onError（phase `ssr-resource`）——静默吞掉会让 「客户端为什么又发了一遍请求」无从查起。给了 onResourceError * 就以它为准。 */ dehydrateAsync(options?: IDehydrateAsyncOptions): Promise<ISSRState>; dispose(): void; /** * Awaitable teardown boundary for real Store Light instances whose `$dispose()` is asynchronous. * Concurrent and repeated callers share the same completion and failure replay. */ disposeAsync(): Promise<void>; }",
-          "declarationLine": 69,
+          "signature": "export declare class SSRRequestScope { #private; readonly runtime: IRuntime; constructor(options?: ISSRRequestScopeOptions); get disposed(): boolean; register(key: string, store: ISSRStore, options?: ISSRRegistrationOptions): void; unregister(key: string, disposeOwned?: boolean): boolean; /** Remove a registration without disposing it; ownership transfers to the caller. */ detach(key: string): ISSRStore | undefined; registerResource(key: string, resource: ISSRResource, options?: ISSRRegistrationOptions): void; unregisterResource(key: string, disposeOwned?: boolean): boolean; detachResource(key: string): ISSRResource | undefined; /** * Applies validated JSON state best-effort rather than atomically. A store or resource can reject * its own hydration; every other entry is still attempted and failures are collected. The * contracts provide no stage/commit/rollback protocol, so successful changes remain applied. * Pending hydration records always reflect the entries actually consumed, including when a later * entry fails. Callers must handle partial application rather than assume rollback. */ hydrate(state: ISSRState): void; dehydrate(): ISSRState; /** * Returns live dehydration references without copying, freezing or validation. Later mutations * can change the payload before serialization, including across an await; this is not a snapshot. * Use only for known-safe JSON data that stays immutable through serialization, such as owned * documentation/demo fixtures. Request input or concurrently mutable stores must use dehydrate() * instead. Select this fast path only when skipping validation and copying is justified. */ dehydrateTrusted(): ITrustedSSRState; /** * Waits for registered asynchronous resources in rounds and returns their failures. Callers can * fail the page or refetch on the client. New waterfall registrations participate in later * rounds. Promises are deduplicated by identity, so a new retry or refetch promise for the same * key is awaited. One resource failure does not block other prefetches. Thrown promise getters * and timeouts are included in the failure list. Disposal during the wait returns results already * collected without marking remaining resources as failures. */ awaitResources(options?: IAwaitResourcesOptions): Promise<readonly ISSRResourceFailure[]>; /** * Takes a snapshot after prefetching. Failed resources are omitted from the payload; other * resources remain included. * * Reports failures to the runtime's `onError` with phase `ssr-resource` by default, so client * refetches remain diagnosable. When `onResourceError` is provided, it handles reporting * instead. */ dehydrateAsync(options?: IDehydrateAsyncOptions): Promise<ISSRState>; dispose(): void; /** * Awaitable teardown boundary for real Store Light instances whose `$dispose()` is asynchronous. * Concurrent and repeated callers share the same completion and failure replay. */ disposeAsync(): Promise<void>; }",
+          "declarationLine": 73,
           "source": "packages/store-ssr/dist/ssr.d.ts",
-          "purpose": "一个请求一个 Runtime 与一份注册表。 请求态**全部**是实例字段：没有模块级快照、没有模块级注册表，所以并发的两条流 看不见对方。但这不等于整个库没有模块级状态，那句话过去写得太满： - `defaultRuntime` 是模块级的。它进不来——`register()` 校验 `store.$runtime === this.runtime`，落在默认 Runtime 上的 store 会被当场拒绝， 这条断言才是隔离的实际保证； - `activeTracker` 是模块级的，但它只在**同步**求值期间被换入换出，跨 await 不留驻，所以两个请求的异步片段不会互相看到； - 所有权表与内核内部面是两张 WeakMap，按对象身份查，不按请求身份查。",
+          "purpose": "SSRRequestScope is part of this module's public class contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for SSRRequestScope.",
           "advanced": "No additional advanced behavior is declared for SSRRequestScope.",
           "parameters": ["options: ISSRRequestScopeOptions (optional)"],
@@ -5021,7 +5021,7 @@
               "name": "awaitResources",
               "kind": "method",
               "signature": "awaitResources(options?: IAwaitResourcesOptions): Promise<readonly ISSRResourceFailure[]>;",
-              "description": "逐轮等待已注册的异步派生，返回失败清单，允许调用方选择整页失败或客户端重取。 新注册的瀑布式 resource 也参与后续轮次；按 Promise 身份去重，同一个 key 的 retry/refetch 新 Promise 仍会被等待。单个 resource 失败不会阻断其他预取。 Promise getter 抛错与超时均计入清单。等待期间 scope 被 dispose 时返回已有结果， 不把剩余 resource 算作失败。",
+              "description": "Waits for registered asynchronous resources in rounds and returns their failures. Callers can fail the page or refetch on the client. New waterfall registrations participate in later rounds. Promises are deduplicated by identity, so a new retry or refetch promise for the same key is awaited. One resource failure does not block other prefetches. Thrown promise getters and timeouts are included in the failure list. Disposal during the wait returns results already collected without marking remaining resources as failures.",
               "parameterDetails": [
                 {
                   "name": "options",
@@ -5035,7 +5035,7 @@
               "name": "dehydrateAsync",
               "kind": "method",
               "signature": "dehydrateAsync(options?: IDehydrateAsyncOptions): Promise<ISSRState>;",
-              "description": "预取后取快照。失败的 resource 不进 payload，其余照常。 缺省把失败报给 Runtime 的 onError（phase `ssr-resource`）——静默吞掉会让 「客户端为什么又发了一遍请求」无从查起。给了 onResourceError 就以它为准。",
+              "description": "Takes a snapshot after prefetching. Failed resources are omitted from the payload; other resources remain included. Reports failures to the runtime's `onError` with phase `ssr-resource` by default, so client refetches remain diagnosable. When `onResourceError` is provided, it handles reporting instead.",
               "parameterDetails": [
                 {
                   "name": "options",
@@ -5064,7 +5064,7 @@
           ],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare class SSRRequestScope { #private; readonly runtime: IRuntime; constructor(options?: ISSRRequestScopeOptions); get disposed(): boolean; register(key: string, store: ISSRStore, options?: ISSRRegistrationOptions): void; unregister(key: string, disposeOwned?: boolean): boolean; /** Remove a registration without disposing it; ownership transfers to the caller. */ detach(key: string): ISSRStore | undefined; registerResource(key: string, resource: ISSRResource, options?: ISSRRegistrationOptions): void; unregisterResource(key: string, disposeOwned?: boolean): boolean; detachResource(key: string): ISSRResource | undefined; /** * Applies validated JSON state best-effort rather than atomically. A store or resource can reject * its own hydration; every other entry is still attempted and failures are collected. The * contracts provide no stage/commit/rollback protocol, so successful changes remain applied. * Pending hydration records always reflect the entries actually consumed, including when a later * entry fails. Callers must handle partial application rather than assume rollback. */ hydrate(state: ISSRState): void; dehydrate(): ISSRState; /** * Returns live dehydration references without copying, freezing or validation. Later mutations * can change the payload before serialization, including across an await; this is not a snapshot. * Use only for known-safe JSON data that stays immutable through serialization, such as owned * documentation/demo fixtures. Request input or concurrently mutable stores must use dehydrate() * instead. Select this fast path only when skipping validation and copying is justified. */ dehydrateTrusted(): ITrustedSSRState; /** * 逐轮等待已注册的异步派生，返回失败清单，允许调用方选择整页失败或客户端重取。 新注册的瀑布式 resource 也参与后续轮次；按 Promise 身份去重，同一个 key 的 * retry/refetch 新 Promise 仍会被等待。单个 resource 失败不会阻断其他预取。 Promise getter 抛错与超时均计入清单。等待期间 scope 被 * dispose 时返回已有结果， 不把剩余 resource 算作失败。 */ awaitResources(options?: IAwaitResourcesOptions): Promise<readonly ISSRResourceFailure[]>; /** * 预取后取快照。失败的 resource 不进 payload，其余照常。 * * 缺省把失败报给 Runtime 的 onError（phase `ssr-resource`）——静默吞掉会让 「客户端为什么又发了一遍请求」无从查起。给了 onResourceError * 就以它为准。 */ dehydrateAsync(options?: IDehydrateAsyncOptions): Promise<ISSRState>; dispose(): void; /** * Awaitable teardown boundary for real Store Light instances whose `$dispose()` is asynchronous. * Concurrent and repeated callers share the same completion and failure replay. */ disposeAsync(): Promise<void>; }"
+            "export declare class SSRRequestScope { #private; readonly runtime: IRuntime; constructor(options?: ISSRRequestScopeOptions); get disposed(): boolean; register(key: string, store: ISSRStore, options?: ISSRRegistrationOptions): void; unregister(key: string, disposeOwned?: boolean): boolean; /** Remove a registration without disposing it; ownership transfers to the caller. */ detach(key: string): ISSRStore | undefined; registerResource(key: string, resource: ISSRResource, options?: ISSRRegistrationOptions): void; unregisterResource(key: string, disposeOwned?: boolean): boolean; detachResource(key: string): ISSRResource | undefined; /** * Applies validated JSON state best-effort rather than atomically. A store or resource can reject * its own hydration; every other entry is still attempted and failures are collected. The * contracts provide no stage/commit/rollback protocol, so successful changes remain applied. * Pending hydration records always reflect the entries actually consumed, including when a later * entry fails. Callers must handle partial application rather than assume rollback. */ hydrate(state: ISSRState): void; dehydrate(): ISSRState; /** * Returns live dehydration references without copying, freezing or validation. Later mutations * can change the payload before serialization, including across an await; this is not a snapshot. * Use only for known-safe JSON data that stays immutable through serialization, such as owned * documentation/demo fixtures. Request input or concurrently mutable stores must use dehydrate() * instead. Select this fast path only when skipping validation and copying is justified. */ dehydrateTrusted(): ITrustedSSRState; /** * Waits for registered asynchronous resources in rounds and returns their failures. Callers can * fail the page or refetch on the client. New waterfall registrations participate in later * rounds. Promises are deduplicated by identity, so a new retry or refetch promise for the same * key is awaited. One resource failure does not block other prefetches. Thrown promise getters * and timeouts are included in the failure list. Disposal during the wait returns results already * collected without marking remaining resources as failures. */ awaitResources(options?: IAwaitResourcesOptions): Promise<readonly ISSRResourceFailure[]>; /** * Takes a snapshot after prefetching. Failed resources are omitted from the payload; other * resources remain included. * * Reports failures to the runtime's `onError` with phase `ssr-resource` by default, so client * refetches remain diagnosable. When `onResourceError` is provided, it handles reporting * instead. */ dehydrateAsync(options?: IDehydrateAsyncOptions): Promise<ISSRState>; dispose(): void; /** * Awaitable teardown boundary for real Store Light instances whose `$dispose()` is asynchronous. * Concurrent and repeated callers share the same completion and failure replay. */ disposeAsync(): Promise<void>; }"
           ],
           "overloadParameterDetails": [
             [
@@ -5082,7 +5082,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "一个请求一个 Runtime 与一份注册表。 请求态**全部**是实例字段：没有模块级快照、没有模块级注册表，所以并发的两条流 看不见对方。但这不等于整个库没有模块级状态，那句话过去写得太满： - `defaultRuntime` 是模块级的。它进不来——`register()` 校验 `store.$runtime === this.runtime`，落在默认 Runtime 上的 store 会被当场拒绝， 这条断言才是隔离的实际保证； - `activeTracker` 是模块级的，但它只在**同步**求值期间被换入换出，跨 await 不留驻，所以两个请求的异步片段不会互相看到； - 所有权表与内核内部面是两张 WeakMap，按对象身份查，不按请求身份查。"
+              "content": "SSRRequestScope is part of this module's public class contract."
             },
             {
               "id": "getting-started",
@@ -5124,7 +5124,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/store-ssr/dist/ssr.d.ts:SSRRequestScope:export declare class SSRRequestScope { #private; readonly runtime: IRuntime; constructor(options?: ISSRRequestScopeOptions); get disposed(): boolean; register(key: string, store: ISSRStore, options?: ISSRRegistrationOptions): void; unregister(key: string, disposeOwned?: boolean): boolean; /** Remove a registration without disposing it; ownership transfers to the caller. */ detach(key: string): ISSRStore | undefined; registerResource(key: string, resource: ISSRResource, options?: ISSRRegistrationOptions): void; unregisterResource(key: string, disposeOwned?: boolean): boolean; detachResource(key: string): ISSRResource | undefined; /** * Applies validated JSON state best-effort rather than atomically. A store or resource can reject * its own hydration; every other entry is still attempted and failures are collected. The * contracts provide no stage/commit/rollback protocol, so successful changes remain applied. * Pending hydration records always reflect the entries actually consumed, including when a later * entry fails. Callers must handle partial application rather than assume rollback. */ hydrate(state: ISSRState): void; dehydrate(): ISSRState; /** * Returns live dehydration references without copying, freezing or validation. Later mutations * can change the payload before serialization, including across an await; this is not a snapshot. * Use only for known-safe JSON data that stays immutable through serialization, such as owned * documentation/demo fixtures. Request input or concurrently mutable stores must use dehydrate() * instead. Select this fast path only when skipping validation and copying is justified. */ dehydrateTrusted(): ITrustedSSRState; /** * 逐轮等待已注册的异步派生，返回失败清单，允许调用方选择整页失败或客户端重取。 新注册的瀑布式 resource 也参与后续轮次；按 Promise 身份去重，同一个 key 的 * retry/refetch 新 Promise 仍会被等待。单个 resource 失败不会阻断其他预取。 Promise getter 抛错与超时均计入清单。等待期间 scope 被 * dispose 时返回已有结果， 不把剩余 resource 算作失败。 */ awaitResources(options?: IAwaitResourcesOptions): Promise<readonly ISSRResourceFailure[]>; /** * 预取后取快照。失败的 resource 不进 payload，其余照常。 * * 缺省把失败报给 Runtime 的 onError（phase `ssr-resource`）——静默吞掉会让 「客户端为什么又发了一遍请求」无从查起。给了 onResourceError * 就以它为准。 */ dehydrateAsync(options?: IDehydrateAsyncOptions): Promise<ISSRState>; dispose(): void; /** * Awaitable teardown boundary for real Store Light instances whose `$dispose()` is asynchronous. * Concurrent and repeated callers share the same completion and failure replay. */ disposeAsync(): Promise<void>; }",
+          "identity": "packages/store-ssr/dist/ssr.d.ts:SSRRequestScope:export declare class SSRRequestScope { #private; readonly runtime: IRuntime; constructor(options?: ISSRRequestScopeOptions); get disposed(): boolean; register(key: string, store: ISSRStore, options?: ISSRRegistrationOptions): void; unregister(key: string, disposeOwned?: boolean): boolean; /** Remove a registration without disposing it; ownership transfers to the caller. */ detach(key: string): ISSRStore | undefined; registerResource(key: string, resource: ISSRResource, options?: ISSRRegistrationOptions): void; unregisterResource(key: string, disposeOwned?: boolean): boolean; detachResource(key: string): ISSRResource | undefined; /** * Applies validated JSON state best-effort rather than atomically. A store or resource can reject * its own hydration; every other entry is still attempted and failures are collected. The * contracts provide no stage/commit/rollback protocol, so successful changes remain applied. * Pending hydration records always reflect the entries actually consumed, including when a later * entry fails. Callers must handle partial application rather than assume rollback. */ hydrate(state: ISSRState): void; dehydrate(): ISSRState; /** * Returns live dehydration references without copying, freezing or validation. Later mutations * can change the payload before serialization, including across an await; this is not a snapshot. * Use only for known-safe JSON data that stays immutable through serialization, such as owned * documentation/demo fixtures. Request input or concurrently mutable stores must use dehydrate() * instead. Select this fast path only when skipping validation and copying is justified. */ dehydrateTrusted(): ITrustedSSRState; /** * Waits for registered asynchronous resources in rounds and returns their failures. Callers can * fail the page or refetch on the client. New waterfall registrations participate in later * rounds. Promises are deduplicated by identity, so a new retry or refetch promise for the same * key is awaited. One resource failure does not block other prefetches. Thrown promise getters * and timeouts are included in the failure list. Disposal during the wait returns results already * collected without marking remaining resources as failures. */ awaitResources(options?: IAwaitResourcesOptions): Promise<readonly ISSRResourceFailure[]>; /** * Takes a snapshot after prefetching. Failed resources are omitted from the payload; other * resources remain included. * * Reports failures to the runtime's `onError` with phase `ssr-resource` by default, so client * refetches remain diagnosable. When `onResourceError` is provided, it handles reporting * instead. */ dehydrateAsync(options?: IDehydrateAsyncOptions): Promise<ISSRState>; dispose(): void; /** * Awaitable teardown boundary for real Store Light instances whose `$dispose()` is asynchronous. * Concurrent and repeated callers share the same completion and failure replay. */ disposeAsync(): Promise<void>; }",
           "guidance": [
             {
               "id": "14-错误一览表",

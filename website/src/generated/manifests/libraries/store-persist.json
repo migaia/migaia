@@ -1678,9 +1678,9 @@
           "name": "defaultJsonCodec",
           "kind": "const",
           "signature": "export declare const defaultJsonCodec: ICodec;",
-          "declarationLine": 8,
+          "declarationLine": 9,
           "source": "packages/store-persist/dist/storage/codec.d.ts",
-          "purpose": "默认 codec：等价于 storage-web 的 `jsonCodec` 再加 Map/Set 往返支持——本包不 import `@migaia/storage-web` 的具体值，只按结构复刻这一份零依赖实现，避免让\"默认 codec 是什么\"这件事 额外背上一条运行时依赖。",
+          "purpose": "Provides the default JSON codec with round-trip support for `Map` and `Set`. It delegates to `storage-contract`'s `collectionsJsonCodec` and also reads legacy collection tags. The module does not depend on concrete `@migaia/storage-web` values.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defaultJsonCodec.",
           "advanced": "No additional advanced behavior is declared for defaultJsonCodec.",
           "parameters": ["This const declaration has no parameters."],
@@ -1704,7 +1704,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "默认 codec：等价于 storage-web 的 `jsonCodec` 再加 Map/Set 往返支持——本包不 import `@migaia/storage-web` 的具体值，只按结构复刻这一份零依赖实现，避免让\"默认 codec 是什么\"这件事 额外背上一条运行时依赖。"
+              "content": "Provides the default JSON codec with round-trip support for `Map` and `Set`. It delegates to `storage-contract`'s `collectionsJsonCodec` and also reads legacy collection tags. The module does not depend on concrete `@migaia/storage-web` values."
             },
             {
               "id": "getting-started",
@@ -1901,7 +1901,7 @@
           "signature": "export type IEnvelope<TState> = { version: number; state: TState; };",
           "declarationLine": 7,
           "source": "packages/store-persist/dist/core/envelope.d.ts",
-          "purpose": "存档信封：version（schema 版本，供 migrate() 用）+ state。 不再像旧实现那样自己维护 revision/双通道冲突判定——storage-web 的 `ICodec`/`selectCodec` 已经把 \"codec 产出形态 vs 后端能力\"这层路由做掉了，store-persist 不需要在同一个 key 上同时维护文本和字节两个 物理位置，也就没有\"两个通道各自解码后按 revision 取新\"这个问题存在的前提。",
+          "purpose": "Stores state with a schema `version` for `migrate()`. Codec routing already matches output formats to backend capabilities. Persistence does not maintain separate text and byte locations for one key or resolve channel conflicts by revision.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEnvelope.",
           "advanced": "No additional advanced behavior is declared for IEnvelope.",
           "parameters": ["This type declaration has no parameters."],
@@ -1927,7 +1927,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "存档信封：version（schema 版本，供 migrate() 用）+ state。 不再像旧实现那样自己维护 revision/双通道冲突判定——storage-web 的 `ICodec`/`selectCodec` 已经把 \"codec 产出形态 vs 后端能力\"这层路由做掉了，store-persist 不需要在同一个 key 上同时维护文本和字节两个 物理位置，也就没有\"两个通道各自解码后按 revision 取新\"这个问题存在的前提。"
+              "content": "Stores state with a schema `version` for `migrate()`. Codec routing already matches output formats to backend capabilities. Persistence does not maintain separate text and byte locations for one key or resolve channel conflicts by revision."
             },
             {
               "id": "getting-started",
@@ -2031,7 +2031,7 @@
           "name": "IHydrationStatus",
           "kind": "type",
           "signature": "export type IHydrationStatus = typeof PersistState.loading | typeof PersistState.success | typeof PersistState.error;",
-          "declarationLine": 19,
+          "declarationLine": 20,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "IHydrationStatus is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IHydrationStatus.",
@@ -2223,8 +2223,8 @@
         {
           "name": "IPersistHandle",
           "kind": "type",
-          "signature": "export type IPersistHandle = { status: IComputedValue<IPersistStatus>; error: IComputedValue<unknown>; hydrated: IComputedValue<boolean>; hydrationStatus: IReadonlyPersistValue<IHydrationStatus>; hydrationError: IReadonlyPersistValue<unknown>; writeStatus: IReadonlyPersistValue<IWriteStatus>; writeError: IReadonlyPersistValue<unknown>; /** Hydration 成功 resolve；失败 reject。 */ ready: Promise<void>; /** Hydration 成功或失败都 resolve。 */ settled: Promise<void>; /** 失败后重新读取一次存档；只有本次读取成功才解除写入闸门。 */ retryHydrate(): Promise<void>; /** 立即写并等待全部在途写入完成；期间 dispose 会以 AbortError 结束。 */ flush(): Promise<void>; /** 排队删除存档；期间 dispose 会以 AbortError 结束。 */ clear(): Promise<void>; readonly disposed: boolean; dispose(): void; };",
-          "declarationLine": 24,
+          "signature": "export type IPersistHandle = { status: IComputedValue<IPersistStatus>; error: IComputedValue<unknown>; hydrated: IComputedValue<boolean>; hydrationStatus: IReadonlyPersistValue<IHydrationStatus>; hydrationError: IReadonlyPersistValue<unknown>; writeStatus: IReadonlyPersistValue<IWriteStatus>; writeError: IReadonlyPersistValue<unknown>; /** Resolves when hydration succeeds and rejects when hydration fails. */ ready: Promise<void>; /** Resolves after hydration, whether it succeeds or fails. */ settled: Promise<void>; /** Reads the archive again after failure. Only successful hydration reopens the write gate. */ retryHydrate(): Promise<void>; /** * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with * `AbortError`. */ flush(): Promise<void>; /** Queues archive removal. Disposal during the wait ends it with `AbortError`. */ clear(): Promise<void>; readonly disposed: boolean; dispose(): void; };",
+          "declarationLine": 25,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "IPersistHandle is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPersistHandle.",
@@ -2243,7 +2243,7 @@
           "aliasOf": "IPersistHandle",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IPersistHandle = { status: IComputedValue<IPersistStatus>; error: IComputedValue<unknown>; hydrated: IComputedValue<boolean>; hydrationStatus: IReadonlyPersistValue<IHydrationStatus>; hydrationError: IReadonlyPersistValue<unknown>; writeStatus: IReadonlyPersistValue<IWriteStatus>; writeError: IReadonlyPersistValue<unknown>; /** Hydration 成功 resolve；失败 reject。 */ ready: Promise<void>; /** Hydration 成功或失败都 resolve。 */ settled: Promise<void>; /** 失败后重新读取一次存档；只有本次读取成功才解除写入闸门。 */ retryHydrate(): Promise<void>; /** 立即写并等待全部在途写入完成；期间 dispose 会以 AbortError 结束。 */ flush(): Promise<void>; /** 排队删除存档；期间 dispose 会以 AbortError 结束。 */ clear(): Promise<void>; readonly disposed: boolean; dispose(): void; };"
+            "export type IPersistHandle = { status: IComputedValue<IPersistStatus>; error: IComputedValue<unknown>; hydrated: IComputedValue<boolean>; hydrationStatus: IReadonlyPersistValue<IHydrationStatus>; hydrationError: IReadonlyPersistValue<unknown>; writeStatus: IReadonlyPersistValue<IWriteStatus>; writeError: IReadonlyPersistValue<unknown>; /** Resolves when hydration succeeds and rejects when hydration fails. */ ready: Promise<void>; /** Resolves after hydration, whether it succeeds or fails. */ settled: Promise<void>; /** Reads the archive again after failure. Only successful hydration reopens the write gate. */ retryHydrate(): Promise<void>; /** * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with * `AbortError`. */ flush(): Promise<void>; /** Queues archive removal. Disposal during the wait ends it with `AbortError`. */ clear(): Promise<void>; readonly disposed: boolean; dispose(): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2282,7 +2282,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/core/types.d.ts:IPersistHandle:export type IPersistHandle = { status: IComputedValue<IPersistStatus>; error: IComputedValue<unknown>; hydrated: IComputedValue<boolean>; hydrationStatus: IReadonlyPersistValue<IHydrationStatus>; hydrationError: IReadonlyPersistValue<unknown>; writeStatus: IReadonlyPersistValue<IWriteStatus>; writeError: IReadonlyPersistValue<unknown>; /** Hydration 成功 resolve；失败 reject。 */ ready: Promise<void>; /** Hydration 成功或失败都 resolve。 */ settled: Promise<void>; /** 失败后重新读取一次存档；只有本次读取成功才解除写入闸门。 */ retryHydrate(): Promise<void>; /** 立即写并等待全部在途写入完成；期间 dispose 会以 AbortError 结束。 */ flush(): Promise<void>; /** 排队删除存档；期间 dispose 会以 AbortError 结束。 */ clear(): Promise<void>; readonly disposed: boolean; dispose(): void; };",
+          "identity": "packages/store-persist/dist/core/types.d.ts:IPersistHandle:export type IPersistHandle = { status: IComputedValue<IPersistStatus>; error: IComputedValue<unknown>; hydrated: IComputedValue<boolean>; hydrationStatus: IReadonlyPersistValue<IHydrationStatus>; hydrationError: IReadonlyPersistValue<unknown>; writeStatus: IReadonlyPersistValue<IWriteStatus>; writeError: IReadonlyPersistValue<unknown>; /** Resolves when hydration succeeds and rejects when hydration fails. */ ready: Promise<void>; /** Resolves after hydration, whether it succeeds or fails. */ settled: Promise<void>; /** Reads the archive again after failure. Only successful hydration reopens the write gate. */ retryHydrate(): Promise<void>; /** * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with * `AbortError`. */ flush(): Promise<void>; /** Queues archive removal. Disposal during the wait ends it with `AbortError`. */ clear(): Promise<void>; readonly disposed: boolean; dispose(): void; };",
           "guidance": [
             {
               "id": "10-底层导出-envelope-工具-状态常量与错误构造函数",
@@ -2421,7 +2421,7 @@
           "name": "IPersistStatus",
           "kind": "type",
           "signature": "export type IPersistStatus = typeof PersistState.loading | typeof PersistState.ready | typeof PersistState.error | typeof PersistState.disposed;",
-          "declarationLine": 18,
+          "declarationLine": 19,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "IPersistStatus is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPersistStatus.",
@@ -2549,10 +2549,10 @@
         {
           "name": "IPersistUnit",
           "kind": "type",
-          "signature": "export type IPersistUnit<TState> = { /** 同步读当前可持久化状态。 */ snapshot(): TState; /** 同步写回一份状态（hydrate 用）。 */ restore(state: TState): void; /** 注册变化通知，返回取消订阅函数。 */ subscribe(onChange: () => void): IDisposer; };",
-          "declarationLine": 10,
+          "signature": "export type IPersistUnit<TState> = { /** Reads the current persistable state synchronously. */ snapshot(): TState; /** Restores state synchronously during hydration. */ restore(state: TState): void; /** Registers change notifications and returns an unsubscribe function. */ subscribe(onChange: () => void): IDisposer; };",
+          "declarationLine": 11,
           "source": "packages/store-persist/dist/core/types.d.ts",
-          "purpose": "任意持久化单位的最小能力面：同步读快照、同步写回、订阅变化。 `persist()`（store-light）、`persistCollection()`（store-indexed）、以及 `persistKeyed()` 内部为每个 key 各自创建的持久化单位，全部实现这同一个接口——`persistUnit()` 只写一遍。",
+          "purpose": "Defines the minimal persistence boundary for synchronous snapshots, restoration, and change subscriptions. `persist()` for `store-light`, `persistCollection()` for `store-indexed`, and each keyed unit from `persistKeyed()` implement this contract. All use the same `persistUnit()` engine.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPersistUnit.",
           "advanced": "No additional advanced behavior is declared for IPersistUnit.",
           "parameters": ["This type declaration has no parameters."],
@@ -2567,7 +2567,7 @@
           "aliasOf": "IPersistUnit",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IPersistUnit<TState> = { /** 同步读当前可持久化状态。 */ snapshot(): TState; /** 同步写回一份状态（hydrate 用）。 */ restore(state: TState): void; /** 注册变化通知，返回取消订阅函数。 */ subscribe(onChange: () => void): IDisposer; };"
+            "export type IPersistUnit<TState> = { /** Reads the current persistable state synchronously. */ snapshot(): TState; /** Restores state synchronously during hydration. */ restore(state: TState): void; /** Registers change notifications and returns an unsubscribe function. */ subscribe(onChange: () => void): IDisposer; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2577,7 +2577,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "任意持久化单位的最小能力面：同步读快照、同步写回、订阅变化。 `persist()`（store-light）、`persistCollection()`（store-indexed）、以及 `persistKeyed()` 内部为每个 key 各自创建的持久化单位，全部实现这同一个接口——`persistUnit()` 只写一遍。"
+              "content": "Defines the minimal persistence boundary for synchronous snapshots, restoration, and change subscriptions. `persist()` for `store-light`, `persistCollection()` for `store-indexed`, and each keyed unit from `persistKeyed()` implement this contract. All use the same `persistUnit()` engine."
             },
             {
               "id": "getting-started",
@@ -2606,7 +2606,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/core/types.d.ts:IPersistUnit:export type IPersistUnit<TState> = { /** 同步读当前可持久化状态。 */ snapshot(): TState; /** 同步写回一份状态（hydrate 用）。 */ restore(state: TState): void; /** 注册变化通知，返回取消订阅函数。 */ subscribe(onChange: () => void): IDisposer; };",
+          "identity": "packages/store-persist/dist/core/types.d.ts:IPersistUnit:export type IPersistUnit<TState> = { /** Reads the current persistable state synchronously. */ snapshot(): TState; /** Restores state synchronously during hydration. */ restore(state: TState): void; /** Registers change notifications and returns an unsubscribe function. */ subscribe(onChange: () => void): IDisposer; };",
           "guidance": [
             {
               "id": "10-底层导出-envelope-工具-状态常量与错误构造函数",
@@ -2680,8 +2680,8 @@
         {
           "name": "IPersistUnitOptions",
           "kind": "type",
-          "signature": "export type IPersistUnitOptions<TState> = { key: string; /** 状态信号挂在哪个 Runtime 上——通常传底层 store/collection/AtomStore 自己的 runtime，保证同一张图。 */ runtime: IRuntime; storage: IPersistStorage; /** Codec 编解码的是整份 envelope（`{ version, state }`），天然是类型擦除的，不按 TState 参数化。 */ codec?: ICodec; version?: number; migrate?: (persisted: TState, fromVersion: number) => TState; partialize?: (state: TState) => Partial<TState>; merge?: (persisted: Partial<TState>, current: TState) => TState; debounceMs?: number; };",
-          "declarationLine": 45,
+          "signature": "export type IPersistUnitOptions<TState> = { key: string; /** * Owns the status signals. Use the underlying store, collection, or `AtomStore` runtime to keep * them in one graph. */ runtime: IRuntime; storage: IPersistStorage; /** * Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize * on the state type. */ codec?: ICodec; version?: number; migrate?: (persisted: TState, fromVersion: number) => TState; partialize?: (state: TState) => Partial<TState>; merge?: (persisted: Partial<TState>, current: TState) => TState; debounceMs?: number; };",
+          "declarationLine": 49,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "IPersistUnitOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPersistUnitOptions.",
@@ -2698,7 +2698,7 @@
           "aliasOf": "IPersistUnitOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IPersistUnitOptions<TState> = { key: string; /** 状态信号挂在哪个 Runtime 上——通常传底层 store/collection/AtomStore 自己的 runtime，保证同一张图。 */ runtime: IRuntime; storage: IPersistStorage; /** Codec 编解码的是整份 envelope（`{ version, state }`），天然是类型擦除的，不按 TState 参数化。 */ codec?: ICodec; version?: number; migrate?: (persisted: TState, fromVersion: number) => TState; partialize?: (state: TState) => Partial<TState>; merge?: (persisted: Partial<TState>, current: TState) => TState; debounceMs?: number; };"
+            "export type IPersistUnitOptions<TState> = { key: string; /** * Owns the status signals. Use the underlying store, collection, or `AtomStore` runtime to keep * them in one graph. */ runtime: IRuntime; storage: IPersistStorage; /** * Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize * on the state type. */ codec?: ICodec; version?: number; migrate?: (persisted: TState, fromVersion: number) => TState; partialize?: (state: TState) => Partial<TState>; merge?: (persisted: Partial<TState>, current: TState) => TState; debounceMs?: number; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2737,7 +2737,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/core/types.d.ts:IPersistUnitOptions:export type IPersistUnitOptions<TState> = { key: string; /** 状态信号挂在哪个 Runtime 上——通常传底层 store/collection/AtomStore 自己的 runtime，保证同一张图。 */ runtime: IRuntime; storage: IPersistStorage; /** Codec 编解码的是整份 envelope（`{ version, state }`），天然是类型擦除的，不按 TState 参数化。 */ codec?: ICodec; version?: number; migrate?: (persisted: TState, fromVersion: number) => TState; partialize?: (state: TState) => Partial<TState>; merge?: (persisted: Partial<TState>, current: TState) => TState; debounceMs?: number; };",
+          "identity": "packages/store-persist/dist/core/types.d.ts:IPersistUnitOptions:export type IPersistUnitOptions<TState> = { key: string; /** * Owns the status signals. Use the underlying store, collection, or `AtomStore` runtime to keep * them in one graph. */ runtime: IRuntime; storage: IPersistStorage; /** * Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize * on the state type. */ codec?: ICodec; version?: number; migrate?: (persisted: TState, fromVersion: number) => TState; partialize?: (state: TState) => Partial<TState>; merge?: (persisted: Partial<TState>, current: TState) => TState; debounceMs?: number; };",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -2747,7 +2747,7 @@
           "name": "IReadonlyPersistValue",
           "kind": "type",
           "signature": "export type IReadonlyPersistValue<T> = { readonly value: T; };",
-          "declarationLine": 21,
+          "declarationLine": 22,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "IReadonlyPersistValue is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IReadonlyPersistValue.",
@@ -2809,7 +2809,7 @@
           "name": "IWriteStatus",
           "kind": "type",
           "signature": "export type IWriteStatus = typeof PersistState.idle | typeof PersistState.writing | typeof PersistState.error | typeof PersistState.disposed;",
-          "declarationLine": 20,
+          "declarationLine": 21,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "IWriteStatus is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWriteStatus.",
@@ -3436,9 +3436,9 @@
           "name": "persistUnit",
           "kind": "function",
           "signature": "export declare function persistUnit<TState>(unit: IPersistUnit<TState>, options: IPersistUnitOptions<TState>): IPersistHandle;",
-          "declarationLine": 7,
+          "declarationLine": 10,
           "source": "packages/store-persist/dist/core/persist-unit.d.ts",
-          "purpose": "持久化核心引擎：给任意满足 `IPersistUnit<TState>` 的东西接上 hydrate（读 storage → 写回 unit） 与防抖写回（unit 变化 → 写 storage）。`persist()`/`persistCollection()`/`persistKeyed()` 内部 各自把自己的原生 API 适配成 `IPersistUnit`，然后调这一个函数——debounce、dispose、hydrate 竞态 只在这里实现一遍。",
+          "purpose": "Connects an `IPersistUnit` to storage hydration and debounced writes. Hydration reads storage and restores the unit. Unit changes trigger storage writes. `persist()`, `persistCollection()`, and `persistKeyed()` adapt their native APIs to `IPersistUnit` and call this engine. Debouncing, disposal, and hydration races are implemented here once.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for persistUnit.",
           "advanced": "No additional advanced behavior is declared for persistUnit.",
           "parameters": ["unit: IPersistUnit<TState>", "options: IPersistUnitOptions<TState>"],
@@ -3485,7 +3485,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "持久化核心引擎：给任意满足 `IPersistUnit<TState>` 的东西接上 hydrate（读 storage → 写回 unit） 与防抖写回（unit 变化 → 写 storage）。`persist()`/`persistCollection()`/`persistKeyed()` 内部 各自把自己的原生 API 适配成 `IPersistUnit`，然后调这一个函数——debounce、dispose、hydrate 竞态 只在这里实现一遍。"
+              "content": "Connects an `IPersistUnit` to storage hydration and debounced writes. Hydration reads storage and restores the unit. Unit changes trigger storage writes. `persist()`, `persistCollection()`, and `persistKeyed()` adapt their native APIs to `IPersistUnit` and call this engine. Debouncing, disposal, and hydration races are implemented here once."
             },
             {
               "id": "getting-started",
@@ -3589,7 +3589,7 @@
           "name": "readEnvelope",
           "kind": "function",
           "signature": "export declare function readEnvelope(storage: IPersistStorage, key: string, codec: ICodec, ctx: { signal?: IAbortSignal; }): Promise<unknown | undefined>;",
-          "declarationLine": 12,
+          "declarationLine": 13,
           "source": "packages/store-persist/dist/storage/codec.d.ts",
           "purpose": "readEnvelope is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for readEnvelope.",
@@ -3767,7 +3767,7 @@
           "name": "removeEnvelope",
           "kind": "function",
           "signature": "export declare function removeEnvelope(storage: IPersistStorage, key: string, ctx: { signal?: IAbortSignal; }): Promise<void>;",
-          "declarationLine": 15,
+          "declarationLine": 16,
           "source": "packages/store-persist/dist/storage/codec.d.ts",
           "purpose": "removeEnvelope is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for removeEnvelope.",
@@ -4065,7 +4065,7 @@
           "name": "writeEnvelope",
           "kind": "function",
           "signature": "export declare function writeEnvelope(storage: IPersistStorage, key: string, codec: ICodec, value: unknown, ctx: { signal?: IAbortSignal; }): Promise<void>;",
-          "declarationLine": 9,
+          "declarationLine": 10,
           "source": "packages/store-persist/dist/storage/codec.d.ts",
           "purpose": "writeEnvelope is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for writeEnvelope.",
@@ -4273,9 +4273,9 @@
           "name": "IPersistableCollection",
           "kind": "type",
           "signature": "export type IPersistableCollection<TState> = { readonly runtime: IRuntime; snapshot(): TState; replace(state: TState): void; };",
-          "declarationLine": 9,
+          "declarationLine": 10,
           "source": "packages/store-persist/dist/indexed/persist-collection.d.ts",
-          "purpose": "`persistCollection()` 支持的四种 store-indexed 集合。全部都有 `snapshot()`（tracked 读， 内部读了一个结构性 Signal，包进 `runtime.effect()` 就能感知任何结构变化）与 `replace(state)`（原子整体替换——`ObservableMap`/`ObservableSet` 的这个方法是本轮跟这份 SDD 一起补的，之前只有 `ObservableObject`/`ObservableArray` 有）。",
+          "purpose": "Supports the four `store-indexed` collections through snapshots and whole-state replacement. `snapshot()` tracks a structural signal, so `runtime.effect()` observes structural changes. `replace(state)` atomically replaces the complete state. `ObservableMap` and `ObservableSet` add the same replacement capability already available on `ObservableObject` and `ObservableArray`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPersistableCollection.",
           "advanced": "No additional advanced behavior is declared for IPersistableCollection.",
           "parameters": ["This type declaration has no parameters."],
@@ -4300,7 +4300,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "`persistCollection()` 支持的四种 store-indexed 集合。全部都有 `snapshot()`（tracked 读， 内部读了一个结构性 Signal，包进 `runtime.effect()` 就能感知任何结构变化）与 `replace(state)`（原子整体替换——`ObservableMap`/`ObservableSet` 的这个方法是本轮跟这份 SDD 一起补的，之前只有 `ObservableObject`/`ObservableArray` 有）。"
+              "content": "Supports the four `store-indexed` collections through snapshots and whole-state replacement. `snapshot()` tracks a structural signal, so `runtime.effect()` observes structural changes. `replace(state)` atomically replaces the complete state. `ObservableMap` and `ObservableSet` add the same replacement capability already available on `ObservableObject` and `ObservableArray`."
             },
             {
               "id": "getting-started",
@@ -4339,7 +4339,7 @@
           "name": "IPersistCollectionOptions",
           "kind": "type",
           "signature": "export type IPersistCollectionOptions<TState> = { key: string; storage: IPersistStorage; codec?: ICodec; version?: number; migrate?: (persisted: TState, fromVersion: number) => TState; partialize?: (state: TState) => Partial<TState>; merge?: (persisted: Partial<TState>, current: TState) => TState; debounceMs?: number; };",
-          "declarationLine": 14,
+          "declarationLine": 15,
           "source": "packages/store-persist/dist/indexed/persist-collection.d.ts",
           "purpose": "IPersistCollectionOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPersistCollectionOptions.",
@@ -4405,7 +4405,7 @@
           "name": "persistCollection",
           "kind": "function",
           "signature": "export declare function persistCollection<TState>(collection: IPersistableCollection<TState>, options: IPersistCollectionOptions<TState>): IPersistHandle;",
-          "declarationLine": 24,
+          "declarationLine": 25,
           "source": "packages/store-persist/dist/indexed/persist-collection.d.ts",
           "purpose": "persistCollection is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for persistCollection.",
@@ -4586,9 +4586,9 @@
           "name": "clearFamily",
           "kind": "function",
           "signature": "export declare function clearFamily(storage: IPersistStorage, namespace: string): Promise<number>;",
-          "declarationLine": 28,
+          "declarationLine": 34,
           "source": "packages/store-persist/dist/keyed/persist-keyed.d.ts",
-          "purpose": "批量清空某个 namespace 下的全部持久化记录。刻意绕开 `AtomStore`——它不知道\"这些 key 现在是否还 有内存中的实例\"，也不负责清理内存状态；只删 storage 里以 `${namespace}:` 为前缀的记录。 若调用方同时持有若干个还没 dispose 的 `persistKeyed()` handle，它们各自的内存值不受影响，也不会 因为存档被删掉就重新触发一次写回（下一次它们自己的 subscribe 触发时才会覆盖写回一条新记录）。",
+          "purpose": "Removes all persisted records whose keys start with `${namespace}:`. `AtomStore` does not inventory live keyed instances or clear their memory state here. Existing `persistKeyed()` handles keep their in-memory values after removal. Removing records does not trigger a write. Their next change notification writes a new record.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for clearFamily.",
           "advanced": "No additional advanced behavior is declared for clearFamily.",
           "parameters": ["storage: IPersistStorage", "namespace: string"],
@@ -4640,7 +4640,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "批量清空某个 namespace 下的全部持久化记录。刻意绕开 `AtomStore`——它不知道\"这些 key 现在是否还 有内存中的实例\"，也不负责清理内存状态；只删 storage 里以 `${namespace}:` 为前缀的记录。 若调用方同时持有若干个还没 dispose 的 `persistKeyed()` handle，它们各自的内存值不受影响，也不会 因为存档被删掉就重新触发一次写回（下一次它们自己的 subscribe 触发时才会覆盖写回一条新记录）。"
+              "content": "Removes all persisted records whose keys start with `${namespace}:`. `AtomStore` does not inventory live keyed instances or clear their memory state here. Existing `persistKeyed()` handles keep their in-memory values after removal. Removing records does not trigger a write. Their next change notification writes a new record."
             },
             {
               "id": "getting-started",
@@ -4679,7 +4679,7 @@
           "name": "IPersistKeyedHandle",
           "kind": "type",
           "signature": "export type IPersistKeyedHandle<T> = IPersistHandle & { readonly value: T; };",
-          "declarationLine": 14,
+          "declarationLine": 17,
           "source": "packages/store-persist/dist/keyed/persist-keyed.d.ts",
           "purpose": "IPersistKeyedHandle is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPersistKeyedHandle.",
@@ -4744,7 +4744,7 @@
         {
           "name": "IPersistKeyedOptions",
           "kind": "type",
-          "signature": "export type IPersistKeyedOptions<T> = { /** Storage key 前缀，格式 `${namespace}:${id}`——必填，clearFamily() 靠它过滤。 */ namespace: string; storage: IPersistStorage; codec?: ICodec; version?: number; debounceMs?: number; partialize?: (value: T) => Partial<T>; merge?: (persisted: Partial<T>, current: T) => T; };",
+          "signature": "export type IPersistKeyedOptions<T> = { /** * Required storage key prefix. Keys use `${namespace}:${id}`, and `clearFamily()` filters by the * prefix. */ namespace: string; storage: IPersistStorage; codec?: ICodec; version?: number; debounceMs?: number; partialize?: (value: T) => Partial<T>; merge?: (persisted: Partial<T>, current: T) => T; };",
           "declarationLine": 4,
           "source": "packages/store-persist/dist/keyed/persist-keyed.d.ts",
           "purpose": "IPersistKeyedOptions is part of this module's public type contract.",
@@ -4762,7 +4762,7 @@
           "aliasOf": "IPersistKeyedOptions",
           "exportPath": "./keyed",
           "overloadSignatures": [
-            "export type IPersistKeyedOptions<T> = { /** Storage key 前缀，格式 `${namespace}:${id}`——必填，clearFamily() 靠它过滤。 */ namespace: string; storage: IPersistStorage; codec?: ICodec; version?: number; debounceMs?: number; partialize?: (value: T) => Partial<T>; merge?: (persisted: Partial<T>, current: T) => T; };"
+            "export type IPersistKeyedOptions<T> = { /** * Required storage key prefix. Keys use `${namespace}:${id}`, and `clearFamily()` filters by the * prefix. */ namespace: string; storage: IPersistStorage; codec?: ICodec; version?: number; debounceMs?: number; partialize?: (value: T) => Partial<T>; merge?: (persisted: Partial<T>, current: T) => T; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4801,7 +4801,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/keyed/persist-keyed.d.ts:IPersistKeyedOptions:export type IPersistKeyedOptions<T> = { /** Storage key 前缀，格式 `${namespace}:${id}`——必填，clearFamily() 靠它过滤。 */ namespace: string; storage: IPersistStorage; codec?: ICodec; version?: number; debounceMs?: number; partialize?: (value: T) => Partial<T>; merge?: (persisted: Partial<T>, current: T) => T; };",
+          "identity": "packages/store-persist/dist/keyed/persist-keyed.d.ts:IPersistKeyedOptions:export type IPersistKeyedOptions<T> = { /** * Required storage key prefix. Keys use `${namespace}:${id}`, and `clearFamily()` filters by the * prefix. */ namespace: string; storage: IPersistStorage; codec?: ICodec; version?: number; debounceMs?: number; partialize?: (value: T) => Partial<T>; merge?: (persisted: Partial<T>, current: T) => T; };",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],
@@ -4811,9 +4811,9 @@
           "name": "persistKeyed",
           "kind": "function",
           "signature": "export declare function persistKeyed<T>(atomStore: IAtomStore, def: IWritableAtomDefinition<T>, id: string, options: IPersistKeyedOptions<T>): IPersistKeyedHandle<T>;",
-          "declarationLine": 22,
+          "declarationLine": 26,
           "source": "packages/store-persist/dist/keyed/persist-keyed.d.ts",
-          "purpose": "给 `AtomStore` 里某一个 key 接上持久化。`AtomStore`/`familyDef` 本身不知道\"当前存在哪些 key\" （刻意的设计，见 SDD §3.4），所以持久化单位是\"这一个 key 自己\"，不是整个 family——每次调用各自 创建一个独立的 `persistUnit()` 实例，`dispose()` 只影响这一个 key。",
+          "purpose": "Persists one keyed definition in an `AtomStore`. `AtomStore` and `familyDef` do not inventory currently existing keys, so the persistence unit is one key rather than a whole family (SDD §3.4). Each call creates an independent `persistUnit()` instance. Disposal affects only that key.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for persistKeyed.",
           "advanced": "No additional advanced behavior is declared for persistKeyed.",
           "parameters": [
@@ -4890,7 +4890,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "给 `AtomStore` 里某一个 key 接上持久化。`AtomStore`/`familyDef` 本身不知道\"当前存在哪些 key\" （刻意的设计，见 SDD §3.4），所以持久化单位是\"这一个 key 自己\"，不是整个 family——每次调用各自 创建一个独立的 `persistUnit()` 实例，`dispose()` 只影响这一个 key。"
+              "content": "Persists one keyed definition in an `AtomStore`. `AtomStore` and `familyDef` do not inventory currently existing keys, so the persistence unit is one key rather than a whole family (SDD §3.4). Each call creates an independent `persistUnit()` instance. Disposal affects only that key."
             },
             {
               "id": "getting-started",
@@ -5106,7 +5106,7 @@
           "signature": "export type IPersistableStore = { readonly $runtime: IRuntime; $plain(): Record<string, unknown>; $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean; }): IDisposer; $hydrate(partial: Record<string, unknown>, options?: { readonly unknown?: 'ignore' | 'report' | 'strict'; readonly onUnknown?: (key: string) => void; }): void; };",
           "declarationLine": 10,
           "source": "packages/store-persist/dist/light/persist.d.ts",
-          "purpose": "`persist()` 实际用到的 store 能力面，只有 4 个成员。 故意在这里定义、不从 `@migaia/store-light` 借用它的 `IReactiveStore`：store-persist 是通用持久化层， 依赖方向不该倒过来。`@migaia/store-light` 产出的 store 结构上完全满足这个接口，传进来不需要任何改动。",
+          "purpose": "Defines the four store capabilities used by `persist()`. The generic persistence layer owns this boundary instead of depending on `store-light`'s `IReactiveStore`. Stores from `@migaia/store-light` satisfy it structurally without adaptation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPersistableStore.",
           "advanced": "No additional advanced behavior is declared for IPersistableStore.",
           "parameters": ["This type declaration has no parameters."],
@@ -5131,7 +5131,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "`persist()` 实际用到的 store 能力面，只有 4 个成员。 故意在这里定义、不从 `@migaia/store-light` 借用它的 `IReactiveStore`：store-persist 是通用持久化层， 依赖方向不该倒过来。`@migaia/store-light` 产出的 store 结构上完全满足这个接口，传进来不需要任何改动。"
+              "content": "Defines the four store capabilities used by `persist()`. The generic persistence layer owns this boundary instead of depending on `store-light`'s `IReactiveStore`. Stores from `@migaia/store-light` satisfy it structurally without adaptation."
             },
             {
               "id": "getting-started",

@@ -1333,7 +1333,7 @@
           "name": "createAsyncStore",
           "kind": "function",
           "signature": "export declare function createAsyncStore<S extends Record<string, unknown>>(shape: IStoreDefinition<S>, options?: ICreateStoreOptions): Promise<IReactiveStore<S>>;",
-          "declarationLine": 90,
+          "declarationLine": 94,
           "source": "packages/store-light/dist/reactive-store.d.ts",
           "purpose": "Explicit asynchronous creation for definitions containing async FieldBuilders. The returned store has completed initialization; callers do not need to expose a half-ready object or gate every field access with an explicit async creation boundary.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createAsyncStore.",
@@ -1557,7 +1557,7 @@
           "name": "createLegacyStore",
           "kind": "function",
           "signature": "export declare function createLegacyStore<S extends Record<string, unknown>>(shape: IStoreDefinition<S>, options?: ICreateStoreOptions): IReactiveStore<S>;",
-          "declarationLine": 84,
+          "declarationLine": 88,
           "source": "packages/store-light/dist/reactive-store.d.ts",
           "purpose": "Compatibility facade for the historical Store definition API.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createLegacyStore.",
@@ -1781,7 +1781,7 @@
           "name": "createStore",
           "kind": "function",
           "signature": "export declare function createStore<S extends Record<string, unknown>>(shape: IStoreDefinition<S> & { [K in keyof S]: S[K] extends IAsyncFieldBuilder<IDisposable> | ILegacyFieldBuilder<IDisposable> ? never : S[K]; }, options?: ICreateStoreOptions): IReactiveStore<S>;",
-          "declarationLine": 98,
+          "declarationLine": 102,
           "source": "packages/store-light/dist/reactive-store.d.ts",
           "purpose": "Main synchronous creation contract. It rejects FieldBuilders before their create() method can start I/O; use createAsyncStore for async definitions.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStore.",
@@ -2834,7 +2834,7 @@
           "name": "createStoreSync",
           "kind": "const",
           "signature": "export declare const createStoreSync: typeof createStore;",
-          "declarationLine": 102,
+          "declarationLine": 106,
           "source": "packages/store-light/dist/reactive-store.d.ts",
           "purpose": "Explicit naming alias for `createStore()`; no separate lifecycle semantics.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreSync.",
@@ -2899,9 +2899,9 @@
           "name": "FIELD_BUILDER",
           "kind": "const",
           "signature": "export declare const FIELD_BUILDER: unique symbol;",
-          "declarationLine": 12,
+          "declarationLine": 14,
           "source": "packages/store-light/dist/store-protocol.d.ts",
-          "purpose": "Store 门面对外开放的扩展协议。 这里的三样东西原本散落在 `wasm/field.ts`、`middleware.ts` 和 `raw.ts`，于是 `reactive-store.ts` 反过来静态 import 了 Wasm 与中间件——对象门面本该只是内核的 facade，却认识了平台实现的具体类型。 方向反过来：**Store 定义协议，扩展去实现**。Wasm 字段、变更策略都只是这些接口 的实现者，Store 不需要知道它们存在。",
+          "purpose": "FIELD_BUILDER is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for FIELD_BUILDER.",
           "advanced": "No additional advanced behavior is declared for FIELD_BUILDER.",
           "parameters": ["This const declaration has no parameters."],
@@ -2928,7 +2928,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Store 门面对外开放的扩展协议。 这里的三样东西原本散落在 `wasm/field.ts`、`middleware.ts` 和 `raw.ts`，于是 `reactive-store.ts` 反过来静态 import 了 Wasm 与中间件——对象门面本该只是内核的 facade，却认识了平台实现的具体类型。 方向反过来：**Store 定义协议，扩展去实现**。Wasm 字段、变更策略都只是这些接口 的实现者，Store 不需要知道它们存在。"
+              "content": "FIELD_BUILDER is part of this module's public const contract."
             },
             {
               "id": "getting-started",
@@ -2967,7 +2967,7 @@
           "name": "IAsyncFieldBuilder",
           "kind": "type",
           "signature": "export type IAsyncFieldBuilder<F extends IDisposable> = { readonly [FIELD_BUILDER]: true; readonly mode: typeof StoreFieldMode.async; create(context: IFieldContext): Promise<F>; };",
-          "declarationLine": 36,
+          "declarationLine": 43,
           "source": "packages/store-light/dist/store-protocol.d.ts",
           "purpose": "IAsyncFieldBuilder is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAsyncFieldBuilder.",
@@ -3031,8 +3031,8 @@
         {
           "name": "ICreateStoreOptions",
           "kind": "type",
-          "signature": "export type ICreateStoreOptions = { /** * 显式隔离运行时；缺省用 defaultRuntime。 * * 收 `IRuntime` 而不是 `Runtime` 具体类：门面只用得到接口上的东西 * （signal/computed/effect/batch/createScope…），收具体类等于要求第三方 必须继承本库的类才能替换运行时。 */ runtime?: IRuntime; debugName?: string; warnAsyncActions?: boolean; /** * Optional MobX-style strict mutation policy. Direct field writes must run inside an * action/$batch/$set/$hydrate; Store methods are actions. */ mutationPolicy?: IMutationPolicy; };",
-          "declarationLine": 67,
+          "signature": "export type ICreateStoreOptions = { /** * Isolates the runtime explicitly. Defaults to `defaultRuntime`. * * The facade accepts `IRuntime` because it uses only interface capabilities such as node * creation, batching, and scopes. A concrete `Runtime` requirement would force replacement * runtimes to inherit the library class. */ runtime?: IRuntime; debugName?: string; warnAsyncActions?: boolean; /** * Optional MobX-style strict mutation policy. Direct field writes must run inside an * action/$batch/$set/$hydrate; Store methods are actions. */ mutationPolicy?: IMutationPolicy; };",
+          "declarationLine": 70,
           "source": "packages/store-light/dist/reactive-store.d.ts",
           "purpose": "ICreateStoreOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICreateStoreOptions.",
@@ -3046,7 +3046,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ICreateStoreOptions = { /** * 显式隔离运行时；缺省用 defaultRuntime。 * * 收 `IRuntime` 而不是 `Runtime` 具体类：门面只用得到接口上的东西 * （signal/computed/effect/batch/createScope…），收具体类等于要求第三方 必须继承本库的类才能替换运行时。 */ runtime?: IRuntime; debugName?: string; warnAsyncActions?: boolean; /** * Optional MobX-style strict mutation policy. Direct field writes must run inside an * action/$batch/$set/$hydrate; Store methods are actions. */ mutationPolicy?: IMutationPolicy; };"
+            "export type ICreateStoreOptions = { /** * Isolates the runtime explicitly. Defaults to `defaultRuntime`. * * The facade accepts `IRuntime` because it uses only interface capabilities such as node * creation, batching, and scopes. A concrete `Runtime` requirement would force replacement * runtimes to inherit the library class. */ runtime?: IRuntime; debugName?: string; warnAsyncActions?: boolean; /** * Optional MobX-style strict mutation policy. Direct field writes must run inside an * action/$batch/$set/$hydrate; Store methods are actions. */ mutationPolicy?: IMutationPolicy; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3085,7 +3085,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-light/dist/reactive-store.d.ts:ICreateStoreOptions:export type ICreateStoreOptions = { /** * 显式隔离运行时；缺省用 defaultRuntime。 * * 收 `IRuntime` 而不是 `Runtime` 具体类：门面只用得到接口上的东西 * （signal/computed/effect/batch/createScope…），收具体类等于要求第三方 必须继承本库的类才能替换运行时。 */ runtime?: IRuntime; debugName?: string; warnAsyncActions?: boolean; /** * Optional MobX-style strict mutation policy. Direct field writes must run inside an * action/$batch/$set/$hydrate; Store methods are actions. */ mutationPolicy?: IMutationPolicy; };",
+          "identity": "packages/store-light/dist/reactive-store.d.ts:ICreateStoreOptions:export type ICreateStoreOptions = { /** * Isolates the runtime explicitly. Defaults to `defaultRuntime`. * * The facade accepts `IRuntime` because it uses only interface capabilities such as node * creation, batching, and scopes. A concrete `Runtime` requirement would force replacement * runtimes to inherit the library class. */ runtime?: IRuntime; debugName?: string; warnAsyncActions?: boolean; /** * Optional MobX-style strict mutation policy. Direct field writes must run inside an * action/$batch/$set/$hydrate; Store methods are actions. */ mutationPolicy?: IMutationPolicy; };",
           "guidance": [
             {
               "id": "4-icreatestoreoptions-参考",
@@ -3141,7 +3141,7 @@
           "name": "IFieldBuilder",
           "kind": "type",
           "signature": "export type IFieldBuilder<F extends IDisposable> = ISyncFieldBuilder<F> | IAsyncFieldBuilder<F> | ILegacyFieldBuilder<F>;",
-          "declarationLine": 46,
+          "declarationLine": 53,
           "source": "packages/store-light/dist/store-protocol.d.ts",
           "purpose": "IFieldBuilder is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFieldBuilder.",
@@ -3210,9 +3210,9 @@
           "name": "IFieldContext",
           "kind": "type",
           "signature": "export type IFieldContext = { runtime: IRuntime; signal: IAbortSignal; createSource(debugName?: string): IFieldSource; };",
-          "declarationLine": 26,
+          "declarationLine": 33,
           "source": "packages/store-light/dist/store-protocol.d.ts",
-          "purpose": "构造上下文：runtime 供创建普通节点，createSource 供自定义存储接入同一张图， signal 让 Store dispose 时能中止在途初始化。 刻意不传 scope——所有权登记是 Store 的职责。让 Builder 自己登记的话，第三方实现 一旦「创建了资源却忘了登记」，$dispose 就漏释放，而 Store 无从察觉。",
+          "purpose": "Provides `runtime` for ordinary nodes and `createSource` for custom storage in the same graph. `signal` aborts in-flight initialization when the store is disposed. The store owns resource registration, so this context does not expose its scope. Delegating registration to builders could leak resources when a third-party builder omits registration.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFieldContext.",
           "advanced": "No additional advanced behavior is declared for IFieldContext.",
           "parameters": ["This type declaration has no parameters."],
@@ -3240,7 +3240,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "构造上下文：runtime 供创建普通节点，createSource 供自定义存储接入同一张图， signal 让 Store dispose 时能中止在途初始化。 刻意不传 scope——所有权登记是 Store 的职责。让 Builder 自己登记的话，第三方实现 一旦「创建了资源却忘了登记」，$dispose 就漏释放，而 Store 无从察觉。"
+              "content": "Provides `runtime` for ordinary nodes and `createSource` for custom storage in the same graph. `signal` aborts in-flight initialization when the store is disposed. The store owns resource registration, so this context does not expose its scope. Delegating registration to builders could leak resources when a third-party builder omits registration."
             },
             {
               "id": "getting-started",
@@ -3279,9 +3279,9 @@
           "name": "IFieldSource",
           "kind": "type",
           "signature": "export type IFieldSource = IDisposable & { track(): void; notify(): void; /** Reserve the Runtime version before mutating external storage, then publish once. */ commit<T>(write: () => T): T; readonly observed: boolean; };",
-          "declarationLine": 14,
+          "declarationLine": 19,
           "source": "packages/store-light/dist/store-protocol.d.ts",
-          "purpose": "Runtime 为字段签发的最小响应式能力，不暴露依赖图内部结构。",
+          "purpose": "Provides the runtime's minimal reactive field capabilities without exposing dependency graph internals.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFieldSource.",
           "advanced": "No additional advanced behavior is declared for IFieldSource.",
           "parameters": ["This type declaration has no parameters."],
@@ -3306,7 +3306,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Runtime 为字段签发的最小响应式能力，不暴露依赖图内部结构。"
+              "content": "Provides the runtime's minimal reactive field capabilities without exposing dependency graph internals."
             },
             {
               "id": "getting-started",
@@ -3408,7 +3408,7 @@
           "name": "ILegacyFieldBuilder",
           "kind": "type",
           "signature": "export type ILegacyFieldBuilder<F extends IDisposable> = { readonly [FIELD_BUILDER]: true; create(context: IFieldContext): Promise<F>; };",
-          "declarationLine": 42,
+          "declarationLine": 49,
           "source": "packages/store-light/dist/store-protocol.d.ts",
           "purpose": "Pre-discriminant builder accepted only by legacy creation paths.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILegacyFieldBuilder.",
@@ -3471,7 +3471,7 @@
           "name": "IMutationGuard",
           "kind": "type",
           "signature": "export type IMutationGuard = { assertMutationAllowed(operation?: string): void; };",
-          "declarationLine": 48,
+          "declarationLine": 55,
           "source": "packages/store-light/dist/store-protocol.d.ts",
           "purpose": "IMutationGuard is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMutationGuard.",
@@ -3537,9 +3537,9 @@
           "name": "IMutationPolicy",
           "kind": "type",
           "signature": "export type IMutationPolicy = IMutationGuard & { runInAction<T>(fn: () => T): T; };",
-          "declarationLine": 56,
+          "declarationLine": 64,
           "source": "packages/store-light/dist/store-protocol.d.ts",
-          "purpose": "Store 门面额外需要的一件事：把一次动作标记为「正在动作内」，好让守卫放行其中的写入。 与 IMutationGuard 分开，是因为 collections 只需要问「能不能改」，不该被迫实现 动作作用域。按需要的最小面拆接口，实现方自然满足更大的那个。",
+          "purpose": "Marks an action scope so the mutation guard permits writes within it. Collections need only `IMutationGuard`, not action scopes. The store facade uses this additional capability.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMutationPolicy.",
           "advanced": "No additional advanced behavior is declared for IMutationPolicy.",
           "parameters": ["This type declaration has no parameters."],
@@ -3564,7 +3564,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Store 门面额外需要的一件事：把一次动作标记为「正在动作内」，好让守卫放行其中的写入。 与 IMutationGuard 分开，是因为 collections 只需要问「能不能改」，不该被迫实现 动作作用域。按需要的最小面拆接口，实现方自然满足更大的那个。"
+              "content": "Marks an action scope so the mutation guard permits writes within it. Collections need only `IMutationGuard`, not action scopes. The store facade uses this additional capability."
             },
             {
               "id": "getting-started",
@@ -3649,7 +3649,7 @@
           "name": "IRaw",
           "kind": "type",
           "signature": "export type IRaw<T> = { readonly [RAW]: true; readonly value: T; };",
-          "declarationLine": 60,
+          "declarationLine": 68,
           "source": "packages/store-light/dist/store-protocol.d.ts",
           "purpose": "IRaw is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRaw.",
@@ -3712,7 +3712,7 @@
           "name": "IReactiveStore",
           "kind": "type",
           "signature": "export type IReactiveStore<S> = IStoreShape<S> & IReactiveStoreApi<S>;",
-          "declarationLine": 59,
+          "declarationLine": 61,
           "source": "packages/store-light/dist/reactive-store.d.ts",
           "purpose": "IReactiveStore is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IReactiveStore.",
@@ -3774,7 +3774,7 @@
         {
           "name": "IReactiveStoreApi",
           "kind": "type",
-          "signature": "export type IReactiveStoreApi<S> = { $runtime: IRuntime; $async: boolean; $snapshot(): IStoreShape<S>; $subscribe(fn: () => void, options?: ISubscribeOptions): IDisposer; $batch(recipe: (draft: IStoreShape<S>) => void): void; $set(patch: IWritableStorePatch<S>): void; $plain(): Record<string, unknown>; $hydrate(partial: Record<string, unknown>, options?: IHydrateOptions): void; readonly $disposed: boolean; /** * 把外部资源挂进本 store 的所有权作用域（典型：collections）。 * * 中型场景的正确拆法是「store 持根 UI/动作，collections 承载热路径结构」； 没有 $own 时两者共 Runtime 却各管 dispose，根一释放结构节点就泄漏。 * 资源必须未归属或已归属本 Runtime；跨 Runtime 直接拒绝。 */ $own<T extends IDisposable>(resource: T): T; /** * Always asynchronous (`docs/lifecycle/migration.sdd.md` §5.1 — the underlying * `@migaia/lifecycle` `LifecycleScope.dispose()` has no synchronous form). Resolves once every * owned Signal/Computed/Effect/wasm field has finished releasing. Callers that need \"started\" is * enough (fire React `useEffect` cleanup, tear down a request scope) may call this without * awaiting; `$disposed` already flips to `true` synchronously before any owned resource is * touched, so read-path guards observe the disposed state immediately regardless of whether the * caller awaits. */ $dispose(): Promise<void>; };",
+          "signature": "export type IReactiveStoreApi<S> = { $runtime: IRuntime; $async: boolean; $snapshot(): IStoreShape<S>; $subscribe(fn: () => void, options?: ISubscribeOptions): IDisposer; $batch(recipe: (draft: IStoreShape<S>) => void): void; $set(patch: IWritableStorePatch<S>): void; $plain(): Record<string, unknown>; $hydrate(partial: Record<string, unknown>, options?: IHydrateOptions): void; readonly $disposed: boolean; /** * Registers an external resource, such as a collection, with this store's ownership scope. * * A store can hold root UI state and actions while collections hold frequently accessed * structures. Sharing a runtime alone does not share disposal ownership; `$own` prevents those * structures from leaking when the root is disposed. The resource must be unowned or owned by * this `Runtime`. Cross-runtime resources are rejected. */ $own<T extends IDisposable>(resource: T): T; /** * Always asynchronous (`docs/lifecycle/migration.sdd.md` §5.1 — the underlying * `@migaia/lifecycle` `LifecycleScope.dispose()` has no synchronous form). Resolves once every * owned Signal/Computed/Effect/wasm field has finished releasing. Callers that need \"started\" is * enough (fire React `useEffect` cleanup, tear down a request scope) may call this without * awaiting; `$disposed` already flips to `true` synchronously before any owned resource is * touched, so read-path guards observe the disposed state immediately regardless of whether the * caller awaits. */ $dispose(): Promise<void>; };",
           "declarationLine": 31,
           "source": "packages/store-light/dist/reactive-store.d.ts",
           "purpose": "IReactiveStoreApi is part of this module's public type contract.",
@@ -3789,7 +3789,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IReactiveStoreApi<S> = { $runtime: IRuntime; $async: boolean; $snapshot(): IStoreShape<S>; $subscribe(fn: () => void, options?: ISubscribeOptions): IDisposer; $batch(recipe: (draft: IStoreShape<S>) => void): void; $set(patch: IWritableStorePatch<S>): void; $plain(): Record<string, unknown>; $hydrate(partial: Record<string, unknown>, options?: IHydrateOptions): void; readonly $disposed: boolean; /** * 把外部资源挂进本 store 的所有权作用域（典型：collections）。 * * 中型场景的正确拆法是「store 持根 UI/动作，collections 承载热路径结构」； 没有 $own 时两者共 Runtime 却各管 dispose，根一释放结构节点就泄漏。 * 资源必须未归属或已归属本 Runtime；跨 Runtime 直接拒绝。 */ $own<T extends IDisposable>(resource: T): T; /** * Always asynchronous (`docs/lifecycle/migration.sdd.md` §5.1 — the underlying * `@migaia/lifecycle` `LifecycleScope.dispose()` has no synchronous form). Resolves once every * owned Signal/Computed/Effect/wasm field has finished releasing. Callers that need \"started\" is * enough (fire React `useEffect` cleanup, tear down a request scope) may call this without * awaiting; `$disposed` already flips to `true` synchronously before any owned resource is * touched, so read-path guards observe the disposed state immediately regardless of whether the * caller awaits. */ $dispose(): Promise<void>; };"
+            "export type IReactiveStoreApi<S> = { $runtime: IRuntime; $async: boolean; $snapshot(): IStoreShape<S>; $subscribe(fn: () => void, options?: ISubscribeOptions): IDisposer; $batch(recipe: (draft: IStoreShape<S>) => void): void; $set(patch: IWritableStorePatch<S>): void; $plain(): Record<string, unknown>; $hydrate(partial: Record<string, unknown>, options?: IHydrateOptions): void; readonly $disposed: boolean; /** * Registers an external resource, such as a collection, with this store's ownership scope. * * A store can hold root UI state and actions while collections hold frequently accessed * structures. Sharing a runtime alone does not share disposal ownership; `$own` prevents those * structures from leaking when the root is disposed. The resource must be unowned or owned by * this `Runtime`. Cross-runtime resources are rejected. */ $own<T extends IDisposable>(resource: T): T; /** * Always asynchronous (`docs/lifecycle/migration.sdd.md` §5.1 — the underlying * `@migaia/lifecycle` `LifecycleScope.dispose()` has no synchronous form). Resolves once every * owned Signal/Computed/Effect/wasm field has finished releasing. Callers that need \"started\" is * enough (fire React `useEffect` cleanup, tear down a request scope) may call this without * awaiting; `$disposed` already flips to `true` synchronously before any owned resource is * touched, so read-path guards observe the disposed state immediately regardless of whether the * caller awaits. */ $dispose(): Promise<void>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3828,7 +3828,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-light/dist/reactive-store.d.ts:IReactiveStoreApi:export type IReactiveStoreApi<S> = { $runtime: IRuntime; $async: boolean; $snapshot(): IStoreShape<S>; $subscribe(fn: () => void, options?: ISubscribeOptions): IDisposer; $batch(recipe: (draft: IStoreShape<S>) => void): void; $set(patch: IWritableStorePatch<S>): void; $plain(): Record<string, unknown>; $hydrate(partial: Record<string, unknown>, options?: IHydrateOptions): void; readonly $disposed: boolean; /** * 把外部资源挂进本 store 的所有权作用域（典型：collections）。 * * 中型场景的正确拆法是「store 持根 UI/动作，collections 承载热路径结构」； 没有 $own 时两者共 Runtime 却各管 dispose，根一释放结构节点就泄漏。 * 资源必须未归属或已归属本 Runtime；跨 Runtime 直接拒绝。 */ $own<T extends IDisposable>(resource: T): T; /** * Always asynchronous (`docs/lifecycle/migration.sdd.md` §5.1 — the underlying * `@migaia/lifecycle` `LifecycleScope.dispose()` has no synchronous form). Resolves once every * owned Signal/Computed/Effect/wasm field has finished releasing. Callers that need \"started\" is * enough (fire React `useEffect` cleanup, tear down a request scope) may call this without * awaiting; `$disposed` already flips to `true` synchronously before any owned resource is * touched, so read-path guards observe the disposed state immediately regardless of whether the * caller awaits. */ $dispose(): Promise<void>; };",
+          "identity": "packages/store-light/dist/reactive-store.d.ts:IReactiveStoreApi:export type IReactiveStoreApi<S> = { $runtime: IRuntime; $async: boolean; $snapshot(): IStoreShape<S>; $subscribe(fn: () => void, options?: ISubscribeOptions): IDisposer; $batch(recipe: (draft: IStoreShape<S>) => void): void; $set(patch: IWritableStorePatch<S>): void; $plain(): Record<string, unknown>; $hydrate(partial: Record<string, unknown>, options?: IHydrateOptions): void; readonly $disposed: boolean; /** * Registers an external resource, such as a collection, with this store's ownership scope. * * A store can hold root UI state and actions while collections hold frequently accessed * structures. Sharing a runtime alone does not share disposal ownership; `$own` prevents those * structures from leaking when the root is disposed. The resource must be unowned or owned by * this `Runtime`. Cross-runtime resources are rejected. */ $own<T extends IDisposable>(resource: T): T; /** * Always asynchronous (`docs/lifecycle/migration.sdd.md` §5.1 — the underlying * `@migaia/lifecycle` `LifecycleScope.dispose()` has no synchronous form). Resolves once every * owned Signal/Computed/Effect/wasm field has finished releasing. Callers that need \"started\" is * enough (fire React `useEffect` cleanup, tear down a request scope) may call this without * awaiting; `$disposed` already flips to `true` synchronously before any owned resource is * touched, so read-path guards observe the disposed state immediately regardless of whether the * caller awaits. */ $dispose(): Promise<void>; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3900,7 +3900,7 @@
           "name": "isFieldBuilder",
           "kind": "function",
           "signature": "export declare function isFieldBuilder(value: unknown): value is IFieldBuilder<IDisposable>;",
-          "declarationLine": 47,
+          "declarationLine": 54,
           "source": "packages/store-light/dist/store-protocol.d.ts",
           "purpose": "isFieldBuilder is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isFieldBuilder.",
@@ -3979,7 +3979,7 @@
           "name": "isRaw",
           "kind": "function",
           "signature": "export declare function isRaw(value: unknown): value is IRaw<unknown>;",
-          "declarationLine": 65,
+          "declarationLine": 73,
           "source": "packages/store-light/dist/store-protocol.d.ts",
           "purpose": "isRaw is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isRaw.",
@@ -4056,9 +4056,9 @@
           "name": "IStoreDefinition",
           "kind": "type",
           "signature": "export type IStoreDefinition<S extends Record<string, unknown>> = S & ThisType<IReactiveStore<S>>;",
-          "declarationLine": 66,
+          "declarationLine": 69,
           "source": "packages/store-light/dist/reactive-store.d.ts",
-          "purpose": "CreateStore 的输入形状：字段/getter/方法 + **ThisType**。 没有 ThisType 时，方法里的 `this` 仍是「输入字面量」类型——wasm 字段还是 IFieldBuilder，写 `this.price.value` 会类型报错，逼人去用外置函数。 加上之后，`this` 是解析后的 IReactiveStore（IFieldBuilder → 真实字段）。",
+          "purpose": "Provides fields, getters, methods, and `ThisType` for a store definition. Without `ThisType`, method `this` retains the input literal type, so a WASM field remains an `IFieldBuilder`. `this.price.value` would then fail type checking and require external functions. Here `this` is the resolved `IReactiveStore`, with builders replaced by their created fields.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreDefinition.",
           "advanced": "No additional advanced behavior is declared for IStoreDefinition.",
           "parameters": ["This type declaration has no parameters."],
@@ -4080,7 +4080,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "CreateStore 的输入形状：字段/getter/方法 + **ThisType**。 没有 ThisType 时，方法里的 `this` 仍是「输入字面量」类型——wasm 字段还是 IFieldBuilder，写 `this.price.value` 会类型报错，逼人去用外置函数。 加上之后，`this` 是解析后的 IReactiveStore（IFieldBuilder → 真实字段）。"
+              "content": "Provides fields, getters, methods, and `ThisType` for a store definition. Without `ThisType`, method `this` retains the input literal type, so a WASM field remains an `IFieldBuilder`. `this.price.value` would then fail type checking and require external functions. Here `this` is the resolved `IReactiveStore`, with builders replaced by their created fields."
             },
             {
               "id": "getting-started",
@@ -5061,7 +5061,7 @@
           "name": "ISyncFieldBuilder",
           "kind": "type",
           "signature": "export type ISyncFieldBuilder<F extends IDisposable> = { readonly [FIELD_BUILDER]: true; readonly mode: typeof StoreFieldMode.sync; create(context: IFieldContext): F; };",
-          "declarationLine": 31,
+          "declarationLine": 38,
           "source": "packages/store-light/dist/store-protocol.d.ts",
           "purpose": "ISyncFieldBuilder is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISyncFieldBuilder.",
@@ -5189,7 +5189,7 @@
           "name": "raw",
           "kind": "function",
           "signature": "export declare function raw<T>(value: T): IRaw<T>;",
-          "declarationLine": 64,
+          "declarationLine": 72,
           "source": "packages/store-light/dist/store-protocol.d.ts",
           "purpose": "raw is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for raw.",
@@ -5484,7 +5484,7 @@
           "name": "storeReady",
           "kind": "function",
           "signature": "export declare function storeReady(store: object): Promise<void>;",
-          "declarationLine": 93,
+          "declarationLine": 97,
           "source": "packages/store-light/dist/reactive-store.d.ts",
           "purpose": "Internal bridge retained for the React adapter and legacy migration tests.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for storeReady.",

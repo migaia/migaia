@@ -1555,7 +1555,7 @@
           "name": "sharedInt32",
           "kind": "const",
           "signature": "export declare const sharedInt32: (runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer) => SharedInt32Signal;",
-          "declarationLine": 30,
+          "declarationLine": 32,
           "source": "packages/store-shared/dist/shared-state.d.ts",
           "purpose": "sharedInt32 is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for sharedInt32.",
@@ -1648,7 +1648,7 @@
           "name": "sharedInt32Array",
           "kind": "const",
           "signature": "export declare const sharedInt32Array: (runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }) => SharedInt32Array;",
-          "declarationLine": 84,
+          "declarationLine": 94,
           "source": "packages/store-shared/dist/shared-state.d.ts",
           "purpose": "sharedInt32Array is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for sharedInt32Array.",
@@ -1746,8 +1746,8 @@
         {
           "name": "SharedInt32Array",
           "kind": "class",
-          "signature": "export declare class SharedInt32Array implements IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly length: number; constructor(runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }); get disposed(): boolean; get(index: number): number; set(index: number, value: number): void; /** * 读-改-写。 * * 用户回调**在锁外**执行：持锁期间调用别人的代码，一旦它抛错就留下一把奇数的 死锁，之后所有读者都会自旋到上限然后抛。所以先一致读、锁外算、再带期望值写， 值被别人改掉就重来。 因此 * `update` 回调必须纯且可重复执行；不要在回调中埋点、发请求或产生不可逆副作用。 */ update(index: number, update: (current: number) => number): number; /** * Scan for remote writes and notify only affected index observers. * * `watch()` 起了回路之后不必手动调；没有 waitAsync 的环境仍可从消息循环 pump。 */ sync(index?: number): number; /** * 起一条 waitAsync 回路覆盖整片。 * * 等的是 epoch 而不是逐格的 seq：一格一个 waiter 在长数组上不可行。醒来后 `sync()` 扫描，只有真正变了的格会通知它自己的观察者。 */ watch(): IDisposer; snapshot(): Int32Array; /** Release cells that no longer have observers after high-churn access. */ prune(): number; dispose(): void; assertActive(): void; /** 一致读某一格：value 与 version 同源。 */ readCell(index: number): { readonly value: number; readonly version: bigint; }; /** 写某一格；返回新版本，或 undefined 表示没写（值未变或期望值不符）。 */ writeCell(index: number, value: number, expected?: number): bigint | undefined; /** Advance the shared 64-bit generation and wake every independent reader cursor. */ notifyWaiters(): void; /** Keep array-level pull bookkeeping aligned with local cell writes. */ recordObservedVersion(index: number, version: bigint): void; }",
-          "declarationLine": 36,
+          "signature": "export declare class SharedInt32Array implements IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly length: number; constructor(runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }); get disposed(): boolean; get(index: number): number; set(index: number, value: number): void; /** * Reads, updates, and writes one cell. * * The callback runs outside the lock so a thrown exception cannot leave readers spinning on an * odd locked version. The operation reads a consistent value, computes outside the lock, and * writes with that value as its expectation. It retries if another writer changes the value. The * `update` callback must be pure and repeatable. Avoid telemetry, requests, and irreversible side * effects in the callback. */ update(index: number, update: (current: number) => number): number; /** * Scans remote writes and notifies only affected index observers. * * An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can * poll from their message loop. */ sync(index?: number): number; /** * Starts an `Atomics.waitAsync` loop for the whole array. * * It waits on the generation epoch instead of creating a waiter for every cell. After waking, * `sync()` scans cells and notifies observers only for cells that changed. */ watch(): IDisposer; snapshot(): Int32Array; /** Release cells that no longer have observers after high-churn access. */ prune(): number; dispose(): void; assertActive(): void; /** Reads one cell consistently, with its value and version from the same observation. */ readCell(index: number): { readonly value: number; readonly version: bigint; }; /** * Writes one cell and returns its new version. Returns `undefined` when the value is unchanged or * the expected value does not match. */ writeCell(index: number, value: number, expected?: number): bigint | undefined; /** Advance the shared 64-bit generation and wake every independent reader cursor. */ notifyWaiters(): void; /** Keep array-level pull bookkeeping aligned with local cell writes. */ recordObservedVersion(index: number, version: bigint): void; }",
+          "declarationLine": 38,
           "source": "packages/store-shared/dist/shared-state.d.ts",
           "purpose": "Fixed-layout, index-granular shared state for Workers. Each element owns a value/seq pair in the SharedArrayBuffer, so changing one conversation slot does not invalidate readers of every other slot.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for SharedInt32Array.",
@@ -1848,7 +1848,7 @@
               "name": "update",
               "kind": "method",
               "signature": "update(index: number, update: (current: number) => number): number;",
-              "description": "读-改-写。 用户回调**在锁外**执行：持锁期间调用别人的代码，一旦它抛错就留下一把奇数的 死锁，之后所有读者都会自旋到上限然后抛。所以先一致读、锁外算、再带期望值写， 值被别人改掉就重来。 因此 `update` 回调必须纯且可重复执行；不要在回调中埋点、发请求或产生不可逆副作用。",
+              "description": "Reads, updates, and writes one cell. The callback runs outside the lock so a thrown exception cannot leave readers spinning on an odd locked version. The operation reads a consistent value, computes outside the lock, and writes with that value as its expectation. It retries if another writer changes the value. The `update` callback must be pure and repeatable. Avoid telemetry, requests, and irreversible side effects in the callback.",
               "parameterDetails": [
                 {
                   "name": "index",
@@ -1867,7 +1867,7 @@
               "name": "sync",
               "kind": "method",
               "signature": "sync(index?: number): number;",
-              "description": "Scan for remote writes and notify only affected index observers. `watch()` 起了回路之后不必手动调；没有 waitAsync 的环境仍可从消息循环 pump。",
+              "description": "Scans remote writes and notifies only affected index observers. An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can poll from their message loop.",
               "parameterDetails": [
                 {
                   "name": "index",
@@ -1881,7 +1881,7 @@
               "name": "watch",
               "kind": "method",
               "signature": "watch(): IDisposer;",
-              "description": "起一条 waitAsync 回路覆盖整片。 等的是 epoch 而不是逐格的 seq：一格一个 waiter 在长数组上不可行。醒来后 `sync()` 扫描，只有真正变了的格会通知它自己的观察者。",
+              "description": "Starts an `Atomics.waitAsync` loop for the whole array. It waits on the generation epoch instead of creating a waiter for every cell. After waking, `sync()` scans cells and notifies observers only for cells that changed.",
               "parameterDetails": [],
               "returns": "IDisposer"
             },
@@ -1921,7 +1921,7 @@
               "name": "readCell",
               "kind": "method",
               "signature": "readCell(index: number): { readonly value: number; readonly version: bigint; };",
-              "description": "一致读某一格：value 与 version 同源。",
+              "description": "Reads one cell consistently, with its value and version from the same observation.",
               "parameterDetails": [
                 {
                   "name": "index",
@@ -1935,7 +1935,7 @@
               "name": "writeCell",
               "kind": "method",
               "signature": "writeCell(index: number, value: number, expected?: number): bigint | undefined;",
-              "description": "写某一格；返回新版本，或 undefined 表示没写（值未变或期望值不符）。",
+              "description": "Writes one cell and returns its new version. Returns `undefined` when the value is unchanged or the expected value does not match.",
               "parameterDetails": [
                 {
                   "name": "index",
@@ -1985,7 +1985,7 @@
           ],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare class SharedInt32Array implements IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly length: number; constructor(runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }); get disposed(): boolean; get(index: number): number; set(index: number, value: number): void; /** * 读-改-写。 * * 用户回调**在锁外**执行：持锁期间调用别人的代码，一旦它抛错就留下一把奇数的 死锁，之后所有读者都会自旋到上限然后抛。所以先一致读、锁外算、再带期望值写， 值被别人改掉就重来。 因此 * `update` 回调必须纯且可重复执行；不要在回调中埋点、发请求或产生不可逆副作用。 */ update(index: number, update: (current: number) => number): number; /** * Scan for remote writes and notify only affected index observers. * * `watch()` 起了回路之后不必手动调；没有 waitAsync 的环境仍可从消息循环 pump。 */ sync(index?: number): number; /** * 起一条 waitAsync 回路覆盖整片。 * * 等的是 epoch 而不是逐格的 seq：一格一个 waiter 在长数组上不可行。醒来后 `sync()` 扫描，只有真正变了的格会通知它自己的观察者。 */ watch(): IDisposer; snapshot(): Int32Array; /** Release cells that no longer have observers after high-churn access. */ prune(): number; dispose(): void; assertActive(): void; /** 一致读某一格：value 与 version 同源。 */ readCell(index: number): { readonly value: number; readonly version: bigint; }; /** 写某一格；返回新版本，或 undefined 表示没写（值未变或期望值不符）。 */ writeCell(index: number, value: number, expected?: number): bigint | undefined; /** Advance the shared 64-bit generation and wake every independent reader cursor. */ notifyWaiters(): void; /** Keep array-level pull bookkeeping aligned with local cell writes. */ recordObservedVersion(index: number, version: bigint): void; }"
+            "export declare class SharedInt32Array implements IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly length: number; constructor(runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }); get disposed(): boolean; get(index: number): number; set(index: number, value: number): void; /** * Reads, updates, and writes one cell. * * The callback runs outside the lock so a thrown exception cannot leave readers spinning on an * odd locked version. The operation reads a consistent value, computes outside the lock, and * writes with that value as its expectation. It retries if another writer changes the value. The * `update` callback must be pure and repeatable. Avoid telemetry, requests, and irreversible side * effects in the callback. */ update(index: number, update: (current: number) => number): number; /** * Scans remote writes and notifies only affected index observers. * * An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can * poll from their message loop. */ sync(index?: number): number; /** * Starts an `Atomics.waitAsync` loop for the whole array. * * It waits on the generation epoch instead of creating a waiter for every cell. After waking, * `sync()` scans cells and notifies observers only for cells that changed. */ watch(): IDisposer; snapshot(): Int32Array; /** Release cells that no longer have observers after high-churn access. */ prune(): number; dispose(): void; assertActive(): void; /** Reads one cell consistently, with its value and version from the same observation. */ readCell(index: number): { readonly value: number; readonly version: bigint; }; /** * Writes one cell and returns its new version. Returns `undefined` when the value is unchanged or * the expected value does not match. */ writeCell(index: number, value: number, expected?: number): bigint | undefined; /** Advance the shared 64-bit generation and wake every independent reader cursor. */ notifyWaiters(): void; /** Keep array-level pull bookkeeping aligned with local cell writes. */ recordObservedVersion(index: number, version: bigint): void; }"
           ],
           "overloadParameterDetails": [
             [
@@ -2042,7 +2042,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-shared/dist/shared-state.d.ts:SharedInt32Array:export declare class SharedInt32Array implements IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly length: number; constructor(runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }); get disposed(): boolean; get(index: number): number; set(index: number, value: number): void; /** * 读-改-写。 * * 用户回调**在锁外**执行：持锁期间调用别人的代码，一旦它抛错就留下一把奇数的 死锁，之后所有读者都会自旋到上限然后抛。所以先一致读、锁外算、再带期望值写， 值被别人改掉就重来。 因此 * `update` 回调必须纯且可重复执行；不要在回调中埋点、发请求或产生不可逆副作用。 */ update(index: number, update: (current: number) => number): number; /** * Scan for remote writes and notify only affected index observers. * * `watch()` 起了回路之后不必手动调；没有 waitAsync 的环境仍可从消息循环 pump。 */ sync(index?: number): number; /** * 起一条 waitAsync 回路覆盖整片。 * * 等的是 epoch 而不是逐格的 seq：一格一个 waiter 在长数组上不可行。醒来后 `sync()` 扫描，只有真正变了的格会通知它自己的观察者。 */ watch(): IDisposer; snapshot(): Int32Array; /** Release cells that no longer have observers after high-churn access. */ prune(): number; dispose(): void; assertActive(): void; /** 一致读某一格：value 与 version 同源。 */ readCell(index: number): { readonly value: number; readonly version: bigint; }; /** 写某一格；返回新版本，或 undefined 表示没写（值未变或期望值不符）。 */ writeCell(index: number, value: number, expected?: number): bigint | undefined; /** Advance the shared 64-bit generation and wake every independent reader cursor. */ notifyWaiters(): void; /** Keep array-level pull bookkeeping aligned with local cell writes. */ recordObservedVersion(index: number, version: bigint): void; }",
+          "identity": "packages/store-shared/dist/shared-state.d.ts:SharedInt32Array:export declare class SharedInt32Array implements IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly length: number; constructor(runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }); get disposed(): boolean; get(index: number): number; set(index: number, value: number): void; /** * Reads, updates, and writes one cell. * * The callback runs outside the lock so a thrown exception cannot leave readers spinning on an * odd locked version. The operation reads a consistent value, computes outside the lock, and * writes with that value as its expectation. It retries if another writer changes the value. The * `update` callback must be pure and repeatable. Avoid telemetry, requests, and irreversible side * effects in the callback. */ update(index: number, update: (current: number) => number): number; /** * Scans remote writes and notifies only affected index observers. * * An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can * poll from their message loop. */ sync(index?: number): number; /** * Starts an `Atomics.waitAsync` loop for the whole array. * * It waits on the generation epoch instead of creating a waiter for every cell. After waking, * `sync()` scans cells and notifies observers only for cells that changed. */ watch(): IDisposer; snapshot(): Int32Array; /** Release cells that no longer have observers after high-churn access. */ prune(): number; dispose(): void; assertActive(): void; /** Reads one cell consistently, with its value and version from the same observation. */ readCell(index: number): { readonly value: number; readonly version: bigint; }; /** * Writes one cell and returns its new version. Returns `undefined` when the value is unchanged or * the expected value does not match. */ writeCell(index: number, value: number, expected?: number): bigint | undefined; /** Advance the shared 64-bit generation and wake every independent reader cursor. */ notifyWaiters(): void; /** Keep array-level pull bookkeeping aligned with local cell writes. */ recordObservedVersion(index: number, version: bigint): void; }",
           "guidance": [
             {
               "id": "5-3-createstoresharederror-createstoresharedrangeerror",
@@ -2202,7 +2202,7 @@
         {
           "name": "SharedInt32Signal",
           "kind": "class",
-          "signature": "export declare class SharedInt32Signal implements IObservable, IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly subs: ReadonlySet<IObserver>; get version(): number; constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer); get disposed(): boolean; get value(): number; set value(next: number); /** * Pull remote writes into this Runtime. * * `watch()` 起了回路之后就不必手动调它；没有 waitAsync 的环境仍可从自己的消息 循环里 pump。 */ sync(): boolean; /** * 起一条 waitAsync 回路：远端写入直接推到本 Runtime，不必再 pump `sync()`。 * * 返回停止函数；`dispose()` 也会停。 */ watch(): IDisposer; peek(): number; onObserved(): void; onUnobserved(): void; isStale(): boolean; dispose(): void; }",
+          "signature": "export declare class SharedInt32Signal implements IObservable, IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly subs: ReadonlySet<IObserver>; get version(): number; constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer); get disposed(): boolean; get value(): number; set value(next: number); /** * Pulls remote writes into this `Runtime`. * * An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can * poll from their own message loop. */ sync(): boolean; /** * Starts an `Atomics.waitAsync` loop that publishes remote writes to this `Runtime` without * manual `sync()` polling. * * Returns a stop function. `dispose()` also stops the loop. */ watch(): IDisposer; peek(): number; onObserved(): void; onUnobserved(): void; isStale(): boolean; dispose(): void; }",
           "declarationLine": 2,
           "source": "packages/store-shared/dist/shared-state.d.ts",
           "purpose": "SharedInt32Signal is part of this module's public class contract.",
@@ -2301,7 +2301,7 @@
               "name": "sync",
               "kind": "method",
               "signature": "sync(): boolean;",
-              "description": "Pull remote writes into this Runtime. `watch()` 起了回路之后就不必手动调它；没有 waitAsync 的环境仍可从自己的消息 循环里 pump。",
+              "description": "Pulls remote writes into this `Runtime`. An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can poll from their own message loop.",
               "parameterDetails": [],
               "returns": "boolean"
             },
@@ -2309,7 +2309,7 @@
               "name": "watch",
               "kind": "method",
               "signature": "watch(): IDisposer;",
-              "description": "起一条 waitAsync 回路：远端写入直接推到本 Runtime，不必再 pump `sync()`。 返回停止函数；`dispose()` 也会停。",
+              "description": "Starts an `Atomics.waitAsync` loop that publishes remote writes to this `Runtime` without manual `sync()` polling. Returns a stop function. `dispose()` also stops the loop.",
               "parameterDetails": [],
               "returns": "IDisposer"
             },
@@ -2356,7 +2356,7 @@
           ],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare class SharedInt32Signal implements IObservable, IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly subs: ReadonlySet<IObserver>; get version(): number; constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer); get disposed(): boolean; get value(): number; set value(next: number); /** * Pull remote writes into this Runtime. * * `watch()` 起了回路之后就不必手动调它；没有 waitAsync 的环境仍可从自己的消息 循环里 pump。 */ sync(): boolean; /** * 起一条 waitAsync 回路：远端写入直接推到本 Runtime，不必再 pump `sync()`。 * * 返回停止函数；`dispose()` 也会停。 */ watch(): IDisposer; peek(): number; onObserved(): void; onUnobserved(): void; isStale(): boolean; dispose(): void; }"
+            "export declare class SharedInt32Signal implements IObservable, IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly subs: ReadonlySet<IObserver>; get version(): number; constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer); get disposed(): boolean; get value(): number; set value(next: number); /** * Pulls remote writes into this `Runtime`. * * An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can * poll from their own message loop. */ sync(): boolean; /** * Starts an `Atomics.waitAsync` loop that publishes remote writes to this `Runtime` without * manual `sync()` polling. * * Returns a stop function. `dispose()` also stops the loop. */ watch(): IDisposer; peek(): number; onObserved(): void; onUnobserved(): void; isStale(): boolean; dispose(): void; }"
           ],
           "overloadParameterDetails": [
             [
@@ -2413,7 +2413,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-shared/dist/shared-state.d.ts:SharedInt32Signal:export declare class SharedInt32Signal implements IObservable, IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly subs: ReadonlySet<IObserver>; get version(): number; constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer); get disposed(): boolean; get value(): number; set value(next: number); /** * Pull remote writes into this Runtime. * * `watch()` 起了回路之后就不必手动调它；没有 waitAsync 的环境仍可从自己的消息 循环里 pump。 */ sync(): boolean; /** * 起一条 waitAsync 回路：远端写入直接推到本 Runtime，不必再 pump `sync()`。 * * 返回停止函数；`dispose()` 也会停。 */ watch(): IDisposer; peek(): number; onObserved(): void; onUnobserved(): void; isStale(): boolean; dispose(): void; }",
+          "identity": "packages/store-shared/dist/shared-state.d.ts:SharedInt32Signal:export declare class SharedInt32Signal implements IObservable, IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly subs: ReadonlySet<IObserver>; get version(): number; constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer); get disposed(): boolean; get value(): number; set value(next: number); /** * Pulls remote writes into this `Runtime`. * * An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can * poll from their own message loop. */ sync(): boolean; /** * Starts an `Atomics.waitAsync` loop that publishes remote writes to this `Runtime` without * manual `sync()` polling. * * Returns a stop function. `dispose()` also stops the loop. */ watch(): IDisposer; peek(): number; onObserved(): void; onUnobserved(): void; isStale(): boolean; dispose(): void; }",
           "guidance": [
             {
               "id": "10-错误一览表",

@@ -1002,9 +1002,9 @@
           "name": "defaultRuntime",
           "kind": "const",
           "signature": "export declare const defaultRuntime: Runtime;",
-          "declarationLine": 13,
+          "declarationLine": 14,
           "source": "packages/reactive/dist/runtime/default-runtime.d.ts",
-          "purpose": "默认共享运行时——全局 `signal()` / `createStore()` 这类不显式传 runtime 的写法 都落在它上面，保持「开箱即用」的心智；需要隔离时显式 `createRuntime()`。 它单独占一个模块，是因为**构造它是模块加载时就发生的副作用**。此前它住在 `runtime.class.ts` 里，于是 `@migaia/reactive` 只要 import 一次 Runtime 类，就顺手 建了一个谁也没要的 Runtime：与「每请求一个 Runtime」的所有权模型冲突，也树摇 不掉（`createRuntime()` 是调用，打包器不能证明它无副作用）。 分出来之后边界是可执行的：`architecture.test.ts` 断言内核入口的传递闭包里没有 这个模块。想要便利写法就显式 import 它（或 `defaultRuntime`），代价随之显式。",
+          "purpose": "defaultRuntime is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defaultRuntime.",
           "advanced": "No additional advanced behavior is declared for defaultRuntime.",
           "parameters": ["This const declaration has no parameters."],
@@ -1028,7 +1028,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "默认共享运行时——全局 `signal()` / `createStore()` 这类不显式传 runtime 的写法 都落在它上面，保持「开箱即用」的心智；需要隔离时显式 `createRuntime()`。 它单独占一个模块，是因为**构造它是模块加载时就发生的副作用**。此前它住在 `runtime.class.ts` 里，于是 `@migaia/reactive` 只要 import 一次 Runtime 类，就顺手 建了一个谁也没要的 Runtime：与「每请求一个 Runtime」的所有权模型冲突，也树摇 不掉（`createRuntime()` 是调用，打包器不能证明它无副作用）。 分出来之后边界是可执行的：`architecture.test.ts` 断言内核入口的传递闭包里没有 这个模块。想要便利写法就显式 import 它（或 `defaultRuntime`），代价随之显式。"
+              "content": "defaultRuntime is part of this module's public const contract."
             },
             {
               "id": "getting-started",
@@ -1086,9 +1086,9 @@
           "name": "IReactiveError",
           "kind": "type",
           "signature": "export type IReactiveError = Error & { readonly source: string; readonly code: string; };",
-          "declarationLine": 7,
+          "declarationLine": 8,
           "source": "packages/reactive/dist/errors.d.ts",
-          "purpose": "全仓统一的结构契约（`docs/contracts/error-codes.md` §2）：错误以属性形式携带 `source`/`code`， 从不替换错误本身——依赖 `instanceof RangeError`/`AggregateError` 等类型判断的调用方不受影响。",
+          "purpose": "Shared error contract from `docs/contracts/error-codes.md` §2. `source` and `code` are attached as properties without replacing the error. Checks such as `instanceof RangeError` and `instanceof AggregateError` keep their meaning.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IReactiveError.",
           "advanced": "No additional advanced behavior is declared for IReactiveError.",
           "parameters": ["This type declaration has no parameters."],
@@ -1113,7 +1113,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "全仓统一的结构契约（`docs/contracts/error-codes.md` §2）：错误以属性形式携带 `source`/`code`， 从不替换错误本身——依赖 `instanceof RangeError`/`AggregateError` 等类型判断的调用方不受影响。"
+              "content": "Shared error contract from `docs/contracts/error-codes.md` §2. `source` and `code` are attached as properties without replacing the error. Checks such as `instanceof RangeError` and `instanceof AggregateError` keep their meaning."
             },
             {
               "id": "getting-started",
@@ -1254,7 +1254,7 @@
           "name": "IReactiveErrorCode",
           "kind": "type",
           "signature": "export type IReactiveErrorCode = (typeof ReactiveErrorCode)[keyof typeof ReactiveErrorCode];",
-          "declarationLine": 119,
+          "declarationLine": 150,
           "source": "packages/reactive/dist/error-code.d.ts",
           "purpose": "IReactiveErrorCode is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IReactiveErrorCode.",
@@ -1550,8 +1550,8 @@
         {
           "name": "ReactiveErrorCode",
           "kind": "const",
-          "signature": "export declare const ReactiveErrorCode: { /** * 在已 dispose 的 Signal / Computed / 自定义 Source 上调用读取或写入方法时抛出。 * * 节点释放后所有对外方法一律拒绝，避免读到已断边的陈旧值。调用方应停止持有该节点的引用， 改用重新创建的实例。 */ readonly nodeDisposed: \"NODE_DISPOSED\"; /** * 求值 Computed 时检测到它（直接或间接）读取了自己正在求值的结果。 * * 循环依赖无法产生确定的值，继续求值只会死循环或返回陈旧半成品。调用方应检查依赖图，拆掉 循环引用。 */ readonly circularDependency: \"CIRCULAR_DEPENDENCY\"; /** * 一个属于某个 Runtime 的节点，在另一个 Runtime 的追踪/所有权边界上被读取、订阅或校验时抛出。 * * 每个 Runtime 维护独立的依赖图与所有权表，跨图操作无法保证一致性，静默放行会产生跨图的陈旧 依赖边。调用方应确认节点与消费它的 Runtime 是同一个，不要跨 Runtime * 共享节点实例。 */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * 传入的对象不是由 `createRuntime()` 创建、或不携带内部所有权登记时抛出。 * * 内核只信任自己登记过的 Runtime/节点；未登记的对象冒充 Runtime 会在后续每一步产生难以追溯的 错误，所以在入口就拒绝。调用方应确认传入的值确实来自本库的工厂函数。 */ readonly notRuntimeOwned: \"NOT_RUNTIME_OWNED\"; /** * 同一个节点对象被重复登记到不同的 Runtime 时，在第二次登记处抛出。 * * 一个节点同时属于两张依赖图，任何后续所有权校验都无法给出正确答案。调用方应为每个 Runtime 各自创建独立的节点，不要跨 Runtime 复用同一个对象。 */ readonly ownershipConflict: \"OWNERSHIP_CONFLICT\"; /** * 检测到本库存在多份运行时副本（重复安装/打包产物与 CDN 副本共存/微前端各自打包），或 `assertSingleRuntimeCopy()` 校验到副本数大于一时抛出。 * * 多副本下所有权表与同步追踪上下文互相看不见彼此，跨副本读取会静默拿到陈旧数据。调用方应 去重依赖，确保进程内只有一份本库；无法去重时才需要 * `assertSingleRuntimeCopy()` 主动失败。 */ readonly copyConflict: \"COPY_CONFLICT\"; /** * 跨副本诊断品牌（`Object.defineProperty` 写入的只读标记）被发现处于非预期形状时抛出。 * * 品牌本应是不可变的内部诊断标记；出现这个错误意味着有代码绕过了正常路径直接篡改了它， 所有权判断已不可信。调用方应停止篡改被托管对象上的内部属性。 */ readonly brandCorrupted: \"BRAND_CORRUPTED\"; /** * 单调版本时钟达到配置的上限（生产默认 `Number.MAX_SAFE_INTEGER`）后，再次申请新版本号时抛出。 * * 原地归零会与仍存活节点持有的旧版本号碰撞、制造漏更新，因此故意 fail-stop。调用方应释放当前 Runtime 持有的全部节点、丢弃它，再创建一份新的 * Runtime，而不是试图复用同一张依赖图。 */ readonly versionExhausted: \"VERSION_EXHAUSTED\"; /** * 一次冲刷内的重算轮数超过 `maxFlushPasses`（默认 100）时抛出。 * * 这通常意味着依赖图里存在自触发环——effect 的写操作又落回了它自己的依赖。为避免整个宿主卡死在 同步死循环里，调度器会清空剩余队列并终止本轮冲刷；调用方应检查错误信息里列出的被丢弃项， * 定位并拆掉环。 */ readonly flushLoop: \"FLUSH_LOOP\"; /** * 一次冲刷中有多个 observer 的 `tick()` 失败、或多个 observable 的生命周期钩子 （`onObserved`/`onUnobserved`）失败时，作为 * `AggregateError` 外壳抛出/上报。 * * 调用方应展开 `error.errors` 逐条处理；单个 observer 失败时不会用到这个码，错误原样抛出/上报。 */ readonly observerFailed: \"OBSERVER_FAILED\"; /** * `runBatched()` 内业务动作与收尾 flush 同时失败时标记聚合错误；不可读的业务错误 `cause` 使三个原值直接存于 `AggregateError.errors`。 * * 可写的普通业务错误仍作为顶层抛出并在 `cause` 附上 flush 失败；调用方应检查顶层错误及其 `cause` 或 `errors`。 */ readonly actionFlushFailed: \"ACTION_FLUSH_FAILED\"; /** * 预留：异步调度策略回调或 `reportError()` 捕获到未被上层处理的错误时，作为诊断上报的通道码。 * * 默认诊断出口改为 `adapter.reportError`（no-op）后，本码不再有默认抛出/上报点；保留以维持公开码表稳定，供自定义 `onAsyncError`/`onError` * 需要「异步调度器错误」这一语义时使用。 */ readonly schedulerFailed: \"SCHEDULER_FAILED\"; /** * `capture()` 产生的 token 在 `commitCapture()` 时已失效、已被消费、属于另一个 tracker，或对应 的 observer 已 dispose 时抛出。 * * Capture token 只能被验证并提交一次；调用方（通常是 Concurrent React 的渲染路径）应重新求值， 不要复用同一个 token。 */ readonly captureInvalid: \"CAPTURE_INVALID\"; /** * 同一个 `IObserverBinding` 被重复调用 observe 方法（已经处于 observed 状态）时抛出。 * * Binding 的 observe 不是幂等操作，重复调用意味着调用方状态机出现了重复触发。调用方应在再次 observe 前先检查 binding 当前是否已在观察中。 */ readonly bindingDuplicate: \"BINDING_DUPLICATE\"; /** * 同一个 Runtime 对象被重复注册内部面（`registerInternals()`）时抛出。 * * 内部面只应在 Runtime 构造时登记一次；重复登记视为编程错误，直接拒绝而不是静默覆盖。调用方 应检查 Runtime 构造流程，确认没有重复调用注册函数。 */ readonly internalsRegistered: \"INTERNALS_REGISTERED\"; /** * 构造 Runtime / Scheduler / VersionClock 时传入的选项（`maxFlushPasses`、最大版本号、 traced action * 名称等）不满足取值要求时，在构造/调用当次抛出。 * * 这是入口参数校验，早失败优于把非法配置带进运行时状态。调用方应修正传入的选项值。 */ readonly invalidOption: \"INVALID_OPTION\"; };",
-          "declarationLine": 14,
+          "signature": "export declare const ReactiveErrorCode: { /** * Thrown when a read or write operation targets a disposed `Signal`, `Computed`, or custom * source. * * Value access rejects after disposal to prevent reading stale values from disconnected nodes. * Stop using the disposed node and create a replacement instance. */ readonly nodeDisposed: \"NODE_DISPOSED\"; /** * Thrown when evaluating a `Computed` directly or indirectly reads its own pending result. * * A cycle cannot produce a determinate value. Further evaluation loops or returns incomplete * stale data. Inspect the dependency graph and remove the cycle. */ readonly circularDependency: \"CIRCULAR_DEPENDENCY\"; /** * Thrown when a node from one `Runtime` is read, subscribed, or checked at another runtime's * boundary. * * Each `Runtime` owns an independent dependency graph and ownership table. Cross-graph operations * cannot preserve consistency and can leave stale dependency edges. Ensure the node and its * consumer belong to the same `Runtime`. Do not share nodes across runtimes. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * Thrown when an object lacks the internal registration supplied by this library's runtime or * node factories. * * The kernel trusts only registered runtimes and nodes. It rejects unregistered objects at the * entry boundary instead of allowing later failures that obscure their source. Use an object from * this library's factories. */ readonly notRuntimeOwned: \"NOT_RUNTIME_OWNED\"; /** * Thrown at the second registration when the same node object is assigned to different runtimes. * * A node cannot belong to two dependency graphs without invalidating ownership checks. Create * independent nodes for each `Runtime` instead of reusing an object across runtimes. */ readonly ownershipConflict: \"OWNERSHIP_CONFLICT\"; /** * Reports multiple library copies, such as duplicate installations, bundled and CDN copies, or * separate microfrontend bundles. Also thrown when `assertSingleRuntimeCopy()` finds more than * one copy. * * Copies do not share ownership tables or synchronous tracking contexts. Cross-copy reads can * therefore return stale data without detection. Deduplicate dependencies to keep one library * copy in the process. Use `assertSingleRuntimeCopy()` when the deployment must reject multiple * copies. */ readonly copyConflict: \"COPY_CONFLICT\"; /** * Thrown when a cross-copy diagnostic brand has an unexpected shape. * * `Object.defineProperty` installs this read-only internal marker. An invalid brand indicates * modification outside the supported path and invalidates ownership checks. Do not modify * internal properties on managed objects. */ readonly brandCorrupted: \"BRAND_CORRUPTED\"; /** * Thrown when a new version is requested after the monotonic clock reaches its configured limit. * The production default is `Number.MAX_SAFE_INTEGER`. * * Resetting the counter would collide with versions held by live nodes and cause missed updates. * The clock therefore stops on exhaustion. Dispose all nodes owned by the current `Runtime`, * discard that runtime, and create a new one instead of reusing the graph. */ readonly versionExhausted: \"VERSION_EXHAUSTED\"; /** * Thrown when one observer executes more than `maxFlushPasses` times in one flush. The default is * 100. * * This usually indicates an effect writes to its own dependency and triggers itself. The * scheduler clears pending work and ends the flush to prevent a synchronous infinite loop. * Inspect the discarded items in the error message to locate and remove the cycle. */ readonly flushLoop: \"FLUSH_LOOP\"; /** * Thrown or reported as an `AggregateError` when multiple observer `tick()` calls fail in a * flush, or multiple observable lifecycle hooks (`onObserved` or `onUnobserved`) fail. * * Inspect each entry in `error.errors`. A single observer failure retains the original error * without this code. */ readonly observerFailed: \"OBSERVER_FAILED\"; /** * Tags the aggregate when both the business action and final flush fail in `runBatched()`. If * reading the business error's `cause` fails, all three original failures enter * `AggregateError.errors`. * * A writable business error remains the top-level error, with the flush failure attached through * `cause`. Inspect the top-level error and its `cause` or `errors`. */ readonly actionFlushFailed: \"ACTION_FLUSH_FAILED\"; /** * Reserved diagnostic code for unhandled failures in an async scheduling callback or * `reportError()`. * * The default `adapter.reportError` is a no-op, so no default throw or report site uses this * code. The code remains stable for custom `onAsyncError` or `onError` handlers that need * scheduler-failure semantics. */ readonly schedulerFailed: \"SCHEDULER_FAILED\"; /** * Thrown when `commitCapture()` receives an invalid or consumed token, a token from another * tracker, or a token whose observer is disposed. * * A capture token can be validated and committed only once. Reevaluate instead of reusing the * token, for example during a Concurrent React render. */ readonly captureInvalid: \"CAPTURE_INVALID\"; /** * Thrown when `observe` is called on an `IObserverBinding` that already owns an active observer. * * `observe` is not idempotent. Duplicate calls indicate a repeated state-machine transition. * Ensure the previous observation ends before calling `observe` again. */ readonly bindingDuplicate: \"BINDING_DUPLICATE\"; /** * Thrown when `registerInternals()` registers the same `Runtime` object twice. * * Register internals once during construction. Duplicate registration is a programming error, not * an instruction to replace the existing internals. Check the runtime construction path. */ readonly internalsRegistered: \"INTERNALS_REGISTERED\"; /** * Thrown during construction or invocation when an option fails validation. Examples include * `maxFlushPasses`, the maximum version, and a traced action's name. * * Entry validation prevents invalid configuration from entering runtime state. Correct the option * value. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "declarationLine": 15,
           "source": "packages/reactive/dist/error-code.d.ts",
           "purpose": "ReactiveErrorCode is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ReactiveErrorCode.",
@@ -1569,7 +1569,7 @@
           "aliasOf": "ReactiveErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const ReactiveErrorCode: { /** * 在已 dispose 的 Signal / Computed / 自定义 Source 上调用读取或写入方法时抛出。 * * 节点释放后所有对外方法一律拒绝，避免读到已断边的陈旧值。调用方应停止持有该节点的引用， 改用重新创建的实例。 */ readonly nodeDisposed: \"NODE_DISPOSED\"; /** * 求值 Computed 时检测到它（直接或间接）读取了自己正在求值的结果。 * * 循环依赖无法产生确定的值，继续求值只会死循环或返回陈旧半成品。调用方应检查依赖图，拆掉 循环引用。 */ readonly circularDependency: \"CIRCULAR_DEPENDENCY\"; /** * 一个属于某个 Runtime 的节点，在另一个 Runtime 的追踪/所有权边界上被读取、订阅或校验时抛出。 * * 每个 Runtime 维护独立的依赖图与所有权表，跨图操作无法保证一致性，静默放行会产生跨图的陈旧 依赖边。调用方应确认节点与消费它的 Runtime 是同一个，不要跨 Runtime * 共享节点实例。 */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * 传入的对象不是由 `createRuntime()` 创建、或不携带内部所有权登记时抛出。 * * 内核只信任自己登记过的 Runtime/节点；未登记的对象冒充 Runtime 会在后续每一步产生难以追溯的 错误，所以在入口就拒绝。调用方应确认传入的值确实来自本库的工厂函数。 */ readonly notRuntimeOwned: \"NOT_RUNTIME_OWNED\"; /** * 同一个节点对象被重复登记到不同的 Runtime 时，在第二次登记处抛出。 * * 一个节点同时属于两张依赖图，任何后续所有权校验都无法给出正确答案。调用方应为每个 Runtime 各自创建独立的节点，不要跨 Runtime 复用同一个对象。 */ readonly ownershipConflict: \"OWNERSHIP_CONFLICT\"; /** * 检测到本库存在多份运行时副本（重复安装/打包产物与 CDN 副本共存/微前端各自打包），或 `assertSingleRuntimeCopy()` 校验到副本数大于一时抛出。 * * 多副本下所有权表与同步追踪上下文互相看不见彼此，跨副本读取会静默拿到陈旧数据。调用方应 去重依赖，确保进程内只有一份本库；无法去重时才需要 * `assertSingleRuntimeCopy()` 主动失败。 */ readonly copyConflict: \"COPY_CONFLICT\"; /** * 跨副本诊断品牌（`Object.defineProperty` 写入的只读标记）被发现处于非预期形状时抛出。 * * 品牌本应是不可变的内部诊断标记；出现这个错误意味着有代码绕过了正常路径直接篡改了它， 所有权判断已不可信。调用方应停止篡改被托管对象上的内部属性。 */ readonly brandCorrupted: \"BRAND_CORRUPTED\"; /** * 单调版本时钟达到配置的上限（生产默认 `Number.MAX_SAFE_INTEGER`）后，再次申请新版本号时抛出。 * * 原地归零会与仍存活节点持有的旧版本号碰撞、制造漏更新，因此故意 fail-stop。调用方应释放当前 Runtime 持有的全部节点、丢弃它，再创建一份新的 * Runtime，而不是试图复用同一张依赖图。 */ readonly versionExhausted: \"VERSION_EXHAUSTED\"; /** * 一次冲刷内的重算轮数超过 `maxFlushPasses`（默认 100）时抛出。 * * 这通常意味着依赖图里存在自触发环——effect 的写操作又落回了它自己的依赖。为避免整个宿主卡死在 同步死循环里，调度器会清空剩余队列并终止本轮冲刷；调用方应检查错误信息里列出的被丢弃项， * 定位并拆掉环。 */ readonly flushLoop: \"FLUSH_LOOP\"; /** * 一次冲刷中有多个 observer 的 `tick()` 失败、或多个 observable 的生命周期钩子 （`onObserved`/`onUnobserved`）失败时，作为 * `AggregateError` 外壳抛出/上报。 * * 调用方应展开 `error.errors` 逐条处理；单个 observer 失败时不会用到这个码，错误原样抛出/上报。 */ readonly observerFailed: \"OBSERVER_FAILED\"; /** * `runBatched()` 内业务动作与收尾 flush 同时失败时标记聚合错误；不可读的业务错误 `cause` 使三个原值直接存于 `AggregateError.errors`。 * * 可写的普通业务错误仍作为顶层抛出并在 `cause` 附上 flush 失败；调用方应检查顶层错误及其 `cause` 或 `errors`。 */ readonly actionFlushFailed: \"ACTION_FLUSH_FAILED\"; /** * 预留：异步调度策略回调或 `reportError()` 捕获到未被上层处理的错误时，作为诊断上报的通道码。 * * 默认诊断出口改为 `adapter.reportError`（no-op）后，本码不再有默认抛出/上报点；保留以维持公开码表稳定，供自定义 `onAsyncError`/`onError` * 需要「异步调度器错误」这一语义时使用。 */ readonly schedulerFailed: \"SCHEDULER_FAILED\"; /** * `capture()` 产生的 token 在 `commitCapture()` 时已失效、已被消费、属于另一个 tracker，或对应 的 observer 已 dispose 时抛出。 * * Capture token 只能被验证并提交一次；调用方（通常是 Concurrent React 的渲染路径）应重新求值， 不要复用同一个 token。 */ readonly captureInvalid: \"CAPTURE_INVALID\"; /** * 同一个 `IObserverBinding` 被重复调用 observe 方法（已经处于 observed 状态）时抛出。 * * Binding 的 observe 不是幂等操作，重复调用意味着调用方状态机出现了重复触发。调用方应在再次 observe 前先检查 binding 当前是否已在观察中。 */ readonly bindingDuplicate: \"BINDING_DUPLICATE\"; /** * 同一个 Runtime 对象被重复注册内部面（`registerInternals()`）时抛出。 * * 内部面只应在 Runtime 构造时登记一次；重复登记视为编程错误，直接拒绝而不是静默覆盖。调用方 应检查 Runtime 构造流程，确认没有重复调用注册函数。 */ readonly internalsRegistered: \"INTERNALS_REGISTERED\"; /** * 构造 Runtime / Scheduler / VersionClock 时传入的选项（`maxFlushPasses`、最大版本号、 traced action * 名称等）不满足取值要求时，在构造/调用当次抛出。 * * 这是入口参数校验，早失败优于把非法配置带进运行时状态。调用方应修正传入的选项值。 */ readonly invalidOption: \"INVALID_OPTION\"; };"
+            "export declare const ReactiveErrorCode: { /** * Thrown when a read or write operation targets a disposed `Signal`, `Computed`, or custom * source. * * Value access rejects after disposal to prevent reading stale values from disconnected nodes. * Stop using the disposed node and create a replacement instance. */ readonly nodeDisposed: \"NODE_DISPOSED\"; /** * Thrown when evaluating a `Computed` directly or indirectly reads its own pending result. * * A cycle cannot produce a determinate value. Further evaluation loops or returns incomplete * stale data. Inspect the dependency graph and remove the cycle. */ readonly circularDependency: \"CIRCULAR_DEPENDENCY\"; /** * Thrown when a node from one `Runtime` is read, subscribed, or checked at another runtime's * boundary. * * Each `Runtime` owns an independent dependency graph and ownership table. Cross-graph operations * cannot preserve consistency and can leave stale dependency edges. Ensure the node and its * consumer belong to the same `Runtime`. Do not share nodes across runtimes. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * Thrown when an object lacks the internal registration supplied by this library's runtime or * node factories. * * The kernel trusts only registered runtimes and nodes. It rejects unregistered objects at the * entry boundary instead of allowing later failures that obscure their source. Use an object from * this library's factories. */ readonly notRuntimeOwned: \"NOT_RUNTIME_OWNED\"; /** * Thrown at the second registration when the same node object is assigned to different runtimes. * * A node cannot belong to two dependency graphs without invalidating ownership checks. Create * independent nodes for each `Runtime` instead of reusing an object across runtimes. */ readonly ownershipConflict: \"OWNERSHIP_CONFLICT\"; /** * Reports multiple library copies, such as duplicate installations, bundled and CDN copies, or * separate microfrontend bundles. Also thrown when `assertSingleRuntimeCopy()` finds more than * one copy. * * Copies do not share ownership tables or synchronous tracking contexts. Cross-copy reads can * therefore return stale data without detection. Deduplicate dependencies to keep one library * copy in the process. Use `assertSingleRuntimeCopy()` when the deployment must reject multiple * copies. */ readonly copyConflict: \"COPY_CONFLICT\"; /** * Thrown when a cross-copy diagnostic brand has an unexpected shape. * * `Object.defineProperty` installs this read-only internal marker. An invalid brand indicates * modification outside the supported path and invalidates ownership checks. Do not modify * internal properties on managed objects. */ readonly brandCorrupted: \"BRAND_CORRUPTED\"; /** * Thrown when a new version is requested after the monotonic clock reaches its configured limit. * The production default is `Number.MAX_SAFE_INTEGER`. * * Resetting the counter would collide with versions held by live nodes and cause missed updates. * The clock therefore stops on exhaustion. Dispose all nodes owned by the current `Runtime`, * discard that runtime, and create a new one instead of reusing the graph. */ readonly versionExhausted: \"VERSION_EXHAUSTED\"; /** * Thrown when one observer executes more than `maxFlushPasses` times in one flush. The default is * 100. * * This usually indicates an effect writes to its own dependency and triggers itself. The * scheduler clears pending work and ends the flush to prevent a synchronous infinite loop. * Inspect the discarded items in the error message to locate and remove the cycle. */ readonly flushLoop: \"FLUSH_LOOP\"; /** * Thrown or reported as an `AggregateError` when multiple observer `tick()` calls fail in a * flush, or multiple observable lifecycle hooks (`onObserved` or `onUnobserved`) fail. * * Inspect each entry in `error.errors`. A single observer failure retains the original error * without this code. */ readonly observerFailed: \"OBSERVER_FAILED\"; /** * Tags the aggregate when both the business action and final flush fail in `runBatched()`. If * reading the business error's `cause` fails, all three original failures enter * `AggregateError.errors`. * * A writable business error remains the top-level error, with the flush failure attached through * `cause`. Inspect the top-level error and its `cause` or `errors`. */ readonly actionFlushFailed: \"ACTION_FLUSH_FAILED\"; /** * Reserved diagnostic code for unhandled failures in an async scheduling callback or * `reportError()`. * * The default `adapter.reportError` is a no-op, so no default throw or report site uses this * code. The code remains stable for custom `onAsyncError` or `onError` handlers that need * scheduler-failure semantics. */ readonly schedulerFailed: \"SCHEDULER_FAILED\"; /** * Thrown when `commitCapture()` receives an invalid or consumed token, a token from another * tracker, or a token whose observer is disposed. * * A capture token can be validated and committed only once. Reevaluate instead of reusing the * token, for example during a Concurrent React render. */ readonly captureInvalid: \"CAPTURE_INVALID\"; /** * Thrown when `observe` is called on an `IObserverBinding` that already owns an active observer. * * `observe` is not idempotent. Duplicate calls indicate a repeated state-machine transition. * Ensure the previous observation ends before calling `observe` again. */ readonly bindingDuplicate: \"BINDING_DUPLICATE\"; /** * Thrown when `registerInternals()` registers the same `Runtime` object twice. * * Register internals once during construction. Duplicate registration is a programming error, not * an instruction to replace the existing internals. Check the runtime construction path. */ readonly internalsRegistered: \"INTERNALS_REGISTERED\"; /** * Thrown during construction or invocation when an option fails validation. Examples include * `maxFlushPasses`, the maximum version, and a traced action's name. * * Entry validation prevents invalid configuration from entering runtime state. Correct the option * value. */ readonly invalidOption: \"INVALID_OPTION\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1608,7 +1608,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/error-code.d.ts:ReactiveErrorCode:export declare const ReactiveErrorCode: { /** * 在已 dispose 的 Signal / Computed / 自定义 Source 上调用读取或写入方法时抛出。 * * 节点释放后所有对外方法一律拒绝，避免读到已断边的陈旧值。调用方应停止持有该节点的引用， 改用重新创建的实例。 */ readonly nodeDisposed: \"NODE_DISPOSED\"; /** * 求值 Computed 时检测到它（直接或间接）读取了自己正在求值的结果。 * * 循环依赖无法产生确定的值，继续求值只会死循环或返回陈旧半成品。调用方应检查依赖图，拆掉 循环引用。 */ readonly circularDependency: \"CIRCULAR_DEPENDENCY\"; /** * 一个属于某个 Runtime 的节点，在另一个 Runtime 的追踪/所有权边界上被读取、订阅或校验时抛出。 * * 每个 Runtime 维护独立的依赖图与所有权表，跨图操作无法保证一致性，静默放行会产生跨图的陈旧 依赖边。调用方应确认节点与消费它的 Runtime 是同一个，不要跨 Runtime * 共享节点实例。 */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * 传入的对象不是由 `createRuntime()` 创建、或不携带内部所有权登记时抛出。 * * 内核只信任自己登记过的 Runtime/节点；未登记的对象冒充 Runtime 会在后续每一步产生难以追溯的 错误，所以在入口就拒绝。调用方应确认传入的值确实来自本库的工厂函数。 */ readonly notRuntimeOwned: \"NOT_RUNTIME_OWNED\"; /** * 同一个节点对象被重复登记到不同的 Runtime 时，在第二次登记处抛出。 * * 一个节点同时属于两张依赖图，任何后续所有权校验都无法给出正确答案。调用方应为每个 Runtime 各自创建独立的节点，不要跨 Runtime 复用同一个对象。 */ readonly ownershipConflict: \"OWNERSHIP_CONFLICT\"; /** * 检测到本库存在多份运行时副本（重复安装/打包产物与 CDN 副本共存/微前端各自打包），或 `assertSingleRuntimeCopy()` 校验到副本数大于一时抛出。 * * 多副本下所有权表与同步追踪上下文互相看不见彼此，跨副本读取会静默拿到陈旧数据。调用方应 去重依赖，确保进程内只有一份本库；无法去重时才需要 * `assertSingleRuntimeCopy()` 主动失败。 */ readonly copyConflict: \"COPY_CONFLICT\"; /** * 跨副本诊断品牌（`Object.defineProperty` 写入的只读标记）被发现处于非预期形状时抛出。 * * 品牌本应是不可变的内部诊断标记；出现这个错误意味着有代码绕过了正常路径直接篡改了它， 所有权判断已不可信。调用方应停止篡改被托管对象上的内部属性。 */ readonly brandCorrupted: \"BRAND_CORRUPTED\"; /** * 单调版本时钟达到配置的上限（生产默认 `Number.MAX_SAFE_INTEGER`）后，再次申请新版本号时抛出。 * * 原地归零会与仍存活节点持有的旧版本号碰撞、制造漏更新，因此故意 fail-stop。调用方应释放当前 Runtime 持有的全部节点、丢弃它，再创建一份新的 * Runtime，而不是试图复用同一张依赖图。 */ readonly versionExhausted: \"VERSION_EXHAUSTED\"; /** * 一次冲刷内的重算轮数超过 `maxFlushPasses`（默认 100）时抛出。 * * 这通常意味着依赖图里存在自触发环——effect 的写操作又落回了它自己的依赖。为避免整个宿主卡死在 同步死循环里，调度器会清空剩余队列并终止本轮冲刷；调用方应检查错误信息里列出的被丢弃项， * 定位并拆掉环。 */ readonly flushLoop: \"FLUSH_LOOP\"; /** * 一次冲刷中有多个 observer 的 `tick()` 失败、或多个 observable 的生命周期钩子 （`onObserved`/`onUnobserved`）失败时，作为 * `AggregateError` 外壳抛出/上报。 * * 调用方应展开 `error.errors` 逐条处理；单个 observer 失败时不会用到这个码，错误原样抛出/上报。 */ readonly observerFailed: \"OBSERVER_FAILED\"; /** * `runBatched()` 内业务动作与收尾 flush 同时失败时标记聚合错误；不可读的业务错误 `cause` 使三个原值直接存于 `AggregateError.errors`。 * * 可写的普通业务错误仍作为顶层抛出并在 `cause` 附上 flush 失败；调用方应检查顶层错误及其 `cause` 或 `errors`。 */ readonly actionFlushFailed: \"ACTION_FLUSH_FAILED\"; /** * 预留：异步调度策略回调或 `reportError()` 捕获到未被上层处理的错误时，作为诊断上报的通道码。 * * 默认诊断出口改为 `adapter.reportError`（no-op）后，本码不再有默认抛出/上报点；保留以维持公开码表稳定，供自定义 `onAsyncError`/`onError` * 需要「异步调度器错误」这一语义时使用。 */ readonly schedulerFailed: \"SCHEDULER_FAILED\"; /** * `capture()` 产生的 token 在 `commitCapture()` 时已失效、已被消费、属于另一个 tracker，或对应 的 observer 已 dispose 时抛出。 * * Capture token 只能被验证并提交一次；调用方（通常是 Concurrent React 的渲染路径）应重新求值， 不要复用同一个 token。 */ readonly captureInvalid: \"CAPTURE_INVALID\"; /** * 同一个 `IObserverBinding` 被重复调用 observe 方法（已经处于 observed 状态）时抛出。 * * Binding 的 observe 不是幂等操作，重复调用意味着调用方状态机出现了重复触发。调用方应在再次 observe 前先检查 binding 当前是否已在观察中。 */ readonly bindingDuplicate: \"BINDING_DUPLICATE\"; /** * 同一个 Runtime 对象被重复注册内部面（`registerInternals()`）时抛出。 * * 内部面只应在 Runtime 构造时登记一次；重复登记视为编程错误，直接拒绝而不是静默覆盖。调用方 应检查 Runtime 构造流程，确认没有重复调用注册函数。 */ readonly internalsRegistered: \"INTERNALS_REGISTERED\"; /** * 构造 Runtime / Scheduler / VersionClock 时传入的选项（`maxFlushPasses`、最大版本号、 traced action * 名称等）不满足取值要求时，在构造/调用当次抛出。 * * 这是入口参数校验，早失败优于把非法配置带进运行时状态。调用方应修正传入的选项值。 */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "identity": "packages/reactive/dist/error-code.d.ts:ReactiveErrorCode:export declare const ReactiveErrorCode: { /** * Thrown when a read or write operation targets a disposed `Signal`, `Computed`, or custom * source. * * Value access rejects after disposal to prevent reading stale values from disconnected nodes. * Stop using the disposed node and create a replacement instance. */ readonly nodeDisposed: \"NODE_DISPOSED\"; /** * Thrown when evaluating a `Computed` directly or indirectly reads its own pending result. * * A cycle cannot produce a determinate value. Further evaluation loops or returns incomplete * stale data. Inspect the dependency graph and remove the cycle. */ readonly circularDependency: \"CIRCULAR_DEPENDENCY\"; /** * Thrown when a node from one `Runtime` is read, subscribed, or checked at another runtime's * boundary. * * Each `Runtime` owns an independent dependency graph and ownership table. Cross-graph operations * cannot preserve consistency and can leave stale dependency edges. Ensure the node and its * consumer belong to the same `Runtime`. Do not share nodes across runtimes. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * Thrown when an object lacks the internal registration supplied by this library's runtime or * node factories. * * The kernel trusts only registered runtimes and nodes. It rejects unregistered objects at the * entry boundary instead of allowing later failures that obscure their source. Use an object from * this library's factories. */ readonly notRuntimeOwned: \"NOT_RUNTIME_OWNED\"; /** * Thrown at the second registration when the same node object is assigned to different runtimes. * * A node cannot belong to two dependency graphs without invalidating ownership checks. Create * independent nodes for each `Runtime` instead of reusing an object across runtimes. */ readonly ownershipConflict: \"OWNERSHIP_CONFLICT\"; /** * Reports multiple library copies, such as duplicate installations, bundled and CDN copies, or * separate microfrontend bundles. Also thrown when `assertSingleRuntimeCopy()` finds more than * one copy. * * Copies do not share ownership tables or synchronous tracking contexts. Cross-copy reads can * therefore return stale data without detection. Deduplicate dependencies to keep one library * copy in the process. Use `assertSingleRuntimeCopy()` when the deployment must reject multiple * copies. */ readonly copyConflict: \"COPY_CONFLICT\"; /** * Thrown when a cross-copy diagnostic brand has an unexpected shape. * * `Object.defineProperty` installs this read-only internal marker. An invalid brand indicates * modification outside the supported path and invalidates ownership checks. Do not modify * internal properties on managed objects. */ readonly brandCorrupted: \"BRAND_CORRUPTED\"; /** * Thrown when a new version is requested after the monotonic clock reaches its configured limit. * The production default is `Number.MAX_SAFE_INTEGER`. * * Resetting the counter would collide with versions held by live nodes and cause missed updates. * The clock therefore stops on exhaustion. Dispose all nodes owned by the current `Runtime`, * discard that runtime, and create a new one instead of reusing the graph. */ readonly versionExhausted: \"VERSION_EXHAUSTED\"; /** * Thrown when one observer executes more than `maxFlushPasses` times in one flush. The default is * 100. * * This usually indicates an effect writes to its own dependency and triggers itself. The * scheduler clears pending work and ends the flush to prevent a synchronous infinite loop. * Inspect the discarded items in the error message to locate and remove the cycle. */ readonly flushLoop: \"FLUSH_LOOP\"; /** * Thrown or reported as an `AggregateError` when multiple observer `tick()` calls fail in a * flush, or multiple observable lifecycle hooks (`onObserved` or `onUnobserved`) fail. * * Inspect each entry in `error.errors`. A single observer failure retains the original error * without this code. */ readonly observerFailed: \"OBSERVER_FAILED\"; /** * Tags the aggregate when both the business action and final flush fail in `runBatched()`. If * reading the business error's `cause` fails, all three original failures enter * `AggregateError.errors`. * * A writable business error remains the top-level error, with the flush failure attached through * `cause`. Inspect the top-level error and its `cause` or `errors`. */ readonly actionFlushFailed: \"ACTION_FLUSH_FAILED\"; /** * Reserved diagnostic code for unhandled failures in an async scheduling callback or * `reportError()`. * * The default `adapter.reportError` is a no-op, so no default throw or report site uses this * code. The code remains stable for custom `onAsyncError` or `onError` handlers that need * scheduler-failure semantics. */ readonly schedulerFailed: \"SCHEDULER_FAILED\"; /** * Thrown when `commitCapture()` receives an invalid or consumed token, a token from another * tracker, or a token whose observer is disposed. * * A capture token can be validated and committed only once. Reevaluate instead of reusing the * token, for example during a Concurrent React render. */ readonly captureInvalid: \"CAPTURE_INVALID\"; /** * Thrown when `observe` is called on an `IObserverBinding` that already owns an active observer. * * `observe` is not idempotent. Duplicate calls indicate a repeated state-machine transition. * Ensure the previous observation ends before calling `observe` again. */ readonly bindingDuplicate: \"BINDING_DUPLICATE\"; /** * Thrown when `registerInternals()` registers the same `Runtime` object twice. * * Register internals once during construction. Duplicate registration is a programming error, not * an instruction to replace the existing internals. Check the runtime construction path. */ readonly internalsRegistered: \"INTERNALS_REGISTERED\"; /** * Thrown during construction or invocation when an option fails validation. Examples include * `maxFlushPasses`, the maximum version, and a traced action's name. * * Entry validation prevents invalid configuration from entering runtime state. Correct the option * value. */ readonly invalidOption: \"INVALID_OPTION\"; };",
           "guidance": [
             {
               "id": "错误码",
@@ -1876,9 +1876,9 @@
           "ownerFragment": "reactive-runtime--IObserver"
         },
         {
-          "identity": "packages/reactive/dist/runtime/types.d.ts:IRuntime:export type IRuntime = { readonly [RUNTIME_BRAND]: true; /** Bump 版本 + 向下游标脏（wasm 字段等自定义 Source 复用同一条通知管线） */ signal<T>(value: T, options?: IReactiveNodeOptions): ISignal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): IComputedValue<T>; effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; batch<T>(fn: () => T): T; untracked<T>(fn: () => T): T; /** 同步冲刷当前队列。observer 内重入时外层 flush 仍拥有队列，返回 `deferred`； 最外层调用完成并排空队列时返回 `completed`。 */ flush(): IFlushResult; /** 受控地替换冲刷策略；只改变何时 flush，不交出 Scheduler 队列本身。 */ setSchedulerStrategy(strategy: ISchedulerStrategy): void; /** 只读版本观测；不交出可递增的 VersionClock。 */ currentVersion(): number; /** 执行并追踪一段真实 action。调用方只能提供 name 与函数，不能伪造 start/end/error 阶段或任意注入 trace event。 */ runTracedAction<T>(name: string, fn: () => T): T; reportError(error: unknown, context: IRuntimeErrorReportContext): void; /** 诊断面只读：事件只能由受信内核产生，调用方不能伪造 action/依赖记录。 */ subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer; };",
+          "identity": "packages/reactive/dist/runtime/types.d.ts:IRuntime:export type IRuntime = { readonly [RUNTIME_BRAND]: true; /** * Creates a writable node owned by this runtime and sharing its dependency graph and version * clock. */ signal<T>(value: T, options?: IReactiveNodeOptions): ISignal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): IComputedValue<T>; effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; batch<T>(fn: () => T): T; untracked<T>(fn: () => T): T; /** * Flushes synchronously. Reentrant observer calls return `deferred`; the outer call returns * `completed` after draining the queue. */ flush(): IFlushResult; /** Replaces flush timing through a controlled strategy without exposing the scheduler queue. */ setSchedulerStrategy(strategy: ISchedulerStrategy): void; /** Reads the current version without exposing an incrementable `VersionClock`. */ currentVersion(): number; /** * Runs and traces an action. Callers provide only its name and function, never fabricated phases * or trace events. */ runTracedAction<T>(name: string, fn: () => T): T; reportError(error: unknown, context: IRuntimeErrorReportContext): void; /** * Subscribes to read-only diagnostics. Only the trusted kernel emits action and dependency * records. */ subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer; };",
           "name": "IRuntime",
-          "signature": "export type IRuntime = { readonly [RUNTIME_BRAND]: true; /** Bump 版本 + 向下游标脏（wasm 字段等自定义 Source 复用同一条通知管线） */ signal<T>(value: T, options?: IReactiveNodeOptions): ISignal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): IComputedValue<T>; effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; batch<T>(fn: () => T): T; untracked<T>(fn: () => T): T; /** 同步冲刷当前队列。observer 内重入时外层 flush 仍拥有队列，返回 `deferred`； 最外层调用完成并排空队列时返回 `completed`。 */ flush(): IFlushResult; /** 受控地替换冲刷策略；只改变何时 flush，不交出 Scheduler 队列本身。 */ setSchedulerStrategy(strategy: ISchedulerStrategy): void; /** 只读版本观测；不交出可递增的 VersionClock。 */ currentVersion(): number; /** 执行并追踪一段真实 action。调用方只能提供 name 与函数，不能伪造 start/end/error 阶段或任意注入 trace event。 */ runTracedAction<T>(name: string, fn: () => T): T; reportError(error: unknown, context: IRuntimeErrorReportContext): void; /** 诊断面只读：事件只能由受信内核产生，调用方不能伪造 action/依赖记录。 */ subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer; };",
+          "signature": "export type IRuntime = { readonly [RUNTIME_BRAND]: true; /** * Creates a writable node owned by this runtime and sharing its dependency graph and version * clock. */ signal<T>(value: T, options?: IReactiveNodeOptions): ISignal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): IComputedValue<T>; effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; batch<T>(fn: () => T): T; untracked<T>(fn: () => T): T; /** * Flushes synchronously. Reentrant observer calls return `deferred`; the outer call returns * `completed` after draining the queue. */ flush(): IFlushResult; /** Replaces flush timing through a controlled strategy without exposing the scheduler queue. */ setSchedulerStrategy(strategy: ISchedulerStrategy): void; /** Reads the current version without exposing an incrementable `VersionClock`. */ currentVersion(): number; /** * Runs and traces an action. Callers provide only its name and function, never fabricated phases * or trace events. */ runTracedAction<T>(name: string, fn: () => T): T; reportError(error: unknown, context: IRuntimeErrorReportContext): void; /** * Subscribes to read-only diagnostics. Only the trusted kernel emits action and dependency * records. */ subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer; };",
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./runtime",
@@ -1886,9 +1886,9 @@
           "ownerFragment": "reactive-runtime--IRuntime"
         },
         {
-          "identity": "packages/reactive/dist/runtime/types.d.ts:IRuntimeOptions:export type IRuntimeOptions = { /** 宿主能力注入面；缺省项回落到 `defaultRuntimeAdapter`。 */ adapter?: Partial<IReactiveRuntimeAdapter>; onError?: (error: unknown, context: IRuntimeErrorContext) => void; onTrace?: (event: IRuntimeTraceEvent) => void; /** * 一次冲刷里单个 observer 允许的最大执行次数，默认 100。单个 observer 超限视为自触发环：抛错并清空队列。 * * 可配置，因为它是策略参数而非物理常数——很长的派生链每轮只推进一级也会吃轮次。 */ maxFlushPasses?: number; /** * 无观察者 Computed 的挂起时机，默认走 adapter 的 `scheduleMicrotask`。 * * 与调度策略分开：挂起是回收，不是冲刷。写死之后这条路径不受任何配置控制， rAF/idle 策略下时机对不上，测试也只能靠等微任务。 */ scheduleIdle?: (task: () => void) => void; };",
+          "identity": "packages/reactive/dist/runtime/types.d.ts:IRuntimeOptions:export type IRuntimeOptions = { /** Injects host capabilities. Missing entries use `defaultRuntimeAdapter`. */ adapter?: Partial<IReactiveRuntimeAdapter>; onError?: (error: unknown, context: IRuntimeErrorContext) => void; onTrace?: (event: IRuntimeTraceEvent) => void; /** * Maximum executions for one observer within one flush. The default is 100. Exceeding the limit * is treated as a self-triggering cycle and throws after clearing the queue. * * The limit is configurable scheduling policy, not a physical constant. */ maxFlushPasses?: number; /** * Schedules suspension of an unobserved `Computed`. Defaults to the adapter's * `scheduleMicrotask`. * * Suspension is cleanup, so its timing is separate from flushing. This configurable channel can * align cleanup with animation-frame or idle policies without requiring callers or tests to wait * for a hard-coded microtask. */ scheduleIdle?: (task: () => void) => void; };",
           "name": "IRuntimeOptions",
-          "signature": "export type IRuntimeOptions = { /** 宿主能力注入面；缺省项回落到 `defaultRuntimeAdapter`。 */ adapter?: Partial<IReactiveRuntimeAdapter>; onError?: (error: unknown, context: IRuntimeErrorContext) => void; onTrace?: (event: IRuntimeTraceEvent) => void; /** * 一次冲刷里单个 observer 允许的最大执行次数，默认 100。单个 observer 超限视为自触发环：抛错并清空队列。 * * 可配置，因为它是策略参数而非物理常数——很长的派生链每轮只推进一级也会吃轮次。 */ maxFlushPasses?: number; /** * 无观察者 Computed 的挂起时机，默认走 adapter 的 `scheduleMicrotask`。 * * 与调度策略分开：挂起是回收，不是冲刷。写死之后这条路径不受任何配置控制， rAF/idle 策略下时机对不上，测试也只能靠等微任务。 */ scheduleIdle?: (task: () => void) => void; };",
+          "signature": "export type IRuntimeOptions = { /** Injects host capabilities. Missing entries use `defaultRuntimeAdapter`. */ adapter?: Partial<IReactiveRuntimeAdapter>; onError?: (error: unknown, context: IRuntimeErrorContext) => void; onTrace?: (event: IRuntimeTraceEvent) => void; /** * Maximum executions for one observer within one flush. The default is 100. Exceeding the limit * is treated as a self-triggering cycle and throws after clearing the queue. * * The limit is configurable scheduling policy, not a physical constant. */ maxFlushPasses?: number; /** * Schedules suspension of an unobserved `Computed`. Defaults to the adapter's * `scheduleMicrotask`. * * Suspension is cleanup, so its timing is separate from flushing. This configurable channel can * align cleanup with animation-frame or idle policies without requiring callers or tests to wait * for a hard-coded microtask. */ scheduleIdle?: (task: () => void) => void; };",
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./runtime",
@@ -1956,9 +1956,9 @@
           "ownerFragment": "reactive-runtime--Runtime"
         },
         {
-          "identity": "packages/reactive/dist/reactive/signal.class.d.ts:Signal:export declare class Signal<T> implements IObservable, IDisposable { #private; readonly subs: ReadonlySet<IObserver>; get version(): number; get onObserved(): (() => void) | undefined; get onUnobserved(): (() => void) | undefined; readonly runtime: IRuntime; debugName?: string; constructor(v: T, runtime: IRuntime, options?: IReactiveNodeOptions); get disposed(): boolean; get observed(): boolean; get value(): T; set value(next: T); peek(): T; /** * 释放：断开全部下游边。 * * Computed 与 Effect 一直有 dispose，Signal 没有——于是任何「我建的源节点用完了」 的场景（collections 的 per-cell、AtomStore * 的实例释放）只能去 import `runtime/internals` 拿 tracker 自己断边，也就是为了一个本该公开的操作而拿到 * 整张图的权限。补齐这个对称性之后，那些豁免就不必要了。 * * 语义与 Computed 一致：释放是终态。先标记 disposed 再通知下游，强制重跑的 Effect 因此会读到明确错误，而不会重新订阅这个已释放节点。 */ dispose(): void; /** Compose an owner lifecycle callback without silently replacing one. */ addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void; }): () => void; }",
+          "identity": "packages/reactive/dist/reactive/signal.class.d.ts:Signal:export declare class Signal<T> implements IObservable, IDisposable { #private; readonly subs: ReadonlySet<IObserver>; get version(): number; get onObserved(): (() => void) | undefined; get onUnobserved(): (() => void) | undefined; readonly runtime: IRuntime; debugName?: string; constructor(v: T, runtime: IRuntime, options?: IReactiveNodeOptions); get disposed(): boolean; get observed(): boolean; get value(): T; set value(next: T); peek(): T; /** * Disposes the signal and disconnects all downstream edges. * * This public operation gives source owners, such as collection cells and `AtomStore` instances, * a release path without importing `runtime/internals` and gaining access to the whole graph. * `Computed` and `Effect` expose the same lifecycle operation. * * Disposal is terminal, as it is for `Computed`. The signal is marked disposed before downstream * notification. A forced effect rerun therefore reads an explicit error instead of resubscribing * to a disposed node. */ dispose(): void; /** Compose an owner lifecycle callback without silently replacing one. */ addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void; }): () => void; }",
           "name": "Signal",
-          "signature": "export declare class Signal<T> implements IObservable, IDisposable { #private; readonly subs: ReadonlySet<IObserver>; get version(): number; get onObserved(): (() => void) | undefined; get onUnobserved(): (() => void) | undefined; readonly runtime: IRuntime; debugName?: string; constructor(v: T, runtime: IRuntime, options?: IReactiveNodeOptions); get disposed(): boolean; get observed(): boolean; get value(): T; set value(next: T); peek(): T; /** * 释放：断开全部下游边。 * * Computed 与 Effect 一直有 dispose，Signal 没有——于是任何「我建的源节点用完了」 的场景（collections 的 per-cell、AtomStore * 的实例释放）只能去 import `runtime/internals` 拿 tracker 自己断边，也就是为了一个本该公开的操作而拿到 * 整张图的权限。补齐这个对称性之后，那些豁免就不必要了。 * * 语义与 Computed 一致：释放是终态。先标记 disposed 再通知下游，强制重跑的 Effect 因此会读到明确错误，而不会重新订阅这个已释放节点。 */ dispose(): void; /** Compose an owner lifecycle callback without silently replacing one. */ addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void; }): () => void; }",
+          "signature": "export declare class Signal<T> implements IObservable, IDisposable { #private; readonly subs: ReadonlySet<IObserver>; get version(): number; get onObserved(): (() => void) | undefined; get onUnobserved(): (() => void) | undefined; readonly runtime: IRuntime; debugName?: string; constructor(v: T, runtime: IRuntime, options?: IReactiveNodeOptions); get disposed(): boolean; get observed(): boolean; get value(): T; set value(next: T); peek(): T; /** * Disposes the signal and disconnects all downstream edges. * * This public operation gives source owners, such as collection cells and `AtomStore` instances, * a release path without importing `runtime/internals` and gaining access to the whole graph. * `Computed` and `Effect` expose the same lifecycle operation. * * Disposal is terminal, as it is for `Computed`. The signal is marked disposed before downstream * notification. A forced effect rerun therefore reads an explicit error instead of resubscribing * to a disposed node. */ dispose(): void; /** Compose an owner lifecycle callback without silently replacing one. */ addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void; }): () => void; }",
           "source": "packages/reactive/dist/reactive/signal.class.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./reactive/*",
@@ -1987,9 +1987,9 @@
           "name": "assertNoForeignOwnershipBrand",
           "kind": "function",
           "signature": "export declare function assertNoForeignOwnershipBrand(value: object): void;",
-          "declarationLine": 4,
+          "declarationLine": 7,
           "source": "packages/reactive/dist/runtime/copy-check.d.ts",
-          "purpose": "本地 WeakMap miss 时识别另一副本的受管对象，避免把它降级成普通值放行。",
+          "purpose": "Detects managed objects from another copy after a local WeakMap miss instead of accepting them as ordinary values.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertNoForeignOwnershipBrand.",
           "advanced": "No additional advanced behavior is declared for assertNoForeignOwnershipBrand.",
           "parameters": ["value: object"],
@@ -2025,7 +2025,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "本地 WeakMap miss 时识别另一副本的受管对象，避免把它降级成普通值放行。"
+              "content": "Detects managed objects from another copy after a local WeakMap miss instead of accepting them as ordinary values."
             },
             {
               "id": "getting-started",
@@ -2064,9 +2064,9 @@
           "name": "assertSingleRuntimeCopy",
           "kind": "function",
           "signature": "export declare function assertSingleRuntimeCopy(): void;",
-          "declarationLine": 20,
+          "declarationLine": 29,
           "source": "packages/reactive/dist/runtime/copy-check.d.ts",
-          "purpose": "要求单副本，否则抛错。 给「宁可启动失败也不要静默陈旧数据」的应用用。库自身不调用它——是否可接受多副本 是部署决策，不是库能替调用方做的判断。",
+          "purpose": "Throws unless the process uses a single registered library copy. Applications can choose startup failure over undetected stale data. The library does not call this itself because accepting multiple copies is a deployment decision.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertSingleRuntimeCopy.",
           "advanced": "No additional advanced behavior is declared for assertSingleRuntimeCopy.",
           "parameters": ["This function declaration has no parameters."],
@@ -2086,7 +2086,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "要求单副本，否则抛错。 给「宁可启动失败也不要静默陈旧数据」的应用用。库自身不调用它——是否可接受多副本 是部署决策，不是库能替调用方做的判断。"
+              "content": "Throws unless the process uses a single registered library copy. Applications can choose startup failure over undetected stale data. The library does not call this itself because accepting multiple copies is a deployment decision."
             },
             {
               "id": "getting-started",
@@ -2229,7 +2229,7 @@
           "signature": "export declare function brandOwnedValue(value: object): void;",
           "declarationLine": 2,
           "source": "packages/reactive/dist/runtime/copy-check.d.ts",
-          "purpose": "为本副本创建的受管对象加不可变品牌，供另一份模块 fail closed。",
+          "purpose": "Brands objects managed by this library copy immutably so another copy rejects foreign ownership.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for brandOwnedValue.",
           "advanced": "No additional advanced behavior is declared for brandOwnedValue.",
           "parameters": ["value: object"],
@@ -2263,7 +2263,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "为本副本创建的受管对象加不可变品牌，供另一份模块 fail closed。"
+              "content": "Brands objects managed by this library copy immutably so another copy rejects foreign ownership."
             },
             {
               "id": "getting-started",
@@ -2302,9 +2302,9 @@
           "name": "consumePendingCopyWarning",
           "kind": "const",
           "signature": "export declare const consumePendingCopyWarning: () => string | undefined;",
-          "declarationLine": 6,
+          "declarationLine": 9,
           "source": "packages/reactive/dist/runtime/copy-check.d.ts",
-          "purpose": "取出并清空待上报的多副本诊断；Runtime 构造时消费。",
+          "purpose": "Returns and clears the pending multiple-copy diagnostic. Runtime construction consumes it.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for consumePendingCopyWarning.",
           "advanced": "No additional advanced behavior is declared for consumePendingCopyWarning.",
           "parameters": ["This const declaration has no parameters."],
@@ -2328,7 +2328,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "取出并清空待上报的多副本诊断；Runtime 构造时消费。"
+              "content": "Returns and clears the pending multiple-copy diagnostic. Runtime construction consumes it."
             },
             {
               "id": "getting-started",
@@ -2367,9 +2367,9 @@
           "name": "noteRuntimeCopy",
           "kind": "function",
           "signature": "export declare function noteRuntimeCopy(copy?: symbol): void;",
-          "declarationLine": 12,
+          "declarationLine": 17,
           "source": "packages/reactive/dist/runtime/copy-check.d.ts",
-          "purpose": "登记本副本。`createRuntime()` 与所有权/内部面边界调用，幂等且有本地 fast path。 `copy` 参数只为测试模拟「另一份模块」——生产路径永远用本副本的身份。",
+          "purpose": "Registers this library copy at `createRuntime()` and ownership or internals boundaries. Registration is idempotent and uses a local fast path. The `copy` parameter lets tests simulate another module copy. Production paths always use this copy's identity.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for noteRuntimeCopy.",
           "advanced": "No additional advanced behavior is declared for noteRuntimeCopy.",
           "parameters": ["copy: symbol (optional)"],
@@ -2403,7 +2403,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "登记本副本。`createRuntime()` 与所有权/内部面边界调用，幂等且有本地 fast path。 `copy` 参数只为测试模拟「另一份模块」——生产路径永远用本副本的身份。"
+              "content": "Registers this library copy at `createRuntime()` and ownership or internals boundaries. Registration is idempotent and uses a local fast path. The `copy` parameter lets tests simulate another module copy. Production paths always use this copy's identity."
             },
             {
               "id": "getting-started",
@@ -2442,9 +2442,9 @@
           "name": "resetRuntimeCopiesForTest",
           "kind": "function",
           "signature": "export declare function resetRuntimeCopiesForTest(): void;",
-          "declarationLine": 22,
+          "declarationLine": 31,
           "source": "packages/reactive/dist/runtime/copy-check.d.ts",
-          "purpose": "仅供测试：清掉模拟出来的副本，避免用例之间互相影响。",
+          "purpose": "Clears simulated library copies for tests so cases do not affect each other.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for resetRuntimeCopiesForTest.",
           "advanced": "No additional advanced behavior is declared for resetRuntimeCopiesForTest.",
           "parameters": ["This function declaration has no parameters."],
@@ -2464,7 +2464,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "仅供测试：清掉模拟出来的副本，避免用例之间互相影响。"
+              "content": "Clears simulated library copies for tests so cases do not affect each other."
             },
             {
               "id": "getting-started",
@@ -2503,9 +2503,9 @@
           "name": "runtimeCopyCount",
           "kind": "const",
           "signature": "export declare const runtimeCopyCount: () => number;",
-          "declarationLine": 14,
+          "declarationLine": 22,
           "source": "packages/reactive/dist/runtime/copy-check.d.ts",
-          "purpose": "当前进程里已进入 Runtime/所有权正确性边界的副本数。单纯 import 不计数。",
+          "purpose": "Returns the number of copies that enter runtime or ownership correctness boundaries. Importing alone does not count.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for runtimeCopyCount.",
           "advanced": "No additional advanced behavior is declared for runtimeCopyCount.",
           "parameters": ["This const declaration has no parameters."],
@@ -2527,7 +2527,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "当前进程里已进入 Runtime/所有权正确性边界的副本数。单纯 import 不计数。"
+              "content": "Returns the number of copies that enter runtime or ownership correctness boundaries. Importing alone does not count."
             },
             {
               "id": "getting-started",
@@ -2585,9 +2585,9 @@
           "name": "internalsOf",
           "kind": "function",
           "signature": "export declare function internalsOf(runtime: IRuntime): IRuntimeInternals;",
-          "declarationLine": 46,
+          "declarationLine": 60,
           "source": "packages/reactive/dist/runtime/internals.d.ts",
-          "purpose": "取内部面。 拿不到就是硬错误而非返回 undefined：一个没登记内部面的对象冒充 Runtime 时， 后续每一步都会以难以追溯的方式出错，不如在入口就断掉。",
+          "purpose": "Retrieves runtime internals. Missing registration throws instead of returning `undefined`. Rejecting an object that impersonates a runtime at this boundary prevents later failures with unclear origins.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for internalsOf.",
           "advanced": "No additional advanced behavior is declared for internalsOf.",
           "parameters": ["runtime: IRuntime"],
@@ -2623,7 +2623,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "取内部面。 拿不到就是硬错误而非返回 undefined：一个没登记内部面的对象冒充 Runtime 时， 后续每一步都会以难以追溯的方式出错，不如在入口就断掉。"
+              "content": "Retrieves runtime internals. Missing registration throws instead of returning `undefined`. Rejecting an object that impersonates a runtime at this boundary prevents later failures with unclear origins."
             },
             {
               "id": "getting-started",
@@ -2661,10 +2661,10 @@
         {
           "name": "IRuntimeInternals",
           "kind": "type",
-          "signature": "export type IRuntimeInternals = { readonly clock: VersionClock; readonly tracker: DependencyTracker; readonly scheduler: Scheduler; /** 单调 duration 时钟（adapter.now）。 */ now(): number; /** 事件时间戳（adapter.timestamp），用于 trace。 */ timestamp(): number; /** 诊断写通道留在内部面，外部只能订阅，不能伪造 action/依赖事件。 */ traceEnabled(): boolean; emitTrace(event: IRuntimeTraceEvent): void; /** Bump 版本 + 向下游标脏（wasm 字段等自定义 Source 复用同一条通知管线）。 */ notify(source: IObservable): void; /** Reserve a version, perform a source write, then publish exactly once. */ commitSource<T>(source: IObservable, write: () => T): T; /** * 「稍后回收」的时机通道：无观察者的 Computed 靠它排挂起。 * * 与 flush 时机刻意分开。挂起不是冲刷：同步 flush 策略是完全合法的测试配置， 若两者共用一条通道，一次读完就立刻断掉上游边，同 tick 内的第二次读会白算。 但它也不该是写死的 * `queueMicrotask`——那样 `IRuntimeOptions` 就管不到它。 */ deferIdle(task: () => void): void; };",
-          "declarationLine": 16,
+          "signature": "export type IRuntimeInternals = { readonly clock: VersionClock; readonly tracker: DependencyTracker; readonly scheduler: Scheduler; /** Monotonic duration clock supplied by `adapter.now`. */ now(): number; /** Event timestamp supplied by `adapter.timestamp` for trace records. */ timestamp(): number; /** * Keeps diagnostic writes internal. External consumers subscribe but cannot fabricate action or * dependency events. */ traceEnabled(): boolean; emitTrace(event: IRuntimeTraceEvent): void; /** * Advances the version and marks downstream nodes dirty. Custom sources such as Wasm fields share * this notification path. */ notify(source: IObservable): void; /** Reserve a version, perform a source write, then publish exactly once. */ commitSource<T>(source: IObservable, write: () => T): T; /** * Schedules deferred cleanup, including suspension of an unobserved `Computed`. * * Cleanup timing is separate from flush timing. Sharing a synchronous flush strategy would * disconnect upstream edges after each read and repeat work on a second read. The cleanup channel * is configurable through `IRuntimeOptions` instead of hard-coding `queueMicrotask`. */ deferIdle(task: () => void): void; };",
+          "declarationLine": 19,
           "source": "packages/reactive/dist/runtime/internals.d.ts",
-          "purpose": "内核内部面。 公共 `IRuntime` 曾经直接挂着 tracker / scheduler / clock / notify，于是任何拿到 runtime 的第三方增强都能绕过：所有权校验、observed/unobserved 生命周期、trace、 双向断边、调度原子性——这些恰恰是本库正确性的全部来源。 边界用 WeakMap 而不是 `private` 或 `unique symbol`：前者只是类型层约定，编译后 属性照样可枚举可访问；后者也只要拿到那个 symbol 就能读。WeakMap 的键在模块外 拿不到，才是运行时真实的封装。 谁能 import 这个模块由 `architecture.test.ts` 约束：只有内核自身与被明确授权的 高级入口，普通增强层一律不行。",
+          "purpose": "IRuntimeInternals is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeInternals.",
           "advanced": "No additional advanced behavior is declared for IRuntimeInternals.",
           "parameters": ["This type declaration has no parameters."],
@@ -2678,7 +2678,7 @@
           "members": [],
           "exportPath": "./internals",
           "overloadSignatures": [
-            "export type IRuntimeInternals = { readonly clock: VersionClock; readonly tracker: DependencyTracker; readonly scheduler: Scheduler; /** 单调 duration 时钟（adapter.now）。 */ now(): number; /** 事件时间戳（adapter.timestamp），用于 trace。 */ timestamp(): number; /** 诊断写通道留在内部面，外部只能订阅，不能伪造 action/依赖事件。 */ traceEnabled(): boolean; emitTrace(event: IRuntimeTraceEvent): void; /** Bump 版本 + 向下游标脏（wasm 字段等自定义 Source 复用同一条通知管线）。 */ notify(source: IObservable): void; /** Reserve a version, perform a source write, then publish exactly once. */ commitSource<T>(source: IObservable, write: () => T): T; /** * 「稍后回收」的时机通道：无观察者的 Computed 靠它排挂起。 * * 与 flush 时机刻意分开。挂起不是冲刷：同步 flush 策略是完全合法的测试配置， 若两者共用一条通道，一次读完就立刻断掉上游边，同 tick 内的第二次读会白算。 但它也不该是写死的 * `queueMicrotask`——那样 `IRuntimeOptions` 就管不到它。 */ deferIdle(task: () => void): void; };"
+            "export type IRuntimeInternals = { readonly clock: VersionClock; readonly tracker: DependencyTracker; readonly scheduler: Scheduler; /** Monotonic duration clock supplied by `adapter.now`. */ now(): number; /** Event timestamp supplied by `adapter.timestamp` for trace records. */ timestamp(): number; /** * Keeps diagnostic writes internal. External consumers subscribe but cannot fabricate action or * dependency events. */ traceEnabled(): boolean; emitTrace(event: IRuntimeTraceEvent): void; /** * Advances the version and marks downstream nodes dirty. Custom sources such as Wasm fields share * this notification path. */ notify(source: IObservable): void; /** Reserve a version, perform a source write, then publish exactly once. */ commitSource<T>(source: IObservable, write: () => T): T; /** * Schedules deferred cleanup, including suspension of an unobserved `Computed`. * * Cleanup timing is separate from flush timing. Sharing a synchronous flush strategy would * disconnect upstream edges after each read and repeat work on a second read. The cleanup channel * is configurable through `IRuntimeOptions` instead of hard-coding `queueMicrotask`. */ deferIdle(task: () => void): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2688,7 +2688,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "内核内部面。 公共 `IRuntime` 曾经直接挂着 tracker / scheduler / clock / notify，于是任何拿到 runtime 的第三方增强都能绕过：所有权校验、observed/unobserved 生命周期、trace、 双向断边、调度原子性——这些恰恰是本库正确性的全部来源。 边界用 WeakMap 而不是 `private` 或 `unique symbol`：前者只是类型层约定，编译后 属性照样可枚举可访问；后者也只要拿到那个 symbol 就能读。WeakMap 的键在模块外 拿不到，才是运行时真实的封装。 谁能 import 这个模块由 `architecture.test.ts` 约束：只有内核自身与被明确授权的 高级入口，普通增强层一律不行。"
+              "content": "IRuntimeInternals is part of this module's public type contract."
             },
             {
               "id": "getting-started",
@@ -2717,7 +2717,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/runtime/internals.d.ts:IRuntimeInternals:export type IRuntimeInternals = { readonly clock: VersionClock; readonly tracker: DependencyTracker; readonly scheduler: Scheduler; /** 单调 duration 时钟（adapter.now）。 */ now(): number; /** 事件时间戳（adapter.timestamp），用于 trace。 */ timestamp(): number; /** 诊断写通道留在内部面，外部只能订阅，不能伪造 action/依赖事件。 */ traceEnabled(): boolean; emitTrace(event: IRuntimeTraceEvent): void; /** Bump 版本 + 向下游标脏（wasm 字段等自定义 Source 复用同一条通知管线）。 */ notify(source: IObservable): void; /** Reserve a version, perform a source write, then publish exactly once. */ commitSource<T>(source: IObservable, write: () => T): T; /** * 「稍后回收」的时机通道：无观察者的 Computed 靠它排挂起。 * * 与 flush 时机刻意分开。挂起不是冲刷：同步 flush 策略是完全合法的测试配置， 若两者共用一条通道，一次读完就立刻断掉上游边，同 tick 内的第二次读会白算。 但它也不该是写死的 * `queueMicrotask`——那样 `IRuntimeOptions` 就管不到它。 */ deferIdle(task: () => void): void; };",
+          "identity": "packages/reactive/dist/runtime/internals.d.ts:IRuntimeInternals:export type IRuntimeInternals = { readonly clock: VersionClock; readonly tracker: DependencyTracker; readonly scheduler: Scheduler; /** Monotonic duration clock supplied by `adapter.now`. */ now(): number; /** Event timestamp supplied by `adapter.timestamp` for trace records. */ timestamp(): number; /** * Keeps diagnostic writes internal. External consumers subscribe but cannot fabricate action or * dependency events. */ traceEnabled(): boolean; emitTrace(event: IRuntimeTraceEvent): void; /** * Advances the version and marks downstream nodes dirty. Custom sources such as Wasm fields share * this notification path. */ notify(source: IObservable): void; /** Reserve a version, perform a source write, then publish exactly once. */ commitSource<T>(source: IObservable, write: () => T): T; /** * Schedules deferred cleanup, including suspension of an unobserved `Computed`. * * Cleanup timing is separate from flush timing. Sharing a synchronous flush strategy would * disconnect upstream edges after each read and repeat work on a second read. The cleanup channel * is configurable through `IRuntimeOptions` instead of hard-coding `queueMicrotask`. */ deferIdle(task: () => void): void; };",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -2727,9 +2727,9 @@
           "name": "isRuntime",
           "kind": "const",
           "signature": "export declare const isRuntime: (candidate: unknown) => candidate is IRuntime;",
-          "declarationLine": 48,
+          "declarationLine": 62,
           "source": "packages/reactive/dist/runtime/internals.d.ts",
-          "purpose": "是否是本库创建的 Runtime。所有权校验用，不泄漏内部面本身。",
+          "purpose": "Checks whether this library creates the runtime. Ownership checks do not expose its internals.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isRuntime.",
           "advanced": "No additional advanced behavior is declared for isRuntime.",
           "parameters": ["This const declaration has no parameters."],
@@ -2753,7 +2753,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "是否是本库创建的 Runtime。所有权校验用，不泄漏内部面本身。"
+              "content": "Checks whether this library creates the runtime. Ownership checks do not expose its internals."
             },
             {
               "id": "getting-started",
@@ -2792,9 +2792,9 @@
           "name": "registerInternals",
           "kind": "function",
           "signature": "export declare function registerInternals(runtime: IRuntime, internals: IRuntimeInternals): void;",
-          "declarationLine": 40,
+          "declarationLine": 53,
           "source": "packages/reactive/dist/runtime/internals.d.ts",
-          "purpose": "Runtime 构造时自报内部面。重复登记视为编程错误，直接拒绝。",
+          "purpose": "Registers internals during runtime construction. Duplicate registration is rejected as a programming error.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for registerInternals.",
           "advanced": "No additional advanced behavior is declared for registerInternals.",
           "parameters": ["runtime: IRuntime", "internals: IRuntimeInternals"],
@@ -2840,7 +2840,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Runtime 构造时自报内部面。重复登记视为编程错误，直接拒绝。"
+              "content": "Registers internals during runtime construction. Duplicate registration is rejected as a programming error."
             },
             {
               "id": "getting-started",
@@ -3000,7 +3000,7 @@
           "name": "IInternalRuntime",
           "kind": "type",
           "signature": "export type IInternalRuntime = Omit<IRuntime, 'signal' | 'computed'> & { signal<T>(value: T, options?: IReactiveNodeOptions): Signal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): Computed<T>; };",
-          "declarationLine": 17,
+          "declarationLine": 20,
           "source": "packages/reactive/dist/runtime/node-factories.d.ts",
           "purpose": "IInternalRuntime is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IInternalRuntime.",
@@ -3065,9 +3065,9 @@
           "name": "internalRuntimeOf",
           "kind": "function",
           "signature": "export declare function internalRuntimeOf(runtime: IRuntime): IInternalRuntime;",
-          "declarationLine": 22,
+          "declarationLine": 28,
           "source": "packages/reactive/dist/runtime/node-factories.d.ts",
-          "purpose": "先校验是本库创建的 Runtime，再把节点工厂的具体返回类型交给实现层。",
+          "purpose": "Validates library runtime registration before exposing concrete factory return types to implementation layers.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for internalRuntimeOf.",
           "advanced": "No additional advanced behavior is declared for internalRuntimeOf.",
           "parameters": ["runtime: IRuntime"],
@@ -3103,7 +3103,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "先校验是本库创建的 Runtime，再把节点工厂的具体返回类型交给实现层。"
+              "content": "Validates library runtime registration before exposing concrete factory return types to implementation layers."
             },
             {
               "id": "getting-started",
@@ -3142,7 +3142,7 @@
           "name": "isAnyRuntimeTracking",
           "kind": "function",
           "signature": "export declare function isAnyRuntimeTracking(): boolean;",
-          "declarationLine": 26,
+          "declarationLine": 32,
           "source": "packages/reactive/dist/runtime/node-factories.d.ts",
           "purpose": "True when a dependency frame is active in any Runtime.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isAnyRuntimeTracking.",
@@ -3203,7 +3203,7 @@
           "name": "isRuntimeTracking",
           "kind": "function",
           "signature": "export declare function isRuntimeTracking(runtime: IRuntime): boolean;",
-          "declarationLine": 24,
+          "declarationLine": 30,
           "source": "packages/reactive/dist/runtime/node-factories.d.ts",
           "purpose": "Read-only tracking-context query for node-building implementation layers.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isRuntimeTracking.",
@@ -4101,9 +4101,9 @@
           "name": "assertOwnedBy",
           "kind": "function",
           "signature": "export declare function assertOwnedBy(value: unknown, runtime: IRuntime, what: string): void;",
-          "declarationLine": 11,
+          "declarationLine": 19,
           "source": "packages/reactive/dist/runtime/ownership.d.ts",
-          "purpose": "断言归属。 未登记的对象一律放行：第三方可以把自己的普通值注册进 Registry，那不涉及图。 只有**登记过且归属不符**才是错误——那才是两张图被接在一起的那一刻。",
+          "purpose": "Asserts ownership for values registered with a runtime. Unregistered values are accepted because third-party ordinary registry values do not join the graph. Only registered values with a different owner fail, preventing two graphs from being joined.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertOwnedBy.",
           "advanced": "No additional advanced behavior is declared for assertOwnedBy.",
           "parameters": ["value: unknown", "runtime: IRuntime", "what: string"],
@@ -4161,7 +4161,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "断言归属。 未登记的对象一律放行：第三方可以把自己的普通值注册进 Registry，那不涉及图。 只有**登记过且归属不符**才是错误——那才是两张图被接在一起的那一刻。"
+              "content": "Asserts ownership for values registered with a runtime. Unregistered values are accepted because third-party ordinary registry values do not join the graph. Only registered values with a different owner fail, preventing two graphs from being joined."
             },
             {
               "id": "getting-started",
@@ -4200,9 +4200,9 @@
           "name": "assertReactiveOwnedBy",
           "kind": "function",
           "signature": "export declare function assertReactiveOwnedBy(value: object, runtime: IRuntime, what: string): void;",
-          "declarationLine": 17,
+          "declarationLine": 27,
           "source": "packages/reactive/dist/runtime/ownership.d.ts",
-          "purpose": "内核图边界使用的严格断言。 普通 Registry 值可以没有 owner；真正进入依赖图的节点则必须由受信工厂登记。 否则第三方只要伪造一个 `runtime` 字段，就能把可变的 subs/version 接进图里。",
+          "purpose": "Strict ownership assertion at kernel graph boundaries. Ordinary registry values may lack an owner. Nodes entering the dependency graph require trusted registration. A fabricated `runtime` field cannot attach mutable `subs` or `version` state to the graph.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertReactiveOwnedBy.",
           "advanced": "No additional advanced behavior is declared for assertReactiveOwnedBy.",
           "parameters": ["value: object", "runtime: IRuntime", "what: string"],
@@ -4258,7 +4258,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "内核图边界使用的严格断言。 普通 Registry 值可以没有 owner；真正进入依赖图的节点则必须由受信工厂登记。 否则第三方只要伪造一个 `runtime` 字段，就能把可变的 subs/version 接进图里。"
+              "content": "Strict ownership assertion at kernel graph boundaries. Ordinary registry values may lack an owner. Nodes entering the dependency graph require trusted registration. A fabricated `runtime` field cannot attach mutable `subs` or `version` state to the graph."
             },
             {
               "id": "getting-started",
@@ -4297,9 +4297,9 @@
           "name": "claimOwnership",
           "kind": "function",
           "signature": "export declare function claimOwnership(value: object, runtime: IRuntime): void;",
-          "declarationLine": 3,
+          "declarationLine": 6,
           "source": "packages/reactive/dist/runtime/ownership.d.ts",
-          "purpose": "登记归属。同一个对象重复登记到不同 Runtime 视为编程错误——那意味着它同时属于 两张图，之后任何一次校验都无法给出正确答案。",
+          "purpose": "Registers ownership. Assigning one object to different runtimes is a programming error because it would belong to two graphs.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for claimOwnership.",
           "advanced": "No additional advanced behavior is declared for claimOwnership.",
           "parameters": ["value: object", "runtime: IRuntime"],
@@ -4347,7 +4347,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "登记归属。同一个对象重复登记到不同 Runtime 视为编程错误——那意味着它同时属于 两张图，之后任何一次校验都无法给出正确答案。"
+              "content": "Registers ownership. Assigning one object to different runtimes is a programming error because it would belong to two graphs."
             },
             {
               "id": "getting-started",
@@ -4386,9 +4386,9 @@
           "name": "ownerOf",
           "kind": "function",
           "signature": "export declare function ownerOf(value: unknown): IRuntime | undefined;",
-          "declarationLine": 5,
+          "declarationLine": 11,
           "source": "packages/reactive/dist/runtime/ownership.d.ts",
-          "purpose": "查归属。未登记返回 undefined——调用方据此区分「不归任何图」与「归错图」。",
+          "purpose": "Returns ownership, or `undefined` for an unregistered value. Callers can distinguish no graph ownership from incorrect ownership.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ownerOf.",
           "advanced": "No additional advanced behavior is declared for ownerOf.",
           "parameters": ["value: unknown"],
@@ -4424,7 +4424,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "查归属。未登记返回 undefined——调用方据此区分「不归任何图」与「归错图」。"
+              "content": "Returns ownership, or `undefined` for an unregistered value. Callers can distinguish no graph ownership from incorrect ownership."
             },
             {
               "id": "getting-started",
@@ -4756,7 +4756,7 @@
               "name": "debugName",
               "type": "string",
               "optional": true,
-              "description": "一个会去读取 IObservable、需要在其变化时收到通知的一端——Computed/Effect 都实现它。 */ export type IObserver = { readonly runtime: IRuntime readonly disposed: boolean debugName?: string readonly deps: ReadonlySet<IObservable> readonly depVersions: ReadonlyMap<IObservable, number> markDirty(): void onDependencyDisconnected(observable: IObservable): void } /** Effect/自定义响应式来源的收尾回调——对应它们建立时留下的、需要在重跑或销毁前撤销的副作用 （取消订阅、清定时器、释放资源……），命名对应 Effect 已有的 dispose() 语义。 */ export type IDisposer = () => void /** 有明确所有权/生命周期的资源：能被显式释放，且可查询是否已释放。 Computed/Effect/Scope（以及未来的 wasm 字段、worker 订阅）都实现它，交给 Scope 统一按 LIFO 释放。 / export type IDisposable = { dispose(): void readonly disposed: boolean } /** 冲刷触发策略——决定\"待处理的响应式副作用什么时候真正执行\"。默认是微任务合并， 可换成 rAF/idle/优先级队列等；Scheduler 类持有一个策略实例，而不是自己是策略。 */ export type ISchedulerStrategy = (flush: () => void) => void /** 显式 flush 的完成状态；判别字符串避免 boolean truthiness 隐藏重入语义。 */ export type IFlushResult = 'completed' | 'deferred' /** 冲刷队列里一项的最小形状：只要求\"一次冲刷时如何处理我\"。Effect 是目前唯一的实现者， 但这里刻意不直接引用 Effect 类——如果引用了，Scheduler 所在文件就要 import Effect， Effect 所在文件又要 import Scheduler，形成循环依赖。用结构类型断开这个环。 / export type IFlushable = { tick(): void /** 环保护触发时要如实报出被丢弃的待办，靠这个名字定位。"
+              "description": "Reads `IObservable` values and receives change notifications. `Computed` and `Effect` implement this observer role. / export type IObserver = { readonly runtime: IRuntime readonly disposed: boolean debugName?: string readonly deps: ReadonlySet<IObservable> readonly depVersions: ReadonlyMap<IObservable, number> markDirty(): void onDependencyDisconnected(observable: IObservable): void } /** Cleanup callback for an effect or custom source. Reverses side effects before rerun or disposal, such as subscriptions, timers, or resource ownership. / export type IDisposer = () => void /** Resource with explicit ownership and lifecycle, supporting disposal and a disposal-state query. `Computed`, `Effect`, and scopes use this contract for LIFO release by the owning scope. It also serves future Wasm fields or worker subscriptions. / export type IDisposable = { dispose(): void readonly disposed: boolean } /** Controls when pending reactive effects execute. Defaults to merged microtasks and can use animation frames, idle callbacks, or priority queues. `Scheduler` owns a strategy instance. / export type ISchedulerStrategy = (flush: () => void) => void /** Outcome of an explicit flush. Distinct strings expose reentrancy instead of hiding it behind boolean truthiness. / export type IFlushResult = 'completed' | 'deferred' /** Minimal queued-item contract describing how a flush processes the item. `Effect` is the current implementation, but this structural view avoids a direct class reference. Otherwise importing `Effect` from `Scheduler` would create a circular dependency. / export type IFlushable = { tick(): void /** Identifies discarded pending work when loop protection triggers."
             }
           ],
           "identity": "packages/reactive/dist/reactive/computed.class.d.ts:Computed:export declare class Computed<T> implements IObservable, IObserver, IDisposable { #private; readonly subs: ReadonlySet<IObserver>; readonly deps: ReadonlySet<IObservable>; readonly depVersions: ReadonlyMap<IObservable, number>; get version(): number; readonly runtime: IRuntime; debugName?: string; constructor(fn: () => T, runtime: IRuntime, config?: IComputedConfig<T>); get disposed(): boolean; get observed(): boolean; dispose(): void; markDirty(): void; isStale(): boolean; onObserved(): void; onUnobserved(): void; onDependencyDisconnected(): void; get value(): T; peek(): T; /** * Evaluate a speculative snapshot without publishing a cache or dependency edges. React may * abandon getSnapshot renders; those reads must not warm a Computed that was never committed. A * committed subscription still uses `value`/`peek` and receives the normal cached reactive path. */ preview(): T; pull(): void; }",
@@ -4904,7 +4904,7 @@
               "type": "string",
               "optional": true,
               "description": "`flush()`：同步冲刷当前队列。重入语义：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。",
-              "descriptionEn": "",
+              "descriptionEn": "Reads `IObservable` values and receives change notifications. `Computed` and `Effect` implement this observer role. / export type IObserver = { readonly runtime: IRuntime readonly disposed: boolean debugName?: string readonly deps: ReadonlySet<IObservable> readonly depVersions: ReadonlyMap<IObservable, number> markDirty(): void onDependencyDisconnected(observable: IObservable): void } /** Cleanup callback for an effect or custom source. Reverses side effects before rerun or disposal, such as subscriptions, timers, or resource ownership. / export type IDisposer = () => void /** Resource with explicit ownership and lifecycle, supporting disposal and a disposal-state query. `Computed`, `Effect`, and scopes use this contract for LIFO release by the owning scope. It also serves future Wasm fields or worker subscriptions. / export type IDisposable = { dispose(): void readonly disposed: boolean } /** Controls when pending reactive effects execute. Defaults to merged microtasks and can use animation frames, idle callbacks, or priority queues. `Scheduler` owns a strategy instance. / export type ISchedulerStrategy = (flush: () => void) => void /** Outcome of an explicit flush. Distinct strings expose reentrancy instead of hiding it behind boolean truthiness. / export type IFlushResult = 'completed' | 'deferred' /** Minimal queued-item contract describing how a flush processes the item. `Effect` is the current implementation, but this structural view avoids a direct class reference. Otherwise importing `Effect` from `Scheduler` would create a circular dependency. / export type IFlushable = { tick(): void /** Identifies discarded pending work when loop protection triggers.",
               "descriptionZh": "`flush()`：同步冲刷当前队列。重入语义：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。"
             }
           ],
@@ -5110,7 +5110,7 @@
               "name": "debugName",
               "type": "string",
               "optional": true,
-              "description": "环保护触发时要如实报出被丢弃的待办，靠这个名字定位。"
+              "description": "Identifies discarded pending work when loop protection triggers."
             }
           ],
           "identity": "packages/reactive/dist/reactive/effect.class.d.ts:Effect:export declare class Effect implements IObserver, IDisposable { #private; readonly deps: ReadonlySet<IObservable>; readonly depVersions: ReadonlyMap<IObservable, number>; readonly runtime: IRuntime; debugName?: string; constructor(fn: () => void | IDisposer, runtime: IRuntime, options?: IReactiveNodeOptions); get disposed(): boolean; markDirty(): void; tick(): void; onDependencyDisconnected(): void; /** * Runs cleanup and the effect body as one terminal-aware transaction. Cleanup may synchronously * dispose this effect; that terminal transition must prevent both a rerun and dependency commit. */ run(): void; dispose(): void; }",
@@ -5174,7 +5174,7 @@
               "type": "string",
               "optional": true,
               "description": "`flush()`：同步冲刷当前队列。重入语义：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。",
-              "descriptionEn": "",
+              "descriptionEn": "Identifies discarded pending work when loop protection triggers.",
               "descriptionZh": "`flush()`：同步冲刷当前队列。重入语义：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。"
             }
           ],
@@ -5316,7 +5316,7 @@
         {
           "name": "Signal",
           "kind": "class",
-          "signature": "export declare class Signal<T> implements IObservable, IDisposable { #private; readonly subs: ReadonlySet<IObserver>; get version(): number; get onObserved(): (() => void) | undefined; get onUnobserved(): (() => void) | undefined; readonly runtime: IRuntime; debugName?: string; constructor(v: T, runtime: IRuntime, options?: IReactiveNodeOptions); get disposed(): boolean; get observed(): boolean; get value(): T; set value(next: T); peek(): T; /** * 释放：断开全部下游边。 * * Computed 与 Effect 一直有 dispose，Signal 没有——于是任何「我建的源节点用完了」 的场景（collections 的 per-cell、AtomStore * 的实例释放）只能去 import `runtime/internals` 拿 tracker 自己断边，也就是为了一个本该公开的操作而拿到 * 整张图的权限。补齐这个对称性之后，那些豁免就不必要了。 * * 语义与 Computed 一致：释放是终态。先标记 disposed 再通知下游，强制重跑的 Effect 因此会读到明确错误，而不会重新订阅这个已释放节点。 */ dispose(): void; /** Compose an owner lifecycle callback without silently replacing one. */ addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void; }): () => void; }",
+          "signature": "export declare class Signal<T> implements IObservable, IDisposable { #private; readonly subs: ReadonlySet<IObserver>; get version(): number; get onObserved(): (() => void) | undefined; get onUnobserved(): (() => void) | undefined; readonly runtime: IRuntime; debugName?: string; constructor(v: T, runtime: IRuntime, options?: IReactiveNodeOptions); get disposed(): boolean; get observed(): boolean; get value(): T; set value(next: T); peek(): T; /** * Disposes the signal and disconnects all downstream edges. * * This public operation gives source owners, such as collection cells and `AtomStore` instances, * a release path without importing `runtime/internals` and gaining access to the whole graph. * `Computed` and `Effect` expose the same lifecycle operation. * * Disposal is terminal, as it is for `Computed`. The signal is marked disposed before downstream * notification. A forced effect rerun therefore reads an explicit error instead of resubscribing * to a disposed node. */ dispose(): void; /** Compose an owner lifecycle callback without silently replacing one. */ addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void; }): () => void; }",
           "declarationLine": 2,
           "source": "packages/reactive/dist/reactive/signal.class.d.ts",
           "purpose": "Signal is part of this module's public class contract.",
@@ -5448,7 +5448,7 @@
               "name": "dispose",
               "kind": "method",
               "signature": "dispose(): void;",
-              "description": "释放：断开全部下游边。 Computed 与 Effect 一直有 dispose，Signal 没有——于是任何「我建的源节点用完了」 的场景（collections 的 per-cell、AtomStore 的实例释放）只能去 import `runtime/internals` 拿 tracker 自己断边，也就是为了一个本该公开的操作而拿到 整张图的权限。补齐这个对称性之后，那些豁免就不必要了。 语义与 Computed 一致：释放是终态。先标记 disposed 再通知下游，强制重跑的 Effect 因此会读到明确错误，而不会重新订阅这个已释放节点。",
+              "description": "Disposes the signal and disconnects all downstream edges. This public operation gives source owners, such as collection cells and `AtomStore` instances, a release path without importing `runtime/internals` and gaining access to the whole graph. `Computed` and `Effect` expose the same lifecycle operation. Disposal is terminal, as it is for `Computed`. The signal is marked disposed before downstream notification. A forced effect rerun therefore reads an explicit error instead of resubscribing to a disposed node.",
               "parameterDetails": [],
               "returns": "void"
             },
@@ -5470,7 +5470,7 @@
           "aliasOf": "Signal",
           "exportPath": "./reactive/*",
           "overloadSignatures": [
-            "export declare class Signal<T> implements IObservable, IDisposable { #private; readonly subs: ReadonlySet<IObserver>; get version(): number; get onObserved(): (() => void) | undefined; get onUnobserved(): (() => void) | undefined; readonly runtime: IRuntime; debugName?: string; constructor(v: T, runtime: IRuntime, options?: IReactiveNodeOptions); get disposed(): boolean; get observed(): boolean; get value(): T; set value(next: T); peek(): T; /** * 释放：断开全部下游边。 * * Computed 与 Effect 一直有 dispose，Signal 没有——于是任何「我建的源节点用完了」 的场景（collections 的 per-cell、AtomStore * 的实例释放）只能去 import `runtime/internals` 拿 tracker 自己断边，也就是为了一个本该公开的操作而拿到 * 整张图的权限。补齐这个对称性之后，那些豁免就不必要了。 * * 语义与 Computed 一致：释放是终态。先标记 disposed 再通知下游，强制重跑的 Effect 因此会读到明确错误，而不会重新订阅这个已释放节点。 */ dispose(): void; /** Compose an owner lifecycle callback without silently replacing one. */ addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void; }): () => void; }"
+            "export declare class Signal<T> implements IObservable, IDisposable { #private; readonly subs: ReadonlySet<IObserver>; get version(): number; get onObserved(): (() => void) | undefined; get onUnobserved(): (() => void) | undefined; readonly runtime: IRuntime; debugName?: string; constructor(v: T, runtime: IRuntime, options?: IReactiveNodeOptions); get disposed(): boolean; get observed(): boolean; get value(): T; set value(next: T); peek(): T; /** * Disposes the signal and disconnects all downstream edges. * * This public operation gives source owners, such as collection cells and `AtomStore` instances, * a release path without importing `runtime/internals` and gaining access to the whole graph. * `Computed` and `Effect` expose the same lifecycle operation. * * Disposal is terminal, as it is for `Computed`. The signal is marked disposed before downstream * notification. A forced effect rerun therefore reads an explicit error instead of resubscribing * to a disposed node. */ dispose(): void; /** Compose an owner lifecycle callback without silently replacing one. */ addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void; }): () => void; }"
           ],
           "overloadParameterDetails": [
             [
@@ -5548,10 +5548,10 @@
               "name": "debugName",
               "type": "string",
               "optional": true,
-              "description": "环保护触发时要如实报出被丢弃的待办，靠这个名字定位。"
+              "description": "Identifies discarded pending work when loop protection triggers."
             }
           ],
-          "identity": "packages/reactive/dist/reactive/signal.class.d.ts:Signal:export declare class Signal<T> implements IObservable, IDisposable { #private; readonly subs: ReadonlySet<IObserver>; get version(): number; get onObserved(): (() => void) | undefined; get onUnobserved(): (() => void) | undefined; readonly runtime: IRuntime; debugName?: string; constructor(v: T, runtime: IRuntime, options?: IReactiveNodeOptions); get disposed(): boolean; get observed(): boolean; get value(): T; set value(next: T); peek(): T; /** * 释放：断开全部下游边。 * * Computed 与 Effect 一直有 dispose，Signal 没有——于是任何「我建的源节点用完了」 的场景（collections 的 per-cell、AtomStore * 的实例释放）只能去 import `runtime/internals` 拿 tracker 自己断边，也就是为了一个本该公开的操作而拿到 * 整张图的权限。补齐这个对称性之后，那些豁免就不必要了。 * * 语义与 Computed 一致：释放是终态。先标记 disposed 再通知下游，强制重跑的 Effect 因此会读到明确错误，而不会重新订阅这个已释放节点。 */ dispose(): void; /** Compose an owner lifecycle callback without silently replacing one. */ addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void; }): () => void; }",
+          "identity": "packages/reactive/dist/reactive/signal.class.d.ts:Signal:export declare class Signal<T> implements IObservable, IDisposable { #private; readonly subs: ReadonlySet<IObserver>; get version(): number; get onObserved(): (() => void) | undefined; get onUnobserved(): (() => void) | undefined; readonly runtime: IRuntime; debugName?: string; constructor(v: T, runtime: IRuntime, options?: IReactiveNodeOptions); get disposed(): boolean; get observed(): boolean; get value(): T; set value(next: T); peek(): T; /** * Disposes the signal and disconnects all downstream edges. * * This public operation gives source owners, such as collection cells and `AtomStore` instances, * a release path without importing `runtime/internals` and gaining access to the whole graph. * `Computed` and `Effect` expose the same lifecycle operation. * * Disposal is terminal, as it is for `Computed`. The signal is marked disposed before downstream * notification. A forced effect rerun therefore reads an explicit error instead of resubscribing * to a disposed node. */ dispose(): void; /** Compose an owner lifecycle callback without silently replacing one. */ addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void; }): () => void; }",
           "guidance": [
             {
               "id": "错误码",
@@ -5680,7 +5680,7 @@
               "type": "string",
               "optional": true,
               "description": "`flush()`：同步冲刷当前队列。重入语义：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。",
-              "descriptionEn": "",
+              "descriptionEn": "Identifies discarded pending work when loop protection triggers.",
               "descriptionZh": "`flush()`：同步冲刷当前队列。重入语义：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。"
             }
           ],
@@ -5709,9 +5709,9 @@
           "name": "createObserverBinding",
           "kind": "function",
           "signature": "export declare function createObserverBinding(runtime: IRuntime): IObserverBinding;",
-          "declarationLine": 56,
+          "declarationLine": 60,
           "source": "packages/reactive/dist/runtime/observer-binding.d.ts",
-          "purpose": "为一个订阅者建立绑定。 捕获发生在 render 期，observer 只在宿主订阅阶段存在。绑定自持 Effect：适配层 能完成 capture/observe/commit/retrack，却拿不到 deps、版本或强制调度入口。",
+          "purpose": "Creates a binding for one observer. Capture runs during render; the observer exists only during host subscription. The binding owns its `Effect` and exposes `capture`, `observe`, `commit`, and `retrack`. Adapters cannot access dependencies, versions, or forced scheduling ports.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createObserverBinding.",
           "advanced": "No additional advanced behavior is declared for createObserverBinding.",
           "parameters": ["runtime: IRuntime"],
@@ -5751,7 +5751,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "为一个订阅者建立绑定。 捕获发生在 render 期，observer 只在宿主订阅阶段存在。绑定自持 Effect：适配层 能完成 capture/observe/commit/retrack，却拿不到 deps、版本或强制调度入口。"
+              "content": "Creates a binding for one observer. Capture runs during render; the observer exists only during host subscription. The binding owns its `Effect` and exposes `capture`, `observe`, `commit`, and `retrack`. Adapters cannot access dependencies, versions, or forced scheduling ports."
             },
             {
               "id": "getting-started",
@@ -5826,7 +5826,7 @@
           "signature": "export declare function createRuntime(options?: IRuntimeOptions): Runtime;",
           "declarationLine": 21,
           "source": "packages/reactive/dist/runtime/runtime.class.d.ts",
-          "purpose": "新建一个隔离运行时——SSR 每请求一个、每个测试用例一个、Worker 一个…",
+          "purpose": "Creates an isolated runtime, for example for one SSR request, test case, or worker.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRuntime.",
           "advanced": "No additional advanced behavior is declared for createRuntime.",
           "parameters": ["options: IRuntimeOptions (optional)"],
@@ -5871,7 +5871,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "新建一个隔离运行时——SSR 每请求一个、每个测试用例一个、Worker 一个…"
+              "content": "Creates an isolated runtime, for example for one SSR request, test case, or worker."
             },
             {
               "id": "getting-started",
@@ -5904,7 +5904,7 @@
               "name": "adapter",
               "type": "Partial<IReactiveRuntimeAdapter>",
               "optional": true,
-              "description": "宿主能力注入面；缺省项回落到 `defaultRuntimeAdapter`。"
+              "description": "Injects host capabilities. Missing entries use `defaultRuntimeAdapter`."
             },
             {
               "name": "onError",
@@ -5922,13 +5922,13 @@
               "name": "maxFlushPasses",
               "type": "number",
               "optional": true,
-              "description": "一次冲刷里单个 observer 允许的最大执行次数，默认 100。单个 observer 超限视为自触发环：抛错并清空队列。 * * 可配置，因为它是策略参数而非物理常数——很长的派生链每轮只推进一级也会吃轮次。"
+              "description": "Maximum executions for one observer within one flush. The default is 100. Exceeding the limit * is treated as a self-triggering cycle and throws after clearing the queue. * * The limit is configurable scheduling policy, not a physical constant."
             },
             {
               "name": "scheduleIdle",
               "type": "(task: () => void) => void",
               "optional": true,
-              "description": "无观察者 Computed 的挂起时机，默认走 adapter 的 `scheduleMicrotask`。 * * 与调度策略分开：挂起是回收，不是冲刷。写死之后这条路径不受任何配置控制， rAF/idle 策略下时机对不上，测试也只能靠等微任务。"
+              "description": "Schedules suspension of an unobserved `Computed`. Defaults to the adapter's * `scheduleMicrotask`. * * Suspension is cleanup, so its timing is separate from flushing. This configurable channel can * align cleanup with animation-frame or idle policies without requiring callers or tests to wait * for a hard-coded microtask."
             }
           ],
           "identity": "packages/reactive/dist/runtime/runtime.class.d.ts:createRuntime:export declare function createRuntime(options?: IRuntimeOptions): Runtime;",
@@ -6071,7 +6071,7 @@
               "type": "Partial<IReactiveRuntimeAdapter>",
               "optional": true,
               "description": "`adapter` 的每个方法（`scheduleMicrotask`/`now`/`timestamp`/`reportError`）独立解析：未提供或显式 `undefined` 回落到默认实现（`queueMicrotask`/`performance.now()`/`Date.now()`/no-op）；提供了但不是函数抛贴 `INVALID_OPTION` 码的 `TypeError`。",
-              "descriptionEn": "",
+              "descriptionEn": "Injects host capabilities. Missing entries use `defaultRuntimeAdapter`.",
               "descriptionZh": "`adapter` 的每个方法（`scheduleMicrotask`/`now`/`timestamp`/`reportError`）独立解析：未提供或显式 `undefined` 回落到默认实现（`queueMicrotask`/`performance.now()`/`Date.now()`/no-op）；提供了但不是函数抛贴 `INVALID_OPTION` 码的 `TypeError`。"
             },
             {
@@ -6095,7 +6095,7 @@
               "type": "number",
               "optional": true,
               "description": "`maxFlushPasses` 非正整数（非安全整数或 `< 1`）抛贴 `INVALID_OPTION` 码的 `RangeError`。",
-              "descriptionEn": "",
+              "descriptionEn": "Maximum executions for one observer within one flush. The default is 100. Exceeding the limit * is treated as a self-triggering cycle and throws after clearing the queue. * * The limit is configurable scheduling policy, not a physical constant.",
               "descriptionZh": "`maxFlushPasses` 非正整数（非安全整数或 `< 1`）抛贴 `INVALID_OPTION` 码的 `RangeError`。"
             },
             {
@@ -6103,7 +6103,7 @@
               "type": "(task: () => void) => void",
               "optional": true,
               "description": "`onError`/`onTrace`/`scheduleIdle` 若提供但不是函数，同样抛 `INVALID_OPTION`。",
-              "descriptionEn": "",
+              "descriptionEn": "Schedules suspension of an unobserved `Computed`. Defaults to the adapter's * `scheduleMicrotask`. * * Suspension is cleanup, so its timing is separate from flushing. This configurable channel can * align cleanup with animation-frame or idle policies without requiring callers or tests to wait * for a hard-coded microtask.",
               "descriptionZh": "`onError`/`onTrace`/`scheduleIdle` 若提供但不是函数，同样抛 `INVALID_OPTION`。"
             }
           ],
@@ -6112,7 +6112,7 @@
         {
           "name": "DependencyTracker",
           "kind": "class",
-          "signature": "export declare class DependencyTracker { #private; constructor(runtime: IRuntime); /** Whether this tracker is currently collecting dependencies. */ isTracking(): boolean; /** Whether any Runtime is currently collecting a dependency frame. */ static isAnyTracking(): boolean; /** 记一条依赖——只暂存到当前帧；跨 runtime 读取立即抛错 */ track(observable: IObservable): void; /** 断开某 observer 的全部依赖边——仅供 dispose 用 */ clearDependencies(observer: IObserver): void; /** * 原子删除 Observable 的全部反向边，再通知下游失效。 * * `invalidate` 用于仍可继续使用的节点（例如 Atom override）；`dispose` 是终态。 两者都更换独立的 topology token 使在途 capture * 过期，不消耗全局值版本， 因此在 VersionClock 已耗尽时仍能完整释放或撤销路由。 */ disconnectObservable(observable: IObservable, reason: typeof ReactiveTraceReason.invalidate | typeof ReactiveTraceReason.dispose): void; /** 事务化重算：成功才 commit 差异，失败丢弃临时集合。 */ runTracked<R>(observer: IObserver, fn: () => R): R; /** Render 阶段只采集依赖与版本，不修改正式订阅边。调用方可在提交阶段交回 token，因而被 Concurrent React 丢弃的 render 不会泄漏订阅。 */ capture<R>(fn: () => R): ICapture<R>; /** 原子验证并提交一次 capture。返回 false 表示捕获后依赖已变化，调用方必须重新求值； token 单次使用，且 observer 必须属于当前 Tracker。 */ commitCapture(observer: IObserver, capture: ICapture<unknown>): boolean; /** 在 fn 执行期间关闭依赖收集——action 内读取、cleanup 回调等场景用 */ untracked<R>(fn: () => R): R; /** 依赖是否真的变了（先惰性 pull 使版本落定再比较） */ hasStaleDependencies(observer: IObserver): boolean; }",
+          "signature": "export declare class DependencyTracker { #private; constructor(runtime: IRuntime); /** Whether this tracker is currently collecting dependencies. */ isTracking(): boolean; /** Whether any Runtime is currently collecting a dependency frame. */ static isAnyTracking(): boolean; /** Stages a dependency in the current frame. Cross-runtime reads throw immediately. */ track(observable: IObservable): void; /** Disconnects all dependency edges for an observer during disposal. */ clearDependencies(observer: IObserver): void; /** * Atomically removes every reverse edge of an observable, then notifies downstream nodes of * invalidation. * * `invalidate` keeps the node reusable, for example after an atom override. `dispose` is * terminal. Both replace an independent topology token so pending captures become stale. Neither * consumes a global value version, so disposal and route removal still work after clock * exhaustion. */ disconnectObservable(observable: IObservable, reason: typeof ReactiveTraceReason.invalidate | typeof ReactiveTraceReason.dispose): void; /** * Recomputes transactionally. Success commits dependency changes; failure discards the temporary * set. */ runTracked<R>(observer: IObserver, fn: () => R): R; /** * Captures render dependencies and versions without changing subscription edges. Discarded * Concurrent React renders cannot leak subscriptions. */ capture<R>(fn: () => R): ICapture<R>; /** * Atomically validates and commits one capture. `false` means dependencies changed and requires * reevaluation. Tokens are single-use and require this tracker's observer. */ commitCapture(observer: IObserver, capture: ICapture<unknown>): boolean; /** * Disables dependency collection while `fn` runs, for example during actions or cleanup * callbacks. */ untracked<R>(fn: () => R): R; /** Checks whether dependencies change after lazily pulling them to settle their versions. */ hasStaleDependencies(observer: IObserver): boolean; }",
           "declarationLine": 8,
           "source": "packages/reactive/dist/runtime/dependency-tracker.class.d.ts",
           "purpose": "DependencyTracker is part of this module's public class contract.",
@@ -6151,7 +6151,7 @@
               "name": "track",
               "kind": "method",
               "signature": "track(observable: IObservable): void;",
-              "description": "记一条依赖——只暂存到当前帧；跨 runtime 读取立即抛错",
+              "description": "Stages a dependency in the current frame. Cross-runtime reads throw immediately.",
               "parameterDetails": [
                 {
                   "name": "observable",
@@ -6165,7 +6165,7 @@
               "name": "clearDependencies",
               "kind": "method",
               "signature": "clearDependencies(observer: IObserver): void;",
-              "description": "断开某 observer 的全部依赖边——仅供 dispose 用",
+              "description": "Disconnects all dependency edges for an observer during disposal.",
               "parameterDetails": [
                 {
                   "name": "observer",
@@ -6179,7 +6179,7 @@
               "name": "disconnectObservable",
               "kind": "method",
               "signature": "disconnectObservable(observable: IObservable, reason: typeof ReactiveTraceReason.invalidate | typeof ReactiveTraceReason.dispose): void;",
-              "description": "原子删除 Observable 的全部反向边，再通知下游失效。 `invalidate` 用于仍可继续使用的节点（例如 Atom override）；`dispose` 是终态。 两者都更换独立的 topology token 使在途 capture 过期，不消耗全局值版本， 因此在 VersionClock 已耗尽时仍能完整释放或撤销路由。",
+              "description": "Atomically removes every reverse edge of an observable, then notifies downstream nodes of invalidation. `invalidate` keeps the node reusable, for example after an atom override. `dispose` is terminal. Both replace an independent topology token so pending captures become stale. Neither consumes a global value version, so disposal and route removal still work after clock exhaustion.",
               "parameterDetails": [
                 {
                   "name": "observable",
@@ -6198,7 +6198,7 @@
               "name": "runTracked",
               "kind": "method",
               "signature": "runTracked<R>(observer: IObserver, fn: () => R): R;",
-              "description": "事务化重算：成功才 commit 差异，失败丢弃临时集合。",
+              "description": "Recomputes transactionally. Success commits dependency changes; failure discards the temporary set.",
               "parameterDetails": [
                 {
                   "name": "observer",
@@ -6217,7 +6217,7 @@
               "name": "capture",
               "kind": "method",
               "signature": "capture<R>(fn: () => R): ICapture<R>;",
-              "description": "Render 阶段只采集依赖与版本，不修改正式订阅边。调用方可在提交阶段交回 token，因而被 Concurrent React 丢弃的 render 不会泄漏订阅。",
+              "description": "Captures render dependencies and versions without changing subscription edges. Discarded Concurrent React renders cannot leak subscriptions.",
               "parameterDetails": [
                 {
                   "name": "fn",
@@ -6231,7 +6231,7 @@
               "name": "commitCapture",
               "kind": "method",
               "signature": "commitCapture(observer: IObserver, capture: ICapture<unknown>): boolean;",
-              "description": "原子验证并提交一次 capture。返回 false 表示捕获后依赖已变化，调用方必须重新求值； token 单次使用，且 observer 必须属于当前 Tracker。",
+              "description": "Atomically validates and commits one capture. `false` means dependencies changed and requires reevaluation. Tokens are single-use and require this tracker's observer.",
               "parameterDetails": [
                 {
                   "name": "observer",
@@ -6250,7 +6250,7 @@
               "name": "untracked",
               "kind": "method",
               "signature": "untracked<R>(fn: () => R): R;",
-              "description": "在 fn 执行期间关闭依赖收集——action 内读取、cleanup 回调等场景用",
+              "description": "Disables dependency collection while `fn` runs, for example during actions or cleanup callbacks.",
               "parameterDetails": [
                 {
                   "name": "fn",
@@ -6264,7 +6264,7 @@
               "name": "hasStaleDependencies",
               "kind": "method",
               "signature": "hasStaleDependencies(observer: IObserver): boolean;",
-              "description": "依赖是否真的变了（先惰性 pull 使版本落定再比较）",
+              "description": "Checks whether dependencies change after lazily pulling them to settle their versions.",
               "parameterDetails": [
                 {
                   "name": "observer",
@@ -6278,7 +6278,7 @@
           "aliasOf": "DependencyTracker",
           "exportPath": "./runtime",
           "overloadSignatures": [
-            "export declare class DependencyTracker { #private; constructor(runtime: IRuntime); /** Whether this tracker is currently collecting dependencies. */ isTracking(): boolean; /** Whether any Runtime is currently collecting a dependency frame. */ static isAnyTracking(): boolean; /** 记一条依赖——只暂存到当前帧；跨 runtime 读取立即抛错 */ track(observable: IObservable): void; /** 断开某 observer 的全部依赖边——仅供 dispose 用 */ clearDependencies(observer: IObserver): void; /** * 原子删除 Observable 的全部反向边，再通知下游失效。 * * `invalidate` 用于仍可继续使用的节点（例如 Atom override）；`dispose` 是终态。 两者都更换独立的 topology token 使在途 capture * 过期，不消耗全局值版本， 因此在 VersionClock 已耗尽时仍能完整释放或撤销路由。 */ disconnectObservable(observable: IObservable, reason: typeof ReactiveTraceReason.invalidate | typeof ReactiveTraceReason.dispose): void; /** 事务化重算：成功才 commit 差异，失败丢弃临时集合。 */ runTracked<R>(observer: IObserver, fn: () => R): R; /** Render 阶段只采集依赖与版本，不修改正式订阅边。调用方可在提交阶段交回 token，因而被 Concurrent React 丢弃的 render 不会泄漏订阅。 */ capture<R>(fn: () => R): ICapture<R>; /** 原子验证并提交一次 capture。返回 false 表示捕获后依赖已变化，调用方必须重新求值； token 单次使用，且 observer 必须属于当前 Tracker。 */ commitCapture(observer: IObserver, capture: ICapture<unknown>): boolean; /** 在 fn 执行期间关闭依赖收集——action 内读取、cleanup 回调等场景用 */ untracked<R>(fn: () => R): R; /** 依赖是否真的变了（先惰性 pull 使版本落定再比较） */ hasStaleDependencies(observer: IObserver): boolean; }"
+            "export declare class DependencyTracker { #private; constructor(runtime: IRuntime); /** Whether this tracker is currently collecting dependencies. */ isTracking(): boolean; /** Whether any Runtime is currently collecting a dependency frame. */ static isAnyTracking(): boolean; /** Stages a dependency in the current frame. Cross-runtime reads throw immediately. */ track(observable: IObservable): void; /** Disconnects all dependency edges for an observer during disposal. */ clearDependencies(observer: IObserver): void; /** * Atomically removes every reverse edge of an observable, then notifies downstream nodes of * invalidation. * * `invalidate` keeps the node reusable, for example after an atom override. `dispose` is * terminal. Both replace an independent topology token so pending captures become stale. Neither * consumes a global value version, so disposal and route removal still work after clock * exhaustion. */ disconnectObservable(observable: IObservable, reason: typeof ReactiveTraceReason.invalidate | typeof ReactiveTraceReason.dispose): void; /** * Recomputes transactionally. Success commits dependency changes; failure discards the temporary * set. */ runTracked<R>(observer: IObserver, fn: () => R): R; /** * Captures render dependencies and versions without changing subscription edges. Discarded * Concurrent React renders cannot leak subscriptions. */ capture<R>(fn: () => R): ICapture<R>; /** * Atomically validates and commits one capture. `false` means dependencies changed and requires * reevaluation. Tokens are single-use and require this tracker's observer. */ commitCapture(observer: IObserver, capture: ICapture<unknown>): boolean; /** * Disables dependency collection while `fn` runs, for example during actions or cleanup * callbacks. */ untracked<R>(fn: () => R): R; /** Checks whether dependencies change after lazily pulling them to settle their versions. */ hasStaleDependencies(observer: IObserver): boolean; }"
           ],
           "overloadParameterDetails": [
             [
@@ -6325,7 +6325,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/runtime/dependency-tracker.class.d.ts:DependencyTracker:export declare class DependencyTracker { #private; constructor(runtime: IRuntime); /** Whether this tracker is currently collecting dependencies. */ isTracking(): boolean; /** Whether any Runtime is currently collecting a dependency frame. */ static isAnyTracking(): boolean; /** 记一条依赖——只暂存到当前帧；跨 runtime 读取立即抛错 */ track(observable: IObservable): void; /** 断开某 observer 的全部依赖边——仅供 dispose 用 */ clearDependencies(observer: IObserver): void; /** * 原子删除 Observable 的全部反向边，再通知下游失效。 * * `invalidate` 用于仍可继续使用的节点（例如 Atom override）；`dispose` 是终态。 两者都更换独立的 topology token 使在途 capture * 过期，不消耗全局值版本， 因此在 VersionClock 已耗尽时仍能完整释放或撤销路由。 */ disconnectObservable(observable: IObservable, reason: typeof ReactiveTraceReason.invalidate | typeof ReactiveTraceReason.dispose): void; /** 事务化重算：成功才 commit 差异，失败丢弃临时集合。 */ runTracked<R>(observer: IObserver, fn: () => R): R; /** Render 阶段只采集依赖与版本，不修改正式订阅边。调用方可在提交阶段交回 token，因而被 Concurrent React 丢弃的 render 不会泄漏订阅。 */ capture<R>(fn: () => R): ICapture<R>; /** 原子验证并提交一次 capture。返回 false 表示捕获后依赖已变化，调用方必须重新求值； token 单次使用，且 observer 必须属于当前 Tracker。 */ commitCapture(observer: IObserver, capture: ICapture<unknown>): boolean; /** 在 fn 执行期间关闭依赖收集——action 内读取、cleanup 回调等场景用 */ untracked<R>(fn: () => R): R; /** 依赖是否真的变了（先惰性 pull 使版本落定再比较） */ hasStaleDependencies(observer: IObserver): boolean; }",
+          "identity": "packages/reactive/dist/runtime/dependency-tracker.class.d.ts:DependencyTracker:export declare class DependencyTracker { #private; constructor(runtime: IRuntime); /** Whether this tracker is currently collecting dependencies. */ isTracking(): boolean; /** Whether any Runtime is currently collecting a dependency frame. */ static isAnyTracking(): boolean; /** Stages a dependency in the current frame. Cross-runtime reads throw immediately. */ track(observable: IObservable): void; /** Disconnects all dependency edges for an observer during disposal. */ clearDependencies(observer: IObserver): void; /** * Atomically removes every reverse edge of an observable, then notifies downstream nodes of * invalidation. * * `invalidate` keeps the node reusable, for example after an atom override. `dispose` is * terminal. Both replace an independent topology token so pending captures become stale. Neither * consumes a global value version, so disposal and route removal still work after clock * exhaustion. */ disconnectObservable(observable: IObservable, reason: typeof ReactiveTraceReason.invalidate | typeof ReactiveTraceReason.dispose): void; /** * Recomputes transactionally. Success commits dependency changes; failure discards the temporary * set. */ runTracked<R>(observer: IObserver, fn: () => R): R; /** * Captures render dependencies and versions without changing subscription edges. Discarded * Concurrent React renders cannot leak subscriptions. */ capture<R>(fn: () => R): ICapture<R>; /** * Atomically validates and commits one capture. `false` means dependencies changed and requires * reevaluation. Tokens are single-use and require this tracker's observer. */ commitCapture(observer: IObserver, capture: ICapture<unknown>): boolean; /** * Disables dependency collection while `fn` runs, for example during actions or cleanup * callbacks. */ untracked<R>(fn: () => R): R; /** Checks whether dependencies change after lazily pulling them to settle their versions. */ hasStaleDependencies(observer: IObserver): boolean; }",
           "guidance": [
             {
               "id": "dependencytracker",
@@ -6419,7 +6419,7 @@
           "name": "IComputedValue",
           "kind": "type",
           "signature": "export type IComputedValue<T> = IDisposable & { readonly runtime: IRuntime; readonly debugName?: string; readonly observed: boolean; readonly value: T; peek(): T; };",
-          "declarationLine": 25,
+          "declarationLine": 26,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "Public read-only derived value view.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IComputedValue.",
@@ -6484,9 +6484,9 @@
           "name": "IDisposable",
           "kind": "type",
           "signature": "export type IDisposable = { dispose(): void; readonly disposed: boolean; };",
-          "declarationLine": 177,
+          "declarationLine": 206,
           "source": "packages/reactive/dist/runtime/types.d.ts",
-          "purpose": "有明确所有权/生命周期的资源：能被显式释放，且可查询是否已释放。 Computed/Effect/Scope（以及未来的 wasm 字段、worker 订阅）都实现它，交给 Scope 统一按 LIFO 释放。",
+          "purpose": "Resource with explicit ownership and lifecycle, supporting disposal and a disposal-state query. `Computed`, `Effect`, and scopes use this contract for LIFO release by the owning scope. It also serves future Wasm fields or worker subscriptions.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDisposable.",
           "advanced": "No additional advanced behavior is declared for IDisposable.",
           "parameters": ["This type declaration has no parameters."],
@@ -6513,7 +6513,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "有明确所有权/生命周期的资源：能被显式释放，且可查询是否已释放。 Computed/Effect/Scope（以及未来的 wasm 字段、worker 订阅）都实现它，交给 Scope 统一按 LIFO 释放。"
+              "content": "Resource with explicit ownership and lifecycle, supporting disposal and a disposal-state query. `Computed`, `Effect`, and scopes use this contract for LIFO release by the owning scope. It also serves future Wasm fields or worker subscriptions."
             },
             {
               "id": "getting-started",
@@ -6552,9 +6552,9 @@
           "name": "IDisposer",
           "kind": "type",
           "signature": "export type IDisposer = () => void;",
-          "declarationLine": 172,
+          "declarationLine": 200,
           "source": "packages/reactive/dist/runtime/types.d.ts",
-          "purpose": "Effect/自定义响应式来源的收尾回调——对应它们建立时留下的、需要在重跑或销毁前撤销的副作用 （取消订阅、清定时器、释放资源……），命名对应 Effect 已有的 dispose() 语义。",
+          "purpose": "Cleanup callback for an effect or custom source. Reverses side effects before rerun or disposal, such as subscriptions, timers, or resource ownership.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDisposer.",
           "advanced": "No additional advanced behavior is declared for IDisposer.",
           "parameters": ["This type declaration has no parameters."],
@@ -6579,7 +6579,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Effect/自定义响应式来源的收尾回调——对应它们建立时留下的、需要在重跑或销毁前撤销的副作用 （取消订阅、清定时器、释放资源……），命名对应 Effect 已有的 dispose() 语义。"
+              "content": "Cleanup callback for an effect or custom source. Reverses side effects before rerun or disposal, such as subscriptions, timers, or resource ownership."
             },
             {
               "id": "getting-started",
@@ -6617,10 +6617,10 @@
         {
           "name": "IFlushable",
           "kind": "type",
-          "signature": "export type IFlushable = { tick(): void; /** 环保护触发时要如实报出被丢弃的待办，靠这个名字定位。 */ readonly debugName?: string; };",
-          "declarationLine": 189,
+          "signature": "export type IFlushable = { tick(): void; /** Identifies discarded pending work when loop protection triggers. */ readonly debugName?: string; };",
+          "declarationLine": 225,
           "source": "packages/reactive/dist/runtime/types.d.ts",
-          "purpose": "冲刷队列里一项的最小形状：只要求\"一次冲刷时如何处理我\"。Effect 是目前唯一的实现者， 但这里刻意不直接引用 Effect 类——如果引用了，Scheduler 所在文件就要 import Effect， Effect 所在文件又要 import Scheduler，形成循环依赖。用结构类型断开这个环。",
+          "purpose": "Minimal queued-item contract describing how a flush processes the item. `Effect` is the current implementation, but this structural view avoids a direct class reference. Otherwise importing `Effect` from `Scheduler` would create a circular dependency.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFlushable.",
           "advanced": "No additional advanced behavior is declared for IFlushable.",
           "parameters": ["This type declaration has no parameters."],
@@ -6634,7 +6634,7 @@
           "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
-            "export type IFlushable = { tick(): void; /** 环保护触发时要如实报出被丢弃的待办，靠这个名字定位。 */ readonly debugName?: string; };"
+            "export type IFlushable = { tick(): void; /** Identifies discarded pending work when loop protection triggers. */ readonly debugName?: string; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6644,7 +6644,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "冲刷队列里一项的最小形状：只要求\"一次冲刷时如何处理我\"。Effect 是目前唯一的实现者， 但这里刻意不直接引用 Effect 类——如果引用了，Scheduler 所在文件就要 import Effect， Effect 所在文件又要 import Scheduler，形成循环依赖。用结构类型断开这个环。"
+              "content": "Minimal queued-item contract describing how a flush processes the item. `Effect` is the current implementation, but this structural view avoids a direct class reference. Otherwise importing `Effect` from `Scheduler` would create a circular dependency."
             },
             {
               "id": "getting-started",
@@ -6673,7 +6673,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/runtime/types.d.ts:IFlushable:export type IFlushable = { tick(): void; /** 环保护触发时要如实报出被丢弃的待办，靠这个名字定位。 */ readonly debugName?: string; };",
+          "identity": "packages/reactive/dist/runtime/types.d.ts:IFlushable:export type IFlushable = { tick(): void; /** Identifies discarded pending work when loop protection triggers. */ readonly debugName?: string; };",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -6683,9 +6683,9 @@
           "name": "IFlushResult",
           "kind": "type",
           "signature": "export type IFlushResult = 'completed' | 'deferred';",
-          "declarationLine": 184,
+          "declarationLine": 219,
           "source": "packages/reactive/dist/runtime/types.d.ts",
-          "purpose": "显式 flush 的完成状态；判别字符串避免 boolean truthiness 隐藏重入语义。",
+          "purpose": "Outcome of an explicit flush. Distinct strings expose reentrancy instead of hiding it behind boolean truthiness.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFlushResult.",
           "advanced": "No additional advanced behavior is declared for IFlushResult.",
           "parameters": ["This type declaration has no parameters."],
@@ -6708,7 +6708,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "显式 flush 的完成状态；判别字符串避免 boolean truthiness 隐藏重入语义。"
+              "content": "Outcome of an explicit flush. Distinct strings expose reentrancy instead of hiding it behind boolean truthiness."
             },
             {
               "id": "getting-started",
@@ -6747,9 +6747,9 @@
           "name": "IObservable",
           "kind": "type",
           "signature": "export type IObservable = { readonly runtime: IRuntime; debugName?: string; /** Reverse edges are maintained by the Runtime tracker, not extension code. */ readonly subs: ReadonlySet<IObserver>; readonly version: number; pull?(): void; isStale?(): boolean; onObserved?(): void; onUnobserved?(): void; };",
-          "declarationLine": 150,
+          "declarationLine": 172,
           "source": "packages/reactive/dist/runtime/types.d.ts",
-          "purpose": "内核内部图协议。它刻意不从 `@migaia/reactive` 公共入口导出。 第三方扩展应组合公开 Signal，而不是手工实现并修改 subs/version；平台内置的 Wasm/SAB 来源通过受约束的内部入口接图，并必须先登记 Runtime 所有权。",
+          "purpose": "Kernel graph protocol exposed as a type from the `@migaia/reactive` public entry. Third-party extensions compose public signals instead of implementing and changing `subs` or `version`. Built-in Wasm and SAB sources join the graph through restricted internal entry points. They must register runtime ownership first.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IObservable.",
           "advanced": "No additional advanced behavior is declared for IObservable.",
           "parameters": ["This type declaration has no parameters."],
@@ -6777,7 +6777,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "内核内部图协议。它刻意不从 `@migaia/reactive` 公共入口导出。 第三方扩展应组合公开 Signal，而不是手工实现并修改 subs/version；平台内置的 Wasm/SAB 来源通过受约束的内部入口接图，并必须先登记 Runtime 所有权。"
+              "content": "Kernel graph protocol exposed as a type from the `@migaia/reactive` public entry. Third-party extensions compose public signals instead of implementing and changing `subs` or `version`. Built-in Wasm and SAB sources join the graph through restricted internal entry points. They must register runtime ownership first."
             },
             {
               "id": "getting-started",
@@ -6816,9 +6816,9 @@
           "name": "IObserver",
           "kind": "type",
           "signature": "export type IObserver = { readonly runtime: IRuntime; readonly disposed: boolean; debugName?: string; readonly deps: ReadonlySet<IObservable>; readonly depVersions: ReadonlyMap<IObservable, number>; markDirty(): void; onDependencyDisconnected(observable: IObservable): void; };",
-          "declarationLine": 162,
+          "declarationLine": 187,
           "source": "packages/reactive/dist/runtime/types.d.ts",
-          "purpose": "一个会去读取 IObservable、需要在其变化时收到通知的一端——Computed/Effect 都实现它。",
+          "purpose": "Reads `IObservable` values and receives change notifications. `Computed` and `Effect` implement this observer role.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IObserver.",
           "advanced": "No additional advanced behavior is declared for IObserver.",
           "parameters": ["This type declaration has no parameters."],
@@ -6846,7 +6846,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "一个会去读取 IObservable、需要在其变化时收到通知的一端——Computed/Effect 都实现它。"
+              "content": "Reads `IObservable` values and receives change notifications. `Computed` and `Effect` implement this observer role."
             },
             {
               "id": "getting-started",
@@ -6986,8 +6986,8 @@
         {
           "name": "IObserverBinding",
           "kind": "type",
-          "signature": "export type IObserverBinding = { /** * 渲染期捕获。 * * 只记录读到了哪些节点及其版本，不建立依赖边——被丢弃的渲染因此不会留下订阅。 */ capture<R>(read: () => R): ICapture<R>; /** * Install the binding-owned observer. Keeping the concrete Effect private prevents adapters from * mutating deps/versions or calling run/markDirty. */ observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; /** * 提交期安装依赖。 * * 返回三态结果，明确区分「需要重新捕获」与「订阅者尚不存在」。调用方只应在 `stale` 时作废快照并重新取值，而**不是**在 commit 阶段去 pull 脏节点—— * 那会把用户的求值错误抛在 commit 里，绕过 Error Boundary。 */ commit(capture: ICapture<unknown>): IObserverCommitResult; /** Force one committed observer run and report whether its dependency set changed. */ retrack(): IObserverRetrackResult; };",
-          "declarationLine": 28,
+          "signature": "export type IObserverBinding = { /** * Captures dependencies during render. * * Records the nodes read and their versions without creating dependency edges. Discarded renders * therefore leave no subscriptions. */ capture<R>(read: () => R): ICapture<R>; /** * Install the binding-owned observer. Keeping the concrete Effect private prevents adapters from * mutating deps/versions or calling run/markDirty. */ observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; /** * Installs captured dependencies during commit. * * Three outcomes distinguish a required fresh capture from a missing observer. Invalidate the * snapshot and reread only for `stale`. Do not pull dirty nodes during commit, because evaluation * errors would bypass the Error Boundary. */ commit(capture: ICapture<unknown>): IObserverCommitResult; /** Force one committed observer run and report whether its dependency set changed. */ retrack(): IObserverRetrackResult; };",
+          "declarationLine": 29,
           "source": "packages/reactive/dist/runtime/observer-binding.d.ts",
           "purpose": "IObserverBinding is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IObserverBinding.",
@@ -7005,7 +7005,7 @@
           "aliasOf": "IObserverBinding",
           "exportPath": "./runtime",
           "overloadSignatures": [
-            "export type IObserverBinding = { /** * 渲染期捕获。 * * 只记录读到了哪些节点及其版本，不建立依赖边——被丢弃的渲染因此不会留下订阅。 */ capture<R>(read: () => R): ICapture<R>; /** * Install the binding-owned observer. Keeping the concrete Effect private prevents adapters from * mutating deps/versions or calling run/markDirty. */ observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; /** * 提交期安装依赖。 * * 返回三态结果，明确区分「需要重新捕获」与「订阅者尚不存在」。调用方只应在 `stale` 时作废快照并重新取值，而**不是**在 commit 阶段去 pull 脏节点—— * 那会把用户的求值错误抛在 commit 里，绕过 Error Boundary。 */ commit(capture: ICapture<unknown>): IObserverCommitResult; /** Force one committed observer run and report whether its dependency set changed. */ retrack(): IObserverRetrackResult; };"
+            "export type IObserverBinding = { /** * Captures dependencies during render. * * Records the nodes read and their versions without creating dependency edges. Discarded renders * therefore leave no subscriptions. */ capture<R>(read: () => R): ICapture<R>; /** * Install the binding-owned observer. Keeping the concrete Effect private prevents adapters from * mutating deps/versions or calling run/markDirty. */ observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; /** * Installs captured dependencies during commit. * * Three outcomes distinguish a required fresh capture from a missing observer. Invalidate the * snapshot and reread only for `stale`. Do not pull dirty nodes during commit, because evaluation * errors would bypass the Error Boundary. */ commit(capture: ICapture<unknown>): IObserverCommitResult; /** Force one committed observer run and report whether its dependency set changed. */ retrack(): IObserverRetrackResult; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7044,7 +7044,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/runtime/observer-binding.d.ts:IObserverBinding:export type IObserverBinding = { /** * 渲染期捕获。 * * 只记录读到了哪些节点及其版本，不建立依赖边——被丢弃的渲染因此不会留下订阅。 */ capture<R>(read: () => R): ICapture<R>; /** * Install the binding-owned observer. Keeping the concrete Effect private prevents adapters from * mutating deps/versions or calling run/markDirty. */ observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; /** * 提交期安装依赖。 * * 返回三态结果，明确区分「需要重新捕获」与「订阅者尚不存在」。调用方只应在 `stale` 时作废快照并重新取值，而**不是**在 commit 阶段去 pull 脏节点—— * 那会把用户的求值错误抛在 commit 里，绕过 Error Boundary。 */ commit(capture: ICapture<unknown>): IObserverCommitResult; /** Force one committed observer run and report whether its dependency set changed. */ retrack(): IObserverRetrackResult; };",
+          "identity": "packages/reactive/dist/runtime/observer-binding.d.ts:IObserverBinding:export type IObserverBinding = { /** * Captures dependencies during render. * * Records the nodes read and their versions without creating dependency edges. Discarded renders * therefore leave no subscriptions. */ capture<R>(read: () => R): ICapture<R>; /** * Install the binding-owned observer. Keeping the concrete Effect private prevents adapters from * mutating deps/versions or calling run/markDirty. */ observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; /** * Installs captured dependencies during commit. * * Three outcomes distinguish a required fresh capture from a missing observer. Invalidate the * snapshot and reread only for `stale`. Do not pull dirty nodes during commit, because evaluation * errors would bypass the Error Boundary. */ commit(capture: ICapture<unknown>): IObserverCommitResult; /** Force one committed observer run and report whether its dependency set changed. */ retrack(): IObserverRetrackResult; };",
           "guidance": [
             {
               "id": "错误码",
@@ -7156,9 +7156,9 @@
           "name": "IObserverCommitResult",
           "kind": "type",
           "signature": "export type IObserverCommitResult = 'committed' | 'stale' | 'no-observer';",
-          "declarationLine": 10,
+          "declarationLine": 11,
           "source": "packages/reactive/dist/runtime/observer-binding.d.ts",
-          "purpose": "一次捕获提交的完整结果。 - `committed`：依赖边已安装； - `stale`：捕获后依赖已变化，token 已消费，必须重新捕获； - `no-observer`：提交目标尚不存在，token 未消费，可在 observer 就绪后重试。",
+          "purpose": "Outcome of a capture commit. - `committed`: dependency edges are installed. - `stale`: dependencies change after capture; the token is consumed and requires a fresh capture. - `no-observer`: the target does not exist yet; the token remains reusable when the observer is ready.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IObserverCommitResult.",
           "advanced": "No additional advanced behavior is declared for IObserverCommitResult.",
           "parameters": ["This type declaration has no parameters."],
@@ -7184,7 +7184,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "一次捕获提交的完整结果。 - `committed`：依赖边已安装； - `stale`：捕获后依赖已变化，token 已消费，必须重新捕获； - `no-observer`：提交目标尚不存在，token 未消费，可在 observer 就绪后重试。"
+              "content": "Outcome of a capture commit. - `committed`: dependency edges are installed. - `stale`: dependencies change after capture; the token is consumed and requires a fresh capture. - `no-observer`: the target does not exist yet; the token remains reusable when the observer is ready."
             },
             {
               "id": "getting-started",
@@ -7223,7 +7223,7 @@
           "name": "IObserverRetrackResult",
           "kind": "type",
           "signature": "export type IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer';",
-          "declarationLine": 11,
+          "declarationLine": 12,
           "source": "packages/reactive/dist/runtime/observer-binding.d.ts",
           "purpose": "IObserverRetrackResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IObserverRetrackResult.",
@@ -7416,7 +7416,7 @@
           "name": "IReactiveNodeOptions",
           "kind": "type",
           "signature": "export type IReactiveNodeOptions = { debugName?: string; };",
-          "declarationLine": 10,
+          "declarationLine": 11,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "IReactiveNodeOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IReactiveNodeOptions.",
@@ -7479,10 +7479,10 @@
         {
           "name": "IReactiveRuntimeAdapter",
           "kind": "type",
-          "signature": "export type IReactiveRuntimeAdapter = { /** 调度一次微任务。 */ scheduleMicrotask(task: () => void): void; /** 单调时间，用于 duration。 */ now(): number; /** 事件时间戳，可与 duration 分离。 */ timestamp(): number; /** 默认错误出口。 */ reportError(error: unknown, context: IRuntimeErrorContext): void; };",
-          "declarationLine": 117,
+          "signature": "export type IReactiveRuntimeAdapter = { /** Schedules one microtask. */ scheduleMicrotask(task: () => void): void; /** Supplies monotonic time for durations. */ now(): number; /** Supplies event timestamps independently of duration measurements. */ timestamp(): number; /** Default error reporting channel. */ reportError(error: unknown, context: IRuntimeErrorContext): void; };",
+          "declarationLine": 133,
           "source": "packages/reactive/dist/runtime/types.d.ts",
-          "purpose": "运行时宿主能力注入面（`docs/contracts/runtime-neutrality.sdd.md` R-9）。 与 `@migaia/utils/scheduler` 的时钟分离一致：`now()` 单调（对应 `IScheduler.now()`），只用于 duration； `timestamp()` 为 epoch 事件时间戳（对应 `IWallClock.timestamp()`）；二者不得混用。默认值见 `default-runtime-adapter.ts`。",
+          "purpose": "Host capability injection boundary (`docs/contracts/runtime-neutrality.sdd.md` R-9). As in `@migaia/utils/scheduler`, `now()` is monotonic and measures durations (`IScheduler.now()`). `timestamp()` supplies epoch event time (`IWallClock.timestamp()`). Do not mix the two clocks. See `default-runtime-adapter.ts` for defaults.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IReactiveRuntimeAdapter.",
           "advanced": "No additional advanced behavior is declared for IReactiveRuntimeAdapter.",
           "parameters": ["This type declaration has no parameters."],
@@ -7496,7 +7496,7 @@
           "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
-            "export type IReactiveRuntimeAdapter = { /** 调度一次微任务。 */ scheduleMicrotask(task: () => void): void; /** 单调时间，用于 duration。 */ now(): number; /** 事件时间戳，可与 duration 分离。 */ timestamp(): number; /** 默认错误出口。 */ reportError(error: unknown, context: IRuntimeErrorContext): void; };"
+            "export type IReactiveRuntimeAdapter = { /** Schedules one microtask. */ scheduleMicrotask(task: () => void): void; /** Supplies monotonic time for durations. */ now(): number; /** Supplies event timestamps independently of duration measurements. */ timestamp(): number; /** Default error reporting channel. */ reportError(error: unknown, context: IRuntimeErrorContext): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7506,7 +7506,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "运行时宿主能力注入面（`docs/contracts/runtime-neutrality.sdd.md` R-9）。 与 `@migaia/utils/scheduler` 的时钟分离一致：`now()` 单调（对应 `IScheduler.now()`），只用于 duration； `timestamp()` 为 epoch 事件时间戳（对应 `IWallClock.timestamp()`）；二者不得混用。默认值见 `default-runtime-adapter.ts`。"
+              "content": "Host capability injection boundary (`docs/contracts/runtime-neutrality.sdd.md` R-9). As in `@migaia/utils/scheduler`, `now()` is monotonic and measures durations (`IScheduler.now()`). `timestamp()` supplies epoch event time (`IWallClock.timestamp()`). Do not mix the two clocks. See `default-runtime-adapter.ts` for defaults."
             },
             {
               "id": "getting-started",
@@ -7535,7 +7535,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/runtime/types.d.ts:IReactiveRuntimeAdapter:export type IReactiveRuntimeAdapter = { /** 调度一次微任务。 */ scheduleMicrotask(task: () => void): void; /** 单调时间，用于 duration。 */ now(): number; /** 事件时间戳，可与 duration 分离。 */ timestamp(): number; /** 默认错误出口。 */ reportError(error: unknown, context: IRuntimeErrorContext): void; };",
+          "identity": "packages/reactive/dist/runtime/types.d.ts:IReactiveRuntimeAdapter:export type IReactiveRuntimeAdapter = { /** Schedules one microtask. */ scheduleMicrotask(task: () => void): void; /** Supplies monotonic time for durations. */ now(): number; /** Supplies event timestamps independently of duration measurements. */ timestamp(): number; /** Default error reporting channel. */ reportError(error: unknown, context: IRuntimeErrorContext): void; };",
           "guidance": [],
           "usageScore": 10,
           "configuration": [],
@@ -7733,10 +7733,10 @@
         {
           "name": "IRuntime",
           "kind": "type",
-          "signature": "export type IRuntime = { readonly [RUNTIME_BRAND]: true; /** Bump 版本 + 向下游标脏（wasm 字段等自定义 Source 复用同一条通知管线） */ signal<T>(value: T, options?: IReactiveNodeOptions): ISignal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): IComputedValue<T>; effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; batch<T>(fn: () => T): T; untracked<T>(fn: () => T): T; /** 同步冲刷当前队列。observer 内重入时外层 flush 仍拥有队列，返回 `deferred`； 最外层调用完成并排空队列时返回 `completed`。 */ flush(): IFlushResult; /** 受控地替换冲刷策略；只改变何时 flush，不交出 Scheduler 队列本身。 */ setSchedulerStrategy(strategy: ISchedulerStrategy): void; /** 只读版本观测；不交出可递增的 VersionClock。 */ currentVersion(): number; /** 执行并追踪一段真实 action。调用方只能提供 name 与函数，不能伪造 start/end/error 阶段或任意注入 trace event。 */ runTracedAction<T>(name: string, fn: () => T): T; reportError(error: unknown, context: IRuntimeErrorReportContext): void; /** 诊断面只读：事件只能由受信内核产生，调用方不能伪造 action/依赖记录。 */ subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer; };",
-          "declarationLine": 76,
+          "signature": "export type IRuntime = { readonly [RUNTIME_BRAND]: true; /** * Creates a writable node owned by this runtime and sharing its dependency graph and version * clock. */ signal<T>(value: T, options?: IReactiveNodeOptions): ISignal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): IComputedValue<T>; effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; batch<T>(fn: () => T): T; untracked<T>(fn: () => T): T; /** * Flushes synchronously. Reentrant observer calls return `deferred`; the outer call returns * `completed` after draining the queue. */ flush(): IFlushResult; /** Replaces flush timing through a controlled strategy without exposing the scheduler queue. */ setSchedulerStrategy(strategy: ISchedulerStrategy): void; /** Reads the current version without exposing an incrementable `VersionClock`. */ currentVersion(): number; /** * Runs and traces an action. Callers provide only its name and function, never fabricated phases * or trace events. */ runTracedAction<T>(name: string, fn: () => T): T; reportError(error: unknown, context: IRuntimeErrorReportContext): void; /** * Subscribes to read-only diagnostics. Only the trusted kernel emits action and dependency * records. */ subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer; };",
+          "declarationLine": 79,
           "source": "packages/reactive/dist/runtime/types.d.ts",
-          "purpose": "运行时消费接口——一套时钟 + 依赖追踪 + 调度器 + 节点工厂。同一 IRuntime 内的节点共享一张依赖图/一条版本时钟， 不同 IRuntime 完全隔离。只有本库 Runtime 实现它；节点/wasm 字段/React 适配层只依赖这个消费面，不碰具体类。 （这里 import type 反引用 Signal/Computed 仅为类型，全部被擦除，不产生任何运行时循环依赖。）",
+          "purpose": "Consumer interface for one clock, dependency tracker, scheduler, and node factories. Nodes in one `IRuntime` share a graph and version clock. Different runtimes are isolated. Only the library's `Runtime` implements this interface. Nodes, Wasm fields, and React adapters depend on this view rather than the concrete class. Type-only references to `Signal` and `Computed` are erased and create no runtime dependency cycle.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntime.",
           "advanced": "No additional advanced behavior is declared for IRuntime.",
           "parameters": ["This type declaration has no parameters."],
@@ -7758,7 +7758,7 @@
           "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
-            "export type IRuntime = { readonly [RUNTIME_BRAND]: true; /** Bump 版本 + 向下游标脏（wasm 字段等自定义 Source 复用同一条通知管线） */ signal<T>(value: T, options?: IReactiveNodeOptions): ISignal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): IComputedValue<T>; effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; batch<T>(fn: () => T): T; untracked<T>(fn: () => T): T; /** 同步冲刷当前队列。observer 内重入时外层 flush 仍拥有队列，返回 `deferred`； 最外层调用完成并排空队列时返回 `completed`。 */ flush(): IFlushResult; /** 受控地替换冲刷策略；只改变何时 flush，不交出 Scheduler 队列本身。 */ setSchedulerStrategy(strategy: ISchedulerStrategy): void; /** 只读版本观测；不交出可递增的 VersionClock。 */ currentVersion(): number; /** 执行并追踪一段真实 action。调用方只能提供 name 与函数，不能伪造 start/end/error 阶段或任意注入 trace event。 */ runTracedAction<T>(name: string, fn: () => T): T; reportError(error: unknown, context: IRuntimeErrorReportContext): void; /** 诊断面只读：事件只能由受信内核产生，调用方不能伪造 action/依赖记录。 */ subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer; };"
+            "export type IRuntime = { readonly [RUNTIME_BRAND]: true; /** * Creates a writable node owned by this runtime and sharing its dependency graph and version * clock. */ signal<T>(value: T, options?: IReactiveNodeOptions): ISignal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): IComputedValue<T>; effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; batch<T>(fn: () => T): T; untracked<T>(fn: () => T): T; /** * Flushes synchronously. Reentrant observer calls return `deferred`; the outer call returns * `completed` after draining the queue. */ flush(): IFlushResult; /** Replaces flush timing through a controlled strategy without exposing the scheduler queue. */ setSchedulerStrategy(strategy: ISchedulerStrategy): void; /** Reads the current version without exposing an incrementable `VersionClock`. */ currentVersion(): number; /** * Runs and traces an action. Callers provide only its name and function, never fabricated phases * or trace events. */ runTracedAction<T>(name: string, fn: () => T): T; reportError(error: unknown, context: IRuntimeErrorReportContext): void; /** * Subscribes to read-only diagnostics. Only the trusted kernel emits action and dependency * records. */ subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7768,7 +7768,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "运行时消费接口——一套时钟 + 依赖追踪 + 调度器 + 节点工厂。同一 IRuntime 内的节点共享一张依赖图/一条版本时钟， 不同 IRuntime 完全隔离。只有本库 Runtime 实现它；节点/wasm 字段/React 适配层只依赖这个消费面，不碰具体类。 （这里 import type 反引用 Signal/Computed 仅为类型，全部被擦除，不产生任何运行时循环依赖。）"
+              "content": "Consumer interface for one clock, dependency tracker, scheduler, and node factories. Nodes in one `IRuntime` share a graph and version clock. Different runtimes are isolated. Only the library's `Runtime` implements this interface. Nodes, Wasm fields, and React adapters depend on this view rather than the concrete class. Type-only references to `Signal` and `Computed` are erased and create no runtime dependency cycle."
             },
             {
               "id": "getting-started",
@@ -7797,7 +7797,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/runtime/types.d.ts:IRuntime:export type IRuntime = { readonly [RUNTIME_BRAND]: true; /** Bump 版本 + 向下游标脏（wasm 字段等自定义 Source 复用同一条通知管线） */ signal<T>(value: T, options?: IReactiveNodeOptions): ISignal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): IComputedValue<T>; effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; batch<T>(fn: () => T): T; untracked<T>(fn: () => T): T; /** 同步冲刷当前队列。observer 内重入时外层 flush 仍拥有队列，返回 `deferred`； 最外层调用完成并排空队列时返回 `completed`。 */ flush(): IFlushResult; /** 受控地替换冲刷策略；只改变何时 flush，不交出 Scheduler 队列本身。 */ setSchedulerStrategy(strategy: ISchedulerStrategy): void; /** 只读版本观测；不交出可递增的 VersionClock。 */ currentVersion(): number; /** 执行并追踪一段真实 action。调用方只能提供 name 与函数，不能伪造 start/end/error 阶段或任意注入 trace event。 */ runTracedAction<T>(name: string, fn: () => T): T; reportError(error: unknown, context: IRuntimeErrorReportContext): void; /** 诊断面只读：事件只能由受信内核产生，调用方不能伪造 action/依赖记录。 */ subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer; };",
+          "identity": "packages/reactive/dist/runtime/types.d.ts:IRuntime:export type IRuntime = { readonly [RUNTIME_BRAND]: true; /** * Creates a writable node owned by this runtime and sharing its dependency graph and version * clock. */ signal<T>(value: T, options?: IReactiveNodeOptions): ISignal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): IComputedValue<T>; effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; batch<T>(fn: () => T): T; untracked<T>(fn: () => T): T; /** * Flushes synchronously. Reentrant observer calls return `deferred`; the outer call returns * `completed` after draining the queue. */ flush(): IFlushResult; /** Replaces flush timing through a controlled strategy without exposing the scheduler queue. */ setSchedulerStrategy(strategy: ISchedulerStrategy): void; /** Reads the current version without exposing an incrementable `VersionClock`. */ currentVersion(): number; /** * Runs and traces an action. Callers provide only its name and function, never fabricated phases * or trace events. */ runTracedAction<T>(name: string, fn: () => T): T; reportError(error: unknown, context: IRuntimeErrorReportContext): void; /** * Subscribes to read-only diagnostics. Only the trusted kernel emits action and dependency * records. */ subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer; };",
           "guidance": [],
           "usageScore": 136,
           "configuration": [],
@@ -7807,7 +7807,7 @@
           "name": "IRuntimeErrorContext",
           "kind": "type",
           "signature": "export type IRuntimeErrorContext = { phase: IRuntimeErrorPhase; observer?: IRuntimeNodeDescriptor; observable?: IRuntimeNodeDescriptor; };",
-          "declarationLine": 97,
+          "declarationLine": 112,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "IRuntimeErrorContext is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeErrorContext.",
@@ -7872,7 +7872,7 @@
           "name": "IRuntimeErrorPhase",
           "kind": "type",
           "signature": "export type IRuntimeErrorPhase = (typeof ReactiveErrorPhase)[keyof typeof ReactiveErrorPhase];",
-          "declarationLine": 96,
+          "declarationLine": 111,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "IRuntimeErrorPhase is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeErrorPhase.",
@@ -7935,7 +7935,7 @@
           "name": "IRuntimeErrorReportContext",
           "kind": "type",
           "signature": "export type IRuntimeErrorReportContext = { phase: IRuntimeErrorPhase; observer?: object; observable?: object; };",
-          "declarationLine": 106,
+          "declarationLine": 121,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "Input accepted by `reportError`. Runtime implementations must snapshot object metadata before invoking public callbacks; raw objects are never forwarded.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeErrorReportContext.",
@@ -7998,7 +7998,7 @@
           "name": "IRuntimeNodeDescriptor",
           "kind": "type",
           "signature": "export type IRuntimeNodeDescriptor = Readonly<{ id: string; kind: IRuntimeNodeKind; debugName?: string; }>;",
-          "declarationLine": 39,
+          "declarationLine": 40,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "Diagnostic callbacks receive this descriptor, never the mutable graph node. `id` remains stable for the node lifetime and correlates trace relationships within one loaded library copy. Aggregators must namespace streams from independently bundled copies.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeNodeDescriptor.",
@@ -8063,7 +8063,7 @@
           "name": "IRuntimeNodeKind",
           "kind": "type",
           "signature": "export type IRuntimeNodeKind = 'observable' | 'observer' | 'computed';",
-          "declarationLine": 33,
+          "declarationLine": 34,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "Public, immutable identity for a reactive graph node.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeNodeKind.",
@@ -8125,8 +8125,8 @@
         {
           "name": "IRuntimeOptions",
           "kind": "type",
-          "signature": "export type IRuntimeOptions = { /** 宿主能力注入面；缺省项回落到 `defaultRuntimeAdapter`。 */ adapter?: Partial<IReactiveRuntimeAdapter>; onError?: (error: unknown, context: IRuntimeErrorContext) => void; onTrace?: (event: IRuntimeTraceEvent) => void; /** * 一次冲刷里单个 observer 允许的最大执行次数，默认 100。单个 observer 超限视为自触发环：抛错并清空队列。 * * 可配置，因为它是策略参数而非物理常数——很长的派生链每轮只推进一级也会吃轮次。 */ maxFlushPasses?: number; /** * 无观察者 Computed 的挂起时机，默认走 adapter 的 `scheduleMicrotask`。 * * 与调度策略分开：挂起是回收，不是冲刷。写死之后这条路径不受任何配置控制， rAF/idle 策略下时机对不上，测试也只能靠等微任务。 */ scheduleIdle?: (task: () => void) => void; };",
-          "declarationLine": 127,
+          "signature": "export type IRuntimeOptions = { /** Injects host capabilities. Missing entries use `defaultRuntimeAdapter`. */ adapter?: Partial<IReactiveRuntimeAdapter>; onError?: (error: unknown, context: IRuntimeErrorContext) => void; onTrace?: (event: IRuntimeTraceEvent) => void; /** * Maximum executions for one observer within one flush. The default is 100. Exceeding the limit * is treated as a self-triggering cycle and throws after clearing the queue. * * The limit is configurable scheduling policy, not a physical constant. */ maxFlushPasses?: number; /** * Schedules suspension of an unobserved `Computed`. Defaults to the adapter's * `scheduleMicrotask`. * * Suspension is cleanup, so its timing is separate from flushing. This configurable channel can * align cleanup with animation-frame or idle policies without requiring callers or tests to wait * for a hard-coded microtask. */ scheduleIdle?: (task: () => void) => void; };",
+          "declarationLine": 143,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "IRuntimeOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeOptions.",
@@ -8145,7 +8145,7 @@
           "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
-            "export type IRuntimeOptions = { /** 宿主能力注入面；缺省项回落到 `defaultRuntimeAdapter`。 */ adapter?: Partial<IReactiveRuntimeAdapter>; onError?: (error: unknown, context: IRuntimeErrorContext) => void; onTrace?: (event: IRuntimeTraceEvent) => void; /** * 一次冲刷里单个 observer 允许的最大执行次数，默认 100。单个 observer 超限视为自触发环：抛错并清空队列。 * * 可配置，因为它是策略参数而非物理常数——很长的派生链每轮只推进一级也会吃轮次。 */ maxFlushPasses?: number; /** * 无观察者 Computed 的挂起时机，默认走 adapter 的 `scheduleMicrotask`。 * * 与调度策略分开：挂起是回收，不是冲刷。写死之后这条路径不受任何配置控制， rAF/idle 策略下时机对不上，测试也只能靠等微任务。 */ scheduleIdle?: (task: () => void) => void; };"
+            "export type IRuntimeOptions = { /** Injects host capabilities. Missing entries use `defaultRuntimeAdapter`. */ adapter?: Partial<IReactiveRuntimeAdapter>; onError?: (error: unknown, context: IRuntimeErrorContext) => void; onTrace?: (event: IRuntimeTraceEvent) => void; /** * Maximum executions for one observer within one flush. The default is 100. Exceeding the limit * is treated as a self-triggering cycle and throws after clearing the queue. * * The limit is configurable scheduling policy, not a physical constant. */ maxFlushPasses?: number; /** * Schedules suspension of an unobserved `Computed`. Defaults to the adapter's * `scheduleMicrotask`. * * Suspension is cleanup, so its timing is separate from flushing. This configurable channel can * align cleanup with animation-frame or idle policies without requiring callers or tests to wait * for a hard-coded microtask. */ scheduleIdle?: (task: () => void) => void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8184,7 +8184,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/runtime/types.d.ts:IRuntimeOptions:export type IRuntimeOptions = { /** 宿主能力注入面；缺省项回落到 `defaultRuntimeAdapter`。 */ adapter?: Partial<IReactiveRuntimeAdapter>; onError?: (error: unknown, context: IRuntimeErrorContext) => void; onTrace?: (event: IRuntimeTraceEvent) => void; /** * 一次冲刷里单个 observer 允许的最大执行次数，默认 100。单个 observer 超限视为自触发环：抛错并清空队列。 * * 可配置，因为它是策略参数而非物理常数——很长的派生链每轮只推进一级也会吃轮次。 */ maxFlushPasses?: number; /** * 无观察者 Computed 的挂起时机，默认走 adapter 的 `scheduleMicrotask`。 * * 与调度策略分开：挂起是回收，不是冲刷。写死之后这条路径不受任何配置控制， rAF/idle 策略下时机对不上，测试也只能靠等微任务。 */ scheduleIdle?: (task: () => void) => void; };",
+          "identity": "packages/reactive/dist/runtime/types.d.ts:IRuntimeOptions:export type IRuntimeOptions = { /** Injects host capabilities. Missing entries use `defaultRuntimeAdapter`. */ adapter?: Partial<IReactiveRuntimeAdapter>; onError?: (error: unknown, context: IRuntimeErrorContext) => void; onTrace?: (event: IRuntimeTraceEvent) => void; /** * Maximum executions for one observer within one flush. The default is 100. Exceeding the limit * is treated as a self-triggering cycle and throws after clearing the queue. * * The limit is configurable scheduling policy, not a physical constant. */ maxFlushPasses?: number; /** * Schedules suspension of an unobserved `Computed`. Defaults to the adapter's * `scheduleMicrotask`. * * Suspension is cleanup, so its timing is separate from flushing. This configurable channel can * align cleanup with animation-frame or idle policies without requiring callers or tests to wait * for a hard-coded microtask. */ scheduleIdle?: (task: () => void) => void; };",
           "guidance": [],
           "usageScore": 34,
           "configuration": [],
@@ -8194,7 +8194,7 @@
           "name": "IRuntimeTraceEvent",
           "kind": "type",
           "signature": "export type IRuntimeTraceEvent = { readonly type: typeof ReactiveTraceType.observableChange; readonly timestamp: number; readonly observable: IRuntimeNodeDescriptor; readonly reason: typeof ReactiveTraceReason.set | typeof ReactiveTraceReason.notify; } | { readonly type: typeof ReactiveTraceType.dependency; readonly timestamp: number; readonly phase: typeof ReactiveTracePhase.connect | typeof ReactiveTracePhase.disconnect; readonly observable: IRuntimeNodeDescriptor; readonly observer: IRuntimeNodeDescriptor; readonly reason?: typeof ReactiveTraceReason.retrack | typeof ReactiveTraceReason.invalidate | typeof ReactiveTraceReason.dispose; } | { readonly type: typeof ReactiveTraceType.observerRun; readonly timestamp: number; readonly phase: typeof ReactiveTracePhase.start | typeof ReactiveTracePhase.end | typeof ReactiveTracePhase.error; readonly observer: IRuntimeNodeDescriptor; readonly durationMs?: number; readonly error?: unknown; } | { readonly type: typeof ReactiveTraceType.action; readonly timestamp: number; readonly phase: typeof ReactiveTracePhase.start | typeof ReactiveTracePhase.end | typeof ReactiveTracePhase.error; readonly name: string; readonly durationMs?: number; readonly error?: unknown; };",
-          "declarationLine": 44,
+          "declarationLine": 45,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "IRuntimeTraceEvent is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeTraceEvent.",
@@ -8263,9 +8263,9 @@
           "name": "ISchedulerStrategy",
           "kind": "type",
           "signature": "export type ISchedulerStrategy = (flush: () => void) => void;",
-          "declarationLine": 182,
+          "declarationLine": 214,
           "source": "packages/reactive/dist/runtime/types.d.ts",
-          "purpose": "冲刷触发策略——决定\"待处理的响应式副作用什么时候真正执行\"。默认是微任务合并， 可换成 rAF/idle/优先级队列等；Scheduler 类持有一个策略实例，而不是自己是策略。",
+          "purpose": "Controls when pending reactive effects execute. Defaults to merged microtasks and can use animation frames, idle callbacks, or priority queues. `Scheduler` owns a strategy instance.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISchedulerStrategy.",
           "advanced": "No additional advanced behavior is declared for ISchedulerStrategy.",
           "parameters": ["This type declaration has no parameters."],
@@ -8288,7 +8288,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "冲刷触发策略——决定\"待处理的响应式副作用什么时候真正执行\"。默认是微任务合并， 可换成 rAF/idle/优先级队列等；Scheduler 类持有一个策略实例，而不是自己是策略。"
+              "content": "Controls when pending reactive effects execute. Defaults to merged microtasks and can use animation frames, idle callbacks, or priority queues. `Scheduler` owns a strategy instance."
             },
             {
               "id": "getting-started",
@@ -8327,7 +8327,7 @@
           "name": "ISignal",
           "kind": "type",
           "signature": "export type ISignal<T> = IDisposable & { readonly runtime: IRuntime; readonly debugName?: string; readonly observed: boolean; value: T; peek(): T; };",
-          "declarationLine": 17,
+          "declarationLine": 18,
           "source": "packages/reactive/dist/runtime/types.d.ts",
           "purpose": "Public writable node view. Graph bookkeeping stays behind Runtime internals; consumers only receive value/lifecycle operations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISignal.",
@@ -8956,7 +8956,7 @@
               "name": "adapter",
               "type": "Partial<IReactiveRuntimeAdapter>",
               "optional": true,
-              "description": "宿主能力注入面；缺省项回落到 `defaultRuntimeAdapter`。"
+              "description": "Injects host capabilities. Missing entries use `defaultRuntimeAdapter`."
             },
             {
               "name": "onError",
@@ -8974,13 +8974,13 @@
               "name": "maxFlushPasses",
               "type": "number",
               "optional": true,
-              "description": "一次冲刷里单个 observer 允许的最大执行次数，默认 100。单个 observer 超限视为自触发环：抛错并清空队列。 * * 可配置，因为它是策略参数而非物理常数——很长的派生链每轮只推进一级也会吃轮次。"
+              "description": "Maximum executions for one observer within one flush. The default is 100. Exceeding the limit * is treated as a self-triggering cycle and throws after clearing the queue. * * The limit is configurable scheduling policy, not a physical constant."
             },
             {
               "name": "scheduleIdle",
               "type": "(task: () => void) => void",
               "optional": true,
-              "description": "无观察者 Computed 的挂起时机，默认走 adapter 的 `scheduleMicrotask`。 * * 与调度策略分开：挂起是回收，不是冲刷。写死之后这条路径不受任何配置控制， rAF/idle 策略下时机对不上，测试也只能靠等微任务。"
+              "description": "Schedules suspension of an unobserved `Computed`. Defaults to the adapter's * `scheduleMicrotask`. * * Suspension is cleanup, so its timing is separate from flushing. This configurable channel can * align cleanup with animation-frame or idle policies without requiring callers or tests to wait * for a hard-coded microtask."
             }
           ],
           "identity": "packages/reactive/dist/runtime/runtime.class.d.ts:Runtime:export declare class Runtime implements IRuntime { #private; readonly [RUNTIME_BRAND]: true; constructor(options?: IRuntimeOptions); signal<T>(value: T, options?: IReactiveNodeOptions): Signal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): Computed<T>; effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; batch<T>(fn: () => T): T; untracked<T>(fn: () => T): T; flush(): IFlushResult; setSchedulerStrategy(strategy: ISchedulerStrategy): void; currentVersion(): number; runTracedAction<T>(name: string, fn: () => T): T; reportError(error: unknown, context: IRuntimeErrorReportContext): void; subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer; }",
@@ -9123,7 +9123,7 @@
               "type": "Partial<IReactiveRuntimeAdapter>",
               "optional": true,
               "description": "`adapter` 的每个方法（`scheduleMicrotask`/`now`/`timestamp`/`reportError`）独立解析：未提供或显式 `undefined` 回落到默认实现（`queueMicrotask`/`performance.now()`/`Date.now()`/no-op）；提供了但不是函数抛贴 `INVALID_OPTION` 码的 `TypeError`。",
-              "descriptionEn": "",
+              "descriptionEn": "Injects host capabilities. Missing entries use `defaultRuntimeAdapter`.",
               "descriptionZh": "`adapter` 的每个方法（`scheduleMicrotask`/`now`/`timestamp`/`reportError`）独立解析：未提供或显式 `undefined` 回落到默认实现（`queueMicrotask`/`performance.now()`/`Date.now()`/no-op）；提供了但不是函数抛贴 `INVALID_OPTION` 码的 `TypeError`。"
             },
             {
@@ -9147,7 +9147,7 @@
               "type": "number",
               "optional": true,
               "description": "`maxFlushPasses` 非正整数（非安全整数或 `< 1`）抛贴 `INVALID_OPTION` 码的 `RangeError`。",
-              "descriptionEn": "",
+              "descriptionEn": "Maximum executions for one observer within one flush. The default is 100. Exceeding the limit * is treated as a self-triggering cycle and throws after clearing the queue. * * The limit is configurable scheduling policy, not a physical constant.",
               "descriptionZh": "`maxFlushPasses` 非正整数（非安全整数或 `< 1`）抛贴 `INVALID_OPTION` 码的 `RangeError`。"
             },
             {
@@ -9155,7 +9155,7 @@
               "type": "(task: () => void) => void",
               "optional": true,
               "description": "`onError`/`onTrace`/`scheduleIdle` 若提供但不是函数，同样抛 `INVALID_OPTION`。",
-              "descriptionEn": "",
+              "descriptionEn": "Schedules suspension of an unobserved `Computed`. Defaults to the adapter's * `scheduleMicrotask`. * * Suspension is cleanup, so its timing is separate from flushing. This configurable channel can * align cleanup with animation-frame or idle policies without requiring callers or tests to wait * for a hard-coded microtask.",
               "descriptionZh": "`onError`/`onTrace`/`scheduleIdle` 若提供但不是函数，同样抛 `INVALID_OPTION`。"
             }
           ],
@@ -9165,9 +9165,9 @@
           "name": "RUNTIME_BRAND",
           "kind": "const",
           "signature": "export declare const RUNTIME_BRAND: unique symbol;",
-          "declarationLine": 9,
+          "declarationLine": 10,
           "source": "packages/reactive/dist/runtime/types.d.ts",
-          "purpose": "Runtime 是本库创建并登记内部面的封闭对象，不是可结构伪造的 SPI。 符号不从公共入口导出；真实权限仍由 internals WeakMap 校验，这个品牌只让类型契约 与运行时事实一致。扩展应组合 `createRuntime()`，而不是手写一个缺少内部面的对象。",
+          "purpose": "A runtime is a registered object created by this library, not a structurally fabricated SPI. The public entry does not export this symbol. The internals WeakMap still checks actual authority. This brand aligns the type contract with runtime ownership. Compose `createRuntime()` instead of creating an object without registered internals.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RUNTIME_BRAND.",
           "advanced": "No additional advanced behavior is declared for RUNTIME_BRAND.",
           "parameters": ["This const declaration has no parameters."],
@@ -9187,7 +9187,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Runtime 是本库创建并登记内部面的封闭对象，不是可结构伪造的 SPI。 符号不从公共入口导出；真实权限仍由 internals WeakMap 校验，这个品牌只让类型契约 与运行时事实一致。扩展应组合 `createRuntime()`，而不是手写一个缺少内部面的对象。"
+              "content": "A runtime is a registered object created by this library, not a structurally fabricated SPI. The public entry does not export this symbol. The internals WeakMap still checks actual authority. This brand aligns the type contract with runtime ownership. Compose `createRuntime()` instead of creating an object without registered internals."
             },
             {
               "id": "getting-started",
@@ -9225,7 +9225,7 @@
         {
           "name": "Scheduler",
           "kind": "class",
-          "signature": "export declare class Scheduler { #private; batchDepth: number; constructor(onAsyncError?: (error: unknown, phase?: IReactiveErrorPhase) => void, maxFlushPasses?: number, scheduleMicrotask?: (task: () => void) => void); /** * Replaces trigger strategy; rejects non-callable runtime values before changing current * strategy. */ setStrategy(strategy: ISchedulerStrategy): void; /** 把一项加入待冲刷队列；不在批处理里就立刻申请一次冲刷 */ enqueue(item: IFlushable): void; /** 从队列移除（比如 effect dispose 时，避免已销毁的实例还留在队列里） */ dequeue(item: IFlushable): void; /** 申请一次冲刷——signal 写入/notifySource 也会各自调用它； 重复调用是安全的，scheduled/flushing 两个标记天然去重，不会重复触发 */ requestFlush(): void; /** * 冲刷全部待执行项（合并为一轮）。 * * 冲刷期间重入返回 `deferred`。最外层 while 最终仍会排空新加入的队列，但内层 `flush()` 无法兑现「返回时本次待办已经执行」；返回判别值让调用方看见这个 * 差异，同时不把合法的 action/devtools 重入升级成 observer 错误。 */ flush(): IFlushResult; /** * 显式批处理：进入时计深度，最外层退出才真正冲刷一次。 错误优先级：若 fn（业务动作）抛错 A，且随后 flush 又抛错 B，优先抛出业务错误 A（B 附在 cause 上）， * 避免原始业务错误被 finally 里的 flush 错误覆盖掉。 */ runBatched<T>(fn: () => T): T; /** * Delay scheduling until a notification fan-out has marked every subscriber. Unlike a user batch, * this preserves the configured async/sync strategy. */ runDeferred<T>(fn: () => T): T; }",
+          "signature": "export declare class Scheduler { #private; batchDepth: number; constructor(onAsyncError?: (error: unknown, phase?: IReactiveErrorPhase) => void, maxFlushPasses?: number, scheduleMicrotask?: (task: () => void) => void); /** * Replaces trigger strategy; rejects non-callable runtime values before changing current * strategy. */ setStrategy(strategy: ISchedulerStrategy): void; /** Enqueues an item and requests a flush immediately when no batch is active. */ enqueue(item: IFlushable): void; /** Removes an item from the queue, for example when an effect is disposed. */ dequeue(item: IFlushable): void; /** * Requests a flush. Signal writes and source notifications also use this path. Scheduling and * flushing flags deduplicate repeated requests. */ requestFlush(): void; /** * Flushes all pending items as one scheduling transaction. * * A reentrant call during flushing returns `deferred`. The outer loop drains newly enqueued work, * but the inner call cannot promise completion before returning. The result exposes this * distinction without treating valid action or DevTools reentrancy as an observer failure. */ flush(): IFlushResult; /** * Runs an explicit batch. Entry increments batch depth; only the outermost exit flushes. * * If the business action throws and the final flush also fails, the business error takes * priority. When that error accepts a `cause`, the flush error is attached without replacing it. * Otherwise an aggregate retains both original failures, so final cleanup cannot hide the * business failure. */ runBatched<T>(fn: () => T): T; /** * Delay scheduling until a notification fan-out has marked every subscriber. Unlike a user batch, * this preserves the configured async/sync strategy. */ runDeferred<T>(fn: () => T): T; }",
           "declarationLine": 3,
           "source": "packages/reactive/dist/runtime/scheduler.class.d.ts",
           "purpose": "Scheduler is part of this module's public class contract.",
@@ -9284,7 +9284,7 @@
               "name": "enqueue",
               "kind": "method",
               "signature": "enqueue(item: IFlushable): void;",
-              "description": "把一项加入待冲刷队列；不在批处理里就立刻申请一次冲刷",
+              "description": "Enqueues an item and requests a flush immediately when no batch is active.",
               "parameterDetails": [
                 {
                   "name": "item",
@@ -9298,7 +9298,7 @@
               "name": "dequeue",
               "kind": "method",
               "signature": "dequeue(item: IFlushable): void;",
-              "description": "从队列移除（比如 effect dispose 时，避免已销毁的实例还留在队列里）",
+              "description": "Removes an item from the queue, for example when an effect is disposed.",
               "parameterDetails": [
                 {
                   "name": "item",
@@ -9312,7 +9312,7 @@
               "name": "requestFlush",
               "kind": "method",
               "signature": "requestFlush(): void;",
-              "description": "申请一次冲刷——signal 写入/notifySource 也会各自调用它； 重复调用是安全的，scheduled/flushing 两个标记天然去重，不会重复触发",
+              "description": "Requests a flush. Signal writes and source notifications also use this path. Scheduling and flushing flags deduplicate repeated requests.",
               "parameterDetails": [],
               "returns": "void"
             },
@@ -9320,7 +9320,7 @@
               "name": "flush",
               "kind": "method",
               "signature": "flush(): IFlushResult;",
-              "description": "冲刷全部待执行项（合并为一轮）。 冲刷期间重入返回 `deferred`。最外层 while 最终仍会排空新加入的队列，但内层 `flush()` 无法兑现「返回时本次待办已经执行」；返回判别值让调用方看见这个 差异，同时不把合法的 action/devtools 重入升级成 observer 错误。",
+              "description": "Flushes all pending items as one scheduling transaction. A reentrant call during flushing returns `deferred`. The outer loop drains newly enqueued work, but the inner call cannot promise completion before returning. The result exposes this distinction without treating valid action or DevTools reentrancy as an observer failure.",
               "parameterDetails": [],
               "returns": "IFlushResult"
             },
@@ -9328,7 +9328,7 @@
               "name": "runBatched",
               "kind": "method",
               "signature": "runBatched<T>(fn: () => T): T;",
-              "description": "显式批处理：进入时计深度，最外层退出才真正冲刷一次。 错误优先级：若 fn（业务动作）抛错 A，且随后 flush 又抛错 B，优先抛出业务错误 A（B 附在 cause 上）， 避免原始业务错误被 finally 里的 flush 错误覆盖掉。",
+              "description": "Runs an explicit batch. Entry increments batch depth; only the outermost exit flushes. If the business action throws and the final flush also fails, the business error takes priority. When that error accepts a `cause`, the flush error is attached without replacing it. Otherwise an aggregate retains both original failures, so final cleanup cannot hide the business failure.",
               "parameterDetails": [
                 {
                   "name": "fn",
@@ -9356,7 +9356,7 @@
           "aliasOf": "Scheduler",
           "exportPath": "./runtime",
           "overloadSignatures": [
-            "export declare class Scheduler { #private; batchDepth: number; constructor(onAsyncError?: (error: unknown, phase?: IReactiveErrorPhase) => void, maxFlushPasses?: number, scheduleMicrotask?: (task: () => void) => void); /** * Replaces trigger strategy; rejects non-callable runtime values before changing current * strategy. */ setStrategy(strategy: ISchedulerStrategy): void; /** 把一项加入待冲刷队列；不在批处理里就立刻申请一次冲刷 */ enqueue(item: IFlushable): void; /** 从队列移除（比如 effect dispose 时，避免已销毁的实例还留在队列里） */ dequeue(item: IFlushable): void; /** 申请一次冲刷——signal 写入/notifySource 也会各自调用它； 重复调用是安全的，scheduled/flushing 两个标记天然去重，不会重复触发 */ requestFlush(): void; /** * 冲刷全部待执行项（合并为一轮）。 * * 冲刷期间重入返回 `deferred`。最外层 while 最终仍会排空新加入的队列，但内层 `flush()` 无法兑现「返回时本次待办已经执行」；返回判别值让调用方看见这个 * 差异，同时不把合法的 action/devtools 重入升级成 observer 错误。 */ flush(): IFlushResult; /** * 显式批处理：进入时计深度，最外层退出才真正冲刷一次。 错误优先级：若 fn（业务动作）抛错 A，且随后 flush 又抛错 B，优先抛出业务错误 A（B 附在 cause 上）， * 避免原始业务错误被 finally 里的 flush 错误覆盖掉。 */ runBatched<T>(fn: () => T): T; /** * Delay scheduling until a notification fan-out has marked every subscriber. Unlike a user batch, * this preserves the configured async/sync strategy. */ runDeferred<T>(fn: () => T): T; }"
+            "export declare class Scheduler { #private; batchDepth: number; constructor(onAsyncError?: (error: unknown, phase?: IReactiveErrorPhase) => void, maxFlushPasses?: number, scheduleMicrotask?: (task: () => void) => void); /** * Replaces trigger strategy; rejects non-callable runtime values before changing current * strategy. */ setStrategy(strategy: ISchedulerStrategy): void; /** Enqueues an item and requests a flush immediately when no batch is active. */ enqueue(item: IFlushable): void; /** Removes an item from the queue, for example when an effect is disposed. */ dequeue(item: IFlushable): void; /** * Requests a flush. Signal writes and source notifications also use this path. Scheduling and * flushing flags deduplicate repeated requests. */ requestFlush(): void; /** * Flushes all pending items as one scheduling transaction. * * A reentrant call during flushing returns `deferred`. The outer loop drains newly enqueued work, * but the inner call cannot promise completion before returning. The result exposes this * distinction without treating valid action or DevTools reentrancy as an observer failure. */ flush(): IFlushResult; /** * Runs an explicit batch. Entry increments batch depth; only the outermost exit flushes. * * If the business action throws and the final flush also fails, the business error takes * priority. When that error accepts a `cause`, the flush error is attached without replacing it. * Otherwise an aggregate retains both original failures, so final cleanup cannot hide the * business failure. */ runBatched<T>(fn: () => T): T; /** * Delay scheduling until a notification fan-out has marked every subscriber. Unlike a user batch, * this preserves the configured async/sync strategy. */ runDeferred<T>(fn: () => T): T; }"
           ],
           "overloadParameterDetails": [
             [
@@ -9413,7 +9413,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/runtime/scheduler.class.d.ts:Scheduler:export declare class Scheduler { #private; batchDepth: number; constructor(onAsyncError?: (error: unknown, phase?: IReactiveErrorPhase) => void, maxFlushPasses?: number, scheduleMicrotask?: (task: () => void) => void); /** * Replaces trigger strategy; rejects non-callable runtime values before changing current * strategy. */ setStrategy(strategy: ISchedulerStrategy): void; /** 把一项加入待冲刷队列；不在批处理里就立刻申请一次冲刷 */ enqueue(item: IFlushable): void; /** 从队列移除（比如 effect dispose 时，避免已销毁的实例还留在队列里） */ dequeue(item: IFlushable): void; /** 申请一次冲刷——signal 写入/notifySource 也会各自调用它； 重复调用是安全的，scheduled/flushing 两个标记天然去重，不会重复触发 */ requestFlush(): void; /** * 冲刷全部待执行项（合并为一轮）。 * * 冲刷期间重入返回 `deferred`。最外层 while 最终仍会排空新加入的队列，但内层 `flush()` 无法兑现「返回时本次待办已经执行」；返回判别值让调用方看见这个 * 差异，同时不把合法的 action/devtools 重入升级成 observer 错误。 */ flush(): IFlushResult; /** * 显式批处理：进入时计深度，最外层退出才真正冲刷一次。 错误优先级：若 fn（业务动作）抛错 A，且随后 flush 又抛错 B，优先抛出业务错误 A（B 附在 cause 上）， * 避免原始业务错误被 finally 里的 flush 错误覆盖掉。 */ runBatched<T>(fn: () => T): T; /** * Delay scheduling until a notification fan-out has marked every subscriber. Unlike a user batch, * this preserves the configured async/sync strategy. */ runDeferred<T>(fn: () => T): T; }",
+          "identity": "packages/reactive/dist/runtime/scheduler.class.d.ts:Scheduler:export declare class Scheduler { #private; batchDepth: number; constructor(onAsyncError?: (error: unknown, phase?: IReactiveErrorPhase) => void, maxFlushPasses?: number, scheduleMicrotask?: (task: () => void) => void); /** * Replaces trigger strategy; rejects non-callable runtime values before changing current * strategy. */ setStrategy(strategy: ISchedulerStrategy): void; /** Enqueues an item and requests a flush immediately when no batch is active. */ enqueue(item: IFlushable): void; /** Removes an item from the queue, for example when an effect is disposed. */ dequeue(item: IFlushable): void; /** * Requests a flush. Signal writes and source notifications also use this path. Scheduling and * flushing flags deduplicate repeated requests. */ requestFlush(): void; /** * Flushes all pending items as one scheduling transaction. * * A reentrant call during flushing returns `deferred`. The outer loop drains newly enqueued work, * but the inner call cannot promise completion before returning. The result exposes this * distinction without treating valid action or DevTools reentrancy as an observer failure. */ flush(): IFlushResult; /** * Runs an explicit batch. Entry increments batch depth; only the outermost exit flushes. * * If the business action throws and the final flush also fails, the business error takes * priority. When that error accepts a `cause`, the flush error is attached without replacing it. * Otherwise an aggregate retains both original failures, so final cleanup cannot hide the * business failure. */ runBatched<T>(fn: () => T): T; /** * Delay scheduling until a notification fan-out has marked every subscriber. Unlike a user batch, * this preserves the configured async/sync strategy. */ runDeferred<T>(fn: () => T): T; }",
           "guidance": [
             {
               "id": "scheduler",
@@ -9539,7 +9539,7 @@
         {
           "name": "VersionClock",
           "kind": "class",
-          "signature": "export declare class VersionClock { #private; /** * 生产上限是 `Number.MAX_SAFE_INTEGER`。即使持续每秒产生一百万个真实变更，也要 约 285 年才耗尽。原地归零会与仍存活节点的旧版本碰撞并制造漏更新，因此耗尽 后故意 * fail-stop；恢复方式是释放 Store / Scope 持有的节点、丢弃旧 Runtime，再新建一份，而不是重置同一张依赖图。终态断边不领取版本，所以时钟耗尽不妨碍清理。 * * `maxVersion` 仅用于把终态缩小后做确定性测试，Runtime 不覆盖默认值。 */ constructor(maxVersion?: number); /** 领取下一个版本号——signal/computed 的值真的变了就调一次 */ next(): number; /** 当前版本号——只读查看，不消耗 */ current(): number; }",
+          "signature": "export declare class VersionClock { #private; /** * The production limit is `Number.MAX_SAFE_INTEGER`. Even one million real changes per second * takes about 285 years to exhaust it. Resetting the counter would collide with live node * versions and cause missed updates, so exhaustion stops writes. Dispose nodes held by stores or * scopes, discard the old runtime, and create another runtime. Terminal disconnection consumes no * version, so exhaustion does not prevent cleanup. * * `maxVersion` reduces the limit for deterministic tests. `Runtime` keeps the default limit. */ constructor(maxVersion?: number); /** Allocates the next version when a signal or computed value changes. */ next(): number; /** Reads the current version without consuming another version. */ current(): number; }",
           "declarationLine": 1,
           "source": "packages/reactive/dist/runtime/version-clock.class.d.ts",
           "purpose": "VersionClock is part of this module's public class contract.",
@@ -9562,7 +9562,7 @@
               "name": "next",
               "kind": "method",
               "signature": "next(): number;",
-              "description": "领取下一个版本号——signal/computed 的值真的变了就调一次",
+              "description": "Allocates the next version when a signal or computed value changes.",
               "parameterDetails": [],
               "returns": "number"
             },
@@ -9570,7 +9570,7 @@
               "name": "current",
               "kind": "method",
               "signature": "current(): number;",
-              "description": "当前版本号——只读查看，不消耗",
+              "description": "Reads the current version without consuming another version.",
               "parameterDetails": [],
               "returns": "number"
             }
@@ -9578,7 +9578,7 @@
           "aliasOf": "VersionClock",
           "exportPath": "./runtime",
           "overloadSignatures": [
-            "export declare class VersionClock { #private; /** * 生产上限是 `Number.MAX_SAFE_INTEGER`。即使持续每秒产生一百万个真实变更，也要 约 285 年才耗尽。原地归零会与仍存活节点的旧版本碰撞并制造漏更新，因此耗尽 后故意 * fail-stop；恢复方式是释放 Store / Scope 持有的节点、丢弃旧 Runtime，再新建一份，而不是重置同一张依赖图。终态断边不领取版本，所以时钟耗尽不妨碍清理。 * * `maxVersion` 仅用于把终态缩小后做确定性测试，Runtime 不覆盖默认值。 */ constructor(maxVersion?: number); /** 领取下一个版本号——signal/computed 的值真的变了就调一次 */ next(): number; /** 当前版本号——只读查看，不消耗 */ current(): number; }"
+            "export declare class VersionClock { #private; /** * The production limit is `Number.MAX_SAFE_INTEGER`. Even one million real changes per second * takes about 285 years to exhaust it. Resetting the counter would collide with live node * versions and cause missed updates, so exhaustion stops writes. Dispose nodes held by stores or * scopes, discard the old runtime, and create another runtime. Terminal disconnection consumes no * version, so exhaustion does not prevent cleanup. * * `maxVersion` reduces the limit for deterministic tests. `Runtime` keeps the default limit. */ constructor(maxVersion?: number); /** Allocates the next version when a signal or computed value changes. */ next(): number; /** Reads the current version without consuming another version. */ current(): number; }"
           ],
           "overloadParameterDetails": [
             [
@@ -9625,7 +9625,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/runtime/version-clock.class.d.ts:VersionClock:export declare class VersionClock { #private; /** * 生产上限是 `Number.MAX_SAFE_INTEGER`。即使持续每秒产生一百万个真实变更，也要 约 285 年才耗尽。原地归零会与仍存活节点的旧版本碰撞并制造漏更新，因此耗尽 后故意 * fail-stop；恢复方式是释放 Store / Scope 持有的节点、丢弃旧 Runtime，再新建一份，而不是重置同一张依赖图。终态断边不领取版本，所以时钟耗尽不妨碍清理。 * * `maxVersion` 仅用于把终态缩小后做确定性测试，Runtime 不覆盖默认值。 */ constructor(maxVersion?: number); /** 领取下一个版本号——signal/computed 的值真的变了就调一次 */ next(): number; /** 当前版本号——只读查看，不消耗 */ current(): number; }",
+          "identity": "packages/reactive/dist/runtime/version-clock.class.d.ts:VersionClock:export declare class VersionClock { #private; /** * The production limit is `Number.MAX_SAFE_INTEGER`. Even one million real changes per second * takes about 285 years to exhaust it. Resetting the counter would collide with live node * versions and cause missed updates, so exhaustion stops writes. Dispose nodes held by stores or * scopes, discard the old runtime, and create another runtime. Terminal disconnection consumes no * version, so exhaustion does not prevent cleanup. * * `maxVersion` reduces the limit for deterministic tests. `Runtime` keeps the default limit. */ constructor(maxVersion?: number); /** Allocates the next version when a signal or computed value changes. */ next(): number; /** Reads the current version without consuming another version. */ current(): number; }",
           "guidance": [
             {
               "id": "versionclock",
@@ -9771,9 +9771,9 @@
           "name": "createFieldSource",
           "kind": "function",
           "signature": "export declare function createFieldSource(runtime: IRuntime, debugName?: string): IRuntimeFieldSource;",
-          "declarationLine": 16,
+          "declarationLine": 17,
           "source": "packages/reactive/dist/runtime/source.d.ts",
-          "purpose": "为扩展层创建一条受控 Source。 调用方只拿到 track/notify/dispose 三个能力，拿不到 node、subs、version 或 Tracker， 因而不能制造单边依赖、伪造版本、通知另一张 Runtime 图。",
+          "purpose": "Creates a controlled source for extension layers. Callers receive `track`, `notify`, `commit`, `dispose`, and read-only observation and disposal state. The node, `subs`, `version`, and tracker stay private. Callers cannot create one-sided edges, fabricate versions, or notify another runtime's graph.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createFieldSource.",
           "advanced": "No additional advanced behavior is declared for createFieldSource.",
           "parameters": ["runtime: IRuntime", "debugName: string (optional)"],
@@ -9821,7 +9821,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "为扩展层创建一条受控 Source。 调用方只拿到 track/notify/dispose 三个能力，拿不到 node、subs、version 或 Tracker， 因而不能制造单边依赖、伪造版本、通知另一张 Runtime 图。"
+              "content": "Creates a controlled source for extension layers. Callers receive `track`, `notify`, `commit`, `dispose`, and read-only observation and disposal state. The node, `subs`, `version`, and tracker stay private. Callers cannot create one-sided edges, fabricate versions, or notify another runtime's graph."
             },
             {
               "id": "getting-started",
