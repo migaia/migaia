@@ -1,9 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "lib": ["ES2024", "ESNext.Disposable"],
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["node"],
+    "types": [],
     "paths": {
       "@migaia/resource": ["../resource/dist/index.d.ts"],
       "@migaia/store-keyed": ["../store-keyed/dist/index.d.ts"],
@@ -11,5 +12,5 @@
       "@migaia/store-light": ["../store-light/dist/index.d.ts"]
     }
   },
-  "include": ["src", "test"]
+  "include": ["src", "../utils/types/host-globals.d.ts"]
 }

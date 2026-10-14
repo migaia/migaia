@@ -77,5 +77,7 @@ export async function serveTrayHost(
   } finally {
     await child.host.dispose()
   }
-  process.exit(code)
+  /** Thread and process entries are Node realms; the structural read keeps Tray free of Node types. */
+  const realm = Reflect.get(globalThis, 'process') as { exit(code: number): never } | undefined
+  realm?.exit(code)
 }

@@ -9,6 +9,7 @@ import { createEventTargetMessageResource } from '../../dist/runtime-adapter/mes
 import { prepareRuntimePeerSourceContext } from '../../dist/remote/runtime-api/peer.js'
 import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
+import type { ICoroutineMessagePort } from '../../dist/remote/runtime-api/coroutine-task.js'
 
 describe('coroutine runtime binding', () => {
   it('[A1] child recipe starts the genuine task port through EventTarget after capture', async () => {
@@ -21,7 +22,7 @@ describe('coroutine runtime binding', () => {
     /** Task lifetime stays open while two real Peers complete their handshake. */
     const finish = deferred<void>()
     /** Parent port publication comes from the supervisor's existing task context operation. */
-    const exposed = deferred<MessagePort>()
+    const exposed = deferred<ICoroutineMessagePort>()
     /** The original task context supplies the sole opaque child connection. */
     const connected =
       deferred<import('../../dist/remote/runtime-api/coroutine-task.js').ICoroutineConnect>()

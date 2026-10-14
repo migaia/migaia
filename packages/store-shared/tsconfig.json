@@ -2,8 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "lib": ["ES2024", "ESNext.Disposable", "DOM", "DOM.Iterable", "WebWorker"],
-    "types": ["node"]
+    "lib": ["ES2024", "ESNext.Disposable"],
+    "types": []
   },
-  "include": ["src", "test"]
+  "include": ["src", "../utils/types/host-globals.d.ts"]
 }

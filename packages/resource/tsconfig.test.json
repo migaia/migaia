@@ -1,6 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "noEmit": true, "rootDir": ".", "types": ["node", "vitest/globals"] },
-  "include": ["src", "test"],
-  "exclude": ["src/ambient.d.ts"]
+  "include": ["src", "test"]
 }
