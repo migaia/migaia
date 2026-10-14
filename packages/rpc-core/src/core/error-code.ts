@@ -2,13 +2,15 @@
 export const ERROR_SOURCE = '@migaia/rpc/core'
 
 /**
- * `@migaia/rpc/core` 错误码的唯一声明处。
+ * Defines the error codes owned by `@migaia/rpc/core` in one place.
  *
- * 契约见 `docs/contracts/error-codes.md`：错误由 `(source, code)` 二元组唯一定位，`source` 恒为
- * `'@migaia/rpc/core'`。抛出点必须引用本文件的常量，不得内联字面量。
+ * The `(source, code)` pair uniquely identifies an error under `docs/contracts/error-codes.md`.
+ * `source` is always `@migaia/rpc/core`. Throw sites reference these constants rather than inline
+ * literals.
  *
- * 码值是公开 API 的一部分，改名等同破坏性变更（`docs/contracts/error-code-rollout.sdd.md` §1.2）。
- * 本表只保留有实际抛出点的码；迁移时删除的历史预留码记录在 `rpc-layering.sdd.md` R2。
+ * Code values are public API, so renaming one is a breaking change. See
+ * `docs/contracts/error-code-rollout.sdd.md` §1.2. Only codes with actual throw sites remain here.
+ * `rpc-layering.sdd.md` R2 records historical reserved codes removed during migration.
  */
 export const RpcCoreErrorCode = {
   /**
@@ -34,17 +36,18 @@ export const RpcCoreErrorCode = {
    */
   forwardHopLimit: 'FORWARD_HOP_LIMIT',
   /**
-   * 两个 middleware 在同一 factory 里声明了相同的 `name`。
+   * Two middleware declarations in the same factory use the same `name`.
    *
-   * 安装器在安装任何 middleware 之前拒绝；调用方应给每个 middleware 唯一的 name。落实 §7.1 的 「重复 singleton middleware 创建失败」。
+   * The installer rejects before installing any middleware. The caller gives each middleware a
+   * unique `name`. Enforces the duplicate singleton middleware creation rule in §7.1.
    */
   middlewareDuplicated: 'MIDDLEWARE_DUPLICATED',
 
   /**
-   * 某个必需 capability 未安装，却执行了依赖它的操作。
+   * An operation requires a capability that is not installed.
    *
-   * 例如未装 `connect` 就构造 endpoint、未装 `ping` 就调用 `ping()`、未装 `abort` 就传 `signal`。 调用方应补齐对应的
-   * middleware。
+   * Examples include creating an endpoint without `connect`, calling `ping()` without `ping`, or
+   * passing `signal` without `abort`. The caller installs the corresponding middleware.
    */
   middlewareMissing: 'MIDDLEWARE_MISSING',
 
@@ -55,10 +58,11 @@ export const RpcCoreErrorCode = {
   capabilityUnsupported: 'CAPABILITY_UNSUPPORTED',
 
   /**
-   * Factory / middleware / transport 描述符非法或配置字段取值不合法。 Replay r12 also rejects encrypt-only
-   * configuration, unavailable entropy and exhausted counters.
+   * A factory, middleware, or transport descriptor or configuration field is invalid. Replay r12
+   * also rejects encrypt-only configuration, unavailable entropy, and exhausted counters.
    *
-   * 这是参数/配置类错误的统一出口；调用方应按 `detail` 修正配置后重试，不要对同一份配置重试。
+   * This code identifies argument and configuration failures. The caller corrects the configuration
+   * using `detail` before retrying.
    */
   invalidConfig: 'INVALID_CONFIG',
 
@@ -69,134 +73,155 @@ export const RpcCoreErrorCode = {
   probeFailed: 'PROBE_FAILED',
 
   /**
-   * 同一个 method 被 `provide()` 注册了两次。
+   * `provide()` registers the same method twice.
    *
-   * 同名 provider 不覆盖；调用方应合并实现或改名。
+   * A provider does not replace another provider with the same name. The caller combines the
+   * implementations or changes the name.
    */
   providerDuplicated: 'PROVIDER_DUPLICATED',
 
   /**
-   * Protocol codec / scheme / envelope 非法，或 caller 无法还原响应错误、provider 收到非法 abort 载荷；作为
-   * `RpcProtocolError` 的基础码。
+   * A protocol codec, scheme, or envelope is invalid, the caller cannot reconstruct a response
+   * error, or a provider receives an invalid abort payload. This is the base code for
+   * `RpcProtocolError`.
    *
-   * 调用方检查 protocol 配置与对端 scheme 是否一致；载荷已发送或取消已生效时检查对端，不要对同一报文重试。
+   * The caller checks that the protocol configuration matches the peer scheme. If the payload is
+   * already sent or cancellation has taken effect, inspect the peer rather than retrying the same
+   * message.
    */
   protocolInvalid: 'PROTOCOL_INVALID',
 
   /**
-   * Contract 字段、方向或 request/response 关联不合法，作为 `RpcContractError` 的基础码。
+   * Contract fields, direction, or request/response correlation are invalid. This is the base code
+   * for `RpcContractError`.
    *
-   * 调用方检查 version、identifier、sender/target 方向或 taskId/method 关联。
+   * The caller checks `version`, `identifier`, sender/target direction, or `taskId`/method
+   * correlation.
    */
   contractInvalid: 'CONTRACT_INVALID',
 
   /**
-   * Codec 的 payload 不符合其输入规则，或发送端错误序列化的读取、data 投影降级；作为 `RpcSerializationError` / `RpcChunkError`
-   * 的基础码。 Physical batch shape/encoding failures preserve the contract cause; malformed semantic
-   * members are reported individually without discarding valid siblings.
+   * A codec payload violates its input rules, or sender-side error serialization degrades a read or
+   * data projection. This is the base code for `RpcSerializationError` and `RpcChunkError`.
+   * Physical batch shape/encoding failures preserve the contract cause; malformed semantic members
+   * are reported individually without discarding valid siblings.
    *
-   * 调用方检查 data、codec 或抛出值；载荷已照常发送或取消已生效时不应重试同一 payload。
+   * The caller checks the data, codec, or thrown value. Do not retry the same payload if it is
+   * already sent or cancellation has taken effect.
    */
   payloadInvalid: 'PAYLOAD_INVALID',
 
   /**
-   * Provider 执行器解析不到目标 method 的 provider（`Provider not found`）。
+   * The provider executor cannot find a provider for the target method (`Provider not found`).
    *
-   * 调用方检查 method 是否已 `provide()`；不可重试。这是入站 provider 查找失败的线材码。
+   * The caller checks whether `provide()` registers the method. Do not retry the failed lookup.
+   * This is the wire code for an inbound provider lookup failure.
    */
   providerNotFound: 'PROVIDER_NOT_FOUND',
 
   /**
-   * 非 dispatch provider 没有返回 `ctx.success()` / `ctx.failed()`。
+   * A non-dispatch provider does not return `ctx.success()` or `ctx.failed()`.
    *
-   * 调用方应让 provider 的每个非 dispatch 分支都显式返回结果，或确认本意是 dispatch。
+   * The caller ensures every non-dispatch branch explicitly returns a result, or selects dispatch
+   * if that is intended.
    */
   providerNotSettled: 'PROVIDER_NOT_SETTLED',
 
   /**
-   * Provider 抛出了未处理异常，作为 `INTERNAL` 响应的标准码。
+   * A provider throws an unhandled exception. This is the standard code for an `INTERNAL` response.
    *
-   * 原始异常只进本地 hooks（脱敏），不进对端；调用方看远端会收到 `RpcRemoteError`（code `INTERNAL`）。
+   * Only local hooks receive the redacted original exception. The peer receives `RpcRemoteError`
+   * with code `INTERNAL`.
    */
   internal: 'INTERNAL',
 
   /**
-   * 目标或 receiver 未解析、失活或不属于当前 binding。
+   * A target or receiver is unresolved, inactive, or outside the current binding.
    *
-   * 调用方检查 targetId 是否已注册/发现，或 `receiverSelector` 是否返回了未知 receiver。
+   * The caller checks whether `targetId` is registered or discovered, or whether `receiverSelector`
+   * returns an unknown receiver.
    */
   targetUnknown: 'TARGET_UNKNOWN',
 
   /**
-   * 操作要求独立 receiver，但目标是匿名 BroadcastChannel 广播组。
+   * An operation requires an individual receiver, but the target is an anonymous BroadcastChannel
+   * group.
    *
-   * 调用方应配置 `uniqueTargetId` + `identifier` 后 pin，或放弃对广播组的逐实例操作。
+   * The caller configures `uniqueTargetId` and `identifier` before pinning, or avoids per-instance
+   * operations on the group.
    */
   targetNotIdentifiable: 'TARGET_NOT_IDENTIFIABLE',
 
   /**
-   * Endpoint 已 dispose 后继续调用其 API（`RpcLifecycleError`）。
+   * An endpoint operation runs after disposal (`RpcLifecycleError`).
    *
-   * 调用方应新建 endpoint，不要复用已关闭的实例。
+   * The caller creates a new endpoint instead of reusing the closed instance.
    */
   endpointDisposed: 'ENDPOINT_DISPOSED',
 
   /**
-   * 调用方 AbortSignal 取消了本地 send（`RpcAbortError`）。
+   * The caller's `AbortSignal` cancels a local send (`RpcAbortError`).
    *
-   * 这是协作式取消的结果；调用方按取消处理，不要把它当作远端失败。
+   * The caller handles this cooperative cancellation separately from remote failures.
    */
   cancelled: 'CANCELLED',
 
   /**
-   * 本地 deadline 到期（`RpcTimeoutError`）。
+   * A local deadline expires (`RpcTimeoutError`).
    *
-   * 调用方检查目标是否可达或超时是否过短；请求失败按单次传输结果处理。
+   * The caller checks target reachability and the timeout duration. Treat the request failure as
+   * the result of this transmission attempt.
    */
   deadlineExceeded: 'DEADLINE_EXCEEDED',
 
   /**
-   * `ctx.success()` / `ctx.failed()` 在 provider 任务结束后仍被调用。
+   * `ctx.success()` or `ctx.failed()` runs after the provider task ends.
    *
-   * 结果已过期，不会产生 wire 副作用；调用方应把响应逻辑收敛到 provider 的同步/await 生命周期内。
+   * The expired result produces no wire effects. The caller keeps response logic within the
+   * provider's synchronous or awaited lifetime.
    */
   contextExpired: 'PROVIDER_CONTEXT_EXPIRED',
 
   /**
-   * Transport 发送失败、terminal 事件或 transport 关闭（`RpcTransportError`）。
+   * A transport send fails, a terminal event occurs, or the transport closes (`RpcTransportError`).
    *
-   * 调用方检查底层通道状态；这是可重试的瞬时类失败（相对远端业务失败）。
+   * The caller checks the underlying channel state. This is a transient transport failure that can
+   * be retried, unlike a remote business failure.
    */
   transport: 'TRANSPORT',
 
   /**
-   * Authentication 的逐 frame transform（encrypt/sign/verify/decrypt）失败（`RpcAuthenticationError`）。
-   * Replay r12 rejects missing/invalid binding, duplicate counters and untrusted physical
-   * sessions.
+   * A per-frame authentication transform fails during encryption, signing, verification, or
+   * decryption (`RpcAuthenticationError`). Replay r12 rejects missing/invalid binding, duplicate
+   * counters and untrusted physical sessions.
    *
-   * 调用方检查密钥/算法配置；失败不向远端回传细节。
+   * The caller checks key and algorithm configuration. Failure details are not sent back to the
+   * peer.
    */
   authenticationFailed: 'AUTHENTICATION_FAILED',
 
   /**
-   * Method 的 params/result 不满足 contract schema（`RpcSchemaValidationError`）。
+   * Method parameters or results violate the contract schema (`RpcSchemaValidationError`).
    *
-   * 调用方按 `data.issues` 修正 data；schema 失败是稳定的，不要重试同一份 data。
+   * The caller corrects the data using `data.issues` rather than retrying the same invalid data.
    */
   schemaInvalid: 'SCHEMA_INVALID',
 
   /**
-   * 同一个 capability 被重复发布，或冻结的 capability registry 被二次写入。 I28 D8/D11 also rejects folded Feature
-   * method collisions and ambiguous runtime instances.
+   * A capability is published twice, or a frozen capability registry receives another write. I28
+   * D8/D11 also rejects folded Feature method collisions and ambiguous runtime instances.
    *
-   * 调用方检查 middleware 是否重复声明了保留 capability；这是配置错误。
+   * The caller checks middleware for duplicate declarations of reserved capabilities. This is a
+   * configuration error.
    */
   capabilityConflict: 'CAPABILITY_CONFLICT',
 
   /**
-   * 本地容量限制（provider admission / replay ledger / discovery waiter / outbound id / chunk 容量）拒绝新工作。
+   * A local capacity limit rejects new work in provider admission, the replay ledger, discovery
+   * waiters, outbound IDs, or chunks.
    *
-   * 调用方降低并发、缩短 TTL 或扩容；是背压信号，不是逻辑错误。
+   * The caller reduces concurrency, shortens TTL, or increases capacity. This signals backpressure
+   * rather than a logic error.
    */
   overloaded: 'OVERLOADED',
 
@@ -207,13 +232,18 @@ export const RpcCoreErrorCode = {
   streamResultUnknown: 'STREAM_RESULT_UNKNOWN',
 
   /**
-   * Chunk frame 格式非法，作为 `RpcChunkError` 的基础码。
+   * A chunk frame has an invalid format. This is the base code for `RpcChunkError`.
    *
-   * 调用方检查分片配置（chunkSize ≥ 4）与对端实现；非法帧只触发 hooks，不重试。
+   * The caller checks chunk configuration (`chunkSize` ≥ 4) and the peer implementation. An invalid
+   * frame only invokes hooks and is not retried.
    */
   chunkInvalid: 'CHUNK_INVALID',
 
-  /** 无同步报告器的 safeRead 遇到 getter/Proxy 抛错，或报告器自身抛错（R11）。 调用方应修复输入对象，或在拥有诊断 sink 的边界传入同步 report。 */
+  /**
+   * A getter or Proxy throws during `safeRead` without a synchronous reporter, or the reporter
+   * itself throws (R11). The caller repairs the input or supplies a synchronous `report` at a
+   * boundary that owns a diagnostic sink.
+   */
   propertyReadFailed: 'PROPERTY_READ_FAILED',
 
   /**
