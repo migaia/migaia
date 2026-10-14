@@ -1,16 +1,9 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { RpcCoreErrorText } from '../error-text.js'
 import { RpcCoreErrorCode, tagRpcError } from '../errors.js'
 import { tryReadProperty } from '@migaia/utils/error'
 import { reportDiagnostic } from './diagnostic-reporter.js'
 import type { IEndpointTimePort } from './time-port.js'
-
-/** Minimal cancellation signal shape shared by browser, worker and Node consumers. */
-export type IAbortSignal = {
-  readonly aborted: boolean
-  readonly reason?: unknown
-  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void
-  removeEventListener(type: 'abort', listener: () => void): void
-}
 
 /**
  * Reads a cancellation reason once; a throwing getter becomes the reason so cancellation remains

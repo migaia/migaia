@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { observePortableNormalization } from '../../../rpc-contract/test/fixtures/portable-observer.js'
 import { readRuntimeCarrier } from '@migaia/rpc-contract/runtime'
 import { readRuntimeOutletConnection } from '../../../rpc-core/dist/remote/runtime-api/outlet.js'
@@ -17,7 +18,6 @@ import {
 } from '@migaia/rpc-threads/adapters/node'
 import type { IRuntimePeer } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
 import { readRuntimePeerConnection } from '../../../rpc-core/dist/remote/runtime-api/peer.js'
-import type { IAbortSignal } from '@migaia/lifecycle'
 
 /** Both public routes use the same genuine child fixture and original native owners. */
 const entry = fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url))

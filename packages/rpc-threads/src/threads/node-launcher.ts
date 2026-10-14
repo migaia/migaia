@@ -1,8 +1,8 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IThreadHandle, IThreadLauncher, IThreadUsage } from '@migaia/supervision/threads'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { ERROR_SOURCE, RpcThreadErrorCode } from '../error-code.js'
 import type { IThreadRuntimeResource } from './runtime-types.js'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IRuntimePeerSourceResult } from '@migaia/rpc-core/remote'
 import {
   createEventEmitterMessageResource,

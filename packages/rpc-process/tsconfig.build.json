@@ -1,11 +1,10 @@
 {
   // The actual independent-publish artifact: real ESM `.js` + `.d.ts` output
-  // under `dist/`, source only (no tests, no `ambient.d.ts` — that file's
-  // global redeclarations must never ship in a consumer-facing `.d.ts`).
+  // under `dist/`, source only (no tests).
   // Run via `pnpm --filter ./packages/rpc run build`.
   "compilerOptions": {
     "target": "es2023",
-    "lib": ["ES2023", "DOM"],
+    "lib": ["ES2023", "ESNext.Disposable"],
     "module": "esnext",
     "moduleResolution": "bundler",
     "types": ["node"],
@@ -24,5 +23,5 @@
     "skipLibCheck": true
   },
   "include": ["src"],
-  "exclude": ["src/core/ambient.d.ts", "src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts"]
 }

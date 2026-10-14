@@ -28,7 +28,7 @@ export function createStorePersistAbortError(
   code: IStorePersistErrorCode,
   message: string,
   cause?: unknown
-): DOMException {
+): Error {
   const error = new DOMException(message, 'AbortError')
   if (cause !== undefined)
     Object.defineProperty(error, 'cause', { value: cause, configurable: true })

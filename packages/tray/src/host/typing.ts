@@ -1,6 +1,8 @@
 import type {
   IExtractPluginConfig,
   IExtractPluginExt,
+  IFeature,
+  IFeatureReference,
   IPluginConstraint,
   IPluginHostConfigFor,
   IPluginHostDisposalResult,
@@ -25,21 +27,52 @@ type IHostBaselineExtensions<THost extends PluginHost<any, any, any>> =
 
 /** Plugin descriptor accepted by the managed Tray Host. */
 export type ITrayPluginConstraint<THost extends PluginHost<any, any, any>> =
-  IPluginConstraint<THost> & Readonly<{ readonly requires?: readonly string[] }>
+  IPluginConstraint<THost>
 
 /** Extracts literal plugin names for the bounded ready-closure solver. */
-type ITrayDefinitionNames<TDefinitions extends readonly unknown[]> = TDefinitions[number] extends {
-  readonly name: infer TName extends string
+type ITrayDefinitionNames<TDefinitions extends readonly unknown[]> = [
+  TDefinitions[number]
+] extends [never]
+  ? never
+  : TDefinitions[number] extends { readonly name: infer TName extends string }
+    ? TName
+    : never
+
+/**
+ * Follows local Feature metadata to provider references without evaluating any factory. Erased
+ * metadata and closures beyond the existing 128-definition budget yield a widened provider guard.
+ */
+type ITrayFeatureProviders<
+  TFeature,
+  TRequiredOnly extends boolean,
+  TDepth extends readonly unknown[] = readonly []
+> = 0 extends 1 & TFeature
+  ? string
+  : TFeature extends IFeatureReference<object, infer TOptional, infer TProvider>
+    ? TRequiredOnly extends true
+      ? TOptional extends true
+        ? never
+        : TProvider
+      : TProvider
+    : TFeature extends IFeature<any, any, infer TDependencies>
+      ? TDepth['length'] extends 128
+        ? string
+        : ITrayFeatureProviders<
+            TDependencies[keyof TDependencies],
+            TRequiredOnly,
+            readonly [...TDepth, unknown]
+          >
+      : never
+
+/** Projects provider names from every declared root and its local Feature closure. */
+type ITrayProviders<TPlugin, TRequiredOnly extends boolean = false> = TPlugin extends {
+  readonly features?: infer TFeatures
 }
-  ? TName
+  ? ITrayFeatureProviders<NonNullable<TFeatures>[keyof NonNullable<TFeatures>], TRequiredOnly>
   : never
 
-/** Extracts required provider names from one literal plugin descriptor. */
-type ITrayRequires<TPlugin> = TPlugin extends {
-  readonly requires?: infer TRequires extends readonly string[]
-}
-  ? TRequires[number]
-  : never
+/** Required providers alone constrain whether an admitted plugin can enter the ready closure. */
+type ITrayRequires<TPlugin> = ITrayProviders<TPlugin, true>
 
 /** Replaces one literal definition while retaining tuple order for exact mutation views. */
 type IReplaceTrayDefinition<
@@ -103,13 +136,14 @@ type IResolveReadyWithFuel<
   ? IResolveReadyWithFuel<TDefinitions, IAddReadyDefinitionsPass<TDefinitions, TReady>, TTail>
   : TReady
 
-type IHasWidenedRequires<TDefinitions extends readonly unknown[]> = TDefinitions extends readonly [
+/** Optional and required references both need literal providers before exact inference is safe. */
+type IHasWidenedProviders<TDefinitions extends readonly unknown[]> = TDefinitions extends readonly [
   infer THead extends object,
   ...infer TTail extends readonly unknown[]
 ]
-  ? string extends ITrayRequires<THead>
+  ? string extends ITrayProviders<THead>
     ? true
-    : IHasWidenedRequires<TTail>
+    : IHasWidenedProviders<TTail>
   : false
 
 type IReadyInferenceExceeded<
@@ -131,7 +165,7 @@ export type ICanResolveReadyDefinitions<TDefinitions extends readonly unknown[]>
       ? false
       : IReadyInferenceExceeded<TDefinitions> extends true
         ? false
-        : IHasWidenedRequires<TDefinitions> extends true
+        : IHasWidenedProviders<TDefinitions> extends true
           ? false
           : true
 
@@ -144,11 +178,9 @@ type IAllDefinitionsIndependent<TDefinitions extends readonly unknown[]> =
     infer THead extends object,
     ...infer TTail extends readonly unknown[]
   ]
-    ? THead extends { readonly requires?: infer TRequires extends readonly string[] }
-      ? [TRequires[number]] extends [never]
-        ? IAllDefinitionsIndependent<TTail>
-        : false
-      : IAllDefinitionsIndependent<TTail>
+    ? [ITrayProviders<THead>] extends [never]
+      ? IAllDefinitionsIndependent<TTail>
+      : false
     : true
 
 /** Exact readiness is selected only for finite, literal, at-most-128 definition tuples. */
@@ -161,7 +193,7 @@ export type IResolveReadyTrayPlugins<TDefinitions extends readonly unknown[]> =
         ? readonly []
         : IAllDefinitionsIndependent<TDefinitions> extends true
           ? TDefinitions
-          : IHasWidenedRequires<TDefinitions> extends true
+          : IHasWidenedProviders<TDefinitions> extends true
             ? readonly []
             : IResolveReadyWithFuel<TDefinitions>
 

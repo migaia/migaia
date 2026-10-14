@@ -282,7 +282,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     /** Computed at the same original post-capture point before pending registration. */
     #terminalReceipt = false
     /** Admission retains original local caller signals; no native child signal is allocated here. */
-    signals!: readonly import('../typing.js').IRpcAbortSignal[]
+    signals!: readonly import('@migaia/utils/promise').IAbortSignal[]
     /** The extension gate contract permits extracting this receiver-free admission callback. */
     readonly assertCanSend = (): void => this.#assertActive()
 

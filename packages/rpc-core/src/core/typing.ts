@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcProviderRejection } from './provider-admission.js'
 import type {
   RpcProviderRejectionReason,
@@ -30,7 +31,7 @@ export type IRpcContext = {
   /** The final provider fence is the selected accepted identity, never an attempt counter. */
   readonly targetGeneration?: import('@migaia/rpc-contract').IRpcRuntimeGeneration
   readonly data: unknown
-  readonly signal: IRpcAbortSignal
+  readonly signal: IAbortSignal
   /** Direct authenticated routing identity; forwarding never substitutes an earlier caller. */
   readonly senderId: string
   /** Remaining provider deadline, calculated with the original endpoint's monotonic clock. */
@@ -64,7 +65,7 @@ export type IRpcProviderLimits = {
 }
 export type IRpcEventListener = (context: IRpcContext) => void | Promise<void>
 export type ISendOptions = {
-  readonly signal?: IRpcAbortSignal
+  readonly signal?: IAbortSignal
   readonly timeoutMs?: number | false
   readonly transfer?: readonly unknown[]
   readonly idempotencyKey?: string
@@ -281,7 +282,7 @@ export type IRpcConnectControl<TTargetId extends string = string> = {
   readonly unpinReceiver: (targetId: TTargetId) => void
   query?: (
     targetId: TTargetId,
-    options?: { readonly timeoutMs?: number; readonly signal?: IRpcAbortSignal }
+    options?: { readonly timeoutMs?: number; readonly signal?: IAbortSignal }
   ) => Promise<readonly IRpcDiscoveryCandidate<TTargetId>[]>
   onQuery?: (
     listener: (query: IRpcInboundDiscoveryQuery<TTargetId>) => void | Promise<void>
@@ -290,7 +291,7 @@ export type IRpcConnectControl<TTargetId extends string = string> = {
   unregister?: (targetId: TTargetId, receiverId?: string) => Promise<void>
   ping?: (
     candidate: IRpcDiscoveryCandidate<TTargetId>,
-    options?: { readonly timeoutMs?: number; readonly signal?: IRpcAbortSignal }
+    options?: { readonly timeoutMs?: number; readonly signal?: IAbortSignal }
   ) => Promise<boolean>
 }
 export type IRpcInboundDiscoveryQuery<TTargetId extends string = string> = {
@@ -344,7 +345,7 @@ export type IRpcPluginMetadata = {
 export type IRpcPluginInstallScope = {
   readonly id: string
   readonly transport: IRpcTransport
-  readonly signal: IRpcAbortSignal
+  readonly signal: IAbortSignal
   readonly hooks: (event: IRpcHookEvent) => void
   readonly getPort: (key: PropertyKey) => unknown
   own<T>(resource: T, release: () => void | Promise<void>): T
@@ -426,7 +427,7 @@ export type IRpcFactoryConfig<
   /** Cancellation and deadline controls for middleware installation and rollback. */
   readonly construction?: {
     /** Aborts construction while still rolling back every installed middleware. */
-    readonly signal?: IRpcAbortSignal
+    readonly signal?: IAbortSignal
     /** Bounds endpoint construction, or disables the deadline when explicitly `false`. */
     readonly timeoutMs?: number | false
   }
@@ -478,7 +479,7 @@ export type IRpcPingEndpointSurface<TPing extends boolean> = boolean extends TPi
     : {}
 export type IRpcPingOptions = {
   readonly timeoutMs?: number | false
-  readonly signal?: IRpcAbortSignal
+  readonly signal?: IAbortSignal
 }
 export type IRpcEndpoint<
   TTargetId extends string = string,
@@ -518,11 +519,3 @@ export type IRpcEndpointFactory = <
   IRpcEndpoint<TTargetId, IFactoryDiscoveryMode<TMiddlewares>, IFactoryPingCapability<TMiddlewares>>
 >
 export type IRpcPublicError = IRpcError
-/** Structural cancellation signal used by the public API without requiring DOM typings. */
-export type IRpcAbortSignal = {
-  readonly aborted: boolean
-  readonly reason?: unknown
-  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void
-  removeEventListener(type: 'abort', listener: () => void): void
-  readonly throwIfAborted?: () => void
-}

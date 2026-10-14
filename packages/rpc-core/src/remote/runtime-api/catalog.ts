@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { createRpcError } from '../../core/errors.js'
 import { RPC_PORTABLE_MAX_DEPTH } from '@migaia/rpc-contract'
 import { RpcWireLimit } from '@migaia/rpc-contract'
@@ -20,6 +21,27 @@ import { assertProviderForwardRoute } from '../../core/internal/provider.js'
 
 /** A callable receives the portable application payload and the original core provider context. */
 export type IRuntimePeerMethod = (payload: any, context: IRpcContext) => unknown
+
+/** A local exposed Feature waits for its installing PluginHost registration to commit. */
+export type ICommitGate = Readonly<{
+  isOpen(): boolean
+  /** Rejects with the lifecycle failure or this invocation's original cancellation reason. */
+  wait(signal: IAbortSignal): Promise<void>
+}>
+
+/** Private method metadata connects compilation to both registration owners without a new registry. */
+const commitGates = new WeakMap<IRuntimePeerMethod, ICommitGate>()
+
+/** Only compiled local Feature methods receive the installing plugin's shared commit gate. */
+export function attachCommitGate<T extends IRuntimePeerMethod>(method: T, gate: ICommitGate): T {
+  commitGates.set(method, gate)
+  return method
+}
+
+/** Scalar and stream registration owners read the same private admission metadata. */
+export function readCommitGate(method: IRuntimePeerMethod): ICommitGate | undefined {
+  return commitGates.get(method)
+}
 
 /** Explicit own data members are the only methods admitted to the automatic directory. */
 export type IRuntimePeerProvide = Readonly<{

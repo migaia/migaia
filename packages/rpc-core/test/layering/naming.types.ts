@@ -335,6 +335,7 @@ export type { IWebRpcTransportTopology as ILayeringOld112 } from '../../dist/cor
 export type { IRpcAbortCapability as ILayeringNew113 } from '@migaia/rpc-core'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcAbortCapability as ILayeringOld113 } from '../../dist/core/typing.js'
+// @ts-expect-error The structural signal is owned by @migaia/utils as IAbortSignal; rpc-core keeps no copy.
 export type { IRpcAbortSignal as ILayeringNew114 } from '@migaia/rpc-core'
 // @ts-expect-error BC2 removes the old public type name.
 export type { IWebRpcAbortSignal as ILayeringOld114 } from '../../dist/core/typing.js'

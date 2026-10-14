@@ -1,5 +1,5 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IDisposable, IRuntime } from '@migaia/reactive'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import { StoreFieldMode } from './field-mode-constants.js'
 
 /**

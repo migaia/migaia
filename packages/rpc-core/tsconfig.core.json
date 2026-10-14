@@ -2,7 +2,7 @@
   // Standalone check (not part of `tsc -b`'s root build graph — this
   // verifies a *property*, not app buildability): the RPC core
   // (composed endpoint/errors/transport/internal adapters) must typecheck with
-  // no DOM, Worker, or Node lib/types at all — see `ambient.d.ts` for why
+  // no DOM, Worker, or Node lib/types at all — see `packages/utils/types/host-globals.d.ts` for why
   // AbortController/AbortSignal specifically are still available. If this
   // stops passing, something in core started depending on a host-specific
   // global, which breaks "importable independent of Store, DOM, or Node".
@@ -25,7 +25,7 @@
     "skipLibCheck": true
   },
   "include": [
-    "src/core/ambient.d.ts",
+    "../utils/types/host-globals.d.ts",
     "src/core/composed.ts",
     "src/core/endpoint-kernel.ts",
     "src/core/errors.ts",

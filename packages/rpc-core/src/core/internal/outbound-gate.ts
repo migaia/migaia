@@ -1,6 +1,6 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { OperationScope } from './operation-scope.js'
 import type { IRpcEnvelope, IRpcRuntimeEnvelope } from '@migaia/rpc-contract'
-import type { IRpcAbortSignal } from '../typing.js'
 import { tagRpcError } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import { RpcCoreErrorCode } from '../error-code.js'
@@ -8,8 +8,8 @@ import { registerTransportConstructionRollback } from './endpoint-bootstrap.js'
 
 /** Existing operation signals and a live settlement check supplied by the outbound owner. */
 export type IRpcOutboundAdmission = Readonly<{
-  queueSignal?: IRpcAbortSignal
-  signals: readonly IRpcAbortSignal[]
+  queueSignal?: IAbortSignal
+  signals: readonly IAbortSignal[]
   assertCanSend(): void
 }>
 
@@ -23,7 +23,7 @@ export abstract class RpcOutboundAdmission {
   }
 
   /** An actual queue read materializes the same original lifecycle-owned signal. */
-  get queueSignal(): IRpcAbortSignal {
+  get queueSignal(): IAbortSignal {
     return this.#scope.signal
   }
 
@@ -31,7 +31,7 @@ export abstract class RpcOutboundAdmission {
   static queuedSignal(
     admission: IRpcOutboundAdmission | undefined,
     waiting: boolean
-  ): IRpcAbortSignal | undefined {
+  ): IAbortSignal | undefined {
     if (!admission) return undefined
     if (#scope in admission && !waiting) return undefined
     return admission.queueSignal

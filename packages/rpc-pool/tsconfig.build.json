@@ -9,5 +9,5 @@
     "rootDir": "./src",
     "sourceMap": true
   },
-  "include": ["src"]
+  "include": ["src", "../utils/types/host-globals.d.ts"]
 }

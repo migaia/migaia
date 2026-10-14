@@ -97,7 +97,7 @@ export const registerAdmissionDefinition = <TDefinition>(
 }
 
 /** Reads a captured definition only through its exact opaque admission object. */
-const readAdmissionDefinition = <TDefinition>(admission: object): TDefinition | undefined =>
+export const readAdmissionDefinition = <TDefinition>(admission: object): TDefinition | undefined =>
   admissionDefinitions.get(admission) as TDefinition | undefined
 
 /** Creates and registers one opaque Host-owned data-order lane. */

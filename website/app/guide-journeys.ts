@@ -11288,7 +11288,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\ntype IApiClient = { load(): Promise<unknown> }\nconst createClient = (baseUrl: string): IApiClient => ({ load: async () => fetch(`${baseUrl}/items`).then((response) => response.json()) })\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      return { value: createClient(config.baseUrl), release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\n\ntry {\n  await tray.get<IApiClient>(apiKey).load()\n} finally {\n  await tray.dispose()\n}"
+                code: "import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\ntype IApiClient = { load(): Promise<unknown> }\nconst createClient = (baseUrl: string): IApiClient => ({ load: async () => fetch(`${baseUrl}/items`).then((response) => response.json()) })\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      return { value: createClient(config.baseUrl), release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTrayGraph(entries)\nawait tray.ready()\n\ntry {\n  await tray.get<IApiClient>(apiKey).load()\n} finally {\n  await tray.dispose()\n}"
               },
               {
                 type: 'list',
@@ -11304,7 +11304,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '静态组合契约', path: 'static-composition' },
-        { label: 'createTray API', path: 'docs/tray/createTray' }
+        { label: 'createTrayGraph API', path: 'docs/tray/createTrayGraph' }
       ]
     },
     en: {
@@ -11319,7 +11319,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\ntype IApiClient = { load(): Promise<unknown> }\nconst createClient = (baseUrl: string): IApiClient => ({ load: async () => fetch(`${baseUrl}/items`).then((response) => response.json()) })\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      return { value: createClient(config.baseUrl), release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\n\ntry {\n  await tray.get<IApiClient>(apiKey).load()\n} finally {\n  await tray.dispose()\n}"
+                code: "import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\ntype IApiClient = { load(): Promise<unknown> }\nconst createClient = (baseUrl: string): IApiClient => ({ load: async () => fetch(`${baseUrl}/items`).then((response) => response.json()) })\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      return { value: createClient(config.baseUrl), release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTrayGraph(entries)\nawait tray.ready()\n\ntry {\n  await tray.get<IApiClient>(apiKey).load()\n} finally {\n  await tray.dispose()\n}"
               },
               {
                 type: 'list',
@@ -11335,14 +11335,14 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Static composition contracts', path: 'static-composition' },
-        { label: 'createTray API', path: 'docs/tray/createTray' }
+        { label: 'createTrayGraph API', path: 'docs/tray/createTrayGraph' }
       ]
     }
   },
   'tray:static-composition': {
     zh: {
       title: '设计静态 Entry 图与 admission 边界',
-      lede: 'createTray 先同步验证并快照整个拓扑，首次 ready 才读取 gate 并启动 Graph；调用方之后修改定义不会改变已接纳结构。',
+      lede: 'createTrayGraph 先同步验证并快照整个拓扑，首次 ready 才读取 gate 并启动 Graph；调用方之后修改定义不会改变已接纳结构。',
       document: {
         sections: [
           {
@@ -11381,7 +11381,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
     },
     en: {
       title: 'Design a static entry graph and admission boundary',
-      lede: 'createTray synchronously validates and snapshots the complete topology. The first ready call reads gates and starts the Graph; later caller mutations cannot change admitted structure.',
+      lede: 'createTrayGraph synchronously validates and snapshots the complete topology. The first ready call reads gates and starts the Graph; later caller mutations cannot change admitted structure.',
       document: {
         sections: [
           {
@@ -11567,7 +11567,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: '动态 Host', path: 'dynamic-host' },
-        { label: 'createTray API', path: 'docs/tray/createTray' }
+        { label: 'createTrayGraph API', path: 'docs/tray/createTrayGraph' }
       ]
     },
     en: {
@@ -11599,7 +11599,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Dynamic Host', path: 'dynamic-host' },
-        { label: 'createTray API', path: 'docs/tray/createTray' }
+        { label: 'createTrayGraph API', path: 'docs/tray/createTrayGraph' }
       ]
     }
   },

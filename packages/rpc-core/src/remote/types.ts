@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { ICodec } from '@migaia/serialize/codec'
 import type { ISupervisor } from '@migaia/supervision'
 import type { IScheduler } from '@migaia/utils/scheduler'
@@ -6,7 +6,7 @@ import type { IRpcFramer, IRpcPortableValue } from '@migaia/rpc-contract'
 import type { IRpcFeature } from '../core/index.js'
 import type { IOneWaySurface } from '../core/features/one-way.js'
 import type { IRpcStreamRuntime } from '../core/stream/index.js'
-import type { IRpcEndpoint, IRpcAbortSignal } from '../core/index.js'
+import type { IRpcEndpoint } from '../core/index.js'
 import type { IRpcTransport } from '../core/index.js'
 import type { IRemoteContract, IRemoteHostCatalog, RemoteMethodMode } from './contract.js'
 import type { IRuntimeCallOptions } from './runtime-api/typing.js'
@@ -69,7 +69,7 @@ export type IRemoteEndpointFactory = (
 
 /** Request and stream options are local control data, never method params. */
 export type IRemoteCallOptions = Readonly<{
-  signal?: IRpcAbortSignal
+  signal?: IAbortSignal
   timeoutMs?: number
   idempotencyKey?: string
   /** Only runtime profile operations negotiate provider-wide ordered execution. */
@@ -99,7 +99,7 @@ export type IRemoteRetryDispatch = Readonly<{
   idempotent: boolean
   key?: string
   generation: number
-  signal?: IRpcAbortSignal
+  signal?: IAbortSignal
   timeoutMs?: number
   deadlineAt?: number
   events: IRemoteGenerationEvents

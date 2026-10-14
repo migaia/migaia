@@ -1,13 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "lib": ["ES2024", "ESNext.Disposable", "DOM"],
     "noEmit": true,
-    "types": ["node"],
+    "types": [],
     "paths": {
       "@migaia/reactive": ["../reactive/dist/index.d.ts"],
       "@migaia/store-light": ["../store-light/dist/index.d.ts"],
       "@migaia/wasm": ["../wasm/src/wasm_provider.d.ts"]
     }
   },
-  "include": ["src", "test"]
+  "include": ["src", "../utils/types/host-globals.d.ts"]
 }

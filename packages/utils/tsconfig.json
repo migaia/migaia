@@ -6,7 +6,7 @@
     "lib": ["ES2024"],
     "rootDir": "src",
     "outDir": "dist",
-    "types": ["node"]
+    "types": []
   },
-  "include": ["src"]
+  "include": ["src", "types/host-globals.d.ts"]
 }

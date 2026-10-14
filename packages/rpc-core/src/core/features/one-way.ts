@@ -1,5 +1,5 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcFeature } from '../feature.js'
-import type { IRpcAbortSignal } from '../typing.js'
 import type { IEndpointCapabilitiesFeatureExpose } from '../internal/endpoint-capabilities-plugin.js'
 import { defineRpcFeature } from '../internal/define-rpc-feature.js'
 import type {
@@ -16,7 +16,7 @@ export type IRpcOneWayOptions = Readonly<{
   /** Physical ownership transfer remains exclusively validated by the existing sender. */
   transfer?: readonly unknown[]
   /** Cancellation controls only local send admission; it is never sent as business data. */
-  signal?: IRpcAbortSignal
+  signal?: IAbortSignal
   /** Only an explicit deadline limits physical send; false keeps the original unbounded send. */
   timeoutMs?: number | false
 }>

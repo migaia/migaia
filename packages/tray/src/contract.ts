@@ -28,7 +28,7 @@ export type ITrayEntryDefinition<T> = {
   ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>
 }
 export type ITrayState = 'open' | ICapabilityGraphState
-export type ITray = {
+export type ITrayGraph = {
   readonly keys: readonly ITrayKey[]
   readonly state: ITrayState
   readonly error: unknown | undefined

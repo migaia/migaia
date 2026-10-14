@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it } from 'vitest'
 import {

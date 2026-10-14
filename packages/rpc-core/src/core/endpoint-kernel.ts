@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcConstructionError,
   createRpcError,
@@ -101,7 +102,7 @@ export type IEndpointKernelHost = {
   readonly ownership: IRpcTransportOwnership | undefined
   readonly resources: ResourceScope
   readonly time: IEndpointTimePort
-  readonly closingSignal: AbortSignal
+  readonly closingSignal: IAbortSignal
   readonly generation: number
   readonly state: IEndpointKernelState
   /** Cold owner construction reads the emitter once after middleware ports have installed. */
@@ -271,7 +272,7 @@ class EndpointKernel implements IEndpointKernelHost {
   }
 
   /** Returns the canonical close signal without exposing its controller. */
-  get closingSignal(): AbortSignal {
+  get closingSignal(): IAbortSignal {
     return this.#closing.signal
   }
 

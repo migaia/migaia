@@ -519,52 +519,63 @@ export const completionApiGuides: Readonly<
       '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
     ]
   }),
-  'rpc-core:remote:createCoroutineHost': guide({
-    purposeEn:
-      'Hosts an in-process coroutine deployment through the existing remote lifecycle contract. It shares memory rather than claiming native process isolation or Worker transfer ownership.',
-    purposeZh:
-      '通过既有 remote 生命周期契约托管同进程 coroutine；它共享进程内内存，不宣称原生进程隔离或 Worker transfer 所有权。',
-    quickStart:
-      "import { createCoroutineHost } from '@migaia/rpc-core/remote'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createCoroutineHost>) {\n  return createCoroutineHost(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
   'rpc-core:remote:createCoroutinePlugin': guide({
     purposeEn:
-      'Installs a coroutine remote deployment into PluginHost so accepted methods and cleanup remain owned by the original Host registration and remote binding.',
+      'Creates a supervised task in the current event loop or connects its child Host through the opaque task connection. PluginHost owns the connection and publishes request, notify, stream and lifecycle operations on host.coroutine.',
     purposeZh:
-      '把 coroutine remote 部署安装到 PluginHost，使已采纳的方法和清理继续由原 Host 注册及 remote binding 持有。',
-    quickStart:
-      "import { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createCoroutinePlugin>) {\n  return createCoroutinePlugin(...args)\n}",
+      '在当前事件循环创建受监督的 task，或通过 task 提供的 opaque connect 连接子 Host。PluginHost 持有连接，通过 host.coroutine 提供 request、notify、stream 与生命周期操作。',
+    quickStart: `import { defineHost } from '@migaia/plugin-host'
+import { createCoroutinePlugin } from '@migaia/rpc-core/remote'
+
+/** Parent mode owns the task and its per-generation message ports. */
+const service = createCoroutinePlugin<{ math: { double(value: number): number } }>({
+  name: 'math',
+  task: async ({ connect, signal }) => {
+    /** Child mode publishes the provider through the task's opaque connection. */
+    const parent = createCoroutinePlugin({
+      name: 'parent',
+      connect,
+      provide: { math: { double: (value: number) => value * 2 } }
+    })
+    /** The task owns its child Host and disposes it before settling. */
+    const childHost = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: {} })
+    try {
+      await childHost.use(parent)
+      /** Settlement is the unit's exit; remain available until cooperative stop. */
+      await new Promise<void>((resolve) => {
+        if (signal.aborted) resolve()
+        else signal.addEventListener('abort', () => resolve(), { once: true })
+      })
+    } finally {
+      await childHost.dispose()
+    }
+  }
+})
+/** Host disposal stops its owned coroutine task. */
+const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: {} })
+try {
+  await host.use(service)
+  console.log(await host.coroutine!.request('math', 'math.double', 21)) // 42
+} finally {
+  await host.dispose()
+}`,
     scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
+      'An application needs a same-process task with the process/thread outlet call and event APIs.',
+      'An owned task needs cooperative stop, restart or replace(name, { task }) under the existing supervisor.'
     ],
     scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
+      '应用需要同进程 task，并使用与 process/thread 出口相同的调用和事件 API。',
+      '受监督的 task 需要协作式 stop、restart 或 replace(name, { task })。'
     ],
     avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
+      'Pass exactly one of task or connect; connect is the opaque value received by that task, never a MessagePort.',
+      'Keep tasks yielding to the event loop. A CPU-bound task cannot be stopped while it stalls that loop.',
+      'Task resolution is a clean exit and rejection is a crash. Dispose the child Host in finally.'
     ],
     avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
+      'task 与 connect 必须二选一；connect 只能是当前 task 收到的 opaque 值，不能传 MessagePort。',
+      'task 必须让出事件循环。CPU 密集 task 阻塞事件循环期间无法停止。',
+      'task resolve 表示正常退出，reject 表示崩溃；在 finally 中释放子 Host。'
     ]
   }),
   'rpc-core:remote:createRemoteHost': guide({

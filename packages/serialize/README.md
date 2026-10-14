@@ -136,7 +136,7 @@ registry.dispose(); // 等待在途操作结算，再释放全部 parser
 
 返回的 `registry` 对象：`primaryType`（只读 `string`）、`types`（只读 `string[]`，注册顺序）、`has(type)`、`encode(value, options?)`、`decode(chunk, options?)`、`close()`（同步、幂等，切断新请求但不释放 parser）、`dispose(options?)`（异步、幂等，`options.deadlineAt?: number` 到期后即使仍有在途操作也会强制释放 parser 并触发 `onDrainTimeout`）。
 
-`encode`/`decode` 的 `options?`：`type?: string`（默认 `primaryType`）、`signal?: ISerializeAbortSignal`、`context?: string`（默认 `'anonymous'`，出错时拼进消息定位是哪个调用点）。
+`encode`/`decode` 的 `options?`：`type?: string`（默认 `primaryType`）、`signal?: IAbortSignal`、`context?: string`（默认 `'anonymous'`，出错时拼进消息定位是哪个调用点）。
 
 **`jsonPlugin`｜3 秒上手** —— 内置 JSON 编解码器，多数场景唯一需要的 parser：
 

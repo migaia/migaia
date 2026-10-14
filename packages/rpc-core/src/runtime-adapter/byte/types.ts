@@ -44,7 +44,7 @@ export type IRuntimeConnectionOptions = Readonly<{
   platform: IRpcTransport['platform']
   expectedStringText: string
   peerId: string
-  signal?: import('../../core/typing.js').IRpcAbortSignal
+  signal?: import('@migaia/utils/promise').IAbortSignal
   handshakeTimeoutMs?: number
   scheduler?: IScheduler
   report(error: unknown): void

@@ -14,7 +14,7 @@ export default defineConfig(withDistFreshness({
     },
     sourcemap: true,
     rollupOptions: {
-      external: ['@migaia/lifecycle', '@migaia/utils', '@migaia/utils/bytes']
+      external: ['@migaia/utils', '@migaia/utils/bytes']
     }
   }
 }))

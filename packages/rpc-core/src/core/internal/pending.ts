@@ -1,4 +1,4 @@
-import type { IAbortSignal } from './async-control.js'
+import type { IAbortSignal } from '@migaia/utils/promise'
 
 export type IPending<T> = {
   readonly resolve: (value: T) => void

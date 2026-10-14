@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   collectionsJsonCodec,
   COLLECTIONS_JSON_CODEC_NAME,
@@ -90,7 +91,7 @@ export async function writeEnvelope(
   key: string,
   codec: ICodec,
   value: unknown,
-  ctx: { signal?: AbortSignal }
+  ctx: { signal?: IAbortSignal }
 ): Promise<void> {
   if (codec.output === PersistCodecOutput.structured) {
     throw createStorePersistTypeError(
@@ -123,7 +124,7 @@ export async function readEnvelope(
   storage: IPersistStorage,
   key: string,
   codec: ICodec,
-  ctx: { signal?: AbortSignal }
+  ctx: { signal?: IAbortSignal }
 ): Promise<unknown | undefined> {
   if (codec.output === PersistCodecOutput.binary && storage.capabilities.binary) {
     assertBinaryCapable(storage)
@@ -145,7 +146,7 @@ export async function readEnvelope(
 export async function removeEnvelope(
   storage: IPersistStorage,
   key: string,
-  ctx: { signal?: AbortSignal }
+  ctx: { signal?: IAbortSignal }
 ): Promise<void> {
   await storage.remove(key, ctx)
 }

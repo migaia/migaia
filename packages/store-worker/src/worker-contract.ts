@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { normalizePortable, type IRpcPortableValue } from '@migaia/rpc-contract'
 import { abort, connect, createFullOneWayEndpoint, timeout } from '@migaia/rpc-core'
 import {
@@ -9,18 +10,11 @@ import { WorkerRpcIdentity } from './worker-constants.js'
 
 type IWorkerHandler = (
   payload: unknown,
-  signal: IWorkerAbortSignal,
+  signal: IAbortSignal,
   context: IWorkerRequestContext
 ) => unknown | Promise<unknown>
 
 type IWorkerRequestContext = Readonly<{ method: string }>
-
-type IWorkerAbortSignal = Readonly<{
-  aborted: boolean
-  reason?: unknown
-  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void
-  removeEventListener(type: 'abort', listener: () => void): void
-}>
 
 /** Creates one worker bridge over the canonical WebRPC request/provider/control closure. */
 export function createWorkerContractEndpoint(
@@ -45,7 +39,7 @@ export function createWorkerContractEndpoint(
     const invoke = async (
       method: string,
       payload: unknown,
-      signal: IWorkerAbortSignal
+      signal: IAbortSignal
     ): Promise<unknown> => {
       let result: unknown
       for (const handler of handlers.get(method) ?? [])
@@ -99,18 +93,18 @@ export function createWorkerContractEndpoint(
 export type IWorkerContractEndpoint = Readonly<{
   request(
     payload: unknown,
-    options?: { signal?: IWorkerAbortSignal; transfer?: readonly Transferable[] }
+    options?: { signal?: IAbortSignal; transfer?: readonly unknown[] }
   ): Promise<unknown>
   notify(
     payload: unknown,
     method?: string,
-    options?: { transfer?: readonly Transferable[]; targetId?: string }
+    options?: { transfer?: readonly unknown[]; targetId?: string }
   ): Promise<void>
   onRequest(
     method: string,
     handler?: (
       payload: unknown,
-      signal: IWorkerAbortSignal,
+      signal: IAbortSignal,
       context: Readonly<{ method: string }>
     ) => unknown | Promise<unknown>
   ): () => void

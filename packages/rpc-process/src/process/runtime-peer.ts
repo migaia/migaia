@@ -1,3 +1,4 @@
+import type { IUrlLike } from '@migaia/utils'
 import {
   createAdapterSourceConfigurationError,
   validateAdapterPeerTimeout as readRuntimeDefaultTimeout
@@ -50,8 +51,7 @@ export type IRuntimeProcessPeerOptions<THandle extends IProcessHandle = IProcess
       | IRuntimePeerSource
       | ISpawnProcessPluginDeployment<THandle>
       | true
-      | string
-      | URL
+      | IUrlLike
       | IProcessShortSpawn
     connect?: IRuntimePeerSource | IConnectProcessPluginDeployment | string
     listen?: IRuntimePeerSource | IRuntimeProcessListen | string

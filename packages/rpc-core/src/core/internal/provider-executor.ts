@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcAbortError,
   createRpcContractError,
@@ -65,7 +66,7 @@ import {
   type IRpcEnvelopeData,
   type IRpcSerializedError
 } from '@migaia/rpc-contract'
-import type { IRpcAbortSignal, IRpcContext, IRpcProviderResult } from '../typing.js'
+import type { IRpcContext, IRpcProviderResult } from '../typing.js'
 import type { ProviderRegistry } from './provider.js'
 import {
   readProviderBulkAdmission,
@@ -260,7 +261,7 @@ function normalizeFailure(
 /** Runtime task records expose their existing liveness without another captured callback. */
 type IProviderContextLifetime = Readonly<{ expired(): boolean }>
 /** A lazy runtime record supplies its original native signal only when the public getter reads it. */
-type IProviderContextSignal = Readonly<{ readSignal(): IRpcAbortSignal }>
+type IProviderContextSignal = Readonly<{ readSignal(): IAbortSignal }>
 
 /** Context callbacks preserve the original callable lifetime source as well as owned task records. */
 function contextExpired(source: (() => boolean) | IProviderContextLifetime): boolean {
@@ -294,7 +295,7 @@ export class ProviderExecutor<TTargetId extends string> {
     /** Original endpoint callbacks and native policy owners remain held by this context's executor. */
     readonly #owner: ProviderExecutor<TId>
     /** Signal source is the original signal/callable or the same lazy runtime execution record. */
-    readonly #signal: IRpcAbortSignal | (() => IRpcAbortSignal) | IProviderContextSignal
+    readonly #signal: IAbortSignal | (() => IAbortSignal) | IProviderContextSignal
     /** The actual executor alone decides expiry; this record adds no lifecycle state. */
     readonly #expired: (() => boolean) | IProviderContextLifetime
     /** The exact original task token still brands every completion and expired result. */
@@ -311,7 +312,7 @@ export class ProviderExecutor<TTargetId extends string> {
     constructor(
       owner: ProviderExecutor<TId>,
       request: IProviderRequestInput,
-      signal: IRpcAbortSignal | (() => IRpcAbortSignal) | IProviderContextSignal,
+      signal: IAbortSignal | (() => IAbortSignal) | IProviderContextSignal,
       expired: (() => boolean) | IProviderContextLifetime,
       taskToken: object,
       runtimeTask?: IRpcRuntimeTask
@@ -338,7 +339,7 @@ export class ProviderExecutor<TTargetId extends string> {
               targetGeneration: runtimeTask.targetGeneration
             }),
         timeoutMs: undefined,
-        signal: undefined as unknown as IRpcAbortSignal,
+        signal: undefined as unknown as IAbortSignal,
         trace: request.route.route.trace,
         success: (data, options) => this.success(data, options),
         failed: (message, code) => this.failed(message, code),
@@ -358,7 +359,7 @@ export class ProviderExecutor<TTargetId extends string> {
         : Math.max(0, Math.floor(this.#deadlineAt - this.#now()))
     }
     /** Only the public signal getter materializes a lazy owned runtime record. */
-    signal(): IRpcAbortSignal {
+    signal(): IAbortSignal {
       return typeof this.#signal === 'function'
         ? this.#signal()
         : ProviderExecutor.#RuntimeExecution.signalFor(this.#signal)
@@ -505,7 +506,7 @@ export class ProviderExecutor<TTargetId extends string> {
       return this.#envelope.task
     }
     /** Actual reads retain native signal identity; ordinary unread success allocates none. */
-    get signal(): IRpcAbortSignal {
+    get signal(): IAbortSignal {
       return this.#native.signal
     }
     /** The original native resource still owns default reason, stack and idempotent abort. */
@@ -517,12 +518,12 @@ export class ProviderExecutor<TTargetId extends string> {
       return this.#state !== 'started'
     }
     /** The public own signal getter delegates only when its application reads it. */
-    readSignal(): IRpcAbortSignal {
+    readSignal(): IAbortSignal {
       return this.#native.signal
     }
     /** Non-record signals preserve the original object and perform no added property probing. */
-    static signalFor(value: IRpcAbortSignal | IProviderContextSignal): IRpcAbortSignal {
-      return #nativeResource in value ? value.#native.signal : (value as IRpcAbortSignal)
+    static signalFor(value: IAbortSignal | IProviderContextSignal): IAbortSignal {
+      return #nativeResource in value ? value.#native.signal : (value as IAbortSignal)
     }
     /** Existing lifecycle retirement calls the same task's revoke method. */
     abort(reason?: unknown, retainStarted = false): void {
@@ -1364,7 +1365,7 @@ export class ProviderExecutor<TTargetId extends string> {
   /** Creates the core-owned context once for an admitted request or stream open. */
   createContext(
     request: IProviderRequestInput,
-    signal: IRpcAbortSignal | (() => IRpcAbortSignal) | IProviderContextSignal,
+    signal: IAbortSignal | (() => IAbortSignal) | IProviderContextSignal,
     isExpired: (() => boolean) | IProviderContextLifetime,
     taskToken: object = {},
     runtimeTask?: IRpcRuntimeTask,
@@ -1813,14 +1814,14 @@ export class ProviderExecutor<TTargetId extends string> {
     /** Timer ownership is unchanged; unread cancellation must still release it immediately. */
     let deadlineTimer: IEndpointTimer | undefined
     /** First read delegates native identity and original abort semantics to lifecycle. */
-    const readSignal = (): IRpcAbortSignal => {
+    const readSignal = (): IAbortSignal => {
       if (generation === undefined) {
         lifecycle = createGenerationController()
         generation = lifecycle.begin()
         if (canceled) lifecycle.supersede(cancellationReason)
         else if (expired) lifecycle.complete(generation.token)
       }
-      return generation.signal as IRpcAbortSignal
+      return generation.signal as IAbortSignal
     }
     /** The private command defers allocation; the full provider remains its original native owner. */
     const controller: IRpcProviderController = fast

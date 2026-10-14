@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
 
 /** 协作式取消与超时。所有公开方法的最后一个可选参数。 */
 export type IOperationContext = {

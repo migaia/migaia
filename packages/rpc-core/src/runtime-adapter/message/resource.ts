@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { retainRuntimeConnectionIdentity } from '../byte/connection-identity.js'
 import { identityCodecV1 } from '@migaia/serialize/codec'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
@@ -19,7 +20,6 @@ import {
   bindNativeReplayTransport
 } from '../../core/internal/native-replay.js'
 import type { IRuntimePeerSourceResult, IRuntimePeerSourceContext } from '../../remote/index.js'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import { createEventEmitterMessageHandoff, createEventTargetMessageHandoff } from './handoff.js'
 import type {
   IAdapterEventEmitterMessagePort,

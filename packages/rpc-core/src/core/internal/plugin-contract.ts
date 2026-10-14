@@ -1,7 +1,8 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IPluginConstraint, IPluginHostCore } from '@migaia/plugin-host'
 import type { IRpcConstructionControl } from './construction-install.js'
 import type { IRpcPortFeature } from './port-feature.js'
-import type { IRpcAbortSignal, IRpcHookEvent } from '../typing.js'
+import type { IRpcHookEvent } from '../typing.js'
 import type { IRpcTransport } from '../transport.js'
 import { RpcPortName } from './plugin-shared-keys.js'
 import type { IRpcPortValues } from './plugin-shared-keys.js'
@@ -10,7 +11,7 @@ import type { IRpcPortValues } from './plugin-shared-keys.js'
 export type IRpcPluginCore = {
   readonly id: string
   readonly transport: IRpcTransport
-  readonly signal: IRpcAbortSignal
+  readonly signal: IAbortSignal
   readonly hooks: (event: IRpcHookEvent) => void
   readonly construction: IRpcConstructionControl
   /** Reads a port from the registration-local Feature output catalog during construction. */
@@ -28,7 +29,7 @@ export type IRpcPluginCore = {
 export type IRpcPluginInstallScope = {
   readonly id: string
   readonly transport: IRpcTransport
-  readonly signal: IRpcAbortSignal
+  readonly signal: IAbortSignal
   readonly hooks: (event: IRpcHookEvent) => void
   readonly getPort: (key: PropertyKey) => unknown
   own<T>(resource: T, release: () => void | Promise<void>): T

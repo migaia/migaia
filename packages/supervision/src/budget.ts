@@ -1,8 +1,8 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createAbortController,
   createMutationQueue,
-  createStringLeaseRegistry,
-  type IAbortSignal
+  createStringLeaseRegistry
 } from '@migaia/lifecycle'
 import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'

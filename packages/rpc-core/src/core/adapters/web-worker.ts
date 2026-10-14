@@ -27,19 +27,27 @@ import { RpcCoreErrorCode } from '../index.js'
  * Minimal event-listener worker/port surface — a real `Worker`, `MessagePort`, or
  * `SharedWorker.port` all satisfy this. Deliberately not `Worker` itself: shared workers and ports
  * must not use a mutable `onmessage` slot (that would silently steal another listener's
- * subscription), and this file has no other DOM dependency beyond the ambient
- * `Transferable`/`MessageEvent` types.
+ * subscription). The event and transfer shapes are structural, so the declaration needs no DOM or
+ * Node types; a real `Worker`/`MessagePort` is assignable.
  */
 export type IWebWorkerLikePort = {
-  postMessage(message: unknown, transfer?: readonly Transferable[]): void
+  postMessage(message: unknown, transfer?: readonly unknown[]): void
   addEventListener(
     type: 'message' | 'error' | 'messageerror',
-    listener: (event: MessageEvent<unknown> | Event) => void
+    listener: (event: IWebWorkerPortEvent) => void
   ): void
   removeEventListener(
     type: 'message' | 'error' | 'messageerror',
-    listener: (event: MessageEvent<unknown> | Event) => void
+    listener: (event: IWebWorkerPortEvent) => void
   ): void
+}
+
+/** The fields this adapter reads from a native message, error or messageerror event. */
+export type IWebWorkerPortEvent = {
+  readonly data?: unknown
+  readonly origin?: unknown
+  readonly source?: unknown
+  readonly type?: string
 }
 
 /** Static metadata for a dedicated worker channel whose peer is known by construction. */
@@ -59,7 +67,7 @@ export type IWebWorkerTransportOptions = {
 export function createWebWorkerTransport(
   port: IWebWorkerLikePort,
   options: IWebWorkerTransportOptions = {}
-): IRpcTransport<unknown, Transferable> {
+): IRpcTransport<unknown, unknown> {
   /** The sole installed probe is replaced per observation generation. */
   let probe: IRpcCarrierProbe | undefined
   /** Disposers compare generations even when the same probe object is installed twice. */
@@ -90,12 +98,12 @@ export function createWebWorkerTransport(
   // `onTransportError` rather than silently dropped: a message that could
   // not even be read is exactly the kind of thing pending callers need to
   // know happened, not have quietly vanish.
-  const onMessage = (event: MessageEvent<unknown> | Event): void => {
+  const onMessage = (event: IWebWorkerPortEvent): void => {
     let data: unknown
     let origin: string | undefined
     let source: unknown
     try {
-      data = (event as MessageEvent<unknown> | undefined)?.data
+      data = (event as IWebWorkerPortEvent | undefined)?.data
       const eventOrigin = (event as { origin?: unknown }).origin
       origin = typeof eventOrigin === 'string' ? eventOrigin : undefined
       source = (event as { source?: unknown }).source
@@ -144,7 +152,7 @@ export function createWebWorkerTransport(
   }
   const onFailure =
     (reason: string) =>
-    (event: Event): void => {
+    (event: IWebWorkerPortEvent): void => {
       let detail: string
       try {
         detail = safeString(
@@ -174,7 +182,7 @@ export function createWebWorkerTransport(
   const onMessageError = onFailure(BrowserRpcErrorText.workerMessageErrorReason)
 
   /** The canonical factory is the sole owner of this static deployment agreement. */
-  const transport: IRpcTransport<unknown, Transferable> = {
+  const transport: IRpcTransport<unknown, unknown> = {
     platform: RpcPlatform.worker,
     topology: 'exclusive',
     ownership: RpcTransportOwnership.borrowed,
@@ -192,7 +200,7 @@ export function createWebWorkerTransport(
         if (generation === probeGeneration) probe = undefined
       }
     },
-    send(message, options?: IRpcSendOptions<Transferable>) {
+    send(message, options?: IRpcSendOptions<unknown>) {
       if (closed) throw createRpcTransportError(BrowserRpcErrorText.workerClosed)
       /** Read the native transfer option once; observation cannot select a different list. */
       const transfer = options?.transfer

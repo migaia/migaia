@@ -1,5 +1,5 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { createAdapterTransportError } from '@migaia/rpc-core/adapter/internal-advanced'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import { type IRuntimePeerSourceResult } from '@migaia/rpc-core/remote'
 import type { IThreadHandle, IThreadLauncher } from '@migaia/supervision/threads'
 import {
@@ -77,7 +77,7 @@ export function createAdapterWebThreadLauncher(
       /** Runtime constructors are read only when an admitted launch actually starts. */
       const Constructor =
         options.Worker ??
-        (globalThis.Worker as unknown as NonNullable<IWebThreadLauncherOptions['Worker']>)
+        (Reflect.get(globalThis, 'Worker') as NonNullable<IWebThreadLauncherOptions['Worker']>)
       /** The service receives the exact peerId used by the client channel factory. */
       const fingerprint = `${THREAD_FINGERPRINT_PREFIX}web-${++sequence}`
       /** The shared bootstrap owner admits safe metadata before native Worker construction. */

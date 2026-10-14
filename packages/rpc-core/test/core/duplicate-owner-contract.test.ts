@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createEndpointTimePort } from '../../dist/core/internal/time-port.js'
 import { describe, expect, it, vi } from 'vitest'
@@ -16,7 +17,7 @@ import { createWebRpcPluginHost } from '../../dist/core/internal/web-rpc-plugin-
 import { ReplayWindow } from '../../dist/core/internal/replay.js'
 import { PeerRegistry } from '../../dist/core/internal/peers.js'
 import { ProviderAdmissionRegistry } from '../../dist/core/internal/provider-admission.js'
-import type { IRpcAbortSignal, IRpcPlugin } from '../../dist/core/typing.js'
+import type { IRpcPlugin } from '../../dist/core/typing.js'
 import { createStringFramer } from '@migaia/rpc-contract/framing'
 
 type IBuildCapabilityTopology =
@@ -181,7 +182,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
       transport,
       createConstructionControl({
         time: createEndpointTimePort(systemScheduler),
-        signal: new AbortController().signal as IRpcAbortSignal
+        signal: new AbortController().signal as IAbortSignal
       }),
       () => undefined,
       { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
@@ -232,7 +233,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     let now = 100
     let disposed = 0
     const control = createConstructionControl({
-      signal: new AbortController().signal as IRpcAbortSignal,
+      signal: new AbortController().signal as IAbortSignal,
       timeoutMs: 50,
       time: {
         scheduler: systemScheduler,
@@ -358,7 +359,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
       firstTransport,
       createConstructionControl({
         time: createEndpointTimePort(systemScheduler),
-        signal: new AbortController().signal as IRpcAbortSignal
+        signal: new AbortController().signal as IAbortSignal
       }),
       () => undefined,
       { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
@@ -368,7 +369,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
       secondTransport,
       createConstructionControl({
         time: createEndpointTimePort(systemScheduler),
-        signal: new AbortController().signal as IRpcAbortSignal
+        signal: new AbortController().signal as IAbortSignal
       }),
       () => undefined,
       { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
@@ -407,7 +408,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
   it('proves MET-RED-023 uses one absolute construction deadline', () => {
     let now = 1_000
     const control = createConstructionControl({
-      signal: new AbortController().signal as IRpcAbortSignal,
+      signal: new AbortController().signal as IAbortSignal,
       timeoutMs: 100,
       time: {
         scheduler: systemScheduler,
@@ -549,7 +550,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     expect(() =>
       createConstructionControl({
         time: createEndpointTimePort(systemScheduler),
-        signal: new AbortController().signal as IRpcAbortSignal,
+        signal: new AbortController().signal as IAbortSignal,
         timeoutMs: -1
       })
     ).toThrow(expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig }))
@@ -566,7 +567,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
       transport,
       createConstructionControl({
         time: createEndpointTimePort(systemScheduler),
-        signal: new AbortController().signal as IRpcAbortSignal
+        signal: new AbortController().signal as IAbortSignal
       }),
       () => undefined,
       { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
@@ -629,7 +630,7 @@ describe('MET-RED-022/035 projection and public lifecycle surface', () => {
       hostTransport,
       createConstructionControl({
         time: createEndpointTimePort(systemScheduler),
-        signal: new AbortController().signal as IRpcAbortSignal
+        signal: new AbortController().signal as IAbortSignal
       }),
       () => undefined,
       { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
