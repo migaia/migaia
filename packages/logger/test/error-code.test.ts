@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { vi } from 'vitest'
 import { Logger, LoggerErrorCode, LOGGER_SOURCE, setLoggerRuntimeManager } from '../src/index.js'
+import { batch } from '../src/plugins/batch.js'
 import { http } from '../src/plugins/http.js'
 import { process as processPlugin } from '../src/plugins/process.js'
 import { LoggerErrorText } from '../src/error-text.js'
@@ -642,5 +643,35 @@ describe('logger error-code contract (E-T9)', () => {
     expect((failure as Error & { cause?: unknown }).cause).toBeUndefined()
     await first.shutdown('manual')
     await second.shutdown('manual')
+  })
+
+  it('BATCH_OVERFLOW rejects a non-immediate submission on a saturated bounded batcher', async () => {
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    const [batchHandle] = await logger.use(batch())
+    // maxSize 1 turns every push into a full batch; maxPendingBatches 1 is the minimal upper
+    // bound, and asyncOutput keeps the first batch queued behind the defer boundary, so the
+    // pending window is still saturated when the second push is admitted.
+    const { createBatcher } = batchHandle.getFeature('batch')
+    const batcher = createBatcher<string>(
+      { maxSize: 1, maxPendingBatches: 1, asyncOutput: true, maxWaitMs: 5 },
+      () => undefined
+    )
+
+    batcher.push('saturate')
+    let failure: unknown
+    try {
+      batcher.push('overflow')
+    } catch (error) {
+      failure = error
+    }
+
+    expect(failure).toBeInstanceOf(Error)
+    expect(failure).toMatchObject({ source: LOGGER_SOURCE, code: LoggerErrorCode.batchOverflow })
+    // The immediate path bypasses the pending bound, so flushing the restored buffer must not
+    // throw even while the window is full.
+    await expect(batcher.flush()).resolves.toBeUndefined()
+    await logger.shutdown('manual')
   })
 })
