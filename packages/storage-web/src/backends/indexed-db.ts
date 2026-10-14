@@ -145,11 +145,14 @@ export type IIndexedDbOptions = {
   readonly recordsStoreName?: string
   /** Explicit release-time opt-in to delete the legacy `documents` object store after migration. */
   readonly cleanupLegacyRecords?: boolean
-  /** 注入点：测试环境（jsdom 没有 IndexedDB）与非浏览器环境用。 */
+  /**
+   * Injects an IndexedDB factory for tests and non-browser environments. jsdom does not provide
+   * IndexedDB.
+   */
   readonly factory?: IDBFactory
   /**
-   * 注入点：`IDBKeyRange` 构造器。jsdom 完全不提供 IndexedDB，测试环境下 必须和 `factory` 一起从 fake-indexeddb
-   * 显式传入；真实浏览器默认取 `globalThis.IDBKeyRange`。
+   * Injects the `IDBKeyRange` constructor. Since jsdom does not provide IndexedDB, tests supply it
+   * explicitly with `factory` from fake-indexeddb. Browsers default to `globalThis.IDBKeyRange`.
    */
   readonly keyRange?: typeof IDBKeyRange
 }
@@ -426,9 +429,10 @@ const toIdbRecordIndexRange = (
 }
 
 /**
- * IndexedDB 后端：唯一原样存字节、支持索引与事务的浏览器存储。
- *
- * 连接管理、写入-等-commit、onblocked/onversionchange 处理，都是从早期 实现直接搬运的已验证坑位处理，未改动核心逻辑，详见各处注释。
+ * Provides the IndexedDB backend, the browser storage backend that stores bytes directly and
+ * supports indexes and transactions. Carries forward the previously verified connection management,
+ * commit-based write completion, and `onblocked`/`onversionchange` handling from the earlier
+ * implementation without changing their core logic. See the comments at each handling site.
  */
 export const indexedDbHost = <TValue = unknown>(
   options: IIndexedDbOptions = {}

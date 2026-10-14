@@ -21,9 +21,9 @@ export type IHttpPluginConfig = {
   authToken?: string
   headers?: Record<string, string>
   retries?: number
-  /** 单次 HTTP 请求最长等待时间；默认 10000ms。 */
+  /** Maximum wait for one HTTP request. Defaults to 10,000 ms. */
   requestTimeoutMs?: number
-  /** 是否复用 batch 插件的批量能力；未装 batch 插件时自动退化为每条日志单独发送 */
+  /** Uses the batch plugin when installed. Without it, each log entry is sent separately. */
   batch?: {
     /** Flushes a batch when it reaches this many entries. */
     maxSize?: number

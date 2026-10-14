@@ -18,7 +18,7 @@ import {
   type IStorageOperationRuntime
 } from './operation-reporter.js'
 
-// operation context / sync-write 纯校验已迁往 `@migaia/storage-contract`；re-export 保持既有 import 路径不变。
+// Pure operation-context and synchronous-write validation belongs to `@migaia/storage-contract`. Re-exports preserve existing import paths.
 export {
   snapshotOperationContext,
   assertOperationContext,
@@ -31,7 +31,10 @@ type IOperationValidationContext = IOperationContext & {
   readonly conflictPolicy?: unknown
 }
 
-/** 结构化取消信号（与 contract 的 `IOperationContext.signal` 同源，避免直接 import `@migaia/lifecycle`）。 */
+/**
+ * Uses the structural cancellation signal from `IOperationContext.signal` without directly
+ * importing `@migaia/lifecycle`.
+ */
 export type IWebAbortSignal = NonNullable<IOperationContext['signal']>
 
 /** Read mutable abort state without allowing a hostile getter to escape the storage protocol. */

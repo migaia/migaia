@@ -110,10 +110,10 @@ function snapshotHostOptions<T>(
 }
 
 /**
- * Store 专用事件 Host；通用插件生命周期和 pipeline 全部由 plugin-host 提供。
+ * Provides a store event host using `plugin-host` for plugin lifecycle and pipelines.
  *
- * 由 `defineHost` 组合而成而不是继承 `PluginHost`：这个壳层真正需要基类的只有一个 domain core 钩子 和一条 dispose
- * 前置，继承却把宿主的整个表面一并交了出去。句柄只带 Store 自己的成员加宿主的公开面。
+ * `defineHost` composes the store domain core and pre-disposal hook instead of inheriting
+ * `PluginHost`. The handle exposes store members together with the host's public surface.
  */
 export type IStoreMiddlewareHost<S> = IHostHandle<
   IStoreMiddlewareCore<S>,

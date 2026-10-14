@@ -6,7 +6,10 @@ import {
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { MiddlewarePipelineErrorText } from './error-text.js'
 
-/** 同时保留 stage/downstream 原错误，并给默认 AggregateError 附加包边界契约。 */
+/**
+ * Preserves both original stage and downstream errors and attaches the package-boundary identity to
+ * the default `AggregateError`.
+ */
 export const createMiddlewarePipelineExecutionError = (
   stageError: unknown,
   downstreamError: unknown

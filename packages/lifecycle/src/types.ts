@@ -28,10 +28,10 @@ export type ILifecycleOwner = {
 }
 
 /**
- * Internal brand stamped on every `LifecycleScope`/`ProvisionalScope` instance so
- * `SyncLifecycleScope.own()` can reject one even if it arrives wrapped in a `syncSafe: true`
- * descriptor claiming otherwise (§4.5: "`SyncLifecycleScope` 明确禁止 own `LifecycleScope`、
- * `ProvisionalScope`"). Not exported — this is an internal cross-module check, not public API.
+ * Brands every `LifecycleScope` and `ProvisionalScope` for the internal cross-module check.
+ * `SyncLifecycleScope.own()` rejects these instances even when the supplied descriptor claims
+ * `syncSafe: true` (§4.5). The symbol is exported between source modules but is not exposed by
+ * package entry points.
  */
 export const ASYNC_OWNER_BRAND: unique symbol = Symbol('@migaia/lifecycle/async-owner')
 
@@ -42,20 +42,18 @@ export type ILifecycleState = (typeof LifecycleState)[keyof typeof LifecycleStat
 export type IUnitState = (typeof LifecycleUnitState)[keyof typeof LifecycleUnitState]
 
 /**
- * The context handed to a release descriptor's `graceful`/`force`/`custom` callback.
- *
- * `deadlineAt` is the transaction-wide shared absolute deadline (same value for every item in one
- * `DisposeTransaction` run, per §4.6 "全程共享同一份绝对 deadline" / L-T32) — it is not recomputed per
- * item.
+ * Supplies context to a release descriptor's `graceful`, `force`, or `custom` callback.
+ * `deadlineAt` is one shared absolute deadline for every item in a `DisposeTransaction` run. It is
+ * not recomputed per item (§4.6 / L-T32).
  */
 export type IReleaseContext = {
   /** Aborts when the owning transaction/scope enters `closing` (L-T26). */
   readonly signal: IAbortSignal
   readonly deadlineAt: number | undefined
   /**
-   * The scheduler whose `now()` produced `deadlineAt`（R-9 时间域契约）. Omitted → `systemScheduler`.
-   * Exposed so descriptor callbacks and the graceful-phase deadline share one clock source instead
-   * of silently mixing domains.
+   * Uses the scheduler whose `now()` produces `deadlineAt` under the R-9 clock-domain contract.
+   * Defaults to `systemScheduler`. Callbacks and the graceful-phase deadline share this clock
+   * source so clock domains do not mix.
    */
   readonly scheduler?: IScheduler
   /** Side-channel diagnostic reporter; its own throws are contained (L-T26). */

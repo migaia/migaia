@@ -7,7 +7,10 @@ export { StorageContractErrorCode, type IStorageContractErrorCode }
 /** `source` value stamped onto every contract-level error this package throws. */
 export const STORAGE_CONTRACT_SOURCE = '@migaia/storage-contract'
 
-/** 契约级错误详情：只含中立字段，不泄漏 web 诊断词汇（codec/migration/extension 等留 storage-web）。 */
+/**
+ * Contains neutral contract error details. Web diagnostics such as codec, migration, and extension
+ * details belong to `storage-web`.
+ */
 export type IStorageContractErrorDetails = {
   readonly backend?: IBackendKind
   readonly key?: string | IStorageKey
@@ -15,8 +18,9 @@ export type IStorageContractErrorDetails = {
 }
 
 /**
- * 契约级错误。`source` 恒为 `@migaia/storage-contract`，码表见 `StorageContractErrorCode`。 构造后
- * `Object.freeze`；不重写 `stack`；`cause` 链可达（`docs/contracts/error-codes.md` §3.2）。
+ * Represents a contract error with `source` fixed to `@migaia/storage-contract`.
+ * `StorageContractErrorCode` defines the codes. Freezes the instance after construction and
+ * preserves `stack` and the reachable `cause` chain. See `docs/contracts/error-codes.md` §3.2.
  */
 export class StorageContractError extends Error {
   readonly source: string

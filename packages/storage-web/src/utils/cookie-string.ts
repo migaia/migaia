@@ -3,7 +3,10 @@ import { StorageBackend } from '../constants.js'
 import type { ICookieRemoveContext, ICookieScope, ICookieWriteContext } from '../types/cookie.js'
 import { utf8ByteLength } from '@migaia/utils/bytes'
 
-/** Cookie 单值上限；超出直接抛错，不静默截断。 */
+/**
+ * Limits a single cookie assignment. An oversized assignment throws instead of being silently
+ * truncated.
+ */
 export const MAX_COOKIE_VALUE_BYTES = 4096
 
 const decodeOrRaw = (value: string): string => {
@@ -17,9 +20,10 @@ const decodeOrRaw = (value: string): string => {
 }
 
 /**
- * 解析 `document.cookie` 的分号分隔字符串为 decoded name → decoded value 映射。 name
- * 必须解码——serializeCookieAssignment 写入时 encodeURIComponent 了 name （命名空间分隔符 `:` 本身就会被编码成
- * `%3A`），这里不对称解码会导致所有 带命名空间前缀的键永远查不到自己刚写入的值。
+ * Parses the semicolon-separated `document.cookie` string into decoded names and values. Decodes
+ * names because `serializeCookieAssignment` applies `encodeURIComponent` when writing them. That
+ * encoding includes namespace separators such as `:` as `%3A`. Symmetric decoding lets namespaced
+ * keys find their newly written values.
  */
 export const parseCookieEntries = (cookieString: string): Array<readonly [string, string]> => {
   const entries: Array<readonly [string, string]> = []
@@ -39,7 +43,7 @@ export const parseCookieEntries = (cookieString: string): Array<readonly [string
 export const parseCookieString = (cookieString: string): Map<string, string> =>
   new Map(parseCookieEntries(cookieString))
 
-/** 构造一次 `document.cookie = ...` 写入用的字符串，附带 Set-Cookie 风格属性。 */
+/** Builds one assignment to `document.cookie` with Set-Cookie-style attributes. */
 export const serializeCookieAssignment = (
   name: string,
   value: string,
@@ -63,7 +67,7 @@ export const serializeCookieAssignment = (
   return serialized
 }
 
-/** 构造一次删除用的写入字符串：空值 + 过去的 expires。 */
+/** Builds a deletion assignment with an empty value and an `expires` date in the past. */
 export const serializeCookieRemoval = (
   name: string,
   ctx?: ICookieRemoveContext & ICookieScope

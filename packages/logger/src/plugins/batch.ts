@@ -17,7 +17,10 @@ export type IBatchPluginConfig = {
   maxConcurrentBatches?: number
   /** Maximum number of queued or executing batches. Defaults to 1024. */
   maxPendingBatches?: number
-  /** 批次满时是否异步调度回调；默认 true。定时触发本身已是异步。 */
+  /**
+   * Schedules a full-batch callback asynchronously when enabled. Defaults to `true`;
+   * timer-triggered callbacks are already asynchronous.
+   */
   asyncOutput?: boolean
 }
 
@@ -26,7 +29,7 @@ export type IBatcher<T> = {
   flush(): Promise<void>
 }
 
-/** Batch 插件共享的批处理器工厂签名。 */
+/** Factory contract for the batch plugin's shared batching capability. */
 export type ICreateBatcher = <T>(
   config: IBatchPluginConfig,
   onBatch: (items: T[]) => void | Promise<void>

@@ -3,17 +3,18 @@ import type { ICodec, IKeyValueStore, IRecordStore } from '@migaia/storage-contr
 import { PersistState } from '../state-constants.js'
 
 /**
- * 任意持久化单位的最小能力面：同步读快照、同步写回、订阅变化。
+ * Defines the minimal persistence boundary for synchronous snapshots, restoration, and change
+ * subscriptions.
  *
- * `persist()`（store-light）、`persistCollection()`（store-indexed）、以及 `persistKeyed()` 内部为每个 key
- * 各自创建的持久化单位，全部实现这同一个接口——`persistUnit()` 只写一遍。
+ * `persist()` for `store-light`, `persistCollection()` for `store-indexed`, and each keyed unit
+ * from `persistKeyed()` implement this contract. All use the same `persistUnit()` engine.
  */
 export type IPersistUnit<TState> = {
-  /** 同步读当前可持久化状态。 */
+  /** Reads the current persistable state synchronously. */
   snapshot(): TState
-  /** 同步写回一份状态（hydrate 用）。 */
+  /** Restores state synchronously during hydration. */
   restore(state: TState): void
-  /** 注册变化通知，返回取消订阅函数。 */
+  /** Registers change notifications and returns an unsubscribe function. */
   subscribe(onChange: () => void): IDisposer
 }
 
@@ -44,15 +45,18 @@ export type IPersistHandle = {
   hydrationError: IReadonlyPersistValue<unknown>
   writeStatus: IReadonlyPersistValue<IWriteStatus>
   writeError: IReadonlyPersistValue<unknown>
-  /** Hydration 成功 resolve；失败 reject。 */
+  /** Resolves when hydration succeeds and rejects when hydration fails. */
   ready: Promise<void>
-  /** Hydration 成功或失败都 resolve。 */
+  /** Resolves after hydration, whether it succeeds or fails. */
   settled: Promise<void>
-  /** 失败后重新读取一次存档；只有本次读取成功才解除写入闸门。 */
+  /** Reads the archive again after failure. Only successful hydration reopens the write gate. */
   retryHydrate(): Promise<void>
-  /** 立即写并等待全部在途写入完成；期间 dispose 会以 AbortError 结束。 */
+  /**
+   * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with
+   * `AbortError`.
+   */
   flush(): Promise<void>
-  /** 排队删除存档；期间 dispose 会以 AbortError 结束。 */
+  /** Queues archive removal. Disposal during the wait ends it with `AbortError`. */
   clear(): Promise<void>
   readonly disposed: boolean
   dispose(): void
@@ -60,10 +64,16 @@ export type IPersistHandle = {
 
 export type IPersistUnitOptions<TState> = {
   key: string
-  /** 状态信号挂在哪个 Runtime 上——通常传底层 store/collection/AtomStore 自己的 runtime，保证同一张图。 */
+  /**
+   * Owns the status signals. Use the underlying store, collection, or `AtomStore` runtime to keep
+   * them in one graph.
+   */
   runtime: IRuntime
   storage: IPersistStorage
-  /** Codec 编解码的是整份 envelope（`{ version, state }`），天然是类型擦除的，不按 TState 参数化。 */
+  /**
+   * Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize
+   * on the state type.
+   */
   codec?: ICodec
   version?: number
   migrate?: (persisted: TState, fromVersion: number) => TState
@@ -73,9 +83,11 @@ export type IPersistUnitOptions<TState> = {
 }
 
 /**
- * Store-persist 需要的存储能力投影：字段全部 `Pick` 自 storage-web canonical 类型，不手写方法签名。 仅 store-persist
- * 内部存在，不作为公开 contract 导出；text-only adapter 只需 `capabilities`/`get`/`set`/ `remove`/`keys`（无需
- * `backend`/`has`/`clearValues`/`clearAll`/`dispose`）。字节通道可选，投影自 `IRecordStore`。
+ * Projects persistence capabilities from canonical `storage-contract` types with `Pick`, without
+ * duplicating method signatures. It is not re-exported as a package entry contract. Text-only
+ * adapters need `capabilities`, `get`, `set`, `remove`, and `keys`. They do not need `backend`,
+ * `has`, `clearValues`, `clearAll`, or `dispose`. Optional byte operations come from
+ * `IRecordStore`.
  */
 export type IPersistStorage = Pick<
   IKeyValueStore,
@@ -85,6 +97,6 @@ export type IPersistStorage = Pick<
   readonly setBytes?: IRecordStore['setBytes']
 }
 
-/** Binary 分支用内部 guard 收窄到具备字节通道的 storage。 */
+/** Provides byte storage capabilities after the binary branch applies its internal guard. */
 export type IPersistByteStorage = IPersistStorage &
   Required<Pick<IPersistStorage, 'getBytes' | 'setBytes'>>

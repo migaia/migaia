@@ -5,7 +5,10 @@ import { LoggerReasoningPhase } from '../plugin-constants.js'
 
 export type IReasoningPluginConfig = {
   labels?: { thinking?: string; response?: string }
-  /** 是否把该插件发起的流式及完整 entry 输出异步调度；默认 false。 */
+  /**
+   * Schedules this plugin's streaming and complete entry output asynchronously when enabled.
+   * Defaults to `false`.
+   */
   asyncOutput?: boolean
 }
 

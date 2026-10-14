@@ -60,8 +60,8 @@ function swapActiveTracker(next: DependencyTracker): DependencyTracker | null {
   return previous
 }
 
-// 依赖追踪上下文（每个 Runtime 一个）：谁在被求值、依赖边的暂存/提交/断开/脏检查。
-// 事务化：runTracked 期间 track() 只暂存到 nextDeps；成功才 commit 差异，失败直接丢弃、旧图不动。
+// Per-runtime dependency tracking owns evaluation context, staged edges, edge commits, disconnection, and stale checks.
+// During `runTracked`, `track()` stages `nextDeps`. Success commits changes; failure discards them and preserves the old graph.
 export class DependencyTracker {
   #stack: (ITrackingFrame | null)[] = []
   #captures = new WeakMap<object, ICaptureState>()
@@ -102,7 +102,7 @@ export class DependencyTracker {
     return activeTracker !== null && activeTracker.#hasActiveObserver()
   }
 
-  /** 记一条依赖——只暂存到当前帧；跨 runtime 读取立即抛错 */
+  /** Stages a dependency in the current frame. Cross-runtime reads throw immediately. */
   track(observable: IObservable): void {
     this.#assertObservableOwner(observable)
     if (activeTracker === this) {
@@ -119,7 +119,7 @@ export class DependencyTracker {
     // 无人追踪（或对方处于 untracked）→ 无依赖可建，静默跳过
   }
 
-  /** 断开某 observer 的全部依赖边——仅供 dispose 用 */
+  /** Disconnects all dependency edges for an observer during disposal. */
   clearDependencies(observer: IObserver): void {
     for (const dep of observer.deps) this.#unsubscribe(dep, observer)
     mutableNodeDeps(observer, observer.deps).clear()
@@ -127,10 +127,13 @@ export class DependencyTracker {
   }
 
   /**
-   * 原子删除 Observable 的全部反向边，再通知下游失效。
+   * Atomically removes every reverse edge of an observable, then notifies downstream nodes of
+   * invalidation.
    *
-   * `invalidate` 用于仍可继续使用的节点（例如 Atom override）；`dispose` 是终态。 两者都更换独立的 topology token 使在途 capture
-   * 过期，不消耗全局值版本， 因此在 VersionClock 已耗尽时仍能完整释放或撤销路由。
+   * `invalidate` keeps the node reusable, for example after an atom override. `dispose` is
+   * terminal. Both replace an independent topology token so pending captures become stale. Neither
+   * consumes a global value version, so disposal and route removal still work after clock
+   * exhaustion.
    */
   disconnectObservable(
     observable: IObservable,
@@ -183,7 +186,10 @@ export class DependencyTracker {
     }
   }
 
-  /** 事务化重算：成功才 commit 差异，失败丢弃临时集合。 */
+  /**
+   * Recomputes transactionally. Success commits dependency changes; failure discards the temporary
+   * set.
+   */
   runTracked<R>(observer: IObserver, fn: () => R): R {
     const frame: ITrackingFrame = {
       kind: ReactiveDependencyKind.observer,
@@ -202,7 +208,10 @@ export class DependencyTracker {
     }
   }
 
-  /** Render 阶段只采集依赖与版本，不修改正式订阅边。调用方可在提交阶段交回 token，因而被 Concurrent React 丢弃的 render 不会泄漏订阅。 */
+  /**
+   * Captures render dependencies and versions without changing subscription edges. Discarded
+   * Concurrent React renders cannot leak subscriptions.
+   */
   capture<R>(fn: () => R): ICapture<R> {
     const frame: ITrackingFrame = {
       kind: ReactiveDependencyKind.capture,
@@ -228,7 +237,10 @@ export class DependencyTracker {
     }
   }
 
-  /** 原子验证并提交一次 capture。返回 false 表示捕获后依赖已变化，调用方必须重新求值； token 单次使用，且 observer 必须属于当前 Tracker。 */
+  /**
+   * Atomically validates and commits one capture. `false` means dependencies changed and requires
+   * reevaluation. Tokens are single-use and require this tracker's observer.
+   */
   commitCapture(observer: IObserver, capture: ICapture<unknown>): boolean {
     if (internalsOf(observer.runtime).tracker !== this) {
       throw createReactiveError(
@@ -409,7 +421,10 @@ export class DependencyTracker {
     assertReactiveOwnedBy(observable, this.#runtime, 'observable')
   }
 
-  /** 在 fn 执行期间关闭依赖收集——action 内读取、cleanup 回调等场景用 */
+  /**
+   * Disables dependency collection while `fn` runs, for example during actions or cleanup
+   * callbacks.
+   */
   untracked<R>(fn: () => R): R {
     this.#stack.push(null)
     const prevTracker = swapActiveTracker(this)
@@ -421,7 +436,7 @@ export class DependencyTracker {
     }
   }
 
-  /** 依赖是否真的变了（先惰性 pull 使版本落定再比较） */
+  /** Checks whether dependencies change after lazily pulling them to settle their versions. */
   hasStaleDependencies(observer: IObserver): boolean {
     for (const [dep, recordedVersion] of observer.depVersions) {
       dep.pull?.()

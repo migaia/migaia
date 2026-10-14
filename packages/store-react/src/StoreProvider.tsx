@@ -43,7 +43,10 @@ export type IStoreProviderProps = {
    * unless this flag is explicitly true.
    */
   readonly disposeOnUnmount?: boolean
-  /** 应用级配置：特性开关 + 就绪屏障。 省略时与历史行为一致（无屏障、features 全关）。 */
+  /**
+   * Configures application features and readiness barriers. Omission keeps all features disabled
+   * and uses no barrier.
+   */
   readonly config?: IStoreProviderConfig
 }
 

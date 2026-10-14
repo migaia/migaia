@@ -20,9 +20,15 @@ export type IColorPluginConfig = {
   color?: IColorMode
   format?: IOutputFormat
   timestamp?: boolean
-  /** Message 参数着色范围；默认 none，只染色级别标签。 */
+  /**
+   * Message argument coloring range. Defaults to `none`, leaving the message and its arguments
+   * uncolored.
+   */
   colorMessage?: 'head' | 'tail' | 'head-tail' | 'all' | 'none'
-  /** 自定义 tag -> 染色函数映射，未命中的 tag 走原样输出， 方便非 level 场景（比如 reasoning 插件的 tag）也能按需上色 */
+  /**
+   * Maps custom tags to paint functions. Tags without a built-in or custom mapping remain
+   * unchanged, allowing non-level tags such as reasoning tags to receive color.
+   */
   colorMap?: Record<string, (text: string) => string>
 }
 
@@ -33,9 +39,9 @@ export const loggerColorFeature = defineFeature<IColorShared, Record<never, neve
   (core) => core.featureExpose
 )
 
-// IPaintFn / IDimFn 这两个类型定义在 typing.ts（公共约定），这里只是使用方之一，
-// 不是定义方——其它插件（比如 reasoning）要用同样的能力，也从 typing.ts 导入
-// 这两个类型，而不是从这个文件导入，避免插件之间产生直接的文件依赖。
+// `IPaintFn` and `IDimFn` belong to the public contract in `typing.ts`. This plugin consumes them.
+// Other plugins, such as reasoning, also import those types from `typing.ts`
+// instead of this file, avoiding direct dependencies between plugins.
 
 export const ANSIS_PLUGIN_NAME = 'ansis' as const
 

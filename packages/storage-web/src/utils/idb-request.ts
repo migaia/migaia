@@ -12,9 +12,11 @@ import {
 import { StorageBackend } from '../constants.js'
 
 /**
- * IndexedDB 请求/事务 → Promise 的转换。这两个函数是从早期实现直接搬运的 已验证坑位处理，逐条保留： - 写入必须等 `transaction.oncomplete` 而非
- * `request.onsuccess`——后者只 代表「请求被接受」，事务仍可能因配额超限、commit 失败或被 abort 而整体回滚。 - `AbortSignal` 是协作式的：单次
- * IDBRequest 撤不回来，只能丢弃结果。
+ * Converts IndexedDB requests and transactions to promises using the handling carried forward from
+ * the earlier implementation. Writes wait for `transaction.oncomplete` rather than
+ * `request.onsuccess`. Request success only means the request is accepted; quota failure, commit
+ * failure, or abort can still roll back the transaction. Cancellation through `AbortSignal` is
+ * cooperative. An individual `IDBRequest` cannot be undone, so cancellation discards its result.
  */
 /**
  * Carries the runtime-neutral cancellation surface through IndexedDB helpers. The helpers only
@@ -127,7 +129,7 @@ export const installIdbOpenRequestHandlers = (
   }
 }
 
-/** 把一次 IDBRequest 包成 Promise，并接上取消信号。 */
+/** Wraps an `IDBRequest` in a promise and connects its cancellation signal. */
 export function fromIdbRequest<T>(
   request: IDBRequest<T>,
   context: IIdbOperationContext | undefined,
@@ -173,7 +175,10 @@ export function fromIdbRequest<T>(
   })
 }
 
-/** 等到事务真正 commit 才算写成功；`request.onsuccess` 只保证请求被接受，不保证落盘。 */
+/**
+ * Waits for transaction commit before reporting write success. `request.onsuccess` only confirms
+ * request acceptance, not persistence.
+ */
 export function idbTransactionCommit(
   transaction: IDBTransaction,
   context: IIdbOperationContext | undefined,

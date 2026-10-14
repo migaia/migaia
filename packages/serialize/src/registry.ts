@@ -348,14 +348,20 @@ async function collectChunks(
   return ['bytes', merged]
 }
 
-/** 把任意分段规约成字符串（文本载体）。`decoder` 必填（Encoding 注入）。 */
+/**
+ * Converts text or byte chunks to text using the required `decoder`. Value chunks reject because
+ * they have no text form.
+ */
 export function chunkToText(chunk: ISerializeChunk, decoder: ITextDecoder): string {
   if (chunk[0] === SerializeChunkKind.text) return chunk[1]
   if (chunk[0] === SerializeChunkKind.bytes) return decoder.decode(chunk[1])
   throw createSerializeTypeError(SerializeErrorCode.invalidChunk, 'a value chunk has no text form')
 }
 
-/** 把任意分段规约成字节（transfer / IndexedDB / wasm）。`encoder` 必填（Encoding 注入）。 */
+/**
+ * Converts text or byte chunks to bytes using the required `encoder`, for transfer, IndexedDB, or
+ * Wasm. Value chunks reject.
+ */
 export function chunkToBytes(chunk: ISerializeChunk, encoder: ITextEncoder): Uint8Array {
   if (chunk[0] === SerializeChunkKind.bytes) return chunk[1].slice()
   if (chunk[0] === SerializeChunkKind.text) return encoder.encode(chunk[1])

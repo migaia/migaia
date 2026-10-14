@@ -15,7 +15,7 @@ export type ICookieScope = {
   readonly partitioned?: boolean
 }
 
-/** Cookie 写入需要的属性，单独扩展而不污染 L0 的 set(key, value)。 */
+/** Supplies cookie write attributes separately from the L0 `set(key, value)` contract. */
 export type ICookieWriteContext = {
   readonly signal?: ICookieSignal
   readonly timeoutMs?: number
@@ -42,8 +42,9 @@ export type ISyncCookieStore = {
 }
 
 /**
- * Cookies 的写入需要额外属性，读取上不可见的键（HttpOnly）可能仍然存在。 `capabilities.opaqueEntries === true`：`has()` 返回
- * false 不代表不存在， `remove()` 也不保证生效——这两条语义由后端实现强制承诺，不是可选行为。
+ * Adds cookie write attributes and acknowledges keys hidden from reads, such as `HttpOnly` cookies.
+ * With `capabilities.opaqueEntries === true`, a `false` result from `has()` does not prove absence,
+ * and `remove()` does not guarantee deletion. The backend must preserve both behaviors.
  */
 export type ICookieStore = Omit<IKeyValueStore, 'set' | 'remove' | 'sync'> & {
   set(key: string, value: string, ctx?: ICookieWriteContext): Promise<void>
