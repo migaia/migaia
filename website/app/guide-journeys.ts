@@ -18613,25 +18613,67 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'logger:index': {
     zh: {
-      title: 'Logger 学习路径',
-      lede: '先让一条结构化日志可靠到达 sink，再按任务加入过滤、批处理、远程发送、pipeline 与关闭语义。',
+      title: 'Logger：按需组合能力的日志库',
+      lede: '核心只负责把一条日志送到输出端；级别过滤、控制台着色、批量上报、进程退出前保存日志都是可选插件。',
       document: {
         sections: [
           {
-            id: 'choose-path',
-            heading: '按你要解决的问题进入',
+            id: 'what',
+            heading: '它解决什么问题',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '很多日志库要么只是 console.log 的包装，加个级别过滤都要自己写；要么内置一大堆用不上的传输方式，想定制又得绕过它的设计。@migaia/logger 的核心只做一件事：一条日志从产生，经过处理步骤，到达输出端，最后在退出前确认都写完了。其他能力都是插件，你装什么，打包结果里就只有什么。'
+              },
+              {
+                type: 'paragraph',
+                text: '同一份代码，开发环境装彩色控制台，生产环境装批量 HTTP 上报和进程退出保护，脚本里什么都不装。日志系统自身出错（比如上报服务挂了）永远不会从 log.info() 那一行抛出来，而是交给 onFailure，业务代码不会因为日志崩溃。它在浏览器、Node.js、Bun、Deno、Worker 中都能运行。'
+              }
+            ]
+          },
+          {
+            id: 'concepts',
+            heading: '四个概念',
             blocks: [
               {
                 type: 'table',
-                headers: ['任务', '阅读路径', '关键结果'],
+                headers: ['概念', '含义'],
                 rows: [
-                  ['输出第一条可观察日志', '快速开始', 'console 与 failure observer 闭环'],
-                  ['控制 entry 经过哪些处理', 'Entry、hook 与 sink', '明确 mutation 与输出边界'],
-                  ['组合 level、color、batch、http', '插件与批处理', '正确顺序和有界队列'],
-                  ['给 Logger 增加业务能力', '编写自定义插件', '扩展方法、流水线与资源清理'],
-                  ['拦截或异步包围日志', 'Pipelines', '选择固定执行模型'],
-                  ['确保退出前完成输出', 'Flush 与 shutdown', '有界 drain 与终态'],
-                  ['跨环境或多 Logger 转发', 'Runtime 与 forwarding', '宿主适配和防环转发']
+                  [
+                    'Entry（日志条目）',
+                    '一次 log 调用产生的对象：tag（如 info）、message、args、meta、data、context 等字段'
+                  ],
+                  [
+                    'Pipeline（处理步骤）',
+                    'Entry 到达输出端之前依次经过的步骤，可以修改或拦截日志，级别过滤就是一个步骤'
+                  ],
+                  [
+                    'Sink（输出端）',
+                    '真正写出日志的地方：控制台、HTTP、文件；一个 Logger 可以有多个'
+                  ],
+                  ['Flush / Shutdown', '等待所有异步输出写完 / 收尾、等待、卸载全部插件']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'plugins',
+            heading: '内置插件',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['插件', '作用'],
+                rows: [
+                  ['level(config?)', '增加 debug、info、warn、error、fatal 方法和级别过滤'],
+                  ['color(config?)', '输出到控制台，可选 pretty 或 JSON 格式和颜色'],
+                  [
+                    'batch(config?) + http(config)',
+                    '把日志攒成批次 POST 到 HTTP 地址，内置重试、超时和 429 退避'
+                  ],
+                  ['file(config)', '逐行 JSON 写入文件（从 @migaia/logger/plugins/file 导入）'],
+                  ['process(config?)', '进程收到退出信号或崩溃时，先保存日志再退出'],
+                  ['reasoning(config?)', '逐字输出 AI 生成过程（thinking / response）'],
+                  ['uuid(config?)', '给每条日志加唯一 id']
                 ]
               }
             ]
@@ -18639,376 +18681,621 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: '快速开始', path: 'getting-started' },
-        { label: '插件与批处理', path: 'plugins-and-batching' },
-        { label: '编写自定义插件', path: 'custom-plugin' },
-        { label: 'Logger API', path: 'docs/logger/Logger' }
+        {
+          label: '快速开始',
+          path: 'getting-started'
+        },
+        {
+          label: 'Entry、Hook 与 Sink',
+          path: 'entries-hooks-and-sinks'
+        },
+        {
+          label: '内置插件与批量上报',
+          path: 'plugins-and-batching'
+        }
       ]
     },
     en: {
-      title: 'Logger learning paths',
-      lede: 'First deliver one structured entry reliably, then add filtering, batching, remote delivery, pipelines, and shutdown behavior by task.',
+      title: 'Logger: a logging library you assemble from plugins',
+      lede: 'The core only carries an entry to its outputs; level filtering, console colors, batched delivery, and saving logs before exit are optional plugins.',
       document: {
         sections: [
           {
-            id: 'choose-path',
-            heading: 'Enter through the problem you need to solve',
+            id: 'what',
+            heading: 'What problem it solves',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Many logging libraries are either a thin console.log wrapper where even level filtering is yours to write, or ship transports you never use and fight customization. The @migaia/logger core does one thing: carry an entry through processing stages to its outputs and confirm everything is written before exit. Everything else is a plugin, and your bundle contains only what you install.'
+              },
+              {
+                type: 'paragraph',
+                text: 'The same code gets a colored console in development, batched HTTP delivery and exit protection in production, and nothing at all in a script. Failures inside logging, such as a down collector, never throw from log.info(); they go to onFailure, so logging never crashes your code. It runs in browsers, Node.js, Bun, Deno, and Workers.'
+              }
+            ]
+          },
+          {
+            id: 'concepts',
+            heading: 'Four concepts',
             blocks: [
               {
                 type: 'table',
-                headers: ['Task', 'Read', 'Outcome'],
+                headers: ['Concept', 'Meaning'],
                 rows: [
                   [
-                    'Emit the first observable log',
-                    'Getting started',
-                    'A console and failure-observer loop'
+                    'Entry',
+                    'The object one log call creates: tag (such as info), message, args, meta, data, context, and more'
                   ],
                   [
-                    'Control how an entry is processed',
-                    'Entries, hooks, and sinks',
-                    'Clear mutation and output boundaries'
+                    'Pipeline',
+                    'Stages an entry passes before any output; they can modify or drop it, and level filtering is one of them'
                   ],
                   [
-                    'Compose level, color, batch, and http',
-                    'Plugins and batching',
-                    'Correct ordering and bounded queues'
+                    'Sink',
+                    'Where entries are written: console, HTTP, files; a Logger can have several'
                   ],
                   [
-                    'Add domain capabilities to Logger',
-                    'Author a custom plugin',
-                    'Extension methods, pipelines, and cleanup'
-                  ],
-                  [
-                    'Intercept or wrap logging asynchronously',
-                    'Pipelines',
-                    'One explicit execution model'
-                  ],
-                  [
-                    'Complete output before exit',
-                    'Flush and shutdown',
-                    'Bounded drain and terminal state'
-                  ],
-                  [
-                    'Forward across environments or loggers',
-                    'Runtime and forwarding',
-                    'Host adaptation and cycle-safe forwarding'
+                    'Flush / Shutdown',
+                    'Wait for every async output / run cleanup, wait, and remove every plugin'
                   ]
                 ]
               }
             ]
+          },
+          {
+            id: 'plugins',
+            heading: 'Built-in plugins',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Plugin', 'Purpose'],
+                rows: [
+                  ['level(config?)', 'Adds debug, info, warn, error, fatal and level filtering'],
+                  [
+                    'color(config?)',
+                    'Writes to the console in pretty or JSON format, with optional colors'
+                  ],
+                  [
+                    'batch(config?) + http(config)',
+                    'Batches entries and POSTs them to an HTTP endpoint with retries, timeouts, and 429 back-off'
+                  ],
+                  [
+                    'file(config)',
+                    'Writes JSON lines to a file (import from @migaia/logger/plugins/file)'
+                  ],
+                  [
+                    'process(config?)',
+                    'On exit signals or crashes, saves logs before the process ends'
+                  ],
+                  [
+                    'reasoning(config?)',
+                    'Streams AI generation token by token (thinking / response)'
+                  ],
+                  ['uuid(config?)', 'Adds a unique id to each entry']
+                ]
+              }
+            ]
           }
         ]
       },
       next: [
-        { label: 'Getting started', path: 'getting-started' },
-        { label: 'Plugins and batching', path: 'plugins-and-batching' },
-        { label: 'Author a custom plugin', path: 'custom-plugin' },
-        { label: 'Logger API', path: 'docs/logger/Logger' }
+        {
+          label: 'Quick start',
+          path: 'getting-started'
+        },
+        {
+          label: 'Entries, hooks, and sinks',
+          path: 'entries-hooks-and-sinks'
+        },
+        {
+          label: 'Built-in plugins and batching',
+          path: 'plugins-and-batching'
+        }
       ]
     }
   },
   'logger:getting-started': {
     zh: {
-      title: '五分钟建立可关闭的结构化 Logger',
-      lede: '显式设置执行预算，安装 level 与 color，并从第一天接入异步失败观察和 shutdown。',
+      title: '快速开始：第一个 Logger',
+      lede: '安装包，创建一个带级别过滤和控制台输出的 Logger，并弄清构造选项。',
       document: {
         sections: [
           {
-            id: 'create',
-            heading: '构造、输出并观察失败',
+            id: 'install',
+            heading: '安装',
+            blocks: [
+              {
+                type: 'code',
+                language: 'bash',
+                code: 'pnpm add @migaia/logger'
+              },
+              {
+                type: 'paragraph',
+                text: 'migaia 的包发布在 GitHub Packages，不在公共 npm。第一次安装前，在项目根目录的 .npmrc 中加入 @migaia:registry=https://npm.pkg.github.com，并用带 read:packages 权限的 GitHub 令牌登录，否则会报 404。'
+              }
+            ]
+          },
+          {
+            id: 'first',
+            heading: '第一个例子',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: {\n    mutationTimeoutMs: 5_000,\n    pipelineDrainTimeoutMs: 5_000\n  },\n  context: ['checkout'],\n  plugins: [level({ level: 'info' }), color()]\n})\n\nlog.onFailure(({ source, error }) => telemetry.capture(source, error))\nlog.info('order accepted', { orderId: '42' })"
+                code: "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [\n    level({ level: 'info' }),\n    color({ format: 'pretty', color: 'never', timestamp: false })\n  ] as const\n})\n\nlog.debug('连接池已创建') // 低于 info，不输出\nlog.info('服务监听端口 %d', 3000)\nlog.warn('慢请求', { path: '/orders', ms: 1200 })\n\nawait log.flush()"
               },
               {
-                type: 'list',
-                items: [
-                  'execution 两项必须显式决定；false 代表接受无限等待。',
-                  '构造期插件同步安装，任何 thenable install 都会使构造失败，不返回半成品。',
-                  '业务 log 调用不抛异步 sink 失败，因此生产环境必须接 onFailure。'
-                ]
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "[INFO] (api) 服务监听端口 3000\n[WARN] (api) 慢请求 { path: '/orders', ms: 1200 }"
+              },
+              {
+                type: 'paragraph',
+                text: "level({ level: 'info' }) 给 Logger 增加 info、warn 等方法，并丢弃低于 info 的日志，所以 debug 那条没有输出。color(...) 是一个输出端，把日志打印到控制台；示例关闭了时间戳和颜色，让输出稳定可读。context: ['api'] 是每条日志默认的来源标记，显示为 (api)。"
+              },
+              {
+                type: 'paragraph',
+                text: '消息里的 %d、%s 是 console 风格的占位符，后面的参数依次填入；最后一个对象参数也只是普通参数。await log.flush() 等待所有输出写完，程序退出前应该调用它。plugins 后面的 as const 让 TypeScript 知道装了哪些插件，从而认识 log.info 这些方法。'
               }
             ]
           },
           {
             id: 'options',
-            heading: '理解每个 Logger 构造字段',
+            heading: '构造选项',
             blocks: [
               {
                 type: 'table',
-                headers: ['字段', '默认值', '作用'],
+                headers: ['选项', '必填', '作用'],
                 rows: [
                   [
                     'execution',
-                    '必填',
-                    '定义插件 mutation 与 pipeline drain 的等待预算；false 明确选择无限等待。'
+                    '是',
+                    '{ mutationTimeoutMs, pipelineDrainTimeoutMs }：安装/卸载插件和卸载时等待处理步骤的超时，false 表示不限时'
                   ],
-                  ['context', '[]', '写入每条 entry 的稳定上下文路径；子 Logger 或领域边界使用。'],
-                  ['topic', "''", 'extends 转发时进入 topicChain 的当前 Logger 标签。'],
-                  ['on', '{}', '构造期注册命名 hook；适合静态且随 Logger 同生命周期的 hook。'],
                   [
                     'plugins',
-                    '[]',
-                    '按 provider → consumer 同步安装，并把 extension 投影到 Logger。'
+                    '否',
+                    '构造时按顺序安装的插件。只能是同步安装的插件；需要异步安装的用 await log.use(plugin)'
                   ],
-                  ['options', '{}', '只读传给插件 core.ctx.options 的业务宿主配置。'],
-                  [
-                    'pipeline.mode',
-                    'sync',
-                    '固定 sync、async、generator 或 async-generator 控制流。'
-                  ],
-                  [
-                    'scheduler',
-                    'systemScheduler',
-                    '统一 flush、shutdown、batch 与 transport deadline 的时间域。'
-                  ]
+                  ['context', '否', "每条日志默认的来源路径，如 ['app', 'api']"],
+                  ['pipeline.mode', '否', "处理步骤的模式，默认 'sync'，创建后不能更改"],
+                  ['topic', '否', '用 extends 转发时显示的节点名'],
+                  ['options', '否', '给插件读取的只读业务配置'],
+                  ['on', '否', '构造时注册 hook 的简写']
                 ]
               }
             ]
           },
           {
-            id: 'close',
-            heading: '所有者结束时等待真实输出',
+            id: 'methods',
+            heading: '常用方法',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "type ILogger = {\n  flush(): Promise<void>\n  shutdown(reason: 'manual'): Promise<void>\n}\n\n// 应用退出钩子接收已创建的 Logger，先确保缓冲日志落盘，再结束运行时。\nconst closeLogger = async (log: ILogger) => {\n  await log.flush()\n  await log.shutdown('manual')\n}"
-              },
-              {
-                type: 'paragraph',
-                text: 'shutdown 运行 handler、flush 并卸载插件，之后新日志静默忽略。重入 shutdown 共享同一个进行中的 Promise。'
+                type: 'table',
+                headers: ['方法', '作用'],
+                rows: [
+                  [
+                    'log.info(...) / warn / error ...',
+                    '由 level 插件提供；没装 level 时用 log.log(tag, message, ...args)'
+                  ],
+                  [
+                    'log.dispatchRaw({ tag, message, meta?, data?, context? })',
+                    '一次给出全部字段，适合结构化日志'
+                  ],
+                  ['log.useSink(fn)', '增加一个输出端，返回移除函数'],
+                  ['log.onFailure(fn)', '观察日志系统自身的错误'],
+                  ['log.flush() / log.shutdown(reason)', '等待写完 / 收尾并关闭'],
+                  ['log.use(plugin) / log.unUse(name)', '运行时安装 / 卸载插件']
+                ]
               }
             ]
           }
         ]
       },
       next: [
-        { label: '理解 entry 流程', path: 'entries-hooks-and-sinks' },
-        { label: '配置内置插件', path: 'plugins-and-batching' }
+        {
+          label: 'Entry、Hook 与 Sink',
+          path: 'entries-hooks-and-sinks'
+        },
+        {
+          label: '内置插件与批量上报',
+          path: 'plugins-and-batching'
+        },
+        {
+          label: 'Logger API',
+          path: 'docs/logger/Logger'
+        }
       ]
     },
     en: {
-      title: 'Build a shutdown-safe structured Logger in five minutes',
-      lede: 'Set execution budgets explicitly, install level and color, and connect asynchronous failure observation and shutdown from day one.',
+      title: 'Quick start: your first Logger',
+      lede: 'Install the package, create a Logger with level filtering and console output, and learn the constructor options.',
       document: {
         sections: [
           {
-            id: 'create',
-            heading: 'Construct, emit, and observe failures',
+            id: 'install',
+            heading: 'Install',
+            blocks: [
+              {
+                type: 'code',
+                language: 'bash',
+                code: 'pnpm add @migaia/logger'
+              },
+              {
+                type: 'paragraph',
+                text: 'migaia packages are published to GitHub Packages, not the public npm registry. Before the first install, add @migaia:registry=https://npm.pkg.github.com to the .npmrc in your project root and authenticate with a GitHub token that has read:packages; otherwise the install fails with 404.'
+              }
+            ]
+          },
+          {
+            id: 'first',
+            heading: 'First example',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: {\n    mutationTimeoutMs: 5_000,\n    pipelineDrainTimeoutMs: 5_000\n  },\n  context: ['checkout'],\n  plugins: [level({ level: 'info' }), color()]\n})\n\nlog.onFailure(({ source, error }) => telemetry.capture(source, error))\nlog.info('order accepted', { orderId: '42' })"
+                code: "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [\n    level({ level: 'info' }),\n    color({ format: 'pretty', color: 'never', timestamp: false })\n  ] as const\n})\n\nlog.debug('pool created') // below info, not printed\nlog.info('listening on port %d', 3000)\nlog.warn('slow request', { path: '/orders', ms: 1200 })\n\nawait log.flush()"
               },
               {
-                type: 'list',
-                items: [
-                  'Choose both execution fields explicitly; false means accepting an unbounded wait.',
-                  'Constructor plugins install synchronously. Any thenable install fails construction instead of returning a partial logger.',
-                  'Business log calls do not throw asynchronous sink failures, so production use must subscribe with onFailure.'
-                ]
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "[INFO] (api) listening on port 3000\n[WARN] (api) slow request { path: '/orders', ms: 1200 }"
+              },
+              {
+                type: 'paragraph',
+                text: "level({ level: 'info' }) adds info, warn, and friends and drops entries below info, so the debug line does not print. color(...) is an output that prints to the console; the example disables timestamps and colors for stable output. context: ['api'] is each entry’s default origin label, shown as (api)."
+              },
+              {
+                type: 'paragraph',
+                text: '%d and %s are console-style placeholders filled by the following arguments; a trailing object is just another argument. await log.flush() waits until every output has written, so call it before exiting. as const after plugins lets TypeScript know which plugins are installed and therefore that log.info exists.'
               }
             ]
           },
           {
             id: 'options',
-            heading: 'Understand every Logger constructor field',
+            heading: 'Constructor options',
             blocks: [
               {
                 type: 'table',
-                headers: ['Field', 'Default', 'Purpose'],
+                headers: ['Option', 'Required', 'Purpose'],
                 rows: [
                   [
                     'execution',
-                    'required',
-                    'Bounds plugin mutations and pipeline drain; false explicitly chooses an unbounded wait.'
-                  ],
-                  [
-                    'context',
-                    '[]',
-                    'Stable context path written into every entry for child or domain boundaries.'
-                  ],
-                  ['topic', "''", 'Current Logger label appended to topicChain during forwarding.'],
-                  [
-                    'on',
-                    '{}',
-                    'Registers named hooks at construction for static Logger-owned behavior.'
+                    'yes',
+                    '{ mutationTimeoutMs, pipelineDrainTimeoutMs }: timeouts for installing or removing plugins and for draining stages; false means no limit'
                   ],
                   [
                     'plugins',
-                    '[]',
-                    'Installs synchronously in provider → consumer order and projects extensions onto Logger.'
+                    'no',
+                    'Plugins installed in order at construction; only synchronous ones. Use await log.use(plugin) for async installation'
                   ],
-                  [
-                    'options',
-                    '{}',
-                    'Business host configuration exposed read-only through plugin core.ctx.options.'
-                  ],
+                  ['context', 'no', "Default origin path of each entry, such as ['app', 'api']"],
                   [
                     'pipeline.mode',
-                    'sync',
-                    'Fixes sync, async, generator, or async-generator control flow.'
+                    'no',
+                    "Pipeline mode, 'sync' by default and fixed after creation"
                   ],
-                  [
-                    'scheduler',
-                    'systemScheduler',
-                    'One time domain for flush, shutdown, batching, and transport deadlines.'
-                  ]
+                  ['topic', 'no', 'Node name shown when forwarding with extends'],
+                  ['options', 'no', 'Read-only business settings plugins can read'],
+                  ['on', 'no', 'Shorthand for registering hooks at construction']
                 ]
               }
             ]
           },
           {
-            id: 'close',
-            heading: 'Wait for real output when the owner ends',
+            id: 'methods',
+            heading: 'Common methods',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "type ILogger = {\n  flush(): Promise<void>\n  shutdown(reason: 'manual'): Promise<void>\n}\n\n// Pass the created Logger from the application shutdown hook.\nconst closeLogger = async (log: ILogger) => {\n  await log.flush()\n  await log.shutdown('manual')\n}"
-              },
-              {
-                type: 'paragraph',
-                text: 'shutdown runs handlers, flushes, and removes plugins. New logs are ignored afterward, and reentrant shutdown calls share the same in-flight Promise.'
+                type: 'table',
+                headers: ['Method', 'Purpose'],
+                rows: [
+                  [
+                    'log.info(...) / warn / error ...',
+                    'Provided by level; without it use log.log(tag, message, ...args)'
+                  ],
+                  [
+                    'log.dispatchRaw({ tag, message, meta?, data?, context? })',
+                    'Supplies every field at once for structured logs'
+                  ],
+                  ['log.useSink(fn)', 'Adds an output and returns a remover'],
+                  ['log.onFailure(fn)', 'Observes failures inside logging'],
+                  ['log.flush() / log.shutdown(reason)', 'Wait for writes / clean up and close'],
+                  ['log.use(plugin) / log.unUse(name)', 'Install / remove a plugin at runtime']
+                ]
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Understand entry flow', path: 'entries-hooks-and-sinks' },
-        { label: 'Configure built-in plugins', path: 'plugins-and-batching' }
+        {
+          label: 'Entries, hooks, and sinks',
+          path: 'entries-hooks-and-sinks'
+        },
+        {
+          label: 'Built-in plugins and batching',
+          path: 'plugins-and-batching'
+        },
+        {
+          label: 'Logger API',
+          path: 'docs/logger/Logger'
+        }
       ]
     }
   },
   'logger:entries-hooks-and-sinks': {
     zh: {
-      title: '组织 entry、hook 与 sink',
-      lede: '普通 log 参数、结构化字段、可修改 hook 和隔离 sink 是四个不同边界。',
+      title: 'Entry、Hook 与 Sink',
+      lede: '一条日志是什么样的对象，怎样把它写到自己的输出端，以及输出端出错时会发生什么。',
       document: {
         sections: [
           {
             id: 'entry',
-            heading: '需要字段语义时使用 dispatchRaw',
+            heading: 'Entry 的字段和自定义输出端',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "log.dispatchRaw({\n  tag: 'info',\n  message: 'user updated',\n  meta: { userId },\n  data: { requestId },\n  context: ['api', 'users']\n})"
+                code: "import { Logger, type ILogEntry } from '@migaia/logger'\n\nconst log = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })\n\n// sink 是日志的输出端：这里把每条日志收集到数组里\nconst received: ILogEntry[] = []\nlog.useSink((entry) => {\n  received.push(entry)\n})\n\nlog.log('info', '用户 %s 登录', 'ada')\nlog.dispatchRaw({\n  tag: 'audit',\n  message: '退款已批准',\n  meta: { orderId: 'A-1001' },\n  data: { amount: 120 },\n  context: ['billing']\n})\n\nawait log.flush()\nfor (const entry of received) {\n  console.log(entry.tag, '|', entry.message, '|', entry.args, entry.meta, entry.data, entry.context)\n}"
               },
               {
                 type: 'paragraph',
-                text: 'log(tag, message, ...args) 保持 console 风格，最后一个对象仍是 args；只有 dispatchRaw 明确区分 meta、data、context、error 与 time。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "info | 用户 %s 登录 | [ 'ada' ] undefined {} []\naudit | 退款已批准 | [] { orderId: 'A-1001' } { amount: 120 } [ 'billing' ]"
+              },
+              {
+                type: 'paragraph',
+                text: 'log.useSink(fn) 增加一个输出端，每条通过处理步骤的日志都会交给它。log.log(tag, message, ...args) 是 console 风格的入口：message 里的 %s 保留原样，参数放在 args 里，由输出端决定怎么格式化。log.dispatchRaw(...) 一次给出全部字段：meta 放索引类信息（如订单号），data 放附加数据，context 标记来源。'
+              },
+              {
+                type: 'paragraph',
+                text: '传给不同输出端的 Entry 是各自浅拷贝的一份，一个输出端修改它不会影响另一个。'
               }
             ]
           },
           {
-            id: 'flow',
-            heading: '按 pipeline → hook → sink 阅读数据流',
+            id: 'hooks',
+            heading: 'Hook',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  'before/after hook 读取可修改的 live entry，用于补充或脱敏。',
-                  '每个 sink 收到独立的顶层快照；嵌套业务对象仍保留原引用，sink 不应修改。',
-                  'raw() 绕过 pipeline 与 sink，只用于逐 token 等明确的原始输出。'
-                ]
+                type: 'paragraph',
+                text: "log.hook(name, fn) 在日志生命周期的特定时刻运行 fn：'before' 和 'after' 对所有日志生效，'before:error' 只对 error 级别生效，也可以用自定义名字配合 log.fireHook(name, entry) 手动触发。hook 拿到的是同一个 Entry 对象，可以修改它；返回值是取消注册的函数。"
+              }
+            ]
+          },
+          {
+            id: 'failure',
+            heading: '输出端出错时',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Logger } from '@migaia/logger'\n\nconst log = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })\n\nlog.useSink(() => {\n  throw new Error('日志服务不可用')\n})\nlog.onFailure(({ source, error }) => {\n  console.log('日志系统出错:', source, (error as Error).message)\n})\n\nlog.log('info', '下单成功') // 不会从这里抛出错误\nconsole.log('业务代码继续执行')\nawait log.flush()"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '日志系统出错: sink 日志服务不可用\n// 日志库另外用 console.error 打印一份诊断（到 stderr）：\n// [logger] sink 抛出异步异常: Error: 日志服务不可用 ...\n业务代码继续执行'
+              },
+              {
+                type: 'paragraph',
+                text: '输出端、处理步骤、hook、flush 出错都不会从 log 调用处抛出，业务代码照常执行。错误交给 log.onFailure(fn)，source 说明出错的环节（sink、pipeline、hook、flush 等）。注意：即使注册了 onFailure，日志库仍会用 console.error 另外打印一行诊断。生产环境请务必注册 onFailure，把这些错误接入监控。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: '选择 pipeline', path: 'pipelines' },
-        { label: 'Logger API', path: 'docs/logger/Logger' }
+        {
+          label: '处理步骤',
+          path: 'pipelines'
+        },
+        {
+          label: 'Flush 与关闭',
+          path: 'flush-and-shutdown'
+        },
+        {
+          label: 'ILogEntry',
+          path: 'docs/logger/ILogEntry'
+        }
       ]
     },
     en: {
-      title: 'Organize entries, hooks, and sinks',
-      lede: 'Console arguments, structured fields, mutable hooks, and isolated sinks are four different boundaries.',
+      title: 'Entries, hooks, and sinks',
+      lede: 'What an entry looks like, how to write it to your own output, and what happens when an output fails.',
       document: {
         sections: [
           {
             id: 'entry',
-            heading: 'Use dispatchRaw when fields carry meaning',
+            heading: 'Entry fields and a custom sink',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "log.dispatchRaw({\n  tag: 'info',\n  message: 'user updated',\n  meta: { userId },\n  data: { requestId },\n  context: ['api', 'users']\n})"
+                code: "import { Logger, type ILogEntry } from '@migaia/logger'\n\nconst log = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })\n\n// A sink is an output: here it collects every entry into an array\nconst received: ILogEntry[] = []\nlog.useSink((entry) => {\n  received.push(entry)\n})\n\nlog.log('info', 'user %s signed in', 'ada')\nlog.dispatchRaw({\n  tag: 'audit',\n  message: 'refund approved',\n  meta: { orderId: 'A-1001' },\n  data: { amount: 120 },\n  context: ['billing']\n})\n\nawait log.flush()\nfor (const entry of received) {\n  console.log(entry.tag, '|', entry.message, '|', entry.args, entry.meta, entry.data, entry.context)\n}"
               },
               {
                 type: 'paragraph',
-                text: 'log(tag, message, ...args) remains console-like, so a final object is still an argument. Only dispatchRaw separates meta, data, context, error, and time explicitly.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "info | user %s signed in | [ 'ada' ] undefined {} []\naudit | refund approved | [] { orderId: 'A-1001' } { amount: 120 } [ 'billing' ]"
+              },
+              {
+                type: 'paragraph',
+                text: 'log.useSink(fn) adds an output that receives every entry passing the stages. log.log(tag, message, ...args) is the console-style entry point: %s stays in message and the arguments go to args for the output to format. log.dispatchRaw(...) supplies every field: meta for indexable facts such as an order id, data for extra payload, context for the origin.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Each sink receives its own shallow copy of the entry, so one sink’s changes never reach another.'
               }
             ]
           },
           {
-            id: 'flow',
-            heading: 'Read the flow as pipeline → hook → sink',
+            id: 'hooks',
+            heading: 'Hooks',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  'before and after hooks receive a mutable live entry for enrichment or redaction.',
-                  'Each sink receives its own top-level snapshot. Nested business objects retain identity and should not be mutated by a sink.',
-                  'raw() bypasses pipelines and sinks and belongs only to explicit raw-output tasks such as token streaming.'
-                ]
+                type: 'paragraph',
+                text: "log.hook(name, fn) runs fn at a point in an entry’s life: 'before' and 'after' apply to all entries, 'before:error' only to errors, and custom names can be fired with log.fireHook(name, entry). Hooks receive the live entry and may modify it; the return value unregisters the hook."
+              }
+            ]
+          },
+          {
+            id: 'failure',
+            heading: 'When an output fails',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Logger } from '@migaia/logger'\n\nconst log = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })\n\nlog.useSink(() => {\n  throw new Error('log service unavailable')\n})\nlog.onFailure(({ source, error }) => {\n  console.log('logging failed:', source, (error as Error).message)\n})\n\nlog.log('info', 'order placed') // never throws here\nconsole.log('business code continues')\nawait log.flush()"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'logging failed: sink log service unavailable\n// the logger also prints a diagnostic with console.error (to stderr):\n// [logger] sink 抛出异步异常: Error: log service unavailable ...\nbusiness code continues'
+              },
+              {
+                type: 'paragraph',
+                text: 'Failures in sinks, stages, hooks, or flush never throw from the log call, so business code continues. They go to log.onFailure(fn), whose source names the stage (sink, pipeline, hook, flush, and so on). Note that the logger still prints a diagnostic with console.error even when onFailure is registered. In production always register onFailure and connect it to monitoring.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Choose a pipeline', path: 'pipelines' },
-        { label: 'Logger API', path: 'docs/logger/Logger' }
+        {
+          label: 'Pipelines',
+          path: 'pipelines'
+        },
+        {
+          label: 'Flush and shutdown',
+          path: 'flush-and-shutdown'
+        },
+        {
+          label: 'ILogEntry',
+          path: 'docs/logger/ILogEntry'
+        }
       ]
     }
   },
   'logger:plugins-and-batching': {
     zh: {
-      title: '组合内置插件与有界批处理',
-      lede: '插件顺序会改变能力可见性；batch 必须先于 http，每个 Logger 必须获得新的有状态插件实例。',
+      title: '内置插件与批量上报',
+      lede: '用 level 控制输出哪些日志，用 color 配置控制台格式，用 batch + http 把日志攒批上报。',
       document: {
         sections: [
           {
-            id: 'compose',
-            heading: '按 provider → consumer 排列插件',
+            id: 'level',
+            heading: '级别和过滤器',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\nimport { batch, color, http, level } from '@migaia/logger/plugins'\n\nconst execution = { mutationTimeoutMs: 5_000, shutdownTimeoutMs: 5_000 }\nconst log = new Logger({\n  execution,\n  plugins: [\n    level({ level: 'info' }),\n    color({ format: 'pretty' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: '/logs', retries: 2 })\n  ]\n})"
+                code: "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [level({ level: 'warn' }), color({ format: 'pretty', color: 'never', timestamp: false })] as const\n})\n\nlog.info('不会输出')\nlog.setLevel('debug') // 运行时调整级别，例如排查问题时临时打开调试日志\nlog.info('现在会输出')\n\n// 过滤器：返回 false 的日志被丢弃\nconst hideHealthChecks = (entry: { message: string }) => !entry.message.includes('/health')\nlog.addFilter(hideHealthChecks)\nlog.info('GET /health 200')\nlog.info('GET /orders 200')\n\nawait log.flush()"
               },
               {
-                type: 'list',
-                items: [
-                  'http 只有在 batch 先安装时才能复用 createBatcher shared 能力。',
-                  '不要把同一个 color()、http() 或 reasoning() 实例安装到多个 Logger。',
-                  'maxPendingBatches 满载时显式 BATCH_OVERFLOW，不静默丢弃。'
-                ]
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '[INFO] 现在会输出\n// GET /health 被过滤器丢弃\n[INFO] GET /orders 200'
+              },
+              {
+                type: 'paragraph',
+                text: 'level 插件的选项：level 是最低输出级别（debug < info < warn < error < fatal，默认 debug），filters 是过滤函数数组。安装后 Logger 多出 setLevel(level)、addFilter(fn)、removeFilter(fn)，可以在运行时调整。'
               }
             ]
           },
           {
-            id: 'choose',
-            heading: '按输出责任选择插件',
+            id: 'color',
+            heading: '控制台输出',
             blocks: [
               {
                 type: 'table',
-                headers: ['插件', '负责', '不负责'],
+                headers: ['color 选项', '默认值', '作用'],
                 rows: [
-                  ['level', '级别与 filter', '最终输出'],
-                  ['color', 'console 格式与颜色', '远程发送'],
-                  ['batch', '有界聚合能力', 'transport'],
-                  ['http', '重试和 HTTP 发送', '控制台'],
-                  ['process', '进程关闭边界', '浏览器 lifecycle'],
-                  ['reasoning', '逐 token 与完整 silent entry', '通用结构化字段'],
-                  ['uuid', 'entry 追踪标识', '请求关联策略']
+                  [
+                    'format',
+                    "'auto'",
+                    "'pretty' 适合人看，'json' 每条一行 JSON，适合日志采集；auto 按运行环境选择"
+                  ],
+                  ['color', "'auto'", "'always'、'never' 或按终端是否支持自动选择"],
+                  ['timestamp', 'true', 'pretty 格式是否显示时间'],
+                  ['colorMessage', "'none'", '消息正文的着色范围']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Entry 的 data.silent 为 true 时，color 不打印它，但其他输出端（如 HTTP）照常接收。'
+              }
+            ]
+          },
+          {
+            id: 'http',
+            heading: '批量 HTTP 上报',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { getLoggerRuntimeManager, Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\n// 演示用：替换 Logger 使用的 fetch，打印 http 插件发出的请求\nsetLoggerRuntimeManager({\n  ...getLoggerRuntimeManager(),\n  fetch: async (url, init) => {\n    const body = JSON.parse(String(init?.body)) as { entries: { message: string }[] }\n    console.log('POST', String(url), body.entries.map((entry) => entry.message))\n    return new Response(null, { status: 204 })\n  }\n})\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 2, maxWaitMs: 1000 }), // 必须在 http 之前\n    http({ url: 'https://logs.example/v1/entries' })\n  ] as const\n})\n\nlog.info('第 1 条')\nlog.info('第 2 条') // 攒满 2 条，发送一批\nlog.info('第 3 条')\nawait log.flush() // 把剩下不满一批的也发出去\nawait log.shutdown('manual')"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "POST https://logs.example/v1/entries [ '第 1 条', '第 2 条' ]\n// flush 发送剩下的一条\nPOST https://logs.example/v1/entries [ '第 3 条' ]"
+              },
+              {
+                type: 'paragraph',
+                text: 'batch 负责攒批：maxSize 条攒满或第一条进入后 maxWaitMs 毫秒到期，就发送一批。http 把每批以 POST { entries } 发到 url，网络错误、429 和 5xx 会重试（默认 2 次），429 优先遵守 Retry-After。batch 必须写在 http 前面，否则不会攒批。flush 会把未满的一批也发出去。'
+              },
+              {
+                type: 'paragraph',
+                text: '批次队列有上限（maxPendingBatches，默认 1024）。下游长期不可用导致队列满时，会以 BATCH_OVERFLOW 报告失败，而不是悄悄丢掉日志。'
+              }
+            ]
+          },
+          {
+            id: 'others',
+            heading: '其他插件',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'file({ path })：从 @migaia/logger/plugins/file 导入，逐行写 JSON；在浏览器里需要通过 setLoggerRuntimeManager 提供写文件的能力。',
+                  'process()：收到退出信号或未捕获异常时先 flush 再退出，shutdownTimeoutMs 默认 3000 毫秒；没有 process 全局对象的环境里自动不起作用。',
+                  'reasoning()：增加 startThinking、thinking、endThinking 等方法，逐字输出 AI 生成内容。',
+                  'uuid()：给每条日志写入 data.uuid。',
+                  '每次安装都要重新调用插件工厂，不要把同一个插件对象装到多个 Logger。'
                 ]
               }
             ]
@@ -19016,53 +19303,113 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: 'HTTP 配置参考', path: 'docs/logger/plugins/http' },
-        { label: 'Flush 与关闭', path: 'flush-and-shutdown' }
+        {
+          label: '编写自定义插件',
+          path: 'custom-plugin'
+        },
+        {
+          label: 'Flush 与关闭',
+          path: 'flush-and-shutdown'
+        },
+        {
+          label: 'http API',
+          path: 'docs/logger/plugins/http'
+        }
       ]
     },
     en: {
-      title: 'Compose built-in plugins and bounded batching',
-      lede: 'Plugin order changes capability visibility. batch must precede http, and every Logger needs fresh stateful plugin instances.',
+      title: 'Built-in plugins and batching',
+      lede: 'Control which entries print with level, configure console output with color, and ship batches with batch + http.',
       document: {
         sections: [
           {
-            id: 'compose',
-            heading: 'Order plugins from provider to consumer',
+            id: 'level',
+            heading: 'Levels and filters',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\nimport { batch, color, http, level } from '@migaia/logger/plugins'\n\nconst execution = { mutationTimeoutMs: 5_000, shutdownTimeoutMs: 5_000 }\nconst log = new Logger({\n  execution,\n  plugins: [\n    level({ level: 'info' }),\n    color({ format: 'pretty' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: '/logs', retries: 2 })\n  ]\n})"
+                code: "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [level({ level: 'warn' }), color({ format: 'pretty', color: 'never', timestamp: false })] as const\n})\n\nlog.info('not printed')\nlog.setLevel('debug') // change the level at runtime, e.g. enable debug while investigating\nlog.info('printed now')\n\n// filter: entries returning false are dropped\nconst hideHealthChecks = (entry: { message: string }) => !entry.message.includes('/health')\nlog.addFilter(hideHealthChecks)\nlog.info('GET /health 200')\nlog.info('GET /orders 200')\n\nawait log.flush()"
               },
               {
-                type: 'list',
-                items: [
-                  'http can reuse the createBatcher shared capability only when batch installs first.',
-                  'Never install the same color(), http(), or reasoning() instance into multiple Loggers.',
-                  'A full maxPendingBatches bound fails explicitly with BATCH_OVERFLOW instead of dropping entries.'
-                ]
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '[INFO] printed now\n// GET /health is dropped by the filter\n[INFO] GET /orders 200'
+              },
+              {
+                type: 'paragraph',
+                text: 'level options: level is the minimum (debug < info < warn < error < fatal, default debug) and filters is an array of filter functions. The Logger gains setLevel(level), addFilter(fn), and removeFilter(fn) for runtime changes.'
               }
             ]
           },
           {
-            id: 'choose',
-            heading: 'Choose a plugin by output responsibility',
+            id: 'color',
+            heading: 'Console output',
             blocks: [
               {
                 type: 'table',
-                headers: ['Plugin', 'Owns', 'Does not own'],
+                headers: ['color option', 'Default', 'Purpose'],
                 rows: [
-                  ['level', 'Severity and filters', 'Final output'],
-                  ['color', 'Console format and color', 'Remote delivery'],
-                  ['batch', 'Bounded aggregation', 'Transport'],
-                  ['http', 'Retries and HTTP delivery', 'Console output'],
-                  ['process', 'Process shutdown boundaries', 'Browser lifecycle'],
                   [
-                    'reasoning',
-                    'Token streams and complete silent entries',
-                    'General structured fields'
+                    'format',
+                    "'auto'",
+                    "'pretty' for people, 'json' for one JSON line per entry for collectors; auto picks by environment"
                   ],
-                  ['uuid', 'Entry tracking identity', 'Request correlation policy']
+                  ['color', "'auto'", "'always', 'never', or chosen by terminal support"],
+                  ['timestamp', 'true', 'Whether pretty output shows the time'],
+                  ['colorMessage', "'none'", 'How much of the message is colored']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'When an entry has data.silent set to true, color skips it while other outputs such as HTTP still receive it.'
+              }
+            ]
+          },
+          {
+            id: 'http',
+            heading: 'Batched HTTP delivery',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { getLoggerRuntimeManager, Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\n// Demo only: replace the fetch Logger uses and print what the http plugin sends\nsetLoggerRuntimeManager({\n  ...getLoggerRuntimeManager(),\n  fetch: async (url, init) => {\n    const body = JSON.parse(String(init?.body)) as { entries: { message: string }[] }\n    console.log('POST', String(url), body.entries.map((entry) => entry.message))\n    return new Response(null, { status: 204 })\n  }\n})\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 2, maxWaitMs: 1000 }), // must come before http\n    http({ url: 'https://logs.example/v1/entries' })\n  ] as const\n})\n\nlog.info('entry 1')\nlog.info('entry 2') // two entries fill a batch, which is sent\nlog.info('entry 3')\nawait log.flush() // send the partial batch too\nawait log.shutdown('manual')"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "POST https://logs.example/v1/entries [ 'entry 1', 'entry 2' ]\n// flush sends the remaining entry\nPOST https://logs.example/v1/entries [ 'entry 3' ]"
+              },
+              {
+                type: 'paragraph',
+                text: 'batch collects entries and sends a batch when maxSize fill it or maxWaitMs pass after the first entry. http POSTs each batch as { entries } to url and retries network errors, 429, and 5xx (twice by default), honoring Retry-After on 429. batch must come before http or nothing is batched. flush sends a partial batch too.'
+              },
+              {
+                type: 'paragraph',
+                text: 'The batch queue is bounded (maxPendingBatches, default 1024). If a long outage fills it, a BATCH_OVERFLOW failure is reported rather than silently dropping entries.'
+              }
+            ]
+          },
+          {
+            id: 'others',
+            heading: 'Other plugins',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'file({ path }): import from @migaia/logger/plugins/file; writes JSON lines, and in browsers needs a file capability supplied through setLoggerRuntimeManager.',
+                  'process(): on exit signals or uncaught errors flushes before exiting; shutdownTimeoutMs defaults to 3000 ms, and it does nothing where no process global exists.',
+                  'reasoning(): adds startThinking, thinking, endThinking, and friends to stream AI output token by token.',
+                  'uuid(): writes data.uuid into each entry.',
+                  'Call the plugin factory for every installation; never install one plugin object into several Loggers.'
                 ]
               }
             ]
@@ -19070,87 +19417,68 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: 'HTTP configuration reference', path: 'docs/logger/plugins/http' },
-        { label: 'Flush and shutdown', path: 'flush-and-shutdown' }
+        {
+          label: 'Write a custom plugin',
+          path: 'custom-plugin'
+        },
+        {
+          label: 'Flush and shutdown',
+          path: 'flush-and-shutdown'
+        },
+        {
+          label: 'http API',
+          path: 'docs/logger/plugins/http'
+        }
       ]
     }
   },
   'logger:custom-plugin': {
     zh: {
-      title: '编写一个可安装、可释放的 Logger 插件',
-      lede: '自定义插件不是一段孤立回调：它声明配置和宿主扩展，在 install 中连接 Logger 流水线，并把所有资源交还给 Logger 生命周期。',
+      title: '编写自定义插件',
+      lede: '插件是一个带 name 和 install 的对象；install 可以给 Logger 增加方法、注册处理步骤和输出端，并登记需要清理的资源。',
       document: {
         sections: [
           {
-            id: 'choose-capability',
-            heading: '先决定插件要给宿主增加什么',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['目标', '使用的契约', '安装后宿主的变化'],
-                rows: [
-                  ['新增业务方法', 'install 返回 extension object', 'Logger 实例获得有类型的方法'],
-                  ['修改或拦截日志', 'usePipeline / useAsyncPipeline', '已有 log 调用经过新规则'],
-                  ['增加输出目的地', 'useSink', '通过流水线的 entry 送到新 sink'],
-                  ['提供插件间能力', 'shared + getShared', '后装的消费插件可以读取能力'],
-                  ['等待异步输出', 'defer / onFlush', 'flush 与 shutdown 能观察完成'],
-                  ['释放监听器或连接', 'onDispose', '卸载或 shutdown 时不会泄漏资源']
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: '只改变现有日志行为时，插件可以返回空对象；只有业务确实需要从 Logger 主动调用新操作时才增加 extension 方法。插件不得绕过 core 私自保存全局 Logger，也不要让 sink 中的异步任务脱离 flush 与 shutdown。'
-              }
-            ]
-          },
-          {
-            id: 'complete-plugin',
-            heading: '完整示例：给宿主增加 audit() 并投递审计 entry',
+            id: 'example',
+            heading: '例子：增加一个 audit() 方法',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import type {\n  ILogEntry,\n  ILoggerPlugin,\n  ILoggerPluginCore\n} from '@migaia/logger'\n\ntype IAuditPluginConfig = {\n  service: string\n  deliver(entry: Readonly<ILogEntry>): void | Promise<void>\n}\n\ntype IAuditPluginExtension = {\n  audit(event: string, data: Record<string, unknown>): void\n}\n\nconst AUDIT_PLUGIN_NAME = 'audit' as const\n\nfunction auditPlugin(\n  config: IAuditPluginConfig\n): ILoggerPlugin<IAuditPluginExtension, IAuditPluginConfig> {\n  return {\n    name: AUDIT_PLUGIN_NAME,\n    config,\n    install(core: ILoggerPluginCore) {\n      // 读取 Host 接纳后的不可变配置快照。\n      const resolved = core.config.get<IAuditPluginConfig>()\n\n      // sink 返回 Promise；Logger 会让 flush() 和 shutdown() 等待它。\n      const stopSink = core.useSink((entry) => resolved.deliver(entry))\n      core.onDispose(stopSink)\n\n      // 返回值会按类型安全地投影到安装后的 Logger 实例。\n      return {\n        audit(event, data) {\n          core.dispatchRaw({\n            tag: 'audit',\n            message: event,\n            data: { ...data, service: resolved.service }\n          })\n        }\n      }\n    }\n  }\n}"
-              },
-              {
-                type: 'list',
-                items: [
-                  'name 是同一 Logger 内的唯一插件身份；重复 name 会在安装阶段失败，不会静默覆盖。',
-                  'config 是调用方输入；install 内统一通过 core.config.get() 读取 Host 接纳后的快照。',
-                  'install 返回的 audit 是宿主新能力；它使用 dispatchRaw 进入正常 pipeline、hook 与 sink。',
-                  'useSink 返回的撤销函数交给 onDispose，因此动态移除和 shutdown 都能清理它。'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'install-and-use',
-            heading: '安装后从宿主调用真实能力',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger, type ILogEntry } from '@migaia/logger'\nimport { color } from '@migaia/logger/plugins'\n\nconst deliveredEntries: ILogEntry[] = []\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    auditPlugin({\n      service: 'checkout',\n      deliver: async (entry) => {\n        deliveredEntries.push(entry)\n      }\n    }),\n    color()\n  ] as const\n})\n\n// audit() 由插件增加；普通 Logger 没有这个方法。\nlogger.audit('refund-approved', { orderId: 'order-42', amount: 1200 })\n\n// flush 确认 sink 已处理审计日志，再向业务调用方确认操作完成。\nawait logger.flush()\nconsole.assert(deliveredEntries[0]?.tag === 'audit')\nconsole.assert(deliveredEntries[0]?.data.service === 'checkout')\nawait logger.shutdown('manual')"
+                code: "import { Logger, type ILogEntry, type ILoggerPlugin } from '@migaia/logger'\n\ntype IAuditConfig = { service: string }\ntype IDeliver = (entry: Readonly<ILogEntry>) => void | Promise<void>\ntype IAuditMethods = { audit(event: string, data: Record<string, unknown>): void }\n\n/** 插件工厂：每次调用返回新的插件对象，不要把同一个对象装到多个 Logger。 */\nfunction auditPlugin(\n  config: IAuditConfig,\n  deliver: IDeliver\n): ILoggerPlugin<IAuditMethods, IAuditConfig> {\n  return {\n    name: 'audit',\n    config,\n    install(core) {\n      const { service } = core.config.get()\n      // 插件自己的输出端：只投递 audit 日志；返回 Promise 时 flush 会等待它\n      const stopSink = core.useSink((entry) => (entry.tag === 'audit' ? deliver(entry) : undefined))\n      core.onDispose(stopSink) // 卸载插件或关闭 Logger 时移除这个输出端\n      return {\n        audit(event, data) {\n          core.dispatchRaw({ tag: 'audit', message: event, data: { ...data, service } })\n        }\n      }\n    }\n  }\n}\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    auditPlugin({ service: 'checkout' }, async (entry) => {\n      await new Promise((resolve) => setTimeout(resolve, 10)) // 模拟发送到审计系统\n      console.log('已投递:', entry.message, entry.data)\n    })\n  ] as const\n})\n\nlogger.audit('refund-approved', { orderId: 'A-1001' }) // 插件给 Logger 增加的方法\nawait logger.flush() // 等待投递完成\nawait logger.shutdown('manual')"
               },
               {
                 type: 'paragraph',
-                text: '构造期把 plugins 写成 as const，TypeScript 才能保留每个插件贡献的 extension 类型。动态安装时使用 const extended = logger.use(auditPlugin(...)) 并从 extended 调用新方法；原变量的静态类型不会自动变宽。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "已投递: refund-approved { orderId: 'A-1001', service: 'checkout' }"
+              },
+              {
+                type: 'paragraph',
+                text: 'ILoggerPlugin<方法类型, 配置类型> 描述一个插件。install(core) 返回的对象会成为 Logger 上的新方法，这里是 logger.audit。core 的类型是 ILoggerPluginCore，提供 core.config.get()（读取本插件的配置）、core.dispatchRaw、core.usePipeline、core.useSink、core.onDispose 等能力。'
+              },
+              {
+                type: 'paragraph',
+                text: "这个插件用 core.useSink 注册了自己的输出端，只投递 audit 日志；deliver 返回 Promise，所以 await logger.flush() 会等投递完成。useSink 返回的移除函数交给 core.onDispose，卸载插件或 await logger.shutdown('manual') 时自动移除。deliver 是函数，通过工厂参数传入而不是放进 config，因为插件配置只能是普通数据。构造时 plugins 写 as const，TypeScript 才知道 logger.audit 存在。"
               }
             ]
           },
           {
-            id: 'production-boundaries',
-            heading: '生产插件必须处理的边界',
+            id: 'rules',
+            heading: '编写插件时注意',
             blocks: [
               {
                 type: 'list',
                 items: [
-                  '流水线模式：sync 插件用 usePipeline；需要 await next(entry) 时，宿主选择 async mode 并使用 useAsyncPipeline。',
-                  '失败：异步 sink 直接返回 Promise，让 Logger 通过 onFailure 报告，并让 flush 观察；不要 catch 后静默吞掉。',
-                  '资源：事件监听器、timer、socket 和订阅都通过 onDispose 登记；清理函数应可重复调用。',
-                  '共享能力：provider 的 shared 必须先于 consumer 安装；共享 key 冲突会使装配失败。',
-                  '实例所有权：有状态插件工厂每次返回新实例；不要把同一个插件对象安装到多个 Logger。',
-                  '验证：至少测试扩展方法、pipeline 顺序、sink 失败、flush 等待、移除与 shutdown 清理。'
+                  '用工厂函数返回插件对象，每次安装都调用一次，避免多个 Logger 共享内部状态。',
+                  'name 在同一个 Logger 内必须唯一。',
+                  '需要修改或拦截日志时，在 install 里用 core.usePipeline / useAsyncPipeline 注册处理步骤，方法要和 Logger 的 pipeline.mode 匹配。',
+                  '在 install 里创建的监听器、定时器、连接，用 core.onDispose(清理函数) 登记，卸载插件或关闭 Logger 时会自动清理。',
+                  '异步输出端直接返回 Promise，Logger 会在 flush 时等待它，并把失败交给 onFailure；不要自己 catch 后吞掉。',
+                  '插件之间共享能力使用 plugin-host 的 Feature（defineFeature / getFeature），旧的 shared 写法已经移除。'
                 ]
               }
             ]
@@ -19158,106 +19486,66 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: '内置插件与批处理', path: 'plugins-and-batching' },
-        { label: '选择 pipeline 模式', path: 'pipelines' },
-        { label: 'ILoggerPlugin 类型参考', path: 'docs/logger/ILoggerPlugin' }
+        {
+          label: '处理步骤',
+          path: 'pipelines'
+        },
+        {
+          label: 'Plugin Host 指南',
+          path: '../plugin-host'
+        },
+        {
+          label: 'ILoggerPlugin',
+          path: 'docs/logger/ILoggerPlugin'
+        }
       ]
     },
     en: {
-      title: 'Author an installable and disposable Logger plugin',
-      lede: 'A custom plugin declares configuration and Host extensions, connects to the Logger flow during install, and returns every resource to the Logger lifecycle.',
+      title: 'Write a custom plugin',
+      lede: 'A plugin is an object with name and install; install can add methods, register stages and outputs, and record resources to clean up.',
       document: {
         sections: [
           {
-            id: 'choose-capability',
-            heading: 'First decide what the plugin adds to its Host',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Goal', 'Contract', 'Change to the installed Host'],
-                rows: [
-                  [
-                    'Add a domain method',
-                    'extension object returned by install',
-                    'The Logger instance gains typed methods'
-                  ],
-                  [
-                    'Change or reject logs',
-                    'usePipeline / useAsyncPipeline',
-                    'Existing log calls pass through a new rule'
-                  ],
-                  ['Add an output destination', 'useSink', 'Accepted entries reach another sink'],
-                  [
-                    'Provide plugin-to-plugin capability',
-                    'shared + getShared',
-                    'A later consumer can read it'
-                  ],
-                  [
-                    'Track asynchronous output',
-                    'defer / onFlush',
-                    'flush and shutdown await completion'
-                  ],
-                  [
-                    'Release listeners or connections',
-                    'onDispose',
-                    'Uninstall and shutdown leak no resources'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: 'A behavior-only plugin may return an empty object. Add extension methods only when application code genuinely needs a new Logger operation. Never retain a global Logger behind core or start sink work that flush and shutdown cannot observe.'
-              }
-            ]
-          },
-          {
-            id: 'complete-plugin',
-            heading: 'Complete example: add audit() and deliver audit entries',
+            id: 'example',
+            heading: 'Example: add an audit() method',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import type {\n  ILogEntry,\n  ILoggerPlugin,\n  ILoggerPluginCore\n} from '@migaia/logger'\n\ntype IAuditPluginConfig = {\n  service: string\n  deliver(entry: Readonly<ILogEntry>): void | Promise<void>\n}\n\ntype IAuditPluginExtension = {\n  audit(event: string, data: Record<string, unknown>): void\n}\n\nconst AUDIT_PLUGIN_NAME = 'audit' as const\n\nfunction auditPlugin(\n  config: IAuditPluginConfig\n): ILoggerPlugin<IAuditPluginExtension, IAuditPluginConfig> {\n  return {\n    name: AUDIT_PLUGIN_NAME,\n    config,\n    install(core: ILoggerPluginCore) {\n      const resolved = core.config.get<IAuditPluginConfig>()\n      const stopSink = core.useSink((entry) => resolved.deliver(entry))\n      core.onDispose(stopSink)\n      return {\n        audit(event, data) {\n          core.dispatchRaw({\n            tag: 'audit',\n            message: event,\n            data: { ...data, service: resolved.service }\n          })\n        }\n      }\n    }\n  }\n}"
-              },
-              {
-                type: 'list',
-                items: [
-                  'name is the unique plugin identity within one Logger; duplicates fail during installation.',
-                  'install reads the Host-admitted configuration snapshot through core.config.get().',
-                  'The returned audit function is the new Host capability and dispatches through normal pipelines, hooks, and sinks.',
-                  'The sink disposer is registered with onDispose, so dynamic removal and shutdown both clean it up.'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'install-and-use',
-            heading: 'Invoke the real capability from the installed Host',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger, type ILogEntry } from '@migaia/logger'\nimport { color } from '@migaia/logger/plugins'\n\nconst deliveredEntries: ILogEntry[] = []\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    auditPlugin({\n      service: 'checkout',\n      deliver: async (entry) => {\n        deliveredEntries.push(entry)\n      }\n    }),\n    color()\n  ] as const\n})\n\nlogger.audit('refund-approved', { orderId: 'order-42', amount: 1200 })\nawait logger.flush()\nconsole.assert(deliveredEntries[0]?.tag === 'audit')\nconsole.assert(deliveredEntries[0]?.data.service === 'checkout')\nawait logger.shutdown('manual')"
+                code: "import { Logger, type ILogEntry, type ILoggerPlugin } from '@migaia/logger'\n\ntype IAuditConfig = { service: string }\ntype IDeliver = (entry: Readonly<ILogEntry>) => void | Promise<void>\ntype IAuditMethods = { audit(event: string, data: Record<string, unknown>): void }\n\n/** Plugin factory: return a new plugin object per call; never install one object into several Loggers. */\nfunction auditPlugin(\n  config: IAuditConfig,\n  deliver: IDeliver\n): ILoggerPlugin<IAuditMethods, IAuditConfig> {\n  return {\n    name: 'audit',\n    config,\n    install(core) {\n      const { service } = core.config.get()\n      // The plugin’s own sink delivers only audit entries; flush waits for its Promise\n      const stopSink = core.useSink((entry) => (entry.tag === 'audit' ? deliver(entry) : undefined))\n      core.onDispose(stopSink) // remove the sink when the plugin is removed or the Logger closes\n      return {\n        audit(event, data) {\n          core.dispatchRaw({ tag: 'audit', message: event, data: { ...data, service } })\n        }\n      }\n    }\n  }\n}\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    auditPlugin({ service: 'checkout' }, async (entry) => {\n      await new Promise((resolve) => setTimeout(resolve, 10)) // simulate sending to the audit system\n      console.log('delivered:', entry.message, entry.data)\n    })\n  ] as const\n})\n\nlogger.audit('refund-approved', { orderId: 'A-1001' }) // a method the plugin adds to the Logger\nawait logger.flush() // wait for delivery\nawait logger.shutdown('manual')"
               },
               {
                 type: 'paragraph',
-                text: 'Keep plugins as a const tuple so TypeScript preserves every contributed extension. For dynamic installation, capture const extended = logger.use(auditPlugin(...)); the original variable does not widen automatically.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "delivered: refund-approved { orderId: 'A-1001', service: 'checkout' }"
+              },
+              {
+                type: 'paragraph',
+                text: 'ILoggerPlugin<Methods, Config> describes a plugin. The object install(core) returns becomes new Logger methods, here logger.audit. core is an ILoggerPluginCore offering core.config.get() for this plugin’s configuration, core.dispatchRaw, core.usePipeline, core.useSink, core.onDispose, and more.'
+              },
+              {
+                type: 'paragraph',
+                text: "The plugin registers its own output with core.useSink and delivers only audit entries; deliver returns a Promise, so await logger.flush() waits for delivery. The remover returned by useSink goes to core.onDispose, so removing the plugin or await logger.shutdown('manual') takes it away. deliver is a function, so it comes through the factory argument rather than config, which only holds plain data. Write plugins as const so TypeScript knows logger.audit exists."
               }
             ]
           },
           {
-            id: 'production-boundaries',
-            heading: 'Production boundaries every plugin must cover',
+            id: 'rules',
+            heading: 'Rules for plugins',
             blocks: [
               {
                 type: 'list',
                 items: [
-                  'Pipeline mode: usePipeline belongs to sync Hosts; await next(entry) requires an async Host and useAsyncPipeline.',
-                  'Failure: return sink Promises so onFailure reports them and flush observes them; never catch and silently swallow.',
-                  'Resources: register listeners, timers, sockets, and subscriptions with onDispose using idempotent cleanup.',
-                  'Shared capability: install the provider before its consumer; duplicate shared keys fail composition.',
-                  'Instance ownership: create a fresh stateful plugin instance for every Logger.',
-                  'Verification: test extension methods, pipeline order, sink failure, flush waiting, removal, and shutdown cleanup.'
+                  'Return plugin objects from a factory called once per installation so Loggers never share internal state.',
+                  'name must be unique within a Logger.',
+                  'To modify or drop entries, register stages in install with core.usePipeline / useAsyncPipeline, matching the Logger’s pipeline.mode.',
+                  'Register listeners, timers, and connections created in install with core.onDispose(cleanup); they are cleaned up when the plugin is removed or the Logger closes.',
+                  'Let async outputs return their Promise so flush waits and failures reach onFailure; do not catch and swallow them.',
+                  'Share capabilities between plugins with plugin-host Features (defineFeature / getFeature); the old shared mechanism is gone.'
                 ]
               }
             ]
@@ -19265,303 +19553,576 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: 'Built-in plugins and batching', path: 'plugins-and-batching' },
-        { label: 'Choose a pipeline mode', path: 'pipelines' },
-        { label: 'ILoggerPlugin type reference', path: 'docs/logger/ILoggerPlugin' }
+        {
+          label: 'Pipelines',
+          path: 'pipelines'
+        },
+        {
+          label: 'Plugin Host guide',
+          path: '../plugin-host'
+        },
+        {
+          label: 'ILoggerPlugin',
+          path: 'docs/logger/ILoggerPlugin'
+        }
       ]
     }
   },
   'logger:pipelines': {
     zh: {
-      title: '为 Logger 选择 pipeline 模式',
-      lede: '模式在构造时固定；自定义 stage 必须使用匹配的注册方法，内置同步插件会自动适配。',
+      title: '处理步骤：在输出之前修改或拦截日志',
+      lede: '处理步骤在日志到达任何输出端之前运行，适合脱敏、补充字段和过滤。',
       document: {
         sections: [
           {
-            id: 'modes',
-            heading: '不要把四种控制流混用',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['mode', '注册方法', '语义'],
-                rows: [
-                  ['sync', 'usePipeline', 'stage 返回后进入下游'],
-                  ['async', 'useAsyncPipeline', 'await next() 洋葱模型'],
-                  ['generator', 'useGeneratorPipeline', '同步 generator 终止值'],
-                  ['async-generator', 'useAsyncGeneratorPipeline', '逐 stage 异步耗尽并取终值']
-                ]
-              },
-              {
-                type: 'list',
-                items: [
-                  '不调用 next 表示拦截当前 entry。',
-                  '重复 next 抛 PIPELINE_NEXT_DUPLICATE。',
-                  'stage 返回后迟到 next 产生 PIPELINE_NEXT_LATE diagnostic。'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'redact',
-            heading: '在 sink 之前完成结构化脱敏',
+            id: 'example',
+            heading: '例子：遮盖敏感信息',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\n\nconst log = new Logger({ execution: { mutationTimeoutMs: 5_000, shutdownTimeoutMs: 5_000 } })\nconst requestId = 'req-42'\nconst off = log.usePipeline((entry, next) => {\n  const authorization = entry.meta?.authorization\n  if (typeof authorization === 'string') {\n    entry.meta = { ...entry.meta, authorization: '[redacted]' }\n  }\n  next(entry)\n})\n\nlog.info('request accepted', { requestId })\noff()"
+                code: "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [level(), color({ format: 'pretty', color: 'never', timestamp: false })] as const\n})\n\n// 处理步骤：在日志到达任何输出端之前，遮盖消息中的令牌\nlog.usePipeline((entry, next) => {\n  next({ ...entry, message: entry.message.replace(/token=\\w+/g, 'token=***') })\n})\n\nlog.info('回调地址 /callback?token=abc123')\nawait log.flush()"
               },
               {
                 type: 'paragraph',
-                text: '同步 stage 必须在返回前调用 next。需要异步查表或加密时，构造 Logger 时选择 async mode，再用 useAsyncPipeline 并 await next(entry)；不要把 Promise 偷塞进 sync stage。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '[INFO] 回调地址 /callback?token=***'
+              },
+              {
+                type: 'paragraph',
+                text: 'log.usePipeline((entry, next) => ...) 注册一个同步步骤。调用 next(新 entry) 把修改后的日志交给下一步；不调用 next 就丢弃这条日志。步骤按注册顺序执行，规则和 middleware-pipeline 相同：每个步骤最多调用一次 next。'
+              }
+            ]
+          },
+          {
+            id: 'modes',
+            heading: '选择模式',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['pipeline.mode', '注册方法', '适用'],
+                rows: [
+                  ["'sync'（默认）", 'usePipeline', '只做同步转换，开销最小'],
+                  ["'async'", 'useAsyncPipeline', '步骤需要 await（例如查询用户名）'],
+                  ["'generator'", 'useGeneratorPipeline', '用 yield/return 控制流程'],
+                  ["'async-generator'", 'useAsyncGeneratorPipeline', '同上，但需要 await']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '模式在构造时确定，之后不能更改。level、uuid 等内置插件会自动适配任何模式；你自己注册步骤时，注册方法必须和模式匹配，否则抛 PIPELINE_MODE_MISMATCH。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Entry 与 sink', path: 'entries-hooks-and-sinks' },
-        { label: '关闭与 drain', path: 'flush-and-shutdown' }
+        {
+          label: 'Flush 与关闭',
+          path: 'flush-and-shutdown'
+        },
+        {
+          label: 'middleware-pipeline 指南',
+          path: '../middleware-pipeline'
+        },
+        {
+          label: 'Logger API',
+          path: 'docs/logger/Logger'
+        }
       ]
     },
     en: {
-      title: 'Choose a Logger pipeline mode',
-      lede: 'The mode is fixed at construction. Custom stages use the matching registration API, while built-in synchronous plugins adapt automatically.',
+      title: 'Pipelines: modify or drop entries before output',
+      lede: 'Stages run before an entry reaches any output, which suits masking, enrichment, and filtering.',
       document: {
         sections: [
           {
-            id: 'modes',
-            heading: 'Do not mix the four control flows',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Mode', 'Register with', 'Semantics'],
-                rows: [
-                  ['sync', 'usePipeline', 'Downstream starts after a stage returns'],
-                  ['async', 'useAsyncPipeline', 'await next() forms an onion'],
-                  ['generator', 'useGeneratorPipeline', 'Synchronous generator terminal'],
-                  [
-                    'async-generator',
-                    'useAsyncGeneratorPipeline',
-                    'Drain each async stage and take its terminal'
-                  ]
-                ]
-              },
-              {
-                type: 'list',
-                items: [
-                  'Omitting next intercepts the current entry.',
-                  'Calling next twice throws PIPELINE_NEXT_DUPLICATE.',
-                  'Calling saved next after return emits a PIPELINE_NEXT_LATE diagnostic.'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'redact',
-            heading: 'Redact structured data before it reaches a sink',
+            id: 'example',
+            heading: 'Example: mask sensitive data',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\n\nconst log = new Logger({ execution: { mutationTimeoutMs: 5_000, shutdownTimeoutMs: 5_000 } })\nconst requestId = 'req-42'\nconst off = log.usePipeline((entry, next) => {\n  const authorization = entry.meta?.authorization\n  if (typeof authorization === 'string') {\n    entry.meta = { ...entry.meta, authorization: '[redacted]' }\n  }\n  next(entry)\n})\n\nlog.info('request accepted', { requestId })\noff()"
+                code: "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [level(), color({ format: 'pretty', color: 'never', timestamp: false })] as const\n})\n\n// A stage masks tokens before the entry reaches any sink\nlog.usePipeline((entry, next) => {\n  next({ ...entry, message: entry.message.replace(/token=\\w+/g, 'token=***') })\n})\n\nlog.info('callback /callback?token=abc123')\nawait log.flush()"
               },
               {
                 type: 'paragraph',
-                text: 'A synchronous stage calls next before returning. For asynchronous lookup or encryption, construct Logger in async mode, register with useAsyncPipeline, and await next(entry). Never hide a Promise inside a sync stage.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '[INFO] callback /callback?token=***'
+              },
+              {
+                type: 'paragraph',
+                text: 'log.usePipeline((entry, next) => ...) registers a synchronous stage. next(newEntry) passes the modified entry on; not calling next drops it. Stages run in registration order with the middleware-pipeline rule that each calls next at most once.'
+              }
+            ]
+          },
+          {
+            id: 'modes',
+            heading: 'Choose a mode',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['pipeline.mode', 'Registration', 'Use it for'],
+                rows: [
+                  [
+                    "'sync' (default)",
+                    'usePipeline',
+                    'synchronous transforms with the least overhead'
+                  ],
+                  [
+                    "'async'",
+                    'useAsyncPipeline',
+                    'stages that await, such as looking up a user name'
+                  ],
+                  ["'generator'", 'useGeneratorPipeline', 'yield/return control flow'],
+                  ["'async-generator'", 'useAsyncGeneratorPipeline', 'the same, with await']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'The mode is fixed at construction. Built-in plugins such as level and uuid adapt to any mode; your own registration method must match the mode or it throws PIPELINE_MODE_MISMATCH.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Entries and sinks', path: 'entries-hooks-and-sinks' },
-        { label: 'Shutdown and drain', path: 'flush-and-shutdown' }
+        {
+          label: 'Flush and shutdown',
+          path: 'flush-and-shutdown'
+        },
+        {
+          label: 'middleware-pipeline guide',
+          path: '../middleware-pipeline'
+        },
+        {
+          label: 'Logger API',
+          path: 'docs/logger/Logger'
+        }
       ]
     }
   },
   'logger:flush-and-shutdown': {
     zh: {
-      title: '正确 flush 并进入终态',
-      lede: 'flush 等待当前可见输出；shutdown 先允许收尾日志，再关闭 admission、drain 并卸载插件。',
+      title: 'Flush 与关闭：退出前确认日志都写完',
+      lede: 'flush 等待异步输出写完；shutdown 先运行收尾钩子，再等待写完，最后卸载所有插件。',
       document: {
         sections: [
           {
-            id: 'sequence',
-            heading: '按所有权边界选择操作',
+            id: 'example',
+            heading: '例子',
             blocks: [
               {
-                type: 'table',
-                headers: ['边界', '调用', '结果'],
-                rows: [
-                  [
-                    '请求或测试检查点',
-                    'await log.flush()',
-                    '等待当前 deferred、sink、batch 与转发下游'
-                  ],
-                  [
-                    '应用正常退出',
-                    "await log.shutdown('manual')",
-                    'handler → flush → 插件清理 → terminal'
-                  ],
-                  ['进程 signal/崩溃', 'process() plugin', '在明确预算内触发同一 shutdown']
-                ]
+                type: 'code',
+                language: 'ts',
+                code: "import { Logger } from '@migaia/logger'\n\nconst log = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })\n\n// 一个需要 50 毫秒才能写完的异步输出端，例如网络上报\nlog.useSink(async (entry) => {\n  await new Promise((resolve) => setTimeout(resolve, 50))\n  console.log('已写入:', entry.message)\n})\nlog.onShutdown((reason) => {\n  console.log('收尾，原因:', reason)\n  log.log('info', '服务即将退出') // 收尾钩子里写的日志也会被等待\n})\n\nlog.log('info', '处理完成')\nawait log.flush() // 等待异步输出端写完\nconsole.log('flush 完成')\n\nawait log.shutdown('manual')\nlog.log('info', '关闭之后的日志') // 被静默忽略\nconsole.log('shutdown 完成')"
               },
               {
-                type: 'list',
-                items: [
-                  '并发 flush 共享当前 Promise；后续仍可再 flush 新工作。',
-                  '重入 shutdown 共享同一 Promise，不重复运行 handler。',
-                  '失败后 Logger 仍进入终态，不通过重试重新开放。'
-                ]
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '已写入: 处理完成\nflush 完成\n收尾，原因: manual\n已写入: 服务即将退出\nshutdown 完成\n// 关闭之后的日志没有输出'
+              },
+              {
+                type: 'paragraph',
+                text: 'log.flush() 等待所有已知的异步工作完成：异步输出端返回的 Promise、批次、转发到其他 Logger 的日志。多个地方同时调用 flush 共享同一个 Promise。为了不被一个永远不完成的请求卡住，每次 flush 最多等待约 3 秒，超时时把情况报告给 onFailure，剩下的工作留给下一次 flush。'
+              },
+              {
+                type: 'paragraph',
+                text: "log.shutdown(reason) 依次执行：运行 onShutdown 注册的收尾函数（收尾函数里仍可写日志）→ flush → 卸载全部插件。之后的日志被静默忽略，不报错。reason 是 'manual'、'signal'、'uncaughtException' 或 'unhandledRejection'。重复调用 shutdown 得到同一个 Promise；关闭后的 Logger 不能重新启用，需要新建一个。log.dispose() 等同于 shutdown('manual')。"
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Process 插件', path: 'docs/logger/plugins/process' },
-        { label: 'Runtime 与 forwarding', path: 'runtime-and-forwarding' }
+        {
+          label: '转发与运行环境',
+          path: 'runtime-and-forwarding'
+        },
+        {
+          label: '排错',
+          path: 'troubleshooting'
+        },
+        {
+          label: 'Logger API',
+          path: 'docs/logger/Logger'
+        }
       ]
     },
     en: {
-      title: 'Flush correctly and enter terminal state',
-      lede: 'flush awaits currently visible output. shutdown permits final handler logs, then closes admission, drains, and removes plugins.',
+      title: 'Flush and shutdown: confirm logs are written before exit',
+      lede: 'flush waits for async outputs; shutdown runs cleanup hooks, waits, then removes every plugin.',
       document: {
         sections: [
           {
-            id: 'sequence',
-            heading: 'Choose an operation from the ownership boundary',
+            id: 'example',
+            heading: 'Example',
             blocks: [
               {
-                type: 'table',
-                headers: ['Boundary', 'Call', 'Result'],
-                rows: [
-                  [
-                    'Request or test checkpoint',
-                    'await log.flush()',
-                    'Await current deferred work, sinks, batches, and forwarding targets'
-                  ],
-                  [
-                    'Normal application exit',
-                    "await log.shutdown('manual')",
-                    'Handlers → flush → plugin cleanup → terminal'
-                  ],
-                  [
-                    'Process signal or crash',
-                    'process() plugin',
-                    'Trigger the same shutdown within an explicit budget'
-                  ]
-                ]
+                type: 'code',
+                language: 'ts',
+                code: "import { Logger } from '@migaia/logger'\n\nconst log = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })\n\n// An async sink that takes 50 ms, such as network delivery\nlog.useSink(async (entry) => {\n  await new Promise((resolve) => setTimeout(resolve, 50))\n  console.log('written:', entry.message)\n})\nlog.onShutdown((reason) => {\n  console.log('cleanup, reason:', reason)\n  log.log('info', 'service shutting down') // logs written in the hook are awaited too\n})\n\nlog.log('info', 'job done')\nawait log.flush() // wait for the async sink\nconsole.log('flush done')\n\nawait log.shutdown('manual')\nlog.log('info', 'after shutdown') // silently ignored\nconsole.log('shutdown done')"
               },
               {
-                type: 'list',
-                items: [
-                  'Concurrent flush calls share the current Promise; a later flush can still observe new work.',
-                  'Reentrant shutdown shares one Promise and does not rerun handlers.',
-                  'Failure still leaves the Logger terminal; retry never reopens it.'
-                ]
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'written: job done\nflush done\ncleanup, reason: manual\nwritten: service shutting down\nshutdown done\n// the entry logged after shutdown prints nothing'
+              },
+              {
+                type: 'paragraph',
+                text: 'log.flush() waits for every known async task: Promises returned by async outputs, batches, and entries forwarded to other Loggers. Concurrent flush calls share one Promise. To avoid hanging on a request that never ends, each flush waits about 3 seconds at most, reports the timeout to onFailure, and leaves the rest to the next flush.'
+              },
+              {
+                type: 'paragraph',
+                text: "log.shutdown(reason) runs onShutdown hooks (which may still log), then flush, then removes every plugin; later entries are ignored silently. reason is 'manual', 'signal', 'uncaughtException', or 'unhandledRejection'. Repeated calls return the same Promise, a closed Logger cannot be reopened, and log.dispose() equals shutdown('manual')."
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Process plugin', path: 'docs/logger/plugins/process' },
-        { label: 'Runtime and forwarding', path: 'runtime-and-forwarding' }
+        {
+          label: 'Forwarding and runtime',
+          path: 'runtime-and-forwarding'
+        },
+        {
+          label: 'Troubleshooting',
+          path: 'troubleshooting'
+        },
+        {
+          label: 'Logger API',
+          path: 'docs/logger/Logger'
+        }
       ]
     }
   },
   'logger:runtime-and-forwarding': {
     zh: {
-      title: '跨运行时适配并组合多个 Logger',
-      lede: 'Logger 通过 runtime manager 获取时钟、调度、stdout、process 与 fetch；extends 只转发运行时行为，不合并类型。',
+      title: '转发与运行环境',
+      lede: '用 extends 把一个 Logger 的日志转发给另一个；用 setLoggerRuntimeManager 替换底层能力。',
       document: {
         sections: [
           {
-            id: 'runtime',
-            heading: '只在平台边界替换 runtime manager',
+            id: 'extends',
+            heading: '把日志转发给另一个 Logger',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Logger, getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst embeddedConsole = { write: (text: string) => console.log(text) }\nconst execution = { mutationTimeoutMs: 5_000, shutdownTimeoutMs: 5_000 }\nconst previous = getLoggerRuntimeManager()\nconst restore = setLoggerRuntimeManager({\n  ...previous,\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => embeddedConsole.write(text)\n})\n\ntry {\n  const embeddedLog = new Logger({ execution })\n  embeddedLog.info('ready')\n  await embeddedLog.shutdown('manual')\n} finally {\n  restore()\n}"
+                code: "import { Logger } from '@migaia/logger'\n\nconst options = { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } as const\n\nconst audit = new Logger({ ...options, topic: 'audit' })\naudit.useSink((entry) => console.log('[审计系统]', entry.message))\n\nconst api = new Logger({ ...options, topic: 'api' })\napi.useSink((entry) => console.log('[控制台]', entry.message))\napi.extends(audit) // api 的每条日志也会完整经过 audit 的处理链和输出端\n\napi.log('info', '用户 ada 修改了密码')\nawait api.flush()\n\napi.unextend(audit)\napi.log('info', '解除转发后只在 api 输出')\nawait api.flush()"
               },
               {
                 type: 'paragraph',
-                text: '浏览器没有 process 时 raw 回退 console，process() 成为 no-op。只有测试、嵌入式宿主或自定义 transport 需要 setLoggerRuntimeManager；在创建任何 Logger 前设置，并在所有 Logger 关闭后调用返回的 restore。'
-              }
-            ]
-          },
-          {
-            id: 'forward',
-            heading: '让每个目标运行自己的 pipeline',
-            blocks: [
+                text: '输出：'
+              },
               {
                 type: 'code',
-                language: 'ts',
-                code: "requestLog.extends(appLog, auditLog)\nrequestLog.info('request complete')\nrequestLog.unextend(auditLog)"
+                language: 'text',
+                code: '[控制台] 用户 ada 修改了密码\n[审计系统] 用户 ada 修改了密码\n[控制台] 解除转发后只在 api 输出'
+              },
+              {
+                type: 'paragraph',
+                text: 'api.extends(audit) 让 api 的每条日志在自己输出之后，再完整经过 audit 的处理步骤和输出端，audit 自己的级别和过滤器同样生效。这比单纯抄送更可靠：审计 Logger 的规则不会被绕过。api.unextend(audit) 解除转发。'
               },
               {
                 type: 'list',
                 items: [
-                  '转发目标仍执行自己的 level、filter、hook 与 sink。',
-                  'topic 追加到 topicChain；context id 同时用于注册期与运行期防环。',
-                  'extends 不把目标插件方法合并到源 Logger 的 TypeScript 类型。'
+                  '转发关系不能成环：a.extends(b) 之后 b.extends(a) 会立即报错。',
+                  'flush 会沿转发关系等待下游 Logger 也写完。',
+                  'extends 只转发日志，不会让 api 在类型上获得 audit 插件提供的方法。'
                 ]
+              }
+            ]
+          },
+          {
+            id: 'runtime',
+            heading: '替换底层能力',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Logger 通过一个运行环境管理器使用 fetch、写 stdout、生成 UUID、安排异步任务等底层能力。测试或特殊宿主中，用 setLoggerRuntimeManager({ ...getLoggerRuntimeManager(), fetch }) 替换其中一部分，返回值是恢复函数。上一页的批量上报例子就是这样替换 fetch 的；直接修改 globalThis.fetch 不会生效。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Runtime manager API', path: 'docs/logger/setLoggerRuntimeManager' },
-        { label: '返回学习路径', path: 'index' }
+        {
+          label: '排错',
+          path: 'troubleshooting'
+        },
+        {
+          label: '快速开始',
+          path: 'getting-started'
+        },
+        {
+          label: 'setLoggerRuntimeManager',
+          path: 'docs/logger/setLoggerRuntimeManager'
+        }
       ]
     },
     en: {
-      title: 'Adapt runtimes and compose multiple Loggers',
-      lede: 'Logger obtains time, scheduling, stdout, process, and fetch through its runtime manager. extends forwards runtime behavior and does not merge types.',
+      title: 'Forwarding and runtime',
+      lede: 'Forward one Logger’s entries to another with extends; replace low-level capabilities with setLoggerRuntimeManager.',
       document: {
         sections: [
           {
-            id: 'runtime',
-            heading: 'Replace the runtime manager only at a platform boundary',
+            id: 'extends',
+            heading: 'Forward entries to another Logger',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Logger, getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst embeddedConsole = { write: (text: string) => console.log(text) }\nconst execution = { mutationTimeoutMs: 5_000, shutdownTimeoutMs: 5_000 }\nconst previous = getLoggerRuntimeManager()\nconst restore = setLoggerRuntimeManager({\n  ...previous,\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => embeddedConsole.write(text)\n})\n\ntry {\n  const embeddedLog = new Logger({ execution })\n  embeddedLog.info('ready')\n  await embeddedLog.shutdown('manual')\n} finally {\n  restore()\n}"
+                code: "import { Logger } from '@migaia/logger'\n\nconst options = { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } as const\n\nconst audit = new Logger({ ...options, topic: 'audit' })\naudit.useSink((entry) => console.log('[audit system]', entry.message))\n\nconst api = new Logger({ ...options, topic: 'api' })\napi.useSink((entry) => console.log('[console]', entry.message))\napi.extends(audit) // every api entry also runs through audit's pipeline and sinks\n\napi.log('info', 'user ada changed the password')\nawait api.flush()\n\napi.unextend(audit)\napi.log('info', 'after unextend only api prints')\nawait api.flush()"
               },
               {
                 type: 'paragraph',
-                text: 'Without process, raw output falls back to console and process() becomes a no-op. Only tests, embedded hosts, or custom transports need setLoggerRuntimeManager. Set it before creating any Logger and call the returned restore after every Logger has shut down.'
-              }
-            ]
-          },
-          {
-            id: 'forward',
-            heading: 'Let every target run its own pipeline',
-            blocks: [
+                text: 'Output:'
+              },
               {
                 type: 'code',
-                language: 'ts',
-                code: "requestLog.extends(appLog, auditLog)\nrequestLog.info('request complete')\nrequestLog.unextend(auditLog)"
+                language: 'text',
+                code: '[console] user ada changed the password\n[audit system] user ada changed the password\n[console] after unextend only api prints'
+              },
+              {
+                type: 'paragraph',
+                text: 'api.extends(audit) sends every api entry, after api’s own outputs, through audit’s stages and outputs, with audit’s levels and filters applied. That is safer than copying, because the audit Logger’s rules cannot be bypassed. api.unextend(audit) removes the link.'
               },
               {
                 type: 'list',
                 items: [
-                  'Each target still runs its own level, filters, hooks, and sinks.',
-                  'Topics append to topicChain, while context IDs prevent cycles at registration and runtime.',
-                  'extends does not merge target plugin methods into the source Logger TypeScript type.'
+                  'Forwarding cannot form a cycle: b.extends(a) after a.extends(b) throws at once.',
+                  'flush waits for downstream Loggers along forwarding links.',
+                  'extends forwards entries only; api does not gain methods from audit’s plugins in its type.'
                 ]
+              }
+            ]
+          },
+          {
+            id: 'runtime',
+            heading: 'Replace low-level capabilities',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A Logger reaches fetch, stdout, UUID generation, and task scheduling through a runtime manager. In tests or unusual hosts replace parts with setLoggerRuntimeManager({ ...getLoggerRuntimeManager(), fetch }); it returns a restore function. The batching example replaces fetch this way; assigning globalThis.fetch has no effect.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Runtime manager API', path: 'docs/logger/setLoggerRuntimeManager' },
-        { label: 'Return to learning paths', path: 'index' }
+        {
+          label: 'Troubleshooting',
+          path: 'troubleshooting'
+        },
+        {
+          label: 'Quick start',
+          path: 'getting-started'
+        },
+        {
+          label: 'setLoggerRuntimeManager',
+          path: 'docs/logger/setLoggerRuntimeManager'
+        }
+      ]
+    }
+  },
+  'logger:troubleshooting': {
+    zh: {
+      title: '排错与常见问题',
+      lede: '按现象查找原因和解决办法。',
+      document: {
+        sections: [
+          {
+            id: 'no-output',
+            heading: '日志没有输出',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '没有安装任何输出端：只装 level 不会打印，需要 color 或自定义 useSink。',
+                  '级别过滤：低于 level 的日志被丢弃，用 setLevel 调低。',
+                  '程序退出前没有 await log.flush()，异步输出还没写完。',
+                  'Logger 已经 shutdown，之后的日志被静默忽略。',
+                  '输出端出错：注册 onFailure 查看原因。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'types',
+            heading: 'log.info 在 TypeScript 里不存在',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'info 等方法由插件提供。构造时把插件数组写成 plugins: [level(), ...] as const，TypeScript 才能推断出这些方法。运行时用 log.use(plugin) 安装的插件，方法在 use 返回的对象上：const extended = await log.use(level())。'
+              }
+            ]
+          },
+          {
+            id: 'batch',
+            heading: 'http 没有批量发送',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '插件顺序必须是 [batch(), http(...)]。顺序反了时 http 找不到批处理能力，会逐条发送。'
+              }
+            ]
+          },
+          {
+            id: 'async-install',
+            heading: '构造时插件安装报错',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '构造函数只能同步安装插件。插件的 install 返回 Promise 时，构造直接报错，不会返回少了插件的 Logger。先构造，再 await log.use(plugin)。'
+              }
+            ]
+          },
+          {
+            id: 'codes',
+            heading: '常见错误代码',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['error.code', '什么时候出现'],
+                rows: [
+                  ['DELIVERY_FAILED', 'http 等输出端发送失败，原始错误在 cause'],
+                  ['BATCH_OVERFLOW', '批次队列已满'],
+                  ['PIPELINE_MODE_MISMATCH', '注册步骤的方法和 pipeline.mode 不匹配'],
+                  ['FILE_SINK_UNAVAILABLE', '当前环境不能写文件']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: "错误带有 error.source（'@migaia/logger'）和 error.code，请用 LoggerErrorCode 常量比较。onFailure 收到的 failure.source 说明出错的环节。"
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: '快速开始',
+          path: 'getting-started'
+        },
+        {
+          label: 'Entry、Hook 与 Sink',
+          path: 'entries-hooks-and-sinks'
+        },
+        {
+          label: 'LoggerErrorCode',
+          path: 'docs/logger/LoggerErrorCode'
+        }
+      ]
+    },
+    en: {
+      title: 'Troubleshooting and FAQ',
+      lede: 'Find the cause and the fix by symptom.',
+      document: {
+        sections: [
+          {
+            id: 'no-output',
+            heading: 'Nothing prints',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'No output installed: level alone prints nothing; add color or a useSink.',
+                  'Level filtering drops entries below level; lower it with setLevel.',
+                  'The program exited without await log.flush(), before async outputs finished.',
+                  'The Logger was shut down, so later entries are ignored silently.',
+                  'An output failed; register onFailure to see why.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'types',
+            heading: 'log.info does not exist in TypeScript',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Methods such as info come from plugins. Write plugins: [level(), ...] as const so TypeScript infers them. For plugins installed at runtime, the methods live on the object use returns: const extended = await log.use(level()).'
+              }
+            ]
+          },
+          {
+            id: 'batch',
+            heading: 'http does not batch',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'The order must be [batch(), http(...)]. Reversed, http cannot find the batching capability and sends one entry at a time.'
+              }
+            ]
+          },
+          {
+            id: 'async-install',
+            heading: 'A plugin fails during construction',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'The constructor installs plugins synchronously only. If an install returns a Promise, construction throws instead of returning a Logger missing plugins. Construct first, then await log.use(plugin).'
+              }
+            ]
+          },
+          {
+            id: 'codes',
+            heading: 'Common error codes',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['error.code', 'When it appears'],
+                rows: [
+                  [
+                    'DELIVERY_FAILED',
+                    'An output such as http failed to deliver; the cause holds the original error'
+                  ],
+                  ['BATCH_OVERFLOW', 'The batch queue is full'],
+                  [
+                    'PIPELINE_MODE_MISMATCH',
+                    'The stage registration method does not match pipeline.mode'
+                  ],
+                  ['FILE_SINK_UNAVAILABLE', 'The environment cannot write files']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: "Errors carry error.source ('@migaia/logger') and error.code; compare against LoggerErrorCode constants. failure.source in onFailure names the failing stage."
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Quick start',
+          path: 'getting-started'
+        },
+        {
+          label: 'Entries, hooks, and sinks',
+          path: 'entries-hooks-and-sinks'
+        },
+        {
+          label: 'LoggerErrorCode',
+          path: 'docs/logger/LoggerErrorCode'
+        }
       ]
     }
   },
@@ -22992,38 +23553,56 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'resource:index': {
     zh: {
-      title: 'Resource 学习路径',
-      lede: '从一个可取消 fetcher 开始，再分别处理缓存新鲜度、Suspense/SSR、重试和资源终止。',
+      title: 'Resource：会随输入自动刷新、可取消的异步数据',
+      lede: '给 Resource 一个请求函数，它负责加载状态、错误、取消旧请求、重试、缓存过期和服务端渲染快照。',
       document: {
         sections: [
           {
-            id: 'mental-model',
-            heading: '把可见状态与传输状态分开',
+            id: 'what',
+            heading: '它解决什么问题',
             blocks: [
               {
-                type: 'table',
-                headers: ['你要回答的问题', '读取入口'],
-                rows: [
-                  ['界面当前应展示 data、error 还是 pending', 'state / read()'],
-                  ['网络或异步工作现在是否在途', 'fetchStatus'],
-                  ['旧 success 是否仍可展示但后台刷新', 'refreshing'],
-                  ['缓存是否超过 ttl', 'isStale'],
-                  ['是否已经永久终止', 'disposed']
-                ]
+                type: 'paragraph',
+                text: '页面经常要根据一个会变的输入（用户 id、搜索条件）请求数据：请求期间显示加载中，失败可以重试，输入变了要取消旧请求，页面关闭时停止请求。每个数据都手写一遍 loading、error、取消变量，很容易出错，最常见的是“旧请求比新请求晚返回，把旧数据显示了出来”。'
+              },
+              {
+                type: 'paragraph',
+                text: 'Resource 把这套状态机做成一个类。你提供请求函数 fetcher，它在 fetcher 第一个 await 之前读取的 Signal 就是依赖；依赖变化时自动取消旧请求、发起新请求，并保证只有最新一次请求的结果会生效。它建立在 @migaia/reactive 之上，不发 HTTP、不依赖 React，用什么发请求由你决定。'
+              },
+              {
+                type: 'paragraph',
+                text: '如果数据只需要在启动时请求一次，不依赖任何会变的输入，也不需要取消、重试或过期，直接 await 一个 Promise 更简单。'
               }
             ]
           },
           {
-            id: 'choose-path',
-            heading: '按交付结果进入下一页',
+            id: 'api',
+            heading: 'API 一览',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  '首次接入：建立 Runtime、Signal 依赖、fetcher 与 dispose 所有权。',
-                  '缓存与刷新：选择 ttl、stale-while-revalidate、invalidate 和 keepAlive。',
-                  'Suspense 与 SSR：理解 read() 抛值和 JSON 安全快照。',
-                  '取消与重试：把 signal 传到真实 I/O，并控制失败退避。'
+                type: 'table',
+                headers: ['API', '作用'],
+                rows: [
+                  [
+                    'new Resource(fetcher, runtime, options?)',
+                    '创建资源；fetcher 收到 { signal }，默认立即发起第一次请求'
+                  ],
+                  [
+                    'resource.state',
+                    "当前状态：{ status: 'idle' | 'pending' | 'success' | 'error' | 'cancelled', data?, error? }；在 Effect 里读取会随状态更新"
+                  ],
+                  ['resource.promise', '当前请求的 Promise，多个读取者共享同一个'],
+                  [
+                    'resource.read() / peek()',
+                    'React Suspense 风格读取：成功返回数据，加载中抛 Promise，失败抛错误；peek 不建立依赖'
+                  ],
+                  ['resource.refetch() / invalidate()', '强制重新请求 / 让缓存立即过期并重新请求'],
+                  ['resource.cancel()', '取消当前请求，资源之后仍可使用'],
+                  [
+                    'resource.dehydrate() / hydrate(snapshot)',
+                    '导出 / 恢复成功数据的快照，用于服务端渲染'
+                  ],
+                  ['resource.dispose()', '永久关闭资源，之后的调用抛 RESOURCE_DISPOSED']
                 ]
               }
             ]
@@ -23031,44 +23610,77 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: '五分钟建立 Resource', path: 'getting-started' },
-        { label: '缓存与刷新', path: 'caching-and-refresh' },
-        { label: 'Suspense 与 SSR', path: 'suspense-and-ssr' }
+        {
+          label: '快速开始',
+          path: 'getting-started'
+        },
+        {
+          label: '缓存与刷新',
+          path: 'caching-and-refresh'
+        },
+        {
+          label: '取消与重试',
+          path: 'cancellation-and-retry'
+        }
       ]
     },
     en: {
-      title: 'Resource learning paths',
-      lede: 'Start with a cancellable fetcher, then handle cache freshness, Suspense and SSR, retries, and terminal ownership separately.',
+      title: 'Resource: async data that refreshes with its inputs and can be cancelled',
+      lede: 'Give a Resource a request function and it handles loading state, errors, cancelling stale requests, retries, cache expiry, and SSR snapshots.',
       document: {
         sections: [
           {
-            id: 'mental-model',
-            heading: 'Separate visible state from transport state',
+            id: 'what',
+            heading: 'What problem it solves',
             blocks: [
               {
-                type: 'table',
-                headers: ['Question', 'Read from'],
-                rows: [
-                  ['Should the UI show data, error, or pending?', 'state / read()'],
-                  ['Is network or asynchronous work currently active?', 'fetchStatus'],
-                  ['Is old success data visible during background refresh?', 'refreshing'],
-                  ['Has the cache exceeded ttl?', 'isStale'],
-                  ['Has the resource terminated permanently?', 'disposed']
-                ]
+                type: 'paragraph',
+                text: 'Pages often load data from a changing input such as a user id or search terms: show loading meanwhile, retry on failure, cancel the old request when the input changes, stop when the page closes. Hand-writing loading, error, and cancel variables for every piece of data is error-prone, most often when an old request answers after a new one and its stale data is shown.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Resource turns that state machine into a class. You provide a fetcher; the Signals it reads before its first await are its dependencies, and when they change it cancels the old request, starts a new one, and only lets the newest result through. It builds on @migaia/reactive, sends no HTTP itself, and does not depend on React; you choose how to fetch.'
+              },
+              {
+                type: 'paragraph',
+                text: 'If data is fetched once at startup, depends on no changing input, and needs no cancellation, retries, or expiry, simply awaiting a Promise is easier.'
               }
             ]
           },
           {
-            id: 'choose-path',
-            heading: 'Choose the next page by delivery outcome',
+            id: 'api',
+            heading: 'API at a glance',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  'First integration: connect Runtime, Signal dependencies, a fetcher, and dispose ownership.',
-                  'Caching and refresh: choose ttl, stale-while-revalidate, invalidate, and keepAlive.',
-                  'Suspense and SSR: understand thrown values from read() and JSON-safe snapshots.',
-                  'Cancellation and retry: forward signal to real I/O and control failure backoff.'
+                type: 'table',
+                headers: ['API', 'Purpose'],
+                rows: [
+                  [
+                    'new Resource(fetcher, runtime, options?)',
+                    'Creates a resource; fetcher receives { signal } and the first request starts immediately by default'
+                  ],
+                  [
+                    'resource.state',
+                    "Current state: { status: 'idle' | 'pending' | 'success' | 'error' | 'cancelled', data?, error? }; read in an Effect to follow updates"
+                  ],
+                  ['resource.promise', 'The current request’s Promise, shared by all readers'],
+                  [
+                    'resource.read() / peek()',
+                    'Suspense-style read: returns data, throws a Promise while loading, throws the error on failure; peek creates no dependency'
+                  ],
+                  [
+                    'resource.refetch() / invalidate()',
+                    'Force a new request / expire the cache now and refetch'
+                  ],
+                  ['resource.cancel()', 'Cancels the current request; the resource stays usable'],
+                  [
+                    'resource.dehydrate() / hydrate(snapshot)',
+                    'Export / restore a snapshot of successful data for server rendering'
+                  ],
+                  [
+                    'resource.dispose()',
+                    'Closes the resource for good; later calls throw RESOURCE_DISPOSED'
+                  ]
                 ]
               }
             ]
@@ -23076,506 +23688,985 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: 'Build a Resource in five minutes', path: 'getting-started' },
-        { label: 'Caching and refresh', path: 'caching-and-refresh' },
-        { label: 'Suspense and SSR', path: 'suspense-and-ssr' }
+        {
+          label: 'Quick start',
+          path: 'getting-started'
+        },
+        {
+          label: 'Caching and refresh',
+          path: 'caching-and-refresh'
+        },
+        {
+          label: 'Cancellation and retry',
+          path: 'cancellation-and-retry'
+        }
       ]
     }
   },
   'resource:getting-started': {
     zh: {
-      title: '五分钟建立响应式异步 Resource',
-      lede: '在首次 await 前读取依赖，把取消 signal 传给真实请求，并由应用所有者最终 dispose。',
+      title: '快速开始：加载一个用户',
+      lede: '安装包，用 Resource 加载数据并显示加载状态，再让它随输入变化自动重新请求。',
       document: {
         sections: [
           {
-            id: 'first-resource',
-            heading: '建立依赖追踪与 latest-wins 请求',
+            id: 'install',
+            heading: '安装',
+            blocks: [
+              {
+                type: 'code',
+                language: 'bash',
+                code: 'pnpm add @migaia/resource @migaia/reactive'
+              },
+              {
+                type: 'paragraph',
+                text: 'migaia 的包发布在 GitHub Packages，不在公共 npm。第一次安装前，在项目根目录的 .npmrc 中加入 @migaia:registry=https://npm.pkg.github.com，并用带 read:packages 权限的 GitHub 令牌登录，否则会报 404。'
+              },
+              {
+                type: 'paragraph',
+                text: 'Resource 依赖 @migaia/reactive，两个包要一起安装。'
+              }
+            ]
+          },
+          {
+            id: 'first',
+            heading: '第一个例子',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Resource, ResourceStatus } from '@migaia/resource'\nimport { Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst userId = new Signal('user-1', runtime)\nconst user = new Resource(\n  async ({ signal }) => {\n    const id = userId.value // 首次 await 前读取，建立依赖\n    const response = await fetch(`/api/users/${id}`, { signal })\n    if (!response.ok) throw new Error(`request failed: ${response.status}`)\n    return response.json() as Promise<IUser>\n  },\n  runtime,\n  { debugName: 'user', ttl: 30_000 }\n)\n\nif (user.state.status === ResourceStatus.success) renderUser(user.state.data)\nuserId.value = 'user-2' // 使上一代失效并启动新请求\n\nuser.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\ntype IUser = { id: string; name: string }\n/** 模拟一个 30 毫秒后返回的接口。 */\nconst fetchUser = async (id: string, signal: AbortSignal): Promise<IUser> => {\n  await new Promise((resolve) => setTimeout(resolve, 30))\n  signal.throwIfAborted()\n  return { id, name: id === '1' ? 'Ada' : 'Grace' }\n}\n\nconst runtime = createRuntime()\nconst user = new Resource<IUser>(\n  // 运行时就是 AbortSignal，但类型声明较窄，传给需要 AbortSignal 的 API 时要断言\n  ({ signal }) => fetchUser('1', signal as AbortSignal),\n  runtime\n)\n\n// 在 Effect 里读取 state：状态变化时自动重新运行\nconst stop = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.pending) console.log('加载中…')\n  if (state.status === ResourceStatus.success) console.log('用户:', state.data.name)\n  if (state.status === ResourceStatus.error) console.log('出错:', state.error)\n})\n\nawait user.promise // 等这次请求完成\nruntime.flush() // 让 Effect 立即读到新状态\nstop()\nuser.dispose()"
               },
               {
-                type: 'list',
-                items: [
-                  '只有 fetcher 首次 await 之前的响应式读取会成为依赖；之后的读取应提前捕获或放进 Computed。',
-                  'signal 必须转交给 fetch、数据库驱动或其他可取消 I/O，否则 Resource 只能忽略迟到结果，不能停止底层工作。',
-                  '依赖变化、refetch 与 invalidate 都会开启新 generation，只有最新结果可写回。',
-                  'dispose 永久终止实例；下一所有权周期创建新的 Resource。'
-                ]
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '加载中…\n用户: Ada'
+              },
+              {
+                type: 'paragraph',
+                text: 'new Resource(fetcher, runtime) 创建资源并立即发起第一次请求。fetcher 收到 { signal }：请求被取消时这个 signal 会被中止，把它交给 fetch 等 API，就能真正停止网络请求。'
+              },
+              {
+                type: 'paragraph',
+                text: 'resource.state 是当前状态。在 Effect 里读取它，状态从 pending 变成 success 时 Effect 会自动重新运行，这就是界面绑定的方式。status 可能是 idle（还没请求）、pending（加载中、没有旧数据）、success（data 是数据）、error（error 是失败原因）、cancelled（被取消）。用 ResourceStatus 常量比较，不要手写字符串。'
+              },
+              {
+                type: 'paragraph',
+                text: '注意类型：fetcher 收到的 signal 在运行时就是 AbortSignal，但声明的类型较窄，直接传给 fetch(url, { signal }) 在严格模式下会报类型错误，需要写成 signal as AbortSignal。'
+              }
+            ]
+          },
+          {
+            id: 'deps',
+            heading: '随输入自动重新请求',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('1')\n\nconst user = new Resource(\n  async ({ signal }) => {\n    const id = userId.value // 在第一个 await 之前读取：userId 成为依赖\n    console.log('请求用户', id)\n    signal.addEventListener('abort', () => console.log('取消请求', id))\n    await new Promise((resolve) => setTimeout(resolve, id === '1' ? 50 : 10))\n    return `user-${id}`\n  },\n  runtime\n)\n\nconst stop = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.success) console.log('显示:', state.data)\n})\n\nuserId.value = '2' // 依赖变化：取消旧请求，发起新请求\nawait new Promise((resolve) => setTimeout(resolve, 100))\nstop()\nuser.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '请求用户 1\n// userId 改为 2\n取消请求 1\n请求用户 2\n显示: user-2\n// user.dispose()\n取消请求 2'
+              },
+              {
+                type: 'paragraph',
+                text: 'fetcher 在第一个 await 之前读取了 userId.value，于是 userId 成为依赖。把 userId 改为 2 后，Resource 取消旧请求（signal 被中止），用新的 id 发起请求。同一轮里连续多次修改只会触发一次新请求。'
+              },
+              {
+                type: 'paragraph',
+                text: '只有第一个 await 之前的读取会被记录。await 之后再读 userId.value 不会建立依赖，所以要先把值读进局部变量，再发请求。'
               }
             ]
           },
           {
             id: 'options',
-            heading: '逐项决定构造配置',
+            heading: '构造选项',
             blocks: [
               {
                 type: 'table',
-                headers: ['字段', '默认值', '何时修改'],
+                headers: ['选项', '默认值', '作用'],
                 rows: [
-                  ['debugName', 'undefined', '需要在 reactive 诊断与请求错误中识别所有者时设置。'],
-                  ['ttl', 'Infinity', '需要基于时间重新验证成功缓存时设置非负毫秒数。'],
-                  [
-                    'autoStart',
-                    'true',
-                    '需要先完成 hydrate、授权或外部准备时设为 false，再显式 refetch。'
-                  ],
-                  ['staleWhileRevalidate', 'false', '刷新期间允许继续展示旧 success data 时开启。'],
-                  ['retry', '0', '传非负次数，或按 failureCount 与 error 判断是否重试。'],
-                  ['retryDelay', '0 ms', '固定退避毫秒数，或按失败次数和错误计算。'],
-                  ['keepAlive', 'false', '无人观察时仍需保留上游依赖与热缓存时开启。'],
-                  [
-                    'initialSnapshot',
-                    'undefined',
-                    '用服务端或持久化的 version: 1 success 快照启动。'
-                  ],
+                  ['autoStart', 'true', '是否在创建时立即请求'],
+                  ['ttl', 'Infinity', '成功数据保持新鲜多少毫秒，过期后下次读取会重新请求'],
+                  ['staleWhileRevalidate', 'false', '刷新时继续显示旧数据，而不是回到 pending'],
+                  ['retry', '0', '失败后重试几次，或 (failureCount, error) => boolean'],
+                  ['retryDelay', '0', '重试前等待的毫秒数，或按失败次数计算的函数'],
+                  ['keepAlive', 'false', '没人读取 state 时是否仍保持数据新鲜'],
+                  ['initialSnapshot', '无', '从服务端快照恢复数据，不发请求'],
                   [
                     'scheduler',
                     'systemScheduler',
-                    '测试、虚拟时钟或宿主时间域需要统一 TTL 与 retry deadline 时替换。'
-                  ]
+                    'TTL 和重试等待使用的时钟（来自 @migaia/utils/scheduler），测试时可以替换'
+                  ],
+                  ['debugName', '无', '调试用的名字']
                 ]
-              },
-              {
-                type: 'paragraph',
-                text: '构造时会一次性读取并校验全部 option；非法 getter、负 ttl、无穷 retryDelay 或无效 snapshot 会在 Resource 建立响应式所有权前失败。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Resource API', path: 'docs/resource/Resource' },
-        { label: '缓存与刷新策略', path: 'caching-and-refresh' },
-        { label: '取消与重试', path: 'cancellation-and-retry' }
+        {
+          label: '缓存与刷新',
+          path: 'caching-and-refresh'
+        },
+        {
+          label: '取消与重试',
+          path: 'cancellation-and-retry'
+        },
+        {
+          label: 'Resource API',
+          path: 'docs/resource/Resource'
+        }
       ]
     },
     en: {
-      title: 'Build a reactive asynchronous Resource in five minutes',
-      lede: 'Read dependencies before the first await, forward cancellation to real I/O, and let the application owner dispose the instance.',
+      title: 'Quick start: load a user',
+      lede: 'Install the package, load data with a Resource while showing its state, then let it refetch when its input changes.',
       document: {
         sections: [
           {
-            id: 'first-resource',
-            heading: 'Connect dependency tracking to latest-wins requests',
+            id: 'install',
+            heading: 'Install',
+            blocks: [
+              {
+                type: 'code',
+                language: 'bash',
+                code: 'pnpm add @migaia/resource @migaia/reactive'
+              },
+              {
+                type: 'paragraph',
+                text: 'migaia packages are published to GitHub Packages, not the public npm registry. Before the first install, add @migaia:registry=https://npm.pkg.github.com to the .npmrc in your project root and authenticate with a GitHub token that has read:packages; otherwise the install fails with 404.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Resource depends on @migaia/reactive, so install both.'
+              }
+            ]
+          },
+          {
+            id: 'first',
+            heading: 'First example',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Resource, ResourceStatus } from '@migaia/resource'\nimport { Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst userId = new Signal('user-1', runtime)\nconst user = new Resource(\n  async ({ signal }) => {\n    const id = userId.value // tracked before the first await\n    const response = await fetch(`/api/users/${id}`, { signal })\n    if (!response.ok) throw new Error(`request failed: ${response.status}`)\n    return response.json() as Promise<IUser>\n  },\n  runtime,\n  { debugName: 'user', ttl: 30_000 }\n)\n\nif (user.state.status === ResourceStatus.success) renderUser(user.state.data)\nuserId.value = 'user-2' // invalidates the previous generation\n\nuser.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\ntype IUser = { id: string; name: string }\n/** A fake endpoint that answers after 30 ms. */\nconst fetchUser = async (id: string, signal: AbortSignal): Promise<IUser> => {\n  await new Promise((resolve) => setTimeout(resolve, 30))\n  signal.throwIfAborted()\n  return { id, name: id === '1' ? 'Ada' : 'Grace' }\n}\n\nconst runtime = createRuntime()\nconst user = new Resource<IUser>(\n  // At runtime this is an AbortSignal, but its declared type is narrower, so assert it for APIs that need AbortSignal\n  ({ signal }) => fetchUser('1', signal as AbortSignal),\n  runtime\n)\n\n// Read state inside an Effect so it reruns on every change\nconst stop = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.pending) console.log('loading…')\n  if (state.status === ResourceStatus.success) console.log('user:', state.data.name)\n  if (state.status === ResourceStatus.error) console.log('failed:', state.error)\n})\n\nawait user.promise // wait for this request\nruntime.flush() // let the Effect see the new state now\nstop()\nuser.dispose()"
               },
               {
-                type: 'list',
-                items: [
-                  'Only reactive reads before the fetcher first awaits become dependencies; capture later values earlier or derive them through Computed.',
-                  'Forward signal to fetch, a database driver, or other cancellable I/O. Otherwise Resource can ignore a late value but cannot stop the underlying work.',
-                  'Dependency changes, refetch, and invalidate start a new generation, and only the latest result may commit.',
-                  'dispose terminates this instance permanently; create another for the next ownership cycle.'
-                ]
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'loading…\nuser: Ada'
+              },
+              {
+                type: 'paragraph',
+                text: 'new Resource(fetcher, runtime) creates the resource and starts the first request at once. fetcher receives { signal }, which aborts when the request is cancelled; pass it to fetch and similar APIs to actually stop the network work.'
+              },
+              {
+                type: 'paragraph',
+                text: 'resource.state is the current state. Read it in an Effect and the Effect reruns when pending becomes success; that is how views bind to it. status is idle (not requested), pending (loading, no old data), success (data holds the result), error (error holds the reason), or cancelled. Compare with ResourceStatus constants rather than literal strings.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Mind the type: the signal is an AbortSignal at runtime, but its declared type is narrower, so fetch(url, { signal }) fails strict type checking; write signal as AbortSignal.'
+              }
+            ]
+          },
+          {
+            id: 'deps',
+            heading: 'Refetch automatically when inputs change',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('1')\n\nconst user = new Resource(\n  async ({ signal }) => {\n    const id = userId.value // read before the first await, so userId becomes a dependency\n    console.log('request user', id)\n    signal.addEventListener('abort', () => console.log('abort request', id))\n    await new Promise((resolve) => setTimeout(resolve, id === '1' ? 50 : 10))\n    return `user-${id}`\n  },\n  runtime\n)\n\nconst stop = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.success) console.log('show:', state.data)\n})\n\nuserId.value = '2' // dependency changed: abort the old request, start a new one\nawait new Promise((resolve) => setTimeout(resolve, 100))\nstop()\nuser.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'request user 1\n// userId becomes 2\nabort request 1\nrequest user 2\nshow: user-2\n// user.dispose()\nabort request 2'
+              },
+              {
+                type: 'paragraph',
+                text: 'fetcher reads userId.value before its first await, so userId becomes a dependency. After userId becomes 2 the Resource aborts the old request and requests with the new id. Several changes in one turn trigger a single new request.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Only reads before the first await are recorded. Reading userId.value after an await creates no dependency, so read it into a local first and then request.'
               }
             ]
           },
           {
             id: 'options',
-            heading: 'Choose every constructor option deliberately',
+            heading: 'Constructor options',
             blocks: [
               {
                 type: 'table',
-                headers: ['Field', 'Default', 'Change it when'],
+                headers: ['Option', 'Default', 'Purpose'],
                 rows: [
-                  [
-                    'debugName',
-                    'undefined',
-                    'Reactive diagnostics and request errors need an owner label.'
-                  ],
+                  ['autoStart', 'true', 'Whether to request immediately on creation'],
                   [
                     'ttl',
                     'Infinity',
-                    'A successful cache must revalidate after a non-negative duration.'
-                  ],
-                  [
-                    'autoStart',
-                    'true',
-                    'Hydration, authorization, or external preparation must finish before an explicit refetch.'
+                    'How many ms success data stays fresh; the next read after expiry refetches'
                   ],
                   [
                     'staleWhileRevalidate',
                     'false',
-                    'Old successful data may remain visible during refresh.'
+                    'Keep old data visible while refreshing instead of returning to pending'
                   ],
-                  ['retry', '0', 'Use a non-negative count or decide from failureCount and error.'],
+                  ['retry', '0', 'Retries after failure, or (failureCount, error) => boolean'],
                   [
                     'retryDelay',
-                    '0 ms',
-                    'Use a fixed delay or calculate backoff from attempt and error.'
+                    '0',
+                    'Milliseconds before a retry, or a function of the failure count'
                   ],
-                  [
-                    'keepAlive',
-                    'false',
-                    'Upstream dependencies and warm cache must survive without observers.'
-                  ],
+                  ['keepAlive', 'false', 'Whether to stay fresh when nobody reads state'],
                   [
                     'initialSnapshot',
-                    'undefined',
-                    'Start from a server or persisted version: 1 success snapshot.'
+                    'none',
+                    'Restore data from a server snapshot without requesting'
                   ],
                   [
                     'scheduler',
                     'systemScheduler',
-                    'Tests, virtual clocks, or hosts need one time domain for TTL and retry deadlines.'
-                  ]
+                    'Clock for TTL and retry waits (from @migaia/utils/scheduler); replace it in tests'
+                  ],
+                  ['debugName', 'none', 'A name for debugging']
                 ]
-              },
-              {
-                type: 'paragraph',
-                text: 'Construction snapshots and validates every option once. A throwing getter, negative ttl, infinite retryDelay, or invalid snapshot fails before the Resource acquires reactive ownership.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Resource API', path: 'docs/resource/Resource' },
-        { label: 'Caching and refresh policies', path: 'caching-and-refresh' },
-        { label: 'Cancellation and retry', path: 'cancellation-and-retry' }
+        {
+          label: 'Caching and refresh',
+          path: 'caching-and-refresh'
+        },
+        {
+          label: 'Cancellation and retry',
+          path: 'cancellation-and-retry'
+        },
+        {
+          label: 'Resource API',
+          path: 'docs/resource/Resource'
+        }
       ]
     }
   },
   'resource:caching-and-refresh': {
     zh: {
-      title: '设计 Resource 缓存新鲜度与后台刷新',
-      lede: 'ttl 决定何时过期，staleWhileRevalidate 决定过期后的可见状态；refetch 与 invalidate 则表达主动刷新意图。',
+      title: '缓存与刷新',
+      lede: '成功的数据会被缓存；用 ttl 控制何时过期，用 staleWhileRevalidate 在刷新时继续显示旧数据。',
       document: {
         sections: [
           {
-            id: 'freshness',
-            heading: '分别选择时间、展示和保活策略',
+            id: 'swr',
+            heading: '刷新时继续显示旧数据',
             blocks: [
-              {
-                type: 'table',
-                headers: ['选项或操作', '作用', '默认'],
-                rows: [
-                  ['ttl', '成功值保持新鲜的毫秒数', 'Infinity'],
-                  ['staleWhileRevalidate', '刷新时继续展示旧 success data', 'false'],
-                  ['keepAlive', '无人观察时仍保持依赖与热缓存', 'false'],
-                  ['refetch()', '忽略新鲜度，立即开始新请求', '显式调用'],
-                  ['invalidate()', '先令缓存过期，再开始新请求', '显式调用']
-                ]
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Resource } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\n\ntype IProduct = { id: string; name: string }\nconst runtime = createRuntime()\nconst fetchProducts = async (): Promise<IProduct[]> => {\n  const response = await fetch('/api/products')\n  return response.json() as Promise<IProduct[]>\n}\nconst renderProducts = (items: IProduct[], options: { refreshing: boolean }) =>\n  console.log(items, options.refreshing)\n\nconst products = new Resource(fetchProducts, runtime, {\n  ttl: 10_000,\n  staleWhileRevalidate: true,\n  keepAlive: false\n})\n\nconst state = products.state\nif (state.status === 'success') {\n  renderProducts(state.data, { refreshing: products.refreshing })\n}\n\nawait products.invalidate() // mutation 后立即重新验证"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nlet version = 0\nconst runtime = createRuntime()\nconst prices = new Resource(\n  async () => {\n    await new Promise((resolve) => setTimeout(resolve, 20))\n    version += 1\n    return `价格表 v${version}`\n  },\n  runtime,\n  { ttl: 1000, staleWhileRevalidate: true }\n)\n\nconst stop = runtime.effect(() => {\n  const state = prices.state\n  if (state.status === ResourceStatus.pending) console.log('加载中…')\n  if (state.status === ResourceStatus.success)\n    console.log(state.data, state.refreshing ? '（后台刷新中）' : '')\n})\n\nawait prices.promise\nruntime.flush()\nawait prices.refetch() // 刷新期间继续显示旧数据，而不是回到“加载中”\nruntime.flush()\nstop()\nprices.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '加载中…\n价格表 v1\n// refetch() 期间\n价格表 v1 （后台刷新中）\n价格表 v2'
+              },
+              {
+                type: 'paragraph',
+                text: '默认情况下，重新请求时状态回到 pending，界面会闪回“加载中”。设置 staleWhileRevalidate: true 后，刷新期间状态仍是 success、data 仍是旧数据，同时 refreshing 为 true，界面可以显示一个小的“刷新中”提示，新数据到达后再替换。'
               }
             ]
           },
           {
-            id: 'reading',
-            heading: '被动读取不会等于强制刷新',
+            id: 'when',
+            heading: '什么时候会重新请求',
             blocks: [
               {
+                type: 'list',
+                items: [
+                  'fetcher 读取的依赖发生变化。',
+                  '成功数据超过 ttl 毫秒后，下一次读取 state、promise 或 read() 时。默认 ttl 是 Infinity，数据不会因时间过期。',
+                  '调用 refetch()：总是发起新请求，并取消正在进行的那一个。',
+                  '调用 invalidate()：让缓存立即过期并重新请求。',
+                  'keepAlive 为 false（默认）时，长时间没人读取 state，Resource 会进入休眠并让缓存过期，下次被读取时重新请求。'
+                ]
+              },
+              {
                 type: 'paragraph',
-                text: 'state、promise 与 read() 只在 idle 或过期时确保请求存在。peek() 既不建立依赖，也不触发 ensureFresh。业务操作已经知道服务端数据变化时，调用 invalidate()，不要靠重复读取碰运气。'
+                text: '只是反复读取 state 不会发起请求，除非数据已过期或从未请求过。需要强制刷新时调用 refetch() 或 invalidate()。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Resource 配置参考', path: 'docs/resource/Resource' },
-        { label: 'SSR 快照', path: 'suspense-and-ssr' },
-        { label: '重试与取消', path: 'cancellation-and-retry' }
+        {
+          label: 'Suspense 与服务端渲染',
+          path: 'suspense-and-ssr'
+        },
+        {
+          label: '取消与重试',
+          path: 'cancellation-and-retry'
+        },
+        {
+          label: 'Resource API',
+          path: 'docs/resource/Resource'
+        }
       ]
     },
     en: {
-      title: 'Design Resource cache freshness and background refresh',
-      lede: 'ttl decides when data expires, staleWhileRevalidate decides what remains visible after expiry, and refetch or invalidate expresses an active refresh intent.',
+      title: 'Caching and refresh',
+      lede: 'Successful data is cached; ttl controls expiry and staleWhileRevalidate keeps old data visible while refreshing.',
       document: {
         sections: [
           {
-            id: 'freshness',
-            heading: 'Choose time, presentation, and retention separately',
+            id: 'swr',
+            heading: 'Keep showing old data while refreshing',
             blocks: [
-              {
-                type: 'table',
-                headers: ['Option or operation', 'Effect', 'Default'],
-                rows: [
-                  ['ttl', 'Milliseconds a successful value remains fresh', 'Infinity'],
-                  [
-                    'staleWhileRevalidate',
-                    'Keeps old success data visible during refresh',
-                    'false'
-                  ],
-                  ['keepAlive', 'Retains dependencies and a warm cache without observers', 'false'],
-                  ['refetch()', 'Starts a new request regardless of freshness', 'Explicit'],
-                  ['invalidate()', 'Expires the cache, then starts a new request', 'Explicit']
-                ]
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Resource } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\n\ntype IProduct = { id: string; name: string }\nconst runtime = createRuntime()\nconst fetchProducts = async (): Promise<IProduct[]> => {\n  const response = await fetch('/api/products')\n  return response.json() as Promise<IProduct[]>\n}\nconst renderProducts = (items: IProduct[], options: { refreshing: boolean }) =>\n  console.log(items, options.refreshing)\n\nconst products = new Resource(fetchProducts, runtime, {\n  ttl: 10_000,\n  staleWhileRevalidate: true,\n  keepAlive: false\n})\n\nconst state = products.state\nif (state.status === 'success') {\n  renderProducts(state.data, { refreshing: products.refreshing })\n}\n\nawait products.invalidate() // revalidate after a mutation"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\nlet version = 0\nconst runtime = createRuntime()\nconst prices = new Resource(\n  async () => {\n    await new Promise((resolve) => setTimeout(resolve, 20))\n    version += 1\n    return `price list v${version}`\n  },\n  runtime,\n  { ttl: 1000, staleWhileRevalidate: true }\n)\n\nconst stop = runtime.effect(() => {\n  const state = prices.state\n  if (state.status === ResourceStatus.pending) console.log('loading…')\n  if (state.status === ResourceStatus.success)\n    console.log(state.data, state.refreshing ? '(refreshing in background)' : '')\n})\n\nawait prices.promise\nruntime.flush()\nawait prices.refetch() // old data stays visible during refresh instead of returning to loading\nruntime.flush()\nstop()\nprices.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'loading…\nprice list v1\n// during refetch()\nprice list v1 (refreshing in background)\nprice list v2'
+              },
+              {
+                type: 'paragraph',
+                text: 'By default a refetch returns state to pending and the view flashes back to loading. With staleWhileRevalidate: true, state stays success with the old data during refresh and refreshing is true, so the view can show a small refreshing hint and swap in the new data on arrival.'
               }
             ]
           },
           {
-            id: 'reading',
-            heading: 'A passive read is not a forced refresh',
+            id: 'when',
+            heading: 'When a new request starts',
             blocks: [
               {
+                type: 'list',
+                items: [
+                  'A dependency read by fetcher changes.',
+                  'More than ttl ms after success, on the next read of state, promise, or read(). ttl defaults to Infinity, so data never expires by time.',
+                  'refetch() always starts a new request and cancels the current one.',
+                  'invalidate() expires the cache now and refetches.',
+                  'With keepAlive false (the default), a Resource nobody reads for a while goes idle and expires its cache, refetching when read again.'
+                ]
+              },
+              {
                 type: 'paragraph',
-                text: 'state, promise, and read() ensure work exists only when idle or stale. peek() neither tracks a dependency nor calls ensureFresh. When a business mutation proves server data changed, call invalidate() instead of hoping repeated reads trigger a refresh.'
+                text: 'Reading state repeatedly does not request again unless the data expired or was never requested; call refetch() or invalidate() to force it.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Resource configuration', path: 'docs/resource/Resource' },
-        { label: 'SSR snapshots', path: 'suspense-and-ssr' },
-        { label: 'Retry and cancellation', path: 'cancellation-and-retry' }
+        {
+          label: 'Suspense and SSR',
+          path: 'suspense-and-ssr'
+        },
+        {
+          label: 'Cancellation and retry',
+          path: 'cancellation-and-retry'
+        },
+        {
+          label: 'Resource API',
+          path: 'docs/resource/Resource'
+        }
       ]
     }
   },
   'resource:suspense-and-ssr': {
     zh: {
-      title: '把 Resource 接入 Suspense 与 SSR 快照',
-      lede: 'read() 使用抛值协议驱动 Suspense；dehydrate/hydrate 使用版本化 JSON 快照跨越服务端与客户端。',
+      title: 'Suspense 与服务端渲染',
+      lede: 'read() 符合 React Suspense 的约定；dehydrate 和 hydrate 让服务端请求过的数据在浏览器里直接可用。',
       document: {
         sections: [
           {
-            id: 'suspense',
-            heading: '让 read() 的三种结果进入正确边界',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['状态', 'read() 行为', '接收者'],
-                rows: [
-                  ['success', '返回 data', '组件正文'],
-                  ['idle / pending', '抛当前 Promise', 'Suspense fallback'],
-                  ['error / cancelled', '抛 error', 'Error Boundary 或 AbortError 分支']
-                ]
-              },
-              {
-                type: 'code',
-                language: 'tsx',
-                code: 'function UserProfile({ resource }: { resource: Resource<IUser> }) {\n  const user = resource.read()\n  return <strong>{user.name}</strong>\n}'
-              }
-            ]
-          },
-          {
-            id: 'snapshot',
-            heading: '只传输成功且版本匹配的缓存',
+            id: 'read',
+            heading: 'Suspense 风格读取',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Resource, type IResourceCacheSnapshot } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\n\ntype IUser = { id: string; name: string }\nconst runtime = createRuntime()\nconst fetchUser = async (): Promise<IUser> => {\n  const response = await fetch('/api/user/current')\n  return response.json() as Promise<IUser>\n}\n\n// 服务端：请求成功后只传 JSON-safe snapshot。\nconst serverResource = new Resource(fetchUser, runtime, { ttl: 30_000 })\nawait serverResource.promise\nconst snapshot = serverResource.dehydrate()\nconst payload = JSON.stringify(snapshot)\n\n// 客户端：用 snapshot 构造，fresh 时不会重复请求。\nconst initialSnapshot = JSON.parse(payload) as IResourceCacheSnapshot<IUser>\nconst clientResource = new Resource(fetchUser, runtime, {\n  initialSnapshot,\n  ttl: 30_000\n})\nconsole.log(await clientResource.promise)"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst user = new Resource(async () => {\n  await new Promise((resolve) => setTimeout(resolve, 10))\n  return 'Ada'\n}, runtime)\n\ntry {\n  user.read() // 还在加载：抛出一个 Promise（React Suspense 会捕获它并显示 fallback）\n} catch (thrown) {\n  console.log('抛出的是 Promise:', thrown instanceof Promise)\n  await thrown\n}\nconsole.log('加载完成后 read():', user.read())\nuser.dispose()"
               },
               {
-                type: 'list',
-                items: [
-                  'dehydrate() 在非 success 时返回 undefined，不序列化 pending 或 error。',
-                  'expiresAt: null 表示内部 Infinity，保持 JSON 安全。',
-                  'hydrate() 会作废当前请求并清空旧依赖，不会同时保留两代结果。',
-                  'version、updatedAt 或 expiresAt 非法时立即抛 INVALID_SNAPSHOT。'
-                ]
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '抛出的是 Promise: true\n加载完成后 read(): Ada'
+              },
+              {
+                type: 'paragraph',
+                text: 'read() 在成功时返回数据；还在加载时抛出当前请求的 Promise，React Suspense 捕获它并显示 fallback，Promise 完成后重新渲染；失败或取消时抛出错误，交给 Error Boundary。peek() 的行为相同，但不建立依赖，也不会因为过期而发起请求。'
+              }
+            ]
+          },
+          {
+            id: 'ssr',
+            heading: '服务端渲染：把数据带到浏览器',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\n// 服务端：请求数据并导出快照\nconst server = createRuntime()\nconst onServer = new Resource(async () => ({ title: 'Hello' }), server)\nawait onServer.promise\nconst json = JSON.stringify(onServer.dehydrate())\nconsole.log('嵌入页面的快照:', json)\nonServer.dispose()\n\n// 浏览器：用快照创建 Resource，不再发请求\nlet requests = 0\nconst client = createRuntime()\nconst onClient = new Resource(\n  async () => {\n    requests += 1\n    return { title: 'Hello' }\n  },\n  client,\n  { initialSnapshot: JSON.parse(json) }\n)\nconsole.log('客户端数据:', onClient.peek(), '请求次数:', requests)\nonClient.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '嵌入页面的快照: {"version":1,"data":{"title":"Hello"},"updatedAt":39.722792,"expiresAt":null}\n客户端数据: { title: \'Hello\' } 请求次数: 0'
+              },
+              {
+                type: 'paragraph',
+                text: 'dehydrate() 在状态为 success 时返回一个可以 JSON 序列化的快照 { version, data, updatedAt, expiresAt }，否则返回 undefined。把它嵌入页面，浏览器创建 Resource 时通过 initialSnapshot 传入，数据立即可用，不再发请求。已有的 Resource 也可以调用 hydrate(snapshot)。'
+              },
+              {
+                type: 'paragraph',
+                text: 'updatedAt 和 expiresAt 使用 Resource 调度器的时间，默认是当前进程内的单调时钟（例子里的 39.7 毫秒），不是日期时间。快照格式不对时抛 INVALID_SNAPSHOT。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Resource API', path: 'docs/resource/Resource' },
-        { label: '缓存策略', path: 'caching-and-refresh' },
-        { label: '错误与取消', path: 'cancellation-and-retry' }
+        {
+          label: '取消与重试',
+          path: 'cancellation-and-retry'
+        },
+        {
+          label: '缓存与刷新',
+          path: 'caching-and-refresh'
+        },
+        {
+          label: 'Resource API',
+          path: 'docs/resource/Resource'
+        }
       ]
     },
     en: {
-      title: 'Integrate Resource with Suspense and SSR snapshots',
-      lede: 'read() drives Suspense through the thrown-value protocol, while dehydrate and hydrate move a versioned JSON snapshot between server and client.',
+      title: 'Suspense and server rendering',
+      lede: 'read() follows the React Suspense convention; dehydrate and hydrate make server-fetched data available in the browser.',
       document: {
         sections: [
           {
-            id: 'suspense',
-            heading: 'Route each read() outcome to the right boundary',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['State', 'read() behavior', 'Receiver'],
-                rows: [
-                  ['success', 'Returns data', 'Component body'],
-                  ['idle / pending', 'Throws the current Promise', 'Suspense fallback'],
-                  ['error / cancelled', 'Throws error', 'Error Boundary or AbortError branch']
-                ]
-              },
-              {
-                type: 'code',
-                language: 'tsx',
-                code: 'function UserProfile({ resource }: { resource: Resource<IUser> }) {\n  const user = resource.read()\n  return <strong>{user.name}</strong>\n}'
-              }
-            ]
-          },
-          {
-            id: 'snapshot',
-            heading: 'Transfer only successful version-compatible cache data',
+            id: 'read',
+            heading: 'Suspense-style reads',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Resource, type IResourceCacheSnapshot } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\n\ntype IUser = { id: string; name: string }\nconst runtime = createRuntime()\nconst fetchUser = async (): Promise<IUser> => {\n  const response = await fetch('/api/user/current')\n  return response.json() as Promise<IUser>\n}\n\n// Server: wait for success and transfer only a JSON-safe snapshot.\nconst serverResource = new Resource(fetchUser, runtime, { ttl: 30_000 })\nawait serverResource.promise\nconst snapshot = serverResource.dehydrate()\nconst payload = JSON.stringify(snapshot)\n\n// Client: construct from the snapshot; a fresh value avoids a duplicate request.\nconst initialSnapshot = JSON.parse(payload) as IResourceCacheSnapshot<IUser>\nconst clientResource = new Resource(fetchUser, runtime, {\n  initialSnapshot,\n  ttl: 30_000\n})\nconsole.log(await clientResource.promise)"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst user = new Resource(async () => {\n  await new Promise((resolve) => setTimeout(resolve, 10))\n  return 'Ada'\n}, runtime)\n\ntry {\n  user.read() // still loading: throws a Promise (React Suspense catches it and shows the fallback)\n} catch (thrown) {\n  console.log('threw a Promise:', thrown instanceof Promise)\n  await thrown\n}\nconsole.log('read() after loading:', user.read())\nuser.dispose()"
               },
               {
-                type: 'list',
-                items: [
-                  'dehydrate() returns undefined outside success and never serializes pending or error state.',
-                  'expiresAt: null represents internal Infinity in a JSON-safe form.',
-                  'hydrate() invalidates current work and clears old dependencies instead of retaining two generations.',
-                  'Invalid version, updatedAt, or expiresAt fails immediately with INVALID_SNAPSHOT.'
-                ]
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'threw a Promise: true\nread() after loading: Ada'
+              },
+              {
+                type: 'paragraph',
+                text: 'read() returns data on success; while loading it throws the current request’s Promise, which React Suspense catches to show the fallback and re-render on completion; on failure or cancellation it throws the error for an Error Boundary. peek() behaves the same without creating a dependency or starting a request on expiry.'
+              }
+            ]
+          },
+          {
+            id: 'ssr',
+            heading: 'Server rendering: carry data to the browser',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\n// Server: fetch data and export a snapshot\nconst server = createRuntime()\nconst onServer = new Resource(async () => ({ title: 'Hello' }), server)\nawait onServer.promise\nconst json = JSON.stringify(onServer.dehydrate())\nconsole.log('snapshot embedded in the page:', json)\nonServer.dispose()\n\n// Browser: create the Resource from the snapshot without requesting\nlet requests = 0\nconst client = createRuntime()\nconst onClient = new Resource(\n  async () => {\n    requests += 1\n    return { title: 'Hello' }\n  },\n  client,\n  { initialSnapshot: JSON.parse(json) }\n)\nconsole.log('client data:', onClient.peek(), 'requests:', requests)\nonClient.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'snapshot embedded in the page: {"version":1,"data":{"title":"Hello"},"updatedAt":40.646208,"expiresAt":null}\nclient data: { title: \'Hello\' } requests: 0'
+              },
+              {
+                type: 'paragraph',
+                text: 'dehydrate() returns a JSON-safe snapshot { version, data, updatedAt, expiresAt } when the state is success, otherwise undefined. Embed it in the page and pass it as initialSnapshot when the browser creates the Resource; data is ready at once with no request. An existing Resource can call hydrate(snapshot) too.'
+              },
+              {
+                type: 'paragraph',
+                text: 'updatedAt and expiresAt use the Resource scheduler’s clock, by default a monotonic in-process clock (39.7 ms in the example), not a date. A malformed snapshot throws INVALID_SNAPSHOT.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Resource API', path: 'docs/resource/Resource' },
-        { label: 'Cache policy', path: 'caching-and-refresh' },
-        { label: 'Errors and cancellation', path: 'cancellation-and-retry' }
+        {
+          label: 'Cancellation and retry',
+          path: 'cancellation-and-retry'
+        },
+        {
+          label: 'Caching and refresh',
+          path: 'caching-and-refresh'
+        },
+        {
+          label: 'Resource API',
+          path: 'docs/resource/Resource'
+        }
       ]
     }
   },
   'resource:cancellation-and-retry': {
     zh: {
-      title: '控制 Resource 取消、重试与退避',
-      lede: 'cancel 只结束当前 generation，retry 只处理真实失败；两者都必须使用同一个 scheduler 时间域。',
+      title: '取消与重试',
+      lede: '旧请求永远不会覆盖新结果；cancel 取消当前请求；retry 让失败的请求自动重试。',
       document: {
         sections: [
           {
-            id: 'retry',
-            heading: '让重试策略受错误和次数约束',
+            id: 'race',
+            heading: '旧请求不会覆盖新结果',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Resource } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\n\ntype IReport = { id: string; total: number }\nconst runtime = createRuntime()\nconst fetchReport = async (): Promise<IReport> => {\n  const response = await fetch('/api/report')\n  return response.json() as Promise<IReport>\n}\nconst isTransientNetworkFailure = (error: unknown) => error instanceof TypeError\n\nconst resource = new Resource(fetchReport, runtime, {\n  retry: (failureCount, error) =>\n    failureCount < 4 && isTransientNetworkFailure(error),\n  retryDelay: (failureCount) => Math.min(250 * 2 ** (failureCount - 1), 5_000)\n})\n\nconst pending = resource.refetch()\nresource.cancel()\nawait pending.catch((error) => {\n  if (error instanceof DOMException && error.name === 'AbortError') return\n  throw error\n})\nresource.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst query = runtime.signal('a')\n\n// 这个接口不理会 signal：被取消后仍然会返回结果\nconst search = new Resource(\n  async () => {\n    const q = query.value\n    await new Promise((resolve) => setTimeout(resolve, q === 'a' ? 60 : 10))\n    console.log('接口返回', q)\n    return `results for ${q}`\n  },\n  runtime\n)\n\nquery.value = 'ab'\nawait new Promise((resolve) => setTimeout(resolve, 100))\nconsole.log('最终数据:', search.peek()) // 旧请求更晚返回，但没有覆盖新结果\nsearch.dispose()"
               },
               {
-                type: 'list',
-                items: [
-                  'failureCount 从 1 开始；retry 数字必须是非负整数。',
-                  'retryDelay 必须返回有限非负毫秒数；无效结果以 INVALID_OPTION 结束本次请求。',
-                  'fetcher 抛出的 Suspense thenable 在 settle 后重跑，不计入失败次数。',
-                  'cancel 后 Resource 仍可复用；dispose 才永久关闭。'
-                ]
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '接口返回 ab\n接口返回 a\n最终数据: results for ab'
+              },
+              {
+                type: 'paragraph',
+                text: '搜索 a 的请求更慢，在 ab 之后才返回，而且这个接口没有理会 signal。Resource 给每次请求一个代号（generation），只有最新一代的结果会写入状态，所以旧结果被丢弃。把 signal 交给 fetch 的作用是节省网络资源；防止旧数据覆盖新数据靠的是代号检查。'
               }
             ]
           },
           {
-            id: 'identity',
-            heading: '按原生 AbortError 与结构化 code 分类',
+            id: 'cancel',
+            heading: '取消当前请求',
             blocks: [
               {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceErrorCode } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst report = new Resource(async ({ signal }) => {\n  await new Promise((resolve, reject) => {\n    const timer = setTimeout(resolve, 1000)\n    signal.addEventListener('abort', () => {\n      clearTimeout(timer)\n      reject(signal.reason)\n    })\n  })\n  return '报表'\n}, runtime)\n\nreport.cancel() // 用户关闭了弹窗\nconst state = report.state\nif (state.status === 'cancelled') {\n  console.log(state.status, state.error.name, (state.error as { code?: string }).code === ResourceErrorCode.requestCancelled)\n}\nreport.dispose()\ntry {\n  report.state\n} catch (error) {\n  console.log((error as { code: string }).code)\n}"
+              },
+              {
                 type: 'paragraph',
-                text: '取消值保持 DOMException 与 AbortError 名称，Resource 只附加 source/code。清理失败不会撤销已完成的状态收敛，而是单独以 CANCELLATION_CLEANUP_FAILED 暴露。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'cancelled AbortError true\nRESOURCE_DISPOSED'
+              },
+              {
+                type: 'paragraph',
+                text: 'cancel() 只取消当前这一次请求：加载中被取消时，status 变为 cancelled，error 是 name 为 AbortError 的 DOMException，code 为 REQUEST_CANCELLED。Resource 之后仍可使用，下次读取或 refetch 会正常请求。如果后台刷新（staleWhileRevalidate）被取消，会继续显示原来的数据。dispose() 则是永久关闭：取消请求、断开依赖，之后任何调用都抛 RESOURCE_DISPOSED。'
+              }
+            ]
+          },
+          {
+            id: 'retry',
+            heading: '失败后自动重试',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nlet attempts = 0\nconst runtime = createRuntime()\nconst config = new Resource(\n  async () => {\n    attempts += 1\n    console.log('第', attempts, '次请求')\n    if (attempts < 3) throw new Error('网络抖动')\n    return { theme: 'dark' }\n  },\n  runtime,\n  { retry: 2, retryDelay: (failureCount) => failureCount * 20 } // 最多再试 2 次，等待 20ms、40ms\n)\n\nconsole.log('结果:', await config.promise)\nconfig.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "第 1 次请求\n第 2 次请求\n第 3 次请求\n结果: { theme: 'dark' }"
+              },
+              {
+                type: 'paragraph',
+                text: 'retry 是失败后最多再试几次；也可以写成 (failureCount, error) => boolean，按错误类型决定。retryDelay 是重试前等待的毫秒数，可以是函数，让等待逐次变长。所有重试都失败后，state 变为 error。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Resource 配置参考', path: 'docs/resource/Resource' },
-        { label: '缓存与刷新', path: 'caching-and-refresh' },
-        { label: 'Suspense 与 SSR', path: 'suspense-and-ssr' }
+        {
+          label: '排错',
+          path: 'troubleshooting'
+        },
+        {
+          label: '缓存与刷新',
+          path: 'caching-and-refresh'
+        },
+        {
+          label: 'Resource API',
+          path: 'docs/resource/Resource'
+        }
       ]
     },
     en: {
-      title: 'Control Resource cancellation, retries, and backoff',
-      lede: 'cancel ends only the current generation, while retry handles only real failures. Both remain in one scheduler time domain.',
+      title: 'Cancellation and retry',
+      lede: 'Stale requests never overwrite new results; cancel stops the current request; retry repeats failed requests automatically.',
       document: {
         sections: [
           {
-            id: 'retry',
-            heading: 'Bound retry by both error and attempt count',
+            id: 'race',
+            heading: 'Stale requests never win',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Resource } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\n\ntype IReport = { id: string; total: number }\nconst runtime = createRuntime()\nconst fetchReport = async (): Promise<IReport> => {\n  const response = await fetch('/api/report')\n  return response.json() as Promise<IReport>\n}\nconst isTransientNetworkFailure = (error: unknown) => error instanceof TypeError\n\nconst resource = new Resource(fetchReport, runtime, {\n  retry: (failureCount, error) =>\n    failureCount < 4 && isTransientNetworkFailure(error),\n  retryDelay: (failureCount) => Math.min(250 * 2 ** (failureCount - 1), 5_000)\n})\n\nconst pending = resource.refetch()\nresource.cancel()\nawait pending.catch((error) => {\n  if (error instanceof DOMException && error.name === 'AbortError') return\n  throw error\n})\nresource.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst query = runtime.signal('a')\n\n// This endpoint ignores signal and still answers after cancellation\nconst search = new Resource(\n  async () => {\n    const q = query.value\n    await new Promise((resolve) => setTimeout(resolve, q === 'a' ? 60 : 10))\n    console.log('endpoint answered', q)\n    return `results for ${q}`\n  },\n  runtime\n)\n\nquery.value = 'ab'\nawait new Promise((resolve) => setTimeout(resolve, 100))\nconsole.log('final data:', search.peek()) // the old request answered later but did not overwrite the new result\nsearch.dispose()"
               },
               {
-                type: 'list',
-                items: [
-                  'failureCount starts at 1, and a numeric retry policy must be a non-negative integer.',
-                  'retryDelay returns finite non-negative milliseconds; an invalid result ends the request with INVALID_OPTION.',
-                  'A Suspense thenable thrown by the fetcher reruns after settlement without consuming a failure attempt.',
-                  'Resource remains reusable after cancel; only dispose closes it permanently.'
-                ]
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'endpoint answered ab\nendpoint answered a\nfinal data: results for ab'
+              },
+              {
+                type: 'paragraph',
+                text: 'The request for a is slower, answers after ab, and ignores signal. The Resource gives every request a generation, and only the newest generation writes state, so the stale result is dropped. Passing signal to fetch saves network work; generation checks are what stop stale data from winning.'
               }
             ]
           },
           {
-            id: 'identity',
-            heading: 'Classify through native AbortError and structured code',
+            id: 'cancel',
+            heading: 'Cancel the current request',
             blocks: [
               {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceErrorCode } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst report = new Resource(async ({ signal }) => {\n  await new Promise((resolve, reject) => {\n    const timer = setTimeout(resolve, 1000)\n    signal.addEventListener('abort', () => {\n      clearTimeout(timer)\n      reject(signal.reason)\n    })\n  })\n  return 'report'\n}, runtime)\n\nreport.cancel() // the user closed the dialog\nconst state = report.state\nif (state.status === 'cancelled') {\n  console.log(state.status, state.error.name, (state.error as { code?: string }).code === ResourceErrorCode.requestCancelled)\n}\nreport.dispose()\ntry {\n  report.state\n} catch (error) {\n  console.log((error as { code: string }).code)\n}"
+              },
+              {
                 type: 'paragraph',
-                text: 'Cancellation preserves DOMException and the AbortError name while Resource attaches source/code. Cleanup failure does not reverse state convergence and surfaces separately as CANCELLATION_CLEANUP_FAILED.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'cancelled AbortError true\nRESOURCE_DISPOSED'
+              },
+              {
+                type: 'paragraph',
+                text: 'cancel() stops only the current request: cancelled while loading, status becomes cancelled with a DOMException named AbortError and code REQUEST_CANCELLED. The Resource stays usable, and the next read or refetch requests normally. A cancelled background refresh (staleWhileRevalidate) keeps showing the old data. dispose() closes for good: it cancels, drops dependencies, and makes every later call throw RESOURCE_DISPOSED.'
+              }
+            ]
+          },
+          {
+            id: 'retry',
+            heading: 'Retry after failure',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nlet attempts = 0\nconst runtime = createRuntime()\nconst config = new Resource(\n  async () => {\n    attempts += 1\n    console.log('request', attempts)\n    if (attempts < 3) throw new Error('network glitch')\n    return { theme: 'dark' }\n  },\n  runtime,\n  { retry: 2, retryDelay: (failureCount) => failureCount * 20 } // up to 2 more tries, waiting 20 ms then 40 ms\n)\n\nconsole.log('result:', await config.promise)\nconfig.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "request 1\nrequest 2\nrequest 3\nresult: { theme: 'dark' }"
+              },
+              {
+                type: 'paragraph',
+                text: 'retry is how many extra attempts follow a failure; it can be (failureCount, error) => boolean to decide by error type. retryDelay is the wait before a retry and may be a function for growing waits. When every attempt fails, state becomes error.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Resource configuration', path: 'docs/resource/Resource' },
-        { label: 'Caching and refresh', path: 'caching-and-refresh' },
-        { label: 'Suspense and SSR', path: 'suspense-and-ssr' }
+        {
+          label: 'Troubleshooting',
+          path: 'troubleshooting'
+        },
+        {
+          label: 'Caching and refresh',
+          path: 'caching-and-refresh'
+        },
+        {
+          label: 'Resource API',
+          path: 'docs/resource/Resource'
+        }
+      ]
+    }
+  },
+  'resource:troubleshooting': {
+    zh: {
+      title: '排错与常见问题',
+      lede: '按现象查找原因和解决办法。',
+      document: {
+        sections: [
+          {
+            id: 'no-refetch',
+            heading: '输入变了但没有重新请求',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '依赖只记录 fetcher 第一个 await 之前的读取。把 userId.value 之类的读取放到第一个 await 之前，存进局部变量再使用。另外确认 Signal 和 Resource 使用同一个 runtime。'
+              }
+            ]
+          },
+          {
+            id: 'no-update',
+            heading: '请求完成了，界面没有更新',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '只执行一次的 switch (resource.state) 不会随状态变化重新运行。把读取 state 的代码放进 Effect（或框架适配层的订阅回调）里；测试里可以在 await resource.promise 之后调用 runtime.flush()。'
+              }
+            ]
+          },
+          {
+            id: 'types',
+            heading: 'fetch(url, { signal }) 报类型错误',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'fetcher 收到的 signal 在运行时是 AbortSignal，但声明为更窄的接口类型。写成 fetch(url, { signal: signal as AbortSignal })。'
+              }
+            ]
+          },
+          {
+            id: 'network',
+            heading: '取消之后网络请求仍在继续',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'fetcher 没有把 signal 交给底层 API。Resource 会忽略旧结果，但不能停止你没有传 signal 的请求。'
+              }
+            ]
+          },
+          {
+            id: 'codes',
+            heading: '错误代码',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['error.code', '什么时候出现'],
+                rows: [
+                  ['RESOURCE_DISPOSED', 'dispose 之后调用了 Resource 的方法'],
+                  ['REQUEST_CANCELLED', 'cancel() 取消了加载中的请求（state.error）'],
+                  ['REQUEST_ABORTED', '请求的 signal 被中止'],
+                  ['INVALID_SNAPSHOT', 'hydrate 或 initialSnapshot 收到格式不对的快照'],
+                  ['INVALID_OPTION', 'ttl、retry、retryDelay 等选项不合法']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: "取消类错误是原生 DOMException（name 为 AbortError），通常按 error.name === 'AbortError' 静默处理。其他错误请用 ResourceErrorCode 常量比较。"
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: '快速开始',
+          path: 'getting-started'
+        },
+        {
+          label: '取消与重试',
+          path: 'cancellation-and-retry'
+        },
+        {
+          label: 'ResourceErrorCode',
+          path: 'docs/resource/ResourceErrorCode'
+        }
+      ]
+    },
+    en: {
+      title: 'Troubleshooting and FAQ',
+      lede: 'Find the cause and the fix by symptom.',
+      document: {
+        sections: [
+          {
+            id: 'no-refetch',
+            heading: 'The input changed but nothing refetched',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Dependencies are recorded only before fetcher’s first await. Read values such as userId.value before the first await into locals. Also make sure the Signal and the Resource share one runtime.'
+              }
+            ]
+          },
+          {
+            id: 'no-update',
+            heading: 'The request finished but the view did not update',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A switch (resource.state) that runs once never reruns. Read state inside an Effect or a framework binding’s subscription; in tests call runtime.flush() after await resource.promise.'
+              }
+            ]
+          },
+          {
+            id: 'types',
+            heading: 'fetch(url, { signal }) reports a type error',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'The signal is an AbortSignal at runtime but declared as a narrower interface. Write fetch(url, { signal: signal as AbortSignal }).'
+              }
+            ]
+          },
+          {
+            id: 'network',
+            heading: 'Network requests continue after cancellation',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'fetcher did not pass signal to the underlying API. The Resource ignores the stale result but cannot stop a request that never received signal.'
+              }
+            ]
+          },
+          {
+            id: 'codes',
+            heading: 'Error codes',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['error.code', 'When it appears'],
+                rows: [
+                  ['RESOURCE_DISPOSED', 'A Resource method was called after dispose'],
+                  ['REQUEST_CANCELLED', 'cancel() stopped a loading request (state.error)'],
+                  ['REQUEST_ABORTED', 'The request signal was aborted'],
+                  ['INVALID_SNAPSHOT', 'hydrate or initialSnapshot received a malformed snapshot'],
+                  ['INVALID_OPTION', 'Invalid ttl, retry, retryDelay, or similar options']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: "Cancellation errors are native DOMExceptions named AbortError and are usually ignored via error.name === 'AbortError'. Compare other errors against ResourceErrorCode constants."
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Quick start',
+          path: 'getting-started'
+        },
+        {
+          label: 'Cancellation and retry',
+          path: 'cancellation-and-retry'
+        },
+        {
+          label: 'ResourceErrorCode',
+          path: 'docs/resource/ResourceErrorCode'
+        }
       ]
     }
   },
   'reactive:index': {
     zh: {
-      title: 'Reactive 学习路径',
-      lede: '先建立一个能运行的响应式图，再按隔离、派生与副作用需求进入对应主题。',
+      title: 'Reactive：值变了，依赖它的计算和副作用自动更新',
+      lede: 'Signal 保存一个可变的值，Computed 从其他值算出新值，Effect 在值变化时执行副作用；依赖关系在读取时自动记录。',
       document: {
         sections: [
           {
-            id: 'mental-model',
-            heading: '先理解三个角色',
+            id: 'what',
+            heading: '它解决什么问题',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Signal 保存可写事实，Computed 从事实推导只读结果，Effect 只负责把结果同步到外部世界。三者必须属于同一个 Runtime 才能组成依赖图。'
+                text: '电子表格里，单元格 C1 写着公式 =A1*B1。改了 A1，C1 自动更新，你不需要告诉表格“C1 依赖 A1”。@migaia/reactive 把这种能力带到 JavaScript：Signal 是输入单元格，Computed 是带公式的单元格，Effect 是“某个单元格变了就做点什么”，例如更新界面或发送请求。'
+              },
+              {
+                type: 'paragraph',
+                text: '没有它，你通常要手写“值变了 → 通知谁”：维护监听列表、在每次修改后手动调用更新函数、担心漏通知或重复通知。用 reactive，你只描述“这个值怎么算”“这件事依赖什么”，什么时候重算、什么时候重跑由引擎决定。'
               },
               {
                 type: 'list',
                 items: [
-                  '需要被直接赋值的状态使用 Signal。',
-                  '能够从现有状态计算得到的值使用 Computed。',
-                  'DOM、网络连接、日志与订阅清理使用 Effect。',
-                  'SSR、测试、Worker 或多个应用根使用各自的 Runtime。'
+                  '依赖自动记录：Computed 和 Effect 运行时读到了哪些 Signal，就依赖哪些。',
+                  'Computed 是惰性的：没人读取就不计算，读取时依赖没变就直接用缓存。',
+                  '多个值同时变化时，Effect 只运行一次，不会看到“一半新一半旧”的中间状态。',
+                  '每个 Runtime 是一张独立的依赖图，服务端渲染的每个请求、每个测试用例都可以有自己的一份，互不影响。'
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: 'reactive 是引擎层，不认识 React 或 DOM，也不提供集合、异步请求状态这类上层能力。只需要组件内部的局部状态时，用框架自带的状态就够了；需要开箱即用的 Store、持久化或 React 绑定，请用建立在它之上的 store-light、store-react 等包。'
               }
             ]
           },
           {
-            id: 'choose-path',
-            heading: '按结果选择下一页',
+            id: 'api',
+            heading: 'API 一览',
             blocks: [
               {
                 type: 'table',
-                headers: ['目标', '阅读路径', '完成标志'],
+                headers: ['API', '作用'],
                 rows: [
-                  ['第一次建立响应式状态', 'Getting Started', '状态变化只触发必要的派生与副作用'],
+                  ['createRuntime(options?)', '创建一张独立的依赖图。所有节点都要属于某个 Runtime'],
+                  ['new Signal(value, runtime)', '可写的值。.value 读写，.peek() 读取但不建立依赖'],
+                  ['new Computed(fn, runtime, config?)', '从其他值派生的只读值，惰性计算并缓存'],
                   [
-                    '设计 Signal、Computed、Effect',
-                    'Core Reactivity',
-                    '事实、派生和副作用职责分离'
+                    'new Effect(fn, runtime)',
+                    '副作用。创建时立即运行一次，依赖变化后重新运行；fn 可以返回清理函数'
                   ],
-                  ['隔离 SSR、测试或 Worker', 'Runtime Isolation', '每个所有权域拥有独立 Runtime']
+                  ['runtime.batch(fn)', '把多次写入合并成一次更新'],
+                  ['runtime.flush()', '立即执行待处理的 Effect（默认在下一个微任务自动执行）'],
+                  ['runtime.untracked(fn) / signal.peek()', '读取但不建立依赖'],
+                  ['node.dispose()', '释放节点，断开依赖；之后读取会抛 NODE_DISPOSED']
                 ]
               }
             ]
@@ -23583,57 +24674,85 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: '五分钟上手', path: 'getting-started' },
-        { label: '核心响应式模型', path: 'reactive' },
-        { label: 'Runtime 隔离', path: 'runtime' }
+        {
+          label: '快速开始',
+          path: 'getting-started'
+        },
+        {
+          label: 'Signal、Computed、Effect',
+          path: 'reactive'
+        },
+        {
+          label: 'Runtime 与调度',
+          path: 'runtime'
+        }
       ]
     },
     en: {
-      title: 'Reactive learning paths',
-      lede: 'Build one working reactive graph, then continue by isolation, derivation, or side-effect needs.',
+      title: 'Reactive: when a value changes, dependent computations and effects update',
+      lede: 'A Signal holds a mutable value, a Computed derives one from others, and an Effect runs side effects when values change; dependencies are recorded automatically as values are read.',
       document: {
         sections: [
           {
-            id: 'mental-model',
-            heading: 'Start with three roles',
+            id: 'what',
+            heading: 'What problem it solves',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Signal stores writable facts, Computed derives read-only results, and Effect synchronizes those results with the outside world. They compose only when owned by the same Runtime.'
+                text: 'In a spreadsheet, cell C1 holds the formula =A1*B1. Change A1 and C1 updates; you never told the sheet that C1 depends on A1. @migaia/reactive brings that to JavaScript: a Signal is an input cell, a Computed is a formula cell, and an Effect does something when cells change, such as updating a view or sending a request.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Without it you hand-write change notification: keep listener lists, call update functions after every change, and worry about missed or duplicate updates. With reactive you describe how a value is computed and what an effect reads; the engine decides when to recompute and rerun.'
               },
               {
                 type: 'list',
                 items: [
-                  'Use Signal for state that callers assign directly.',
-                  'Use Computed for values fully derived from existing state.',
-                  'Use Effect for DOM, connections, logging, and subscription cleanup.',
-                  'Give SSR requests, tests, Workers, or separate app roots their own Runtime.'
+                  'Dependencies are recorded automatically: whatever a Computed or Effect reads while running is what it depends on.',
+                  'A Computed is lazy: it computes only when read and reuses its cache when dependencies have not changed.',
+                  'When several values change together an Effect runs once and never sees a half-updated state.',
+                  'Each Runtime is an independent graph, so every SSR request or test can have its own without interference.'
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: 'reactive is the engine layer: it knows nothing about React or the DOM and offers no collections or async request state. For component-local state, your framework’s own state is enough; for ready-made stores, persistence, or React bindings, use store-light, store-react, and the other packages built on it.'
               }
             ]
           },
           {
-            id: 'choose-path',
-            heading: 'Choose the next page by outcome',
+            id: 'api',
+            heading: 'API at a glance',
             blocks: [
               {
                 type: 'table',
-                headers: ['Outcome', 'Path', 'Done when'],
+                headers: ['API', 'Purpose'],
                 rows: [
                   [
-                    'Build reactive state for the first time',
-                    'Getting Started',
-                    'Changes run only necessary derivations and effects'
+                    'createRuntime(options?)',
+                    'Creates an independent graph; every node belongs to one Runtime'
                   ],
                   [
-                    'Design Signal, Computed, and Effect roles',
-                    'Core Reactivity',
-                    'Facts, derivations, and side effects stay separate'
+                    'new Signal(value, runtime)',
+                    'A writable value. .value reads and writes; .peek() reads without a dependency'
                   ],
                   [
-                    'Isolate SSR, tests, or Workers',
-                    'Runtime Isolation',
-                    'Each ownership domain has a dedicated Runtime'
+                    'new Computed(fn, runtime, config?)',
+                    'A read-only derived value, computed lazily and cached'
+                  ],
+                  [
+                    'new Effect(fn, runtime)',
+                    'A side effect. Runs once on creation and again after dependencies change; fn may return a cleanup'
+                  ],
+                  ['runtime.batch(fn)', 'Merges several writes into one update'],
+                  [
+                    'runtime.flush()',
+                    'Runs pending Effects now (they run automatically in the next microtask by default)'
+                  ],
+                  ['runtime.untracked(fn) / signal.peek()', 'Reads without creating a dependency'],
+                  [
+                    'node.dispose()',
+                    'Releases a node and its dependencies; later reads throw NODE_DISPOSED'
                   ]
                 ]
               }
@@ -23642,309 +24761,963 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: 'Five-minute start', path: 'getting-started' },
-        { label: 'Core reactivity', path: 'reactive' },
-        { label: 'Runtime isolation', path: 'runtime' }
+        {
+          label: 'Quick start',
+          path: 'getting-started'
+        },
+        {
+          label: 'Signal, Computed, Effect',
+          path: 'reactive'
+        },
+        {
+          label: 'Runtime and scheduling',
+          path: 'runtime'
+        }
       ]
     }
   },
   'reactive:getting-started': {
     zh: {
-      title: '五分钟建立响应式状态',
-      lede: '用一个隔离 Runtime 完成可写状态、派生值、副作用和清理的最小闭环。',
+      title: '快速开始：第一张依赖图',
+      lede: '安装包，用两个 Signal、一个 Computed 和一个 Effect 计算并打印总价，并理解每个构造参数。',
       document: {
         sections: [
           {
             id: 'install',
-            heading: '安装与导入',
+            heading: '安装',
             blocks: [
-              { type: 'code', language: 'bash', code: 'pnpm add @migaia/reactive' },
+              {
+                type: 'code',
+                language: 'bash',
+                code: 'pnpm add @migaia/reactive'
+              },
               {
                 type: 'paragraph',
-                text: '应用代码优先从主入口导入 createRuntime。低层实现入口和具体 class 文件不属于首次接入路径。'
+                text: 'migaia 的包发布在 GitHub Packages，不在公共 npm。第一次安装前，在项目根目录的 .npmrc 中加入 @migaia:registry=https://npm.pkg.github.com，并用带 read:packages 权限的 GitHub 令牌登录，否则会报 404。'
               }
             ]
           },
           {
-            id: 'first-graph',
-            heading: '建立第一张图',
+            id: 'first',
+            heading: '第一个例子',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst price = runtime.signal(12)\nconst quantity = runtime.signal(2)\nconst total = runtime.computed(() => price.value * quantity.value)\n\nconst stop = runtime.effect(() => {\n  console.log(`total: ${total.value}`)\n})\n\nquantity.value = 3\nruntime.flush()\nstop()"
+                code: "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\n\nconst price = new Signal(10, runtime)\nconst quantity = new Signal(2, runtime)\nconst total = new Computed(() => price.value * quantity.value, runtime)\n\nconst effect = new Effect(() => {\n  console.log('总价:', total.value)\n}, runtime)\n\nquantity.value = 3\nruntime.flush() // 立即执行待处理的 Effect（不调用时会在下一个微任务自动执行）\n\neffect.dispose()\ntotal.dispose()\nquantity.dispose()\nprice.dispose()"
               },
               {
-                type: 'list',
-                items: [
-                  'effect 创建时立即执行一次，因此先输出 total: 24。',
-                  'quantity 更新后，total 被标脏；runtime.flush() 同步排空 Effect 队列，重新计算后输出 total: 36。',
-                  'stop() 是 disposer；所有权结束时调用它，避免继续订阅。'
-                ]
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '总价: 20\n// quantity 改为 3，flush 之后\n总价: 30'
+              },
+              {
+                type: 'paragraph',
+                text: 'createRuntime() 创建一张依赖图。new Signal(10, runtime) 创建一个初始值为 10 的可写值；new Computed(fn, runtime) 创建一个派生值，fn 里读到了 price 和 quantity，于是它依赖这两个 Signal。'
+              },
+              {
+                type: 'paragraph',
+                text: 'new Effect(fn, runtime) 创建时立即运行一次，打印 20，同时记录它读到了 total。给 quantity 赋值后，total 被标记为过期，Effect 进入待执行队列。runtime.flush() 立即执行队列：Effect 重新运行，读取 total 时它按需重新计算为 30。'
+              },
+              {
+                type: 'paragraph',
+                text: '所有构造函数的参数顺序都是“先业务参数，后 runtime”：new Signal(value, runtime, options?)、new Computed(fn, runtime, config?)、new Effect(fn, runtime, options?)。options 里可以传 debugName，出错时用它标识节点。'
               }
             ]
           },
           {
-            id: 'next-decision',
-            heading: '接下来判断什么',
+            id: 'auto',
+            heading: '不调用 flush 时',
             blocks: [
               {
                 type: 'paragraph',
-                text: '如果代码运行在 SSR、测试或 Worker 中，先阅读 Runtime 隔离；如果需要自定义 equals、keepAlive 或 cleanup，进入核心响应式模型。精确签名和配置字段留在 Docs API Reference。'
+                text: '实际代码里通常不需要手动 flush：赋值后，待处理的 Effect 会在下一个微任务自动运行，并且同一轮里的多次赋值只触发一次运行。flush() 适合测试和服务端渲染这类需要确定“此刻已经更新完”的场景。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst name = new Signal('Ada', runtime)\nconst effect = new Effect(() => console.log('你好,', name.value), runtime)\n\nname.value = 'Grace'\nname.value = 'Linus'\nconsole.log('赋值语句执行完了')\nawait Promise.resolve() // 等一个微任务：Effect 只重新运行一次，读到最后的值\n\neffect.dispose()\nname.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '你好, Ada\n赋值语句执行完了\n你好, Linus'
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: '释放',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '不再需要的节点要调用 dispose()：它断开依赖关系，Effect 还会执行最后一次清理。释放之后再读取会抛 NODE_DISPOSED，而不是悄悄返回一个永远不会更新的旧值。建议按“使用者先、数据源后”的顺序释放：先 Effect，再 Computed，最后 Signal。需要一次性释放一组节点时，把它们交给 @migaia/lifecycle 的 Scope 统一管理。'
+              },
+              {
+                type: 'paragraph',
+                text: '也可以用 Runtime 上的快捷方法创建节点，不必每次传 runtime：'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst count = runtime.signal(1)\nconst doubled = runtime.computed(() => count.value * 2)\nconst stop = runtime.effect(() => console.log('doubled =', doubled.value)) // 返回的是停止函数\n\ncount.value = 2\nruntime.flush()\nstop()\ndoubled.dispose()\ncount.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'doubled = 2\ndoubled = 4'
+              },
+              {
+                type: 'paragraph',
+                text: '注意 runtime.effect() 返回的是停止函数，而不是 Effect 对象。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: '核心响应式模型', path: 'reactive' },
-        { label: 'Runtime 隔离', path: 'runtime' }
+        {
+          label: 'Signal、Computed、Effect',
+          path: 'reactive'
+        },
+        {
+          label: 'Runtime 与调度',
+          path: 'runtime'
+        },
+        {
+          label: 'Signal API',
+          path: 'docs/reactive/reactive/Signal'
+        }
       ]
     },
     en: {
-      title: 'Build reactive state in five minutes',
-      lede: 'Complete the smallest writable-state, derivation, effect, and cleanup loop inside one isolated Runtime.',
+      title: 'Quick start: your first dependency graph',
+      lede: 'Install the package, compute and print a total with two Signals, a Computed, and an Effect, and learn each constructor argument.',
       document: {
         sections: [
           {
             id: 'install',
-            heading: 'Install and import',
+            heading: 'Install',
             blocks: [
-              { type: 'code', language: 'bash', code: 'pnpm add @migaia/reactive' },
+              {
+                type: 'code',
+                language: 'bash',
+                code: 'pnpm add @migaia/reactive'
+              },
               {
                 type: 'paragraph',
-                text: 'Application code should start with createRuntime from the main entry. Low-level implementation entry points and concrete class files are outside the first-use path.'
+                text: 'migaia packages are published to GitHub Packages, not the public npm registry. Before the first install, add @migaia:registry=https://npm.pkg.github.com to the .npmrc in your project root and authenticate with a GitHub token that has read:packages; otherwise the install fails with 404.'
               }
             ]
           },
           {
-            id: 'first-graph',
-            heading: 'Build the first graph',
+            id: 'first',
+            heading: 'First example',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst price = runtime.signal(12)\nconst quantity = runtime.signal(2)\nconst total = runtime.computed(() => price.value * quantity.value)\n\nconst stop = runtime.effect(() => {\n  console.log(`total: ${total.value}`)\n})\n\nquantity.value = 3\nruntime.flush()\nstop()"
+                code: "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\n\nconst price = new Signal(10, runtime)\nconst quantity = new Signal(2, runtime)\nconst total = new Computed(() => price.value * quantity.value, runtime)\n\nconst effect = new Effect(() => {\n  console.log('total:', total.value)\n}, runtime)\n\nquantity.value = 3\nruntime.flush() // run pending Effects now (otherwise they run in the next microtask)\n\neffect.dispose()\ntotal.dispose()\nquantity.dispose()\nprice.dispose()"
               },
               {
-                type: 'list',
-                items: [
-                  'The effect runs immediately, so the first output is total: 24.',
-                  'Updating quantity dirties total. runtime.flush() drains the Effect queue synchronously, recomputes it, and outputs total: 36.',
-                  'stop() is the disposer. Call it when ownership ends so the subscription cannot continue.'
-                ]
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'total: 20\n// after quantity becomes 3 and flush\ntotal: 30'
+              },
+              {
+                type: 'paragraph',
+                text: 'createRuntime() creates a graph. new Signal(10, runtime) creates a writable value starting at 10; new Computed(fn, runtime) creates a derived value whose fn reads price and quantity, so it depends on both Signals.'
+              },
+              {
+                type: 'paragraph',
+                text: 'new Effect(fn, runtime) runs immediately, printing 20 and recording that it read total. Assigning quantity marks total stale and queues the Effect. runtime.flush() runs the queue: the Effect reruns and reading total recomputes it to 30.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Every constructor takes business arguments first, then runtime: new Signal(value, runtime, options?), new Computed(fn, runtime, config?), new Effect(fn, runtime, options?). options may carry a debugName that identifies the node in errors.'
               }
             ]
           },
           {
-            id: 'next-decision',
-            heading: 'Make the next decision',
+            id: 'auto',
+            heading: 'Without flush',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'For SSR, tests, or Workers, continue with Runtime isolation. For custom equality, keepAlive, or cleanup, continue with core reactivity. Exact signatures and fields stay in the Docs API reference.'
+                text: 'Real code rarely needs flush: after assignments, pending Effects run automatically in the next microtask, and several assignments in one turn trigger one run. flush() suits tests and server rendering, where you need to know updates are done right now.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst name = new Signal('Ada', runtime)\nconst effect = new Effect(() => console.log('hello,', name.value), runtime)\n\nname.value = 'Grace'\nname.value = 'Linus'\nconsole.log('assignments finished')\nawait Promise.resolve() // wait one microtask: the Effect reruns once and sees the last value\n\neffect.dispose()\nname.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'hello, Ada\nassignments finished\nhello, Linus'
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: 'Disposal',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Call dispose() on nodes you no longer need: it removes dependencies, and an Effect runs its final cleanup. Reading afterwards throws NODE_DISPOSED instead of silently returning a value that never updates. Release consumers before sources: Effects, then Computeds, then Signals. To release a group at once, hand them to a Scope from @migaia/lifecycle.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Runtime shortcuts create nodes without passing runtime each time:'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst count = runtime.signal(1)\nconst doubled = runtime.computed(() => count.value * 2)\nconst stop = runtime.effect(() => console.log('doubled =', doubled.value)) // returns a stop function\n\ncount.value = 2\nruntime.flush()\nstop()\ndoubled.dispose()\ncount.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'doubled = 2\ndoubled = 4'
+              },
+              {
+                type: 'paragraph',
+                text: 'Note that runtime.effect() returns a stop function, not an Effect object.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Core reactivity', path: 'reactive' },
-        { label: 'Runtime isolation', path: 'runtime' }
+        {
+          label: 'Signal, Computed, Effect',
+          path: 'reactive'
+        },
+        {
+          label: 'Runtime and scheduling',
+          path: 'runtime'
+        },
+        {
+          label: 'Signal API',
+          path: 'docs/reactive/reactive/Signal'
+        }
       ]
     }
   },
   'reactive:reactive': {
     zh: {
-      title: '组合 Signal、Computed 与 Effect',
-      lede: '用职责分离保持依赖图可预测：事实可写、派生只读、副作用可清理。',
+      title: 'Signal、Computed、Effect',
+      lede: '三种节点各自的行为：Computed 何时计算、何时算“没变”，Effect 何时运行、如何清理，以及怎样读取而不建立依赖。',
       document: {
         sections: [
           {
-            id: 'state-derivation-effect',
-            heading: '不要把三种职责混在一起',
+            id: 'lazy',
+            heading: 'Computed 是惰性的，并且有缓存',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst query = runtime.signal('')\nconst rows = runtime.signal<readonly IRow[]>([])\nconst visibleRows = runtime.computed(\n  () => rows.value.filter((row) => row.name.includes(query.value)),\n  { debugName: 'search.visibleRows' }\n)\n\nconst stop = runtime.effect(() => {\n  renderTable(visibleRows.value)\n  return () => clearTable()\n}, { debugName: 'search.render' })"
+                code: "import { Computed, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst count = new Signal(1, runtime)\nlet runs = 0\nconst doubled = new Computed(() => {\n  runs += 1\n  return count.value * 2\n}, runtime)\n\nconsole.log('创建后计算次数:', runs) // 没人读取，还没计算\nconsole.log(doubled.value, doubled.value) // 读两次\nconsole.log('读取后计算次数:', runs) // 只算了一次，第二次用缓存\ncount.value = 5\nconsole.log(doubled.value, '计算次数:', runs) // 依赖变了，读取时重新计算\n\ndoubled.dispose()\ncount.dispose()"
               },
               {
-                type: 'list',
-                items: [
-                  'query 与 rows 是事实来源，只有它们被直接赋值。',
-                  'visibleRows 是纯派生，不在 effect 中写回另一个 Signal。',
-                  'Effect 只拥有外部资源，并返回下一次重跑或释放前执行的 cleanup。'
-                ]
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '创建后计算次数: 0\n2 2\n读取后计算次数: 1\n10 计算次数: 2'
+              },
+              {
+                type: 'paragraph',
+                text: 'Computed 创建时不计算，第一次被读取时才计算；依赖没变时再读取直接返回缓存。没有任何 Effect 或 Computed 订阅它时，它会在空闲时自动断开依赖，下次读取再重新计算，因此不会因为忘记释放而一直占着依赖关系。如果希望没人订阅时也保持最新，创建时传 { keepAlive: true }。'
               }
             ]
           },
           {
-            id: 'reads',
-            heading: '区分 value 与 peek',
+            id: 'glitch',
+            heading: '多个依赖同时变化，只运行一次',
             blocks: [
               {
+                type: 'code',
+                language: 'ts',
+                code: "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = new Signal('Ada', runtime)\nconst upper = new Computed(() => firstName.value.toUpperCase(), runtime)\nconst length = new Computed(() => firstName.value.length, runtime)\n\n// Effect 同时依赖两个 Computed，而它们来自同一个 Signal\nconst effect = new Effect(() => console.log(`${upper.value} (${length.value} 个字母)`), runtime)\n\nfirstName.value = 'Grace'\nruntime.flush() // Effect 只运行一次，不会先看到新的 upper 和旧的 length\n\neffect.dispose()\nupper.dispose()\nlength.dispose()\nfirstName.dispose()"
+              },
+              {
                 type: 'paragraph',
-                text: '在 Computed 或 Effect 中读取 value 会建立依赖；peek() 会得到当前值但不建立依赖。只有当这次读取不应决定未来重跑时才使用 peek()。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'ADA (3 个字母)\nGRACE (5 个字母)'
+              },
+              {
+                type: 'paragraph',
+                text: 'upper 和 length 都依赖 firstName，Effect 又同时依赖它们。修改 firstName 后，Effect 只运行一次，并且一定同时看到两个新值。手写通知时很容易出现“先收到 upper 的更新、length 还是旧的”这种中间状态。'
               }
             ]
           },
           {
-            id: 'dispose',
-            heading: '让所有权决定释放时机',
+            id: 'equals',
+            heading: '自定义“没变”的判断',
             blocks: [
               {
+                type: 'code',
+                language: 'ts',
+                code: "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst user = new Signal({ id: 1, name: 'Ada', lastSeen: 100 }, runtime)\n// 只关心 id 和 name；lastSeen 变化时认为结果“没变”\nconst profile = new Computed(\n  () => ({ id: user.value.id, name: user.value.name }),\n  runtime,\n  (previous, next) => previous.id === next.id && previous.name === next.name\n)\nconst effect = new Effect(() => console.log('渲染资料:', profile.value.name), runtime)\n\nuser.value = { ...user.value, lastSeen: 200 }\nruntime.flush() // profile 判定为相等，Effect 不重新运行\nuser.value = { ...user.value, name: 'Grace' }\nruntime.flush()\n\neffect.dispose()\nprofile.dispose()\nuser.dispose()"
+              },
+              {
                 type: 'paragraph',
-                text: 'Effect disposer、Computed.dispose() 与 Signal.dispose() 都是终态操作。组件卸载、请求结束或领域对象销毁时释放；不要在释放后继续读取旧节点。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '渲染资料: Ada\n// lastSeen 变化：没有输出\n渲染资料: Grace'
+              },
+              {
+                type: 'paragraph',
+                text: 'Computed 默认用 Object.is 比较新旧值，相同就不通知下游。返回对象时每次都是新对象，所以可以传第三个参数自定义比较：这里只要 id 和 name 不变，就认为结果没变，Effect 不重新运行。第三个参数也可以是对象 { equals, keepAlive, debugName }。Signal 赋值同理：赋一个 Object.is 相等的值不会触发任何更新。'
+              }
+            ]
+          },
+          {
+            id: 'cleanup',
+            heading: 'Effect 的清理函数',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst room = new Signal('general', runtime)\n\nconst effect = new Effect(() => {\n  const current = room.value\n  console.log('加入房间', current)\n  return () => console.log('离开房间', current) // 下次重新运行前、以及 dispose 时调用\n}, runtime)\n\nroom.value = 'random'\nruntime.flush()\neffect.dispose()\nroom.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '加入房间 general\n// room 改为 random\n离开房间 general\n加入房间 random\n// effect.dispose()\n离开房间 random'
+              },
+              {
+                type: 'paragraph',
+                text: 'Effect 的函数可以返回一个清理函数。它在 Effect 下次重新运行之前、以及 dispose() 时调用，适合取消订阅、关闭连接、清除定时器。清理函数里读取的值不会建立依赖。'
+              }
+            ]
+          },
+          {
+            id: 'peek',
+            heading: '读取但不建立依赖',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst query = new Signal('apple', runtime)\nconst pageSize = new Signal(10, runtime)\n\nconst effect = new Effect(() => {\n  // 只在 query 变化时搜索；pageSize 用 peek() 读取，不建立依赖\n  console.log(`搜索 ${query.value}，每页 ${pageSize.peek()} 条`)\n}, runtime)\n\npageSize.value = 20\nruntime.flush() // pageSize 变化不触发 Effect\nquery.value = 'banana'\nruntime.flush() // query 变化触发，读到最新的 pageSize\n\neffect.dispose()\nquery.dispose()\npageSize.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '搜索 apple，每页 10 条\n// pageSize 改为 20：没有输出\n搜索 banana，每页 20 条'
+              },
+              {
+                type: 'paragraph',
+                text: 'signal.peek() 和 computed.peek() 读取当前值但不建立依赖；runtime.untracked(fn) 让 fn 里的所有读取都不建立依赖。适合“需要这个值，但它变化时不需要重新运行”的情况。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Signal API', path: 'docs/reactive/reactive/Signal' },
-        { label: 'Computed API', path: 'docs/reactive/reactive/Computed' },
-        { label: 'Effect API', path: 'docs/reactive/reactive/Effect' }
+        {
+          label: 'Runtime 与调度',
+          path: 'runtime'
+        },
+        {
+          label: '排错',
+          path: 'troubleshooting'
+        },
+        {
+          label: 'Computed API',
+          path: 'docs/reactive/reactive/Computed'
+        }
       ]
     },
     en: {
-      title: 'Compose Signal, Computed, and Effect',
-      lede: 'Keep the graph predictable through role separation: facts are writable, derivations are read-only, and side effects are disposable.',
+      title: 'Signal, Computed, Effect',
+      lede: 'How each node behaves: when a Computed computes and counts as unchanged, when an Effect runs and cleans up, and how to read without a dependency.',
       document: {
         sections: [
           {
-            id: 'state-derivation-effect',
-            heading: 'Do not mix the three roles',
+            id: 'lazy',
+            heading: 'Computed is lazy and cached',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst query = runtime.signal('')\nconst rows = runtime.signal<readonly IRow[]>([])\nconst visibleRows = runtime.computed(\n  () => rows.value.filter((row) => row.name.includes(query.value)),\n  { debugName: 'search.visibleRows' }\n)\n\nconst stop = runtime.effect(() => {\n  renderTable(visibleRows.value)\n  return () => clearTable()\n}, { debugName: 'search.render' })"
+                code: "import { Computed, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst count = new Signal(1, runtime)\nlet runs = 0\nconst doubled = new Computed(() => {\n  runs += 1\n  return count.value * 2\n}, runtime)\n\nconsole.log('computations after creation:', runs) // nobody has read it, so nothing ran\nconsole.log(doubled.value, doubled.value) // read twice\nconsole.log('computations after reading:', runs) // computed once; the second read used the cache\ncount.value = 5\nconsole.log(doubled.value, 'computations:', runs) // the dependency changed, so reading recomputes\n\ndoubled.dispose()\ncount.dispose()"
               },
               {
-                type: 'list',
-                items: [
-                  'query and rows are facts and are the only values assigned directly.',
-                  'visibleRows is a pure derivation; the effect does not copy it into another Signal.',
-                  'Effect owns only the external resource and returns cleanup for rerun or disposal.'
-                ]
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'computations after creation: 0\n2 2\ncomputations after reading: 1\n10 computations: 2'
+              },
+              {
+                type: 'paragraph',
+                text: 'A Computed does not compute on creation, only on first read; later reads return the cache while dependencies are unchanged. With no subscribing Effect or Computed it disconnects from its dependencies when idle and recomputes on the next read, so a forgotten Computed does not hold the graph. Pass { keepAlive: true } to keep it current without subscribers.'
               }
             ]
           },
           {
-            id: 'reads',
-            heading: 'Distinguish value from peek',
+            id: 'glitch',
+            heading: 'Several dependencies change, one run',
             blocks: [
               {
+                type: 'code',
+                language: 'ts',
+                code: "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = new Signal('Ada', runtime)\nconst upper = new Computed(() => firstName.value.toUpperCase(), runtime)\nconst length = new Computed(() => firstName.value.length, runtime)\n\n// The Effect depends on two Computeds that share one Signal\nconst effect = new Effect(() => console.log(`${upper.value} (${length.value} letters)`), runtime)\n\nfirstName.value = 'Grace'\nruntime.flush() // the Effect runs once and never sees a new upper with an old length\n\neffect.dispose()\nupper.dispose()\nlength.dispose()\nfirstName.dispose()"
+              },
+              {
                 type: 'paragraph',
-                text: 'Reading value inside a Computed or Effect records a dependency. peek() returns the current value without tracking. Use peek() only when that read must not decide future reruns.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'ADA (3 letters)\nGRACE (5 letters)'
+              },
+              {
+                type: 'paragraph',
+                text: 'upper and length both depend on firstName, and the Effect depends on both. After firstName changes, the Effect runs once and always sees both new values; hand-written notification easily exposes an intermediate state with a new upper and an old length.'
               }
             ]
           },
           {
-            id: 'dispose',
-            heading: 'Let ownership decide disposal',
+            id: 'equals',
+            heading: 'Decide what counts as unchanged',
             blocks: [
               {
+                type: 'code',
+                language: 'ts',
+                code: "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst user = new Signal({ id: 1, name: 'Ada', lastSeen: 100 }, runtime)\n// Only id and name matter; a lastSeen change counts as \"unchanged\"\nconst profile = new Computed(\n  () => ({ id: user.value.id, name: user.value.name }),\n  runtime,\n  (previous, next) => previous.id === next.id && previous.name === next.name\n)\nconst effect = new Effect(() => console.log('render profile:', profile.value.name), runtime)\n\nuser.value = { ...user.value, lastSeen: 200 }\nruntime.flush() // profile is equal, so the Effect does not rerun\nuser.value = { ...user.value, name: 'Grace' }\nruntime.flush()\n\neffect.dispose()\nprofile.dispose()\nuser.dispose()"
+              },
+              {
                 type: 'paragraph',
-                text: 'An Effect disposer, Computed.dispose(), and Signal.dispose() are terminal. Dispose them when a component unmounts, a request ends, or a domain owner is destroyed; never keep reading an old node afterward.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'render profile: Ada\n// lastSeen changed: no output\nrender profile: Grace'
+              },
+              {
+                type: 'paragraph',
+                text: 'A Computed compares old and new values with Object.is and notifies only on change. Returning an object makes a new one every time, so pass a third argument to compare: here unchanged id and name mean unchanged, and the Effect does not rerun. The third argument can also be { equals, keepAlive, debugName }. Signals behave the same: assigning an Object.is-equal value triggers nothing.'
+              }
+            ]
+          },
+          {
+            id: 'cleanup',
+            heading: 'Effect cleanup',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst room = new Signal('general', runtime)\n\nconst effect = new Effect(() => {\n  const current = room.value\n  console.log('join room', current)\n  return () => console.log('leave room', current) // called before the next run and on dispose\n}, runtime)\n\nroom.value = 'random'\nruntime.flush()\neffect.dispose()\nroom.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'join room general\n// room becomes random\nleave room general\njoin room random\n// effect.dispose()\nleave room random'
+              },
+              {
+                type: 'paragraph',
+                text: 'An Effect function may return a cleanup, called before the next run and on dispose(); use it to unsubscribe, close connections, or clear timers. Values read inside the cleanup create no dependencies.'
+              }
+            ]
+          },
+          {
+            id: 'peek',
+            heading: 'Read without a dependency',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst query = new Signal('apple', runtime)\nconst pageSize = new Signal(10, runtime)\n\nconst effect = new Effect(() => {\n  // Search only when query changes; peek() reads pageSize without a dependency\n  console.log(`search ${query.value}, ${pageSize.peek()} per page`)\n}, runtime)\n\npageSize.value = 20\nruntime.flush() // a pageSize change does not trigger the Effect\nquery.value = 'banana'\nruntime.flush() // a query change triggers it and reads the latest pageSize\n\neffect.dispose()\nquery.dispose()\npageSize.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'search apple, 10 per page\n// pageSize becomes 20: no output\nsearch banana, 20 per page'
+              },
+              {
+                type: 'paragraph',
+                text: 'signal.peek() and computed.peek() read the current value without a dependency; runtime.untracked(fn) makes every read inside fn untracked. Use them when you need a value but its changes should not trigger a rerun.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Signal API', path: 'docs/reactive/reactive/Signal' },
-        { label: 'Computed API', path: 'docs/reactive/reactive/Computed' },
-        { label: 'Effect API', path: 'docs/reactive/reactive/Effect' }
+        {
+          label: 'Runtime and scheduling',
+          path: 'runtime'
+        },
+        {
+          label: 'Troubleshooting',
+          path: 'troubleshooting'
+        },
+        {
+          label: 'Computed API',
+          path: 'docs/reactive/reactive/Computed'
+        }
       ]
     }
   },
   'reactive:runtime': {
     zh: {
-      title: '隔离 Runtime 与宿主能力',
-      lede: '把依赖图、调度、错误和 trace 放进明确的所有权域，避免 SSR、测试与多应用根串线。',
+      title: 'Runtime 与调度',
+      lede: 'Runtime 是一张独立的依赖图：用 batch 合并写入，用 flush 控制执行时机，用选项接收错误和诊断事件。',
       document: {
         sections: [
           {
-            id: 'ownership',
-            heading: '每个隔离域创建一个 Runtime',
+            id: 'batch',
+            heading: '合并多次写入',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\n\nexport function createRequestState(requestId: string) {\n  const runtime = createRuntime({\n    onError: (error, context) => reportRequestError(requestId, error, context)\n  })\n  const user = runtime.signal<IUser | null>(null, { debugName: 'request.user' })\n  return { runtime, user }\n}"
+                code: "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst first = new Signal('Ada', runtime)\nconst last = new Signal('Lovelace', runtime)\nconst full = new Computed(() => `${first.value} ${last.value}`, runtime)\nconst effect = new Effect(() => console.log('全名:', full.value), runtime)\n\nruntime.batch(() => {\n  first.value = 'Grace'\n  last.value = 'Hopper'\n}) // batch 结束时统一执行一次，不会出现 \"Grace Lovelace\"\n\neffect.dispose()\nfull.dispose()\nfirst.dispose()\nlast.dispose()"
               },
               {
                 type: 'paragraph',
-                text: '不要在 SSR 请求或互相隔离的测试中使用 defaultRuntime。不同 Runtime 的节点不能互相建立依赖，这是隔离保证而不是限制。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '全名: Ada Lovelace\n全名: Grace Hopper'
+              },
+              {
+                type: 'paragraph',
+                text: 'runtime.batch(fn) 里的所有写入在 fn 结束时统一触发一次更新，所以 Effect 不会看到 first 已改、last 还没改的“Grace Lovelace”。batch 可以嵌套，只有最外层结束时才执行。batch 返回 fn 的返回值。'
               }
             ]
           },
           {
-            id: 'host-options',
-            heading: '只在宿主边界配置能力',
+            id: 'options',
+            heading: 'createRuntime 的选项',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  'adapter：替换微任务、单调时钟、事件时间戳或默认错误出口。',
-                  'onError：集中接收被隔离的异步与诊断失败。',
-                  'onTrace：仅在诊断需要时启用，避免常态 trace 成本。',
-                  'maxFlushPasses：循环保护，默认 100；不要靠提高它掩盖自触发环。',
-                  'scheduleIdle：控制未观察 Computed 的回收时机，不控制 effect flush。'
+                type: 'table',
+                headers: ['选项', '默认值', '作用'],
+                rows: [
+                  [
+                    'onError(error, context)',
+                    '无',
+                    '接收 Effect 运行出错等错误；context.phase 说明出错的阶段'
+                  ],
+                  [
+                    'onTrace(event)',
+                    '无',
+                    '接收诊断事件（节点创建、依赖连接、Effect 运行），用于开发者工具'
+                  ],
+                  [
+                    'maxFlushPasses',
+                    '100',
+                    '一次 flush 最多重算多少轮，超过视为无限循环并抛 FLUSH_LOOP'
+                  ],
+                  [
+                    'adapter',
+                    '原生实现',
+                    '替换 scheduleMicrotask、now、timestamp、reportError，用于测试或特殊运行环境'
+                  ],
+                  ['scheduleIdle', '微任务', '没人订阅的 Computed 在何时断开依赖']
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: 'runtime.setSchedulerStrategy(strategy) 可以把自动执行的时机从“下一个微任务”换成 requestAnimationFrame 等，strategy 收到一个 flush 函数，决定何时调用它。'
+              }
+            ]
+          },
+          {
+            id: 'isolation',
+            heading: '每个场景使用自己的 Runtime',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '节点只能依赖同一个 Runtime 的节点，跨 Runtime 读取会抛 CROSS_RUNTIME。包里提供一个进程级共享的 defaultRuntime，写小脚本时可以直接用；但服务端渲染（每个请求一个 Runtime）、单元测试（每个用例一个）和 Worker 中应该用 createRuntime() 创建自己的，否则不同请求或用例的状态会互相影响。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'createRuntime 配置参考', path: 'docs/reactive/runtime/createRuntime' },
-        { label: 'Runtime API', path: 'docs/reactive/runtime/Runtime' }
+        {
+          label: '排错',
+          path: 'troubleshooting'
+        },
+        {
+          label: 'Signal、Computed、Effect',
+          path: 'reactive'
+        },
+        {
+          label: 'createRuntime API',
+          path: 'docs/reactive/runtime/createRuntime'
+        }
       ]
     },
     en: {
-      title: 'Isolate Runtime and host capabilities',
-      lede: 'Put graph state, scheduling, errors, and tracing inside an explicit ownership domain so SSR, tests, and app roots cannot leak into each other.',
+      title: 'Runtime and scheduling',
+      lede: 'A Runtime is an independent graph: merge writes with batch, control timing with flush, and receive errors and diagnostics through options.',
       document: {
         sections: [
           {
-            id: 'ownership',
-            heading: 'Create one Runtime per isolation domain',
+            id: 'batch',
+            heading: 'Merge several writes',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\n\nexport function createRequestState(requestId: string) {\n  const runtime = createRuntime({\n    onError: (error, context) => reportRequestError(requestId, error, context)\n  })\n  const user = runtime.signal<IUser | null>(null, { debugName: 'request.user' })\n  return { runtime, user }\n}"
+                code: "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst first = new Signal('Ada', runtime)\nconst last = new Signal('Lovelace', runtime)\nconst full = new Computed(() => `${first.value} ${last.value}`, runtime)\nconst effect = new Effect(() => console.log('full name:', full.value), runtime)\n\nruntime.batch(() => {\n  first.value = 'Grace'\n  last.value = 'Hopper'\n}) // runs once when batch ends; \"Grace Lovelace\" never appears\n\neffect.dispose()\nfull.dispose()\nfirst.dispose()\nlast.dispose()"
               },
               {
                 type: 'paragraph',
-                text: 'Do not use defaultRuntime for SSR requests or isolated tests. Nodes from different runtimes cannot form dependencies; that is the isolation guarantee, not an accidental limitation.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'full name: Ada Lovelace\nfull name: Grace Hopper'
+              },
+              {
+                type: 'paragraph',
+                text: 'Every write inside runtime.batch(fn) triggers one update when fn ends, so the Effect never sees the half-changed “Grace Lovelace”. batch nests, running only when the outermost one ends, and returns fn’s return value.'
               }
             ]
           },
           {
-            id: 'host-options',
-            heading: 'Configure capabilities only at the host boundary',
+            id: 'options',
+            heading: 'createRuntime options',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  'adapter replaces microtasks, monotonic time, event timestamps, or the default error sink.',
-                  'onError centralizes contained asynchronous and diagnostic failures.',
-                  'onTrace is enabled only when diagnostics justify its steady-state cost.',
-                  'maxFlushPasses is a loop guard and defaults to 100; never raise it to hide a self-triggering cycle.',
-                  'scheduleIdle controls reclamation of unobserved Computed nodes, not Effect flushing.'
+                type: 'table',
+                headers: ['Option', 'Default', 'Purpose'],
+                rows: [
+                  [
+                    'onError(error, context)',
+                    'none',
+                    'Receives errors such as a failing Effect; context.phase names the stage'
+                  ],
+                  [
+                    'onTrace(event)',
+                    'none',
+                    'Receives diagnostic events (node creation, dependency links, Effect runs) for devtools'
+                  ],
+                  [
+                    'maxFlushPasses',
+                    '100',
+                    'Maximum recompute passes per flush; exceeding it means an infinite loop and throws FLUSH_LOOP'
+                  ],
+                  [
+                    'adapter',
+                    'native',
+                    'Replaces scheduleMicrotask, now, timestamp, reportError for tests or unusual hosts'
+                  ],
+                  ['scheduleIdle', 'microtask', 'When unobserved Computeds disconnect']
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: 'runtime.setSchedulerStrategy(strategy) moves automatic runs from the next microtask to, for example, requestAnimationFrame; strategy receives a flush function and decides when to call it.'
+              }
+            ]
+          },
+          {
+            id: 'isolation',
+            heading: 'Give each context its own Runtime',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Nodes may depend only on nodes from the same Runtime; reading across Runtimes throws CROSS_RUNTIME. The package offers a process-wide defaultRuntime that is fine for small scripts, but server rendering (one Runtime per request), unit tests (one per case), and Workers should call createRuntime() so requests or tests never share state.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'createRuntime configuration', path: 'docs/reactive/runtime/createRuntime' },
-        { label: 'Runtime API', path: 'docs/reactive/runtime/Runtime' }
+        {
+          label: 'Troubleshooting',
+          path: 'troubleshooting'
+        },
+        {
+          label: 'Signal, Computed, Effect',
+          path: 'reactive'
+        },
+        {
+          label: 'createRuntime API',
+          path: 'docs/reactive/runtime/createRuntime'
+        }
+      ]
+    }
+  },
+  'reactive:troubleshooting': {
+    zh: {
+      title: '排错与常见问题',
+      lede: '按现象查找原因和解决办法。',
+      document: {
+        sections: [
+          {
+            id: 'errors',
+            heading: '常见错误',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Computed, Signal, createRuntime, ReactiveErrorCode } from '@migaia/reactive'\n\nconst a = createRuntime()\nconst b = createRuntime()\n\nconst count = new Signal(1, a)\nconst wrong = new Computed(() => count.value * 2, b) // 依赖了另一个 Runtime 的 Signal\ntry {\n  wrong.value\n} catch (error) {\n  console.log((error as { code: string }).code === ReactiveErrorCode.crossRuntime, (error as { code: string }).code)\n}\n\ncount.dispose()\ntry {\n  count.value\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nwrong.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'true CROSS_RUNTIME\nNODE_DISPOSED'
+              },
+              {
+                type: 'paragraph',
+                text: '第一个错误：Computed 属于 Runtime b，却读取了 Runtime a 的 Signal。让相关节点使用同一个 Runtime。第二个错误：Signal 已经 dispose，再读取就会报错；检查释放顺序，确保释放后没有代码继续使用它。'
+              }
+            ]
+          },
+          {
+            id: 'loop',
+            heading: '两个 Effect 互相触发：FLUSH_LOOP',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime({ maxFlushPasses: 5 })\nconst a = new Signal(0, runtime)\nconst b = new Signal(0, runtime)\n// 错误：两个 Effect 互相写对方读取的 Signal，形成无限循环\nconst syncB = new Effect(() => {\n  b.value = a.value + 1\n}, runtime)\nconst syncA = new Effect(() => {\n  a.value = b.value + 1\n}, runtime)\n\ntry {\n  runtime.flush()\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nsyncA.dispose()\nsyncB.dispose()\na.dispose()\nb.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'FLUSH_LOOP'
+              },
+              {
+                type: 'paragraph',
+                text: 'Effect A 写入 B 读取的值，B 又写入 A 读取的值，两者会无限地互相触发。超过 maxFlushPasses 轮后，flush 抛 FLUSH_LOOP，错误信息列出被丢弃的待处理节点（用 debugName 标识）。解决办法是改用 Computed 表达派生关系，而不是在 Effect 里写入 Signal。'
+              }
+            ]
+          },
+          {
+            id: 'not-running',
+            heading: 'Effect 没有重新运行',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Effect 读取依赖的方式是 peek() 或在 untracked 里，这样不会建立依赖。',
+                  '新值和旧值 Object.is 相等，或 Computed 的 equals 判定为相等，视为没有变化。',
+                  '还没到下一个微任务。测试里赋值后要 await 一个微任务，或调用 runtime.flush()。',
+                  '依赖的 Signal 属于另一个 Runtime。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'codes',
+            heading: '错误代码',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['error.code', '什么时候出现'],
+                rows: [
+                  ['NODE_DISPOSED', '读写已释放的节点'],
+                  ['CROSS_RUNTIME', '节点依赖了另一个 Runtime 的节点'],
+                  ['CIRCULAR_DEPENDENCY', 'Computed 计算时读到了自己'],
+                  ['FLUSH_LOOP', '一次 flush 超过 maxFlushPasses 轮'],
+                  ['OBSERVER_FAILED', '一次 flush 中多个 Effect 出错，聚合成 AggregateError'],
+                  ['INVALID_OPTION', 'createRuntime 等的选项不合法']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: "错误都带有 error.source（'@migaia/reactive'）和 error.code，请用 ReactiveErrorCode 常量比较。"
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: '快速开始',
+          path: 'getting-started'
+        },
+        {
+          label: 'Runtime 与调度',
+          path: 'runtime'
+        },
+        {
+          label: 'ReactiveErrorCode',
+          path: 'docs/reactive/ReactiveErrorCode'
+        }
+      ]
+    },
+    en: {
+      title: 'Troubleshooting and FAQ',
+      lede: 'Find the cause and the fix by symptom.',
+      document: {
+        sections: [
+          {
+            id: 'errors',
+            heading: 'Common errors',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Computed, Signal, createRuntime, ReactiveErrorCode } from '@migaia/reactive'\n\nconst a = createRuntime()\nconst b = createRuntime()\n\nconst count = new Signal(1, a)\nconst wrong = new Computed(() => count.value * 2, b) // depends on a Signal from another Runtime\ntry {\n  wrong.value\n} catch (error) {\n  console.log((error as { code: string }).code === ReactiveErrorCode.crossRuntime, (error as { code: string }).code)\n}\n\ncount.dispose()\ntry {\n  count.value\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nwrong.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'true CROSS_RUNTIME\nNODE_DISPOSED'
+              },
+              {
+                type: 'paragraph',
+                text: 'First error: a Computed in Runtime b read a Signal from Runtime a; put related nodes in one Runtime. Second: the Signal was disposed and then read; check the release order so nothing uses a node after disposal.'
+              }
+            ]
+          },
+          {
+            id: 'loop',
+            heading: 'Effects triggering each other: FLUSH_LOOP',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Effect, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime({ maxFlushPasses: 5 })\nconst a = new Signal(0, runtime)\nconst b = new Signal(0, runtime)\n// Bug: two Effects write the Signal the other reads, looping forever\nconst syncB = new Effect(() => {\n  b.value = a.value + 1\n}, runtime)\nconst syncA = new Effect(() => {\n  a.value = b.value + 1\n}, runtime)\n\ntry {\n  runtime.flush()\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\nsyncA.dispose()\nsyncB.dispose()\na.dispose()\nb.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'FLUSH_LOOP'
+              },
+              {
+                type: 'paragraph',
+                text: 'Effect A writes what B reads and B writes what A reads, so they trigger each other forever. After maxFlushPasses passes flush throws FLUSH_LOOP, listing the dropped pending nodes by debugName. Express derived values with a Computed instead of writing Signals inside Effects.'
+              }
+            ]
+          },
+          {
+            id: 'not-running',
+            heading: 'An Effect does not rerun',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'The Effect reads the value through peek() or inside untracked, which creates no dependency.',
+                  'The new value is Object.is-equal to the old one, or a Computed’s equals reports equality, so nothing changed.',
+                  'The next microtask has not run yet; in tests await a microtask or call runtime.flush() after assigning.',
+                  'The Signal belongs to another Runtime.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'codes',
+            heading: 'Error codes',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['error.code', 'When it appears'],
+                rows: [
+                  ['NODE_DISPOSED', 'Reading or writing a disposed node'],
+                  ['CROSS_RUNTIME', 'A node depends on a node from another Runtime'],
+                  ['CIRCULAR_DEPENDENCY', 'A Computed read itself while computing'],
+                  ['FLUSH_LOOP', 'One flush exceeded maxFlushPasses passes'],
+                  [
+                    'OBSERVER_FAILED',
+                    'Several Effects failed in one flush, aggregated into an AggregateError'
+                  ],
+                  ['INVALID_OPTION', 'Invalid options for createRuntime and similar']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: "Errors carry error.source ('@migaia/reactive') and error.code; compare against ReactiveErrorCode constants."
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Quick start',
+          path: 'getting-started'
+        },
+        {
+          label: 'Runtime and scheduling',
+          path: 'runtime'
+        },
+        {
+          label: 'ReactiveErrorCode',
+          path: 'docs/reactive/ReactiveErrorCode'
+        }
       ]
     }
   },
