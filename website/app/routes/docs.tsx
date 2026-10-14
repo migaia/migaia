@@ -1329,13 +1329,21 @@ function ModuleOverview({
           ) : null}
         </section>
       ) : null}
-      <RelatedTypes
-        api={api}
-        locale={locale}
-        selectedFragment={selectedTypeFragment}
-        standalone
-        symbols={typingSymbols}
-      />
+      {typingSymbols.length > 0 ? (
+        <section className="api-signature">
+          <h2>{locale === 'zh' ? '完整类型签名' : 'Full type signature'}</h2>
+          <details>
+            <summary>{locale === 'zh' ? '类型定义' : 'Type definitions'}</summary>
+            <RelatedTypes
+              api={api}
+              locale={locale}
+              selectedFragment={selectedTypeFragment}
+              standalone
+              symbols={typingSymbols}
+            />
+          </details>
+        </section>
+      ) : null}
     </>
   )
 }
@@ -3068,6 +3076,8 @@ function RelatedTypes({
   useEffect(() => {
     /** Scrolls to a subordinate type when the current fragment identifies it. */
     const locateFragment = () => {
+      // Type routes start collapsed; an explicit fragment opens the requested declaration.
+      if (!window.location.hash) return
       /** Decoded public fragment used to match the generated declaration identity. */
       let fragment: string
       if (selectedFragment) fragment = selectedFragment
@@ -3089,6 +3099,9 @@ function RelatedTypes({
         )
         return
       }
+      /** Explicit type links reveal the declaration before scrolling to its anchor. */
+      const disclosure = target.closest('details')
+      if (disclosure) disclosure.open = true
       target.scrollIntoView({ block: 'start' })
     }
     locateFragment()
