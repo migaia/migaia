@@ -3,8 +3,9 @@ import { StorageErrorText } from '../error-text.js'
 import type { ISchemaAdapter } from './types.js'
 
 /**
- * [Standard Schema](https://standardschema.dev) 的最小契约。zod ≥3.24、 valibot ≥1.0、arktype ≥2.0
- * 都实现了该规范，一个适配器覆盖三家。 本包不 import 任何一家，也不把它们列为 peerDependency。
+ * Defines the minimal [Standard Schema](https://standardschema.dev) contract. Zod ≥3.24, Valibot
+ * ≥1.0, and ArkType ≥2.0 implement it, so one adapter supports all three. This package does not
+ * import them or list them as peer dependencies.
  */
 export type IStandardSchemaV1<TInput = unknown, TOutput = TInput> = {
   readonly '~standard': {
@@ -22,7 +23,7 @@ export type IStandardSchemaV1<TInput = unknown, TOutput = TInput> = {
   }
 }
 
-/** 适配任意实现了 Standard Schema 规范的校验库。 */
+/** Adapts any validation library that implements Standard Schema. */
 export const fromStandardSchema = <T>(
   schema: IStandardSchemaV1<unknown, T>
 ): ISchemaAdapter<T, T> => {

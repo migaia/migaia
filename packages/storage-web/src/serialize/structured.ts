@@ -2,8 +2,10 @@ import type { ICodec } from './types.js'
 import { StorageCodecOutput } from '../constants.js'
 
 /**
- * 不做序列化，交给后端的 structured clone（IndexedDB）。可直接存 Blob/File/ArrayBuffer/Map/Set/Date，甚至循环引用。仅结构化后端可用；
- * 遇到 text-only 后端时选路层拒绝降级，见 registry.ts。
+ * Passes serialization to the backend's structured cloning, such as IndexedDB. Supports `Blob`,
+ * `File`, `ArrayBuffer`, `Map`, `Set`, `Date`, and cyclic references directly. Only structured
+ * backends can use it. The routing layer rejects fallback on text-only backends; see
+ * `registry.ts`.
  */
 export const structuredCodec: ICodec<unknown, unknown> = Object.freeze({
   name: 'structured',

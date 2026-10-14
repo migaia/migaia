@@ -1,10 +1,10 @@
 import type { IWebStorageLike } from '../types/storage.js'
 
 /**
- * 探测一个 Storage 对象是否真的可用。
- *
- * Safari 隐私模式下 `localStorage`/`sessionStorage` 对象存在， `setItem` 却会抛异常（旧版本是 SecurityError，新版本是
- * quota=0 的 QuotaExceededError）。唯一可靠的探测方式是真的写一次再删掉。
+ * Probes whether a storage object is usable by writing and deleting a value. Safari private mode
+ * can expose `localStorage` or `sessionStorage` while `setItem` throws. Older versions use
+ * `SecurityError`; newer versions can use `QuotaExceededError` with zero quota. A real write
+ * followed by deletion checks this behavior.
  */
 export const probeWebStorage = (
   storage: IWebStorageLike | undefined,
