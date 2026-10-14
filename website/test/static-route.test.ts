@@ -777,7 +777,14 @@ test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampolin
   )
   assert.match(architecture, /适用与不适用场景/)
   assert.match(architecture, /本地、瞬时的事件订阅/)
-  assert.match(api, /何时使用，以及可选择的公开 API/)
+  /** The package introduction reuses its real purpose instead of a generator instruction. */
+  const packagePurpose = api.match(/<meta name="description" content="([^"]+)"/)?.[1]
+  assert.ok(packagePurpose)
+  assert.equal(
+    renderedText(api.match(/<p class="lede">([\s\S]*?)<\/p>/)?.[1] ?? '').trim(),
+    renderedText(packagePurpose).trim()
+  )
+  assert.doesNotMatch(api, /何时使用，以及可选择的公开 API/)
   assert.match(api, /选择一个入口/)
   assert.match(
     api,

@@ -269,9 +269,7 @@ export const meta: IMetaFunction<typeof loader> = ({ loaderData: data, location,
         : libraryReferenceDescription(locale, library.slug)
       : (data.journey?.lede ??
         (domain === 'guides'
-          ? locale === 'zh'
-            ? `按实际任务学习 ${library.slug}：先完成最小闭环，再处理失败、资源释放与生产边界。`
-            : `Learn ${library.slug} through concrete tasks, then handle failures, cleanup, and production boundaries.`
+          ? libraryReferenceDescription(locale, library.slug)
           : locale === 'zh'
             ? (LIBRARY_ARCHITECTURE_LEDES_ZH[
                 library.slug as keyof typeof LIBRARY_ARCHITECTURE_LEDES_ZH
@@ -712,6 +710,7 @@ function DocsLibrary({
           </p>
           <h1>
             {selectedSymbol?.name ??
+              api?.symbols.find((symbol) => symbol.fragment === selectedTypeFragment)?.name ??
               (moduleName === 'index'
                 ? locale === 'zh'
                   ? `${library.slug} 参考`
@@ -720,9 +719,7 @@ function DocsLibrary({
           </h1>
           {!selectedSymbol ? (
             <p className="lede">
-              {locale === 'zh'
-                ? `${visibleModuleName} 解决什么问题、何时使用，以及可选择的公开 API。`
-                : `What ${visibleModuleName} solves, when to use it, and which public API to choose.`}
+              {openingSentence(libraryReferenceDescription(locale, library.slug))}
             </p>
           ) : null}
           {api && selectedSymbol ? (
@@ -2039,7 +2036,7 @@ function ModuleGuidance({
       ))}
       <p className="document-next-step">
         <Link className="text-link" to={`/${locale}/guides/${library.slug}`}>
-          {locale === 'zh' ? '继续阅读完整任务指南 →' : 'Continue to the complete task guide →'}
+          {locale === 'zh' ? `${library.slug} 入门指南 →` : `Get started with ${library.slug} →`}
         </Link>
       </p>
     </div>
@@ -2947,12 +2944,12 @@ function DomainLibrary({
             journey?.lede ??
             (locale === 'zh'
               ? guide
-                ? `按实际任务学习 ${library.slug}：先完成最小闭环，再处理失败、资源释放与生产边界。`
+                ? libraryReferenceDescription(locale, library.slug)
                 : (LIBRARY_ARCHITECTURE_LEDES_ZH[
                     library.slug as keyof typeof LIBRARY_ARCHITECTURE_LEDES_ZH
                   ] ?? libraryReferenceDescription(locale, library.slug))
               : guide
-                ? `Learn ${library.slug} through concrete tasks, then handle failures, cleanup, and production boundaries.`
+                ? libraryReferenceDescription(locale, library.slug)
                 : libraryReferenceDescription(locale, library.slug))
           }
         />
