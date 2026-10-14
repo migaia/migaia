@@ -1,9 +1,10 @@
+import { currentRuntimeVersion } from '../src/entry/extension.js'
 import { describe, expect, it, vi } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createRuntime } from '../src/runtime/runtime.class'
-import { noteRuntimeCopy, resetRuntimeCopiesForTest } from '../src/runtime/copy-check'
+import { createRuntime } from '../src/index.js'
+import { noteRuntimeCopy, resetRuntimeCopiesForTest } from '../src/runtime/copy-check.js'
 import { ReactiveErrorCode } from '../src/error-code.js'
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url))
@@ -98,7 +99,7 @@ describe('AF-T4 reactive runtime-neutrality', () => {
     const signal = runtime.signal(0)
     signal.value = 1
     await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(runtime.currentVersion()).toBeGreaterThan(0)
+    expect(currentRuntimeVersion(runtime)).toBeGreaterThan(0)
     signal.dispose()
   })
 
@@ -224,15 +225,16 @@ describe('AF-T71 runtime callback admission', () => {
 describe('Sol scheduler strategy admission', () => {
   it('rejects null, object, and string immediately while retaining the prior strategy', () => {
     const scheduled: Array<() => void> = []
-    const runtime = createRuntime()
-    runtime.setSchedulerStrategy((flush) => {
-      scheduled.push(flush)
+    const runtime = createRuntime({
+      schedulerStrategy: (flush) => {
+        scheduled.push(flush)
+      }
     })
 
     for (const invalid of [null, {}, 'not-a-function']) {
       let caught: unknown
       try {
-        runtime.setSchedulerStrategy(invalid as never)
+        createRuntime({ schedulerStrategy: invalid as never })
       } catch (error) {
         caught = error
       }
@@ -254,7 +256,7 @@ describe('Sol scheduler strategy admission', () => {
     expect(scheduled).toHaveLength(1)
     scheduled.shift()?.()
     expect(runs).toBe(2)
-    dispose()
+    dispose.dispose()
     signal.dispose()
   })
 })
@@ -267,16 +269,18 @@ describe('scheduler strategy runtime contract', () => {
     const onUnhandled = (reason: unknown): void => {
       unhandled.push(reason)
     }
-    const runtime = createRuntime({ onError: (error) => reported.push(error) })
+    const runtime = createRuntime({
+      onError: (error) => reported.push(error),
+      schedulerStrategy: async () => {
+        await Promise.resolve()
+        throw rejection
+      }
+    })
     const signal = runtime.signal(0)
     let runs = 0
     const dispose = runtime.effect(() => {
       void signal.value
       runs++
-    })
-    runtime.setSchedulerStrategy(async () => {
-      await Promise.resolve()
-      throw rejection
     })
 
     process.on('unhandledRejection', onUnhandled)
@@ -296,7 +300,7 @@ describe('scheduler strategy runtime contract', () => {
       expect(unhandled).toEqual([])
     } finally {
       process.off('unhandledRejection', onUnhandled)
-      dispose()
+      dispose.dispose()
       signal.dispose()
     }
   })
@@ -304,7 +308,10 @@ describe('scheduler strategy runtime contract', () => {
   it('reports thenable getter failure with its cause and recovers for later writes', async () => {
     const getterError = new Error('then getter failure')
     const reported: unknown[] = []
-    const runtime = createRuntime({ onError: (error) => reported.push(error) })
+    const runtime = createRuntime({
+      onError: (error) => reported.push(error),
+      schedulerStrategy: () => thenable as never
+    })
     const signal = runtime.signal(0)
     let runs = 0
     const dispose = runtime.effect(() => {
@@ -319,7 +326,6 @@ describe('scheduler strategy runtime contract', () => {
         }
       }
     )
-    runtime.setSchedulerStrategy(() => thenable as never)
 
     try {
       signal.value = 1
@@ -333,7 +339,7 @@ describe('scheduler strategy runtime contract', () => {
       await flush()
       expect(runs).toBe(2)
     } finally {
-      dispose()
+      dispose.dispose()
       signal.dispose()
     }
   })
@@ -341,15 +347,17 @@ describe('scheduler strategy runtime contract', () => {
   it('clears scheduled after a synchronous strategy throw and recovers for later writes', async () => {
     const strategyError = new Error('sync strategy failure')
     const reported: unknown[] = []
-    const runtime = createRuntime({ onError: (error) => reported.push(error) })
+    const runtime = createRuntime({
+      onError: (error) => reported.push(error),
+      schedulerStrategy: () => {
+        throw strategyError
+      }
+    })
     const signal = runtime.signal(0)
     let runs = 0
     const dispose = runtime.effect(() => {
       void signal.value
       runs++
-    })
-    runtime.setSchedulerStrategy(() => {
-      throw strategyError
     })
 
     try {
@@ -361,7 +369,7 @@ describe('scheduler strategy runtime contract', () => {
       await flush()
       expect(runs).toBe(2)
     } finally {
-      dispose()
+      dispose.dispose()
       signal.dispose()
     }
   })
@@ -383,17 +391,17 @@ describe('scheduler strategy runtime contract', () => {
     )
     const runtime = createRuntime({
       adapter: { scheduleMicrotask: (task) => fallbackTasks.push(task) },
-      onError: (error) => reported.push(error)
+      onError: (error) => reported.push(error),
+      schedulerStrategy: (flush) => {
+        oldCallback = flush
+        return thenable as never
+      }
     })
     const signal = runtime.signal(0)
     let runs = 0
     const dispose = runtime.effect(() => {
       void signal.value
       runs++
-    })
-    runtime.setSchedulerStrategy((flush) => {
-      oldCallback = flush
-      return thenable as never
     })
 
     const onUnhandled = (reason: unknown): void => {
@@ -431,7 +439,7 @@ describe('scheduler strategy runtime contract', () => {
       expect(unhandled).toEqual([])
     } finally {
       process.off('unhandledRejection', onUnhandled)
-      dispose()
+      dispose.dispose()
       signal.dispose()
     }
   })

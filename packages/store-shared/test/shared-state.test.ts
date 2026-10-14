@@ -1,11 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Effect, createRuntime } from '@migaia/reactive'
+import { createRuntime } from '@migaia/reactive'
 import { sharedInt32, sharedInt32Array } from '../src/shared-state'
 
+/** Runs notifications immediately so cross-runtime assertions observe committed writes. */
 function syncRuntime() {
-  const runtime = createRuntime()
-  runtime.setSchedulerStrategy((run) => run())
-  return runtime
+  return createRuntime({ schedulerStrategy: (run) => run() })
 }
 
 const hasSharedArrayBuffer = typeof SharedArrayBuffer !== 'undefined'
@@ -38,7 +37,7 @@ describeShared('SharedInt32Signal：跨 Runtime 共享一段内存', () => {
   it('prunes unobserved array cells after a high-churn observer is released', () => {
     const runtime = syncRuntime()
     const array = sharedInt32Array(runtime, 2)
-    const observer = new Effect(() => void array.get(0), runtime)
+    const observer = runtime.effect(() => void array.get(0))
     observer.dispose()
     expect(array.prune()).toBe(1)
     array.dispose()
@@ -55,10 +54,10 @@ describeShared('SharedInt32Signal：跨 Runtime 共享一段内存', () => {
 
     let seen = 0
     let runs = 0
-    const observer = new Effect(() => {
+    const observer = readerRuntime.effect(() => {
       runs++
       seen = reader.value
-    }, readerRuntime)
+    })
     expect(seen).toBe(1)
 
     writer.value = 42
@@ -81,10 +80,10 @@ describeShared('SharedInt32Signal：跨 Runtime 共享一段内存', () => {
     const runtime = syncRuntime()
     const signal = sharedInt32(runtime, 5)
     let runs = 0
-    const observer = new Effect(() => {
+    const observer = runtime.effect(() => {
       runs++
       void signal.value
-    }, runtime)
+    })
 
     signal.value = 5
     expect(runs).toBe(1)
@@ -141,7 +140,7 @@ describeShared('SharedInt32Array：逐下标失效', () => {
     const runtime = syncRuntime()
     const array = sharedInt32Array(runtime, 100_000)
     expect(array.get(99_999)).toBe(0)
-    const observer = new Effect(() => void array.get(42), runtime)
+    const observer = runtime.effect(() => void array.get(42))
 
     observer.dispose()
     array.dispose()
@@ -153,14 +152,14 @@ describeShared('SharedInt32Array：逐下标失效', () => {
     })
     let firstRuns = 0
     let secondRuns = 0
-    const first = new Effect(() => {
+    const first = runtime.effect(() => {
       firstRuns++
       array.get(0)
-    }, runtime)
-    const second = new Effect(() => {
+    })
+    const second = runtime.effect(() => {
       secondRuns++
       array.get(2)
-    }, runtime)
+    })
 
     array.set(2, 99)
     expect(secondRuns).toBe(2)
@@ -308,10 +307,10 @@ describeShared('SharedInt32Array：逐下标失效', () => {
     const runtime = syncRuntime()
     const array = sharedInt32Array(runtime, 1, { initialValues: [5] })
     let runs = 0
-    const observer = new Effect(() => {
+    const observer = runtime.effect(() => {
       runs++
       void array.get(0)
-    }, runtime)
+    })
 
     array.set(0, 5)
     expect(runs).toBe(1)
@@ -406,16 +405,16 @@ describeShared('SharedInt32Array：multi-reader generation/cursor同步', () => 
     const runsByIndex = new Map<number, number>()
     const observers = touched.map((index) => {
       runsByIndex.set(index, 0)
-      return new Effect(() => {
+      return readerRuntime.effect(() => {
         runsByIndex.set(index, (runsByIndex.get(index) ?? 0) + 1)
         void reader.get(index)
-      }, readerRuntime)
+      })
     })
     let untouchedRuns = 0
-    const untouchedObserver = new Effect(() => {
+    const untouchedObserver = readerRuntime.effect(() => {
       untouchedRuns++
       void reader.get(4_242)
-    }, readerRuntime)
+    })
 
     for (const index of touched) writer.set(index, index * 2)
     expect(reader.sync()).toBe(touched.length)
@@ -513,18 +512,24 @@ describeShared('seqlock：值与版本同源', () => {
   })
 
   it('publishes the remote generation before a local scheduler failure', () => {
-    const writerRuntime = syncRuntime()
+    /** Preserve the failure boundary after the initial observer has subscribed. */
+    let failScheduling = false
+    /** Scheduler failure remains the exact error published after the write commits. */
+    const failure = new Error('local scheduler failed')
+    /** Uses the original synchronous schedule until the test activates its failure boundary. */
+    const writerRuntime = createRuntime({
+      schedulerStrategy: (run) => {
+        if (failScheduling) throw failure
+        run()
+      }
+    })
     const readerRuntime = syncRuntime()
     const writer = sharedInt32Array(writerRuntime, 1, { initialValues: [0] })
     const reader = sharedInt32Array(readerRuntime, 1, { buffer: writer.buffer })
-    const observer = new Effect(() => {
+    const observer = writerRuntime.effect(() => {
       void writer.get(0)
-    }, writerRuntime)
-    const failure = new Error('local scheduler failed')
-
-    writerRuntime.setSchedulerStrategy(() => {
-      throw failure
     })
+    failScheduling = true
 
     expect(() => writer.set(0, 7)).toThrow(failure)
     // Remote readers must observe the committed generation even when local
@@ -589,9 +594,9 @@ describeShared('waitAsync 推送：远端写入不必靠 pump', () => {
     const reader = sharedInt32(readerRuntime, 0, writer.buffer)
 
     const seen: number[] = []
-    const observer = new Effect(() => {
+    const observer = readerRuntime.effect(() => {
       seen.push(reader.value)
-    }, readerRuntime)
+    })
     const stop = reader.watch()
 
     writer.value = 3
@@ -645,14 +650,14 @@ describeShared('waitAsync 推送：远端写入不必靠 pump', () => {
     let cell1Runs = 0
     let cell3Runs = 0
     let cell3Value = -1
-    const watcher1 = new Effect(() => {
+    const watcher1 = readerRuntime.effect(() => {
       cell1Runs++
       reader.get(1)
-    }, readerRuntime)
-    const watcher3 = new Effect(() => {
+    })
+    const watcher3 = readerRuntime.effect(() => {
       cell3Runs++
       cell3Value = reader.get(3)
-    }, readerRuntime)
+    })
     const stop = reader.watch()
 
     writer.set(3, 99)
@@ -677,9 +682,9 @@ describeShared('waitAsync 推送：远端写入不必靠 pump', () => {
     const reader = sharedInt32(readerRuntime, 0, writer.buffer)
 
     const seen: number[] = []
-    const observer = new Effect(() => {
+    const observer = readerRuntime.effect(() => {
       seen.push(reader.value)
-    }, readerRuntime)
+    })
     const stop = reader.watch()
     stop()
 
@@ -705,10 +710,10 @@ describeShared('waitAsync 推送：远端写入不必靠 pump', () => {
 
     let wakes = 0
     reader.watch()
-    const stopCounting = new Effect(() => {
+    const stopCounting = readerRuntime.effect(() => {
       wakes++
       reader.peek()
-    }, readerRuntime)
+    })
     reader.dispose()
 
     writer.value = 7

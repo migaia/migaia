@@ -39,7 +39,7 @@ function runRuntimeFailure(
   } catch (error) {
     caught = error
   } finally {
-    dispose()
+    dispose.dispose()
     signal.dispose()
   }
   return { caught, actionError, flushError, reads, stacks }
@@ -169,7 +169,7 @@ describe('batch cause-read reporting', () => {
       } catch (error) {
         caught = error
       } finally {
-        dispose()
+        dispose.dispose()
         signal.dispose()
       }
       expect(caught).toBe(actionError)

@@ -1,5 +1,7 @@
+import { internalRuntimeOf } from '../src/entry/extension.js'
+import type { IReactiveEffect } from '../src/index.js'
 import { describe, expect, it, vi } from 'vitest'
-import { createRuntime } from '../src/runtime/runtime.class.js'
+import { createRuntime } from '../src/index.js'
 import { ReactiveErrorCode } from '../src/error-code.js'
 import { Scheduler } from '../src/runtime/scheduler.class.js'
 
@@ -21,18 +23,21 @@ describe('PK-04 synchronous callback admission', () => {
     const reported: unknown[] = []
     const scheduled: Array<() => void> = []
     const rejection = new Error('terminal cleanup rejection')
-    const runtime = createRuntime({ onError: (error) => reported.push(error) })
-    runtime.setSchedulerStrategy((flush) => {
-      scheduled.push(flush)
+    const runtime = createRuntime({
+      onError: (error) => reported.push(error),
+      schedulerStrategy: (flush) => {
+        scheduled.push(flush)
+      }
     })
-    const source = runtime.signal(0)
+
+    const source = internalRuntimeOf(runtime).signal(0)
     let runs = 0
-    let stop: (() => void) | undefined
+    let stop: IReactiveEffect | undefined
 
     stop = runtime.effect(() => {
       runs++
       void source.value
-      if (runs === 2) stop?.()
+      if (runs === 2) stop?.dispose()
       return runs === 2 ? ((() => Promise.reject(rejection)) as never) : undefined
     })
 
@@ -101,7 +106,7 @@ describe('PK-04 scheduler ownership', () => {
     )
     signals[0].value = 999
     expect(signals.at(-1)?.value).toBe(999)
-    for (const dispose of disposers) dispose()
+    for (const dispose of disposers) dispose.dispose()
     for (const signal of signals) signal.dispose()
   })
 
@@ -152,7 +157,7 @@ describe('PK-04 scheduler ownership', () => {
         throw idleError
       }
     })
-    const source = runtime.signal(1)
+    const source = internalRuntimeOf(runtime).signal(1)
     const computed = runtime.computed(() => source.value + 1)
     expect(computed.value).toBe(2)
     await flush()

@@ -1,3 +1,4 @@
+import { internalRuntimeOf } from '../src/entry/extension.js'
 import { describe, expect, it } from 'vitest'
 import {
   createRuntime,
@@ -42,7 +43,7 @@ describe('RT26 failure-contained observer trace terminals', () => {
       onError: (error) => reported.push(error),
       onTrace: (event) => events.push(event)
     })
-    const source = runtime.signal(0)
+    const source = internalRuntimeOf(runtime).signal(0)
     let runs = 0
 
     const stop = runtime.effect(() => {
@@ -61,7 +62,7 @@ describe('RT26 failure-contained observer trace terminals', () => {
     expect(source.subs).toHaveLength(1)
     expect(runtime.flush()).toBe('completed')
 
-    stop()
+    stop.dispose()
     expect(source.subs).toHaveLength(0)
     source.dispose()
   })
@@ -89,7 +90,7 @@ describe('RT26 failure-contained observer trace terminals', () => {
       onError: (error) => reported.push(error),
       onTrace: (event) => events.push(event)
     })
-    const source = runtime.signal(1)
+    const source = internalRuntimeOf(runtime).signal(1)
     let runs = 0
     const computed = runtime.computed(() => {
       runs++
@@ -136,7 +137,7 @@ describe('RT26 failure-contained observer trace terminals', () => {
       onError: (error) => reported.push(error),
       onTrace: (event) => events.push(event)
     })
-    const source = runtime.signal(0)
+    const source = internalRuntimeOf(runtime).signal(0)
     let runs = 0
     const stop = runtime.effect(() => {
       runs++
@@ -153,7 +154,7 @@ describe('RT26 failure-contained observer trace terminals', () => {
     expect(source.subs).toHaveLength(1)
     expect(runtime.flush()).toBe('completed')
 
-    stop()
+    stop.dispose()
     source.dispose()
   })
 
@@ -181,7 +182,7 @@ describe('RT26 failure-contained observer trace terminals', () => {
       onError: (error) => reported.push(error),
       onTrace: (event) => events.push(event)
     })
-    const source = runtime.signal(1)
+    const source = internalRuntimeOf(runtime).signal(1)
     const computed = runtime.computed(() => {
       void source.value
       throw bodyError
@@ -231,7 +232,7 @@ describe('RT26 failure-contained observer trace terminals', () => {
       onError: (error) => reported.push(error),
       onTrace: (event) => events.push(event)
     })
-    const source = runtime.signal(1)
+    const source = internalRuntimeOf(runtime).signal(1)
 
     expect(() =>
       runtime.effect(() => {
@@ -274,8 +275,8 @@ describe('RT26 failure-contained observer trace terminals', () => {
     expect(computed.peek()).toBe(0)
     source.value = 1
     expect(computed.peek()).toBe(1)
-    stop()
-    stop()
+    stop.dispose()
+    stop.dispose()
     computed.dispose()
     computed.dispose()
     unsubscribe()

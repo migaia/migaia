@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { claimOwnership } from '@migaia/reactive/ownership'
+import { claimOwnership } from '@migaia/reactive/extension'
 import type { IDisposable } from '@migaia/reactive'
 import { createLegacyStore, storeReady, FIELD_BUILDER, type IFieldBuilder } from '../src'
 import { createStoreLightRangeError, StoreLightErrorCode, STORE_LIGHT_SOURCE } from '../src/errors'

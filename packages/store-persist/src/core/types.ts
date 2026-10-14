@@ -1,4 +1,4 @@
-import type { IComputedValue, IDisposer, IRuntime } from '@migaia/reactive'
+import type { IReactiveComputed, IDisposer, IRuntime } from '@migaia/reactive'
 import type { ICodec, IKeyValueStore, IRecordStore } from '@migaia/storage-contract'
 import { PersistState } from '../state-constants.js'
 
@@ -38,9 +38,9 @@ export type IReadonlyPersistValue<T> = {
 }
 
 export type IPersistHandle = {
-  status: IComputedValue<IPersistStatus>
-  error: IComputedValue<unknown>
-  hydrated: IComputedValue<boolean>
+  status: IReactiveComputed<IPersistStatus>
+  error: IReactiveComputed<unknown>
+  hydrated: IReactiveComputed<boolean>
   hydrationStatus: IReadonlyPersistValue<IHydrationStatus>
   hydrationError: IReadonlyPersistValue<unknown>
   writeStatus: IReadonlyPersistValue<IWriteStatus>

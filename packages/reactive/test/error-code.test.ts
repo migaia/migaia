@@ -2,23 +2,22 @@ import { describe, expect, it, vi } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Signal } from '../src/reactive/signal.class'
-import { createRuntime } from '../src/runtime/runtime.class'
-import { createObserverBinding } from '../src/runtime/observer-binding'
-import { internalsOf, registerInternals } from '../src/runtime/internals'
-import { assertReactiveOwnedBy, claimOwnership } from '../src/runtime/ownership'
+import { createRuntime } from '../src/index.js'
+import { createObserverBinding } from '../src/entry/extension.js'
+import { internalsOf, registerInternals } from '../src/entry/internals.js'
+import { assertReactiveOwnedBy, claimOwnership } from '../src/entry/extension.js'
 import {
   assertSingleRuntimeCopy,
   brandOwnedValue,
   noteRuntimeCopy,
   resetRuntimeCopiesForTest,
   runtimeCopyCount
-} from '../src/runtime/copy-check'
-import { VersionClock } from '../src/runtime/version-clock.class'
-import { Scheduler } from '../src/runtime/scheduler.class'
-import type { IFlushable } from '../src/runtime/types'
-import { ReactiveErrorCode } from '../src/error-code'
-import { createReactiveError, REACTIVE_SOURCE } from '../src/errors'
+} from '../src/runtime/copy-check.js'
+import { VersionClock } from '../src/runtime/version-clock.class.js'
+import { Scheduler } from '../src/runtime/scheduler.class.js'
+import type { IFlushable } from '../src/runtime/types.js'
+import { ReactiveErrorCode } from '../src/error-code.js'
+import { createReactiveError, REACTIVE_SOURCE } from '../src/errors.js'
 import * as ts from 'typescript'
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url))
@@ -55,7 +54,7 @@ describe('M-T36 (§3.7.1): every declared code has a real trigger', () => {
   })
   it('NODE_DISPOSED: reading a disposed Signal', () => {
     const runtime = createRuntime()
-    const signal = new Signal(1, runtime)
+    const signal = runtime.signal(1)
     signal.dispose()
     expect(() => signal.value).toThrowError(
       expect.objectContaining({ code: ReactiveErrorCode.nodeDisposed })
@@ -371,7 +370,7 @@ describe('M-T36 (§3.7.1) reverse direction: the table is exhaustive and does no
 
   it('every tagged error carries source === "@migaia/reactive"', () => {
     const runtime = createRuntime()
-    const signal = new Signal(1, runtime)
+    const signal = runtime.signal(1)
     signal.dispose()
     let caught: unknown
     try {

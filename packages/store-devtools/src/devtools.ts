@@ -2,10 +2,12 @@ import {
   ReactiveErrorPhase,
   ReactiveTracePhase,
   ReactiveTraceType,
-  type IObservable,
-  type IObserver,
+  type IReactiveComputed,
+  type IReactiveEffect,
+  type IReactiveSignal,
   type IRuntimeTraceEvent
-} from '@migaia/reactive/runtime'
+} from '@migaia/reactive'
+import type { IObservable, IObserver } from '@migaia/reactive/extension'
 import type { IReactiveStore } from '@migaia/store-light'
 import { ClonePolicy } from '@migaia/store-middleware/tolerant-clone'
 import {
@@ -95,8 +97,14 @@ const nodeLabel = (node: object): string =>
 
 // Detects cycles on the current path rather than through a global visited set. Shared diamond nodes expand once per path.
 // Only revisiting a node still on that path is a cycle. Push on entry and remove on return.
-export function getDependencyTree(observer: IObserver, maxDepth = 20): IDependencyTreeNode {
+/** Traverses dependencies of runtime-created public handles or extension graph observers. */
+export function getDependencyTree(
+  root: IObserver | IReactiveEffect | IReactiveComputed<unknown>,
+  maxDepth = 20
+): IDependencyTreeNode {
   assertDepth(maxDepth, 'dependency tree')
+  /** Runtime factories return the existing observer node behind the narrow public handle. */
+  const observer = root as IObserver
   const path = new Set<object>()
   const visitObservable = (current: IObservable, depth: number): IDependencyTreeNode => {
     const node: IDependencyTreeNode = {
@@ -131,8 +139,14 @@ export function getDependencyTree(observer: IObserver, maxDepth = 20): IDependen
   }
 }
 
-export function getObserverTree(observable: IObservable, maxDepth = 20): IDependencyTreeNode {
+/** Traverses subscribers of runtime-created public handles or extension graph observables. */
+export function getObserverTree(
+  root: IObservable | IReactiveSignal<unknown> | IReactiveComputed<unknown>,
+  maxDepth = 20
+): IDependencyTreeNode {
   assertDepth(maxDepth, 'observer tree')
+  /** Runtime factories return the existing observable node behind the narrow public handle. */
+  const observable = root as IObservable
   const path = new Set<object>()
   const visitObserver = (current: IObserver, depth: number): IDependencyTreeNode => {
     const node: IDependencyTreeNode = {

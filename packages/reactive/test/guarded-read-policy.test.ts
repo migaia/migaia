@@ -51,7 +51,10 @@ describe('reactive guarded-read policy', () => {
   it('reports one failed strategy then read with the original cause', () => {
     const failure = new Error('then failed')
     const reported: unknown[] = []
-    const runtime = createRuntime({ onError: (error) => reported.push(error) })
+    const runtime = createRuntime({
+      onError: (error) => reported.push(error),
+      schedulerStrategy: () => result as never
+    })
     const signal = runtime.signal(0)
     const dispose = runtime.effect(() => {
       void signal.value
@@ -63,7 +66,7 @@ describe('reactive guarded-read policy', () => {
         throw failure
       }
     })
-    runtime.setSchedulerStrategy(() => result as never)
+
     try {
       signal.value = 1
       expect(reported).toHaveLength(1)
@@ -74,14 +77,17 @@ describe('reactive guarded-read policy', () => {
       })
       expect(reads).toBe(1)
     } finally {
-      dispose()
+      dispose.dispose()
       signal.dispose()
     }
   })
 
   it('keeps a captured then method when the strategy returns a thenable', async () => {
     const reported: unknown[] = []
-    const runtime = createRuntime({ onError: (error) => reported.push(error) })
+    const runtime = createRuntime({
+      onError: (error) => reported.push(error),
+      schedulerStrategy: () => result as never
+    })
     const signal = runtime.signal(0)
     const dispose = runtime.effect(() => {
       void signal.value
@@ -93,7 +99,7 @@ describe('reactive guarded-read policy', () => {
         return (resolve: (value?: unknown) => void): void => resolve(undefined)
       }
     })
-    runtime.setSchedulerStrategy(() => result as never)
+
     try {
       signal.value = 1
       await Promise.resolve()
@@ -105,7 +111,7 @@ describe('reactive guarded-read policy', () => {
         message: ReactiveErrorText.schedulerStrategyReturnedThenable
       })
     } finally {
-      dispose()
+      dispose.dispose()
       signal.dispose()
     }
   })
@@ -136,7 +142,7 @@ describe('reactive guarded-read policy', () => {
     } catch (error) {
       caught = error
     } finally {
-      dispose()
+      dispose.dispose()
       signal.dispose()
     }
     expect(caught).toBeInstanceOf(AggregateError)

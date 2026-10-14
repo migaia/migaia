@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from 'react'
-import { Effect, type IDisposer, type IRuntime } from '@migaia/reactive'
-import { assertReactiveOwnedBy } from '@migaia/reactive/ownership'
+import type { IDisposer, IRuntime } from '@migaia/reactive'
+import { assertReactiveOwnedBy } from '@migaia/reactive/extension'
 import { notifyReact } from './notify-react.js'
 
 /**
@@ -39,7 +39,8 @@ export function useNodeValue<T>(node: IStableNode<T>, runtime: IRuntime, enabled
     (onChange: () => void): IDisposer => {
       if (!enabled) return () => {}
       let first = true
-      const effect = new Effect(() => {
+      /** The runtime-created observer owns this subscription and releases it on React cleanup. */
+      const effect = runtime.effect(() => {
         // 读 .value 才会建立依赖边；首跑只为登记，不通知
         void node.value
         if (first) {
@@ -47,7 +48,7 @@ export function useNodeValue<T>(node: IStableNode<T>, runtime: IRuntime, enabled
           return
         }
         notifyReact(runtime, onChange)
-      }, runtime)
+      })
       return () => effect.dispose()
     },
     [node, runtime, enabled]

@@ -864,7 +864,7 @@ describe('AF-T86 Resource dispose teardown convergence', () => {
     expect(() => resource.dispose()).not.toThrow()
     expect(resource.disposed).toBe(true)
 
-    stop()
+    stop.dispose()
   })
 })
 

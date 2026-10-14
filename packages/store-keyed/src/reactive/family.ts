@@ -1,6 +1,5 @@
 import { defaultRuntime } from '@migaia/reactive'
-import type { IComputedValue, IDisposable, IRuntime } from '@migaia/reactive'
-import type { IComputedConfig } from '@migaia/reactive/reactive/computed.class'
+import type { IReactiveComputed, IDisposable, IRuntime, IComputedConfig } from '@migaia/reactive'
 import {
   createStoreKeyedAggregateError,
   createStoreKeyedError,
@@ -517,7 +516,7 @@ export function computedFamily<K extends IFamilyKey, T>(
   derive: (key: K) => T,
   runtime: IRuntime = defaultRuntime,
   options: IComputedFamilyOptions<T> = {}
-): IFamily<K, IComputedValue<T>> {
+): IFamily<K, IReactiveComputed<T>> {
   if (typeof derive !== 'function') {
     throw createStoreKeyedError(
       StoreKeyedErrorCode.invalidOption,

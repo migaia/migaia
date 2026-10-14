@@ -1,37 +1,39 @@
 import { internalsOf } from './internals.js'
 import { DependencyTracker } from './dependency-tracker.class.js'
-import type { IReactiveNodeOptions, IRuntime } from './types.js'
-import type { Signal } from '../reactive/signal.class.js'
-import type { Computed, IComputedConfig } from '../reactive/computed.class.js'
+import type {
+  IObservable,
+  IObserver,
+  IReactiveComputed,
+  IReactiveNodeOptions,
+  IReactiveSignal,
+  IRuntime
+} from './types.js'
+import type { IComputedConfig } from '../reactive/computed.class.js'
 
 /**
- * Factory view that retains concrete node classes for implementation layers.
+ * Factory view for implementation layers that need the existing graph protocols.
  *
- * Public `IRuntime.signal()` and `computed()` return the narrow `ISignal` and `IComputedValue`
- * views. Graph implementation layers need concrete classes, such as collections disposing cells or
- * object views using `Computed` configuration.
- *
- * This module stays separate from `internals.ts`, which controls access to the tracker, scheduler,
- * clock, and notification port. Those capabilities can bypass ownership, lifecycle, and scheduling
- * guarantees. Concrete factory return types therefore do not expand the internals import
- * allowlist.
- *
- * Nodes still come from the same runtime and use the same ownership registration and notification
- * path. Only their exposed types are wider. Values without library runtime registration still
- * throw.
+ * Nodes retain the same runtime ownership, notification path, and public lifecycle. This view adds
+ * read-only graph relationships and observer operations without exposing mutable edge sets or the
+ * runtime tracker, scheduler, and clock objects.
  */
 export type IInternalRuntime = Omit<IRuntime, 'signal' | 'computed'> & {
-  signal<T>(value: T, options?: IReactiveNodeOptions): Signal<T>
-  computed<T>(fn: () => T, config?: IComputedConfig<T>): Computed<T>
+  signal<T>(value: T, options?: IReactiveNodeOptions): IReactiveSignal<T> & IObservable
+  computed<T>(
+    fn: () => T,
+    config?: IComputedConfig<T>
+  ): IReactiveComputed<T> & IObservable & IObserver
 }
 
-/**
- * Validates library runtime registration before exposing concrete factory return types to
- * implementation layers.
- */
+/** Validates runtime registration before exposing graph factory types to implementation layers. */
 export function internalRuntimeOf(runtime: IRuntime): IInternalRuntime {
   internalsOf(runtime)
   return runtime as IInternalRuntime
+}
+
+/** Reads the existing version clock; fabricated runtimes retain the NOT_RUNTIME_OWNED failure. */
+export function currentRuntimeVersion(runtime: IRuntime): number {
+  return internalsOf(runtime).clock.current()
 }
 
 /** Read-only tracking-context query for node-building implementation layers. */

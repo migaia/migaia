@@ -1,10 +1,10 @@
+import { currentRuntimeVersion } from '../src/entry/extension.js'
 import { describe, expect, it } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import * as reactivePublicApi from '../src/index'
-import { createRuntime } from '../src/runtime/runtime.class'
-import { Signal } from '../src/reactive/signal.class'
-import { ReactiveErrorCode } from '../src/error-code'
+import * as reactivePublicApi from '../src/index.js'
+import { createRuntime } from '../src/index.js'
+import { ReactiveErrorCode } from '../src/error-code.js'
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url))
 
@@ -40,7 +40,7 @@ describe('M-T14 (§5.2): multiple Runtime instances stay isolated after createSc
   it('a node created by one Runtime is rejected by another Runtime’s tracking context', () => {
     const runtimeA = createRuntime()
     const runtimeB = createRuntime()
-    const foreign = new Signal(1, runtimeB)
+    const foreign = runtimeB.signal(1)
     expect(() =>
       runtimeA.effect(() => {
         expect(foreign.value).toBeDefined()
@@ -52,20 +52,20 @@ describe('M-T14 (§5.2): multiple Runtime instances stay isolated after createSc
   it('each Runtime keeps an independent version clock — writes in one never advance the other', () => {
     const runtimeA = createRuntime()
     const runtimeB = createRuntime()
-    const a = new Signal(0, runtimeA)
-    const beforeB = runtimeB.currentVersion()
+    const a = runtimeA.signal(0)
+    const beforeB = currentRuntimeVersion(runtimeB)
     a.value = 1
     a.value = 2
-    expect(runtimeA.currentVersion()).toBeGreaterThan(beforeB)
-    expect(runtimeB.currentVersion()).toBe(beforeB)
+    expect(currentRuntimeVersion(runtimeA)).toBeGreaterThan(beforeB)
+    expect(currentRuntimeVersion(runtimeB)).toBe(beforeB)
     a.dispose()
   })
 
   it('each Runtime keeps an independent flush queue — flushing one does not run the other’s effects', () => {
     const runtimeA = createRuntime()
     const runtimeB = createRuntime()
-    const a = new Signal(0, runtimeA)
-    const b = new Signal(0, runtimeB)
+    const a = runtimeA.signal(0)
+    const b = runtimeB.signal(0)
     let runsA = 0
     let runsB = 0
     const stopA = runtimeA.effect(() => {
@@ -84,8 +84,8 @@ describe('M-T14 (§5.2): multiple Runtime instances stay isolated after createSc
     expect([runsA, runsB]).toEqual([2, 1])
     runtimeB.flush()
     expect([runsA, runsB]).toEqual([2, 2])
-    stopA()
-    stopB()
+    stopA.dispose()
+    stopB.dispose()
     a.dispose()
     b.dispose()
   })
@@ -93,8 +93,8 @@ describe('M-T14 (§5.2): multiple Runtime instances stay isolated after createSc
   it('disposing one Runtime’s nodes leaves the other Runtime’s nodes fully usable', () => {
     const runtimeA = createRuntime()
     const runtimeB = createRuntime()
-    const a = new Signal(1, runtimeA)
-    const b = new Signal(1, runtimeB)
+    const a = runtimeA.signal(1)
+    const b = runtimeB.signal(1)
     a.dispose()
     expect(() => a.value).toThrowError(
       expect.objectContaining({ code: ReactiveErrorCode.nodeDisposed })

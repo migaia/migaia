@@ -36,8 +36,7 @@ import {
   type IRuntimeErrorReportContext,
   type IRuntimeOptions,
   type IReactiveRuntimeAdapter,
-  type IRuntimeTraceEvent,
-  type ISchedulerStrategy
+  type IRuntimeTraceEvent
 } from './types.js'
 import { Signal } from '../reactive/signal.class.js'
 import { Computed, type IComputedConfig } from '../reactive/computed.class.js'
@@ -49,7 +48,7 @@ import { Effect } from '../reactive/effect.class.js'
 // It also supports independent schedulers, worker runtimes, and distinct stores in DevTools.
 //
 // Runtime factories (`runtime.signal`, `computed`, and `effect`) assign nodes to their creator's graph.
-// Global `signal()`, `computed()`, and `effect()` convenience calls delegate to `defaultRuntime`.
+// Shared convenience calls use the same factories through `defaultRuntime`.
 export class Runtime implements IRuntime {
   readonly [RUNTIME_BRAND] = true as const
   #onError: (error: unknown, context: IRuntimeErrorContext) => unknown
@@ -148,6 +147,14 @@ export class Runtime implements IRuntime {
         ReactiveErrorCode.invalidOption
       )
     }
+    /** Constructor-selected flush timing is admitted before allocating any graph state. */
+    const schedulerStrategyOption = readOption('schedulerStrategy')
+    if (schedulerStrategyOption !== undefined && typeof schedulerStrategyOption !== 'function') {
+      throw tagReactiveError(
+        new TypeError(ReactiveErrorText.schedulerStrategyInvalid),
+        ReactiveErrorCode.invalidOption
+      )
+    }
     const clock = new VersionClock()
     const tracker = new DependencyTracker(this)
     this.#onError =
@@ -178,6 +185,7 @@ export class Runtime implements IRuntime {
       maxFlushPassesOption,
       adapter.scheduleMicrotask
     )
+    if (schedulerStrategyOption !== undefined) scheduler.setStrategy(schedulerStrategyOption)
     // 通知闭包只保存在 WeakMap 内部面。Runtime 实例本身没有 notify 方法，
     // 因而第三方不能拿一个伪造节点绕过受控节点 API。
     const publish = (source: IObservable, version: number): void => {
@@ -266,9 +274,9 @@ export class Runtime implements IRuntime {
   computed<T>(fn: () => T, config?: IComputedConfig<T>): Computed<T> {
     return new Computed(fn, this, config)
   }
-  effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer {
-    const e = new Effect(fn, this, options)
-    return () => e.dispose()
+  /** Creates the existing graph observer and exposes its own disposal lifecycle. */
+  effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): Effect {
+    return new Effect(fn, this, options)
   }
   batch<T>(fn: () => T): T {
     return internalsOf(this).scheduler.runBatched(fn)
@@ -278,12 +286,6 @@ export class Runtime implements IRuntime {
   }
   flush(): IFlushResult {
     return internalsOf(this).scheduler.flush()
-  }
-  setSchedulerStrategy(strategy: ISchedulerStrategy): void {
-    internalsOf(this).scheduler.setStrategy(strategy)
-  }
-  currentVersion(): number {
-    return internalsOf(this).clock.current()
   }
   runTracedAction<T>(name: string, fn: () => T): T {
     if (typeof name !== 'string' || name.length === 0) {
@@ -370,7 +372,7 @@ export class Runtime implements IRuntime {
 }
 
 /** Creates an isolated runtime, for example for one SSR request, test case, or worker. */
-export function createRuntime(options?: IRuntimeOptions): Runtime {
+export function createRuntime(options?: IRuntimeOptions): IRuntime {
   // 双实例自检（copy-check.ts）：创建 Runtime 是首个正确性边界，登记本副本，使
   // runtimeCopyCount()/assertSingleRuntimeCopy() 能发现「两份模块副本」的部署错误。
   noteRuntimeCopy()

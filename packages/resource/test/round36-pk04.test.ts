@@ -85,7 +85,7 @@ describe('PK-04 Resource policy and settlement contracts', () => {
     resolveFetch('done')
     await flush()
     expect(snapshots).toContainEqual(['success', 'idle'])
-    dispose()
+    dispose.dispose()
     resource.dispose()
   })
 })

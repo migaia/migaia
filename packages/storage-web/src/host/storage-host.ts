@@ -26,7 +26,7 @@ import {
   type IStorageStoreCell
 } from './reactive.js'
 import type { IKeyValueStore } from '@migaia/storage-contract'
-import type { IRuntime } from '@migaia/reactive/runtime'
+import type { IRuntime } from '@migaia/reactive'
 import type {
   IStorageBackendPluginHandle,
   IStorageHost,

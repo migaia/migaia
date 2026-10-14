@@ -7,7 +7,7 @@ import {
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { tryReadProperty } from '@migaia/utils/error'
 import { Resource } from '@migaia/resource'
-import type { IComputedValue, IRuntime } from '@migaia/reactive/runtime'
+import type { IReactiveComputed, IRuntime } from '@migaia/reactive'
 import {
   createStorageAggregateError,
   createStorageTypeError,
@@ -495,7 +495,7 @@ export const createStorageReactiveService = (
 
       let resource: Resource<T> | undefined
       /** Canonical same-runtime computed projection whose dependency is Resource.state. */
-      let computedState: IComputedValue<ILiveQueryState<T>> | undefined
+      let computedState: IReactiveComputed<ILiveQueryState<T>> | undefined
       /** Cached terminal projection retained after lifecycle disposes the computed owner. */
       let disposedState: ILiveQueryState<T> | undefined
       let computedStateDisposed = false

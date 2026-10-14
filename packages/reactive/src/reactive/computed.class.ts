@@ -112,7 +112,7 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
   preview(): T {
     if (this.#disposed)
       throw createReactiveError(ReactiveErrorCode.nodeDisposed, ReactiveErrorText.disposedComputed)
-    const version = this.runtime.currentVersion()
+    const version = internalsOf(this.runtime).clock.current()
     if (
       this.#previewVersion === version &&
       this.#previewEpoch === this.#dirtyEpoch &&
@@ -154,7 +154,7 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     const capture = this.#previewCapture
     if (
       capture &&
-      this.#previewVersion === this.runtime.currentVersion() &&
+      this.#previewVersion === internalsOf(this.runtime).clock.current() &&
       this.#previewEpoch === this.#dirtyEpoch &&
       !this.#previewDirty &&
       runtime.tracker.commitCapture(this, capture)

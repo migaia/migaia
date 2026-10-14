@@ -171,7 +171,7 @@ describe('store-indexed', () => {
     expect(collection.snapshot()).toEqual([1, 2, 3])
     expect(runs).toBe(1)
 
-    dispose()
+    dispose.dispose()
     collection.dispose()
   })
 
@@ -204,7 +204,7 @@ describe('store-indexed', () => {
     expect(map.has('b')).toBe(false)
     expect(map.size).toBe(2)
 
-    dispose()
+    dispose.dispose()
     map.dispose()
   })
 
@@ -220,7 +220,7 @@ describe('store-indexed', () => {
     map.replace(new Map([['a', 1]]))
     expect(runs).toBe(1)
 
-    dispose()
+    dispose.dispose()
     map.dispose()
   })
 
@@ -242,7 +242,7 @@ describe('store-indexed', () => {
     expect(set.has(2)).toBe(false)
     expect(set.size).toBe(3)
 
-    dispose()
+    dispose.dispose()
     set.dispose()
   })
 
@@ -258,7 +258,7 @@ describe('store-indexed', () => {
     set.replace([2, 1])
     expect(runs).toBe(1)
 
-    dispose()
+    dispose.dispose()
     set.dispose()
   })
 
@@ -281,8 +281,8 @@ describe('store-indexed', () => {
     expect(structuralRuns).toBe(2)
     expect(membershipRuns).toBe(2)
 
-    disposeMembership()
-    disposeStructure()
+    disposeMembership.dispose()
+    disposeStructure.dispose()
     set.dispose()
   })
 

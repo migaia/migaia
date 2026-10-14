@@ -8,7 +8,7 @@ import { createNodeMessagePortTransport } from '@migaia/rpc-core/adapters/messag
 import { Logger, type ILogEntry, type ISink } from '@migaia/logger'
 import { createCapabilityHost } from '@migaia/capability'
 import { jsonPlugin } from '@migaia/serialize'
-import { Signal, createRuntime } from '@migaia/reactive'
+import { createRuntime } from '@migaia/reactive'
 import { Resource } from '@migaia/resource'
 import { memoryStorageHost } from '@migaia/storage-web/memory'
 import { createStore } from '@migaia/store-light'
@@ -25,7 +25,7 @@ const capabilityHost = createCapabilityHost(undefined)
 void capabilityHost.dispose()
 jsonPlugin()
 const runtime = createRuntime()
-new Signal(0, runtime).dispose()
+runtime.signal(0).dispose()
 new Resource(() => 1, runtime).dispose()
 memoryStorageHost().dispose()
 createStore({ count: 0 }).$dispose()

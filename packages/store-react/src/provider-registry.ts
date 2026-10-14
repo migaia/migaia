@@ -5,7 +5,7 @@ import {
   type IDisposer,
   type IRuntime
 } from '@migaia/reactive'
-import { claimOwnership, ownerOf } from '@migaia/reactive/ownership'
+import { claimOwnership, ownerOf } from '@migaia/reactive/extension'
 import {
   containAsyncRejection,
   createSyncStartedDisposalLedger,

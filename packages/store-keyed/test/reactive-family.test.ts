@@ -516,9 +516,8 @@ describe('computedFamily', () => {
     })
     family.get(2) // over capacity, but 'a' is observed via the effect -> retained
     expect(family.has(1)).toBe(true)
-    // `runtime.effect()` returns an `IDisposer` (`() => void`), not an object with a `.dispose()`
-    // method — call it directly.
-    unsubscribe()
+    // The effect handle owns its subscription lifecycle.
+    unsubscribe.dispose()
     family.dispose()
   })
 })

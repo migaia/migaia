@@ -1,4 +1,4 @@
-import { createRuntime } from '@migaia/reactive/runtime'
+import { createRuntime } from '@migaia/reactive'
 import { describe, expect, it } from 'vitest'
 import { Resource } from '../src/index.js'
 import { ResourceErrorCode } from '../src/error-code.js'

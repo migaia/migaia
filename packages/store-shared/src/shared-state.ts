@@ -2,13 +2,10 @@ import {
   ReactiveErrorPhase,
   type IDisposable,
   type IDisposer,
-  type IObservable,
-  type IObserver,
   type IRuntime
-} from '@migaia/reactive/runtime'
-import { internalsOf } from '@migaia/reactive/internals'
-import { claimOwnership } from '@migaia/reactive/ownership'
-import { registerSubs, registerVersion, readVersion } from '@migaia/reactive/node-internals'
+} from '@migaia/reactive'
+import { claimOwnership, type IObservable, type IObserver } from '@migaia/reactive/extension'
+import { internalsOf, registerSubs, registerVersion, readVersion } from '@migaia/reactive/internals'
 import { createStoreSharedError, createStoreSharedRangeError } from './errors.js'
 import { StoreSharedErrorCode } from './error-code.js'
 import { StoreSharedErrorText } from './error-text.js'
