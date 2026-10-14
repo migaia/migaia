@@ -664,14 +664,17 @@ test('SITE-T-LOGGER-RUNTIME renders the process-wide layer contract and every ho
   }
 })
 
-test('SITE-T-PLUGIN-HOST-ERROR renders identity, cause, and detail as separate contracts', () => {
+test('SITE-T-PLUGIN-HOST-ERROR explains stable codes, original causes, and retained diagnostic detail', () => {
   const errorHtml = readFileSync(
     join(buildRoot, 'zh/docs/plugin-host/PluginHostError/index.html'),
     'utf8'
   )
-  assert.match(errorHtml, /\(source, code\)/)
-  assert.match(errorHtml, /原始失败通过 cause 保持可达/)
-  assert.match(errorHtml, /不可变结构化诊断放入 detail/)
+  /** The example proves failure identity without relying on the old constructor prose. */
+  const text = renderedText(errorHtml)
+  assert.match(text, /error\.code !== PluginHostErrorCode\.pluginInstallFailed/)
+  assert.match(text, /error\.cause === unavailable/)
+  assert.match(text, /保留触发当前错误的原始失败对象/)
+  assert.match(text, /附加应用需要的诊断数据/)
   for (const option of ['code', 'message', 'options-cause', 'options-detail']) {
     assert.match(errorHtml, new RegExp(`--option-${option}"`))
   }
@@ -683,9 +686,13 @@ test('SITE-T-TRAY-ENTRYPOINTS render distinct static and dynamic ownership paths
     'utf8'
   )
   const hostHtml = readFileSync(join(buildRoot, 'zh/docs/tray/host/createHost/index.html'), 'utf8')
-  assert.match(staticHtml, /不可变静态组合根/)
-  assert.match(staticHtml, /await tray\.ready\(\)/)
-  assert.match(staticHtml, /await tray\.dispose\(\)/)
+  /** The fixed graph path starts declared dependencies, consumes a service, and releases the graph. */
+  const staticText = renderedText(staticHtml)
+  assert.match(staticText, /能力集合在启动前固定/)
+  assert.match(staticText, /requires: \[configKey\]/)
+  assert.match(staticText, /await graph\.ready\(\)/)
+  assert.match(staticText, /greeting\.greet\('Migaia'\) === 'Hello, Migaia'/)
+  assert.match(staticText, /await graph\.dispose\(\)/)
   assert.match(staticHtml, /--option-entries-key"/)
   assert.match(hostHtml, /唯一由 Tray 托管的 PluginHost 身份/)
   assert.match(hostHtml, /physicalCompletion/)
@@ -1113,7 +1120,12 @@ test('SITE-T-A26/A30 closes emitted chunk and terminology boundaries', () => {
   for (const file of emittedFiles(buildRoot).filter((candidate) => candidate.endsWith('.html'))) {
     const html = readFileSync(file, 'utf8')
     const proseHtml = html.replace(/<pre(?:\s[^>]*)?>[\s\S]*?<\/pre>/gi, '')
-    assert.doesNotMatch(renderedText(proseHtml), /\bpackages?\b|\bzh-cn\b|\.\.\/packages/i)
+    // A published package is a valid API concept; only repository paths and stale locales leak internals.
+    assert.doesNotMatch(
+      renderedText(proseHtml),
+      /\bzh-cn\b|\.\.[\\/]packages\b|\bpackages[\\/][a-z0-9-]+/i,
+      `repository path or stale locale in page prose: ${file}`
+    )
     assert.doesNotMatch(
       html,
       /not-applicable:|No additional advanced behavior is declared|source-backed (?:advanced semantics|signature)|Declared shape:|(?:function|type) signature export (?:declare|type)/i
@@ -2354,22 +2366,26 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
       'Release WASM allocations deterministically and preserve failure facts',
       'Write a release matrix for every outcome'
     ],
-    ['/zh/guides/tray', 'Tray 学习路径', '先选择正确的组合根'],
-    ['/en/guides/tray', 'Tray learning paths', 'Choose the correct composition root first'],
-    ['/zh/guides/tray/getting-started', '五分钟创建可释放的静态 Tray', '声明完整集合与显式依赖'],
+    ['/zh/guides/tray', 'Tray 学习路径', '先管理完整 Host 实例'],
+    ['/en/guides/tray', 'Tray learning paths', 'Manage complete Host instances first'],
+    [
+      '/zh/guides/tray/getting-started',
+      '五分钟创建和管理 Host 实例',
+      'defineTrayHost、createTray 与 spawn'
+    ],
     [
       '/en/guides/tray/getting-started',
-      'Create a disposable static Tray in five minutes',
-      'Declare the complete set and explicit dependencies'
+      'Create and manage Host instances in five minutes',
+      'defineTrayHost, createTray, and spawn'
     ],
     [
       '/zh/guides/tray/static-composition',
-      '设计静态 Entry 图与 admission 边界',
+      '静态依赖图：Entry 定义与依赖校验',
       '每个 Entry 只声明自己的边界'
     ],
     [
       '/en/guides/tray/static-composition',
-      'Design a static entry graph and admission boundary',
+      'Static dependency graph: entries and dependencies',
       'Each entry declares only its own boundary'
     ],
     [
@@ -2506,27 +2522,27 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
       'Interpolate display text safely and localize numeric output consistently',
       'Choose missing-value and nullish policy explicitly'
     ],
-    ['/zh/guides/rpc-core', 'RPC 学习路径', '先决定端点需要公开什么'],
-    ['/en/guides/rpc-core', 'RPC learning paths', 'First decide what the endpoint must expose'],
+    ['/zh/guides/rpc-core', 'RPC 学习路径', '从实际宿主入口开始'],
+    ['/en/guides/rpc-core', 'RPC learning paths', 'Start from the actual host entry'],
     [
       '/zh/guides/rpc-core/getting-started',
-      '五分钟建立可释放的 RPC 调用链',
-      '先建立 transport，再分别创建两端'
+      '从 Runtime Peer 与插件建立首条调用链',
+      '浏览器：createBrowserPeer'
     ],
     [
       '/en/guides/rpc-core/getting-started',
-      'Build a disposable RPC call path in five minutes',
-      'Create the transport first, then construct both endpoints'
+      'Build the first call path with Runtime Peers and plugins',
+      'Browser: createBrowserPeer'
     ],
     [
       '/zh/guides/rpc-core/endpoint-composition',
-      '四个 Peer/Plugin 工厂：来源、类型与所有权',
-      '按所有权选择四个工厂'
+      '高级组合：精确选择 Endpoint 能力',
+      '选择 Endpoint preset 或显式 Feature 图'
     ],
     [
       '/en/guides/rpc-core/endpoint-composition',
-      'Four Peer/Plugin factories: sources, types and ownership',
-      'Choose the four factories by ownership'
+      'Advanced composition: select Endpoint capabilities precisely',
+      'Choose an Endpoint preset or an explicit Feature graph'
     ],
     [
       '/zh/guides/rpc-core/calls-and-cancellation',
@@ -2720,41 +2736,57 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
       'Adapt runtimes and compose multiple Loggers',
       'Replace the runtime manager only at a platform boundary'
     ],
-    ['/zh/guides/plugin-host', 'Plugin Host 学习路径', '先按任务选择入口'],
-    ['/en/guides/plugin-host', 'Plugin Host learning paths', 'Choose an entry by task'],
-    ['/zh/guides/plugin-host/getting-started', '创建并使用第一个 Plugin Host', '定义领域 core'],
+    ['/zh/guides/plugin-host', '用插件扩展应用', '按要完成的任务选择指南'],
+    ['/en/guides/plugin-host', 'Extend an application with plugins', 'Choose a guide by the task'],
+    [
+      '/zh/guides/plugin-host/getting-started',
+      '安装 upper 插件并得到 MIGAIA',
+      '从插件句柄调用已安装的方法'
+    ],
     [
       '/en/guides/plugin-host/getting-started',
-      'Create and use your first Plugin Host',
-      'Define a domain core'
+      'Install upper and obtain MIGAIA',
+      'Call installed methods through the plugin handle'
     ],
-    ['/zh/guides/plugin-host/install-and-compose', '安装与组合插件', '先排序，再交给 Host 安装'],
+    [
+      '/zh/guides/plugin-host/install-and-compose',
+      '让 greeter 使用 formatter 的能力',
+      '声明 Feature 依赖并安装两个插件'
+    ],
     [
       '/en/guides/plugin-host/install-and-compose',
-      'Install and compose plugins',
-      'Order first, then install'
+      'Let greeter use the formatter capability',
+      'Declare Feature dependencies and install both plugins'
     ],
     [
       '/zh/guides/plugin-host/configuration-and-shared',
-      '配置与 shared 能力',
-      '配置更新成功后才提交'
+      '更新问候语，让插件复用格式化能力',
+      '更新 prefix，并检查下一次问候'
     ],
     [
       '/en/guides/plugin-host/configuration-and-shared',
-      'Configuration and shared capabilities',
-      'Commit configuration only after successful updates'
+      'Update greetings and reuse formatting across plugins',
+      'Update prefix and check the next greeting'
     ],
-    ['/zh/guides/plugin-host/pipelines', '选择并运行 pipeline', '按控制流选择模式'],
+    [
+      '/zh/guides/plugin-host/pipelines',
+      '安装大写处理步骤，并读取转换结果',
+      '先为这个任务选择 sync'
+    ],
     [
       '/en/guides/plugin-host/pipelines',
-      'Choose and run a pipeline',
-      'Choose a mode from control flow'
+      'Install an uppercase stage and consume its result',
+      'Choose sync for this task first'
     ],
-    ['/zh/guides/plugin-host/removal-and-rollback', '卸载、回滚与物理清理', '按依赖反向卸载'],
+    [
+      '/zh/guides/plugin-host/removal-and-rollback',
+      '移除插件，并在安装失败后重新开始',
+      '移除 upper，确认清理只执行一次'
+    ],
     [
       '/en/guides/plugin-host/removal-and-rollback',
-      'Removal, rollback, and physical cleanup',
-      'Remove in reverse dependency order'
+      'Remove a plugin and recover from failed installation',
+      'Remove upper and confirm one cleanup'
     ],
     ['/zh/guides/capability', 'Capability 学习路径', '从变化发生在哪里开始'],
     ['/en/guides/capability', 'Capability learning paths', 'Start with where change occurs'],
@@ -3142,21 +3174,30 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     )
     .join('\n')
   const pluginHostText = renderedText(pluginHostTopics)
-  assert.match(pluginHostText, /new AppHost/)
-  assert.match(pluginHostText, /view\.extensions/)
-  assert.match(pluginHostText, /provider before its consumer/)
-  assert.match(pluginHostText, /queueAdmissionTimeoutMs/)
-  assert.match(pluginHostText, /disposeStepTimeoutMs/)
-  assert.match(pluginHostText, /Register installation resources with core\.onDispose/)
-  assert.match(pluginHostText, /Expose a domain entry point from the Host subclass/)
+  assert.match(pluginHostText, /defineHost/)
+  assert.match(pluginHostText, /const \[handle\] = await host\.use\(upper\)/)
+  assert.match(pluginHostText, /handle\.extensions\.upper/)
+  assert.match(pluginHostText, /factory receives their outputs through its second argument/)
+  assert.match(pluginHostText, /Host resolves these dependencies and installs formatter first/)
+  assert.match(pluginHostText, /Returned handles retain input order/)
+  assert.match(pluginHostText, /core\.config\.get\(\)/)
+  assert.match(pluginHostText, /handle\.config\.update/)
+  assert.match(pluginHostText, /previous\.prefix, 'Hello'/)
+  assert.match(pluginHostText, /core\.onDispose/)
+  assert.match(pluginHostText, /host\.runPipeline/)
   assert.match(pluginHostText, /pipelineDrainTimeoutMs/)
-  assert.match(pluginHostText, /VIEW_REVOKED/)
+  assert.match(pluginHostText, /REGISTRATION_REVOKED/)
   assert.match(pluginHostText, /physicalCompletion/)
-  assert.match(guideSource, /mutationTimeoutMs: 5_000/)
-  assert.match(guideSource, /satisfies IPlugin<IAppCore, IGreetingExtension, IGreetingConfig>/)
-  assert.match(guideSource, /installed\.config\.update\('greeting'/)
+  assert.match(pluginHostText, /cleanup\.cleanupErrors/)
+  assert.match(pluginHostText, /'RECOVERED'/)
+  assert.match(guideSource, /mutationTimeoutMs: 5000/)
+  assert.match(
+    guideSource,
+    /const \[greeterHandle, formatterHandle\] = await host\.use\(greeter, formatter\)/
+  )
+  assert.match(guideSource, /await handle\.config\.update\(\(\) => \(\{ prefix: 'Welcome' \}\)\)/)
   assert.match(guideSource, /core\.usePipeline\(\(value, next\)/)
-  assert.match(guideSource, /consumer first/)
+  assert.match(guideSource, /dependencies\.casing\.upper\(name\)/)
 
   const loggerTopics = [
     'getting-started',
@@ -3223,20 +3264,27 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   assert.match(guideSource, /await db\.transaction\(async \(tx\)/)
   assert.match(guideSource, /plugins: \[indexedDbReactive\(\{[\s\S]*?id: 'primary'/)
 
-  const webRpcStart = readFileSync(
+  /** The first RPC task teaches Runtime Peers and Host connection plugins. */
+  const rpcStart = readFileSync(
     join(buildRoot, artifactPath('/en/guides/rpc-core/getting-started')),
     'utf8'
   )
-  const webRpcStartText = renderedText(webRpcStart)
-  assert.match(webRpcStartText, /createClientEndpoint/)
-  assert.match(webRpcStartText, /createProviderEndpoint/)
-  assert.match(webRpcStartText, /createMemoryTransportPair/)
-  assert.match(webRpcStartText, /provider\.provide/)
-  assert.match(webRpcStartText, /client\.send/)
-  assert.match(webRpcStartText, /construction\.timeoutMs/)
-  assert.match(webRpcStartText, /4096 \/ 310000 ms/)
-  assert.match(webRpcStartText, /OVERLOADED/)
-  assert.match(webRpcStartText, /dispatch is a one-way notification/)
+  /** Actual task results and ownership replace the old low-level Endpoint introduction. */
+  const rpcStartText = renderedText(rpcStart)
+  assert.match(rpcStartText, /createBrowserPeer/)
+  assert.match(rpcStartText, /peer\.request\('double', 21\) === 42/)
+  assert.match(rpcStartText, /provide: \{/)
+  assert.match(rpcStartText, /await peer\.close\(\)/)
+  assert.match(rpcStartText, /createProcessPlugin/)
+  assert.match(rpcStartText, /createThreadPlugin/)
+  assert.match(rpcStartText, /host\.process!\.request\('service', 'math\.double', 21\) === 42/)
+  assert.match(rpcStartText, /host\.thread!\.request\('worker', 'math\.double', 21\) === 42/)
+  assert.match(rpcStartText, /createCoroutinePlugin/)
+  assert.match(rpcStartText, /host\.coroutine!\.request\('math', 'math\.double', 21\) === 42/)
+  assert.match(rpcStartText, /finally \{\s+await host\.dispose\(\)/)
+  assert.match(rpcStartText, /connect and listen own only the local connection/)
+  assert.match(rpcStartText, /cannot be forcibly stopped/)
+  assert.match(rpcStartText, /Choose advanced Endpoint composition afterwards/)
   assert.match(guideSource, /middlewares: \[\\n\s+contract\(\{ version: '1' \}\),/)
   assert.match(guideSource, /await Promise\.all\(\[client\.dispose\(\), provider\.dispose\(\)\]\)/)
   assert.match(guideSource, /path: 'endpoint-composition'/)
@@ -3474,22 +3522,31 @@ test('SITE-T-WEBRPC-NAV exposes primary endpoints and every guide from the left 
   }
 })
 
-test('SITE-T-WEBRPC-ENDPOINT-SELECTION explains four factories and source ownership', () => {
+test('SITE-T-WEBRPC-ENDPOINT-SELECTION explains advanced factories and the lower-level call boundary', () => {
   for (const locale of ['en', 'zh']) {
     const path = `/${locale}/guides/rpc-core/endpoint-composition`
     const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
     for (const factory of [
-      'createProcessPeer',
-      'createProcessPlugin',
-      'createThreadPeer',
-      'createThreadPlugin'
+      'createClientEndpoint',
+      'createProviderEndpoint',
+      'createFullEndpoint',
+      'createComposedEndpoint'
     ])
       assert.ok(page.includes(factory), `${path} misses ${factory}`)
-    for (const source of ['spawn', 'connect', 'listen', 'provide', 'expose'])
-      assert.ok(page.includes(source), `${path} misses ${source}`)
-    assert.match(page, locale === 'zh' ? /所有权/ : /ownership/)
-    assert.match(page, /createPeerPair/)
-    assert.match(page, /createComposedEndpoint/)
+    /** The lower-level example supplies both endpoints and consumes a typed result. */
+    const text = renderedText(page)
+    for (const contract of [
+      'createMemoryTransportPair',
+      'context.success',
+      'client.send<number>',
+      'client.dispose()',
+      'provider.dispose()'
+    ])
+      assert.ok(text.includes(contract), `${path} misses ${contract}`)
+    assert.match(text, /=== 42/)
+    assert.match(text, /send\(targetId, method, payload\)/)
+    assert.match(text, /request\(method, payload\)/)
+    assert.match(text, /createCanonicalChunkFeature/)
     assert.ok(page.includes(`/${locale}/guides/rpc-core/extension-authoring`))
   }
 })
