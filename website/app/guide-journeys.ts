@@ -10,7 +10,7 @@ export type IGuideJourney = {
 type IGuideSections = IGuideJourney['document']['sections']
 
 /** Complete host-by-host RPC transport tutorials, kept separate from endpoint policy. */
-const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = {
+const rpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = {
   zh: [
     {
       id: 'memory-transport',
@@ -11168,183 +11168,479 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   'tray:index': {
     zh: {
       title: 'Tray 学习路径',
-      lede: '先判断集合是启动前固定还是运行期变化：固定集合使用静态 Tray，动态插件使用托管 Host，两者共享依赖与释放语义但公开面不同。',
+      lede: '把一组插件作为完整 Host（插件宿主）运行。创建实例后，用同一套 API 调用、重启并释放它们。',
       document: {
         sections: [
           {
-            id: 'choose-root',
-            heading: '先选择正确的组合根',
+            id: 'host-management',
+            heading: '先管理完整 Host 实例',
             blocks: [
               {
-                type: 'table',
-                headers: ['需求', '入口', '关键边界'],
-                rows: [
-                  ['启动前已知完整集合', '@migaia/tray', '一次 admission，ready 后只读'],
-                  [
-                    '运行期 use、replace、unUse',
-                    '@migaia/tray/host',
-                    'Graph 与 PluginHost 同一发布凭据'
-                  ],
-                  ['跨 Worker 或远端装配', '宿主 adapter', 'Tray core 不负责跨 realm 传输'],
-                  ['UI 通知与交互状态', '应用层', '不要把视图策略塞进组合根']
+                type: 'paragraph',
+                text: '用 defineTrayHost 声明 plugins 与 exposes。把定义传给 createTray({ hosts })，再用 spawn 创建实例。'
+              },
+              {
+                type: 'list',
+                items: [
+                  '通过 remote.request、notify 与 stream 调用公开的 plugin.feature.method。',
+                  '通过 restart、replace 与 remove 管理实例。',
+                  '通过 on 或 watch 观察生命周期，最后 await dispose。'
                 ]
               }
             ]
           },
           {
-            id: 'reading-order',
-            heading: '沿所有权顺序阅读',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  '静态组合：声明 key、requires、start 与 release。',
-                  'Readiness：在启动前关闭外部门，并保留失败身份。',
-                  '资源所有权：主值和辅助资源只释放一次。',
-                  '动态 Host：理解 definition、ready closure 与 mutation 结果。',
-                  '物理清理：区分逻辑提交和真正 quiescence。'
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        { label: '五分钟创建静态 Tray', path: 'getting-started' },
-        { label: '静态组合', path: 'static-composition' }
-      ]
-    },
-    en: {
-      title: 'Tray learning paths',
-      lede: 'First decide whether the complete set is fixed before startup or changes at runtime. Use static Tray for the former and managed Host for dynamic plugins; they share dependency and release semantics but expose different surfaces.',
-      document: {
-        sections: [
-          {
-            id: 'choose-root',
-            heading: 'Choose the correct composition root first',
+            id: 'runtime',
+            heading: '按执行边界选择 runtime',
             blocks: [
               {
                 type: 'table',
-                headers: ['Need', 'Entry', 'Important boundary'],
+                headers: ['runtime', '入口配置', '执行边界'],
                 rows: [
+                  ['coroutine（默认）', '省略 runtime', '共享事件循环，停止采用协作取消。'],
                   [
-                    'Complete set known before startup',
-                    '@migaia/tray',
-                    'One admission and a readonly surface after ready'
+                    'thread',
+                    "runtime: 'thread' 与 entry",
+                    '独立 Worker isolate，可设置 limits.heapBytes。'
                   ],
                   [
-                    'Runtime use, replace, and unUse',
-                    '@migaia/tray/host',
-                    'Graph and PluginHost share one publication receipt'
-                  ],
-                  [
-                    'Cross-Worker or remote composition',
-                    'Host adapter',
-                    'Tray core does not transport across realms'
-                  ],
-                  [
-                    'UI notification and interaction state',
-                    'Application layer',
-                    'Keep view policy out of the composition root'
+                    'process',
+                    "runtime: 'process' 与 entry",
+                    '子进程，可设置 sandbox: { name, wrap }。'
                   ]
                 ]
               }
             ]
           },
           {
-            id: 'reading-order',
-            heading: 'Read in ownership order',
+            id: 'routing-and-topics',
+            heading: '调用路由与业务 pub/sub',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  'Static composition: declare key, requires, start, and release.',
-                  'Readiness: close external gates before startup and preserve failure identity.',
-                  'Resource ownership: release primary values and auxiliary resources exactly once.',
-                  'Dynamic Host: understand definitions, ready closure, and mutation results.',
-                  'Physical cleanup: separate logical commit from actual quiescence.'
-                ]
+                type: 'paragraph',
+                text: 'tray.routing.roundRobin(host) 与 tray.routing("roundRobin", host) 共享选择序列。leastInFlight 选择在途业务调用最少的 ready 实例。'
+              },
+              {
+                type: 'paragraph',
+                text: '用 defineRoutingPolicy 定义自选策略。用 publish 与 subscribe 分发业务 topic，listener 接收 (payload, meta)。meta.from 是父 registry 认证的发送方。'
+              }
+            ]
+          },
+          {
+            id: 'static-dependency-graph',
+            heading: '随后学习静态依赖图',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '启动前已知完整 capability 集合时使用 createTrayGraph(entries)。静态 Graph 管理同一 realm 的依赖启动与资源释放。'
+              },
+              {
+                type: 'paragraph',
+                text: '@migaia/tray/host 提供单个 PluginHost 的托管组合。它与多实例 registry 使用不同公开 API。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Create a static Tray in five minutes', path: 'getting-started' },
-        { label: 'Static composition', path: 'static-composition' }
+        {
+          label: '五分钟管理 Host 实例',
+          path: 'getting-started'
+        },
+        {
+          label: '静态依赖图',
+          path: 'static-composition'
+        },
+        {
+          label: '托管 PluginHost',
+          path: 'dynamic-host'
+        }
+      ]
+    },
+    en: {
+      title: 'Tray learning paths',
+      lede: 'Run a set of plugins as a complete Host. Create instances, call their methods, then restart or dispose them through the same API.',
+      document: {
+        sections: [
+          {
+            id: 'host-management',
+            heading: 'Manage complete Host instances first',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Declare plugins and exposes with defineTrayHost. Pass the definitions to createTray({ hosts }), then create instances with spawn.'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Call exposed plugin.feature.method paths through remote.request, notify, and stream.',
+                  'Manage instances with restart, replace, and remove.',
+                  'Observe lifecycle with on or watch, then await dispose.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'runtime',
+            heading: 'Choose the runtime by execution boundary',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['runtime', 'Entry configuration', 'Execution boundary'],
+                rows: [
+                  [
+                    'coroutine (default)',
+                    'Omit runtime',
+                    'Shares the event loop and stops through cooperative cancellation.'
+                  ],
+                  [
+                    'thread',
+                    "runtime: 'thread' and entry",
+                    'Runs in a Worker isolate and accepts limits.heapBytes.'
+                  ],
+                  [
+                    'process',
+                    "runtime: 'process' and entry",
+                    'Runs in a child process and accepts sandbox: { name, wrap }.'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'routing-and-topics',
+            heading: 'Route calls and publish business topics',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'tray.routing.roundRobin(host) and tray.routing("roundRobin", host) share a selection sequence. leastInFlight chooses a ready instance with the fewest pending business calls.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Define custom selection with defineRoutingPolicy. Distribute business topics with publish and subscribe. Each listener receives (payload, meta). The parent registry authenticates the sender in meta.from.'
+              }
+            ]
+          },
+          {
+            id: 'static-dependency-graph',
+            heading: 'Continue with the static dependency graph',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Use createTrayGraph(entries) when the complete capability set is known before startup. The static Graph owns dependency startup and resource release within one realm.'
+              },
+              {
+                type: 'paragraph',
+                text: '@migaia/tray/host provides managed composition for one PluginHost. Its public API differs from the instance registry.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Manage Host instances in five minutes',
+          path: 'getting-started'
+        },
+        {
+          label: 'Static dependency graph',
+          path: 'static-composition'
+        },
+        {
+          label: 'Managed PluginHost',
+          path: 'dynamic-host'
+        }
       ]
     }
   },
   'tray:getting-started': {
     zh: {
-      title: '五分钟创建可释放的静态 Tray',
-      lede: '集中声明 key 和依赖，等待整图 ready 后读取服务，并由创建者在 finally 中释放。',
+      title: '五分钟创建和管理 Host 实例',
+      lede: '先声明可调用 Feature，再创建 registry 与实例。统一处理调用、实例生命周期和最终释放。',
       document: {
         sections: [
           {
             id: 'define',
-            heading: '声明完整集合与显式依赖',
+            heading: 'defineTrayHost、createTray 与 spawn',
             blocks: [
+              {
+                type: 'paragraph',
+                text: '本例运行于 Node 24 或 Bun 的 ESM 主入口。Feature 是可复用的方法集合。plugins 构建处理端，spawn 返回的 remote 是调用端。默认 coroutine 与主入口共享事件循环。'
+              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\ntype IApiClient = { load(): Promise<unknown> }\nconst createClient = (baseUrl: string): IApiClient => ({ load: async () => fetch(`${baseUrl}/items`).then((response) => response.json()) })\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      return { value: createClient(config.baseUrl), release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTrayGraph(entries)\nawait tray.ready()\n\ntry {\n  await tray.get<IApiClient>(apiKey).load()\n} finally {\n  await tray.dispose()\n}"
+                code: "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst service = defineFeature(() => ({\n  echo: (value: string) => value,\n  note: (value: string) => console.log(value),\n  async *count(limit: number) {\n    for (let value = 1; value <= limit; value++) yield value\n  }\n}))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'worker', features: { svc: service }, install: () => ({})\n  })] as const,\n  exposes: ['worker.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.assert(await alice.request('worker.svc.echo', 'hello') === 'hello')\n  await alice.notify('worker.svc.note', 'ready')\n  /** Collect streamed results before using them. */\n  const values: number[] = []\n  for await (const value of alice.stream('worker.svc.count', 3)) values.push(value)\n  console.assert(values.join(',') === '1,2,3')\n  await tray.restart('alice')\n  await tray.replace('alice')\n  await tray.remove('alice')\n} finally {\n  await tray.dispose()\n}"
               },
               {
                 type: 'list',
                 items: [
-                  'requires 必须列出 context.get 读取的每个依赖。',
-                  'start 返回完整的 value/release 对；部分构造失败由 entry 自己回滚。',
-                  '未 await ready、未知 key、失败或终态时 get 都显式失败。'
+                  'exposes 声明 plugin.feature 路径。remote 调用使用 plugin.feature.method 路径。',
+                  'request 等待结果，notify 发送通知，stream 消费迭代结果。',
+                  'replace 可传 { config }。替换实例初始化成功后才采用新 config。',
+                  'remove 后，旧 remote 不能继续调用。同 id 重新 spawn 不会恢复旧 remote。'
                 ]
+              }
+            ]
+          },
+          {
+            id: 'runtime',
+            heading: 'coroutine、thread 与 process',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['配置', '说明'],
+                rows: [
+                  ['省略 runtime 或 runtime: "coroutine"', '共享事件循环，停止采用协作取消。'],
+                  ['runtime: "thread", entry', 'Worker isolate，可传 limits: { heapBytes }。'],
+                  ['runtime: "process", entry', '子进程，可传 sandbox: { name, wrap }。']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'thread 与 process 的 entry 导入共享 Host 定义，然后执行 await serveTrayHost(host)。sandbox 仅用于 process，并把启动命令交给外部 wrap。Tray 不提供沙箱实现。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { defineTrayHost, type ITraySandbox } from '@migaia/tray'\n\nexport function defineProcessAgent(sandbox: ITraySandbox) {\n  return defineTrayHost({\n    name: 'process-agent',\n    runtime: 'process',\n    entry: new URL('./agent.js', import.meta.url),\n    sandbox,\n    plugins: () => [] as const,\n    exposes: [] as const\n  })\n}"
+              }
+            ]
+          },
+          {
+            id: 'routing',
+            heading: '通过 callable tray.routing 选择实例',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, defineRoutingPolicy } from '@migaia/tray'\n\nconst service = defineFeature(() => ({ echo: (value: string) => value }))\nconst firstReady = defineRoutingPolicy('firstReady', (candidates) => candidates[0]!.id)\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'worker', features: { svc: service }, install: () => ({})\n  })] as const,\n  exposes: ['worker.svc']\n})\nconst tray = createTray({ hosts: [agent], routing: [firstReady] })\ntry {\n  await tray.spawn('agent', { id: 'alice' })\n  await tray.spawn('agent', { id: 'bob' })\n  console.assert(await tray.routing.roundRobin(agent).request('worker.svc.echo', 'one') === 'one')\n  console.assert(await tray.routing('roundRobin', agent).request('worker.svc.echo', 'two') === 'two')\n  console.assert(await tray.routing.leastInFlight(agent).request('worker.svc.echo', 'three') === 'three')\n  console.assert(await tray.routing.firstReady(agent).request('worker.svc.echo', 'four') === 'four')\n} finally {\n  await tray.dispose()\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'roundRobin 按 spawn 顺序循环选择 ready 实例。member 与 callable 形式共享序列。',
+                  'leastInFlight 选择在途业务调用最少的实例。同值按 spawn 顺序选择。',
+                  'defineRoutingPolicy 的 pick 同步返回一个候选实例 id。通过 createTray({ routing }) 或 host 的 routing: [policy] 注册。',
+                  '每次 request、notify 或 stream 重新选择实例。失败不自动 retry 或 fail over。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'pubsub',
+            heading: 'publish 与 subscribe 使用独立业务 topic',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createTray } from '@migaia/tray'\n\nconst tray = createTray({ hosts: [] })\n/** The consumer keeps the delivered value and its authenticated source. */\nlet delivered: unknown\nconst unsubscribe = tray.subscribe('orders.updated', (payload, meta) => {\n  delivered = payload\n  console.assert('parent' in meta.from && meta.from.parent === true)\n})\ntry {\n  tray.publish('orders.updated', 'order-42')\n  console.assert(delivered === 'order-42')\n} finally {\n  unsubscribe()\n  await tray.dispose()\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'meta 是随消息提供的来源信息。listener 的 meta.from 由父侧 Tray 根据已认证连接填写。实例发布使用 { id, host, generation }，父端发布使用 { parent: true }。payload 不能冒充发送方。'
+              },
+              {
+                type: 'paragraph',
+                text: '子实例的订阅在该实例停止或重启时结束。父侧订阅在 unsubscribe 或 tray.dispose 时释放。未 ready 的实例会错过消息。pub/sub 不提供 replay、持久化或 delivery acknowledgement。'
+              }
+            ]
+          },
+          {
+            id: 'observe',
+            heading: '用 on 与 watch 观察生命周期',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '沿用 Node 24 或 Bun ESM。处理端是正在启动的 coroutine 实例，消费端通过 on 的回调和 watch 的迭代器读取状态变化。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createTray, defineTrayHost, TrayInstanceEvent } from '@migaia/tray'\n\n/** A coroutine Host emits lifecycle changes when started. */\nconst agent = defineTrayHost({ name: 'agent', plugins: () => [] as const, exposes: [] })\n/** Parent Tray owns the instance and the observation lifetime. */\nconst tray = createTray({ hosts: [agent] })\n/** The consumer records ready events from the instance. */\nconst ready: string[] = []\nconst unsubscribe = tray.on(TrayInstanceEvent.ready, (event) => { ready.push(event.id) })\n/** The iterator retains lifecycle records until this consumer reads them. */\nconst events = tray.watch()\ntry {\n  await tray.spawn('agent', { id: 'alice' })\n  console.assert(ready.includes('alice'))\n  console.assert((await events.next()).value?.id === 'alice')\n} finally {\n  unsubscribe()\n  await events.return?.()\n  await tray.dispose()\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'on 返回取消订阅函数。watch 接受 AbortSignal，并保留最近 100 条未读记录。生命周期记录是只读观察，业务消息使用 publish 与 subscribe。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: '静态组合契约', path: 'static-composition' },
-        { label: 'createTrayGraph API', path: 'docs/tray/createTrayGraph' }
+        {
+          label: '静态依赖图',
+          path: 'static-composition'
+        },
+        {
+          label: '选择 thread 或 process runtime',
+          path: 'docs/tray/defineTrayHost'
+        },
+        {
+          label: '调用和管理 Host 实例',
+          path: 'docs/tray/createTray'
+        }
       ]
     },
     en: {
-      title: 'Create a disposable static Tray in five minutes',
-      lede: 'Declare keys and dependencies centrally, wait until the complete graph is ready, then read services and let the creator release them in finally.',
+      title: 'Create and manage Host instances in five minutes',
+      lede: 'Declare callable Features, then create the registry and instances. Make calls, manage instances, and dispose Tray when finished.',
       document: {
         sections: [
           {
             id: 'define',
-            heading: 'Declare the complete set and explicit dependencies',
+            heading: 'defineTrayHost, createTray, and spawn',
             blocks: [
+              {
+                type: 'paragraph',
+                text: 'Run this example in a Node 24 or Bun ESM entry. A Feature groups reusable methods. plugins builds the handler side. The remote returned by spawn is the consumer. The default coroutine shares the entry event loop.'
+              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\ntype IApiClient = { load(): Promise<unknown> }\nconst createClient = (baseUrl: string): IApiClient => ({ load: async () => fetch(`${baseUrl}/items`).then((response) => response.json()) })\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      return { value: createClient(config.baseUrl), release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTrayGraph(entries)\nawait tray.ready()\n\ntry {\n  await tray.get<IApiClient>(apiKey).load()\n} finally {\n  await tray.dispose()\n}"
+                code: "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst service = defineFeature(() => ({\n  echo: (value: string) => value,\n  note: (value: string) => console.log(value),\n  async *count(limit: number) {\n    for (let value = 1; value <= limit; value++) yield value\n  }\n}))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'worker', features: { svc: service }, install: () => ({})\n  })] as const,\n  exposes: ['worker.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.assert(await alice.request('worker.svc.echo', 'hello') === 'hello')\n  await alice.notify('worker.svc.note', 'ready')\n  /** Collect streamed results before using them. */\n  const values: number[] = []\n  for await (const value of alice.stream('worker.svc.count', 3)) values.push(value)\n  console.assert(values.join(',') === '1,2,3')\n  await tray.restart('alice')\n  await tray.replace('alice')\n  await tray.remove('alice')\n} finally {\n  await tray.dispose()\n}"
               },
               {
                 type: 'list',
                 items: [
-                  'requires lists every dependency read through context.get.',
-                  'start returns a complete value/release pair; the entry rolls back its own partial construction.',
-                  'get fails explicitly before ready, for an unknown key, after failure, or in terminal state.'
+                  'exposes declares plugin.feature paths. Remote calls use plugin.feature.method paths.',
+                  'request awaits a result, notify sends a notification, and stream consumes iterable results.',
+                  'replace accepts { config }. The new config is saved only after the replacement instance starts successfully.',
+                  'remove invalidates the old remote. Spawning the same id does not restore it.'
                 ]
+              }
+            ]
+          },
+          {
+            id: 'runtime',
+            heading: 'coroutine, thread, and process',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Configuration', 'Behavior'],
+                rows: [
+                  [
+                    'Omit runtime or use runtime: "coroutine"',
+                    'Shares the event loop and stops through cooperative cancellation.'
+                  ],
+                  [
+                    'runtime: "thread", entry',
+                    'Runs in a Worker isolate and accepts limits: { heapBytes }.'
+                  ],
+                  [
+                    'runtime: "process", entry',
+                    'Runs in a child process and accepts sandbox: { name, wrap }.'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'A thread or process entry imports the shared Host definition and runs await serveTrayHost(host). Only process accepts sandbox. Its external wrap transforms the launch command. Tray supplies no sandbox implementation.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { defineTrayHost, type ITraySandbox } from '@migaia/tray'\n\nexport function defineProcessAgent(sandbox: ITraySandbox) {\n  return defineTrayHost({\n    name: 'process-agent',\n    runtime: 'process',\n    entry: new URL('./agent.js', import.meta.url),\n    sandbox,\n    plugins: () => [] as const,\n    exposes: [] as const\n  })\n}"
+              }
+            ]
+          },
+          {
+            id: 'routing',
+            heading: 'Choose instances through callable tray.routing',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost, defineRoutingPolicy } from '@migaia/tray'\n\nconst service = defineFeature(() => ({ echo: (value: string) => value }))\nconst firstReady = defineRoutingPolicy('firstReady', (candidates) => candidates[0]!.id)\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'worker', features: { svc: service }, install: () => ({})\n  })] as const,\n  exposes: ['worker.svc']\n})\nconst tray = createTray({ hosts: [agent], routing: [firstReady] })\ntry {\n  await tray.spawn('agent', { id: 'alice' })\n  await tray.spawn('agent', { id: 'bob' })\n  console.assert(await tray.routing.roundRobin(agent).request('worker.svc.echo', 'one') === 'one')\n  console.assert(await tray.routing('roundRobin', agent).request('worker.svc.echo', 'two') === 'two')\n  console.assert(await tray.routing.leastInFlight(agent).request('worker.svc.echo', 'three') === 'three')\n  console.assert(await tray.routing.firstReady(agent).request('worker.svc.echo', 'four') === 'four')\n} finally {\n  await tray.dispose()\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'roundRobin cycles through ready instances in spawn order. Member and callable forms share one sequence.',
+                  'leastInFlight chooses the fewest pending business calls. Spawn order breaks ties.',
+                  'The defineRoutingPolicy picker synchronously returns a candidate instance id. Register it with createTray({ routing }) or routing: [policy] in the host definition.',
+                  'Each request, notify, or stream selects an instance again. Calls never automatically retry or fail over.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'pubsub',
+            heading: 'Publish and subscribe to separate business topics',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createTray } from '@migaia/tray'\n\nconst tray = createTray({ hosts: [] })\n/** The consumer keeps the delivered value and its authenticated source. */\nlet delivered: unknown\nconst unsubscribe = tray.subscribe('orders.updated', (payload, meta) => {\n  delivered = payload\n  console.assert('parent' in meta.from && meta.from.parent === true)\n})\ntry {\n  tray.publish('orders.updated', 'order-42')\n  console.assert(delivered === 'order-42')\n} finally {\n  unsubscribe()\n  await tray.dispose()\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'meta carries source information alongside the payload. Parent Tray fills meta.from from the authenticated connection. Instance publications carry { id, host, generation }. Parent publications carry { parent: true }. Payloads cannot impersonate the sender.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Child subscriptions end when that instance stops or restarts. Parent subscriptions end at unsubscribe or tray.dispose. Instances miss messages while not ready. Pub/sub provides no replay, persistence, or delivery acknowledgement.'
+              }
+            ]
+          },
+          {
+            id: 'observe',
+            heading: 'Observe lifecycle with on and watch',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Continue in Node 24 or Bun ESM. The coroutine instance emits lifecycle changes. The consumer reads them through an on callback and a watch iterator.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createTray, defineTrayHost, TrayInstanceEvent } from '@migaia/tray'\n\n/** A coroutine Host emits lifecycle changes when started. */\nconst agent = defineTrayHost({ name: 'agent', plugins: () => [] as const, exposes: [] })\n/** Parent Tray owns the instance and the observation lifetime. */\nconst tray = createTray({ hosts: [agent] })\n/** The consumer records ready events from the instance. */\nconst ready: string[] = []\nconst unsubscribe = tray.on(TrayInstanceEvent.ready, (event) => { ready.push(event.id) })\n/** The iterator retains lifecycle records until this consumer reads them. */\nconst events = tray.watch()\ntry {\n  await tray.spawn('agent', { id: 'alice' })\n  console.assert(ready.includes('alice'))\n  console.assert((await events.next()).value?.id === 'alice')\n} finally {\n  unsubscribe()\n  await events.return?.()\n  await tray.dispose()\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'on returns an unsubscribe function. watch accepts an AbortSignal and retains the latest 100 unread records. Lifecycle records are readonly observations. Use publish and subscribe for business messages.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Static composition contracts', path: 'static-composition' },
-        { label: 'createTrayGraph API', path: 'docs/tray/createTrayGraph' }
+        {
+          label: 'Static dependency graph',
+          path: 'static-composition'
+        },
+        {
+          label: 'Choose thread or process runtime',
+          path: 'docs/tray/defineTrayHost'
+        },
+        {
+          label: 'Call and manage Host instances',
+          path: 'docs/tray/createTray'
+        }
       ]
     }
   },
   'tray:static-composition': {
     zh: {
-      title: '设计静态 Entry 图与 admission 边界',
-      lede: 'createTrayGraph 先同步验证并快照整个拓扑，首次 ready 才读取 gate 并启动 Graph；调用方之后修改定义不会改变已接纳结构。',
+      title: '静态依赖图：Entry 定义与依赖校验',
+      lede: '按依赖顺序启动一组 entry（启动项），再按相反顺序释放它们。createTrayGraph 保存启动定义，首次 ready() 才执行启动。',
       document: {
         sections: [
+          {
+            id: 'static-dependency-graph',
+            heading: '创建完整静态集合并等待 ready',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '本例运行于 Node 24 或 Bun ESM。config entry 提供问候语前缀，greeting entry 使用该配置。消费端取得服务并断言问候结果。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createTrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** The provider starts before the service that reads this config. */\nconst configKey = 'config' as ITrayKey\n/** The consumer exposes the greeting created from that config. */\nconst greetingKey = 'greeting' as ITrayKey\n/** Node 24 or Bun ESM owns this fixed set of startup entries. */\nconst graph = createTrayGraph([\n  {\n    key: configKey, kind: 'value',\n    start: () => ({ value: { prefix: 'Hello' }, release: () => undefined })\n  },\n  {\n    key: greetingKey, kind: 'service', requires: [configKey],\n    start: ({ get }) => {\n      /** Read the provider after it is ready. */\n      const config = get<{ prefix: string }>(configKey)\n      return {\n        value: { greet: (name: string) => `${config.prefix}, ${name}` },\n        release: () => undefined\n      }\n    }\n  }\n])\ntry {\n  await graph.ready()\n  /** Consume the service rather than discarding its result. */\n  const greeting = graph.get<{ greet(name: string): string }>(greetingKey)\n  console.assert(greeting.greet('Migaia') === 'Hello, Migaia')\n} finally {\n  await graph.dispose()\n}"
+              }
+            ]
+          },
           {
             id: 'entry',
             heading: '每个 Entry 只声明自己的边界',
@@ -11368,22 +11664,37 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: '数组、字段、kind、key、requires 或 readiness 外形非法时抛 TRAY_INVALID_ENTRY；重复 key 抛 TRAY_DUPLICATE_ENTRY。admission 冻结规范化 key/requires，失败不会留下半启动 Graph。'
+                text: '无效定义抛出 TRAY_INVALID_ENTRY。重复 key 抛出 TRAY_DUPLICATE_ENTRY。校验在启动任何 entry 前完成。创建后修改原数组不会改变依赖关系。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Readiness 与错误', path: 'readiness-and-errors' },
+        { label: '处理启动未就绪与失败', path: 'readiness-and-errors' },
         { label: 'ITrayEntryDefinition 类型', path: 'docs/tray/index' }
       ]
     },
     en: {
-      title: 'Design a static entry graph and admission boundary',
-      lede: 'createTrayGraph synchronously validates and snapshots the complete topology. The first ready call reads gates and starts the Graph; later caller mutations cannot change admitted structure.',
+      title: 'Static dependency graph: entries and dependencies',
+      lede: 'Start a fixed set of entries in dependency order and release them in reverse order. createTrayGraph saves the definitions, and the first ready() starts them.',
       document: {
         sections: [
+          {
+            id: 'static-dependency-graph',
+            heading: 'Create the complete static set and await ready',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Run in Node 24 or Bun ESM. The config entry provides a greeting prefix. The greeting entry uses it. The consumer obtains the service and asserts the greeting result.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createTrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** The provider starts before the service that reads this config. */\nconst configKey = 'config' as ITrayKey\n/** The consumer exposes the greeting created from that config. */\nconst greetingKey = 'greeting' as ITrayKey\n/** Node 24 or Bun ESM owns this fixed set of startup entries. */\nconst graph = createTrayGraph([\n  {\n    key: configKey, kind: 'value',\n    start: () => ({ value: { prefix: 'Hello' }, release: () => undefined })\n  },\n  {\n    key: greetingKey, kind: 'service', requires: [configKey],\n    start: ({ get }) => {\n      /** Read the provider after it is ready. */\n      const config = get<{ prefix: string }>(configKey)\n      return {\n        value: { greet: (name: string) => `${config.prefix}, ${name}` },\n        release: () => undefined\n      }\n    }\n  }\n])\ntry {\n  await graph.ready()\n  /** Consume the service rather than discarding its result. */\n  const greeting = graph.get<{ greet(name: string): string }>(greetingKey)\n  console.assert(greeting.greet('Migaia') === 'Hello, Migaia')\n} finally {\n  await graph.dispose()\n}"
+              }
+            ]
+          },
           {
             id: 'entry',
             heading: 'Each entry declares only its own boundary',
@@ -11419,14 +11730,14 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Invalid arrays, fields, kinds, keys, requires, or readiness shapes throw TRAY_INVALID_ENTRY; duplicate keys throw TRAY_DUPLICATE_ENTRY. Admission freezes normalized key and requires snapshots, and failure leaves no partially started Graph.'
+                text: 'Invalid definitions throw TRAY_INVALID_ENTRY. Duplicate keys throw TRAY_DUPLICATE_ENTRY. Validation finishes before any entry starts. Later changes to the original array do not change dependencies.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Readiness and errors', path: 'readiness-and-errors' },
+        { label: 'Handle startup readiness and failure', path: 'readiness-and-errors' },
         { label: 'ITrayEntryDefinition types', path: 'docs/tray/index' }
       ]
     }
@@ -13325,64 +13636,67 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   'rpc-core:index': {
     zh: {
       title: 'RPC 学习路径',
-      lede: '先选择最窄 endpoint 表面与真实 transport，再逐步加入 provider、契约、发现、控制、分片和生命周期策略。',
+      lede: '先选择 Runtime Peer 或 PluginHost 插件。用 request、notify 与 stream 进入业务调用。',
       document: {
         sections: [
           {
-            id: 'choose-endpoint',
-            heading: '先决定端点需要公开什么',
+            id: 'choose-runtime',
+            heading: '从实际宿主入口开始',
             blocks: [
               {
                 type: 'table',
-                headers: ['需求', '入口', '公开能力'],
+                headers: ['场景', '入口', '所有者'],
                 rows: [
                   [
-                    '只调用或通知远端',
-                    'createClientEndpoint',
-                    'send、sendAll、dispatch、dispatchAll'
+                    'iframe、SharedWorker、可靠有序 RTCDataChannel',
+                    '@migaia/rpc-browser 的 createBrowserPeer',
+                    '调用方 close 逻辑 Peer。'
                   ],
-                  ['暴露方法并可能回调对端', 'createProviderEndpoint', 'outbound + provide'],
                   [
-                    '明确需要全部能力',
-                    'createFullEndpoint',
-                    'outbound、provider、discovery、control'
+                    'PluginHost 管理子进程',
+                    '@migaia/rpc-process 的 createProcessPlugin',
+                    'Host 管理 host.process 出口。'
                   ],
-                  ['严格控制 bundle 与表面', 'createComposedEndpoint', '只投影显式 Feature']
+                  [
+                    'PluginHost 管理 Worker',
+                    '@migaia/rpc-threads 的 createThreadPlugin',
+                    'Host 管理 host.thread 出口。'
+                  ],
+                  [
+                    '同进程受监督 task',
+                    '@migaia/rpc-core/remote 的 createCoroutinePlugin',
+                    'Host 管理 host.coroutine 出口。'
+                  ]
                 ]
-              },
-              {
-                type: 'paragraph',
-                text: 'Feature 决定 endpoint 根对象公开的方法；middleware 负责协议、连接、认证、超时和策略。Feature 的私有依赖不会自动扩大公开 API。'
               }
             ]
           },
           {
-            id: 'choose-transport',
-            heading: '再按拓扑与所有权选择 transport',
+            id: 'calls-and-ownership',
+            heading: '先完成调用和释放闭环',
             blocks: [
               {
                 type: 'list',
                 items: [
-                  'exclusive：Dedicated Worker 或 MessagePort 等唯一对端链路。',
-                  'multiplexed：Shared Worker 等多发送方链路，必须有 peer/source 身份校验。',
-                  'broadcast：BroadcastChannel 等诚实节点路由，不是身份或保密边界。',
-                  'owned transport 由 endpoint dispose；borrowed transport 只解除自身订阅。'
+                  'Peer 的 provide 使用业务函数或 async generator。插件还可通过 expose 公开本端 Host 的方法。',
+                  '独立 Peer 用 close 释放。PluginHost 安装的连接随 Host dispose 释放。',
+                  'request 等待结果。notify 完成只表示发送，不表示远端执行成功。',
+                  '需要独立进程或 Worker Peer 时，使用 createProcessPeer 或 createThreadPeer。'
                 ]
               }
             ]
           },
           {
             id: 'reading-order',
-            heading: '按一条真实调用链继续阅读',
+            heading: '按业务入口继续阅读',
             blocks: [
               {
                 type: 'list',
                 items: [
-                  '快速开始：用 Memory transport 跑通一次 request/response。',
-                  'Client 与取消：区分 send、sendAll、dispatch，并处理 timeout 与 AbortSignal。',
-                  'Provider 与契约：校验 params/result，并保留远端错误链。',
-                  'Transport 与安全：确认 topology、origin、sourceProof 与 authentication。',
-                  '分片、重放和生命周期：只在实际需要时加入容量与恢复策略。'
+                  '快速开始：浏览器 Runtime Peer 和三个运行时插件入口。',
+                  '调用与取消：理解 payload、timeoutMs 和 AbortSignal。',
+                  'Provider 与契约：约束真正公开的方法。',
+                  '高级组合：只有需要自定义 Endpoint 能力或 middleware 时选择 createClientEndpoint、createComposedEndpoint 等工厂。'
                 ]
               }
             ]
@@ -13390,79 +13704,83 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: '五分钟建立第一条 RPC 链路', path: 'getting-started' },
-        { label: '选择 Endpoint 组合方式', path: 'endpoint-composition' },
-        { label: 'Provider 与契约', path: 'providers-and-contracts' }
+        {
+          label: 'Runtime Peer 与插件快速开始',
+          path: 'getting-started'
+        },
+        {
+          label: '调用与取消',
+          path: 'calls-and-cancellation'
+        },
+        {
+          label: '高级 Endpoint 组合',
+          path: 'endpoint-composition'
+        }
       ]
     },
     en: {
       title: 'RPC learning paths',
-      lede: 'Choose the narrowest endpoint surface and a truthful transport first, then add providers, contracts, discovery, control, chunking, and lifecycle policies as separate decisions.',
+      lede: 'Choose a Runtime Peer or a PluginHost plugin first. Enter business calls through request, notify, and stream.',
       document: {
         sections: [
           {
-            id: 'choose-endpoint',
-            heading: 'First decide what the endpoint must expose',
+            id: 'choose-runtime',
+            heading: 'Start from the actual host entry',
             blocks: [
               {
                 type: 'table',
-                headers: ['Need', 'Entry', 'Public capability'],
+                headers: ['Scenario', 'Entry', 'Owner'],
                 rows: [
                   [
-                    'Only call or notify a remote peer',
-                    'createClientEndpoint',
-                    'send, sendAll, dispatch, dispatchAll'
+                    'iframe, SharedWorker, or reliable ordered RTCDataChannel',
+                    'createBrowserPeer from @migaia/rpc-browser',
+                    'Caller closes the logical Peer.'
                   ],
                   [
-                    'Expose methods and possibly call back',
-                    'createProviderEndpoint',
-                    'outbound + provide'
+                    'PluginHost manages a child process',
+                    'createProcessPlugin from @migaia/rpc-process',
+                    'Host owns the host.process outlet.'
                   ],
                   [
-                    'Explicitly need every capability',
-                    'createFullEndpoint',
-                    'outbound, provider, discovery, control'
+                    'PluginHost manages a Worker',
+                    'createThreadPlugin from @migaia/rpc-threads',
+                    'Host owns the host.thread outlet.'
                   ],
                   [
-                    'Control bundle and surface precisely',
-                    'createComposedEndpoint',
-                    'Only explicitly selected Features'
+                    'Supervised task in the same process',
+                    'createCoroutinePlugin from @migaia/rpc-core/remote',
+                    'Host owns the host.coroutine outlet.'
                   ]
                 ]
-              },
-              {
-                type: 'paragraph',
-                text: 'Features decide which methods appear on the endpoint root. Middleware owns protocol, connection, authentication, timeout, and policy. A Feature’s private dependency never expands the public API automatically.'
               }
             ]
           },
           {
-            id: 'choose-transport',
-            heading: 'Then choose a transport by topology and ownership',
+            id: 'calls-and-ownership',
+            heading: 'Complete the call and cleanup loop first',
             blocks: [
               {
                 type: 'list',
                 items: [
-                  'exclusive: one-peer links such as a Dedicated Worker or MessagePort.',
-                  'multiplexed: multi-sender links such as Shared Worker, requiring peer or source identity verification.',
-                  'broadcast: honest-node routing such as BroadcastChannel, not an identity or confidentiality boundary.',
-                  'An owned transport is closed by endpoint disposal; a borrowed transport only loses this endpoint’s subscriptions.'
+                  'Peer provide accepts business functions or async generators. Plugins can also expose local Host methods through expose.',
+                  'Close standalone Peers with close. Host disposal releases connections installed as plugins.',
+                  'request awaits a result. notify completion means the message was sent, not that remote execution succeeded.',
+                  'Use createProcessPeer or createThreadPeer when a standalone process or Worker Peer fits the application.'
                 ]
               }
             ]
           },
           {
             id: 'reading-order',
-            heading: 'Continue along one real call path',
+            heading: 'Continue from the business entry',
             blocks: [
               {
                 type: 'list',
                 items: [
-                  'Getting started: complete one request/response through a Memory transport.',
-                  'Client and cancellation: distinguish send, sendAll, and dispatch, then handle timeout and AbortSignal.',
-                  'Provider and contracts: validate params and results while preserving remote error chains.',
-                  'Transport and security: verify topology, origin, sourceProof, and authentication.',
-                  'Chunking, replay, and lifecycle: add capacity and recovery policy only when the workload requires it.'
+                  'Getting started: browser Runtime Peer and the three runtime plugin entries.',
+                  'Calls and cancellation: understand payload, timeoutMs, and AbortSignal.',
+                  'Providers and contracts: constrain methods that are actually exposed.',
+                  'Advanced composition: choose createClientEndpoint, createComposedEndpoint, or another factory when custom Endpoint capabilities or middleware are required.'
                 ]
               }
             ]
@@ -13470,287 +13788,275 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: 'Build the first RPC link in five minutes', path: 'getting-started' },
-        { label: 'Choose an Endpoint composition', path: 'endpoint-composition' },
-        { label: 'Providers and contracts', path: 'providers-and-contracts' }
+        {
+          label: 'Runtime Peer and plugin quickstart',
+          path: 'getting-started'
+        },
+        {
+          label: 'Calls and cancellation',
+          path: 'calls-and-cancellation'
+        },
+        {
+          label: 'Advanced Endpoint composition',
+          path: 'endpoint-composition'
+        }
       ]
     }
   },
   'rpc-core:getting-started': {
     zh: {
-      title: '五分钟建立可释放的 RPC 调用链',
-      lede: '用一对 Memory transport、最窄 client/provider preset 和同一组基础 middleware 完成请求、响应与释放闭环。',
+      title: '从 Runtime Peer 与插件建立首条调用链',
+      lede: '完成浏览器、进程、Worker 或同进程 task 的远程调用。Peer 是两端之间的调用连接，PluginHost 是安装和释放插件的宿主。',
       document: {
         sections: [
           {
-            id: 'create-pair',
-            heading: '先建立 transport，再分别创建两端',
+            id: 'browser-peer',
+            heading: '浏览器：createBrowserPeer',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { connect, contract, protocol, timeout } from '@migaia/rpc-core'\nimport { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { createProviderEndpoint } from '@migaia/rpc-core/provider'\n\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst provider = await createProviderEndpoint({\n  id: 'provider',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ] as const\n})\n\nconst client = await createClientEndpoint({\n  id: 'client',\n  targetIds: ['provider'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport }),\n    timeout({ timeoutMs: 5_000 })\n  ] as const\n})"
+                type: 'paragraph',
+                text: '在 https://app.example 页面加载 id 为 billing 的 iframe。先在 iframe 内运行下面的 provide 示例，再运行父页面代码。createBrowserPeer 返回后即可 request。'
               },
               {
-                type: 'list',
-                items: [
-                  'id 是拓扑内唯一路由标识，不是身份凭证。',
-                  'transport 在 factory 与 connect() 同时提供时必须是同一对象。',
-                  'middlewares 使用 as const，才能保留条件能力的精确类型。'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'factory-options',
-            heading: '逐项决定 Endpoint 构造配置',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['字段', '默认值', '作用'],
-                rows: [
-                  ['id', '必填', '拓扑内稳定路由标签；不是认证身份。'],
-                  ['targetIds', '[]', '已知远端种子；自动 discovery 可在之后发现更多目标。'],
-                  [
-                    'transport',
-                    '由 middleware 提供',
-                    'Endpoint 使用的消息通道；与 connect.transport 同时存在时必须同一引用。'
-                  ],
-                  ['provider', '{}', '构造完成前原子注册的初始 provider 方法。'],
-                  [
-                    'providerLimits',
-                    '256 global / 64 peer',
-                    '限制在途 provider 工作，满载立即返回 OVERLOADED。'
-                  ],
-                  ['replay', '4096 / 310000 ms', '限制 outbound request id 的容量与保留时间。'],
-                  ['middlewares', '必填 tuple', '按序原子安装协议、连接、认证、timeout 等策略。'],
-                  ['construction.signal', 'undefined', '取消构造，但仍逆序回滚已安装 middleware。'],
-                  ['construction.timeoutMs', 'false', '限制完整构造；false 明确关闭 deadline。']
-                ]
-              }
-            ]
-          },
-          {
-            id: 'call',
-            heading: '注册 provider 并发出一次可等待调用',
-            blocks: [
-              {
                 type: 'code',
                 language: 'ts',
-                code: "provider.provide('sum', (context) => {\n  const values = context.data as readonly number[]\n  return context.success(values.reduce((total, value) => total + value, 0))\n})\n\nconst total = await client.send<number>('provider', 'sum', [1, 2, 3])\nconsole.log(total) // 6"
+                code: "import { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** The billing iframe is already loaded on this https://app.example page. */\nconst frame = document.querySelector<HTMLIFrameElement>('#billing')!\n/** This Peer borrows the iframe window and completes the handshake. */\nconst peer = await createBrowserPeer<{ double(value: number): number }>({\n  connect: { window: frame.contentWindow!, origin: 'https://billing.example' }\n})\ntry {\n  console.assert(await peer.request('double', 21) === 42)\n} finally {\n  await peer.close()\n}"
               },
               {
                 type: 'paragraph',
-                text: 'send 等待一次结构化响应；dispatch 是不等待响应的单向通知。不要用 dispatch 模拟需要确认或重试的业务操作。'
+                text: 'iframe 是处理端。provide 公开供父页面调用的业务函数。以下 origin 对应父页面。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createBrowserPeer } from '@migaia/rpc-browser'\n\nasync function* count(limit: number) {\n  for (let value = 1; value <= limit; value++) yield value\n}\nconst peer = await createBrowserPeer({\n  connect: { window: window.parent, origin: 'https://app.example' },\n  provide: {\n    double: (value: number) => value * 2,\n    note: (value: string) => console.log(value),\n    count\n  }\n})\nwindow.addEventListener('pagehide', () => void peer.close(), { once: true })"
+              },
+              {
+                type: 'paragraph',
+                text: 'close 释放本端逻辑连接和监听器。借用 Window、SharedWorker port 或 RTCDataChannel 的原生生命周期仍由调用方管理。'
               }
             ]
           },
           {
-            id: 'dispose',
-            heading: '让 endpoint 所有者关闭整棵资源',
+            id: 'process-and-thread-plugins',
+            heading: '进程与 Worker：createProcessPlugin / createThreadPlugin',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '把插件交给 host.use 安装。通过 host.process 或 host.thread 的首个参数指定连接名。下面假设对应 entry 提供 math.double。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { defineHost } from '@migaia/plugin-host'\nimport { createProcessPlugin } from '@migaia/rpc-process'\nimport { createThreadPlugin } from '@migaia/rpc-threads'\n\ntype IServiceApi = { math: { double(value: number): number } }\nconst processService = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({\n  name: 'service', spawn: new URL('./service.js', import.meta.url)\n})\nconst threadService = createThreadPlugin<IServiceApi, Record<never, never>, 'worker'>({\n  name: 'worker', spawn: new URL('./worker.js', import.meta.url)\n})\nconst host = defineHost<Record<string, never>, never, readonly [typeof processService, typeof threadService]>({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  await host.use(processService)\n  await host.use(threadService)\n  console.assert(await host.process!.request('service', 'math.double', 21) === 42)\n  console.assert(await host.thread!.request('worker', 'math.double', 21) === 42)\n} finally {\n  await host.dispose()\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'spawn 创建的执行单元由 Host 管理。connect 与 listen 只持有本端连接，不拥有远端进程或 Worker。'
+              }
+            ]
+          },
+          {
+            id: 'coroutine-plugin',
+            heading: '同进程 task：createCoroutinePlugin',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: 'type IDisposableEndpoint = { dispose(): Promise<void> }\n\nexport async function disposeEndpointTree(\n  client: IDisposableEndpoint,\n  provider: IDisposableEndpoint\n) {\n  // 两个 endpoint 互不依赖，允许并行结算 pending 请求并释放各自所有资源。\n  await Promise.all([client.dispose(), provider.dispose()])\n}'
+                code: "import { defineHost } from '@migaia/plugin-host'\nimport { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\nconst service = createCoroutinePlugin<{ math: { double(value: number): number } }>({\n  name: 'math',\n  task: async ({ connect, signal }) => {\n    const parent = createCoroutinePlugin({\n      name: 'parent', connect,\n      provide: { math: { double: (value: number) => value * 2 } }\n    })\n    const child = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\n    try {\n      await child.use(parent)\n      await new Promise<void>((resolve) => {\n        if (signal.aborted) resolve()\n        else signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n    } finally {\n      await child.dispose()\n    }\n  }\n})\nconst host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  await host.use(service)\n  console.assert(await host.coroutine!.request('math', 'math.double', 21) === 42)\n} finally {\n  await host.dispose()\n}"
               },
               {
                 type: 'paragraph',
-                text: 'dispose 立即结算 pending 请求、关闭 provider admission，并清理 middleware、订阅和 owned transport。重复调用复用第一次结果。'
+                text: 'task 模式创建受监督的任务。子 task 用收到的 connect 连接父 Host。task 与 connect 必须二选一。'
+              },
+              {
+                type: 'paragraph',
+                text: 'task resolve 表示正常退出。task reject 表示异常退出。停止通过 signal 协作取消。task 在 finally 中释放子 Host 后才结束。阻塞事件循环的 task 无法强制停止。'
+              }
+            ]
+          },
+          {
+            id: 'advanced-composition',
+            heading: '下一步再选高级 Endpoint 组合',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '直接 Endpoint 按目标 id 与方法名调用。它不提供 Runtime Peer 的握手方法目录。需要控制 Feature 和 middleware 时继续阅读高级组合。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: '五分钟建立首条调用链', path: 'getting-started' },
-        { label: 'Provider 与契约', path: 'providers-and-contracts' },
-        { label: 'createClientEndpoint API', path: 'docs/rpc-core/client/createClientEndpoint' }
+        {
+          label: '高级 Endpoint 组合',
+          path: 'endpoint-composition'
+        },
+        {
+          label: 'createBrowserPeer API',
+          path: 'docs/rpc-browser/createBrowserPeer'
+        },
+        {
+          label: 'createCoroutinePlugin API',
+          path: 'docs/rpc-core/remote/createCoroutinePlugin'
+        }
       ]
     },
     en: {
-      title: 'Build a disposable RPC call path in five minutes',
-      lede: 'Use a Memory transport pair, narrow client/provider presets, and the same foundational middleware to close the request, response, and disposal loop.',
+      title: 'Build the first call path with Runtime Peers and plugins',
+      lede: 'Complete a remote call in a browser, process, Worker, or same-process task. A Peer connects the two sides. PluginHost installs and releases connection plugins.',
       document: {
         sections: [
           {
-            id: 'create-pair',
-            heading: 'Create the transport first, then construct both endpoints',
+            id: 'browser-peer',
+            heading: 'Browser: createBrowserPeer',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { connect, contract, protocol, timeout } from '@migaia/rpc-core'\nimport { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { createProviderEndpoint } from '@migaia/rpc-core/provider'\n\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst provider = await createProviderEndpoint({\n  id: 'provider',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ] as const\n})\n\nconst client = await createClientEndpoint({\n  id: 'client',\n  targetIds: ['provider'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport }),\n    timeout({ timeoutMs: 5_000 })\n  ] as const\n})"
+                type: 'paragraph',
+                text: 'Load the billing iframe on the https://app.example page. Run the provide example below inside the iframe before running the parent code. Call request after createBrowserPeer returns.'
               },
               {
-                type: 'list',
-                items: [
-                  'id is a unique routing label within the topology and is not an identity credential.',
-                  'When transport appears in both the factory and connect(), both references must be the same object.',
-                  'Keep middlewares as const so conditional capabilities remain precisely typed.'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'factory-options',
-            heading: 'Choose every Endpoint construction option',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Field', 'Default', 'Purpose'],
-                rows: [
-                  [
-                    'id',
-                    'required',
-                    'Stable routing label within the topology; never an authentication identity.'
-                  ],
-                  [
-                    'targetIds',
-                    '[]',
-                    'Known-peer seed; automatic discovery may find more targets later.'
-                  ],
-                  [
-                    'transport',
-                    'provided by middleware',
-                    'Endpoint message channel; it must be the same reference as connect.transport when both exist.'
-                  ],
-                  [
-                    'provider',
-                    '{}',
-                    'Initial provider methods registered atomically before construction resolves.'
-                  ],
-                  [
-                    'providerLimits',
-                    '256 global / 64 peer',
-                    'Bounds active provider work and returns OVERLOADED immediately at saturation.'
-                  ],
-                  [
-                    'replay',
-                    '4096 / 310000 ms',
-                    'Bounds outbound request-id capacity and retention lifetime.'
-                  ],
-                  [
-                    'middlewares',
-                    'required tuple',
-                    'Installs protocol, connection, authentication, timeout, and policy atomically in order.'
-                  ],
-                  [
-                    'construction.signal',
-                    'undefined',
-                    'Cancels construction while still rolling installed middleware back in reverse order.'
-                  ],
-                  [
-                    'construction.timeoutMs',
-                    'false',
-                    'Bounds complete construction; false explicitly disables its deadline.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'call',
-            heading: 'Register a provider and issue one awaited call',
-            blocks: [
-              {
                 type: 'code',
                 language: 'ts',
-                code: "provider.provide('sum', (context) => {\n  const values = context.data as readonly number[]\n  return context.success(values.reduce((total, value) => total + value, 0))\n})\n\nconst total = await client.send<number>('provider', 'sum', [1, 2, 3])\nconsole.log(total) // 6"
+                code: "import { createBrowserPeer } from '@migaia/rpc-browser'\n\n/** The billing iframe is already loaded on this https://app.example page. */\nconst frame = document.querySelector<HTMLIFrameElement>('#billing')!\n/** This Peer borrows the iframe window and completes the handshake. */\nconst peer = await createBrowserPeer<{ double(value: number): number }>({\n  connect: { window: frame.contentWindow!, origin: 'https://billing.example' }\n})\ntry {\n  console.assert(await peer.request('double', 21) === 42)\n} finally {\n  await peer.close()\n}"
               },
               {
                 type: 'paragraph',
-                text: 'send awaits one structured response. dispatch is a one-way notification with no response. Do not use dispatch to model a business operation that requires acknowledgement or retry.'
+                text: 'The iframe provides the handler side. provide publishes the functions called by the parent page. Its origin option identifies the parent page.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createBrowserPeer } from '@migaia/rpc-browser'\n\nasync function* count(limit: number) {\n  for (let value = 1; value <= limit; value++) yield value\n}\nconst peer = await createBrowserPeer({\n  connect: { window: window.parent, origin: 'https://app.example' },\n  provide: {\n    double: (value: number) => value * 2,\n    note: (value: string) => console.log(value),\n    count\n  }\n})\nwindow.addEventListener('pagehide', () => void peer.close(), { once: true })"
+              },
+              {
+                type: 'paragraph',
+                text: 'close releases local logical connections and listeners. The caller still owns the native Window, SharedWorker port, or RTCDataChannel.'
               }
             ]
           },
           {
-            id: 'dispose',
-            heading: 'Let the endpoint owner close the complete resource tree',
+            id: 'process-and-thread-plugins',
+            heading: 'Processes and Workers: createProcessPlugin / createThreadPlugin',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Install each plugin with host.use. The first argument on host.process or host.thread selects a connection name. The example assumes each entry provides math.double.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { defineHost } from '@migaia/plugin-host'\nimport { createProcessPlugin } from '@migaia/rpc-process'\nimport { createThreadPlugin } from '@migaia/rpc-threads'\n\ntype IServiceApi = { math: { double(value: number): number } }\nconst processService = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({\n  name: 'service', spawn: new URL('./service.js', import.meta.url)\n})\nconst threadService = createThreadPlugin<IServiceApi, Record<never, never>, 'worker'>({\n  name: 'worker', spawn: new URL('./worker.js', import.meta.url)\n})\nconst host = defineHost<Record<string, never>, never, readonly [typeof processService, typeof threadService]>({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  await host.use(processService)\n  await host.use(threadService)\n  console.assert(await host.process!.request('service', 'math.double', 21) === 42)\n  console.assert(await host.thread!.request('worker', 'math.double', 21) === 42)\n} finally {\n  await host.dispose()\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'Host manages execution units created with spawn. connect and listen own only the local connection, never the remote process or Worker.'
+              }
+            ]
+          },
+          {
+            id: 'coroutine-plugin',
+            heading: 'Same-process tasks: createCoroutinePlugin',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: 'type IDisposableEndpoint = { dispose(): Promise<void> }\n\nexport async function disposeEndpointTree(\n  client: IDisposableEndpoint,\n  provider: IDisposableEndpoint\n) {\n  // 两个 endpoint 互不依赖，允许并行结算 pending 请求并释放各自所有资源。\n  await Promise.all([client.dispose(), provider.dispose()])\n}'
+                code: "import { defineHost } from '@migaia/plugin-host'\nimport { createCoroutinePlugin } from '@migaia/rpc-core/remote'\n\nconst service = createCoroutinePlugin<{ math: { double(value: number): number } }>({\n  name: 'math',\n  task: async ({ connect, signal }) => {\n    const parent = createCoroutinePlugin({\n      name: 'parent', connect,\n      provide: { math: { double: (value: number) => value * 2 } }\n    })\n    const child = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\n    try {\n      await child.use(parent)\n      await new Promise<void>((resolve) => {\n        if (signal.aborted) resolve()\n        else signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n    } finally {\n      await child.dispose()\n    }\n  }\n})\nconst host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } })\ntry {\n  await host.use(service)\n  console.assert(await host.coroutine!.request('math', 'math.double', 21) === 42)\n} finally {\n  await host.dispose()\n}"
               },
               {
                 type: 'paragraph',
-                text: 'dispose settles pending requests immediately, closes provider admission, and cleans middleware, subscriptions, and owned transports. Repeated calls reuse the first result.'
+                text: 'Task mode creates a supervised task. A child task uses its received connect value to connect to the parent Host. Select either task or connect.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Task resolution means a clean exit. Rejection means a crash. Stop cooperatively cancels signal. The task releases its child Host in finally before ending. A task blocking the event loop cannot be forcibly stopped.'
+              }
+            ]
+          },
+          {
+            id: 'advanced-composition',
+            heading: 'Choose advanced Endpoint composition afterwards',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A direct Endpoint calls a target id and method name. It does not provide the Runtime Peer handshake directory. Continue to advanced composition when explicit Feature or middleware control is required.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Build the first call path in five minutes', path: 'getting-started' },
-        { label: 'Providers and contracts', path: 'providers-and-contracts' },
-        { label: 'createClientEndpoint API', path: 'docs/rpc-core/client/createClientEndpoint' }
+        {
+          label: 'Advanced Endpoint composition',
+          path: 'endpoint-composition'
+        },
+        {
+          label: 'createBrowserPeer API',
+          path: 'docs/rpc-browser/createBrowserPeer'
+        },
+        {
+          label: 'createCoroutinePlugin API',
+          path: 'docs/rpc-core/remote/createCoroutinePlugin'
+        }
       ]
     }
   },
   'rpc-core:endpoint-composition': {
     zh: {
-      title: '四个 Peer/Plugin 工厂：来源、类型与所有权',
-      lede: '先区分进程或 Worker，再决定独立 Peer 或 PluginHost 所有。provide/expose 决定真正公开的方法，目录由库生成。',
+      title: '高级组合：精确选择 Endpoint 能力',
+      lede: '完成 Runtime Peer 或插件调用后，再按自定义协议与公开能力选择 Endpoint 工厂。',
       document: {
         sections: [
           {
             id: 'factory-choice',
-            heading: '按所有权选择四个工厂',
+            heading: '选择 Endpoint preset 或显式 Feature 图',
             blocks: [
               {
                 type: 'table',
-                headers: ['Factory', 'Entry', 'Owner'],
+                headers: ['需求', '工厂', '公开能力'],
                 rows: [
-                  ['createProcessPeer', 'process', '调用方 close / caller close'],
-                  ['createProcessPlugin', 'process', 'PluginHost / host.process'],
-                  ['createThreadPeer', 'threads', '调用方 close / caller close'],
-                  ['createThreadPlugin', 'threads', 'PluginHost / host.thread']
+                  ['只发起调用', 'createClientEndpoint', 'send、sendAll、dispatch、dispatchAll'],
+                  ['提供方法并调用对端', 'createProviderEndpoint', 'outbound 与 provide'],
+                  [
+                    '完整能力集合',
+                    'createFullEndpoint',
+                    'outbound、provider、discovery 与 control'
+                  ],
+                  ['显式选择 Feature 图', 'createComposedEndpoint', '只公开所选 Feature 的方法。']
                 ]
               },
               {
                 type: 'paragraph',
-                text: '独立 Peer 的调用方负责 close；Plugin 随 host.use 安装，由 Host outlet 统一寻址和释放。四个工厂提供同一套 request、notify 与 stream，不需要复制业务协议。'
+                text: 'Feature 决定公开能力。middleware 负责连接、协议与调用策略。内部使用的 Feature 不会自动增加公开方法。'
               }
             ]
           },
           {
-            id: 'source-ownership',
-            heading: '选择 spawn、connect 或 listen',
+            id: 'endpoint-call',
+            heading: '用 Memory transport 理解底层调用',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  'spawn 持有真实 launcher 单元，可以按原 owner 执行 stop/kill/restart/replace。',
-                  'connect/listen 借用对端，只可关闭本端连接，不拥有对端进程或 Worker。',
-                  '没有来源或同时选择多个来源会同步拒绝；自动来源只在真实 launcher bootstrap 下成立。',
-                  '需要避开 relay 时由双方显式 connect/listen；没有 direct/upgrade 分配器。'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'typed-provide',
-            heading: '从真实 provide 交叉推导调用',
-            blocks: [
+                type: 'paragraph',
+                text: '本例在 Node 24 或 Bun ESM 内运行。Memory transport 是同进程的消息连接。provider 是处理端，client 是调用端；断言验证 double 返回 42。'
+              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createPeerPair } from '@migaia/rpc-core/testing'\n\nconst pair = await createPeerPair({\n  a: { provide: { echo: (text: string) => text } },\n  b: { provide: { double: (value: number) => value * 2 } }\n})\ntry {\n  console.log(await pair.a.request('double', 21))\n  console.log(await pair.b.request('echo', 'ready'))\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n}"
+                code: "import { connect } from '@migaia/rpc-core'\nimport { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { createProviderEndpoint } from '@migaia/rpc-core/provider'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst provider = await createProviderEndpoint({\n  id: 'calculator', transport: right,\n  middlewares: [connect({ transport: right })] as const\n})\nconst client = await createClientEndpoint({\n  id: 'app', targetIds: ['calculator'], transport: left,\n  middlewares: [connect({ transport: left })] as const\n})\ntry {\n  provider.provide('double', (context) => context.success(Number(context.data) * 2))\n  console.assert(await client.send<number>('calculator', 'double', 21) === 42)\n} finally {\n  await Promise.all([client.dispose(), provider.dispose()])\n}"
               },
               {
                 type: 'paragraph',
-                text: '这个内存示例使用真实 Peer/core，但不证明原生 transfer 或进程隔离。生产父子端完整 launcher、budget、bootstrap 和类型范例在各工厂指南。'
+                text: 'Endpoint 使用 send(targetId, method, payload) 与 context.success。Runtime Peer 使用 request(method, payload) 与业务函数。不要混用两套调用形式。'
               }
             ]
           },
           {
-            id: 'advanced-core',
-            heading: '高级 core 组合保留原 Feature owner',
+            id: 'composition-boundary',
+            heading: '复用现有 Feature',
             blocks: [
               {
                 type: 'paragraph',
-                text: '窗口、浏览器载体或精确自定义 endpoint 可使用 core/client、provider、full、composed。createComposedEndpoint 只安装显式 Feature 图；createCanonicalChunkFeature、createOutboundFeature 和 createProviderFeature 共享原重组、身份及准入 owner。不要再使用旧 chunk/outbound/provider aliases。'
+                text: '用对象列出 createComposedEndpoint 需要的 Features。复用 createCanonicalChunkFeature、createOutboundFeature 与 createProviderFeature，获得已有的分块传输、调用与方法注册能力。'
               }
             ]
           }
@@ -13758,81 +14064,86 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: '独立进程 Peer',
-          path: 'docs/rpc-process/createProcessPeer'
+          label: '自定义 Feature 与 middleware',
+          path: 'extension-authoring'
         },
         {
-          label: '独立 Worker Peer',
-          path: 'docs/rpc-threads/createThreadPeer'
-        },
-        {
-          label: '载体与安全边界',
+          label: '载体与安全',
           path: 'transports-and-security'
+        },
+        {
+          label: 'createComposedEndpoint API',
+          path: 'docs/rpc-core/composed/createComposedEndpoint'
         }
       ]
     },
     en: {
-      title: 'Four Peer/Plugin factories: sources, types and ownership',
-      lede: 'Choose process or Worker, then standalone Peer or PluginHost ownership. Real provide/expose methods define the generated directory.',
+      title: 'Advanced composition: select Endpoint capabilities precisely',
+      lede: 'Complete Runtime Peer or plugin calls first. Then choose an Endpoint factory for custom protocols and public capabilities.',
       document: {
         sections: [
           {
             id: 'factory-choice',
-            heading: 'Choose the four factories by ownership',
+            heading: 'Choose an Endpoint preset or an explicit Feature graph',
             blocks: [
               {
                 type: 'table',
-                headers: ['Factory', 'Entry', 'Owner'],
+                headers: ['Need', 'Factory', 'Public capability'],
                 rows: [
-                  ['createProcessPeer', 'process', 'Caller close'],
-                  ['createProcessPlugin', 'process', 'PluginHost / host.process'],
-                  ['createThreadPeer', 'threads', 'Caller close'],
-                  ['createThreadPlugin', 'threads', 'PluginHost / host.thread']
+                  [
+                    'Outbound calls only',
+                    'createClientEndpoint',
+                    'send, sendAll, dispatch, dispatchAll'
+                  ],
+                  [
+                    'Provide methods and call peers',
+                    'createProviderEndpoint',
+                    'outbound and provide'
+                  ],
+                  [
+                    'Complete capability set',
+                    'createFullEndpoint',
+                    'outbound, provider, discovery, and control'
+                  ],
+                  [
+                    'Explicit Feature graph',
+                    'createComposedEndpoint',
+                    'Publishes only methods from selected Features.'
+                  ]
                 ]
               },
               {
                 type: 'paragraph',
-                text: 'Standalone callers close their Peer. A Plugin is installed with host.use and addressed/released through the Host outlet. All four factories share request, notify and stream without copying a business protocol.'
+                text: 'Features define public capabilities. Middleware owns connection, protocol, and call policy. Internally used Features do not automatically add public methods.'
               }
             ]
           },
           {
-            id: 'source-ownership',
-            heading: 'Select spawn, connect or listen',
+            id: 'endpoint-call',
+            heading: 'Learn lower-level calls through Memory transport',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  'spawn owns the genuine launcher unit and uses its original stop/kill/restart/replace owner.',
-                  'connect/listen borrow the peer and close only the local session, never the remote unit.',
-                  'Missing or conflicting sources are rejected; automatic sources require genuine launcher bootstrap.',
-                  'Avoid relay by explicitly connecting/listening; there is no direct/upgrade allocator.'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'typed-provide',
-            heading: 'Infer calls from actual provide',
-            blocks: [
+                type: 'paragraph',
+                text: 'Run this example in Node 24 or Bun ESM. Memory transport connects both sides in one process. provider handles the call, client consumes the result, and the assertion checks that double returns 42.'
+              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createPeerPair } from '@migaia/rpc-core/testing'\n\nconst pair = await createPeerPair({\n  a: { provide: { echo: (text: string) => text } },\n  b: { provide: { double: (value: number) => value * 2 } }\n})\ntry {\n  console.log(await pair.a.request('double', 21))\n  console.log(await pair.b.request('echo', 'ready'))\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n}"
+                code: "import { connect } from '@migaia/rpc-core'\nimport { createClientEndpoint } from '@migaia/rpc-core/client'\nimport { createProviderEndpoint } from '@migaia/rpc-core/provider'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst provider = await createProviderEndpoint({\n  id: 'calculator', transport: right,\n  middlewares: [connect({ transport: right })] as const\n})\nconst client = await createClientEndpoint({\n  id: 'app', targetIds: ['calculator'], transport: left,\n  middlewares: [connect({ transport: left })] as const\n})\ntry {\n  provider.provide('double', (context) => context.success(Number(context.data) * 2))\n  console.assert(await client.send<number>('calculator', 'double', 21) === 42)\n} finally {\n  await Promise.all([client.dispose(), provider.dispose()])\n}"
               },
               {
                 type: 'paragraph',
-                text: 'This memory example uses the real Peer/core and proves neither native transfer nor process isolation. Each factory guide includes the complete production launcher, budget, bootstrap and types.'
+                text: 'Endpoint uses send(targetId, method, payload) and context.success. Runtime Peer uses request(method, payload) and business functions. Keep each call form with its API.'
               }
             ]
           },
           {
-            id: 'advanced-core',
-            heading: 'Advanced core composition retains Feature owners',
+            id: 'composition-boundary',
+            heading: 'Reuse existing Features',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Window/browser carriers and precisely customized endpoints use core/client, provider, full and composed. createComposedEndpoint installs an explicit Feature graph; canonical chunk, outbound and provider factories share original reassembly, identity and admission owners. The old chunk/outbound/provider aliases are removed.'
+                text: 'List the required Features in an object passed to createComposedEndpoint. Reuse createCanonicalChunkFeature, createOutboundFeature, and createProviderFeature for chunked transfer, calls, and method registration.'
               }
             ]
           }
@@ -13840,16 +14151,16 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'process Peer',
-          path: 'docs/rpc-process/createProcessPeer'
-        },
-        {
-          label: 'Worker Peer',
-          path: 'docs/rpc-threads/createThreadPeer'
+          label: 'Custom Features and middleware',
+          path: 'extension-authoring'
         },
         {
           label: 'Transport and security',
           path: 'transports-and-security'
+        },
+        {
+          label: 'createComposedEndpoint API',
+          path: 'docs/rpc-core/composed/createComposedEndpoint'
         }
       ]
     }
@@ -14466,7 +14777,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               }
             ]
           },
-          ...webRpcTransportGuideSections.zh,
+          ...rpcTransportGuideSections.zh,
           {
             id: 'authentication',
             heading: '需要保密或抗篡改时保护每一帧',
@@ -14520,7 +14831,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               }
             ]
           },
-          ...webRpcTransportGuideSections.en,
+          ...rpcTransportGuideSections.en,
           {
             id: 'authentication',
             heading: 'Protect every frame when confidentiality or integrity matters',
@@ -18574,87 +18885,34 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'plugin-host:index': {
     zh: {
-      title: 'Plugin Host 学习路径',
-      lede: '从一次可靠安装开始，再理解配置、共享能力、pipeline 与卸载；API 声明放在最后查阅，不替代这些任务指南。',
+      title: '用插件扩展应用',
+      lede: '安装一个插件，把文字转换成大写。再学习共享处理能力、更新配置和卸载插件。',
       document: {
         sections: [
           {
             id: 'choose-path',
-            heading: '先按任务选择入口',
+            heading: '按要完成的任务选择指南',
             blocks: [
               {
                 type: 'table',
-                headers: ['你要完成的任务', '阅读路径', '得到的结果'],
+                headers: ['任务', '入口', '可检查的结果'],
                 rows: [
-                  ['创建宿主并安装第一个插件', '快速开始', '可调用且可卸载的 immutable view'],
-                  ['多个插件有先后关系', '安装与组合', '由组合层给出的显式拓扑顺序'],
-                  ['插件交换配置或能力', '配置与 shared', '事务配置与有所有者的共享值'],
-                  ['按顺序拦截领域调用', 'Pipelines', '与执行模型匹配的 stage 链'],
-                  ['安全卸载或处理失败', '卸载、回滚与清理', '逻辑撤销和物理清理分离']
-                ]
-              }
-            ]
-          },
-          {
-            id: 'mental-model',
-            heading: '先建立正确心智模型',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  'Host 串行化 mutation，并只在完整安装成功后发布新 view。',
-                  'view 是某一代不可变快照；扩展位于 view.extensions，而不是 Host 实例上。',
-                  'PluginHost 不解析依赖图；组合层必须先安装 provider，卸载时先移除 consumer。',
-                  '卸载先撤销新调用能力，再等待在途 pipeline 与资源完成物理清理。'
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        { label: '快速开始', path: 'getting-started' },
-        { label: '安装与组合', path: 'install-and-compose' },
-        { label: 'PluginHost API', path: 'docs/plugin-host/PluginHost' }
-      ]
-    },
-    en: {
-      title: 'Plugin Host learning paths',
-      lede: 'Start with one reliable installation, then learn configuration, shared capabilities, pipelines, and removal. API declarations are the final lookup layer, not a substitute for these tasks.',
-      document: {
-        sections: [
-          {
-            id: 'choose-path',
-            heading: 'Choose an entry by task',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Task', 'Read', 'Outcome'],
-                rows: [
+                  ['安装第一个插件', 'getting-started', '把 migaia 转换为 MIGAIA。'],
                   [
-                    'Create a host and install one plugin',
-                    'Getting started',
-                    'An immutable callable and removable view'
+                    '让插件使用另一个插件的能力',
+                    'install-and-compose',
+                    '用 formatter 的 Feature 生成 Hello MIGAIA。'
                   ],
                   [
-                    'Order several related plugins',
-                    'Install and compose',
-                    'An explicit topology owned by the composition layer'
+                    '更新问候语并共享格式化方法',
+                    'configuration-and-shared',
+                    '新调用使用 Welcome，两个插件复用 casing。'
                   ],
+                  ['按顺序转换输入', 'pipelines', '处理结果从 hello 变为 HELLO。'],
                   [
-                    'Exchange configuration or capabilities',
-                    'Configuration and shared',
-                    'Transactional config and owned shared values'
-                  ],
-                  [
-                    'Intercept domain calls in order',
-                    'Pipelines',
-                    'A stage chain matching one execution model'
-                  ],
-                  [
-                    'Remove safely or recover from failure',
-                    'Removal, rollback, and cleanup',
-                    'Logical revocation separated from physical cleanup'
+                    '移除插件并处理安装失败',
+                    'removal-and-rollback',
+                    '资源释放一次，失败后可以重新安装。'
                   ]
                 ]
               }
@@ -18662,15 +18920,16 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
           },
           {
             id: 'mental-model',
-            heading: 'Build the right mental model first',
+            heading: '分清定义、安装与调用',
             blocks: [
               {
                 type: 'list',
                 items: [
-                  'The Host serializes mutations and publishes a new view only after a complete installation succeeds.',
-                  'A view is an immutable generation snapshot; extensions live on view.extensions, not the Host instance.',
-                  'PluginHost does not resolve a dependency graph. The composition layer installs providers first and removes consumers first.',
-                  'Removal revokes new calls before active pipelines and resources finish physical cleanup.'
+                  'Host 是管理插件安装和清理的宿主。defineHost 创建可直接使用的 Host handle（宿主句柄）。',
+                  'definePlugin 保存插件定义。host.use(...plugins) 才执行安装，并返回按输入顺序排列的 plugin handle（插件句柄）。',
+                  'extension 是 install 返回给业务调用方的方法。使用 handle.extensions 调用它。',
+                  'Feature 是可复用的能力实现。用 defineFeature 声明依赖，通过 handle.getFeature 读取已安装的输出。',
+                  '需要卸载时调用 host.unUse。应用结束时 await host.dispose，并检查清理结果。'
                 ]
               }
             ]
@@ -18678,650 +18937,725 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: 'Getting started', path: 'getting-started' },
-        { label: 'Install and compose', path: 'install-and-compose' },
-        { label: 'PluginHost API', path: 'docs/plugin-host/PluginHost' }
+        {
+          label: '安装 upper 并得到 MIGAIA',
+          path: 'getting-started'
+        },
+        {
+          label: '组合 formatter 与 greeter',
+          path: 'install-and-compose'
+        }
+      ]
+    },
+    en: {
+      title: 'Extend an application with plugins',
+      lede: 'Install a plugin that converts text to uppercase. Then share processing capabilities, update configuration, and remove plugins.',
+      document: {
+        sections: [
+          {
+            id: 'choose-path',
+            heading: 'Choose a guide by the task',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Task', 'Guide', 'Result to check'],
+                rows: [
+                  ['Install the first plugin', 'getting-started', 'Convert migaia to MIGAIA.'],
+                  [
+                    'Use a capability from another plugin',
+                    'install-and-compose',
+                    'Build Hello MIGAIA through the formatter Feature.'
+                  ],
+                  [
+                    'Update greetings and share formatting',
+                    'configuration-and-shared',
+                    'New calls use Welcome and two plugins reuse casing.'
+                  ],
+                  ['Transform input in order', 'pipelines', 'Turn hello into HELLO.'],
+                  [
+                    'Remove a plugin and handle installation failure',
+                    'removal-and-rollback',
+                    'Release resources once and install again after failure.'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'mental-model',
+            heading: 'Separate definitions, installation, and calls',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'The Host owns plugin installation and cleanup. defineHost creates its usable handle.',
+                  'definePlugin stores a definition. host.use(...plugins) performs installation and returns plugin handles in input order.',
+                  'An extension is a business method returned by install. Call it through handle.extensions.',
+                  'A Feature is a reusable capability implementation. Declare dependencies with defineFeature and read installed output through handle.getFeature.',
+                  'Call host.unUse to remove a plugin. Await host.dispose at shutdown and inspect its cleanup result.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Install upper and obtain MIGAIA',
+          path: 'getting-started'
+        },
+        {
+          label: 'Compose formatter and greeter',
+          path: 'install-and-compose'
+        }
       ]
     }
   },
   'plugin-host:getting-started': {
     zh: {
-      title: '创建并使用第一个 Plugin Host',
-      lede: '用显式执行预算、领域 core 和一个插件完成安装、调用与清理闭环。',
+      title: '安装 upper 插件并得到 MIGAIA',
+      lede: '定义一个转换方法。安装后从插件句柄调用它，并在同一个脚本中释放宿主。',
       document: {
         sections: [
           {
             id: 'create-host',
-            heading: '定义领域 core，并显式选择等待预算',
+            heading: '运行一个完整的安装与调用示例',
             blocks: [
+              {
+                type: 'paragraph',
+                text: '以下完整示例在 Node 24 的 ESM 项目中运行。安装 @migaia/plugin-host 后保存为 main.ts，执行 node main.ts。node:assert/strict 用断言检查业务结果；通过时脚本没有输出。'
+              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { PluginHost } from '@migaia/plugin-host'\n\ntype ICore = { write(message: string): void }\n\nclass AppHost extends PluginHost<ICore> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (message) => console.log(message) }\n  }\n}\n\nconst host = new AppHost({\n  execution: {\n    mutationTimeoutMs: 5_000,\n    pipelineDrainTimeoutMs: 5_000\n  }\n})"
+                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst upper = definePlugin({\n  name: 'upper',\n  install: () => ({ upper: (value: string) => value.toUpperCase() })\n})\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [handle] = await host.use(upper)\n  const result = handle.extensions.upper('migaia')\n  assert.equal(result, 'MIGAIA')\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
               },
               {
                 type: 'paragraph',
-                text: '两个 execution 字段都是必填的产品决策。数字提供有界等待；false 表示明确接受无限等待，而不是默认值。'
+                text: 'definePlugin 不会立即执行 install。defineHost 创建宿主，await host.use(upper) 安装插件。返回值是 tuple（按输入顺序排列的结果数组），所以示例取出第一项 handle。'
               }
             ]
           },
           {
             id: 'use-view',
-            heading: '只从成功安装返回的 view 调用能力',
+            heading: '从插件句柄调用已安装的方法',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "type IGreetingPlugin = { name: 'greeting' }\ntype IInstalledView = {\n  extensions: { greet(name: string): void }\n  unUse(name: string): Promise<{ physicalCompletion?: Promise<void> }>\n}\ntype IGreetingHost = {\n  use(plugin: IGreetingPlugin): Promise<IInstalledView>\n  dispose(): Promise<void>\n}\n\nexport async function runGreeting(host: IGreetingHost, greetingPlugin: IGreetingPlugin) {\n  const view = await host.use(greetingPlugin)\n  view.extensions.greet('Migaia')\n\n  const removal = await view.unUse('greeting')\n  if (removal.physicalCompletion) await removal.physicalCompletion\n  await host.dispose()\n}\n\n// 调用方把上一节创建的 host 和 greetingPlugin 传入，形成安装、使用、卸载闭环。"
+                type: 'paragraph',
+                text: 'handle.extensions.upper 是本例的业务入口。传入 migaia 后得到 MIGAIA，assert.equal 检查结果。Host handle 负责安装和清理，plugin handle 负责访问插件能力。'
               },
               {
-                type: 'list',
-                items: [
-                  'use() 成功后才会发布包含新插件的 view；失败不会留下半安装能力。',
-                  '不要把 extension 当作 host.greet 调用，它只存在于对应 view.extensions 上。',
-                  '应用终止时 await host.dispose()，不要只触发清理后立即退出。'
-                ]
+                type: 'paragraph',
+                text: '当前入口不需要旧式 view。plugin handle 没有 unUse 或 dispose；这些操作属于 Host。安装失败时 use 拒绝，调用方不能使用本次未返回的 handle。'
               }
             ]
           },
           {
             id: 'plugin-contract',
-            heading: '插件同时声明扩展、配置、共享能力与清理责任',
+            heading: '需要领域能力时再提供 core',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import type { IPlugin } from '@migaia/plugin-host'\n\ntype IAppCore = { write(message: string): void }\ntype IGreetingConfig = { prefix: string }\ntype IGreetingExtension = { greet(name: string): void }\n\nconst greetingPlugin = {\n  name: 'greeting',\n  config: { prefix: 'Hello' },\n  shared: (core) => ({\n    formatGreeting: (name: string) => `${core.config.get('prefix')} ${name}`\n  }),\n  install: (core) => {\n    const greet = (name: string) => {\n      core.write(`${core.config.get('prefix')} ${name}`)\n    }\n    core.onDispose(() => core.write('greeting disposed'))\n    return { greet }\n  },\n  update: (next, core) => {\n    core.write(`prefix changed to ${next.prefix}`)\n  }\n} satisfies IPlugin<IAppCore, IGreetingExtension, IGreetingConfig>"
+                type: 'paragraph',
+                text: 'core 是 install 收到的宿主能力对象。它提供配置、pipeline（逐步处理输入的管线）和 onDispose。defineHost 的 domainCore 可添加应用自己的方法。单纯转换字符串不需要 domainCore。'
               },
               {
-                type: 'list',
-                items: [
-                  'name 是稳定且无点号的所有者 ID；Host 用它归属 extension、shared、stage 与 disposer。',
-                  'config 在安装前复制；update 接收下一代只读快照，成功后才发布新 view。',
-                  'install 返回运行时 extension；shared 返回供后续插件读取的跨插件能力。',
-                  '用 core.onDispose 登记安装期间创建的资源；不要只依赖进程退出。'
-                ]
+                type: 'paragraph',
+                text: 'install 返回的 extension 与 Feature 的输出分开访问。应用资源在 install 中通过 core.onDispose 登记，交给宿主在卸载时清理。'
               }
             ]
           },
           {
             id: 'host-options',
-            heading: '逐项选择 Host 配置，而不是复制一组神秘数字',
+            heading: '只配置这个任务需要的等待时间',
             blocks: [
               {
-                type: 'table',
-                headers: ['字段', '默认值', '作用与选择'],
-                rows: [
-                  [
-                    'execution.mutationTimeoutMs',
-                    '必填',
-                    '安装、更新或卸载 hook 的最长等待；false 明确允许无限等待。'
-                  ],
-                  [
-                    'execution.pipelineDrainTimeoutMs',
-                    '必填',
-                    '卸载时等待在途 pipeline lease；超时后通过 physicalCompletion 继续观察。'
-                  ],
-                  [
-                    'pipeline.mode',
-                    'sync',
-                    '选择 sync、async、generator 或 async-generator；必须匹配 stage 控制流。'
-                  ],
-                  [
-                    'queueAdmissionTimeoutMs',
-                    'undefined',
-                    '默认只诊断排队；number 超时拒绝，false 关闭 admission timer。'
-                  ],
-                  [
-                    'queueAdmissionDiagnosticMs',
-                    '1000 ms',
-                    '排队多久后报告诊断；false 关闭诊断 timer。'
-                  ],
-                  [
-                    'disposeStepTimeoutMs',
-                    '5000 ms',
-                    '单个 disposer 的等待预算；false 表示永久等待。'
-                  ],
-                  [
-                    'diagnostic',
-                    '内部默认处理器',
-                    '接收 queue、pipeline 违规等非致命诊断与错误码。'
-                  ],
-                  [
-                    'scheduler',
-                    'systemScheduler',
-                    '测试或自定义时间域使用；同一 scheduler 驱动 queue 与 dispose deadline。'
-                  ]
-                ]
+                type: 'paragraph',
+                text: 'execution.mutationTimeoutMs 限制安装、配置更新和卸载 hook 的等待。execution.pipelineDrainTimeoutMs 限制卸载时等待正在运行的 pipeline。两个字段必填，本例各使用 5000 ms。false 表示明确接受无限等待。'
+              },
+              {
+                type: 'paragraph',
+                text: 'finally 等待 Host 清理，并报告 cleanupErrors。若返回 physicalCompletion，则继续等待实际清理。cleanupComplete: false 不能解释成资源已经释放。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: '安装多个插件', path: 'install-and-compose' },
-        { label: '理解所有构造配置', path: 'docs/plugin-host/PluginHost' }
+        {
+          label: '让 greeter 使用 formatter 的 Feature',
+          path: 'install-and-compose'
+        },
+        {
+          label: '为插件更新配置',
+          path: 'configuration-and-shared'
+        }
       ]
     },
     en: {
-      title: 'Create and use your first Plugin Host',
-      lede: 'Close the installation, invocation, and cleanup loop with explicit execution budgets, a domain core, and one plugin.',
+      title: 'Install upper and obtain MIGAIA',
+      lede: 'Define a conversion method. Call it through the installed plugin handle, then release the Host in the same script.',
       document: {
         sections: [
           {
             id: 'create-host',
-            heading: 'Define a domain core and choose wait budgets explicitly',
+            heading: 'Run a complete installation and call example',
             blocks: [
+              {
+                type: 'paragraph',
+                text: 'Run this complete example in a Node 24 ESM project. Install @migaia/plugin-host, save it as main.ts, then run node main.ts. Assertions check the business result. A successful run is silent.'
+              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { PluginHost } from '@migaia/plugin-host'\n\ntype ICore = { write(message: string): void }\n\nclass AppHost extends PluginHost<ICore> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (message) => console.log(message) }\n  }\n}\n\nconst host = new AppHost({\n  execution: {\n    mutationTimeoutMs: 5_000,\n    pipelineDrainTimeoutMs: 5_000\n  }\n})"
+                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst upper = definePlugin({\n  name: 'upper',\n  install: () => ({ upper: (value: string) => value.toUpperCase() })\n})\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [handle] = await host.use(upper)\n  const result = handle.extensions.upper('migaia')\n  assert.equal(result, 'MIGAIA')\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
               },
               {
                 type: 'paragraph',
-                text: 'Both execution fields are required product decisions. A number provides a bounded wait; false explicitly accepts an unbounded wait and is not an implicit default.'
+                text: 'definePlugin does not execute install immediately. defineHost creates the Host and await host.use(upper) installs the plugin. The result is a tuple in input order, so the example takes its first handle.'
               }
             ]
           },
           {
             id: 'use-view',
-            heading: 'Invoke capabilities only through the returned view',
+            heading: 'Call installed methods through the plugin handle',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "type IGreetingPlugin = { name: 'greeting' }\ntype IInstalledView = {\n  extensions: { greet(name: string): void }\n  unUse(name: string): Promise<{ physicalCompletion?: Promise<void> }>\n}\ntype IGreetingHost = {\n  use(plugin: IGreetingPlugin): Promise<IInstalledView>\n  dispose(): Promise<void>\n}\n\nexport async function runGreeting(host: IGreetingHost, greetingPlugin: IGreetingPlugin) {\n  const view = await host.use(greetingPlugin)\n  view.extensions.greet('Migaia')\n\n  const removal = await view.unUse('greeting')\n  if (removal.physicalCompletion) await removal.physicalCompletion\n  await host.dispose()\n}\n\n// Pass the host and greetingPlugin created in the previous section to close the install-use-remove loop."
+                type: 'paragraph',
+                text: 'handle.extensions.upper is the business entry in this example. It converts migaia to MIGAIA and assert.equal checks the result. The Host handle manages installation and cleanup. The plugin handle accesses plugin capabilities.'
               },
               {
-                type: 'list',
-                items: [
-                  'use() publishes the new view only after complete success; failure leaves no half-installed capability.',
-                  'Do not call an extension as host.greet. It exists only on the matching view.extensions object.',
-                  'Await host.dispose() during application shutdown instead of starting cleanup and exiting immediately.'
-                ]
+                type: 'paragraph',
+                text: 'This entry requires no legacy view. Plugin handles have no unUse or dispose methods. Those operations belong to the Host. Failed installation rejects use and returns no handle for that attempt.'
               }
             ]
           },
           {
             id: 'plugin-contract',
-            heading:
-              'A plugin declares extensions, configuration, shared capabilities, and cleanup ownership',
+            heading: 'Supply a domain core only when the task needs it',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import type { IPlugin } from '@migaia/plugin-host'\n\ntype IAppCore = { write(message: string): void }\ntype IGreetingConfig = { prefix: string }\ntype IGreetingExtension = { greet(name: string): void }\n\nconst greetingPlugin = {\n  name: 'greeting',\n  config: { prefix: 'Hello' },\n  shared: (core) => ({\n    formatGreeting: (name: string) => `${core.config.get('prefix')} ${name}`\n  }),\n  install: (core) => {\n    const greet = (name: string) => {\n      core.write(`${core.config.get('prefix')} ${name}`)\n    }\n    core.onDispose(() => core.write('greeting disposed'))\n    return { greet }\n  },\n  update: (next, core) => {\n    core.write(`prefix changed to ${next.prefix}`)\n  }\n} satisfies IPlugin<IAppCore, IGreetingExtension, IGreetingConfig>"
+                type: 'paragraph',
+                text: 'The installation core provides configuration, pipelines, and onDispose. defineHost domainCore can add application methods. Converting a string requires no domainCore.'
               },
               {
-                type: 'list',
-                items: [
-                  'name is a stable owner ID without dots. The Host uses it to own extensions, shared values, stages, and disposers.',
-                  'Configuration is copied before installation. update receives the next readonly snapshot, which is published only after success.',
-                  'install returns runtime extensions; shared returns a cross-plugin capability visible to later plugins.',
-                  'Register installation resources with core.onDispose instead of relying on process exit.'
-                ]
+                type: 'paragraph',
+                text: 'Extensions returned by install and Feature outputs have separate access paths. Register application resources with core.onDispose during install so the Host can clean them during removal.'
               }
             ]
           },
           {
             id: 'host-options',
-            heading: 'Choose every Host option instead of copying unexplained numbers',
+            heading: 'Configure only the waits this task requires',
             blocks: [
               {
-                type: 'table',
-                headers: ['Field', 'Default', 'Purpose and choice'],
-                rows: [
-                  [
-                    'execution.mutationTimeoutMs',
-                    'required',
-                    'Maximum wait for install, update, or removal hooks; false explicitly permits an unbounded wait.'
-                  ],
-                  [
-                    'execution.pipelineDrainTimeoutMs',
-                    'required',
-                    'Wait for active pipeline leases during removal; physicalCompletion observes work that outlives the budget.'
-                  ],
-                  [
-                    'pipeline.mode',
-                    'sync',
-                    'Choose sync, async, generator, or async-generator to match stage control flow.'
-                  ],
-                  [
-                    'queueAdmissionTimeoutMs',
-                    'undefined',
-                    'Diagnose queueing by default; a number rejects on timeout, while false disables the admission timer.'
-                  ],
-                  [
-                    'queueAdmissionDiagnosticMs',
-                    '1000 ms',
-                    'Report a queued mutation after this duration; false disables its diagnostic timer.'
-                  ],
-                  [
-                    'disposeStepTimeoutMs',
-                    '5000 ms',
-                    'Budget for one disposer step; false waits forever.'
-                  ],
-                  [
-                    'diagnostic',
-                    'internal default',
-                    'Receives non-fatal queue and pipeline violations with their error code.'
-                  ],
-                  [
-                    'scheduler',
-                    'systemScheduler',
-                    'Use a custom time domain for tests or hosts; it drives queue and disposal deadlines together.'
-                  ]
-                ]
+                type: 'paragraph',
+                text: 'execution.mutationTimeoutMs bounds installation, configuration update, and removal hooks. execution.pipelineDrainTimeoutMs bounds waiting for active pipelines during removal. Both fields are required. This example uses 5000 ms for each. false explicitly permits an unbounded wait.'
+              },
+              {
+                type: 'paragraph',
+                text: 'finally awaits Host cleanup and reports cleanupErrors. When physicalCompletion exists, it also awaits actual cleanup. cleanupComplete: false does not mean resources were released.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Install multiple plugins', path: 'install-and-compose' },
         {
-          label: 'Understand every constructor option',
-          path: 'docs/plugin-host/PluginHost'
+          label: 'Let greeter use the formatter Feature',
+          path: 'install-and-compose'
+        },
+        {
+          label: 'Update plugin configuration',
+          path: 'configuration-and-shared'
         }
       ]
     }
   },
   'plugin-host:install-and-compose': {
     zh: {
-      title: '安装与组合插件',
-      lede: '把依赖关系留给组合层，把原子提交、所有权登记和不可变 view 留给 PluginHost。',
+      title: '让 greeter 使用 formatter 的能力',
+      lede: '一个插件提供大写方法。另一个插件声明依赖并生成 Hello MIGAIA。',
       document: {
         sections: [
           {
             id: 'order',
-            heading: '先排序，再交给 Host 安装',
+            heading: '声明 Feature 依赖并安装两个插件',
             blocks: [
+              {
+                type: 'paragraph',
+                text: '以下完整示例在 Node 24 的 ESM 项目中运行。安装 @migaia/plugin-host 后保存为 main.ts，执行 node main.ts。node:assert/strict 用断言检查业务结果；通过时脚本没有输出。'
+              },
               {
                 type: 'code',
                 language: 'ts',
-                code: 'type IPlugin = { name: string }\ntype IOrderedView = { extensions: { feature: { run(): void } } }\ntype IPluginHost = { use(plugins: IPlugin[]): Promise<IOrderedView> }\n\nexport async function installFeature(\n  host: IPluginHost,\n  databasePlugin: IPlugin,\n  repositoryPlugin: IPlugin,\n  featurePlugin: IPlugin\n) {\n  // 依赖顺序由调用方明确给出：database → repository → feature。\n  const ordered = [databasePlugin, repositoryPlugin, featurePlugin]\n  const view = await host.use(ordered)\n  view.extensions.feature.run()\n}'
+                code: "import assert from 'node:assert/strict'\nimport { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst casing = defineFeature(() => ({ upper: (value: string) => value.toUpperCase() }))\nconst formatter = definePlugin({\n  name: 'formatter', features: { casing }, install: () => ({})\n})\nconst greeting = defineFeature(\n  (_core, dependencies) => ({ greet: (name: string) => `Hello ${dependencies.casing.upper(name)}` }),\n  { casing: formatter.getFeature('casing') }\n)\nconst greeter = definePlugin({\n  name: 'greeter', features: { greeting },\n  install: (core) => ({ greet: (name: string) => core.features.greeting.greet(name) })\n})\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [greeterHandle, formatterHandle] = await host.use(greeter, formatter)\n  assert.equal(greeterHandle.extensions.greet('migaia'), 'Hello MIGAIA')\n  assert.equal(formatterHandle.getFeature('casing').upper('ready'), 'READY')\n  const removal = await host.unUse('formatter', { policy: 'cascade' })\n  assert.equal(removal.ok, true)\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
               },
               {
-                type: 'list',
-                items: [
-                  'provider 必须先于 consumer 安装；PluginHost 不会读取依赖元数据或执行拓扑排序。',
-                  '把相关插件作为一个 batch 交给 use()；任何安装 hook 失败，整批候选状态都不会发布。',
-                  '插件 ID 必须稳定且唯一；重复 ID 会在进入可见状态前被拒绝。'
-                ]
+                type: 'paragraph',
+                text: 'formatter 是 provider（提供能力的插件），greeter 是 consumer（使用能力的插件）。formatter.getFeature("casing") 返回依赖引用。defineFeature 的第二参数声明直接依赖，factory 的第二参数接收依赖输出。'
+              },
+              {
+                type: 'paragraph',
+                text: 'Host 解析这些依赖，并先安装 formatter。use 返回的 handles 仍按输入顺序排列，所以第一项对应 greeter。示例把两个插件放在同一次 use 调用中。'
               }
             ]
           },
           {
             id: 'ownership',
-            heading: '安装 hook 只登记自己拥有的资源',
+            heading: '只把需要的方法交给业务调用方',
             blocks: [
               {
                 type: 'paragraph',
-                text: '插件可以登记 extension、shared 值、pipeline stage 与 disposer。Host 记录所有者，以便卸载时先撤销该插件的新调用入口，再执行对应清理；不要让插件偷偷修改另一个插件拥有的对象。'
+                text: 'greeter 的 install 显式返回 greet。调用方通过 greeterHandle.extensions.greet 使用它。Feature 不会把所有依赖方法自动添加到 extensions。'
+              },
+              {
+                type: 'paragraph',
+                text: '跨插件关系通过 getFeature 引用声明。当前契约不使用 provide/requires 元数据或 shared.get。缺少必需 provider 时安装失败。'
+              },
+              {
+                type: 'paragraph',
+                text: '移除仍被使用的 provider 默认会拒绝。示例使用 policy: "cascade"，让 Host 一并移除 greeter 与 formatter。若只想修改配置，可保留插件并进入下一篇。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: '配置与 shared', path: 'configuration-and-shared' },
-        { label: '卸载顺序与回滚', path: 'removal-and-rollback' }
+        {
+          label: '更新问候语并让两个插件共享 casing',
+          path: 'configuration-and-shared'
+        },
+        {
+          label: '把已组合的服务接到 Runtime Peer',
+          path: '../rpc-core/getting-started'
+        }
       ]
     },
     en: {
-      title: 'Install and compose plugins',
-      lede: 'Keep dependency relationships in the composition layer, while PluginHost owns atomic commit, registration, and immutable views.',
+      title: 'Let greeter use the formatter capability',
+      lede: 'One plugin provides uppercase conversion. Another declares its dependency and produces Hello MIGAIA.',
       document: {
         sections: [
           {
             id: 'order',
-            heading: 'Order first, then install through the Host',
+            heading: 'Declare Feature dependencies and install both plugins',
             blocks: [
+              {
+                type: 'paragraph',
+                text: 'Run this complete example in a Node 24 ESM project. Install @migaia/plugin-host, save it as main.ts, then run node main.ts. Assertions check the business result. A successful run is silent.'
+              },
               {
                 type: 'code',
                 language: 'ts',
-                code: 'type IPlugin = { name: string }\ntype IOrderedView = { extensions: { feature: { run(): void } } }\ntype IPluginHost = { use(plugins: IPlugin[]): Promise<IOrderedView> }\n\nexport async function installFeature(\n  host: IPluginHost,\n  databasePlugin: IPlugin,\n  repositoryPlugin: IPlugin,\n  featurePlugin: IPlugin\n) {\n  // The caller supplies the dependency order explicitly: database → repository → feature.\n  const ordered = [databasePlugin, repositoryPlugin, featurePlugin]\n  const view = await host.use(ordered)\n  view.extensions.feature.run()\n}'
+                code: "import assert from 'node:assert/strict'\nimport { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst casing = defineFeature(() => ({ upper: (value: string) => value.toUpperCase() }))\nconst formatter = definePlugin({\n  name: 'formatter', features: { casing }, install: () => ({})\n})\nconst greeting = defineFeature(\n  (_core, dependencies) => ({ greet: (name: string) => `Hello ${dependencies.casing.upper(name)}` }),\n  { casing: formatter.getFeature('casing') }\n)\nconst greeter = definePlugin({\n  name: 'greeter', features: { greeting },\n  install: (core) => ({ greet: (name: string) => core.features.greeting.greet(name) })\n})\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [greeterHandle, formatterHandle] = await host.use(greeter, formatter)\n  assert.equal(greeterHandle.extensions.greet('migaia'), 'Hello MIGAIA')\n  assert.equal(formatterHandle.getFeature('casing').upper('ready'), 'READY')\n  const removal = await host.unUse('formatter', { policy: 'cascade' })\n  assert.equal(removal.ok, true)\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
               },
               {
-                type: 'list',
-                items: [
-                  'Install a provider before its consumer. PluginHost does not read dependency metadata or perform topological sorting.',
-                  'Pass related plugins as one batch to use(). If any install hook fails, no candidate state from the batch is published.',
-                  'Plugin IDs must be stable and unique; a duplicate is rejected before becoming visible.'
-                ]
+                type: 'paragraph',
+                text: 'formatter provides the capability and greeter consumes it. formatter.getFeature("casing") creates a dependency reference. The second defineFeature argument declares direct dependencies. The factory receives their outputs through its second argument.'
+              },
+              {
+                type: 'paragraph',
+                text: 'The Host resolves these dependencies and installs formatter first. Returned handles retain input order, so the first handle belongs to greeter. The example supplies both plugins in one use call.'
               }
             ]
           },
           {
             id: 'ownership',
-            heading: 'An install hook registers only what it owns',
+            heading: 'Expose only the business methods the caller needs',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'A plugin may register extensions, shared values, pipeline stages, and disposers. The Host records ownership so removal can revoke new calls first and then clean those resources. A plugin must not mutate an object owned by another plugin behind the Host.'
+                text: 'The greeter install hook explicitly returns greet. The caller uses greeterHandle.extensions.greet. Feature dependencies do not automatically add their methods to extensions.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Declare cross-plugin relationships through getFeature references. The current contract does not use provide/requires metadata or shared.get. A missing required provider rejects installation.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Removing a provider that still has consumers is rejected by default. The example selects policy: "cascade" to remove greeter and formatter together. Keep the plugins installed when only their configuration needs to change.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Configuration and shared', path: 'configuration-and-shared' },
-        { label: 'Removal order and rollback', path: 'removal-and-rollback' }
+        {
+          label: 'Update greetings and share casing with two plugins',
+          path: 'configuration-and-shared'
+        },
+        {
+          label: 'Connect the composed service to a Runtime Peer',
+          path: '../rpc-core/getting-started'
+        }
       ]
     }
   },
   'plugin-host:configuration-and-shared': {
     zh: {
-      title: '配置与 shared 能力',
-      lede: '配置是事务快照；shared 是按引用发布、按所有者撤销的能力。两者不要混成可随意修改的全局对象。',
+      title: '更新问候语，让插件复用格式化能力',
+      lede: '保留已经安装的插件，只更新它的 prefix。跨插件复用通过 Feature 依赖完成。',
       document: {
         sections: [
           {
             id: 'config',
-            heading: '配置更新成功后才提交',
+            heading: '更新 prefix，并检查下一次问候',
             blocks: [
+              {
+                type: 'paragraph',
+                text: '以下完整示例在 Node 24 的 ESM 项目中运行。安装 @migaia/plugin-host 后保存为 main.ts，执行 node main.ts。node:assert/strict 用断言检查业务结果；通过时脚本没有输出。'
+              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "type IConfigView = {\n  config: {\n    update(name: 'greeting', change: (previous: { prefix: string }) => { prefix: string }): Promise<void>\n    get(path: 'greeting.prefix'): string\n  }\n}\ntype IConfigHost = {\n  use(plugin: { name: 'greeting' }): Promise<IConfigView>\n  getCurrentView(): IConfigView\n}\n\nexport async function switchGreetingLanguage(host: IConfigHost, greetingPlugin: { name: 'greeting' }) {\n  const installed = await host.use(greetingPlugin)\n  await installed.config.update('greeting', (previous) => ({\n    prefix: previous.prefix === 'Hello' ? '你好' : 'Hello'\n  }))\n\n  // update 成功后重新读取当前 view，拿到已经提交的新配置。\n  const current = host.getCurrentView()\n  return current.config.get('greeting.prefix')\n}"
+                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst greeting = definePlugin({\n  name: 'greeting',\n  config: { prefix: 'Hello' },\n  install: (core) => ({ greet: (name: string) => `${core.config.get().prefix} ${name}` })\n})\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [handle] = await host.use(greeting)\n  assert.equal(handle.extensions.greet('Migaia'), 'Hello Migaia')\n  const previous = handle.config.get()\n  await handle.config.update(() => ({ prefix: 'Welcome' }))\n  assert.equal(previous.prefix, 'Hello')\n  assert.equal(handle.config.get().prefix, 'Welcome')\n  assert.equal(handle.extensions.greet('Migaia'), 'Welcome Migaia')\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
               },
               {
-                type: 'list',
-                items: [
-                  '读取 view.config 得到该代不可变配置快照；旧 view 不会被原地改写。',
-                  '更新采用 copy-on-write。所有 update hook 成功后，Host 才发布新 config 与新 view。',
-                  'hook 失败或超时会保留上一代配置，失败 operation 失去迟到提交资格。',
-                  'update 完成后重新取得当前 view；不要假设旧 view 被原地刷新。'
-                ]
+                type: 'paragraph',
+                text: 'handle.config.get() 读取当前配置。handle.config.update(recipe) 接收修改函数，返回值作为配置 patch（要修改的字段）提交。示例只更新 prefix。'
+              },
+              {
+                type: 'paragraph',
+                text: '先前取得的配置对象仍保存 Hello。更新成功后再次读取 handle.config.get() 得到 Welcome，下一次 greet 使用新值。update hook 失败时旧配置继续保留。'
               }
             ]
           },
           {
             id: 'shared',
-            heading: 'shared 保留原始引用，但仍有明确所有者',
+            heading: '通过一个 provider 服务两个 consumer',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'shared 适合连接同一 Host 内已排序的插件。consumer 只能读取安装顺序中已经存在的 provider 值；Host 不会推导依赖，因此组合层仍须保证 provider 先装、consumer 先卸。'
+                text: '本节代码是独立脚本，沿用前面声明的 Node 24 ESM 环境。formatter 持有 casing，title 和 badge 分别声明依赖。两个业务结果都由断言检查。'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "type IRepository = { findById(id: string): Promise<unknown> }\ntype ISharedView = {\n  shared: { get(name: 'repository'): IRepository }\n}\ntype ISharedHost = {\n  use(plugins: Array<{ name: string }>): Promise<ISharedView>\n}\n\nexport async function loadOrder(host: ISharedHost, databasePlugin: { name: string }, repositoryPlugin: { name: string }) {\n  // 先安装 provider，再由 consumer 暴露 repository shared capability。\n  const view = await host.use([databasePlugin, repositoryPlugin])\n  const repository = view.shared.get('repository')\n  return repository.findById('42')\n}"
+                code: "import assert from 'node:assert/strict'\nimport { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst casing = defineFeature(() => ({ upper: (value: string) => value.toUpperCase() }))\nconst formatter = definePlugin({ name: 'formatter', features: { casing }, install: () => ({}) })\nconst title = defineFeature(\n  (_core, dependencies) => ({ render: (value: string) => `Title: ${dependencies.casing.upper(value)}` }),\n  { casing: formatter.getFeature('casing') }\n)\nconst badge = defineFeature(\n  (_core, dependencies) => ({ render: (value: string) => `[${dependencies.casing.upper(value)}]` }),\n  { casing: formatter.getFeature('casing') }\n)\nconst titlePlugin = definePlugin({ name: 'title', features: { title }, install: () => ({}) })\nconst badgePlugin = definePlugin({ name: 'badge', features: { badge }, install: () => ({}) })\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [titles, badges] = await host.use(titlePlugin, badgePlugin, formatter)\n  assert.equal(titles.getFeature('title').render('migaia'), 'Title: MIGAIA')\n  assert.equal(badges.getFeature('badge').render('migaia'), '[MIGAIA]')\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'shared 字段和 shared.get 属于已移除的旧写法。使用 defineFeature 与 provider.getFeature，让 Host 记录真实依赖。每个插件通过自己的 handle.getFeature 读取已安装的根 Feature 输出。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: '构建 pipeline', path: 'pipelines' },
-        { label: 'PluginHost 配置参考', path: 'docs/plugin-host/PluginHost' }
+        {
+          label: '把转换步骤接入 pipeline',
+          path: 'pipelines'
+        },
+        {
+          label: '卸载 provider 与 consumer',
+          path: 'removal-and-rollback'
+        }
       ]
     },
     en: {
-      title: 'Configuration and shared capabilities',
-      lede: 'Configuration is a transactional snapshot. A shared capability is published by reference and revoked by owner. Neither is an ungoverned global object.',
+      title: 'Update greetings and reuse formatting across plugins',
+      lede: 'Keep the installed plugin and update only its prefix. Reuse capabilities through Feature dependencies.',
       document: {
         sections: [
           {
             id: 'config',
-            heading: 'Commit configuration only after successful updates',
+            heading: 'Update prefix and check the next greeting',
             blocks: [
+              {
+                type: 'paragraph',
+                text: 'Run this complete example in a Node 24 ESM project. Install @migaia/plugin-host, save it as main.ts, then run node main.ts. Assertions check the business result. A successful run is silent.'
+              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "type IConfigView = {\n  config: {\n    update(name: 'greeting', change: (previous: { prefix: string }) => { prefix: string }): Promise<void>\n    get(path: 'greeting.prefix'): string\n  }\n}\ntype IConfigHost = {\n  use(plugin: { name: 'greeting' }): Promise<IConfigView>\n  getCurrentView(): IConfigView\n}\n\nexport async function switchGreetingLanguage(host: IConfigHost, greetingPlugin: { name: 'greeting' }) {\n  const installed = await host.use(greetingPlugin)\n  await installed.config.update('greeting', (previous) => ({\n    prefix: previous.prefix === 'Hello' ? '你好' : 'Hello'\n  }))\n\n  // Re-read the current view after commit so the caller observes the new snapshot.\n  const current = host.getCurrentView()\n  return current.config.get('greeting.prefix')\n}"
+                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst greeting = definePlugin({\n  name: 'greeting',\n  config: { prefix: 'Hello' },\n  install: (core) => ({ greet: (name: string) => `${core.config.get().prefix} ${name}` })\n})\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [handle] = await host.use(greeting)\n  assert.equal(handle.extensions.greet('Migaia'), 'Hello Migaia')\n  const previous = handle.config.get()\n  await handle.config.update(() => ({ prefix: 'Welcome' }))\n  assert.equal(previous.prefix, 'Hello')\n  assert.equal(handle.config.get().prefix, 'Welcome')\n  assert.equal(handle.extensions.greet('Migaia'), 'Welcome Migaia')\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
               },
               {
-                type: 'list',
-                items: [
-                  'Read view.config as the immutable snapshot for that generation. An old view is never rewritten in place.',
-                  'Updates use copy-on-write. The Host publishes the next config and view only after every update hook succeeds.',
-                  'A failed or timed-out hook preserves the previous generation and loses authority to commit late.',
-                  'Acquire the current view again after update; never assume an old view refreshes in place.'
-                ]
+                type: 'paragraph',
+                text: 'handle.config.get() reads current configuration. handle.config.update(recipe) accepts a function whose result patches the configuration. The example changes only prefix.'
+              },
+              {
+                type: 'paragraph',
+                text: 'The previously read object retains Hello. After successful update, handle.config.get() reads Welcome and the next greet uses it. A failed update hook leaves the prior configuration in place.'
               }
             ]
           },
           {
             id: 'shared',
-            heading: 'Shared values retain identity and still have an owner',
+            heading: 'Serve two consumers through one provider',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Shared capabilities connect already ordered plugins inside one Host. A consumer sees only provider values installed earlier. Because the Host does not derive dependencies, the composition layer still installs providers first and removes consumers first.'
+                text: 'This independent script uses the same declared Node 24 ESM environment. formatter owns casing. title and badge declare their dependencies separately. Assertions check both business results.'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "type IRepository = { findById(id: string): Promise<unknown> }\ntype ISharedView = {\n  shared: { get(name: 'repository'): IRepository }\n}\ntype ISharedHost = {\n  use(plugins: Array<{ name: string }>): Promise<ISharedView>\n}\n\nexport async function loadOrder(host: ISharedHost, databasePlugin: { name: string }, repositoryPlugin: { name: string }) {\n  // Install the provider before the consumer; the view then exposes its shared repository capability.\n  const view = await host.use([databasePlugin, repositoryPlugin])\n  const repository = view.shared.get('repository')\n  return repository.findById('42')\n}"
+                code: "import assert from 'node:assert/strict'\nimport { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst casing = defineFeature(() => ({ upper: (value: string) => value.toUpperCase() }))\nconst formatter = definePlugin({ name: 'formatter', features: { casing }, install: () => ({}) })\nconst title = defineFeature(\n  (_core, dependencies) => ({ render: (value: string) => `Title: ${dependencies.casing.upper(value)}` }),\n  { casing: formatter.getFeature('casing') }\n)\nconst badge = defineFeature(\n  (_core, dependencies) => ({ render: (value: string) => `[${dependencies.casing.upper(value)}]` }),\n  { casing: formatter.getFeature('casing') }\n)\nconst titlePlugin = definePlugin({ name: 'title', features: { title }, install: () => ({}) })\nconst badgePlugin = definePlugin({ name: 'badge', features: { badge }, install: () => ({}) })\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [titles, badges] = await host.use(titlePlugin, badgePlugin, formatter)\n  assert.equal(titles.getFeature('title').render('migaia'), 'Title: MIGAIA')\n  assert.equal(badges.getFeature('badge').render('migaia'), '[MIGAIA]')\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'The old shared field and shared.get have been removed. Use defineFeature and provider.getFeature so the Host records actual dependencies. Each plugin handle reads its installed root Feature output through getFeature.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Build a pipeline', path: 'pipelines' },
         {
-          label: 'PluginHost configuration reference',
-          path: 'docs/plugin-host/PluginHost'
+          label: 'Connect conversion steps to a pipeline',
+          path: 'pipelines'
+        },
+        {
+          label: 'Remove providers and consumers',
+          path: 'removal-and-rollback'
         }
       ]
     }
   },
   'plugin-host:pipelines': {
     zh: {
-      title: '选择并运行 pipeline',
-      lede: '构造 Host 时选择唯一执行模型；插件登记与该模型匹配的 stage，调用方只运行已发布 view。',
+      title: '安装大写处理步骤，并读取转换结果',
+      lede: '用 sync pipeline 把 hello 变成 HELLO。卸载插件后，同一个入口恢复原始输入。',
       document: {
         sections: [
           {
             id: 'modes',
-            heading: '按控制流选择模式',
+            heading: '先为这个任务选择 sync',
             blocks: [
               {
-                type: 'table',
-                headers: ['模式', '控制流', '适合场景'],
-                rows: [
-                  ['sync', 'stage 返回后进入下游', '同步校验与变换'],
-                  ['async', 'await next() 形成洋葱模型', '计时、事务与异步拦截'],
-                  ['generator', 'yield 值并使用显式 terminal', '同步流式协议'],
-                  ['async-generator', '异步 yield 与显式 terminal', '异步流和背压边界']
-                ]
+                type: 'paragraph',
+                text: 'pipeline 是按顺序处理输入的管线。stage 是其中一个处理步骤。字符串转换无需等待，所以本例选择 sync，并通过 core.usePipeline 注册 stage。需要异步等待时选择 async 和 useAsyncPipeline。generator 与 async-generator 用于生成器控制流。'
               }
             ]
           },
           {
             id: 'run-sync',
-            heading: '把领域入口封装在 Host 子类中',
+            heading: '运行完整的安装、处理和卸载脚本',
             blocks: [
+              {
+                type: 'paragraph',
+                text: '以下完整示例在 Node 24 的 ESM 项目中运行。安装 @migaia/plugin-host 后保存为 main.ts，执行 node main.ts。node:assert/strict 用断言检查业务结果；通过时脚本没有输出。'
+              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "class MessageHost extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return core\n  }\n\n  dispatch(message: string): string {\n    let output = message\n    this.runPipeline(message, (next) => {\n      output = next\n    })\n    return output\n  }\n}\n\nconst uppercasePlugin = {\n  name: 'uppercase',\n  install(core) {\n    core.usePipeline((value, next) => next(value.toUpperCase()))\n    return {}\n  }\n}\n\nconst view = await host.use(uppercasePlugin)\nview.host.dispatch('hello') // HELLO"
+                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst uppercase = definePlugin<Record<string, never>, Record<string, never>, string>({\n  name: 'uppercase',\n  install: (core) => {\n    core.usePipeline((value, next) => next(value.toUpperCase()))\n    return {}\n  }\n})\nconst host = defineHost<Record<string, never>, string>({\n  host: {\n    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n    pipeline: { mode: 'sync' }\n  }\n})\nconst output: string[] = []\ntry {\n  await host.use(uppercase)\n  await host.runPipeline('hello', (value) => output.push(value))\n  assert.deepEqual(output, ['HELLO'])\n  assert.equal((await host.unUse('uppercase')).ok, true)\n  output.length = 0\n  await host.runPipeline('hello', (value) => output.push(value))\n  assert.deepEqual(output, ['hello'])\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
               },
               {
-                type: 'list',
-                items: [
-                  'runPipeline 是 protected：由领域 Host 暴露有语义的 dispatch、execute 或 transform，不把底层 runner 泄漏给调用方。',
-                  'sync stage 必须在返回前调用 next；需要 await 时把 Host 配成 async，并登记 useAsyncPipeline。',
-                  '插件通过 install 收到的 core 登记 stage，因此卸载时 Host 能按 owner 撤销并 drain。'
-                ]
+                type: 'paragraph',
+                text: 'defineHost 返回的 handle 提供 runPipeline。done callback（完成回调）接收最终值，本例把它放入 output 并检查 HELLO。卸载 uppercase 后再次运行，结果回到 hello。'
+              },
+              {
+                type: 'paragraph',
+                text: 'core.usePipeline 在安装期间登记步骤。Host 因而知道这个步骤属于 uppercase，并在卸载时从后续运行中移除它。'
               }
             ]
           },
           {
             id: 'drain',
-            heading: '在途执行持有 lease',
+            heading: '清理前等待已经开始的处理',
             blocks: [
               {
                 type: 'paragraph',
-                text: '移除插件时，属于它的 stage 会先从新 pipeline 中消失；已经开始的执行仍持有 lease。Host 最多等待 execution.pipelineDrainTimeoutMs，随后通过 removal result 暴露是否仍有物理清理。'
+                text: '已经开始的 pipeline 保留自己的执行快照。卸载需要等待相关运行结束，再释放资源。execution.pipelineDrainTimeoutMs 控制等待时间。Host dispose 的 cleanupComplete 与 physicalCompletion 区分已经结束和仍在进行的清理。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: '卸载与 drain', path: 'removal-and-rollback' },
-        { label: 'PluginHost API', path: 'docs/plugin-host/PluginHost' }
+        {
+          label: '检查卸载结果和安装失败回滚',
+          path: 'removal-and-rollback'
+        }
       ]
     },
     en: {
-      title: 'Choose and run a pipeline',
-      lede: 'Choose one execution model when constructing the Host. Plugins register matching stages, and callers run only a published view.',
+      title: 'Install an uppercase stage and consume its result',
+      lede: 'Use a sync pipeline to turn hello into HELLO. Removing the plugin restores the original input through the same entry.',
       document: {
         sections: [
           {
             id: 'modes',
-            heading: 'Choose a mode from control flow',
+            heading: 'Choose sync for this task first',
             blocks: [
               {
-                type: 'table',
-                headers: ['Mode', 'Control flow', 'Use it for'],
-                rows: [
-                  [
-                    'sync',
-                    'Downstream starts after a stage returns',
-                    'Synchronous validation and transformation'
-                  ],
-                  [
-                    'async',
-                    'await next() forms an onion model',
-                    'Timing, transactions, and asynchronous interception'
-                  ],
-                  [
-                    'generator',
-                    'Yielded values plus an explicit terminal',
-                    'Synchronous streaming protocols'
-                  ],
-                  [
-                    'async-generator',
-                    'Asynchronous yields plus an explicit terminal',
-                    'Async streams and backpressure boundaries'
-                  ]
-                ]
+                type: 'paragraph',
+                text: 'A pipeline processes input through ordered stages. String conversion needs no asynchronous wait, so this example selects sync and registers its stage with core.usePipeline. Choose async and useAsyncPipeline for asynchronous work. generator and async-generator serve generator control flow.'
               }
             ]
           },
           {
             id: 'run-sync',
-            heading: 'Expose a domain entry point from the Host subclass',
+            heading: 'Run the complete install, transform, and remove script',
             blocks: [
+              {
+                type: 'paragraph',
+                text: 'Run this complete example in a Node 24 ESM project. Install @migaia/plugin-host, save it as main.ts, then run node main.ts. Assertions check the business result. A successful run is silent.'
+              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "class MessageHost extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return core\n  }\n\n  dispatch(message: string): string {\n    let output = message\n    this.runPipeline(message, (next) => {\n      output = next\n    })\n    return output\n  }\n}\n\nconst uppercasePlugin = {\n  name: 'uppercase',\n  install(core) {\n    core.usePipeline((value, next) => next(value.toUpperCase()))\n    return {}\n  }\n}\n\nconst view = await host.use(uppercasePlugin)\nview.host.dispatch('hello') // HELLO"
+                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst uppercase = definePlugin<Record<string, never>, Record<string, never>, string>({\n  name: 'uppercase',\n  install: (core) => {\n    core.usePipeline((value, next) => next(value.toUpperCase()))\n    return {}\n  }\n})\nconst host = defineHost<Record<string, never>, string>({\n  host: {\n    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n    pipeline: { mode: 'sync' }\n  }\n})\nconst output: string[] = []\ntry {\n  await host.use(uppercase)\n  await host.runPipeline('hello', (value) => output.push(value))\n  assert.deepEqual(output, ['HELLO'])\n  assert.equal((await host.unUse('uppercase')).ok, true)\n  output.length = 0\n  await host.runPipeline('hello', (value) => output.push(value))\n  assert.deepEqual(output, ['hello'])\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
               },
               {
-                type: 'list',
-                items: [
-                  'runPipeline is protected. Expose a domain-specific dispatch, execute, or transform method instead of leaking the runner.',
-                  'A sync stage calls next before returning. Configure async mode and register useAsyncPipeline when the stage must await.',
-                  'A stage registered through the installation core retains its plugin owner, so removal can revoke and drain it correctly.'
-                ]
+                type: 'paragraph',
+                text: 'The defineHost handle exposes runPipeline. Its completion callback receives the final value. The example stores that value in output and checks HELLO. Running again after uppercase removal produces hello.'
+              },
+              {
+                type: 'paragraph',
+                text: 'core.usePipeline registers a stage during installation. The Host records uppercase as its owner and removes the stage from subsequent runs when the plugin is removed.'
               }
             ]
           },
           {
             id: 'drain',
-            heading: 'An active run holds a lease',
+            heading: 'Wait for active processing before resource cleanup',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'During removal, the owned stage disappears from new pipelines first, while an already-started run retains its lease. The Host waits up to execution.pipelineDrainTimeoutMs and then reports whether physical cleanup remains.'
+                text: 'An active pipeline retains its execution snapshot. Removal waits for related runs before releasing resources. execution.pipelineDrainTimeoutMs controls the wait. Host disposal distinguishes finished and ongoing cleanup through cleanupComplete and physicalCompletion.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Removal and drain', path: 'removal-and-rollback' },
-        { label: 'PluginHost API', path: 'docs/plugin-host/PluginHost' }
+        {
+          label: 'Check removal results and installation rollback',
+          path: 'removal-and-rollback'
+        }
       ]
     }
   },
   'plugin-host:removal-and-rollback': {
     zh: {
-      title: '卸载、回滚与物理清理',
-      lede: '先阻止新调用，再等待旧调用与资源退出；逻辑终态不能因为清理缓慢或失败而重新开放。',
+      title: '移除插件，并在安装失败后重新开始',
+      lede: '让宿主释放插件登记的资源。检查移除结果，保留安装错误，并确认失败没有留下半安装插件。',
       document: {
         sections: [
           {
             id: 'remove',
-            heading: '按依赖反向卸载，并检查结构化结果',
+            heading: '移除 upper，确认清理只执行一次',
             blocks: [
+              {
+                type: 'paragraph',
+                text: '以下完整示例在 Node 24 的 ESM 项目中运行。安装 @migaia/plugin-host 后保存为 main.ts，执行 node main.ts。node:assert/strict 用断言检查业务结果；通过时脚本没有输出。'
+              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "type ICleanupView = { unUse(name: string): Promise<{ cleanupComplete: boolean; cleanupErrors: unknown[]; physicalCompletion?: Promise<void> }> }\nconst diagnostics = { report: (error: unknown) => console.error(error) }\n\nexport async function removeInDependencyOrder(view: ICleanupView, host: { view(): ICleanupView }) {\n  await view.unUse('feature') // consumer first\n  const result = await host.view().unUse('database') // provider last\n\n  if (!result.cleanupComplete && result.physicalCompletion) {\n    await result.physicalCompletion\n  }\n  for (const error of result.cleanupErrors) diagnostics.report(error)\n}"
+                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nlet releases = 0\nconst upper = definePlugin({\n  name: 'upper',\n  install: (core) => {\n    core.onDispose(() => { releases += 1 })\n    return { upper: (value: string) => value.toUpperCase() }\n  }\n})\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [handle] = await host.use(upper)\n  const captured = handle.extensions.upper\n  assert.equal(captured('migaia'), 'MIGAIA')\n  const result = await host.unUse('upper')\n  assert.equal(result.ok, true)\n  assert.equal(releases, 1)\n  assert.throws(() => captured('again'), (error: unknown) =>\n    error instanceof PluginHostError && error.code === PluginHostErrorCode.registrationRevoked\n  )\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
               },
               {
-                type: 'list',
-                items: [
-                  '新 view 先失去被移除能力；此前捕获的旧 view 再调用时以 VIEW_REVOKED 失败。',
-                  'cleanupComplete 表示返回时物理清理是否结束；cleanupErrors 保留每个清理失败。',
-                  'physicalCompletion 存在时可在更高层 shutdown 边界继续等待真实完成。'
-                ]
+                type: 'paragraph',
+                text: 'unUse 位于 Host，结果是 { ok, affected } 或 { ok: false, errors, affected }。cleanupComplete 和 physicalCompletion 属于 Host dispose 结果，不能套在 unUse 返回值上。'
+              },
+              {
+                type: 'paragraph',
+                text: '示例从 extensions 取出的 captured 绑定这一次安装。移除后调用它会抛 REGISTRATION_REVOKED。plugin handle 本身按名称读取当前安装，和这个已取出的函数有不同用途。'
               }
             ]
           },
           {
             id: 'rollback',
-            heading: '安装失败保留主错误',
+            heading: '处理一次失败，再重新安装',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'batch 安装的主失败仍是原始 install error，候选状态永远不会成为 live。回滚 disposer 的失败属于二次清理信息，只能进入 cause、聚合错误或 diagnostic，不能覆盖主失败。'
+                text: '以下是独立脚本。invalid 的 install 用无效 JSON 模拟真实同步失败。assert.rejects 检查错误码，随后重新安装 upper 并消费 RECOVERED。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nlet releases = 0\nconst upper = definePlugin({\n  name: 'upper',\n  install: (core) => {\n    core.onDispose(() => { releases += 1 })\n    return { upper: (value: string) => value.toUpperCase() }\n  }\n})\nconst invalid = definePlugin({ name: 'invalid', install: () => JSON.parse('{') })\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  await assert.rejects(host.use(upper, invalid), (error: unknown) =>\n    error instanceof PluginHostError && error.code === PluginHostErrorCode.pluginInstallFailed\n  )\n  assert.equal(releases, 1)\n  const [handle] = await host.use(upper)\n  assert.equal(handle.extensions.upper('recovered'), 'RECOVERED')\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
+              },
+              {
+                type: 'paragraph',
+                text: '同一批次有 install 失败时，候选插件不会发布。Host 逆序清理已创建的安装资源，并把原始失败保留在 cause 链中。调用方应先处理失败原因，再开始新安装。'
+              },
+              {
+                type: 'paragraph',
+                text: '清理失败需要读取 unUse.errors 或 dispose.cleanupErrors。不要仅因逻辑关闭完成就报告全部资源已经释放。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: '重新查看完整路径', path: 'index' },
-        { label: '错误码参考', path: 'docs/plugin-host/PluginHostErrorCode' }
+        {
+          label: '组合需要互相调用的插件',
+          path: 'install-and-compose'
+        },
+        {
+          label: '把服务接到 Runtime Peer',
+          path: '../rpc-core/getting-started'
+        }
       ]
     },
     en: {
-      title: 'Removal, rollback, and physical cleanup',
-      lede: 'Stop new calls first, then wait for old calls and resources to leave. Slow or failed cleanup never reopens logical terminal state.',
+      title: 'Remove a plugin and recover from failed installation',
+      lede: 'Let the Host release resources registered by the plugin. Check removal results and confirm failure leaves no partially installed plugin.',
       document: {
         sections: [
           {
             id: 'remove',
-            heading: 'Remove in reverse dependency order and inspect the result',
+            heading: 'Remove upper and confirm one cleanup',
             blocks: [
+              {
+                type: 'paragraph',
+                text: 'Run this complete example in a Node 24 ESM project. Install @migaia/plugin-host, save it as main.ts, then run node main.ts. Assertions check the business result. A successful run is silent.'
+              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "type ICleanupView = { unUse(name: string): Promise<{ cleanupComplete: boolean; cleanupErrors: unknown[]; physicalCompletion?: Promise<void> }> }\nconst diagnostics = { report: (error: unknown) => console.error(error) }\n\nexport async function removeInDependencyOrder(view: ICleanupView, host: { view(): ICleanupView }) {\n  await view.unUse('feature') // consumer first\n  const result = await host.view().unUse('database') // provider last\n\n  if (!result.cleanupComplete && result.physicalCompletion) {\n    await result.physicalCompletion\n  }\n  for (const error of result.cleanupErrors) diagnostics.report(error)\n}"
+                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nlet releases = 0\nconst upper = definePlugin({\n  name: 'upper',\n  install: (core) => {\n    core.onDispose(() => { releases += 1 })\n    return { upper: (value: string) => value.toUpperCase() }\n  }\n})\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [handle] = await host.use(upper)\n  const captured = handle.extensions.upper\n  assert.equal(captured('migaia'), 'MIGAIA')\n  const result = await host.unUse('upper')\n  assert.equal(result.ok, true)\n  assert.equal(releases, 1)\n  assert.throws(() => captured('again'), (error: unknown) =>\n    error instanceof PluginHostError && error.code === PluginHostErrorCode.registrationRevoked\n  )\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
               },
               {
-                type: 'list',
-                items: [
-                  'A new view loses the removed capability first. A previously captured stale view fails with VIEW_REVOKED when invoked again.',
-                  'cleanupComplete reports whether physical cleanup ended before return; cleanupErrors preserves each cleanup failure.',
-                  'When physicalCompletion exists, a higher-level shutdown boundary can keep waiting for actual completion.'
-                ]
+                type: 'paragraph',
+                text: 'unUse belongs to the Host. It returns { ok, affected } or { ok: false, errors, affected }. cleanupComplete and physicalCompletion belong to Host disposal, not to unUse results.'
+              },
+              {
+                type: 'paragraph',
+                text: 'The captured function from extensions belongs to this installation. Calling it after removal throws REGISTRATION_REVOKED. The plugin handle itself reads the current installation by name, which is a different access path.'
               }
             ]
           },
           {
             id: 'rollback',
-            heading: 'Preserve the primary installation failure',
+            heading: 'Handle one failure, then install again',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'The original install error remains the primary batch failure, and candidate state never becomes live. A rollback disposer failure is secondary cleanup evidence and belongs in a cause, aggregate, or diagnostic; it never replaces the primary failure.'
+                text: 'This is an independent script. The invalid install hook parses malformed JSON to produce a real synchronous failure. assert.rejects checks the error code. The script then installs upper again and consumes RECOVERED.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nlet releases = 0\nconst upper = definePlugin({\n  name: 'upper',\n  install: (core) => {\n    core.onDispose(() => { releases += 1 })\n    return { upper: (value: string) => value.toUpperCase() }\n  }\n})\nconst invalid = definePlugin({ name: 'invalid', install: () => JSON.parse('{') })\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  await assert.rejects(host.use(upper, invalid), (error: unknown) =>\n    error instanceof PluginHostError && error.code === PluginHostErrorCode.pluginInstallFailed\n  )\n  assert.equal(releases, 1)\n  const [handle] = await host.use(upper)\n  assert.equal(handle.extensions.upper('recovered'), 'RECOVERED')\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'When an install hook fails in a batch, candidate plugins are not published. The Host cleans created installation resources in reverse order and retains the original failure in the cause chain. Handle that failure before starting another installation.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Read unUse.errors or dispose.cleanupErrors when cleanup fails. Logical closure alone cannot establish that every resource was released.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Review the complete path', path: 'index' },
-        { label: 'Error-code reference', path: 'docs/plugin-host/PluginHostErrorCode' }
+        {
+          label: 'Compose plugins that call each other',
+          path: 'install-and-compose'
+        },
+        {
+          label: 'Connect the service to a Runtime Peer',
+          path: '../rpc-core/getting-started'
+        }
       ]
     }
   },

@@ -521,61 +521,165 @@ export const completionApiGuides: Readonly<
   }),
   'rpc-core:remote:createCoroutinePlugin': guide({
     purposeEn:
-      'Creates a supervised task in the current event loop or connects its child Host through the opaque task connection. PluginHost owns the connection and publishes request, notify, stream and lifecycle operations on host.coroutine.',
+      'Run a supervised task in the same process and verify its returned result. A task is work that stays available until it finishes or receives a stop signal. Run this complete main.ts example in Node.js. The consumer Host supplies task. The handler Host uses the connect value received by that task. Both sides use host.coroutine.',
     purposeZh:
-      '在当前事件循环创建受监督的 task，或通过 task 提供的 opaque connect 连接子 Host。PluginHost 持有连接，通过 host.coroutine 提供 request、notify、stream 与生命周期操作。',
-    quickStart: `import { defineHost } from '@migaia/plugin-host'
+      '你将运行同进程受监督的 task，并验证返回值。task 是持续工作到完成或收到停止 signal（信号）的任务。在 Node.js 中运行这个完整的 main.ts 示例。调用端 Host 传入 task。处理端 Host 使用该 task 收到的 connect。两端通过 host.coroutine 调用。',
+    quickStart: `import assert from 'node:assert/strict'
+import { defineHost } from '@migaia/plugin-host'
 import { createCoroutinePlugin } from '@migaia/rpc-core/remote'
 
-/** Parent mode owns the task and its per-generation message ports. */
-const service = createCoroutinePlugin<{ math: { double(value: number): number } }>({
+const service = createCoroutinePlugin<{ double(value: number): number }>({
+  name: 'math', task: async ({ connect, signal }) => {
+    const parent = createCoroutinePlugin({ name: 'parent', connect, provide: { double: (value: number) => value * 2 } })
+    const child = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
+    try { await child.use(parent); await new Promise<void>((resolve) => { if (signal.aborted) resolve(); else signal.addEventListener('abort', () => resolve(), { once: true }) }) }
+    finally { await child.dispose() }
+  }
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
+try { await host.use(service); assert.equal(await host.coroutine!.request('math', 'double', 21), 42) }
+finally { await host.dispose() }`,
+    examplesEn: [
+      {
+        id: 'complete-coroutine-calls',
+        title: 'main.ts: handler and consumer in one process',
+        description:
+          'Run this file in Node.js. The task installs the handler Host. The outer Host consumes request, notify and stream. readNote waits for the saved notification payload. Assertions check the numeric result, notification and streamed items. finally closes both Hosts.',
+        code: `import assert from 'node:assert/strict'
+import { defineHost } from '@migaia/plugin-host'
+import { createCoroutinePlugin } from '@migaia/rpc-core/remote'
+
+/** The task publishes this API to the parent Host. */
+type IServiceApi = {
+  double(value: number): number
+  note(value: string): void
+  readNote(): Promise<string>
+  count(limit: number): AsyncIterableIterator<number>
+}
+/** Both Hosts run in this Node.js main.ts process. */
+const service = createCoroutinePlugin<IServiceApi>({
   name: 'math',
   task: async ({ connect, signal }) => {
-    /** Child mode publishes the provider through the task's opaque connection. */
+    /** Store the first notification so readNote confirms that the handler ran. */
+    let receiveNote: (value: string) => void = () => undefined
+    const receivedNote = new Promise<string>((resolve) => { receiveNote = resolve })
+    /** Child mode joins the connection supplied to this task. */
     const parent = createCoroutinePlugin({
-      name: 'parent',
-      connect,
-      provide: { math: { double: (value: number) => value * 2 } }
+      name: 'parent', connect,
+      provide: {
+        double: (value: number) => value * 2,
+        note: (value: string) => receiveNote(value),
+        readNote: () => receivedNote,
+        count: async function* (limit: number) {
+          for (let value = 1; value <= limit; value++) yield value
+        }
+      }
     })
-    /** The task owns its child Host and disposes it before settling. */
-    const childHost = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: {} })
+    /** The handler Host stays available until the parent stops its task. */
+    const child = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
     try {
-      await childHost.use(parent)
-      /** Settlement is the unit's exit; remain available until cooperative stop. */
+      await child.use(parent)
       await new Promise<void>((resolve) => {
         if (signal.aborted) resolve()
         else signal.addEventListener('abort', () => resolve(), { once: true })
       })
-    } finally {
-      await childHost.dispose()
-    }
+    } finally { await child.dispose() }
   }
 })
-/** Host disposal stops its owned coroutine task. */
-const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: {} })
+/** The consumer Host owns the installed task. */
+const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
 try {
   await host.use(service)
-  console.log(await host.coroutine!.request('math', 'math.double', 21)) // 42
-} finally {
-  await host.dispose()
-}`,
+  assert.equal(await host.coroutine!.request('math', 'double', 21), 42)
+  await host.coroutine!.notify('math', 'note', 'hello')
+  assert.equal(await host.coroutine!.request('math', 'readNote'), 'hello')
+  /** Collect every item before checking the complete stream. */
+  const values: number[] = []
+  for await (const value of host.coroutine!.stream('math', 'count', 3)) values.push(value)
+  assert.deepEqual(values, [1, 2, 3])
+} finally { await host.dispose() }`
+      }
+    ],
+    examplesZh: [
+      {
+        id: 'complete-coroutine-calls',
+        title: 'main.ts：同进程的处理端与调用端',
+        description:
+          '在 Node.js 中运行这个文件。task 安装处理端 Host。外层 Host 调用 request、notify 与 stream（逐项结果）。readNote 等待已保存的通知 payload（输入值）。Assertions 验证数字结果、通知与所有流结果。finally 释放两个 Hosts。',
+        code: `import assert from 'node:assert/strict'
+import { defineHost } from '@migaia/plugin-host'
+import { createCoroutinePlugin } from '@migaia/rpc-core/remote'
+
+/** The task publishes this API to the parent Host. */
+type IServiceApi = {
+  double(value: number): number
+  note(value: string): void
+  readNote(): Promise<string>
+  count(limit: number): AsyncIterableIterator<number>
+}
+/** Both Hosts run in this Node.js main.ts process. */
+const service = createCoroutinePlugin<IServiceApi>({
+  name: 'math',
+  task: async ({ connect, signal }) => {
+    /** Store the first notification so readNote confirms that the handler ran. */
+    let receiveNote: (value: string) => void = () => undefined
+    const receivedNote = new Promise<string>((resolve) => { receiveNote = resolve })
+    /** Child mode joins the connection supplied to this task. */
+    const parent = createCoroutinePlugin({
+      name: 'parent', connect,
+      provide: {
+        double: (value: number) => value * 2,
+        note: (value: string) => receiveNote(value),
+        readNote: () => receivedNote,
+        count: async function* (limit: number) {
+          for (let value = 1; value <= limit; value++) yield value
+        }
+      }
+    })
+    /** The handler Host stays available until the parent stops its task. */
+    const child = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
+    try {
+      await child.use(parent)
+      await new Promise<void>((resolve) => {
+        if (signal.aborted) resolve()
+        else signal.addEventListener('abort', () => resolve(), { once: true })
+      })
+    } finally { await child.dispose() }
+  }
+})
+/** The consumer Host owns the installed task. */
+const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
+try {
+  await host.use(service)
+  assert.equal(await host.coroutine!.request('math', 'double', 21), 42)
+  await host.coroutine!.notify('math', 'note', 'hello')
+  assert.equal(await host.coroutine!.request('math', 'readNote'), 'hello')
+  /** Collect every item before checking the complete stream. */
+  const values: number[] = []
+  for await (const value of host.coroutine!.stream('math', 'count', 3)) values.push(value)
+  assert.deepEqual(values, [1, 2, 3])
+} finally { await host.dispose() }`
+      }
+    ],
     scenariosEn: [
-      'An application needs a same-process task with the process/thread outlet call and event APIs.',
-      'An owned task needs cooperative stop, restart or replace(name, { task }) under the existing supervisor.'
+      'The application needs supervised work without a Worker or child process.',
+      'The parent needs cooperative stop, restart or replace(name, { task }).'
     ],
     scenariosZh: [
-      '应用需要同进程 task，并使用与 process/thread 出口相同的调用和事件 API。',
-      '受监督的 task 需要协作式 stop、restart 或 replace(name, { task })。'
+      '应用需要受监督的工作，无需 Worker 或子进程。',
+      '父端需要协作停止、restart 或 replace(name, { task })。'
     ],
     avoidEn: [
-      'Pass exactly one of task or connect; connect is the opaque value received by that task, never a MessagePort.',
-      'Keep tasks yielding to the event loop. A CPU-bound task cannot be stopped while it stalls that loop.',
-      'Task resolution is a clean exit and rejection is a crash. Dispose the child Host in finally.'
+      'Pass exactly one of task or connect. A child uses only the connect value received by its task.',
+      'CPU-bound work that blocks the event loop cannot be stopped until it yields.',
+      'A resolved task exits normally. A rejected task crashes. Release its handler Host in finally.',
+      'Next task: cancel an unfinished request in Calls and cancellation (calls-and-cancellation).'
     ],
     avoidZh: [
-      'task 与 connect 必须二选一；connect 只能是当前 task 收到的 opaque 值，不能传 MessagePort。',
-      'task 必须让出事件循环。CPU 密集 task 阻塞事件循环期间无法停止。',
-      'task resolve 表示正常退出，reject 表示崩溃；在 finally 中释放子 Host。'
+      'task 与 connect 必须二选一。子端只使用自己的 task 收到的 connect。',
+      'CPU 密集工作阻塞事件循环期间无法停止。',
+      'task resolve 表示正常退出。task reject 表示异常退出。在 finally 中释放处理端 Host。',
+      '下一任务：按“调用与取消”（calls-and-cancellation）取消未完成的 request。'
     ]
   }),
   'rpc-core:remote:createRemoteHost': guide({
@@ -2136,52 +2240,187 @@ try {
   }),
   'rpc-process:index:createProcessPlugin': guide({
     purposeEn:
-      'Creates a symmetric process connection owned by PluginHost and addressed through its process outlet. Both sides publish explicit provide/expose methods; the library builds the v2 directory and requires batch reception before business calls are admitted.',
+      'Launch a process from a PluginHost and verify its returned result. PluginHost installs plugins and releases their connections together. In Node.js, compile the service.ts handler below to service.js beside main.js. Compile the parent main.ts and run main.js with Node.js. host.process selects the connection by name.',
     purposeZh:
-      '创建对称进程连接，由 PluginHost 持有，通过 host.process 出口调用。两端通过 provide/expose 显式发布方法，由库生成 v2 目录并要求批量帧接收；类型声明不会代替运行时鉴权。',
-    quickStart:
-      "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport {\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessByteChannel\n} from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IChildApi = { math: { double: (value: number) => number } }\ntype IOptions = Parameters<typeof createProcessPeer<IChildApi>>[0]\ntype ISpawn = Exclude<NonNullable<IOptions['spawn']>, Function>\nconst report = (error: unknown) => console.error(error)\nconst launcher = createNodeProcessLauncher()\nconst token = randomBytes(32).toString('base64url')\nlet handle: Awaited<ReturnType<typeof launcher.launch>>\nconst spawn: ISpawn = {\n  kind: 'spawn',\n  channelKind: 'byte',\n  wire: 'native',\n  token,\n  supervision: {\n    id: 'math-process',\n    isolation: 'best-effort',\n    report,\n    launcher: {\n      ...launcher,\n      launch: async (spec, request) => {\n        handle = await launcher.launch(spec, request)\n        return handle\n      }\n    },\n    budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n    spec: {\n      command: process.execPath,\n      args: [fileURLToPath(new URL('./service.js', import.meta.url))],\n      env: { inherit: ['PATH'], set: {} },\n      stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n      bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n    }\n  },\n  rawChannel: async () => handle.channel!,\n  establish: (raw, prepared) =>\n    createProcessTransport(raw as IProcessByteChannel, {\n      role: 'initiator',\n      offer: prepared.offer!,\n      peerId: handle.runtimeApiIdentity!.instanceId,\n      scheduler: prepared.scheduler,\n      ipc: { ...prepared.session, log: () => undefined },\n      report\n    })\n}\nimport { defineHost } from '@migaia/plugin-host'\nimport { createProcessPlugin } from '@migaia/rpc-process'\n\nconst child = createProcessPlugin<IChildApi, Record<never, never>, 'child'>({\n  name: 'child',\n  spawn,\n  report\n})\nconst host = defineHost<Record<string, never>, never, readonly [typeof child]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\ntry {\n  await host.use(child)\n  console.log(await host.process!.request('child', 'math.double', 21))\n} finally {\n  await host.dispose()\n}",
+      '你将从 PluginHost 启动进程，并验证返回值。PluginHost 负责安装 plugins，并统一释放连接。在 Node.js 中，先将下方处理端 service.ts 编译成 main.js 旁的 service.js。将父端 main.ts 编译为 main.js，再用 Node.js 运行。host.process 用连接名称选择目标。',
+    quickStart: `import assert from 'node:assert/strict'
+import { defineHost } from '@migaia/plugin-host'
+import { createProcessPlugin } from '@migaia/rpc-process'
+
+type IServiceApi = { math: { double(value: number): number } }
+const service = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({
+  name: 'service', spawn: new URL('./service.js', import.meta.url)
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
+try {
+  await host.use(service)
+  assert.equal(await host.process!.request('service', 'math.double', 21), 42)
+} finally { await host.dispose() }`,
+    examplesEn: [
+      {
+        id: 'service-handler',
+        title: 'Handler: service.ts in the launched process',
+        description:
+          'Compile this file beside the parent main.ts. The parent launches it through spawn. note stores its first payload. readNote waits for that payload before returning it.',
+        code: `import { createProcessPeer } from '@migaia/rpc-process'
+
+/** Store the first notification so readNote can confirm that the handler ran. */
+let receiveNote: (value: string) => void = () => undefined
+const receivedNote = new Promise<string>((resolve) => { receiveNote = resolve })
+/** This entry is launched by main.ts; it automatically connects to the parent. */
+await createProcessPeer({
+  provide: {
+    math: { double: (value: number) => value * 2 },
+    note: (value: string) => receiveNote(value),
+    readNote: () => receivedNote,
+    count: async function* (limit: number) {
+      for (let value = 1; value <= limit; value++) yield value
+    }
+  }
+})`
+      },
+      {
+        id: 'parent-calls',
+        title: 'Consumer: main.ts verifies all three call forms',
+        description:
+          'Run this parent in Node.js with the compiled service.js beside it. request returns a result. notify waits only for sending. readNote confirms that the notification handler ran. stream returns values one at a time. Assertions check every result.',
+        code: `import assert from 'node:assert/strict'
+import { defineHost } from '@migaia/plugin-host'
+import { createProcessPlugin } from '@migaia/rpc-process'
+
+type IServiceApi = {
+  math: { double(value: number): number }
+  note(value: string): void
+  readNote(): Promise<string>
+  count(limit: number): AsyncIterableIterator<number>
+}
+/** main.ts launches the compiled service.ts handler. */
+const service = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({
+  name: 'service', spawn: new URL('./service.js', import.meta.url)
+})
+/** The parent Host owns its plugin and child process. */
+const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
+try {
+  await host.use(service)
+  assert.equal(await host.process!.request('service', 'math.double', 21), 42)
+  await host.process!.notify('service', 'note', 'hello')
+  assert.equal(await host.process!.request('service', 'readNote'), 'hello')
+  /** Collect every streamed value before checking the result. */
+  const values: number[] = []
+  for await (const value of host.process!.stream('service', 'count', 3)) values.push(value)
+  assert.deepEqual(values, [1, 2, 3])
+} finally { await host.dispose() }`
+      }
+    ],
+    examplesZh: [
+      {
+        id: 'service-handler',
+        title: '处理端：启动的进程内运行 service.ts',
+        description:
+          '将这个文件与父端 main.ts 一起编译。父端通过 spawn 启动它。note 保存首次收到的 payload（输入值）。readNote 等待这个值后再返回。',
+        code: `import { createProcessPeer } from '@migaia/rpc-process'
+
+/** Store the first notification so readNote can confirm that the handler ran. */
+let receiveNote: (value: string) => void = () => undefined
+const receivedNote = new Promise<string>((resolve) => { receiveNote = resolve })
+/** This entry is launched by main.ts; it automatically connects to the parent. */
+await createProcessPeer({
+  provide: {
+    math: { double: (value: number) => value * 2 },
+    note: (value: string) => receiveNote(value),
+    readNote: () => receivedNote,
+    count: async function* (limit: number) {
+      for (let value = 1; value <= limit; value++) yield value
+    }
+  }
+})`
+      },
+      {
+        id: 'parent-calls',
+        title: '调用端：main.ts 验证三种调用',
+        description:
+          '在 Node.js 中运行父端，旁边放置已编译的 service.js。request 等待结果。notify 只等待发送。readNote 确认通知处理函数已执行。stream 逐项返回结果。Assertions 验证所有结果。',
+        code: `import assert from 'node:assert/strict'
+import { defineHost } from '@migaia/plugin-host'
+import { createProcessPlugin } from '@migaia/rpc-process'
+
+type IServiceApi = {
+  math: { double(value: number): number }
+  note(value: string): void
+  readNote(): Promise<string>
+  count(limit: number): AsyncIterableIterator<number>
+}
+/** main.ts launches the compiled service.ts handler. */
+const service = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({
+  name: 'service', spawn: new URL('./service.js', import.meta.url)
+})
+/** The parent Host owns its plugin and child process. */
+const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
+try {
+  await host.use(service)
+  assert.equal(await host.process!.request('service', 'math.double', 21), 42)
+  await host.process!.notify('service', 'note', 'hello')
+  assert.equal(await host.process!.request('service', 'readNote'), 'hello')
+  /** Collect every streamed value before checking the result. */
+  const values: number[] = []
+  for await (const value of host.process!.stream('service', 'count', 3)) values.push(value)
+  assert.deepEqual(values, [1, 2, 3])
+} finally { await host.dispose() }`
+      }
+    ],
     scenariosEn: [
-      'An application needs typed request, notify and stream calls across a process boundary.',
-      'A spawn-owned unit needs lifecycle control, or a borrowed connect/listen session needs local close without owning the remote unit.'
+      'One PluginHost manages several process connections and releases them together.',
+      'A launched unit needs stop, restart or replace through host.process.'
     ],
     scenariosZh: [
-      '应用需要跨进程边界进行有类型的 request、notify 和 stream 调用。',
-      'spawn 单元需要原 owner 的生命周期控制，或借用 connect/listen 连接只需要关闭本端会话。'
+      '一个 PluginHost 管理多个进程连接，并统一释放。',
+      '启动的执行单元需要经 host.process 执行 stop、restart 或 replace。'
     ],
     avoidEn: [
-      'In-process functions need no remote boundary; call the function directly.',
-      'Do not assume a display name, type assertion or transport ownership label grants remote permissions.'
+      'Use createProcessPeer when the application needs a connection without PluginHost ownership.',
+      'A borrowed connect or listen session cannot stop or restart the remote unit.',
+      'Next task: cancel an unfinished request in Calls and cancellation (calls-and-cancellation).'
     ],
     avoidZh: [
-      '同一进程内的普通函数不需要远端边界，直接调用函数即可。',
-      '不要认为显示名称、类型断言或 ownership 标签会授予远端权限。'
+      '应用只需要独立连接时，使用 createProcessPeer。',
+      '借用的 connect 或 listen 会话不能停止或重启远端单元。',
+      '下一任务：按“调用与取消”（calls-and-cancellation）取消未完成的 request。'
     ],
     optionsEn: [
       {
-        name: 'provide',
+        name: 'spawn',
         description:
-          'Functions owned by this side; nested objects become method paths in the generated directory.',
-        whenToUse: 'The remote side must invoke explicitly published application methods.'
+          'Use true to rerun the current entry, or pass a string, URL or short spawn object.',
+        whenToUse: 'The Host must launch and own the execution unit.'
+      },
+      {
+        name: 'provide / expose',
+        description:
+          'provide publishes local functions. expose starts empty and publishes only listed Host methods.',
+        whenToUse: 'The child must call explicitly published local methods.'
       },
       {
         name: 'defaultTimeoutMs',
         description:
-          'Positive default request/stream deadline in milliseconds; defaults to 30000 and remains within the launcher call cap.',
-        whenToUse:
-          'Set one bounded application deadline; per-call timeoutMs:false explicitly disables this default.'
+          'Sets the default request and stream waiting limit in milliseconds. The default is 30000.',
+        whenToUse: 'Use timeoutMs on one call to override this default.'
       }
     ],
     optionsZh: [
       {
-        name: 'provide',
-        description: '本端拥有并公开的函数；嵌套对象在库生成的目录中形成方法路径。',
-        whenToUse: '对端需要调用明确公开的业务方法时使用。'
+        name: 'spawn',
+        description: '用 true 重跑当前入口，或传入 string、URL、简短的启动配置对象。',
+        whenToUse: 'Host 需要启动并持有执行单元时使用。'
+      },
+      {
+        name: 'provide / expose',
+        description: 'provide 发布本端函数。expose 默认为空，只公开列出的 Host methods（方法）。',
+        whenToUse: '子端需要调用明确公开的本端方法时使用。'
       },
       {
         name: 'defaultTimeoutMs',
-        description: 'request/stream 的正毫秒默认期限，默认30000，仍受launcher总调用预算限制。',
-        whenToUse: '设置一个有界业务期限；单调用timeoutMs:false显式关闭此默认值。'
+        description: '设置 request 与 stream 的默认等待上限，单位为毫秒。默认值为 30000。',
+        whenToUse: '单次调用通过 timeoutMs 覆盖默认值。'
       }
     ]
   }),
@@ -2238,52 +2477,187 @@ try {
   }),
   'rpc-threads:index:createThreadPlugin': guide({
     purposeEn:
-      'Creates a symmetric Worker connection owned by PluginHost and addressed through its thread outlet. Both sides publish explicit provide/expose methods; the library builds the v2 directory and requires batch reception before business calls are admitted.',
+      'Launch a Worker from a PluginHost and verify its returned result. PluginHost installs plugins and releases their connections together. In Node.js, compile the worker.ts handler below to worker.js beside main.js. Compile the parent main.ts and run main.js with Node.js. host.thread selects the connection by name.',
     purposeZh:
-      '创建对称Worker连接，由 PluginHost 持有，通过 host.thread 出口调用。两端通过 provide/expose 显式发布方法，由库生成 v2 目录并要求批量帧接收；类型声明不会代替运行时鉴权。',
-    quickStart:
-      "import { fileURLToPath } from 'node:url'\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\ntype IChildApi = { math: { double: (value: number) => number } }\nconst report = (error: unknown) => console.error(error)\nconst spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}\nimport { defineHost } from '@migaia/plugin-host'\nimport { createThreadPlugin } from '@migaia/rpc-threads'\n\nconst worker = createThreadPlugin<IChildApi, Record<never, never>, 'worker'>({\n  name: 'worker',\n  spawn,\n  report\n})\nconst host = defineHost<Record<string, never>, never, readonly [typeof worker]>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\ntry {\n  await host.use(worker)\n  console.log(await host.thread!.request('worker', 'math.double', 21))\n} finally {\n  await host.dispose()\n}",
+      '你将从 PluginHost 启动Worker，并验证返回值。PluginHost 负责安装 plugins，并统一释放连接。在 Node.js 中，先将下方处理端 worker.ts 编译成 main.js 旁的 worker.js。将父端 main.ts 编译为 main.js，再用 Node.js 运行。host.thread 用连接名称选择目标。',
+    quickStart: `import assert from 'node:assert/strict'
+import { defineHost } from '@migaia/plugin-host'
+import { createThreadPlugin } from '@migaia/rpc-threads'
+
+type IServiceApi = { math: { double(value: number): number } }
+const service = createThreadPlugin<IServiceApi, Record<never, never>, 'service'>({
+  name: 'service', spawn: new URL('./worker.js', import.meta.url)
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
+try {
+  await host.use(service)
+  assert.equal(await host.thread!.request('service', 'math.double', 21), 42)
+} finally { await host.dispose() }`,
+    examplesEn: [
+      {
+        id: 'worker-handler',
+        title: 'Handler: worker.ts in the launched Worker',
+        description:
+          'Compile this file beside the parent main.ts. The parent launches it through spawn. note stores its first payload. readNote waits for that payload before returning it.',
+        code: `import { createThreadPeer } from '@migaia/rpc-threads'
+
+/** Store the first notification so readNote can confirm that the handler ran. */
+let receiveNote: (value: string) => void = () => undefined
+const receivedNote = new Promise<string>((resolve) => { receiveNote = resolve })
+/** This entry is launched by main.ts; it automatically connects to the parent. */
+await createThreadPeer({
+  provide: {
+    math: { double: (value: number) => value * 2 },
+    note: (value: string) => receiveNote(value),
+    readNote: () => receivedNote,
+    count: async function* (limit: number) {
+      for (let value = 1; value <= limit; value++) yield value
+    }
+  }
+})`
+      },
+      {
+        id: 'parent-calls',
+        title: 'Consumer: main.ts verifies all three call forms',
+        description:
+          'Run this parent in Node.js with the compiled worker.js beside it. request returns a result. notify waits only for sending. readNote confirms that the notification handler ran. stream returns values one at a time. Assertions check every result.',
+        code: `import assert from 'node:assert/strict'
+import { defineHost } from '@migaia/plugin-host'
+import { createThreadPlugin } from '@migaia/rpc-threads'
+
+type IServiceApi = {
+  math: { double(value: number): number }
+  note(value: string): void
+  readNote(): Promise<string>
+  count(limit: number): AsyncIterableIterator<number>
+}
+/** main.ts launches the compiled worker.ts handler. */
+const service = createThreadPlugin<IServiceApi, Record<never, never>, 'service'>({
+  name: 'service', spawn: new URL('./worker.js', import.meta.url)
+})
+/** The parent Host owns its plugin and child Worker. */
+const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
+try {
+  await host.use(service)
+  assert.equal(await host.thread!.request('service', 'math.double', 21), 42)
+  await host.thread!.notify('service', 'note', 'hello')
+  assert.equal(await host.thread!.request('service', 'readNote'), 'hello')
+  /** Collect every streamed value before checking the result. */
+  const values: number[] = []
+  for await (const value of host.thread!.stream('service', 'count', 3)) values.push(value)
+  assert.deepEqual(values, [1, 2, 3])
+} finally { await host.dispose() }`
+      }
+    ],
+    examplesZh: [
+      {
+        id: 'worker-handler',
+        title: '处理端：启动的Worker内运行 worker.ts',
+        description:
+          '将这个文件与父端 main.ts 一起编译。父端通过 spawn 启动它。note 保存首次收到的 payload（输入值）。readNote 等待这个值后再返回。',
+        code: `import { createThreadPeer } from '@migaia/rpc-threads'
+
+/** Store the first notification so readNote can confirm that the handler ran. */
+let receiveNote: (value: string) => void = () => undefined
+const receivedNote = new Promise<string>((resolve) => { receiveNote = resolve })
+/** This entry is launched by main.ts; it automatically connects to the parent. */
+await createThreadPeer({
+  provide: {
+    math: { double: (value: number) => value * 2 },
+    note: (value: string) => receiveNote(value),
+    readNote: () => receivedNote,
+    count: async function* (limit: number) {
+      for (let value = 1; value <= limit; value++) yield value
+    }
+  }
+})`
+      },
+      {
+        id: 'parent-calls',
+        title: '调用端：main.ts 验证三种调用',
+        description:
+          '在 Node.js 中运行父端，旁边放置已编译的 worker.js。request 等待结果。notify 只等待发送。readNote 确认通知处理函数已执行。stream 逐项返回结果。Assertions 验证所有结果。',
+        code: `import assert from 'node:assert/strict'
+import { defineHost } from '@migaia/plugin-host'
+import { createThreadPlugin } from '@migaia/rpc-threads'
+
+type IServiceApi = {
+  math: { double(value: number): number }
+  note(value: string): void
+  readNote(): Promise<string>
+  count(limit: number): AsyncIterableIterator<number>
+}
+/** main.ts launches the compiled worker.ts handler. */
+const service = createThreadPlugin<IServiceApi, Record<never, never>, 'service'>({
+  name: 'service', spawn: new URL('./worker.js', import.meta.url)
+})
+/** The parent Host owns its plugin and child Worker. */
+const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
+try {
+  await host.use(service)
+  assert.equal(await host.thread!.request('service', 'math.double', 21), 42)
+  await host.thread!.notify('service', 'note', 'hello')
+  assert.equal(await host.thread!.request('service', 'readNote'), 'hello')
+  /** Collect every streamed value before checking the result. */
+  const values: number[] = []
+  for await (const value of host.thread!.stream('service', 'count', 3)) values.push(value)
+  assert.deepEqual(values, [1, 2, 3])
+} finally { await host.dispose() }`
+      }
+    ],
     scenariosEn: [
-      'An application needs typed request, notify and stream calls across a Worker boundary.',
-      'A spawn-owned unit needs lifecycle control, or a borrowed connect/listen session needs local close without owning the remote unit.'
+      'One PluginHost manages several Worker connections and releases them together.',
+      'A launched unit needs stop, restart or replace through host.thread.'
     ],
     scenariosZh: [
-      '应用需要跨Worker边界进行有类型的 request、notify 和 stream 调用。',
-      'spawn 单元需要原 owner 的生命周期控制，或借用 connect/listen 连接只需要关闭本端会话。'
+      '一个 PluginHost 管理多个Worker连接，并统一释放。',
+      '启动的执行单元需要经 host.thread 执行 stop、restart 或 replace。'
     ],
     avoidEn: [
-      'In-process functions need no remote boundary; call the function directly.',
-      'Do not assume a display name, type assertion or transport ownership label grants remote permissions.'
+      'Use createThreadPeer when the application needs a connection without PluginHost ownership.',
+      'A borrowed connect or listen session cannot stop or restart the remote unit.',
+      'Next task: cancel an unfinished request in Calls and cancellation (calls-and-cancellation).'
     ],
     avoidZh: [
-      '同一进程内的普通函数不需要远端边界，直接调用函数即可。',
-      '不要认为显示名称、类型断言或 ownership 标签会授予远端权限。'
+      '应用只需要独立连接时，使用 createThreadPeer。',
+      '借用的 connect 或 listen 会话不能停止或重启远端单元。',
+      '下一任务：按“调用与取消”（calls-and-cancellation）取消未完成的 request。'
     ],
     optionsEn: [
       {
-        name: 'provide',
+        name: 'spawn',
         description:
-          'Functions owned by this side; nested objects become method paths in the generated directory.',
-        whenToUse: 'The remote side must invoke explicitly published application methods.'
+          'Use true to rerun a Node, Bun or Deno entry. Pass an explicit URL in browsers.',
+        whenToUse: 'The Host must launch and own the execution unit.'
+      },
+      {
+        name: 'provide / expose',
+        description:
+          'provide publishes local functions. expose starts empty and publishes only listed Host methods.',
+        whenToUse: 'The child must call explicitly published local methods.'
       },
       {
         name: 'defaultTimeoutMs',
         description:
-          'Positive default request/stream deadline in milliseconds; defaults to 30000 and remains within the launcher call cap.',
-        whenToUse:
-          'Set one bounded application deadline; per-call timeoutMs:false explicitly disables this default.'
+          'Sets the default request and stream waiting limit in milliseconds. The default is 30000.',
+        whenToUse: 'Use timeoutMs on one call to override this default.'
       }
     ],
     optionsZh: [
       {
-        name: 'provide',
-        description: '本端拥有并公开的函数；嵌套对象在库生成的目录中形成方法路径。',
-        whenToUse: '对端需要调用明确公开的业务方法时使用。'
+        name: 'spawn',
+        description: '用 true 重跑 Node、Bun 或 Deno 入口。浏览器必须传入显式 URL。',
+        whenToUse: 'Host 需要启动并持有执行单元时使用。'
+      },
+      {
+        name: 'provide / expose',
+        description: 'provide 发布本端函数。expose 默认为空，只公开列出的 Host methods（方法）。',
+        whenToUse: '子端需要调用明确公开的本端方法时使用。'
       },
       {
         name: 'defaultTimeoutMs',
-        description: 'request/stream 的正毫秒默认期限，默认30000，仍受launcher总调用预算限制。',
-        whenToUse: '设置一个有界业务期限；单调用timeoutMs:false显式关闭此默认值。'
+        description: '设置 request 与 stream 的默认等待上限，单位为毫秒。默认值为 30000。',
+        whenToUse: '单次调用通过 timeoutMs 覆盖默认值。'
       }
     ]
   }),
