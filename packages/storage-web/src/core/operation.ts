@@ -1,9 +1,6 @@
 import type { IOperationContext } from '@migaia/storage-contract'
 import { tryReadProperty } from '@migaia/utils/error'
-import {
-  createAbortTimeoutSignal,
-  type IAbortSignal as IUtilsAbortSignal
-} from '@migaia/utils/promise'
+import { createAbortTimeoutSignal, type IAbortSignal } from '@migaia/utils/promise'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -31,11 +28,8 @@ type IOperationValidationContext = IOperationContext & {
   readonly conflictPolicy?: unknown
 }
 
-/** 结构化取消信号（与 contract 的 `IOperationContext.signal` 同源，避免直接 import `@migaia/lifecycle`）。 */
-export type IWebAbortSignal = NonNullable<IOperationContext['signal']>
-
 /** Read mutable abort state without allowing a hostile getter to escape the storage protocol. */
-const readSignalAborted = (signal: IWebAbortSignal | undefined): boolean => {
+const readSignalAborted = (signal: IAbortSignal | undefined): boolean => {
   if (signal === undefined) return false
   try {
     return signal.aborted
@@ -45,7 +39,7 @@ const readSignalAborted = (signal: IWebAbortSignal | undefined): boolean => {
 }
 
 /** Treat an inaccessible abort reason as the cancellation cause instead of leaking its getter. */
-export const readAbortReason = (signal: IWebAbortSignal | undefined): unknown => {
+export const readAbortReason = (signal: IAbortSignal | undefined): unknown => {
   if (signal === undefined) return undefined
   /** Storage operations use an inaccessible reason as the cancellation cause. */
   const read = tryReadProperty(signal, 'reason')
@@ -54,7 +48,7 @@ export const readAbortReason = (signal: IWebAbortSignal | undefined): unknown =>
 
 /** Subscribe once with race closure and return cleanup that cannot mask an operation result. */
 export const subscribeToAbort = (
-  signal: IWebAbortSignal | undefined,
+  signal: IAbortSignal | undefined,
   onAbort: () => void,
   reporter: IStorageOperationReporter
 ): (() => void) => {
@@ -90,7 +84,7 @@ export const subscribeToAbort = (
 }
 
 /** Throw the stable storage error when an operation signal has already been cancelled. */
-export const throwIfAborted = (signal: IWebAbortSignal | undefined): void => {
+export const throwIfAborted = (signal: IAbortSignal | undefined): void => {
   if (readSignalAborted(signal))
     throw new StorageContractError(StorageContractErrorCode.aborted, {
       cause: readAbortReason(signal)
@@ -113,7 +107,7 @@ export const mergeSignals = (
   if (timeoutMs === undefined) return { signal: externalSignal, dispose: () => {}, context }
   try {
     const merged = createAbortTimeoutSignal({
-      signal: externalSignal as IUtilsAbortSignal | undefined,
+      signal: externalSignal as IAbortSignal | undefined,
       timeoutMs,
       timeoutReason: () => new StorageContractError(StorageContractErrorCode.aborted),
       report: (error) => reportCleanupError(reporter, error)

@@ -43,11 +43,9 @@ type IGeneratorUndefinedSignal<TValue> = undefined extends TValue
   ? typeof GENERATOR_UNDEFINED
   : never
 
-/** Public compatibility name for utils-owned structural abort-signal admission. */
-export type IMiddlewarePipelineAbortSignal = IAbortSignal
-export type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal }
+export type IMiddlewarePipelineContext = { readonly signal: IAbortSignal }
 export type IMiddlewarePipelineControlOptions = {
-  readonly signal?: IMiddlewarePipelineAbortSignal
+  readonly signal?: IAbortSignal
 }
 export type ISyncMiddlewareStage<TValue> = (
   value: TValue,
@@ -89,7 +87,7 @@ export type IMiddlewarePipelineOptions = {
   readonly assertActive?: () => void
   /** Host-owned error construction for the stage+downstream failure case. */
   readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown
-  readonly signal?: IMiddlewarePipelineAbortSignal
+  readonly signal?: IAbortSignal
 }
 
 /** Invokes a one-argument optional-context callback. */
@@ -147,14 +145,12 @@ const createNextGuard = <TValue, TResult>(
 }
 
 /** Reads one observed abort reason and applies the package's Error identity policy. */
-const makeAbortError = (signal: IMiddlewarePipelineAbortSignal): Error => {
+const makeAbortError = (signal: IAbortSignal): Error => {
   const read = tryReadProperty(signal, 'reason')
   return createMiddlewarePipelineAbortError(read.threw ? read.error : read.value)
 }
 /** Applies structural signal admission inside each mode's own throw boundary. */
-const admit = (
-  signal: IMiddlewarePipelineAbortSignal | undefined
-): IMiddlewarePipelineContext | undefined => {
+const admit = (signal: IAbortSignal | undefined): IMiddlewarePipelineContext | undefined => {
   if (signal === undefined) return undefined
   const admission = admitAbortSignal(signal)
   if (admission.kind === 'invalid')
@@ -304,7 +300,7 @@ export const runSyncMiddleware = <TValue>(
   value: TValue,
   done: (value: TValue, context?: IMiddlewarePipelineContext) => void,
   onViolation: IMiddlewarePipelineViolationHandler,
-  signal?: IMiddlewarePipelineAbortSignal,
+  signal?: IAbortSignal,
   assertActive?: () => void
 ): void => {
   const context = admit(signal)
@@ -488,7 +484,7 @@ export const runGeneratorMiddleware = <TValue>(
   value: TValue,
   done: (value: TValue, context?: IMiddlewarePipelineContext) => void,
   signals: IGeneratorMiddlewareSignals = MiddlewarePipelineGeneratorSignals,
-  signal?: IMiddlewarePipelineAbortSignal,
+  signal?: IAbortSignal,
   assertActive?: () => void
 ): void => {
   const context = admit(signal)
@@ -528,7 +524,7 @@ export const runAsyncGeneratorMiddleware = async <TValue>(
   value: TValue,
   done: (value: TValue, context?: IMiddlewarePipelineContext) => void | Promise<void>,
   signals: IGeneratorMiddlewareSignals = MiddlewarePipelineGeneratorSignals,
-  signal?: IMiddlewarePipelineAbortSignal,
+  signal?: IAbortSignal,
   assertActive?: () => void
 ): Promise<void> => {
   const context = admit(signal)

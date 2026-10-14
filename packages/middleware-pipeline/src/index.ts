@@ -24,7 +24,6 @@ export {
   type IAsyncGeneratorMiddlewareStage,
   type IAsyncMiddlewareStage,
   type IGeneratorMiddlewareStage,
-  type IMiddlewarePipelineAbortSignal,
   type IMiddlewarePipelineContext,
   type IMiddlewarePipelineControlOptions,
   type ISyncMiddlewareStage

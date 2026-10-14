@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { MiddlewarePipelineErrorText } from './error-text.js'
 import { createMiddlewarePipelineInvalidOptionError } from './signal-errors.js'
 import {
@@ -12,7 +13,6 @@ import {
   type IAsyncGeneratorMiddlewareStage,
   type IAsyncMiddlewareStage,
   type IGeneratorMiddlewareStage,
-  type IMiddlewarePipelineAbortSignal,
   type IMiddlewarePipelineContext,
   type IMiddlewarePipelineControlOptions,
   type ISyncMiddlewareStage
@@ -71,7 +71,7 @@ export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Read
   /** Checks owner admission before each frame; a thrown failure prevents that stage from starting. */
   readonly assertActive?: () => void
   /** Default cooperative abort signal; a run-level signal overrides it. */
-  readonly signal?: IMiddlewarePipelineAbortSignal
+  readonly signal?: IAbortSignal
   /** Optional generator sentinel set; all three sentinel identities must be distinct. */
   readonly signals?: IGeneratorMiddlewareSignals
   /**
@@ -101,7 +101,7 @@ type INormalizedPipelineOptions = Readonly<{
   readonly mode: IMiddlewarePipelineMode
   readonly onViolation: IMiddlewarePipelineViolationHandler
   readonly assertActive?: () => void
-  readonly signal?: IMiddlewarePipelineAbortSignal
+  readonly signal?: IAbortSignal
   readonly signals: IGeneratorMiddlewareSignals
   readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown
 }>
@@ -155,7 +155,7 @@ const readPipelineOptions = (options: unknown): INormalizedPipelineOptions => {
     onViolation:
       readCallback<IMiddlewarePipelineViolationHandler>(candidate.onViolation) ?? ignoreViolation,
     assertActive: readCallback<() => void>(candidate.assertActive),
-    signal: candidate.signal as IMiddlewarePipelineAbortSignal | undefined,
+    signal: candidate.signal as IAbortSignal | undefined,
     signals: readSignals(candidate.signals),
     combineStageAndDownstreamError: readCallback<(stage: unknown, downstream: unknown) => unknown>(
       candidate.combineStageAndDownstreamError
@@ -167,7 +167,7 @@ const readPipelineOptions = (options: unknown): INormalizedPipelineOptions => {
 const selectSignal = (
   options: INormalizedPipelineOptions,
   control: unknown
-): IMiddlewarePipelineAbortSignal | undefined => {
+): IAbortSignal | undefined => {
   if (control === undefined) return options.signal
   if (!isOptionRecord(control))
     throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption)
@@ -219,7 +219,7 @@ const runForMode = (
   }
   if (mode === MiddlewarePipelineMode.async) {
     /** Async mode converts malformed control admission into a rejected Promise. */
-    let signal: IMiddlewarePipelineAbortSignal | undefined
+    let signal: IAbortSignal | undefined
     try {
       signal = selectSignal(options, control)
     } catch (error) {
