@@ -2694,45 +2694,49 @@ function InlineText({
   readonly text: string
 }) {
   const errorPath = errorReferencePath(locale, library)
-  return text
-    .replace(/\bpackages\b/gi, 'libraries')
-    .replace(/\bpackage\b/gi, 'library')
-    .split(
-      /(`[^`]+`|@migai(?:a)?\/[a-z0-9-]+(?:\/[a-z0-9-]+)*|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:Capability Graph|Lifecycle|PluginHost|Reactive|Resource|Storage Host|Tray|WASM|RPC)\b)/g
-    )
-    .map((part, index) => {
-      const inlineCode = part.startsWith('`') && part.endsWith('`')
-      const value = inlineCode ? part.slice(1, -1) : part
-      const errorCode = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/.test(value)
-      const referencedLibrary = crossLibraryReference(value, library)
-      if (referencedLibrary) {
-        const description = libraryReferenceDescription(locale, referencedLibrary)
-        return (
-          <Link
-            aria-label={`${value}：${description}`}
-            className="library-reference"
-            key={index}
-            title={description}
-            to={domainPath(locale, domain, referencedLibrary)}
-          >
-            {inlineCode ? <code>{value}</code> : value}
-            <span className="library-reference-popover" role="note">
-              <strong>{referencedLibrary}</strong>
-              <span>{description}</span>
-              <b>{locale === 'zh' ? '查看该类库 →' : 'Open library →'}</b>
-            </span>
-          </Link>
-        )
-      }
-      if (errorCode && errorPath)
-        return (
-          <Link className="text-link" key={index} to={errorPath}>
-            <code>{value}</code>
-          </Link>
-        )
-      if (inlineCode) return <code key={index}>{value}</code>
-      return <Fragment key={index}>{part}</Fragment>
-    })
+  return (
+    text
+      // Reader terminology says "library"; identifiers such as `package.json`, `read:packages`
+      // and the product name "GitHub Packages" keep their literal spelling.
+      .replace(/(?<!GitHub |[\w.:/-])packages(?![\w.:/-])/gi, 'libraries')
+      .replace(/(?<![\w.:/-])package(?![\w.:/-])/gi, 'library')
+      .split(
+        /(`[^`]+`|@migai(?:a)?\/[a-z0-9-]+(?:\/[a-z0-9-]+)*|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:Capability Graph|Lifecycle|PluginHost|Reactive|Resource|Storage Host|Tray|WASM|RPC)\b)/g
+      )
+      .map((part, index) => {
+        const inlineCode = part.startsWith('`') && part.endsWith('`')
+        const value = inlineCode ? part.slice(1, -1) : part
+        const errorCode = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/.test(value)
+        const referencedLibrary = crossLibraryReference(value, library)
+        if (referencedLibrary) {
+          const description = libraryReferenceDescription(locale, referencedLibrary)
+          return (
+            <Link
+              aria-label={`${value}：${description}`}
+              className="library-reference"
+              key={index}
+              title={description}
+              to={domainPath(locale, domain, referencedLibrary)}
+            >
+              {inlineCode ? <code>{value}</code> : value}
+              <span className="library-reference-popover" role="note">
+                <strong>{referencedLibrary}</strong>
+                <span>{description}</span>
+                <b>{locale === 'zh' ? '查看该类库 →' : 'Open library →'}</b>
+              </span>
+            </Link>
+          )
+        }
+        if (errorCode && errorPath)
+          return (
+            <Link className="text-link" key={index} to={errorPath}>
+              <code>{value}</code>
+            </Link>
+          )
+        if (inlineCode) return <code key={index}>{value}</code>
+        return <Fragment key={index}>{part}</Fragment>
+      })
+  )
 }
 
 type IGuideApiGroup = {
