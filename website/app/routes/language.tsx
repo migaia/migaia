@@ -7,33 +7,28 @@ const STARTER_LIBRARY = 'utils'
 
 type ILanguageRouteProps = { readonly params: { readonly lang?: string } }
 
-/** Localized home purpose shared by the introduction and its search description. */
-const LANGUAGE_DESCRIPTION = {
-  zh: '从一个目标开始，沿着真实的类库、模块与 API 走到可验证结果。',
-  en: 'Start with a goal and follow a verified path through libraries, modules, and APIs.'
-} as const
-
-/** Uses the same home title in each locale and preserves the page's authored purpose. */
+/** Reuses the reviewed localized home purpose in the search description. */
 export const meta: IMetaFunction = ({ params }) => [
   { title: 'migaia' },
   {
     name: 'description',
-    content: LANGUAGE_DESCRIPTION[params.lang === 'zh' ? 'zh' : 'en']
+    content: copyFor(params.lang === 'zh' ? 'zh' : 'en').homeDescription
   }
 ]
 
-/** Renders the first-use journey: capability map, quickstart, goals, and architecture preview. */
+/** Connects application scenarios to package references and common library combinations. */
 function Language({ params }: ILanguageRouteProps) {
+  /** Selects the canonical locale for page copy and all documentation links. */
   const locale = (params.lang === 'zh' ? 'zh' : 'en') as ILocale
+  /** Chooses the existing localized navigation labels. */
   const chinese = locale === 'zh'
+  /** Reviewed home data is the single source for the hero and scenario cards. */
   const copy = copyFor(locale)
   return (
     <main id="main-content" className="page-shell language-home" lang={locale} data-pagefind-body>
-      <p className="eyebrow">{chinese ? 'Migaia 文档' : 'Migaia documentation'}</p>
-      <h1>
-        {chinese ? '用清晰、可组合的类库构建系统。' : 'Build with clear, composable libraries.'}
-      </h1>
-      <p className="lede">{LANGUAGE_DESCRIPTION[locale]}</p>
+      <p className="eyebrow">{copy.homeEyebrow}</p>
+      <h1>{copy.homeTitle}</h1>
+      <p className="lede">{copy.homeDescription}</p>
       <div className="actions">
         <Link className="button button-primary" to={domainPath(locale, 'docs')}>
           {chinese ? '开始查文档' : 'Start with Docs'}
@@ -43,25 +38,26 @@ function Language({ params }: ILanguageRouteProps) {
         </Link>
       </div>
       <section className="section-block" aria-labelledby="capabilities">
-        <p className="eyebrow">{copy.capabilityMap}</p>
-        <h2 id="capabilities">{copy.shortestPath}</h2>
-        <div className="capability-grid">
-          <Link className="capability-item" to={domainPath(locale, 'docs', STARTER_LIBRARY)}>
-            <strong>{copy.foundation}</strong>
-            <span>{copy.foundationText}</span>
-          </Link>
-          <Link className="capability-item" to={domainPath(locale, 'guides', STARTER_LIBRARY)}>
-            <strong>{copy.runtime}</strong>
-            <span>{copy.runtimeText}</span>
-          </Link>
-          <Link className="capability-item" to={domainPath(locale, 'docs', 'store-light')}>
-            <strong>{copy.stateStorage}</strong>
-            <span>{copy.stateStorageText}</span>
-          </Link>
-          <Link className="capability-item" to={domainPath(locale, 'architecture', 'rpc-core')}>
-            <strong>{copy.integration}</strong>
-            <span>{copy.integrationText}</span>
-          </Link>
+        <p className="eyebrow">{copy.scenarios}</p>
+        <h2 id="capabilities">{copy.scenarioTitle}</h2>
+        <div className="capability-grid home-scenarios">
+          {copy.homeScenarios.map((scenario) => (
+            <article className="capability-item" key={scenario.title}>
+              <strong>{scenario.title}</strong>
+              <p>{scenario.body}</p>
+              <nav className="actions home-scenario-links" aria-label={scenario.title}>
+                {scenario.libraries.map((library) => (
+                  <Link
+                    className="text-link"
+                    key={library}
+                    to={domainPath(locale, 'docs', library)}
+                  >
+                    {library}
+                  </Link>
+                ))}
+              </nav>
+            </article>
+          ))}
         </div>
       </section>
       <section className="section-block split-block" aria-labelledby="quickstart">
@@ -93,8 +89,12 @@ function Language({ params }: ILanguageRouteProps) {
             <span>{copy.capabilityPluginHostText}</span>
           </Link>
           <Link className="capability-item" to={domainPath(locale, 'architecture', 'rpc-core')}>
-            <strong>{copy.webRpcSerialize}</strong>
-            <span>{copy.webRpcSerializeText}</span>
+            <strong>{copy.rpcPeerSerialize}</strong>
+            <span>{copy.rpcPeerSerializeText}</span>
+          </Link>
+          <Link className="capability-item" to={domainPath(locale, 'architecture', 'tray')}>
+            <strong>{copy.traySupervision}</strong>
+            <span>{copy.traySupervisionText}</span>
           </Link>
         </div>
       </section>
